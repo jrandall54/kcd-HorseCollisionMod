@@ -2,9 +2,9 @@
 <kcd_mod>
   <info>
     <name>HorseCollisionMod</name>
-    <description>Allows for ragdoll and collisions with NPCs while on horseback. Includes toggles for damage and crime.</description>
-    <author>Antigravity</author>
-    <version>1.0.0</version>
+    <description>Adds visceral physical collision and ragdolling to NPCs when impacted by a sprinting horse.</description>
+    <author>jrandall54</author>
+    <version>1.2.0</version>
     <created_on>2026-08-22</created_on>
   </info>
   <supports>

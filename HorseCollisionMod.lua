@@ -3,14 +3,11 @@ HorseCollisionMod = {}
 HorseCollisionMod.Config = {
 	SpeedThreshold = 2.0,
 	HitRadius = 2.5,
-	DamageMultiplier = 15.0,
-	CooldownMs = 3000,
-	EnableCrime = false,
-	EnableDamage = true
+	Knockback = 50.0,
+	Uplift = 30.0
 }
 
 HorseCollisionMod.RecentHits = {}
-HorseCollisionMod.TimerId = nil
 
 local function GetTimeMs()
 	return System.GetCurrTime() * 1000
@@ -24,53 +21,50 @@ end
 function HorseCollisionMod:TriggerRagdoll(npc, velocity, speed, horseEnt, playerEnt)
 	local npcId = tostring(npc.id)
 	local now = GetTimeMs()
-	
-	if self.RecentHits[npcId] and (now - self.RecentHits[npcId]) < self.Config.CooldownMs then
-		return
-	end
+	if self.RecentHits[npcId] and (now - self.RecentHits[npcId]) < 3000 then return end
 	self.RecentHits[npcId] = now
 	
 	System.LogAlways("[HorseCollisionMod] EXECUTING COLLISION ON " .. tostring(npc:GetName()))
 	
-	local damage = self.Config.DamageMultiplier * speed
-	if not self.Config.EnableDamage then damage = 0 end
-	
-	local theShooter = playerEnt
-	if not self.Config.EnableCrime then theShooter = nil end
-
-	local hit = {
-		dir = velocity or {x=0,y=0,z=0},
-		damage = damage,
-		target = npc,
-		shooter = theShooter,
-		weapon = horseEnt, 
-		typeId = 0,
-		knocksDownLeg = true,
-		knocksDown = true,
-		partId = -1,
-		materialId = 0
-	}
-	
-	local success, err = pcall(function()
-		if npc.Server and type(npc.Server.OnHit) == "function" then
-			npc.Server.OnHit(npc, hit)
-		end
-	end)
-	
-	if not success then
-		System.LogAlways("[HorseCollisionMod] ERROR IN ONHIT: " .. tostring(err))
-	end
-	
 	pcall(function()
 		if npc.actor then
-			npc.actor:Fall(velocity or {x=0,y=0,z=0}, true)
+			npc.actor:Fall({x=0,y=0,z=0}, true)
 		end
 	end)
+	
+	local k_back = self.Config.Knockback
+	local k_up = self.Config.Uplift
+	
+	if k_back > 0 or k_up > 0 then
+		pcall(function()
+			local hitPos = {x=0,y=0,z=0}
+			if npc.GetPos then hitPos = npc:GetPos() end
+			hitPos.z = hitPos.z + 1.0
+			
+			local dir = {x=1, y=0, z=0}
+			if speed > 0 and velocity then
+				dir.x = velocity.x / speed
+				dir.y = velocity.y / speed
+				dir.z = 0
+			end
+			
+			local combined = { x = dir.x * k_back, y = dir.y * k_back, z = k_up }
+			local impulseMag = math.sqrt((combined.x * combined.x) + (combined.y * combined.y) + (combined.z * combined.z))
+			
+			if npc.AddImpulse and impulseMag > 0 then
+				local normDir = { x = combined.x / impulseMag, y = combined.y / impulseMag, z = combined.z / impulseMag }
+				System.LogAlways("[HorseCollisionMod] Applying Knockback Impulse Mag: " .. tostring(impulseMag) .. " to " .. tostring(npc:GetName()))
+				
+				Script.SetTimer(50, function()
+					pcall(function() npc:AddImpulse(-1, hitPos, normDir, impulseMag, 1) end)
+				end)
+			end
+		end)
+	end
 end
 
 function HorseCollisionMod:SafeUpdate()
 	if type(player) == "nil" or (not player) or type(player.human) == "nil" or type(player.player) == "nil" then return end
-	
 	local isMounted = false
 	pcall(function() isMounted = player.human:IsMounted() end)
 	if not isMounted then return end
@@ -116,9 +110,9 @@ function HorseCollisionMod:SafeUpdate()
 	end
 end
 
-function HorseCollisionMod:UpdateTimer()
-	if not self.HasStartedTimer then return end
-	Script.SetTimer(100, function() HorseCollisionMod:UpdateTimer() end)
+function HorseCollisionMod:UpdateTimer(assignedTick)
+	if self.TimerTick ~= assignedTick then return end
+	Script.SetTimer(100, function() HorseCollisionMod:UpdateTimer(assignedTick) end)
 	local success, err = pcall(function() self:SafeUpdate() end)
 	if not success then
 		System.LogAlways("[HorseCollisionMod] CRITICAL ERROR IN UPDATE TIMER: " .. tostring(err))
@@ -127,15 +121,14 @@ end
 
 function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 	if actionName == "sys_loadingimagescreen" and eventName == "OnEnd" then
-		if not self.HasStartedTimer then
-			self.HasStartedTimer = true
-			System.LogAlways("[HorseCollisionMod] Load screen ended. Initializing physics timer.")
-			Script.SetTimer(100, function() HorseCollisionMod:UpdateTimer() end)
-		end
+		self.TimerTick = (self.TimerTick or 0) + 1
+		local currentTick = self.TimerTick
+		System.LogAlways("[HorseCollisionMod] Load screen ended. Initializing physics timer loop " .. tostring(currentTick))
+		Script.SetTimer(100, function() HorseCollisionMod:UpdateTimer(currentTick) end)
 	end
 end
 
-System.LogAlways("[HorseCollisionMod] TOP OF FILE REACHED")
+System.LogAlways("[HorseCollisionMod] TOP OF FILE REACHED (Release 1.2.0)")
 
 if type(UIAction) == "table" and type(UIAction.RegisterActionListener) == "function" then
     UIAction.RegisterActionListener(HorseCollisionMod, "", "", "uiActionListener")

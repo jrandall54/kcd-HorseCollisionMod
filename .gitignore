@@ -1,11 +1,10 @@
-# Build artifacts
+/build/
+/releases/
+/references/
+/temp_*/
+/vanilla_scripts/
 *.pak
 *.zip
-
-# IDE and OS Files
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
-ehthumbs.db
 *.log
+.idea/
+.VSCode/
