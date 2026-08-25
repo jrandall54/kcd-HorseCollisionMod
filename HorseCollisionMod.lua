@@ -5,7 +5,8 @@ HorseCollisionMod.Config = {
 	HitRadius = 2.5,
 	Knockback = 50.0,
 	Uplift = 30.0,
-	ProtectMutt = true
+	ProtectMutt = true,
+	StaminaDrain = 25.0
 }
 
 HorseCollisionMod.RecentHits = {}
@@ -15,6 +16,7 @@ local function GetTimeMs()
 end
 
 local function GetVectorLength(v)
+	
 	if not v then 
 		return 0 
 	end
@@ -41,17 +43,18 @@ function HorseCollisionMod:TriggerRagdoll(npc, velocity, speed, horseEnt, player
 	
 	local k_back = self.Config.Knockback
 	local k_up = self.Config.Uplift
+	local staminaDrain = self.Config.StaminaDrain
 	
 	if k_back > 0 or k_up > 0 then
 		pcall(function()
 			local hitPos = {x=0,y=0,z=0}
+			local dir = {x=1, y=0, z=0}
 			
 			if npc.GetPos then 
 				hitPos = npc:GetPos() 
 			end
 
 			hitPos.z = hitPos.z + 1.0
-			local dir = {x=1, y=0, z=0}
 			
 			if speed > 0 and velocity then
 				dir.x = velocity.x / speed
@@ -63,6 +66,7 @@ function HorseCollisionMod:TriggerRagdoll(npc, velocity, speed, horseEnt, player
 			local impulseMag = math.sqrt((combined.x * combined.x) + (combined.y * combined.y) + (combined.z * combined.z))
 			
 			if npc.AddImpulse and impulseMag > 0 then
+				
 				local normDir = { x = combined.x / impulseMag, y = combined.y / impulseMag, z = combined.z / impulseMag }
 
 				System.LogAlways("[HorseCollisionMod] Applying Knockback Impulse Mag: "
@@ -77,6 +81,27 @@ function HorseCollisionMod:TriggerRagdoll(npc, velocity, speed, horseEnt, player
 			end
 		end)
 	end
+	
+	if staminaDrain > 0 and horseEnt and playerEnt then
+		pcall(function()
+			if horseEnt.soul and playerEnt.actor and playerEnt.human then
+				
+				local currentStamina = horseEnt.soul:GetState("stamina")
+				
+				if currentStamina then
+					
+					horseEnt.soul:DealDamage(0, staminaDrain, nil, true)
+					local newStamina = currentStamina - staminaDrain
+					
+					if newStamina <= 0 then
+						
+						System.LogAlways("[HorseCollisionMod] Horse ran out of stamina! Ragdolling rider.")
+						playerEnt.actor:Fall({x=0,y=0,z=0}, true)
+					end
+				end
+			end
+		end)
+	end
 end
 
 function HorseCollisionMod:SafeUpdate()
@@ -87,6 +112,7 @@ function HorseCollisionMod:SafeUpdate()
 	end
 	
 	local isMounted = false
+	
 	pcall(function() 
 		isMounted = player.human:IsMounted() 
 	end)
@@ -96,6 +122,7 @@ function HorseCollisionMod:SafeUpdate()
 	end
 	
 	local horseWuid = nil
+	
 	pcall(function() 
 		horseWuid = player.player:GetPlayerHorse() 
 	end)
@@ -105,6 +132,7 @@ function HorseCollisionMod:SafeUpdate()
 	end
 	
 	local horseEnt = nil
+	
 	pcall(function() 
 		horseEnt = XGenAIModule.GetEntityByWUID(horseWuid) 
 	end)
@@ -114,6 +142,7 @@ function HorseCollisionMod:SafeUpdate()
 	end
 	
 	local velocity = nil
+	
 	pcall(function()
 		if horseEnt.GetVelocity then 
 			velocity = horseEnt:GetVelocity() 
@@ -126,6 +155,7 @@ function HorseCollisionMod:SafeUpdate()
 	local speed = GetVectorLength(velocity)
 	
 	if speed >= self.Config.SpeedThreshold then
+		
 		local horsePos = nil
 
 		pcall(function()
@@ -145,10 +175,13 @@ function HorseCollisionMod:SafeUpdate()
 		if type(hitEnts) == "table" then
 			for _, ent in pairs(hitEnts) do
 				if ent and type(ent) == "table" and ent.id and ent.id ~= player.id and ent.id ~= horseEnt.id then
+					
 					local isMutt = false
 					
 					pcall(function()
+						
 						local entName = ent:GetName()
+						
 						if entName and string.find(entName, "dogCompanion") then
 							isMutt = true
 						end
@@ -157,6 +190,7 @@ function HorseCollisionMod:SafeUpdate()
 					local isProtected = (self.Config.ProtectMutt and isMutt)
 
 					if not isProtected then
+						
 						local isHuman = false
 
 						pcall(function()
@@ -166,6 +200,7 @@ function HorseCollisionMod:SafeUpdate()
 						end)
 						
 						if isHuman and ent.actor then
+							
 							local isDead = false
 
 							if ent.IsDead then
@@ -205,8 +240,10 @@ end
 
 function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 	if actionName == "sys_loadingimagescreen" and eventName == "OnEnd" then
-		self.TimerTick = (self.TimerTick or 0) + 1
-		local currentTick = self.TimerTick
+		
+		local currentTick = (self.TimerTick or 0) + 1
+		
+		self.TimerTick = currentTick
 		
 		System.LogAlways("[HorseCollisionMod] Load screen ended. Initializing physics timer loop "
 				.. tostring(currentTick))
@@ -217,11 +254,11 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 	end
 end
 
-System.LogAlways("[HorseCollisionMod] TOP OF FILE REACHED (Release 1.2.0)")
+System.LogAlways("[HorseCollisionMod] TOP OF FILE REACHED (Release 1.3.0)")
 
 if type(UIAction) == "table" and type(UIAction.RegisterActionListener) == "function" then
-    UIAction.RegisterActionListener(HorseCollisionMod, "", "", "uiActionListener")
-    System.LogAlways("[HorseCollisionMod] Registered via UIAction!")
+	UIAction.RegisterActionListener(HorseCollisionMod, "", "", "uiActionListener")
+	System.LogAlways("[HorseCollisionMod] Registered via UIAction!")
 else
-    System.LogAlways("[HorseCollisionMod] FATAL: UIAction IS NIL! Cannot register!")
+	System.LogAlways("[HorseCollisionMod] FATAL: UIAction IS NIL! Cannot register!")
 end
