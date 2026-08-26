@@ -180,6 +180,25 @@ if (-not $NoLooseScript) {
 }
 
 if ($Launch) {
+	# The UAC prompt on every launch is not Windows being cautious about an
+	# unknown publisher on its own account. It is the RUNASADMIN compatibility
+	# layer, set per user for this executable, forcing elevation. The game does
+	# not ask for it: its own manifest requests asInvoker, and the whole game
+	# folder is user writable. Vortex and various setup guides set this flag, so
+	# it can come back; the check is here rather than being a one-time fix.
+	$layerKey = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+	$layers = $null
+
+	if (Test-Path $layerKey) {
+		$layers = (Get-ItemProperty -Path $layerKey -Name $exe -ErrorAction SilentlyContinue).$exe
+	}
+
+	if ($layers -and $layers -match "RUNASADMIN") {
+		Write-Host "[DEPLOY] note: RUNASADMIN is set for the game, so Windows will" -ForegroundColor Yellow
+		Write-Host "         ask for elevation on every launch. To clear just this app:"
+		Write-Host "         Properties > Compatibility > untick 'Run this program as an administrator'"
+	}
+
 	if (-not (Test-Path $exe)) {
 		Write-Host "[DEPLOY] game executable not found at $exe" -ForegroundColor Red
 		exit 1
