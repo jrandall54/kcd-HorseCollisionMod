@@ -19,7 +19,8 @@ param (
 	[switch]$Launch,
 	[switch]$ParkVortexMod,
 	[switch]$NoDevMode,
-	[switch]$NoLooseScript
+	[switch]$NoLooseScript,
+	[switch]$ScriptOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +41,29 @@ $devDir = Join-Path $modsDir $devMod
 if (-not (Test-Path $gameRoot)) {
 	Write-Host "[DEPLOY] game not found at $gameRoot" -ForegroundColor Red
 	exit 1
+}
+
+# The inner loop: push only the loose script, then reload it from the console.
+# This deliberately skips the running-game guard below, because that guard is
+# about the pak, which the engine holds open. A loose .lua is not locked, so it
+# can be replaced under a running game and picked up by:
+#
+#     python dev_console.py --reload
+#
+if ($ScriptOnly) {
+	# Under Data, not the game root. sys_game_folder is "Data", so that is where
+	# the engine's file system is rooted: a loose script one level higher is
+	# never found. The failure is quiet, because "Loading and executing script
+	# file" is logged before the read is attempted and a miss logs nothing.
+	$looseDir = Join-Path $gameRoot "Data\Scripts\Startup"
+
+	New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
+	Copy-Item "HorseCollisionMod.lua" `
+		-Destination (Join-Path $looseDir "HorseCollisionMod.lua") -Force
+
+	Write-Host "[DEPLOY] loose script updated. Reload it with:" -ForegroundColor Green
+	Write-Host "         python dev_console.py --reload"
+	exit 0
 }
 
 # Read the version from the manifest when none is given, so the two cannot
@@ -153,7 +177,11 @@ Write-Host "[DEPLOY] load order: $($order -join ' -> ')"
 # the same packed bytes. The check below says so rather than leaving a silent
 # no-op to be discovered later.
 if (-not $NoLooseScript) {
-	$looseDir = Join-Path $gameRoot "Scripts\Startup"
+	# Under Data, not the game root. sys_game_folder is "Data", so that is where
+	# the engine's file system is rooted: a loose script one level higher is
+	# never found. The failure is quiet, because "Loading and executing script
+	# file" is logged before the read is attempted and a miss logs nothing.
+	$looseDir = Join-Path $gameRoot "Data\Scripts\Startup"
 	$loosePath = Join-Path $looseDir "HorseCollisionMod.lua"
 
 	New-Item -ItemType Directory -Force -Path $looseDir | Out-Null

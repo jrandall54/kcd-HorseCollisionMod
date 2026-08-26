@@ -98,23 +98,44 @@ re-reads the same packed bytes and nothing changes. The CVar is flagged
 
 `system.cfg` therefore now carries `sys_PakPriority = 0`, loose files first,
 which takes effect on the next restart. `dev_deploy.ps1` writes the script loose
-to `<game>\Scripts\Startup\HorseCollisionMod.lua` alongside the pak, and warns if
-the CVar is not 0 rather than leaving a silent no-op to be found later.
-`-NoLooseScript` skips it.
+alongside the pak, and warns if the CVar is not 0 rather than leaving a silent
+no-op to be found later. `-NoLooseScript` skips it.
 
 The packed copy inside the pak is untouched and remains what ships. The loose
 file is only what the running game reads first.
+
+### Loose files go under Data
+
+`sys_game_folder` is `Data`, so the engine's file system is rooted at
+`<game>\Data`. A loose script belongs at
+
+```
+<game>\Data\Scripts\Startup\HorseCollisionMod.lua
+```
+
+One level higher is never found, and the failure is silent: "Loading and
+executing script file" is logged **before** the read is attempted, and a miss
+logs nothing at all. That reads exactly like a script that loaded and did
+nothing, which cost a round of wrong diagnosis. Confirmed by reloading a probe
+script that existed only as a loose file: under `Data` it executed and printed,
+one level up it did not.
 
 ## The loop
 
 ```
 .\dev_deploy.ps1 -Launch          once, at the start of a session
+
                                   edit HorseCollisionMod.lua
+.\dev_deploy.ps1 -ScriptOnly      push the script to the running game
 python dev_console.py --reload    new code live, keep playing
 ```
 
-Animation data changes need `--anim-reload` as well, and a rebuild first, since
-the ADB files live in the pak rather than loose.
+`-ScriptOnly` deliberately skips the running-game guard, because that guard is
+about the pak, which the engine holds open. A loose `.lua` is not locked and can
+be replaced underneath a running game.
+
+Animation data changes need a rebuild and `--anim-reload`, since the ADB files
+live in the pak rather than loose.
 
 ## Watch out for
 
