@@ -134,6 +134,31 @@ python dev_console.py --reload    new code live, keep playing
 about the pak, which the engine holds open. A loose `.lua` is not locked and can
 be replaced underneath a running game.
 
+### Reloading has to restart the detection loop
+
+Re-executing the script is not enough on its own. The mod's loop is started only
+by its UI listener when a loading screen ends, because a Startup script has no
+"game loaded" hook. A reload rebuilds the `HorseCollisionMod` table with
+`TimerTick` unset, so the loop still running from before sees its generation no
+longer match and stops, and nothing starts a new one. The mod goes silent and
+the game looks completely vanilla until a save is loaded.
+
+`--reload` therefore calls the entry point directly afterwards, which stands in
+for that loading screen:
+
+```
+#HorseCollisionMod:uiActionListener('sys_loadingimagescreen', 'OnEnd', nil)
+```
+
+A successful reload now ends with the mod announcing its new loop:
+
+```
+[log] [HorseCollisionMod] Load screen ended. v2.0.0 initializing physics timer loop 1
+```
+
+Both console Lua prefixes, `#` and `!`, work once the game is in dev mode. They
+do nothing without it, which is what made `#` look broken earlier.
+
 Animation data changes need a rebuild and `--anim-reload`, since the ADB files
 live in the pak rather than loose.
 

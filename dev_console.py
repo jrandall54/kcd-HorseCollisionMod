@@ -99,6 +99,17 @@ MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
 # of the first can be told apart from a failure of the mechanism.
 RELOAD_COMMANDS = [
     "lua_reload_script " + MOD_SCRIPT,
+    # Re-executing the script is not enough on its own. The mod's detection
+    # loop is only started by its UI listener when a loading screen ends,
+    # because a Startup script has no "game loaded" hook to hang off. Reloading
+    # rebuilds the HorseCollisionMod table with TimerTick unset, so the loop
+    # still running from before sees its generation no longer matches and stops
+    # -- and nothing starts a new one. The mod goes silent and the game looks
+    # completely vanilla until a save is loaded.
+    #
+    # Calling the entry point directly stands in for that loading screen, which
+    # bumps the generation and starts a fresh loop running the new code.
+    "#HorseCollisionMod:uiActionListener('sys_loadingimagescreen', 'OnEnd', nil)",
 ]
 
 # The animation half. Mannequin owns the databases the stagger options live in,
