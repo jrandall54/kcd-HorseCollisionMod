@@ -1789,3 +1789,22 @@ touches the fragment every stagger uses.
 itself interrupting the smart object activity that owns the item, in which case the place to
 look is the `panicDrop` recovery paths in `so_slot.xml` and `so_tool.xml` and whether the
 action can be started without cancelling the activity.
+
+### Result
+
+**Tested in game.** The basket stays in her hands through the stagger. Removing the
+`ColliderMode` layer was the fix, and the `UseHand` hypothesis recorded earlier would have
+been the wrong change.
+
+Two qualifications, both from the same test:
+
+**It looks slightly glitchy.** The clip is a hit reaction authored for someone with empty
+hands, so the arms swing through a pose the basket was never meant to follow. The item is
+kept rather than lost, which is the behavior that matters, but it does not read as natural.
+Fixing that properly means either a carried-item variant of the reaction or declaring the
+carry tag on the fragment, and neither is worth doing before the tooling makes iteration
+cheap.
+
+**The drop still happens at trot and gallop.** Those tiers use the physics ragdoll, not this
+fragment, so they were never covered by this change and the behavior predates 2.0.0. That is
+a separate issue against the ragdoll path and should not be folded into this one.
