@@ -20,6 +20,10 @@ Known gaps carried into later phases:
 - [x] Female NPCs stagger too. `wh_female_fragmentids.xml` had no `AnimationControlled`
       fragment at all, so it is declared and the block added to their database.
 - [x] Detection reach narrowed to a horse-shaped footprint, tuned from 103 logged impacts.
+- [ ] NPCs carrying something (basket, bucket, sack) drop it when they stagger and walk off
+      without it. The stagger fragment declared a `ColliderMode` layer that the vanilla hit
+      reaction it should have been modeled on does not. Removed for 2.0.1, awaiting a test.
+      See the diary for the candidates ruled out along the way.
 - [ ] The horse and a staggering NPC can still push against each other instead of clearing
       past. Setting the animation's collider mode to `Disabled` did not resolve it, and it
       matches vanilla behavior when riding head-on into someone. Revisit with Phase 2

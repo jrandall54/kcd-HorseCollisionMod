@@ -76,20 +76,27 @@ STAGGERS = [
     ("hcm_stagger_right", "hitreaction_idle_medium_torso_stab_right"),
 ]
 
-# Collider mode held for the duration of the stagger.
+# Collider mode held for the duration of the stagger, or None to declare no
+# ColliderMode layer at all.
 #
-# The vanilla object-interaction options all use "Interactive", which keeps
-# the actor solid. That is right for someone standing at a cabinet and wrong
-# here: it makes the horse snag on a victim who is mid-stagger and cannot step
-# aside, which reads as getting stuck inside them. "Disabled" lets the horse
-# continue through for the second or so the animation lasts.
+# Build 2.0.0 shipped "Disabled" on the theory that it would stop the horse
+# snagging on a victim who is mid-stagger and cannot step aside. It did not,
+# and it is a departure from vanilla: the clips these options play live on the
+# HitDeath fragment in the stock database, and neither of the two options
+# there declares a ColliderMode layer. Disabling an actor's colliders while a
+# physicalized item is attached to their hand is the leading explanation for
+# NPCs dropping baskets and buckets when they stagger.
 #
-# Set back to "Interactive" if the pass-through looks worse than the snag.
-COLLIDER_MODE = "Disabled"
+# None therefore matches vanilla. Set to "Disabled" or "Interactive" only with
+# an in-game result to justify it.
+COLLIDER_MODE = None
 
-# Modeled on the vanilla cabinet_o option, minus the object-alignment,
-# camera and hand-usage layers, which only make sense against a physical
-# object. MovementControlMethod is kept so the animation drives the body.
+# Modeled on the vanilla HitDeath option that plays these same clips
+# (FragTags "so_forward+minor_hit"), rather than on an object interaction.
+# The camera layer is dropped because it aims the player's camera and the
+# victim here is never the player. MovementControlMethod is added so the
+# animation drives the body, which an interactive action needs and a natively
+# triggered hit reaction does not.
 TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
         <AnimLayer>
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
@@ -108,16 +115,18 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
               <Inertia value="0" />
             </ProceduralParams>
           </Procedural>
-        </ProcLayer>
+        </ProcLayer>{collider}
+      </Fragment>"""
+
+COLLIDER_LAYER = """
         <ProcLayer>
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
           <Procedural type="ColliderMode">
             <ProceduralParams>
-              <ColliderMode value="{collider}" />
+              <ColliderMode value="%s" />
             </ProceduralParams>
           </Procedural>
-        </ProcLayer>
-      </Fragment>"""
+        </ProcLayer>"""
 
 
 def read_pak_entry(pak, entry):
@@ -155,6 +164,18 @@ def newline_of(text):
     return "\n"
 
 
+def render_option(tags, clip, nl):
+    """Renders one Fragment option with the file's own line endings."""
+    collider = ""
+
+    if COLLIDER_MODE:
+        collider = COLLIDER_LAYER % COLLIDER_MODE
+
+    option = TEMPLATE.format(tags=tags, clip=clip, collider=collider)
+
+    return option.replace("\n", nl)
+
+
 def write_database():
     raw = read_pak_entry(PAK, ADB_ENTRY).decode("ascii", "replace")
     nl = newline_of(raw)
@@ -175,8 +196,7 @@ def write_database():
         raise SystemExit("AnimationControlled fragment not found")
 
     added = nl.join(
-        TEMPLATE.format(tags=tags, clip=clip, collider=COLLIDER_MODE).replace("\n", nl)
-        for tags, clip in STAGGERS)
+        render_option(tags, clip, nl) for tags, clip in STAGGERS)
     anchor = nl + "    </AnimationControlled>"
     patched = raw.replace(anchor, nl + added + anchor, 1)
 
@@ -242,8 +262,7 @@ def write_female():
         raise SystemExit("clips absent from the female database: %s" % missing)
 
     options = nl.join(
-        TEMPLATE.format(tags=tags, clip=clip, collider=COLLIDER_MODE).replace("\n", nl)
-        for tags, clip in STAGGERS)
+        render_option(tags, clip, nl) for tags, clip in STAGGERS)
     block = (nl + "    <AnimationControlled>"
              + nl + options
              + nl + "    </AnimationControlled>")

@@ -1707,3 +1707,85 @@ animation databases is not a small footprint.
 
 **Deferred to Phase 2 and beyond**: mass and armor scaling, Horsemanship, polearm bracing,
 morale, and the horse-NPC tangling when walking head-on into someone.
+
+---
+
+## Build 2.0.1-dev.1: carried items dropped during the stagger
+
+**Reported after 2.0.0 shipped**: a woman carrying a basket staggered, left the basket on
+the ground, and walked off without it.
+
+### The UseHand hypothesis was wrong
+
+The note written when this was first observed guessed that the cause was the `UseHand`
+procedural layer, which the stagger template dropped when it was modeled on vanilla's
+`cabinet_o` option. Reading the data says otherwise.
+
+`UseHand` appears in seven fragments in `kcd_male_database.adb` and nowhere else:
+`LedgeGrab`, `Door`, `Door_Locked`, `Door_LockUnlock`, `Door_CloseLock`, `Door_UnlockOpen`
+and `AnimationControlled`. Every one is an animation where the character needs their hands
+for something. No hit reaction declares it. So the layer means "this animation requires the
+hands", which is a reason for the engine to empty them, not to preserve what they hold.
+Adding it back would have been more likely to cause the drop than to fix it.
+
+### Two other candidates ruled out
+
+**The `hitReaction` message is not responsible.** `sb_switch_hitreactions.xml` does contain
+a path that matches the symptom exactly: on entering the `Hit` state it runs the `dropItems`
+tree from `sb_combat.xml`, which places every non-weapon held item on the ground, links it
+to the NPC with the tag `panicDrop` so a later activity can retrieve it, and then posts
+`daycycle:restartRequest` so the NPC abandons what they were doing. That whole block is
+gated behind the `Hit` state machine state. The `HitReactionType.Collision` branch this mod
+posts into only fires barks and an awareness impulse and never touches the state machine.
+
+Worth recording for later anyway: the gate is `!$b_context['suppressDaycycleRestartAfterHit']`,
+so there is a sanctioned context flag for turning that behavior off if a future build ever
+does put an NPC into the `Hit` state.
+
+**Scope displacement is not responsible.** Carrying is expressed as an override on
+`MotionMovement`, for example `tags="walk+r_basket"` with
+`scopes="FullBody+HoldItemLeft+HoldItemRight+HoldItem+Looking"`. The hold itself lives in
+the `HoldItemLeft` and `HoldItemRight` scopes, which are separate `AutoReinstall` fragments.
+`AnimationControlled` claims `FullBody+HoldItem+Looking` and never touches either.
+
+### What the template should have been modeled on
+
+`hitreaction_idle_medium_torso_stab_front` is not an orphan clip. It is an option on the
+vanilla `HitDeath` fragment under FragTags `so_forward+minor_hit`, which is where
+`GetImpactDir`'s `so_` prefix came from in the first place. That option is the correct model
+for ours, and it is much barer than `cabinet_o`:
+
+| Layer | vanilla `HitDeath` | 2.0.0 `AnimationControlled` |
+| --- | --- | --- |
+| AnimLayer | the clip | the clip |
+| `AnimateCamera` | yes | no |
+| `MovementControlMethod` | no | yes |
+| `ColliderMode` | no | `Disabled` |
+
+`ColliderMode="Disabled"` is the change under suspicion. Vanilla never disables an actor's
+colliders during a hit reaction, and a carried basket is a physicalized entity attached to
+the hand. It was added in the first place to stop the horse snagging on a victim who is
+mid-stagger, and this diary already records that it did not achieve that, so reverting it
+costs nothing that was working.
+
+`MovementControlMethod` is kept. An interactive action needs the animation to drive the body
+in a way a natively triggered hit reaction does not. The camera layer stays out because it
+aims the player's camera and the victim here is never the player.
+
+### The change
+
+`COLLIDER_MODE` in `build_adb.py` now accepts `None`, meaning declare no `ColliderMode`
+layer at all, and that is the new default. Setting it to `"Disabled"` or `"Interactive"`
+still works and should now require an in-game result to justify.
+
+**Hypothesis**: with no `ColliderMode` layer the victim stays physically as they are for the
+duration of the stagger, and whatever they are carrying stays in their hands.
+
+**To test**: find a woman carrying a basket, walk a horse into her, and watch the basket.
+Also worth confirming the stagger still plays and reads the same otherwise, since this
+touches the fragment every stagger uses.
+
+**If the basket still drops**, the remaining suspect is `StartInteractiveActionByName`
+itself interrupting the smart object activity that owns the item, in which case the place to
+look is the `panicDrop` recovery paths in `so_slot.xml` and `so_tool.xml` and whether the
+action can be started without cancelling the activity.
