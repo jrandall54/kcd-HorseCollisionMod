@@ -67,10 +67,30 @@ EVENT_NAMES = {
 
 LOG_EVENTS = (EV_LOG_MESSAGE, EV_LOG_WARNING, EV_LOG_ERROR)
 
-# The mod's script as the engine's file system names it. Script.ReloadScript is
-# what vanilla uses to pull a script back in at runtime; see the calls at the
-# top of Scripts/common.lua.
+# The mod's script as the engine's file system names it.
 MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
+
+# Reloading the mod's Lua without restarting. `lua_reload_script` is a native
+# console command this build registers, which is a better bet than driving
+# Script.ReloadScript through the "#" Lua prefix. Both are listed so a failure
+# of the first can be told apart from a failure of the mechanism.
+RELOAD_COMMANDS = [
+    "lua_reload_script " + MOD_SCRIPT,
+    '#Script.ReloadScript("%s")' % MOD_SCRIPT,
+]
+
+# Why no log line ever came back on the first working session. The remote
+# console forwards console output, and a shipping build generally has console
+# verbosity turned off, so there is nothing to forward even while the game is
+# writing plenty to kcd.log. con_restricted is cleared first in case it is what
+# refuses commands from a remote client.
+DIAGNOSE_COMMANDS = [
+    "con_restricted 0",
+    "log_Verbosity 4",
+    "log_IncludeTime 1",
+    "e_TimeOfDay",
+    "version",
+]
 
 
 def pack(event, payload=""):
@@ -168,11 +188,14 @@ class Console(object):
             self.alive = False
             return
 
-        if self.raw:
-            print("<< %r" % chunk)
-
         self.buffer = self.buffer + chunk
         messages, self.buffer = unpack(self.buffer)
+
+        # The server pings every frame, so a raw dump of the keepalives buries
+        # everything worth reading. Only dump a chunk that carries something
+        # other than requests and noops.
+        if self.raw and any(e not in (EV_REQ, EV_NOOP) for e, _ in messages):
+            print("<< %r" % chunk)
 
         for event, text in messages:
             self._answer()
@@ -232,6 +255,8 @@ def main():
     parser.add_argument("--commands", metavar="FILE", nargs="?",
                         const="console_commands.txt",
                         help="save the game's console command and CVar list")
+    parser.add_argument("--diagnose", action="store_true",
+                        help="try to turn on console output, then read it back")
     args = parser.parse_args()
 
     console = Console(raw=args.raw, quiet=args.quiet)
@@ -261,8 +286,12 @@ def main():
         console.close()
         return 0
 
-    if args.reload:
-        console.reload_mod()
+    if args.diagnose:
+        for command in DIAGNOSE_COMMANDS:
+            console.queue(command)
+    elif args.reload:
+        for command in RELOAD_COMMANDS:
+            console.queue(command)
     elif args.lua:
         console.lua(args.lua)
     elif args.command:
@@ -270,8 +299,13 @@ def main():
     else:
         return interactive(console)
 
-    # The command goes out on the server's next request, so the wait covers
-    # both the handshake and whatever the command prints afterwards.
+    # The wait is measured from when the queue actually drains, not from
+    # connect. The server sends its whole autocomplete list first, one entry
+    # per exchange, so a fixed deadline from connect can expire before the
+    # command has even gone out.
+    while console.alive and not console.drained():
+        console.pump()
+
     deadline = time.time() + args.wait
 
     while time.time() < deadline and console.alive:
