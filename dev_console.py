@@ -99,8 +99,20 @@ MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
 # of the first can be told apart from a failure of the mechanism.
 RELOAD_COMMANDS = [
     "lua_reload_script " + MOD_SCRIPT,
-    '#Script.ReloadScript("%s")' % MOD_SCRIPT,
 ]
+
+# The animation half. Mannequin owns the databases the stagger options live in,
+# so if either of these takes effect the ADB changes hotload too and animation
+# edits stop costing a restart. Untested: both are listed so a refusal can be
+# told apart from a reload that ran and did nothing.
+ANIM_RELOAD_COMMANDS = [
+    "mn_reload",
+    "wh_am_ReloadDB",
+]
+
+# The console refuses cheat-flagged commands unless the game was launched with
+# -devmode. Seeing this text back is the signal that the flag did not take.
+CHEAT_REFUSAL = "VF_CHEAT"
 
 # Why no log line ever came back on the first working session. The remote
 # console forwards console output, and a shipping build generally has console
@@ -158,6 +170,7 @@ class Console(object):
         self.commands = []
         self.autocomplete_done = False
         self.collecting = False
+        self.refusals = []
 
     def connect(self, timeout=5.0):
         self.sock = socket.create_connection((HOST, PORT), timeout=timeout)
@@ -245,6 +258,9 @@ class Console(object):
             if self.quiet and event not in LOG_EVENTS:
                 continue
 
+            if CHEAT_REFUSAL in text:
+                self.refusals.append(COLOUR_CODES.sub("", text).strip())
+
             label = EVENT_NAMES.get(event, "event-%d" % event)
             show("[%s] %s" % (label, COLOUR_CODES.sub("", text).strip()))
 
@@ -280,6 +296,8 @@ def main():
                         help="save the game's console command and CVar list")
     parser.add_argument("--diagnose", action="store_true",
                         help="try to turn on console output, then read it back")
+    parser.add_argument("--anim-reload", action="store_true",
+                        help="ask Mannequin to reload the animation databases")
     args = parser.parse_args()
 
     console = Console(raw=args.raw, quiet=args.quiet)
@@ -314,6 +332,9 @@ def main():
             console.queue(command)
     elif args.reload:
         for command in RELOAD_COMMANDS:
+            console.queue(command)
+    elif args.anim_reload:
+        for command in ANIM_RELOAD_COMMANDS:
             console.queue(command)
     elif args.lua:
         console.lua(args.lua)
