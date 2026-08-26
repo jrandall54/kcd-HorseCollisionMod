@@ -269,7 +269,12 @@ class Console(object):
                 show("[autocomplete] complete, %d entries" % len(self.commands))
                 continue
 
-            if event in (EV_REQ, EV_NOOP) and not self.raw:
+            # Keepalives are never printed as lines, not even under --raw. The
+            # server pings every frame, so a listening session shows hundreds of
+            # "[req]" a second and the log underneath is unreadable. --raw still
+            # dumps the bytes of any chunk that carries something real, which is
+            # what it is actually for.
+            if event in (EV_REQ, EV_NOOP):
                 continue
 
             if self.quiet and event not in LOG_EVENTS:
