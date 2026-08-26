@@ -17,7 +17,8 @@ param (
 	[string]$Version = "",
 	[switch]$NoBuild,
 	[switch]$Launch,
-	[switch]$ParkVortexMod
+	[switch]$ParkVortexMod,
+	[switch]$NoDevMode
 )
 
 $ErrorActionPreference = "Stop"
@@ -147,11 +148,27 @@ if ($Launch) {
 		exit 1
 	}
 
+	# Dev mode comes from the command line, not from a config file. The
+	# "sys_DevMode = 1" line in system.cfg does nothing: querying it over the
+	# remote console answers "Unknown command: sys_DevMode". Without -devmode the
+	# console refuses anything marked VF_CHEAT, which includes lua_reload_script.
+	$launchArgs = @()
+
+	if (-not $NoDevMode) {
+		$launchArgs = $launchArgs + "-devmode"
+	}
+
 	# Started with the executable's own folder as the working directory, which is
 	# what a double-click does. Note there are two user.cfg files in this install,
 	# one in the game root and one next to the executable, and which of them the
 	# engine picks up depends on this. Do not change it without checking that the
 	# graphics settings in Bin\Win64\user.cfg still apply.
-	Write-Host "[DEPLOY] launching..."
-	Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe -Parent)
+	Write-Host "[DEPLOY] launching $(if ($launchArgs) { $launchArgs -join ' ' } else { '(no flags)' })..."
+
+	if ($launchArgs) {
+		Start-Process -FilePath $exe -ArgumentList $launchArgs -WorkingDirectory (Split-Path $exe -Parent)
+	}
+	else {
+		Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe -Parent)
+	}
 }

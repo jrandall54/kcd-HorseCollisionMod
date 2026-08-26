@@ -1,10 +1,18 @@
 """Talks to the running game's remote console over TCP.
 
 CryEngine embeds a console server, and this build has it: with
-`log_EnableRemoteConsole = 1` alongside the `sys_DevMode = 1` already in
-system.cfg, the game listens on port 4600 and accepts console commands from
-outside the process. Because dev mode is on, a command beginning with "#" is
-evaluated as Lua, which is what makes this useful rather than merely tidy.
+`log_EnableRemoteConsole = 1` in system.cfg the game listens on port 4600,
+accepts console commands, and streams its console output back. Confirmed
+against the running game: `MemInfo` executed and echoed, and the mod's own
+telemetry arrived live while the game was being played.
+
+Two limits found the same way:
+
+  * Commands marked VF_CHEAT are refused, `lua_reload_script` among them.
+    Dev mode is what lifts that, and it comes from the **command line**
+    (`-devmode`), not from a config file. The `sys_DevMode = 1` line sitting
+    in system.cfg is inert: querying it answers "Unknown command".
+  * `wh_con_expr_prefix` is `!`, not `#`.
 
 The wire format, confirmed against the running game:
 
@@ -36,10 +44,25 @@ Setup, once, in the game's system.cfg:
 
 import argparse
 import collections
+import re
 import socket
 import sys
 import threading
 import time
+
+# CryEngine marks up console text with "$" followed by a colour digit. Left in,
+# a log line reads "$3MemInfo = $60 $5[]$4".
+COLOUR_CODES = re.compile(r"\$[0-9]")
+
+
+def show(text):
+    """Prints a line, flushing so a piped or redirected run is not silent.
+
+    Python block-buffers stdout when it is not a terminal, so a long listening
+    run that is stopped from outside prints nothing at all and looks like the
+    game sent nothing. That cost one wrong conclusion already.
+    """
+    print(text, flush=True)
 
 HOST = "127.0.0.1"
 PORT = 4600
@@ -170,7 +193,7 @@ class Console(object):
             self.sent = self.sent + 1
 
             if not self.quiet:
-                print(">> %s" % command)
+                show(">> %s" % command)
         else:
             self.sock.sendall(pack(EV_NOOP))
 
@@ -195,7 +218,7 @@ class Console(object):
         # everything worth reading. Only dump a chunk that carries something
         # other than requests and noops.
         if self.raw and any(e not in (EV_REQ, EV_NOOP) for e, _ in messages):
-            print("<< %r" % chunk)
+            show("<< %r" % chunk)
 
         for event, text in messages:
             self._answer()
@@ -207,13 +230,13 @@ class Console(object):
                 # bury the log, so it is collected and only counted here.
                 if self.collecting:
                     if len(self.commands) % 500 == 0:
-                        print("... %d console commands so far" % len(self.commands))
+                        show("... %d console commands so far" % len(self.commands))
 
                     continue
 
             if event == EV_AUTOCOMPLETE_DONE:
                 self.autocomplete_done = True
-                print("[autocomplete] complete, %d entries" % len(self.commands))
+                show("[autocomplete] complete, %d entries" % len(self.commands))
                 continue
 
             if event in (EV_REQ, EV_NOOP) and not self.raw:
@@ -223,7 +246,7 @@ class Console(object):
                 continue
 
             label = EVENT_NAMES.get(event, "event-%d" % event)
-            print("[%s] %s" % (label, text))
+            show("[%s] %s" % (label, COLOUR_CODES.sub("", text).strip()))
 
     def listen_forever(self):
         while self.alive:
