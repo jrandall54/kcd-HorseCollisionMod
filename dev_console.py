@@ -112,6 +112,9 @@ class Console(object):
         self.buffer = b""
         self.outbox = collections.deque()
         self.sent = 0
+        self.commands = []
+        self.autocomplete_done = False
+        self.collecting = False
 
     def connect(self, timeout=5.0):
         self.sock = socket.create_connection((HOST, PORT), timeout=timeout)
@@ -132,8 +135,15 @@ class Console(object):
     def drained(self):
         return not self.outbox
 
-    def _answer_request(self):
-        """The server asked. Reply with work if there is any, a noop if not."""
+    def _answer(self):
+        """Reply with queued work if there is any, a noop if there is not.
+
+        Called once for every packet received, not only for eCET_Req. The
+        server sends one packet and then waits: replying only to requests got
+        a single autocomplete entry and then silence, with the same result
+        whether the reply was a noop or a command, which rules out the reply's
+        content and leaves strict alternation as the explanation.
+        """
         if self.outbox:
             command = self.outbox.popleft()
             self.sock.sendall(pack(EV_CONSOLE_COMMAND, command))
@@ -165,13 +175,25 @@ class Console(object):
         messages, self.buffer = unpack(self.buffer)
 
         for event, text in messages:
-            if event == EV_REQ:
-                self._answer_request()
+            self._answer()
 
-                if not self.raw:
+            if event == EV_AUTOCOMPLETE_LIST:
+                self.commands.append(text)
+
+                # The list runs to thousands of entries. Printing it would
+                # bury the log, so it is collected and only counted here.
+                if self.collecting:
+                    if len(self.commands) % 500 == 0:
+                        print("... %d console commands so far" % len(self.commands))
+
                     continue
 
-            if event == EV_NOOP and not self.raw:
+            if event == EV_AUTOCOMPLETE_DONE:
+                self.autocomplete_done = True
+                print("[autocomplete] complete, %d entries" % len(self.commands))
+                continue
+
+            if event in (EV_REQ, EV_NOOP) and not self.raw:
                 continue
 
             if self.quiet and event not in LOG_EVENTS:
@@ -207,6 +229,9 @@ def main():
                         help="show only log lines")
     parser.add_argument("--wait", type=float, default=3.0,
                         help="seconds to keep reading after the command is sent")
+    parser.add_argument("--commands", metavar="FILE", nargs="?",
+                        const="console_commands.txt",
+                        help="save the game's console command and CVar list")
     args = parser.parse_args()
 
     console = Console(raw=args.raw, quiet=args.quiet)
@@ -223,6 +248,9 @@ def main():
         return 1
 
     print("connected to %s:%d" % (HOST, PORT))
+
+    if args.commands:
+        return collect_commands(console, args.commands)
 
     if args.listen:
         try:
@@ -254,6 +282,50 @@ def main():
         print("         re-run with --raw to see what it did send.")
 
     console.close()
+    return 0
+
+
+def collect_commands(console, path):
+    """Drains the autocomplete list the server sends on connect, and saves it.
+
+    That list is every console command and CVar the build registers. Having it
+    on disk answers questions this project keeps hitting from the other side,
+    such as which command loads a save or reloads animation data, without
+    guessing at names or reading them out of a strings dump.
+    """
+    console.collecting = True
+    idle = 0.0
+    last = 0
+
+    # There is no total to count down from, so the list is considered finished
+    # either when the server says so or when it stops sending for long enough.
+    while console.alive and not console.autocomplete_done and idle < 5.0:
+        before = len(console.commands)
+        console.pump()
+
+        if len(console.commands) > before:
+            idle = 0.0
+            last = len(console.commands)
+        else:
+            idle = idle + 0.5
+
+    console.close()
+
+    if not console.commands:
+        print("nothing collected. The server sent no autocomplete entries.")
+        return 1
+
+    entries = sorted(set(console.commands))
+
+    with open(path, "w", encoding="ascii", errors="replace") as handle:
+        handle.write("\n".join(entries) + "\n")
+
+    print("saved %d entries (%d unique) to %s" % (last, len(entries), path))
+
+    if not console.autocomplete_done:
+        print("note: the server never sent its end-of-list marker, so this")
+        print("      may be partial. Re-run to check the count is stable.")
+
     return 0
 
 
