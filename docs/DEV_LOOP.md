@@ -96,7 +96,28 @@ means pak-only: loose files on disk are ignored entirely. A reload therefore
 re-reads the same packed bytes and nothing changes. The CVar is flagged
 `REQUIRE_APP_RESTART` so it cannot be flipped live.
 
-To close the loop, `system.cfg` needs `sys_PakPriority = 0` (loose files first)
-and one restart. After that the deploy can write the script loose, an edit on
-disk is picked up by `--reload`, and only animation-data changes would need more
-than that.
+`system.cfg` therefore now carries `sys_PakPriority = 0`, loose files first,
+which takes effect on the next restart. `dev_deploy.ps1` writes the script loose
+to `<game>\Scripts\Startup\HorseCollisionMod.lua` alongside the pak, and warns if
+the CVar is not 0 rather than leaving a silent no-op to be found later.
+`-NoLooseScript` skips it.
+
+The packed copy inside the pak is untouched and remains what ships. The loose
+file is only what the running game reads first.
+
+## The loop
+
+```
+.\dev_deploy.ps1 -Launch          once, at the start of a session
+                                  edit HorseCollisionMod.lua
+python dev_console.py --reload    new code live, keep playing
+```
+
+Animation data changes need `--anim-reload` as well, and a rebuild first, since
+the ADB files live in the pak rather than loose.
+
+## Watch out for
+
+`Bin\Win64\user.cfg` sets `sys_PakStreamCache = 1` and `sys_preload = 1`. Those
+are aggressive caching settings and are the first suspects if a loose-file
+override does not take even at priority 0.
