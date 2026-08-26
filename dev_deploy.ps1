@@ -18,7 +18,8 @@ param (
 	[switch]$NoBuild,
 	[switch]$Launch,
 	[switch]$ParkVortexMod,
-	[switch]$NoDevMode
+	[switch]$NoDevMode,
+	[switch]$NoLooseScript
 )
 
 $ErrorActionPreference = "Stop"
@@ -141,6 +142,42 @@ $noBom = New-Object System.Text.UTF8Encoding($false)
 
 Write-Host "[DEPLOY] $Version installed to Mods\$devMod" -ForegroundColor Green
 Write-Host "[DEPLOY] load order: $($order -join ' -> ')"
+
+# The script also goes down loose, next to the game's own Scripts tree, so an
+# edit on disk can be picked up by `dev_console.py --reload` without a restart.
+# The packed copy inside the pak stays where it is and remains what ships; this
+# is only what the running game reads first.
+#
+# It only works with sys_PakPriority = 0 in system.cfg. The stock value is 2,
+# pak-only, under which loose files are ignored entirely and a reload re-reads
+# the same packed bytes. The check below says so rather than leaving a silent
+# no-op to be discovered later.
+if (-not $NoLooseScript) {
+	$looseDir = Join-Path $gameRoot "Scripts\Startup"
+	$loosePath = Join-Path $looseDir "HorseCollisionMod.lua"
+
+	New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
+	Copy-Item "HorseCollisionMod.lua" -Destination $loosePath -Force
+
+	Write-Host "[DEPLOY] script also placed loose at Scripts\Startup\ for hot reload"
+
+	$cfg = Join-Path $gameRoot "system.cfg"
+	$priority = $null
+
+	if (Test-Path $cfg) {
+		$match = Select-String -Path $cfg -Pattern '^\s*sys_PakPriority\s*=\s*(\d)' |
+			Select-Object -Last 1
+
+		if ($match) {
+			$priority = $match.Matches[0].Groups[1].Value
+		}
+	}
+
+	if ($priority -ne "0") {
+		Write-Host "[DEPLOY] warning: sys_PakPriority is '$priority', not 0." -ForegroundColor Yellow
+		Write-Host "         Loose files are ignored, so --reload will re-read the packed copy."
+	}
+}
 
 if ($Launch) {
 	if (-not (Test-Path $exe)) {
