@@ -53,11 +53,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 2.0.0
+-- @release 2.0.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "2.0.0"
+HorseCollisionMod.Version = "2.0.1"
 
 --- Tuning values. Safe to edit in place; nothing here is derived at runtime.
 --
