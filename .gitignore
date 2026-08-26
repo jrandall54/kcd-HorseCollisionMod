@@ -1,12 +1,23 @@
-/build/
+# Build output and generated files.
+#
+# Everything listed here is produced by building the project, so it exists in
+# any clone after the first build and would otherwise show up as untracked.
+
+# Staging directory used by build.ps1
+/build_temp/
+
+# Packaged mod artifacts
 /releases/
-/references/
-/temp_*/
-/vanilla_scripts/
+
+# Animation data generated from a local game install by build_adb.py
+/mod_assets/
+
 *.pak
 *.zip
 *.log
-.idea/
-.VSCode/
 
-.agent_instructions.md
+__pycache__/
+
+# Editor settings
+.idea/
+.vscode/

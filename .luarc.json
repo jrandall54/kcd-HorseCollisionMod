@@ -1,0 +1,39 @@
+{
+    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+
+    "runtime.version": "Lua 5.1",
+
+    "workspace.library": [
+        "docs"
+    ],
+
+    "workspace.ignoreDir": [
+        "references",
+        "vanilla_scripts",
+        "mod_assets",
+        "mod_xmls.disabled",
+        "releases",
+        "archived_dev_session_1",
+        "archived_dev_session_5"
+    ],
+
+    "diagnostics.globals": [
+        "HorseCollisionMod",
+        "System",
+        "Script",
+        "XGenAIModule",
+        "Framework",
+        "UIAction",
+        "player",
+        "g_localActor"
+    ],
+
+    "diagnostics.disable": [
+        "lowercase-global"
+    ],
+
+    "format.defaultConfig": {
+        "indent_style": "tab",
+        "max_line_length": "90"
+    }
+}
