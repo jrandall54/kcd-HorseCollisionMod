@@ -1,0 +1,306 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>HorseCollisionMod API</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#23201c;--mut:#6b6459;--line:#e3ddd2;--acc:#7a5c2e;
+--code:#f2ede3;--card:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{display:flex;max-width:1180px;margin:0 auto;gap:2.5rem;padding:0 1.5rem}
+nav{width:230px;flex:0 0 230px;position:sticky;top:0;align-self:flex-start;
+height:100vh;overflow-y:auto;padding:2rem 0;border-right:1px solid var(--line)}
+nav h2{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;
+color:var(--mut);margin:1.6rem 0 .5rem}
+nav a{display:block;padding:.2rem 0;color:var(--fg);text-decoration:none;
+font-size:.9rem}
+nav a:hover{color:var(--acc);text-decoration:underline}
+main{flex:1;min-width:0;padding:2rem 0 5rem}
+h1{font-size:1.9rem;margin:0 0 .3rem}
+.sub{color:var(--mut);margin:0 0 2rem;font-size:.92rem}
+h2{font-size:1.3rem;margin:2.8rem 0 .8rem;padding-bottom:.35rem;
+border-bottom:1px solid var(--line)}
+h3{font-size:1.02rem;margin:1.6rem 0 .5rem}
+p{margin:.7rem 0}
+code{background:var(--code);padding:.1em .35em;border-radius:3px;
+font:.88em ui-monospace,SFMono-Regular,Consolas,monospace}
+.item{background:var(--card);border:1px solid var(--line);border-radius:7px;
+padding:1.1rem 1.3rem;margin:1.1rem 0}
+.sig{font:.95rem ui-monospace,SFMono-Regular,Consolas,monospace;
+color:var(--acc);font-weight:600;margin:0 0 .5rem;word-break:break-word}
+table{border-collapse:collapse;width:100%;margin:.8rem 0;font-size:.9rem}
+th,td{text-align:left;padding:.4rem .6rem;border-bottom:1px solid var(--line);
+vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:.78rem;text-transform:uppercase;
+letter-spacing:.05em}
+td:first-child{font-family:ui-monospace,Consolas,monospace;white-space:nowrap}
+.ret{color:var(--mut);font-size:.9rem;margin:.5rem 0 0}
+ul{margin:.6rem 0;padding-left:1.2rem}
+li{margin:.25rem 0}
+@media(max-width:860px){.wrap{flex-direction:column;gap:0}
+nav{width:auto;flex:auto;position:static;height:auto;border-right:0;
+border-bottom:1px solid var(--line)}}
+</style></head><body><div class='wrap'>
+<nav><h2>Tables</h2>
+<a href='#t-Config'>Config</a>
+<a href='#t-HitReactionType'>HitReactionType</a>
+<a href='#t-HitReactionStrength'>HitReactionStrength</a>
+<a href='#t-RecentHits'>RecentHits</a>
+<h2>Functions</h2>
+<a href='#f-GetTimeMs'>GetTimeMs</a>
+<a href='#f-GetVectorLength'>GetVectorLength</a>
+<a href='#f-Log'>Log</a>
+<a href='#f-GetSpeedTier'>GetSpeedTier</a>
+<a href='#f-SendHitReaction'>SendHitReaction</a>
+<a href='#f-IsInHorseFootprint'>IsInHorseFootprint</a>
+<a href='#f-GetImpactDir'>GetImpactDir</a>
+<a href='#f-PlayStagger'>PlayStagger</a>
+<a href='#f-Ragdoll'>Ragdoll</a>
+<a href='#f-IsCombatCollision'>IsCombatCollision</a>
+<a href='#f-ThrowRider'>ThrowRider</a>
+<a href='#f-DrainHorseStamina'>DrainHorseStamina</a>
+<a href='#f-TriggerCollision'>TriggerCollision</a>
+<a href='#f-SafeUpdate'>SafeUpdate</a>
+<a href='#f-UpdateTimer'>UpdateTimer</a>
+<a href='#f-uiActionListener'>uiActionListener</a>
+</nav><main>
+<h1>HorseCollisionMod</h1>
+<p class='sub'>version 2.0.0 &middot; jrandall54</p>
+<p>Horse Collision Overhaul for Kingdom Come: Deliverance.</p>
+<p>Gives mounted collisions a reaction proportional to the horse&#x27;s gait. In vanilla, riding into an NPC produces only an audio bark and no animation at any speed. This module adds three tiers:</p>
+<ul>
+<li><strong>Walk</strong> - the NPC plays a full standing stagger animation and is not</li>
+<p>  knocked down. No health damage, and the vanilla bark still fires.</p>
+<li><strong>Trot</strong> - a physics ragdoll at reduced impulse.</li>
+<li><strong>Gallop</strong> - a physics ragdoll at full impulse.</li>
+</ul>
+<p>At trot and gallop the horse also loses stamina, and dismounts Henry when spent. That is the anti-bulldozing budget: riding through a crowd has to end with Henry on the ground rather than being a free way to scatter a dozen people.</p>
+<h3>How the walk stagger works</h3>
+<p>This part has no precedent in other KCD mods, so it is worth stating plainly. Lua cannot drive an NPC&#x27;s animation directly. Everything obvious was tried and fails silently: <code>human:PlayAnim</code> is accepted but never renders, physics impulses are ignored because actors are animation-driven, <code>soul:DealDamage</code> only moves stat numbers, and the <code>hitReaction</code> and <code>combat:hit</code> brain messages reach a behavior tree that cannot drive the body.</p>
+<p>What does work is <code>actor:StartInteractiveActionByName</code>, the call vanilla uses to make an actor mime opening a door. It takes over the body, plays a whole animation, and hands control back. Its name argument resolves against the FragTags of exactly one Mannequin fragment, <code>AnimationControlled</code>, where vanilla ships only object interactions.</p>
+<p>So the mod adds its own entries there. Four data files ship alongside this script, all generated by <code>build_adb.py</code>, and all four are required:</p>
+<ul>
+<li><code>kcd_male_database.adb</code> - adds <code>hcm_stagger_*</code> options pointing at</li>
+<p>   <code>hitreaction_idle_medium_torso_stab_*</code>, a standing hit reaction the game    already contains.</p>
+<li><code>kcd_animationControlledTags.xml</code> - declares those FragTags. An option</li>
+<p>   whose tag is not declared aborts after one frame.</p>
+<li><code>wh_female_fragmentids.xml</code> - declares <code>AnimationControlled</code> for women,</li>
+<p>   who have the same clips but no such fragment in vanilla.</p>
+<li><code>wh_female_database.adb</code> - the fragment block itself, added wholesale.</li>
+</ul>
+<p>See <code>docs/TESTING_DIARY.md</code> for the full investigation.</p>
+<h3>Limitations</h3>
+<ul>
+<li>Dogs and other animals do not react. They use separate animation</li>
+<p>  databases which this mod does not touch.</p>
+<li>Ships full replacements of the male and female animation databases, so</li>
+<p>  it conflicts with any mod that edits human animations.</p>
+</ul>
+<h2>Tables</h2>
+<div class='item' id='t-Config'>
+<p class='sig'>HorseCollisionMod.Config</p>
+<p>Tuning values. Safe to edit in place; nothing here is derived at runtime.</p>
+<table><tr><th>Field</th><th>Meaning</th></tr>
+<tr><td>SpeedWalk</td><td>lower bound of the walk tier, in meters per second</td></tr>
+<tr><td>SpeedTrot</td><td>lower bound of the trot tier</td></tr>
+<tr><td>SpeedGallop</td><td>lower bound of the gallop tier</td></tr>
+<tr><td>HitRadius</td><td>radius of the broad-phase sphere around the horse</td></tr>
+<tr><td>HorseFrontReach</td><td>how far ahead of the horse origin counts as a hit</td></tr>
+<tr><td>HorseRearReach</td><td>how far behind the horse origin counts as a hit</td></tr>
+<tr><td>HorseHalfWidth</td><td>lateral half-width of the horse footprint</td></tr>
+<tr><td>HorseMaxVerticalDiff</td><td>height difference above which a hit is ignored</td></tr>
+<tr><td>TickSeconds</td><td>detection interval, used to sweep the footprint forward</td></tr>
+<tr><td>SweepMultiplier</td><td>how far ahead to sweep, per meter per second</td></tr>
+<tr><td>MaxSweepExtra</td><td>cap on the forward sweep, in meters</td></tr>
+<tr><td>HitCooldownMs</td><td>minimum gap between reactions on the same victim</td></tr>
+<tr><td>Knockback</td><td>horizontal ragdoll impulse at full strength</td></tr>
+<tr><td>Uplift</td><td>vertical ragdoll impulse at full strength</td></tr>
+<tr><td>ProtectMutt</td><td>when true, Henry&#x27;s dog is never a valid victim</td></tr>
+<tr><td>StaminaDrainWalk</td><td>horse stamina cost per victim at walk</td></tr>
+<tr><td>StaminaDrainTrot</td><td>horse stamina cost per victim at trot</td></tr>
+<tr><td>StaminaDrainGallop</td><td>horse stamina cost per victim at gallop</td></tr>
+<tr><td>ThrowRiderOnStaminaEmpty</td><td>dismount Henry when the horse is spent</td></tr>
+<tr><td>CombatStaminaMultiplier</td><td>stamina cost multiplier while in a fight</td></tr>
+<tr><td>SuppressStaggerInCombat</td><td>skip the stagger animation during a fight</td></tr>
+<tr><td>SendHitReaction</td><td>post the native brain message so barks still fire</td></tr>
+<tr><td>WalkStagger</td><td>whether the walk tier plays a stagger animation</td></tr>
+<tr><td>LogTelemetry</td><td>write diagnostics to kcd.log</td></tr>
+</table>
+</div>
+<div class='item' id='t-HitReactionType'>
+<p class='sig'>HorseCollisionMod.HitReactionType</p>
+<p>Engine enum, transcribed from <code>Libs/AI/TypeDefinitions.xml</code>.</p>
+<p>The values are deliberately non-sequential; they mirror a C++ enum. The full set is kept rather than just the value used, so the contract stays verifiable against the engine.</p>
+</div>
+<div class='item' id='t-HitReactionStrength'>
+<p class='sig'>HorseCollisionMod.HitReactionStrength</p>
+<p>Engine enum, transcribed from <code>Libs/AI/TypeDefinitions.xml</code>.</p>
+<p>Ascending severity. <code>Tickle</code> and <code>Unpleasant</code> cost the victim no health.</p>
+</div>
+<div class='item' id='t-RecentHits'>
+<p class='sig'>HorseCollisionMod.RecentHits</p>
+<p>Time of the last reaction per victim, keyed by entity id.</p>
+</div>
+<h2>Functions</h2>
+<div class='item' id='f-GetTimeMs'>
+<p class='sig'>GetTimeMs()</p>
+<p>Current time in milliseconds.</p>
+<p class='ret'><strong>Returns</strong> <code>number</code> milliseconds since the game session started</p>
+</div>
+<div class='item' id='f-GetVectorLength'>
+<p class='sig'>GetVectorLength(v)</p>
+<p>Magnitude of a CryEngine vector.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>v</td><td><code>?table</code></td><td>vector with x, y and z components, or nil</td></tr>
+</table>
+<p class='ret'><strong>Returns</strong> <code>number</code> length, or 0 when v is nil</p>
+</div>
+<div class='item' id='f-Log'>
+<p class='sig'>Log(message)</p>
+<p>Writes a prefixed line to kcd.log when telemetry is enabled.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>message</td><td><code>string</code></td><td>text to log</td></tr>
+</table>
+</div>
+<div class='item' id='f-GetSpeedTier'>
+<p class='sig'>GetSpeedTier(speed)</p>
+<p>Resolves a speed to its gait name.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>speed</td><td><code>number</code></td><td>horse speed in meters per second</td></tr>
+</table>
+<p class='ret'><strong>Returns</strong> <code>string</code> one of &quot;Gallop&quot;, &quot;Trot&quot;, &quot;Walk&quot; or &quot;Idle&quot;</p>
+</div>
+<div class='item' id='f-SendHitReaction'>
+<p class='sig'>SendHitReaction(npc, horseWuid, strength)</p>
+<p>Posts the native <code>hitReaction</code> message to the victim&#x27;s brain.</p>
+<p>This is what makes the vanilla collision bark, perception and crime handling fire, so the reaction still feels like part of the game rather than something bolted on. It does <strong>not</strong> drive animation.</p>
+<p>Delivery is best effort. The receiving handler is declared <code>Atomic=&quot;true&quot;</code> and drops messages when busy, so nothing here may depend on a given message arriving.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>npc</td><td><code>table</code></td><td>victim entity</td></tr>
+<tr><td>horseWuid</td><td><code>userdata</code></td><td>WUID of the horse, sent as the attacker</td></tr>
+<tr><td>strength</td><td><code>number</code></td><td>a `HitReactionStrength` value</td></tr>
+</table>
+</div>
+<div class='item' id='f-IsInHorseFootprint'>
+<p class='sig'>IsInHorseFootprint(npc, horsePos, horseForward, speed)</p>
+<p>Tests whether a victim is actually under the horse.</p>
+<p>The sphere search is a broad-phase cull and nothing more. A horse is about two meters long and under a meter wide, so a sphere around its origin also catches people walking alongside or trailing behind it, which is what makes collisions feel like they reach too far.</p>
+<p>This narrows the sphere to an oriented box: the victim must be within the horse&#x27;s width laterally, between its rear and front reach along its facing, and at a comparable height. The front reach is extended by the distance the horse travels in one tick so that fast victims are not missed between frames.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>npc</td><td><code>table</code></td><td>victim entity</td></tr>
+<tr><td>horsePos</td><td><code>table</code></td><td>world position of the horse</td></tr>
+<tr><td>horseForward</td><td><code>table</code></td><td>horse facing, unit vector</td></tr>
+<tr><td>speed</td><td><code>number</code></td><td>horse speed in meters per second</td></tr>
+</table>
+<p class='ret'><strong>Returns</strong> <code>boolean</code> true when the victim is inside the footprint</p>
+</div>
+<div class='item' id='f-GetImpactDir'>
+<p class='sig'>GetImpactDir(npc, velocity, speed)</p>
+<p>Works out which side of the victim the impact lands on.</p>
+<p>The stagger clips are authored relative to the NPC&#x27;s facing, so the impact has to be expressed in the victim&#x27;s own frame. Using the horse&#x27;s frame instead makes NPCs stagger into the horse rather than away from it.</p>
+<p>The impact is derived from the horse&#x27;s <strong>direction of travel</strong>, not its position. Position is ambiguous at the moment of contact, when the horse is effectively on top of the victim and a centimeter either way flips the answer. Travel direction is stable, and it is what actually decides which side of the body is struck: a horse moving north hits the south face of whoever is in front of it.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>npc</td><td><code>table</code></td><td>victim entity</td></tr>
+<tr><td>velocity</td><td><code>table</code></td><td>horse velocity vector</td></tr>
+<tr><td>speed</td><td><code>number</code></td><td>horse speed in meters per second</td></tr>
+</table>
+<p class='ret'><strong>Returns</strong> <code>string</code> one of &quot;so_forward&quot;, &quot;so_back&quot;, &quot;so_left&quot;, &quot;so_right&quot;</p>
+</div>
+<div class='item' id='f-PlayStagger'>
+<p class='sig'>PlayStagger(npc, velocity, speed)</p>
+<p>Plays the walk-speed stagger on a victim.</p>
+<p>Calls <code>actor:StartInteractiveActionByName</code> with one of the <code>hcm_stagger_*</code> names this mod adds to the animation database. See the module header for why this is the only call that works.</p>
+<p>The return value reports whether the call was accepted, which is <strong>not</strong> the same as the animation playing: an unrecognized name is accepted and then aborts within a frame. Only in-game observation confirms playback.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>npc</td><td><code>table</code></td><td>victim entity</td></tr>
+<tr><td>velocity</td><td><code>table</code></td><td>horse velocity vector</td></tr>
+<tr><td>speed</td><td><code>number</code></td><td>horse speed in meters per second</td></tr>
+</table>
+<p class='ret'><strong>Returns</strong> <code>boolean</code> true when the call was accepted without error</p>
+</div>
+<div class='item' id='f-Ragdoll'>
+<p class='sig'>Ragdoll(npc, velocity, speed, impulseScale)</p>
+<p>Knocks a victim down with a physics ragdoll.</p>
+<p>Used at trot and gallop. <code>actor:Fall</code> switches the victim to a ragdoll, after which an impulse can be applied. Impulses are ignored on an upright, animation-driven actor, which is why the order matters and why the impulse is deferred by a tick.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>npc</td><td><code>table</code></td><td>victim entity</td></tr>
+<tr><td>velocity</td><td><code>table</code></td><td>horse velocity vector</td></tr>
+<tr><td>speed</td><td><code>number</code></td><td>horse speed in meters per second</td></tr>
+<tr><td>impulseScale</td><td><code>number</code></td><td>multiplier on the configured impulse, 0 to 1</td></tr>
+</table>
+</div>
+<div class='item' id='f-IsCombatCollision'>
+<p class='sig'>IsCombatCollision(npc)</p>
+<p>Whether this collision should count as a combat one.</p>
+<p>Two independent signals, because neither alone is reliable:</p>
+<ul>
+<li><code>player.soul:IsInCombatDanger()</code> is what vanilla scripts use, but it</li>
+<p>  reflects immediate danger rather than &quot;a fight is happening&quot;, and it was   observed reading false through a whole session the player described as   being in combat with guards. Mounted and moving, the player may simply   not be in danger at the instant of each impact.</p>
+<li>The victim having a weapon drawn. Townsfolk do not walk around armed, so</li>
+<p>  this catches the case the first signal misses: charging someone who is   actively fighting.</p>
+</ul>
+<p>Both raw values are logged so a disagreement between them is visible rather than being hidden behind a single boolean.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>npc</td><td><code>table</code></td><td>victim entity</td></tr>
+</table>
+<p class='ret'><strong>Returns</strong> <code>boolean</code> true when combat rules should apply</p>
+<p class='ret'><strong>Returns</strong> <code>string</code> diagnostic describing both signals</p>
+</div>
+<div class='item' id='f-ThrowRider'>
+<p class='sig'>ThrowRider(horseEnt, playerEnt)</p>
+<p>Throws the rider from the horse.</p>
+<p>Prefers the horse&#x27;s own <code>RearAndThrowDown</code>, which plays the animation of the animal rearing and unseating its rider. Falls back to ragdolling the player, which is what earlier builds did and which reads as the player simply collapsing rather than being thrown.</p>
+<p><code>RearAndThrowDown</code> is undocumented. It sits on the horse entity&#x27;s <code>horse</code> extension, alongside <code>HasRider</code> and <code>IsMountable</code>.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>horseEnt</td><td><code>table</code></td><td>the player&#x27;s horse entity</td></tr>
+<tr><td>playerEnt</td><td><code>table</code></td><td>the player entity</td></tr>
+</table>
+</div>
+<div class='item' id='f-DrainHorseStamina'>
+<p class='sig'>DrainHorseStamina(horseEnt, playerEnt, staminaDrain)</p>
+<p>Charges the horse for an impact and dismounts Henry when it is spent.</p>
+<p>Stamina is written with <code>soul:SetState</code>, never <code>soul:DealDamage</code>. That call takes <code>(stamina, health, attacker, ...)</code>  -  stamina first  -  even though vanilla&#x27;s own debug helper names the parameters health-first, so using it here silently injures the horse instead.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>horseEnt</td><td><code>table</code></td><td>the player&#x27;s horse entity</td></tr>
+<tr><td>playerEnt</td><td><code>table</code></td><td>the player entity</td></tr>
+<tr><td>staminaDrain</td><td><code>number</code></td><td>points of stamina to remove</td></tr>
+</table>
+</div>
+<div class='item' id='f-TriggerCollision'>
+<p class='sig'>TriggerCollision(npc, velocity, speed, horseEnt, playerEnt,)</p>
+<p>Applies the appropriate reaction for one collision.</p>
+<p>Enforces the per-victim cooldown, then dispatches on gait.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>npc</td><td><code>table</code></td><td>victim entity</td></tr>
+<tr><td>velocity</td><td><code>table</code></td><td>horse velocity vector</td></tr>
+<tr><td>speed</td><td><code>number</code></td><td>horse speed in meters per second</td></tr>
+<tr><td>horseEnt</td><td><code>table</code></td><td>the player&#x27;s horse entity</td></tr>
+<tr><td>playerEnt</td><td><code>table</code></td><td>the player entity</td></tr>
+<tr><td>horseWuid</td><td><code>userdata</code></td><td>WUID of the horse</td></tr>
+</table>
+</div>
+<div class='item' id='f-SafeUpdate'>
+<p class='sig'>SafeUpdate()</p>
+<p>One tick of collision detection.</p>
+<p>Bails out early unless the player is mounted and moving at least at walking pace, then tests every entity within <code>HitRadius</code> of the horse.</p>
+<p>Every engine call is wrapped in <code>pcall</code>, because entities can be unstreamed or partially initialized at any moment and an uncaught error would kill the timer loop for the rest of the session.</p>
+</div>
+<div class='item' id='f-UpdateTimer'>
+<p class='sig'>UpdateTimer(assignedTick)</p>
+<p>Reschedules itself every 100 ms and runs one detection tick.</p>
+<p>The tick number guards against duplicate loops. Each load screen starts a new loop, and any loop whose number no longer matches the current one stops on its next iteration, so reloading a save leaves no stale timers running.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>assignedTick</td><td><code>number</code></td><td>the loop generation this timer belongs to</td></tr>
+</table>
+</div>
+<div class='item' id='f-uiActionListener'>
+<p class='sig'>uiActionListener(actionName, eventName, argTable)</p>
+<p>UI event handler that serves as the mod&#x27;s entry point.</p>
+<p>A Startup script has no general &quot;game loaded&quot; hook available to it, so the end of the loading screen stands in for one.</p>
+<table><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>actionName</td><td><code>string</code></td><td>UI action that fired</td></tr>
+<tr><td>eventName</td><td><code>string</code></td><td>phase of that action</td></tr>
+<tr><td>argTable</td><td><code>table</code></td><td>event arguments, unused</td></tr>
+</table>
+</div>
+</main></div></body></html>
