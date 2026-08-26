@@ -114,6 +114,16 @@ ANIM_RELOAD_COMMANDS = [
 # -devmode. Seeing this text back is the signal that the flag did not take.
 CHEAT_REFUSAL = "VF_CHEAT"
 
+# Sent on every connection before anything else. Console verbosity is a runtime
+# value that resets with the game, so a session started after a restart is
+# silent until it is raised again; a run that relied on a previous session
+# having set it looked like the command had vanished. con_restricted is cleared
+# in the same breath since it is the other thing that can refuse input.
+SETUP_COMMANDS = [
+    "log_Verbosity 4",
+    "con_restricted 0",
+]
+
 # Why no log line ever came back on the first working session. The remote
 # console forwards console output, and a shipping build generally has console
 # verbosity turned off, so there is nothing to forward even while the game is
@@ -171,6 +181,7 @@ class Console(object):
         self.autocomplete_done = False
         self.collecting = False
         self.refusals = []
+        self.setup_count = 0
 
     def connect(self, timeout=5.0):
         self.sock = socket.create_connection((HOST, PORT), timeout=timeout)
@@ -180,6 +191,12 @@ class Console(object):
     def queue(self, command):
         """Queues a console command, sent on the server's next request."""
         self.outbox.append(command)
+
+    def setup(self):
+        """Queues the per-connection preamble that makes output readable."""
+        for command in SETUP_COMMANDS:
+            self.outbox.append(command)
+        self.setup_count = len(SETUP_COMMANDS)
 
     def lua(self, code):
         # sys_DevMode = 1 makes the console evaluate a leading "#" as Lua.
@@ -313,10 +330,12 @@ def main():
         print("  3. the game was restarted after that line was added")
         return 1
 
-    print("connected to %s:%d" % (HOST, PORT))
+    show("connected to %s:%d" % (HOST, PORT))
 
     if args.commands:
         return collect_commands(console, args.commands)
+
+    console.setup()
 
     if args.listen:
         try:
