@@ -1,9 +1,16 @@
 """Renders the mod's LDoc comments to a single self-contained HTML page.
 
-The doc comments in HorseCollisionMod.lua are written in standard LDoc
-syntax, so `ldoc HorseCollisionMod.lua` produces the same content if a Lua
-toolchain is installed. This script exists so the API page can be regenerated
-without one, since the project otherwise needs no Lua on the build machine.
+**This is not LDoc.** LDoc is the standard Lua documentation generator, and
+`config.ld` at the repository root configures the project for it; `ldoc .`
+is the canonical way to build docs/api/. Installing LDoc needs a C compiler,
+because it depends on penlight which depends on luafilesystem.
+
+This script is a stand-in for when that is not set up. It reads the same
+standard LDoc tags out of the same file and writes to the same place, but it
+implements only the tags this project actually uses (@module, @author,
+@release, @table, @field, @tparam, @treturn) and its HTML is its own. Output
+will not be byte-identical to LDoc's, and anything relying on LDoc features
+beyond those tags will simply not appear.
 
 Run: python docs/generate_api_docs.py
 Output: docs/api/index.html
@@ -14,8 +21,11 @@ import io
 import os
 import re
 
-SOURCE = "HorseCollisionMod.lua"
-OUT_DIR = os.path.join("docs", "api")
+# Resolved from the repository root, not the working directory: this script
+# lives in docs/ and is run from wherever is convenient.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SOURCE = os.path.join(REPO_ROOT, "src", "HorseCollisionMod.lua")
+OUT_DIR = os.path.join(REPO_ROOT, "docs", "api")
 OUT = os.path.join(OUT_DIR, "index.html")
 
 

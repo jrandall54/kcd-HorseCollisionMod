@@ -128,3 +128,81 @@ the same NPC's reaction restarts every tick and they never finish staggering.
 KCD horses have three speed plateaus, not four. Telemetry across roughly 90 logged impacts
 clustered at 2.05 to 3.74, 6.38 to 7.03, and 9.18 to 10.81 m/s. The thresholds sit in the
 empty gaps between those clusters rather than at invented round numbers.
+
+## Tuning rationale
+
+Where the numbers in `HorseCollisionMod.Config` came from. The config table
+itself is kept scannable, because people go there to change a setting rather
+than to read; this is the reasoning behind the defaults.
+
+### Speed tiers
+
+KCD horses have three speed plateaus, not four. Telemetry across 90+ logged
+impacts clustered at 2.05-3.74, 6.38-7.03 and 9.18-10.81 m/s, so `SpeedWalk`,
+`SpeedTrot` and `SpeedGallop` sit in the empty gaps between those clusters
+rather than on round numbers.
+
+One consequence worth knowing: almost nothing lands between 8.03 and 8.84 m/s,
+so the trot-to-gallop boundary at 8.5 is a sharp cliff in reaction strength at
+a speed the horse spends a lot of time near.
+
+### Detection footprint
+
+`HitRadius` is a broad-phase sphere only. Everything inside it is then tested
+against the horse footprint, so the sphere can stay generous without NPCs
+reacting from an unnatural distance.
+
+The footprint numbers were tuned from **103 logged impacts** rather than
+guessed dimensions. A horse is long and narrow, so a sphere alone catches
+people alongside and behind it who were never actually struck.
+
+Lateral distances were pressed hard against the previous 0.55 cap, with a
+median of 0.30 and a 90th percentile of 0.51, which is what let NPCs half a
+meter clear of the flank still react. `HorseHalfWidth = 0.35` is about a horse
+chest's half-width and keeps impacts genuinely in front of the animal.
+
+### The forward sweep
+
+The footprint is extended forward by the distance the horse covers in one tick,
+so victims are not missed between frames.
+
+This was the single biggest cause of over-reach. **45 of those 103 impacts
+landed beyond the front reach** and were admitted by the sweep alone, which sat
+pinned at its old 0.95 cap a quarter of the time and pushed the effective reach
+past two meters. `SweepMultiplier` was halved and `MaxSweepExtra` capped much
+lower: the sweep only needs to cover one tick of travel, not a stride.
+
+### Stamina
+
+Measured against a full horse stamina pool of 210. At the current values a
+gallop costs roughly three bodies and a trot roughly five before the horse is
+spent and Henry is thrown. The previous 20/40 allowed ten and five, which made
+plowing through a crowd close to free. A walking bump is not hard enough to
+tire a horse at all, hence `StaminaDrainWalk = 0`.
+
+Stamina regenerates quickly between impacts, so how many people can be put down
+in one run depends on the horse and on how fast the hits are strung together.
+
+### Combat multiplier
+
+Riding through a market at speed is meant to be fun and cheap. Using the horse
+as a crowd-control weapon mid-battle is not: without a penalty, charging a group
+of four leaves them ragdolled and the rider free to shoot or swing at no cost.
+
+At `CombatStaminaMultiplier = 2.5` a galloping charge into combat spends the
+horse in a single impact, making it a committed move rather than a repeatable
+one.
+
+### Suppressing the stagger in combat
+
+The stagger hands the victim's body to an interactive action, which pulls them
+out of their combat behavior. On return they have lost track of the player and
+bark lines like "Where did he go?" while he is standing in front of them.
+
+`SuppressStaggerInCombat` keeps their perception intact. The knockdown tiers are
+unaffected either way.
+
+### WalkStagger
+
+Turning it off compares against vanilla collision handling without uninstalling
+the mod. The knockdown tiers are unaffected.
