@@ -210,7 +210,7 @@ if ($Version -eq "") {
 }
 
 if (-not $NoBuild) {
-	& powershell.exe -ExecutionPolicy Bypass ``
+	& powershell.exe -ExecutionPolicy Bypass `
 		-File (Join-Path $repoRoot "build.ps1") -Version $Version
 	if ($LASTEXITCODE -ne 0) {
 		Write-Host "[DEPLOY] build failed, nothing deployed" -ForegroundColor Red
