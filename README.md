@@ -153,6 +153,7 @@ tools/
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
 docs/
   DEV_LOOP.md             the hot-reload development loop
+  RELEASING.md            building, publishing to Nexus, regenerating the API docs
   TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
   TESTING_DIARY.md        every build tested, what was expected, what happened
   api/                    generated Lua API reference (ldoc .)
@@ -163,103 +164,18 @@ resolves paths from the repository root, so they can be run from any directory.
 
 ## Build from source
 
-Requires PowerShell and Python 3. LuaJIT is optional and adds a syntax check.
-
-```
-powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.0.0"
-```
-
-Animation data is generated from your own game install rather than committed, so the first
-build runs `tools/build_adb.py` for you. It finds the game automatically: `--game-root`, then the
-`KCD_PATH` environment variable, then the usual Steam and GOG locations, then every Steam
-library listed in `libraryfolders.vdf`. If none of those find it, it says so and lists
-everywhere it looked.
-
-Output goes to `releases\`. API reference, technical notes and the development log are in
-`docs/`, and `docs/DEV_LOOP.md` covers the hot-reload tooling.
-
-## Publishing a release
-
-`tools/publish_nexus.ps1` uploads a built zip to the mod page through the Nexus Mods
-v3 API, so a release does not have to go through the browser.
-
-Once, to store your API key:
-
-```
-.\tools\publish_nexus.ps1 -SaveApiKey
-```
-
-Then per release:
+Requires PowerShell and Python 3.
 
 ```
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.1.0"
-.\tools\publish_nexus.ps1 -Version 2.1.0 -DryRun
-.\tools\publish_nexus.ps1 -Version 2.1.0 -ChangelogFile releases\notes-2.1.0.md
 ```
 
-This is a release step, run by hand on a tagged version. It is not wired into
-anything that runs on a push.
+Animation data is generated from your own game install rather than committed, so the
+first build runs `tools/build_adb.py` for you and resolves the game folder itself.
+Output goes to `releases\`.
 
-### The API key
-
-`-SaveApiKey` prompts for the key and writes it to
-`%LOCALAPPDATA%\HorseCollisionMod\nexus.cred`, encrypted with DPAPI under your
-Windows account. That file is unreadable to other users on the machine and useless
-if copied to another one, which covers how a key realistically leaks: a synced
-folder, a backup, a shared machine, a stray `git add`. It lives outside the
-repository so it cannot be committed at all.
-
-What DPAPI does not defend against is code already running as you, which decrypts
-it exactly as the script does. That is a reasonable trade for a mod upload key,
-but it is a trade rather than the key being safe from everything.
-
-`-ForgetApiKey` deletes it. Key resolution is `-ApiKey`, then `$env:NEXUS_API_KEY`,
-then the stored file, so a single session can still override without touching what
-is saved. Prefer the stored key to `setx`, which puts it in the registry as
-plaintext, and to passing `-ApiKey`, which puts it in shell history.
-
-`-DryRun` resolves and validates everything, then stops before uploading. Without it
-the script prints what it is about to publish and asks you to type the version back
-before anything reaches the live page.
-
-Before uploading it checks that the version string is one the API accepts, that the
-zip really is a mod release, that the version in the zip's `mod.manifest` matches the
-one being published, and that the version is not already on the page. `-Force` skips
-those and the confirmation prompt.
-
-Two things the API cannot do, so they stay manual: creating a mod page, and editing
-the mod description. Only files and changelogs are covered.
-
-Deliberately not a GitHub Action. The build reads the game's own `Animations-part1.pak`
-to generate `mod_assets/`, so it cannot run on a hosted runner that has no game
-install. See `docs/TESTING_DIARY.md` for the full reasoning.
-
-This uses a personal API key for personal use, which is what Nexus Mods permit them
-for: one author publishing to one mod page, the key read from the environment at the
-moment of use and stored by nothing. Every request identifies itself with
-`Application-Name` and `Application-Version`, as their
-[acceptable use policy](https://help.nexusmods.com/article/114-api-acceptable-use-policy)
-requires. Turning this into a tool other people point at their own mod pages would make
-it a public-facing application, which has to be registered with Nexus Mods first.
-
-## API documentation
-
-The doc comments in `src/HorseCollisionMod.lua` are standard LDoc, and `config.ld`
-configures the project. Regenerate `docs/api/` with:
-
-```
-ldoc .
-```
-
-LDoc needs a C compiler to install, because it depends on penlight which depends
-on luafilesystem. On Windows without one:
-
-```
-winget install BrechtSanders.WinLibs.POSIX.UCRT --scope user
-luarocks install ldoc
-```
-
-The compiler is only needed for that install; `ldoc .` runs on its own afterwards.
+`docs/RELEASING.md` covers publishing to Nexus Mods and regenerating the API reference.
+`docs/DEV_LOOP.md` covers the hot-reload development loop.
 
 ## License
 
