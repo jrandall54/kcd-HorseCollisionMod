@@ -244,6 +244,22 @@ if (Test-Path $orderPath) {
 }
 
 $order = @($order | Where-Object { $_.Trim() -ne $devMod })
+
+# Drop entries whose folder is gone. Parking a mod, or removing one in
+# Vortex, leaves its line behind, and a load order listing folders that do
+# not exist is a confusing thing to read when working out which build is
+# actually being tested. The game skips them, so this is tidying rather
+# than a fix.
+$order = @($order | Where-Object {
+	$keep = Test-Path (Join-Path $modsDir $_.Trim())
+
+	if (-not $keep) {
+		Write-Host "[DEPLOY] dropping stale load order entry: $($_.Trim())" -ForegroundColor Yellow
+	}
+
+	$keep
+})
+
 $order = $order + $devMod
 
 # Written through .NET rather than Set-Content because PowerShell 5.1's
