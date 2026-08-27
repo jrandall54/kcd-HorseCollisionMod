@@ -2413,3 +2413,90 @@ A sweep of every tracked text file for control characters in the
 `\x00-\x08\x0B\x0C\x0E-\x1F` range found no others. Worth repeating that sweep
 after any bulk scripted edit, since the corruption is invisible in an editor
 and survives review.
+
+---
+
+## Build 2.0.1-dev.14: the ColliderMode A/B, and a wrong conclusion corrected
+
+First controlled test of the carried-item question, using the animation
+hot-reload to run both variants against the same NPCs in one session.
+
+**Hypothesis under test**: removing the `ColliderMode` layer is what stops NPCs
+dropping carried items during the walk-tier stagger.
+
+**User reported**: "During the initial and after the hotswap the bucket
+remained in their hand for women and the animation played normally for men."
+
+**Result: the hypothesis is wrong, and so was the conclusion recorded for
+2.0.1-dev.1.** The bucket stays in hand *both* with `COLLIDER_MODE = None` and
+with `COLLIDER_MODE = "Disabled"`. The layer makes no difference to whether the
+item is held.
+
+### Why the earlier conclusion was wrong
+
+The 2.0.1-dev.1 entry states plainly: "The basket stays in her hands through
+the stagger. Removing the `ColliderMode` layer was the fix." That was drawn
+from a single observation with no control. The un-fixed variant was never run
+against the same NPC, so there was nothing to attribute the result to.
+
+The contradiction was already on the record. A later session noted a woman
+keeping her bucket while running the *un-fixed* data, which the recorded cause
+could not account for. That should have been treated as falsifying evidence at
+the time rather than as an anomaly to re-test later.
+
+The general lesson, and it has now cost two sessions: **a change plus a good
+outcome is not a cause.** Where an A/B is possible, run it. It is possible
+here, and cheap, precisely because of the hot-reload work.
+
+### What this means for the branch
+
+`COLLIDER_MODE = None` stays, but on much narrower grounds than the commit
+claimed. It is not a bug fix. It matches the vanilla `HitDeath` option that
+owns the clip, which is a reasonable default, and it is not observably worse.
+It does not fix anything, because on current evidence nothing was broken.
+
+The carried-item drop at trot and gallop is untouched by any of this. That is
+the physics ragdoll path and predates 2.0.0.
+
+### The real remaining issue is that the stagger ignores the item
+
+**User reported**: "it looks a little unnatural because the animation that we
+are forcing doesn't take into account the bucket in their hand."
+
+Which is correct and was already recorded in dev-1: the clip is authored for
+empty hands, so the arms swing through a pose the item was never meant to
+follow. Keeping the item is not the same as the item looking right.
+
+### The goal now stated
+
+Rather than the item staying glued through a pose that does not fit it, the
+target behavior is: the stagger plays, the item is dropped naturally, the NPC
+does their reaction and bark, and then picks the item back up and resumes the
+behavior loop it was in.
+
+**There is vanilla precedent, and this diary already found it.** From the
+dev-1 entry: `sb_switch_hitreactions.xml`, on entering the `Hit` state, runs
+the `dropItems` tree from `sb_combat.xml`, which places every non-weapon held
+item on the ground, **links it to the NPC with the tag `panicDrop` so a later
+activity can retrieve it**, and posts `daycycle:restartRequest`.
+
+That is precisely drop, then retrieve. It was ruled out as the *cause* of the
+old symptom, correctly, because the branch is gated behind the `Hit` state and
+the `HitReactionType.Collision` path this mod posts into never touches the
+state machine. Being ruled out as a cause is not the same as being unavailable
+as a mechanism.
+
+Also already noted there: the restart is gated on
+`!$b_context['suppressDaycycleRestartAfterHit']`, so there is a sanctioned flag
+for suppressing the abandon-what-you-were-doing half while keeping the drop.
+That matters, because the goal is to resume the behavior loop, not restart the
+day cycle.
+
+Open questions, in order:
+
+1. Can the `dropItems` tree be invoked without putting the NPC into the full
+   `Hit` state, which would bring combat behavior with it?
+2. Does the `panicDrop` retrieval actually run for a non-combat NPC, and what
+   drives it? The places to look are the `panicDrop` recovery paths in
+   `so_slot.xml` and `so_tool.xml`.
+3. Does the pickup return them to their previous activity or restart it?
