@@ -44,8 +44,11 @@ gets tested.
 - [x] Live telemetry over CryEngine's remote console, with backend chatter filtered out.
 - [x] Read the mod's live state out of the running game, which settles questions that
       guessing does not.
+- [x] Publish a release to Nexus Mods without the browser, through their v3 API.
+      Not a GitHub Action: the build reads the game's own paks, so it cannot run on a
+      hosted runner. Revisit if additive ADB deployment below ever lands.
 
-See `docs/DEV_LOOP.md`.
+See `docs/DEV_LOOP.md`, and `README.md` for publishing.
 
 ## Phase 2: Mass, armor and momentum
 

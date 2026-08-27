@@ -150,6 +150,7 @@ tools/
   build_adb.py            generates the animation data from a game install
   dev_deploy.ps1          installs into the game without Vortex
   dev_console.py          talks to the running game over its remote console
+  publish_nexus.ps1       uploads a built release to the Nexus Mods page
 docs/
   DEV_LOOP.md             the hot-reload development loop
   TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
@@ -176,6 +177,35 @@ everywhere it looked.
 
 Output goes to `releases\`. API reference, technical notes and the development log are in
 `docs/`, and `docs/DEV_LOOP.md` covers the hot-reload tooling.
+
+## Publishing a release
+
+`tools/publish_nexus.ps1` uploads a built zip to the mod page through the Nexus Mods
+v3 API, so a release does not have to go through the browser.
+
+```
+$env:NEXUS_API_KEY = "<key from nexusmods.com/settings/api-keys>"
+
+powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.1.0"
+.\tools\publish_nexus.ps1 -Version 2.1.0 -DryRun
+.\tools\publish_nexus.ps1 -Version 2.1.0 -ChangelogFile releases\notes-2.1.0.md
+```
+
+`-DryRun` resolves and validates everything, then stops before uploading. Without it
+the script prints what it is about to publish and asks you to type the version back
+before anything reaches the live page.
+
+Before uploading it checks that the version string is one the API accepts, that the
+zip really is a mod release, that the version in the zip's `mod.manifest` matches the
+one being published, and that the version is not already on the page. `-Force` skips
+those and the confirmation prompt.
+
+Two things the API cannot do, so they stay manual: creating a mod page, and editing
+the mod description. Only files and changelogs are covered.
+
+Deliberately not a GitHub Action. The build reads the game's own `Animations-part1.pak`
+to generate `mod_assets/`, so it cannot run on a hosted runner that has no game
+install. See `docs/TESTING_DIARY.md` for the full reasoning.
 
 ## API documentation
 
