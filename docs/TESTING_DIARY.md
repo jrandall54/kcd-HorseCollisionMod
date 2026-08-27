@@ -2121,3 +2121,68 @@ file is for.
 the spec, meaning they can change or be removed without the 90-day deprecation
 window the stable endpoints get. Worth re-reading the spec if a release ever
 fails for no apparent reason.
+
+### Acceptable use policy, and what it changed
+
+Checked against
+https://help.nexusmods.com/article/114-api-acceptable-use-policy after the
+first working dry run. Two things were wrong and one was worth writing down.
+
+**Missing required headers.** The policy requires every request to carry
+`Application-Name` and `Application-Version`, and explicitly forbids "sending
+request metadata which is either blank or impersonates another application".
+The script sent neither. Now sends `HorseCollisionMod-publish` and a version
+that moves independently of the mod's, since the policy asks that the name stay
+constant across releases of the tool.
+
+Worth noting the v3 spec is misleading here: `Application-Name` appears in it
+exactly once, as an *optional* header on `downloadRepackedModFileVersion`. The
+policy governs, not the spec.
+
+**The poll loop was the one place this script could be a bad citizen.** It sat
+at a fixed two second interval for up to sixty attempts. Now backs off from one
+second to five, reaching about three minutes of waiting in 40 requests rather
+than 90. Nexus do not publish a specific quota in the policy, only that
+excessive consumption may be rate limited, so the fix is to not need a number.
+
+**Personal key use is within policy, and would stop being so if this were
+generalized.** Nexus permit personal API keys for testing and personal use.
+This qualifies: one author publishing to one mod page, the key read from the
+environment at the moment of use, stored by nothing, never used without the
+author starting the run. The policy's prohibition on "storing user API keys on
+your own server and/or using them without the action being initiated by the
+user" is the one to stay on the right side of, and a local script that reads an
+environment variable does.
+
+If this ever became a tool other modders point at their own pages, that is a
+public-facing application, and the policy requires registering with Nexus Mods
+at support@nexusmods.com with a testing build before release rather than
+shipping on personal keys. Relevant because generalizing the dev tooling for
+other modders has come up before.
+
+### Error output
+
+A first working dry run ended on the duplicate-version check, which was correct,
+but PowerShell rendered the `throw` as a full error record: source extent,
+squiggly underline, `CategoryInfo`, `FullyQualifiedErrorId`, with the actual
+sentence split across the noise. Unreadable for something a person runs by hand.
+
+A script-scope `trap` now prints the message and exits, so every guard reports
+as one line. The already-published case is not really a failure and got its own
+yellow message and exit code 2, so a wrapper can tell "already there" from
+"went wrong".
+
+### Confirmed working
+
+First live run against the real mod page, dry run only, no writes:
+
+```
+mod:      Horse Collision Mod [9869834848546]
+mod file: HorseCollisionMod [7863762]
+versions: 1 (0 archived)
+Version 2.0.0 is already on the page, uploaded 2026-08-26T05:08:54.000+00:00.
+```
+
+All four lookups resolve, including the mod-file-version to mod-file hop, and
+the duplicate check reads live data. The upload, finalise and publish calls
+remain untested until a real release.

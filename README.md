@@ -207,6 +207,14 @@ Deliberately not a GitHub Action. The build reads the game's own `Animations-par
 to generate `mod_assets/`, so it cannot run on a hosted runner that has no game
 install. See `docs/TESTING_DIARY.md` for the full reasoning.
 
+This uses a personal API key for personal use, which is what Nexus Mods permit them
+for: one author publishing to one mod page, the key read from the environment at the
+moment of use and stored by nothing. Every request identifies itself with
+`Application-Name` and `Application-Version`, as their
+[acceptable use policy](https://help.nexusmods.com/article/114-api-acceptable-use-policy)
+requires. Turning this into a tool other people point at their own mod pages would make
+it a public-facing application, which has to be registered with Nexus Mods first.
+
 ## API documentation
 
 The doc comments in `src/HorseCollisionMod.lua` are standard LDoc, and `config.ld`

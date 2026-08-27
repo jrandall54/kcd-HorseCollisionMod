@@ -30,6 +30,19 @@
     description. Neither has an API endpoint, so the page copy is still pasted
     in by hand on each release.
 
+    Acceptable use. Nexus Mods permit a personal API key for personal use, which
+    is what this is: one author publishing to one mod page, the key read from
+    the environment at the moment of use, never stored by anything and never
+    used without the author starting the run. Every request identifies itself
+    with Application-Name and Application-Version as the policy requires.
+
+    If this ever became a tool other people run against their own mod pages,
+    that is a public-facing application and it would have to be registered with
+    Nexus Mods first, at support@nexusmods.com, rather than shipping on personal
+    keys.
+
+    https://help.nexusmods.com/article/114-api-acceptable-use-policy
+
 .PARAMETER Version
     The version to publish, e.g. 2.1.0. Must match the version in the zip's
     mod.manifest, and must not already exist on the mod file.
@@ -101,7 +114,25 @@ $ErrorActionPreference = "Stop"
 
 $ApiBase = "https://api.nexusmods.com/v3"
 
+# Nexus Mods' acceptable use policy requires every request to identify the
+# client, and forbids metadata that is blank or impersonates another
+# application. The name is meant to stay constant across versions of the tool,
+# so only AppVersion moves.
+#
+# https://help.nexusmods.com/article/114-api-acceptable-use-policy
+$AppName = "HorseCollisionMod-publish"
+$AppVersion = "1.0.0"
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+
+# Turns a thrown message into a plain line instead of PowerShell's error record
+# with its source extent and CategoryInfo block, which buries the sentence that
+# actually says what to do.
+trap {
+    Write-Host ""
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    exit 1
+}
 
 # ---------------------------------------------------------------------------
 # HTTP
@@ -154,7 +185,12 @@ function Invoke-NexusApi {
     $params = @{
         Method  = $Method
         Uri     = "$ApiBase$Path"
-        Headers = @{ "apikey" = $ApiKey; "Accept" = "application/json" }
+        Headers = @{
+            "apikey"              = $ApiKey
+            "Accept"              = "application/json"
+            "Application-Name"    = $AppName
+            "Application-Version" = $AppVersion
+        }
     }
 
     if ($null -ne $Body) {
@@ -282,7 +318,13 @@ Write-Host "  versions: $($owned.versions_count) ($($owned.archived_count) archi
 $existing = (Invoke-NexusApi GET "/mod-files/$modFileId/versions").data.versions
 $clash = $existing | Where-Object { $_.version -eq $Version }
 if ($clash) {
-    throw "Version $Version was already published on $($clash[0].uploaded_at). Nothing to do."
+    # Not a failure so much as nothing to do, and re-running a publish is a
+    # normal thing to do after a partial one. Given its own exit code so a
+    # wrapper can tell "already there" from "went wrong".
+    Write-Host ""
+    Write-Host "Version $Version is already on the page, uploaded $($clash[0].uploaded_at)." -ForegroundColor Yellow
+    Write-Host "Nothing to do. Bump the version if this was meant to be a new release."
+    exit 2
 }
 
 # ---------------------------------------------------------------------------
@@ -378,14 +420,19 @@ else {
 # fails with a 422 that reads like a bad request.
 Write-Host "Waiting for the upload to become available ..."
 $state = $null
-for ($attempt = 1; $attempt -le 60; $attempt++) {
+for ($attempt = 1; $attempt -le 40; $attempt++) {
     $state = (Invoke-NexusApi GET "/uploads/$uploadId").data.state
     if ($state -eq "available") { break }
-    Start-Sleep -Seconds 2
+
+    # Backs off rather than hammering a fixed interval. Excessive consumption
+    # is what the acceptable use policy rate limits for, and a poll loop is the
+    # easiest place in this script to be a bad citizen by accident. Reaches
+    # roughly three minutes of waiting in 40 requests instead of 90.
+    Start-Sleep -Seconds ([Math]::Min(5, 1 + [Math]::Floor($attempt / 3)))
 }
 
 if ($state -ne "available") {
-    throw ("Upload $uploadId is still '$state' after two minutes." +
+    throw ("Upload $uploadId is still '$state' after about three minutes." +
            "`n  The data is uploaded. Retry the publish without re-sending it:" +
            "`n    tools\publish_nexus.ps1 -Version $Version -ResumeUploadId $uploadId")
 }
