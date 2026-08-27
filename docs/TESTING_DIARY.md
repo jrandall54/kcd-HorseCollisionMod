@@ -2379,3 +2379,37 @@ observation.
 
 Everything above is static verification of the generated data. No build test
 has run.
+
+### The deploy tool could not build, and nothing caught it
+
+Reported on trying to start a test session:
+
+```
+-File : The term '-File' is not recognized as the name of a cmdlet
+```
+
+`dev_deploy.ps1` invoked the build across two lines, and the first ended with
+**two** backticks instead of one. PowerShell reads the first as escaping the
+second, so the line yielded a literal backtick and no continuation, and
+`-File ...` on the next line was parsed as its own command.
+
+Two things are worth keeping from this.
+
+**The untested path was the one everyone uses.** `-NoBuild`, `-ScriptOnly` and
+`-AnimOnly` all skip that block. Those were the only three exercised after the
+repository reorganization, so the default path and `-Launch`, which is how a
+test session actually starts, were both broken for the whole interval. A parse
+check does not catch it either: the result is syntactically valid, just wrong.
+The only thing that would have caught it is running the tool the way it is
+normally run.
+
+**The cause was a scripted edit mangling an escape.** The same class of damage
+put a literal backspace character into the README, where `.\build.ps1` had
+rendered as `.uild.ps1`, because a `\b` in a generated string was interpreted
+as an escape rather than a path separator. Both came from writing file content
+through a shell heredoc.
+
+A sweep of every tracked text file for control characters in the
+`\x00-\x08\x0B\x0C\x0E-\x1F` range found no others. Worth repeating that sweep
+after any bulk scripted edit, since the corruption is invisible in an editor
+and survives review.
