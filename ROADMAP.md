@@ -52,7 +52,36 @@ gets tested.
       Not a GitHub Action: the build reads the game's own paks, so it cannot run on a
       hosted runner. Revisit if additive ADB deployment below ever lands.
 
-See `docs/DEV_LOOP.md`, and `README.md` for publishing.
+See `docs/DEV_LOOP.md`, and `docs/RELEASING.md` for publishing.
+
+## Additive deployment
+
+Stop replacing vanilla animation files, so the mod cannot be silently overwritten by
+another animation mod and cannot silently overwrite one.
+
+Proven in game rather than assumed. CryEngine's Mannequin loader supports sub-databases,
+no vanilla KCD file uses one, and the loader is present in `WHGame.dll` regardless. A
+342 byte parent that references the untouched vanilla database in its own pak, plus the
+mod's own fragment file, works end to end. The database path is a Lua entity-class
+property, so entities can be redirected without touching a vanilla script.
+
+- [x] Confirm the engine loads a SubADB at all.
+- [x] Confirm fragments defined only in a sub-database resolve.
+- [x] Confirm a SubADB can carry a whole database, not just a fragment subset.
+- [x] Confirm entities can be redirected to a parent, replacing no vanilla file.
+- [ ] Move the redirect from a console command into the mod's Startup Lua.
+- [ ] Convert the female side, which was kept as the control during testing.
+- [ ] Decide what to do about `kcd_animationControlledTags.xml` and
+      `wh_female_fragmentids.xml`, which declare the tags and fragment ids and are still
+      replacements. Untested whether a sub-database can carry its own definitions.
+- [ ] Ship it, which changes the install from a database replacement to an addition.
+
+Honest limit: this moves the contested resource from a 5.5 MB database no one can merge
+to a single Lua string. Two mods redirecting the same property still collide, but a
+cooperative mod can chain by referencing the current value. Small and fixable rather
+than total and silent.
+
+See `docs/TESTING_DIARY.md`, builds 2.0.1-dev.15 through dev.17.
 
 ## Phase 2: Mass, armor and momentum
 
