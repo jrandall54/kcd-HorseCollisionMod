@@ -138,6 +138,27 @@ rather than invent a parallel system.
 - A way to patch the animation data at install time instead of replacing it, so the mod stops
   conflicting with other animation mods.
 
+## Repository layout
+
+```
+build.ps1                 the one build entry point
+src/
+  HorseCollisionMod.lua   the mod
+  mod.manifest
+tools/
+  build_adb.py            generates the animation data from a game install
+  dev_deploy.ps1          installs into the game without Vortex
+  dev_console.py          talks to the running game over its remote console
+docs/
+  DEV_LOOP.md             the hot-reload development loop
+  TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
+  TESTING_DIARY.md        every build tested, what was expected, what happened
+  api/                    generated Lua API reference
+```
+
+`mod_assets/` and `releases/` are generated and not committed. Every script
+resolves paths from the repository root, so they can be run from any directory.
+
 ## Build from source
 
 Requires PowerShell and Python 3. LuaJIT is optional and adds a syntax check.
@@ -147,7 +168,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.0.0"
 ```
 
 Animation data is generated from your own game install rather than committed, so the first
-build runs `build_adb.py` for you. It finds the game automatically: `--game-root`, then the
+build runs `tools/build_adb.py` for you. It finds the game automatically: `--game-root`, then the
 `KCD_PATH` environment variable, then the usual Steam and GOG locations, then every Steam
 library listed in `libraryfolders.vdf`. If none of those find it, it says so and lists
 everywhere it looked.

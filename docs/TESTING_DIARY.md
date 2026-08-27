@@ -1875,3 +1875,44 @@ stops it.
 - `sys_PakPriority = 0` and `mn_allowEditableDatabasesInPureGame = 1` are
   development settings now live in `system.cfg`. Set `sys_PakPriority` back to
   2 for normal play.
+
+### Repository layout
+
+Not a build test. Recorded because it changes where everything lives and how
+the scripts find each other.
+
+Eleven tracked files sat at the repository root, of which four were scripts and
+two were the mod itself. Nothing distinguished the mod from the tooling that
+builds it. The layout is now:
+
+```
+build.ps1                 the one build entry point
+src/    HorseCollisionMod.lua, mod.manifest
+tools/  build_adb.py, dev_deploy.ps1, dev_console.py
+docs/
+```
+
+**Every script now resolves paths from the repository root rather than the
+working directory.** That was the real work; moving the files was the easy
+part. `build.ps1` derives its root from `$PSCommandPath`, `dev_deploy.ps1`
+takes one level up from its own location since it lives in `tools/`, and
+`build_adb.py` uses `os.path.dirname` twice on `__file__`.
+
+Before this, `build_adb.py` wrote `mod_assets/` relative to whatever directory
+it was invoked from. Running it from `C:\` created `C:\mod_assets` and reported
+success, which is the kind of quiet wrong behavior that is hard to notice.
+Verified afterwards by running both `build.ps1` and `tools/build_adb.py` from
+`C:\`: output lands in the repository, and no stray directory is created.
+
+Two traps found while rewiring:
+
+- **LuaJIT's syntax check needs forward slashes.** `build.ps1` hands the script
+  path to `loadfile` inside a single-quoted Lua string, and Lua treats a
+  backslash there as an escape. The path is converted with
+  `.Replace([char]92, [char]47)`.
+- **`git status --porcelain` prints a rename as `old -> new`.** Anything
+  matching paths against that output has to reduce it to the destination first
+  or the match silently fails while a rename is staged.
+
+The build artifact is unchanged: same three files in the zip, same five entries
+in the pak, same sizes.
