@@ -1,17 +1,17 @@
 -- LDoc configuration. Run `ldoc .` from the repository root.
 --
--- LDoc is the standard documentation generator for Lua and is what the doc
--- comments in src/HorseCollisionMod.lua are written for. It is not required to
--- build the mod, only to regenerate docs/api/.
+-- LDoc is the standard documentation generator for Lua, and the doc comments
+-- in src/HorseCollisionMod.lua are written for it. It is not needed to build
+-- the mod, only to regenerate docs/api/.
 --
 -- Installing it needs a C compiler, because LDoc depends on penlight which
--- depends on luafilesystem, which is a C module:
+-- depends on luafilesystem, which is a C module. On Windows without one:
 --
---     choco install mingw
+--     winget install BrechtSanders.WinLibs.POSIX.UCRT --scope user
 --     luarocks install ldoc
 --
--- docs/generate_api_docs.py renders the same comments to the same place
--- without a Lua toolchain, for when that is not worth setting up.
+-- The compiler is only needed for that install. Afterwards `ldoc .` runs on
+-- its own.
 
 project = "HorseCollisionMod"
 title = "HorseCollisionMod API reference"

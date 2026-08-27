@@ -154,8 +154,7 @@ docs/
   DEV_LOOP.md             the hot-reload development loop
   TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
   TESTING_DIARY.md        every build tested, what was expected, what happened
-  api/                    generated Lua API reference
-  generate_api_docs.py    renders that page without a Lua toolchain
+  api/                    generated Lua API reference (ldoc .)
 ```
 
 `mod_assets/` and `releases/` are generated and not committed. Every script
@@ -180,24 +179,22 @@ Output goes to `releases\`. API reference, technical notes and the development l
 
 ## API documentation
 
-The doc comments in `src/HorseCollisionMod.lua` are standard LDoc. `config.ld`
-configures the project, so the canonical way to rebuild `docs/api/` is:
+The doc comments in `src/HorseCollisionMod.lua` are standard LDoc, and `config.ld`
+configures the project. Regenerate `docs/api/` with:
 
 ```
 ldoc .
 ```
 
 LDoc needs a C compiler to install, because it depends on penlight which depends
-on luafilesystem:
+on luafilesystem. On Windows without one:
 
 ```
-choco install mingw
+winget install BrechtSanders.WinLibs.POSIX.UCRT --scope user
 luarocks install ldoc
 ```
 
-`docs/generate_api_docs.py` renders the same comments to the same place without a
-Lua toolchain. It is a stand-in, not LDoc: it implements only the tags this
-project uses and its HTML is its own, so the output is not byte-identical.
+The compiler is only needed for that install; `ldoc .` runs on its own afterwards.
 
 ## License
 
