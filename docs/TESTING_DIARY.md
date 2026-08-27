@@ -2500,3 +2500,82 @@ Open questions, in order:
    drives it? The places to look are the `panicDrop` recovery paths in
    `so_slot.xml` and `so_tool.xml`.
 3. Does the pickup return them to their previous activity or restart it?
+
+### Vanilla does have drop-and-pick-back-up, and it is complete
+
+Read out of `Scripts.pak` rather than inferred. The answer to "is there
+precedent for a woman dropping her bucket and picking it back up" is yes, and
+the whole loop already exists.
+
+**The drop.** `Libs/AI/final/sb_combat.xml` declares
+`<BehaviorTree name="dropItems">` with variables `hand` (0 right, 1 left),
+`item` and `itemCategory`, plus a forward-declared `t_dropItems_dropWeapons`
+bool. It places held items on the ground, and for anything whose
+`itemCategory` is neither `melee_weapon` nor `missile_weapon` it runs:
+
+```
+AddLink From="this.id" To="item" Tag="panicDrop"
+```
+
+so the dropped item stays linked to the NPC that dropped it.
+
+**The retrieval.** `Libs/AI/final/so_slot.xml` holds 24 item-handling trees,
+among them `pickItem`, `pickFromGround`, `findPickedItem`, `safePickItem` and
+`slotRecoveryCheck`. The `panicDrop` recovery lives in the `placeItem` tree and
+does exactly the expected three steps:
+
+```
+GraphSearch ... SubGraph="panicDrop"
+RemoveLink From="this.id" To="handCheck" Tag="panicDrop"
+SmartObjSetBehaviorState behaviors="pickItem" state="Enabled"
+```
+
+`so_tool.xml` has a parallel path that filters the graph with
+`LinkTagFilter tag="panicDrop"`.
+
+So: drop, tag, later find by tag, untag, enable the pick-up behavior. That is
+the behavior described as the goal, and it ships with the game.
+
+**`dropItems` is not welded to the `Hit` state.** It is a named tree, invoked
+by `<IncludeTree File="final/sb_combat.xml" Name="dropItems" />`. The `Hit`
+state is one caller, not the definition. An earlier entry ruled the `Hit` path
+out as the *cause* of the old symptom, which was correct, but that is not the
+same as the tree being unavailable as a mechanism.
+
+**Where the mod's message lands.** `sb_switch_hitreactions.xml` line 260 is the
+branch guarded by `$hitReaction.hitType == $enum:HitReactionType.Collision`.
+That branch currently does a dead check, some barks gated on
+`!$b_inCombat & !$b_context['suppressCollisionsBark']`, and an awareness
+impulse. Adding an `IncludeTree` of `dropItems` there is the shape of the
+change.
+
+### The cost, which is the real decision
+
+`sb_switch_hitreactions.xml` is 132,889 bytes, and **the mod deliberately
+stopped shipping it.** The current pak contains only the four animation files
+and `Scripts/Startup/HorseCollisionMod.lua`. Re-adding it means:
+
+- A hard conflict with any other mod that edits hit reactions. Behavior trees
+  cannot be merged, only replaced, exactly like the Mannequin databases.
+- A second whole-file replacement pinned to 1.9.7, doubling the surface that
+  a game patch would invalidate.
+- This diary already records a failed attempt to drive animation from this
+  file: "A `PlayAnimation` node added to `sb_switch_hitreactions.xml`: node
+  runs, animation fails." That was a different goal, but it is a reminder that
+  editing the tree is not automatically effective.
+
+Against that, the payoff is real: the current stagger clip is authored for
+empty hands, so an NPC keeping a bucket through it looks wrong. Dropping the
+item, reacting, and picking it up is both more natural and vanilla-sanctioned.
+
+Not yet established, and worth knowing before committing to this:
+
+1. Whether `dropItems` runs correctly outside a combat subbrain, given it lives
+   in `sb_combat.xml` and forward-declares a combat variable.
+2. What drives the `pickItem` behavior once enabled, and whether it returns the
+   NPC to their previous activity or restarts it. The day-cycle restart in the
+   `Hit` path is gated on `!$b_context['suppressDaycycleRestartAfterHit']`, so
+   there is a sanctioned flag for keeping the drop without the restart.
+3. Whether the same path exists for the female smart objects, since the bucket
+   carriers are women and the female animation data has needed separate work
+   throughout this project.
