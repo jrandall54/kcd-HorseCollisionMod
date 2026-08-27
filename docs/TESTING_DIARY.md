@@ -3225,3 +3225,80 @@ the cause turns out to be unfixable.
 
 Next: isolate. `mn_allowEditableDatabasesInPureGame` back to 1, changing
 nothing else, still packed and still without dev mode.
+
+---
+
+## Build 2.1.0-dev.5: the canary, and how SubADB merging actually works
+
+Three cold-start failures in a row, each with every file demonstrably loading,
+so the question became whether the mod's options ever reach the fragment at
+all. The diary records the technique that settles it: build 2.0.0-dev8 used a
+canary that repointed a vanilla tag at a stagger clip.
+
+**Setup.** One extra option was added to the mod's sub-database carrying the
+**vanilla** FragTag `cabinet_o`, pointing at a stagger clip instead of the
+cabinet animation. Because that tag is declared in vanilla's tag file and in the
+mod's, tag declaration stops being a variable. The mod was temporarily made to
+ask for `cabinet_o`. Sub-database order at the time: the mod's file first,
+vanilla's second.
+
+**User reported**: "so women remain with single frame glitched but the cupboard
+animation fires on men."
+
+Two separate results, both valuable.
+
+### Men: the later sub-database replaces the fragment, it does not merge
+
+The men played vanilla's cabinet animation, not the mod's clip. So vanilla's
+`cabinet_o` option won while vanilla's sub-database was listed **second**.
+
+That is the answer to the whole failure. **When two sub-databases define the
+same fragment id, the later one replaces it outright. Options are not merged.**
+
+Every earlier symptom follows from it. With vanilla listed last, its 32-option
+`AnimationControlled` fragment replaced the mod's entirely, so the four
+`hcm_stagger_*` options were simply absent, and every call against them
+resolved to nothing. That is the one-frame snap back, and it produces no error
+because `StartInteractiveActionByName` returns success either way.
+
+It also explains why the loader has to be given the mod's file last **and** that
+file has to carry vanilla's own options, or redirected NPCs lose every door,
+cabinet and wardrobe interaction in the game. The cost of carrying them is
+modest: the `AnimationControlled` fragment is 68,966 bytes, **1.24% of the
+5.5 MB database**.
+
+### Women: the female parent database is never loaded at all
+
+The log lists exactly two sub-database loads, both male:
+
+```
+Loading subADB Animations/Mannequin/ADB/hcm_male_stagger.adb
+Loading subADB Animations/Mannequin/ADB/kcd_male_database.adb
+```
+
+No `hcm_female_stagger.adb`, no `wh_female_database.adb`. The female parent was
+never opened, even though `NPC_Female_x.lua` loads and the redirect reports all
+seven classes claimed with none pending.
+
+So the female failure is a different bug from the male one and was masked by it.
+Unresolved: whether female NPCs are actually instances of `NPC_Female_x`, or
+whether some other class serves them and is not in the redirect table.
+
+### What was wrong with the earlier attempts, in order
+
+Worth listing, because each looked like a complete explanation at the time:
+
+1. **Parent `FragDef` pointed at vanilla's fragment ids.** Real, and fixed. The
+   parent's FragDef is what the loader validates FragTags against, and vanilla's
+   chain does not declare `hcm_stagger_*`. Fixing it removed the `Unknown tags`
+   errors and changed nothing visible, because the next fault was still ahead.
+2. **`ActionController` still pointed at vanilla's controller def.** Also real,
+   also fixed. The controller def owns the fragment and tag definitions an
+   entity resolves names through at runtime; a database's FragDef governs
+   load-time validation only. Fixing it changed nothing visible either.
+3. **Sub-database ordering.** Tested both ways before understanding the
+   semantics, which is why neither order worked: one loses the mod's options,
+   the other loses vanilla's.
+
+All three were genuine defects. None was sufficient alone, which is why each
+fix produced no visible change and looked like a dead end.

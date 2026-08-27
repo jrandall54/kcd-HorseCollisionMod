@@ -196,17 +196,30 @@ TAGS_OUT = os.path.join(OUT_DIR, "kcd_animationControlledTags.xml")
 # 2.0.1-dev.15 through dev.19. Opt out with --replace to build the 2.0.0 layout.
 ADDITIVE = "--replace" not in sys.argv
 
+# Diagnostic. Adds one option to the mod's sub-database carrying the vanilla
+# FragTag cabinet_o, pointing at a stagger clip rather than the cabinet
+# animation. That tag is declared in vanilla's tag file and in ours, so tag
+# declaration is not a variable: if an NPC asked for cabinet_o staggers, this
+# sub-database's options are reaching the merged fragment and winning over
+# vanilla's. If they play the cabinet animation, they are not.
+#
+# The same technique settled a comparable question in build 2.0.0-dev8.
+CANARY = "--canary" in sys.argv
+CANARY_TAG = "cabinet_o"
+
 # Per gender: vanilla database, vanilla fragment ids, vanilla tag definition.
 GENDERS = {
     "male": {
         "db": "Animations/Mannequin/ADB/kcd_male_database.adb",
         "ids": "Animations/Mannequin/ADB/kcd_male_fragmentids.xml",
         "tags": "Animations/Mannequin/ADB/kcd_male_tags.xml",
+        "ctrl": "Animations/Mannequin/ADB/kcd_male_controllerdefs.xml",
     },
     "female": {
         "db": "Animations/Mannequin/ADB/wh_female_database.adb",
         "ids": "Animations/Mannequin/ADB/wh_female_fragmentids.xml",
         "tags": "Animations/Mannequin/ADB/wh_female_tags.xml",
+        "ctrl": "Animations/Mannequin/ADB/wh_female_controllerdefs.xml",
     },
 }
 
@@ -571,6 +584,22 @@ def write_additive_gender(gender, paths, shared_tags, nl):
     with io.open(out(ids_name), "wb") as handle:
         handle.write(ids.encode("ascii"))
 
+    # The controller def is what an entity actually resolves fragments and
+    # tags through at runtime, by way of its ActionController property. A
+    # database's own FragDef governs load-time validation only. Without this
+    # the stagger options load and validate cleanly, and then every call
+    # against them resolves to nothing, because the entity is still looking
+    # them up in vanilla's tag file where hcm_stagger_* is not declared.
+    ctrl_name = "hcm_%s_controllerdefs.xml" % gender
+    ctrl = read_pak_entry(PAK, paths["ctrl"]).decode("ascii", "replace")
+    ctrl = ctrl.replace(paths["ids"], "Animations/Mannequin/ADB/" + ids_name)
+
+    if ids_name not in ctrl:
+        raise SystemExit("%s controller def Fragments element not matched" % gender)
+
+    with io.open(out(ctrl_name), "wb") as handle:
+        handle.write(ctrl.encode("ascii"))
+
     # Every referenced clip must already exist in that gender's database, or
     # the option resolves to nothing silently.
     db = read_pak_entry(PAK, paths["db"]).decode("ascii", "replace")
@@ -581,7 +610,30 @@ def write_additive_gender(gender, paths, shared_tags, nl):
         raise SystemExit("clips absent from the %s database: %s"
                          % (gender, missing))
 
-    options = nl.join(render_option(tags, clip, nl) for tags, clip in STAGGERS)
+    entries = list(STAGGERS)
+
+    if CANARY:
+        entries.append((CANARY_TAG, STAGGERS[0][1]))
+
+    options = nl.join(render_option(tags, clip, nl) for tags, clip in entries)
+
+    # Sub-databases do not merge options into a fragment another one already
+    # defines: the later sub replaces that fragment outright. Proven with a
+    # canary carrying the vanilla cabinet_o tag, which played vanilla's
+    # cabinet animation rather than this mod's clip while vanilla's
+    # sub-database was listed second.
+    #
+    # So this file has to carry vanilla's own options too, or redirected
+    # entities lose every door, cabinet and wardrobe interaction. It is still
+    # only the one fragment: 69 KB against the 5.5 MB whole database.
+    existing = re.search(
+        "\n    <AnimationControlled>(.*?)\n    </AnimationControlled>", db, re.S)
+
+    if existing:
+        inherited = existing.group(1).strip("\r\n")
+        options = inherited + nl + options
+        print("  %-6s inherits %d vanilla options"
+              % (gender, inherited.count("<Fragment")))
 
     stagger = nl.join([
         '<?xml version="1.0" encoding="us-ascii"?>',
@@ -601,10 +653,28 @@ def write_additive_gender(gender, paths, shared_tags, nl):
 
     # The parent holds no fragments of its own. The vanilla database is read
     # from its own pak and is never overridden, which is the whole point.
+    #
+    # FragDef must be OUR fragment ids, not vanilla's. The parent's FragDef is
+    # what the loader resolves FragTags against; a sub-database's own FragDef
+    # does not govern that, despite being honoured for other purposes. With
+    # vanilla's here the chain reaches vanilla's tag file, which declares no
+    # hcm_stagger_* tag, and every option is rejected with:
+    #
+    #   [CAnimationDatabaseManager::LoadDatabase] Unknown tags for fragmentID
+    #       AnimationControlled tag  fragTags hcm_stagger_forward
+    #
+    # which reads in game as the one-frame snap back, the signature of a valid
+    # call with no matching option.
     parent = nl.join([
         '<?xml version="1.0" encoding="us-ascii"?>',
-        '<AnimDB FragDef="%s" TagDef="%s">' % (paths["ids"], paths["tags"]),
+        '<AnimDB FragDef="Animations/Mannequin/ADB/%s" TagDef="%s">'
+        % (ids_name, paths["tags"]),
         "  <SubADBs>",
+        # Order matters: both sub-databases define the AnimationControlled
+        # fragment, vanilla with 30 options and this mod with 4. If a
+        # fragment, and the later one replaces the earlier outright rather
+        # than merging. This mod's file therefore goes last, and carries
+        # vanilla's options as well as its own.
         '    <SubADB File="%s" />' % paths["db"],
         '    <SubADB File="Animations/Mannequin/ADB/%s" />' % stagger_name,
         "  </SubADBs>",
@@ -615,10 +685,11 @@ def write_additive_gender(gender, paths, shared_tags, nl):
     with io.open(out(parent_name), "wb") as handle:
         handle.write(parent.encode("ascii"))
 
-    print("  %-6s %s (%d B), %s (%d B), %s (%d B)"
+    print("  %-6s %s (%d B), %s (%d B), %s (%d B), %s (%d B)"
           % (gender, parent_name, os.path.getsize(out(parent_name)),
              stagger_name, os.path.getsize(out(stagger_name)),
-             ids_name, os.path.getsize(out(ids_name))))
+             ids_name, os.path.getsize(out(ids_name)),
+             ctrl_name, os.path.getsize(out(ctrl_name))))
 
 
 def write_additive():

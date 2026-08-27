@@ -425,6 +425,7 @@ function HorseCollisionMod:PlayStagger(npc, velocity, speed)
 	local dir = self:GetImpactDir(npc, velocity, speed)
 	local action = "hcm_stagger_" .. string.gsub(dir, "so_", "")
 
+
 	-- Gender is logged because the female animation set has no
 	-- AnimationControlled fragment, so female victims accept the call and
 	-- play nothing. Without this the misses look random.
@@ -910,8 +911,8 @@ end
 
 --- Entity classes whose animation database this mod redirects.
 --
--- Each entry maps an entity class table to the parent database that should
--- replace its stock one. The parent is a few hundred bytes and holds no
+-- Each entry maps an entity class table to the character set it belongs to.
+-- The parent database is a few hundred bytes and holds no
 -- fragments of its own; it references the untouched vanilla database inside its
 -- own pak, plus this mod's fragment file.
 --
@@ -923,13 +924,38 @@ end
 --
 -- @table AnimationDatabases
 HorseCollisionMod.AnimationDatabases = {
-	NPC_x         = "Animations/Mannequin/ADB/hcm_male_database.adb",
-	NPC_NAI_x     = "Animations/Mannequin/ADB/hcm_male_database.adb",
-	NullAI_x      = "Animations/Mannequin/ADB/hcm_male_database.adb",
-	DummyTarget_x = "Animations/Mannequin/ADB/hcm_male_database.adb",
-	Player        = "Animations/Mannequin/ADB/hcm_male_database.adb",
-	NPC_Female_x  = "Animations/Mannequin/ADB/hcm_female_database.adb",
-	PlayerFemale  = "Animations/Mannequin/ADB/hcm_female_database.adb"
+	NPC_x         = "male",
+	NPC_NAI_x     = "male",
+	NullAI_x      = "male",
+	DummyTarget_x = "male",
+	Player        = "male",
+	NPC_Female_x  = "female",
+	PlayerFemale  = "female"
+}
+
+--- The two properties each redirected class needs, per character set.
+--
+-- Both matter, and only one of them is obvious. `AnimDatabase3P` decides which
+-- fragments exist. `ActionController` decides how a name is resolved into one,
+-- because it owns the fragment and tag definitions the entity looks names up
+-- in. A database's own `FragDef` governs load-time validation only.
+--
+-- Redirecting the database alone loads the stagger options cleanly and then
+-- fails every call against them, because the entity is still resolving
+-- `hcm_stagger_*` in vanilla's tag file, where it is not declared. That reads
+-- in game as a one-frame twitch and produces no error at the call site: it
+-- returns success.
+--
+-- @table AnimationSets
+HorseCollisionMod.AnimationSets = {
+	male = {
+		AnimDatabase3P   = "Animations/Mannequin/ADB/hcm_male_database.adb",
+		ActionController = "Animations/Mannequin/ADB/hcm_male_controllerdefs.xml"
+	},
+	female = {
+		AnimDatabase3P   = "Animations/Mannequin/ADB/hcm_female_database.adb",
+		ActionController = "Animations/Mannequin/ADB/hcm_female_controllerdefs.xml"
+	}
 }
 
 --- Points the human entity classes at this mod's parent databases.
@@ -948,13 +974,16 @@ function HorseCollisionMod:RedirectAnimationDatabases()
 	local redirected = 0
 	local pending = 0
 
-	for class, database in pairs(self.AnimationDatabases) do
+	for class, set in pairs(self.AnimationDatabases) do
 		local target = rawget(_G, class)
+		local paths = self.AnimationSets[set]
 
 		if type(target) ~= "table" then
 			pending = pending + 1
-		elseif target.AnimDatabase3P ~= database then
-			target.AnimDatabase3P = database
+		elseif target.AnimDatabase3P ~= paths.AnimDatabase3P
+				or target.ActionController ~= paths.ActionController then
+			target.AnimDatabase3P = paths.AnimDatabase3P
+			target.ActionController = paths.ActionController
 			redirected = redirected + 1
 		end
 	end
