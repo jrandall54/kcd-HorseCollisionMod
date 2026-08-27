@@ -1707,3 +1707,171 @@ animation databases is not a small footprint.
 
 **Deferred to Phase 2 and beyond**: mass and armor scaling, Horsemanship, polearm bracing,
 morale, and the horse-NPC tangling when walking head-on into someone.
+
+---
+
+## Session: development loop tooling
+
+No build under test. The whole session went into the loop used to test builds,
+which had become the slowest part of the project: close the game, remove the
+old mod in Vortex, install the new archive, deploy, launch, clear a prompt,
+wait for the main menu, load a save. Every iteration.
+
+Two tools came out of it, `dev_deploy.ps1` and `dev_console.py`, and both
+halves of the mod now reload into a running game. `docs/DEV_LOOP.md` is the
+reference; this entry records what had to be discovered to get there.
+
+### The remote console
+
+CryEngine embeds a console server on port 4600, enabled with
+`log_EnableRemoteConsole = 1`. Three things about it cost time:
+
+- The event type is written as an **ASCII digit**, `'0' + type`, not a raw
+  byte. The server's opening `b"1\x00"` is type 1, not 49.
+- The exchange is **server-driven and strictly alternating**. The server sends
+  one packet and waits. A client that answers only explicit requests gets one
+  packet and then silence. Answer every packet.
+- `log_Verbosity` resets with the game, so a session started after a restart is
+  silent until it is raised again. That reads exactly like commands vanishing.
+
+### Dev mode is a command line switch
+
+`sys_DevMode` is **not a CVar in this build**; querying it answers "Unknown
+command", so the `sys_DevMode = 1` line that used to sit in `system.cfg` never
+did anything. Dev mode comes from `-devmode` on the command line. Without it
+the console refuses everything marked `VF_CHEAT`, which includes
+`lua_reload_script`.
+
+### Loose files go under Data
+
+`sys_game_folder` is `Data`, so the engine's file system is rooted at
+`<game>\Data`. A loose script belongs at `Data\Scripts\Startup\`. One level
+higher is never found, and **the failure is silent**: "Loading and executing
+script file" is logged *before* the read is attempted, and a miss logs nothing
+at all. That reads exactly like a script that loaded and did nothing.
+
+Loose files also require `sys_PakPriority = 0`. It ships as 2, pak-only, under
+which loose files are ignored entirely and a reload re-reads the same packed
+bytes. It is flagged `REQUIRE_APP_RESTART`.
+
+### Animation data reloads too - **WORKING**
+
+`mn_reload` had appeared to be a no-op for as long as it had been tried. It
+needed two fixes together, which is why it looked like an engine limitation:
+
+1. The ADB files existed only inside the pak, so the reload re-read the same
+   packed bytes. They now deploy loose to `Data\Animations\Mannequin\ADB`.
+2. **`mn_allowEditableDatabasesInPureGame` ships at 0.** A shipping build
+   treats its Mannequin databases as read only, so the reload ran and was never
+   permitted to replace anything. It is now set in `system.cfg` and sent again
+   before every `mn_reload`.
+
+Either alone does nothing. Confirmed in game by pointing the male stagger
+fragments at `ringing_alarm_bell` and watching NPCs ring an invisible bell,
+then reverting, without the game ever restarting. A combined test changing the
+Lua (`Knockback` 50 to 2000) and the animation data in one pass also worked.
+
+Note for future tests: `ringing_alarm_bell` and `library_cabinet_open` exist
+only in the male database, which is why the stagger work used hit reactions.
+A female-visible test needs a clip present in `wh_female_database.adb`.
+
+### Reloading has to restart the detection loop
+
+Re-executing the script is not enough. The loop is started only by the UI
+listener when a loading screen ends, because a Startup script has no "game
+loaded" hook. A reload rebuilds the table with `TimerTick` unset, the running
+loop sees its generation no longer match and stops, and nothing starts a new
+one. The mod goes silent and the game looks completely vanilla until a save is
+loaded. `--reload` therefore calls the entry point directly afterwards.
+
+That exposed a second bug. The generation counter lived on the table that
+`lua_reload_script` rebuilds, so it restarted at 1 on every reload while the
+loop still running was also generation 1: its guard matched and it kept going.
+The counter now lives in a global that a reload does not rebuild. The
+generation in the log line is now a real signal that a reload took.
+
+### The gallop "regression" that was not one
+
+**User report**: after turning `ProtectMutt` off, gallop appeared to stop
+ragdolling.
+
+**Not reproducible as described, and the telemetry explains it.** Across the
+session: Gallop 17 impacts at 8.84-10.75 m/s, Trot 27 at 4.51-8.03, Walk 14 at
+2.38-3.96. Gallop fired throughout, including nine times after the reload.
+
+The stretch that prompted the report is eleven consecutive non-gallop impacts
+where the horse never exceeded **8.03 m/s** against a `SpeedGallop` threshold
+of **8.5**. The horse was trotting. Stamina was not the limiter either: it read
+210.0, 190.7, 190.5 and 182.5 during that run, at or near a full pool.
+
+`ProtectMutt` is one isolated line and cannot affect the gallop path.
+
+**Worth revisiting as tuning**: trot impacts cluster at 6.5-7.0 and top out at
+8.03; gallop starts at 8.84. Almost nothing lands between, so the boundary is a
+visible cliff in reaction strength right where the horse spends much of its
+time.
+
+### Measurement errors worth not repeating
+
+Three conclusions in this session were drawn from signals that had never been
+verified, and all three were wrong:
+
+- **"194 ticks in 10 s proves two loops running."** It assumed
+  `Script.SetTimer(100, ...)` yields 10 ticks a second. It fires roughly every
+  54 ms in this build. Tracing the generation directly showed one loop. The
+  duplicate-loop race is real in the code but was not occurring.
+- **"26 FPS, the game is starved."** `System.GetFrameTime()` was sampled while
+  the game sat unfocused and windowed, where it is throttled. The user's own
+  counter reads 50+ in Rattay. The reading was meaningless as a proxy for play.
+- **Three separate causes proposed for the audio bug**, all wrong, when the
+  answer was already written in this file (see below).
+
+The pattern: prove the signal itself works before drawing a conclusion from it.
+
+### Audio: already answered, in this file
+
+**Re-diagnosed from scratch and got it wrong three times** before finding the
+existing entry from build 2.1.0-dev5. The cause is Warhorse's PROS online
+service failing to reach its backend and retrying on the main thread every half
+second, which stalls the audio buffer. `kcd.log` shows the pair every 0.5 s
+with no gap:
+
+```
+ERROR: operation 'Do connect' takes too much time. Duration 0.500069 sec
+PROS: disconnected on server side. Trying to reconnect.
+```
+
+It is **intermittent**, which is what made it look new each time: whether the
+retry loop engages depends on what the backend does on that launch. Some
+launches are clean with nothing changed. That is a reason to search the record
+harder, not a reason to assume the symptom is new.
+
+Nothing in the mod is involved. Blocking the game outbound in the firewall
+stops it.
+
+### Environment findings
+
+- **`Bin\Win64\user.cfg` was never being read.** It held performance tuning
+  that therefore never applied, plus a dead `hcm_*` CVar block left over from
+  1.x: the mod reads none of those and the build registers no `hcm_` CVars at
+  all. Consolidated into the single `user.cfg` beside `system.cfg`.
+- `r_TexturesStreamPoolSize` reads 4096 regardless of either file, so **KCD's
+  own graphics profile overrides `user.cfg`** for it.
+- The manifest declared `1.*`. The game matches `<kcd_version>` against
+  `wh_sys_version` and **disables the mod when nothing matches**, so that
+  claimed compatibility the mod cannot honor: it ships whole animation
+  databases generated from 1.9.7. Now pinned to `1.9.7`, which fails safe.
+- The install is a Steam build at 1.9.7 with only the auth DLL replaced
+  (`steam_api64.rne` is the original, preserved). Game data is stock, so the
+  generated databases match what a retail owner on 1.9.7 has.
+
+### Still open
+
+- Carried items are still dropped at trot and gallop, on the physics ragdoll
+  path. Separate from the walk-tier stagger fix and predates 2.0.0.
+- During this session a woman **kept her bucket** while running the *un-fixed*
+  animation data, which does not fit the `ColliderMode="Disabled"` explanation
+  recorded for the carried-item drop. Worth re-testing before that fix merges.
+- `sys_PakPriority = 0` and `mn_allowEditableDatabasesInPureGame = 1` are
+  development settings now live in `system.cfg`. Set `sys_PakPriority` back to
+  2 for normal play.
