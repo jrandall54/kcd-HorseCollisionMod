@@ -175,6 +175,27 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(REPO_ROOT, "mod_assets", "Animations", "Mannequin", "ADB")
 ADB_OUT = os.path.join(OUT_DIR, "kcd_male_database.adb")
 TAGS_OUT = os.path.join(OUT_DIR, "kcd_animationControlledTags.xml")
+
+# SubADB mode. Off by default: the shipped 2.0.0 layout splices the stagger
+# options directly into the vanilla database, which is proven to work.
+#
+# With it on, the options go into their own database and the vanilla file gets
+# a three-line reference to it instead. That is worth having because a whole
+# Mannequin database cannot be merged, so any other mod touching human
+# animations currently wins outright and this mod's fragments vanish silently.
+# A three-line reference is something a person can reapply; 5.5 MB of spliced
+# XML is not.
+#
+# Enable with --subadb. Untested as of writing, which is the point of the flag.
+USE_SUBADB = "--subadb" in sys.argv
+
+SUBADB_ENTRY = "Animations/Mannequin/ADB/hcm_male_stagger.adb"
+SUBADB_OUT = os.path.join(OUT_DIR, "hcm_male_stagger.adb")
+
+# Taken from the vanilla database header so the sub-database resolves fragment
+# ids and tags against exactly the same definitions.
+FRAG_DEF = "Animations/Mannequin/ADB/kcd_male_fragmentids.xml"
+TAG_DEF = "Animations/Mannequin/ADB/kcd_male_tags.xml"
 FEM_ADB_OUT = os.path.join(OUT_DIR, "wh_female_database.adb")
 FEM_IDS_OUT = os.path.join(OUT_DIR, "wh_female_fragmentids.xml")
 
@@ -293,6 +314,63 @@ def render_option(tags, clip, nl):
     return option.replace("\n", nl)
 
 
+def write_subadb_database(raw, nl, added):
+    """Writes the stagger options into their own database, referenced as a SubADB.
+
+    CryEngine's Mannequin loader can assemble one database from several files.
+    No vanilla KCD .adb uses it, all 28 of them splice everything into one
+    document, but the loader is present in WHGame.dll:
+
+        SubADBs
+        Loading subADB %s
+        [CAnimationDatabaseManager::LoadDatabase] Unknown tags %s for subADB %s
+
+    If this works, the mod's fragments live in a file nothing else touches and
+    the edit to the vanilla database shrinks to a three-line reference, which
+    is the difference between a conflict another animation mod cannot resolve
+    and one they can merge by hand.
+
+    Emitted without a Tags filter deliberately. The error string above shows
+    Tags is validated against the tag definition, so an unfiltered SubADB is
+    the case least likely to fail for a reason unrelated to the question being
+    asked.
+    """
+    sub = [
+        '<?xml version="1.0" encoding="us-ascii"?>',
+        '<AnimDB FragDef="%s" TagDef="%s">' % (FRAG_DEF, TAG_DEF),
+        "  <FragmentList>",
+        "    <AnimationControlled>",
+        added,
+        "    </AnimationControlled>",
+        "  </FragmentList>",
+        "</AnimDB>",
+        "",
+    ]
+
+    with io.open(SUBADB_OUT, "wb") as handle:
+        handle.write(nl.join(sub).encode("ascii"))
+
+    reference = nl.join([
+        "  <SubADBs>",
+        '    <SubADB File="%s" />' % SUBADB_ENTRY,
+        "  </SubADBs>",
+    ])
+
+    anchor = nl + "</AnimDB>"
+    patched = raw.replace(anchor, nl + reference + anchor, 1)
+
+    if patched == raw:
+        raise SystemExit("SubADBs insertion anchor not matched")
+
+    with io.open(ADB_OUT, "wb") as handle:
+        handle.write(patched.encode("ascii"))
+
+    print("SubADB mode: %d options in their own database" % len(STAGGERS))
+    print("wrote %s (%d bytes)" % (SUBADB_OUT, os.path.getsize(SUBADB_OUT)))
+    print("wrote %s (%d bytes, vanilla + %d)"
+          % (ADB_OUT, os.path.getsize(ADB_OUT), len(patched) - len(raw)))
+
+
 def write_database():
     raw = read_pak_entry(PAK, ADB_ENTRY).decode("ascii", "replace")
     nl = newline_of(raw)
@@ -314,6 +392,11 @@ def write_database():
 
     added = nl.join(
         render_option(tags, clip, nl) for tags, clip in STAGGERS)
+
+    if USE_SUBADB:
+        write_subadb_database(raw, nl, added)
+        return
+
     anchor = nl + "    </AnimationControlled>"
     patched = raw.replace(anchor, nl + added + anchor, 1)
 

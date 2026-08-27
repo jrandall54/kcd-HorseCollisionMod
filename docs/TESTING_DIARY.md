@@ -2699,3 +2699,83 @@ exactly the kind of question that was expensive before that tooling existed.
 
 Recorded now so the option is not lost: **the current whole-database
 replacement is a choice, not a constraint.**
+
+---
+
+## Build 2.0.1-dev.15: SubADB loads
+
+**Hypothesis**: the Mannequin loader in this build supports sub-databases, so
+the mod's fragments can live in their own `.adb` and the vanilla database only
+needs a reference to it.
+
+Background is in the compatibility entry above: no vanilla `.adb` uses
+`<SubADB>`, but `WHGame.dll` carries `SubADBs`, `Loading subADB %s` and a
+subADB-specific tag error, and `SubADB` exists as a standalone string
+alongside `File` and `Tags`.
+
+### The build
+
+`build_adb.py --subadb` writes two files instead of one:
+
+- `hcm_male_stagger.adb`, 3,406 bytes, a complete `AnimDB` with the same
+  `FragDef` and `TagDef` as the parent and an `AnimationControlled`
+  `FragmentList` holding the four stagger options.
+- `kcd_male_database.adb`, vanilla plus **96 bytes**:
+
+```xml
+  <SubADBs>
+    <SubADB File="Animations/Mannequin/ADB/hcm_male_stagger.adb" />
+  </SubADBs>
+```
+
+Emitted without a `Tags` filter on purpose. The loader validates `Tags` against
+the tag definition, so an unfiltered reference is the case least likely to fail
+for a reason unrelated to the question.
+
+Compare that 96-byte diff with the roughly 3,200 bytes the inline splice adds.
+
+### Result: the engine loads it
+
+Reloaded into the running game with `--anim-reload --verbose`. Verbosity
+mattered: at the default the line does not appear at all, which made the first
+attempt read as a silent failure when it was a logging level.
+
+```
+[log] Loading subADB Animations/Mannequin/ADB/hcm_male_stagger.adb
+```
+
+No `Unknown tags ... for subADB` error accompanied it. The `Unknown tags`
+lines that do appear are the pre-existing vanilla noise for
+`CombatStealthAttackSuccess` and `CombatStealthHitSuccess` with `stealthLying*`
+tags, and their format is "for fragmentID", not "for subADB".
+
+**So the feature is live in this build despite no vanilla file using it.** Worth
+noting how close this came to a wrong negative: 28 vanilla databases using zero
+SubADBs is exactly the kind of complete-looking sample that justifies "the fork
+removed it".
+
+### The in-game control is built in
+
+The female database is still built with the options spliced inline, and only
+the male one uses the SubADB. So a single test separates the two cleanly:
+
+- Women stagger, men do not: SubADB parsed but its fragments did not resolve.
+- Both stagger: SubADB works end to end.
+- Neither: something unrelated broke.
+
+### Still to establish
+
+Loading is not the whole prize. The reference still lives inside a replaced
+`kcd_male_database.adb`, so this does not yet remove the conflict, it shrinks
+it from 5.5 MB of spliced XML to three lines another author could reapply by
+hand.
+
+Removing the conflict entirely needs the second half: a small parent `.adb`
+that declares *both* the vanilla database and the mod's file as SubADBs, with
+entities pointed at the parent. The database path is a Lua entity property,
+`AnimDatabase3P` in `Scripts/Entities/actor/player.lua`, so redirecting it does
+not require touching any animation file, though it would require touching
+`player.lua` and `BasicAI.lua` unless it can be set at runtime.
+
+Unknown, and the next thing to test: whether a SubADB can carry a whole
+database rather than a fragment subset.
