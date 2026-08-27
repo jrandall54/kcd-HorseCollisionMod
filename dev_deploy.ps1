@@ -25,7 +25,8 @@ param (
 	[switch]$ParkVortexMod,
 	[switch]$NoDevMode,
 	[switch]$NoLooseScript,
-	[switch]$ScriptOnly
+	[switch]$ScriptOnly,
+	[switch]$AnimOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -131,26 +132,67 @@ $devDir = Join-Path $modsDir $devMod
 
 Write-Host "[DEPLOY] game: $gameRoot"
 
-# The inner loop: push only the loose script, then reload it from the console.
-# This deliberately skips the running-game guard below, because that guard is
-# about the pak, which the engine holds open. A loose .lua is not locked, so it
-# can be replaced under a running game and picked up by:
+# Copies the parts of the mod that can be replaced under a running game.
 #
-#     python dev_console.py --reload
+# Both live under Data, because sys_game_folder is "Data" and that is where
+# the engine's file system is rooted. One level higher is never found, and the
+# failure is quiet: "Loading and executing script file" is logged before the
+# read is attempted and a miss logs nothing.
 #
-if ($ScriptOnly) {
-	# Under Data, not the game root. sys_game_folder is "Data", so that is where
-	# the engine's file system is rooted: a loose script one level higher is
-	# never found. The failure is quiet, because "Loading and executing script
-	# file" is logged before the read is attempted and a miss logs nothing.
-	$looseDir = Join-Path $gameRoot "Data\Scripts\Startup"
+# Neither is what ships. The packed copies inside the pak stay exactly as they
+# are; these are only what a running game reads first, and only while
+# sys_PakPriority is 0.
+function Copy-LooseFiles {
+	param (
+		[string]$Root,
+		[switch]$Script,
+		[switch]$Anim
+	)
 
-	New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
-	Copy-Item "HorseCollisionMod.lua" `
-		-Destination (Join-Path $looseDir "HorseCollisionMod.lua") -Force
+	if ($Script) {
+		$looseDir = Join-Path $Root "Data\Scripts\Startup"
 
-	Write-Host "[DEPLOY] loose script updated. Reload it with:" -ForegroundColor Green
-	Write-Host "         python dev_console.py --reload"
+		New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
+		Copy-Item "HorseCollisionMod.lua" `
+			-Destination (Join-Path $looseDir "HorseCollisionMod.lua") -Force
+
+		Write-Host "[DEPLOY] loose script updated"
+	}
+
+	if ($Anim) {
+		$source = "mod_assets\Animations\Mannequin\ADB"
+
+		if (-not (Test-Path $source)) {
+			Write-Host "[DEPLOY] no mod_assets yet. Run build.ps1 first." -ForegroundColor Yellow
+			return
+		}
+
+		$looseDir = Join-Path $Root "Data\Animations\Mannequin\ADB"
+
+		New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
+		Copy-Item "$source\*" -Destination $looseDir -Force
+
+		Write-Host "[DEPLOY] loose animation databases updated"
+	}
+}
+
+# The inner loops: push what changed, then reload it from the console. Both
+# deliberately skip the running-game guard below, because that guard is about
+# the pak, which the engine holds open. A loose file is not locked and can be
+# replaced underneath a running game.
+if ($ScriptOnly -or $AnimOnly) {
+	Copy-LooseFiles -Root $gameRoot -Script:$ScriptOnly -Anim:$AnimOnly
+
+	Write-Host "[DEPLOY] reload it with:" -ForegroundColor Green
+
+	if ($ScriptOnly) {
+		Write-Host "         python dev_console.py --reload"
+	}
+
+	if ($AnimOnly) {
+		Write-Host "         python dev_console.py --anim-reload"
+	}
+
 	exit 0
 }
 
@@ -281,17 +323,7 @@ Write-Host "[DEPLOY] load order: $($order -join ' -> ')"
 # the same packed bytes. The check below says so rather than leaving a silent
 # no-op to be discovered later.
 if (-not $NoLooseScript) {
-	# Under Data, not the game root. sys_game_folder is "Data", so that is where
-	# the engine's file system is rooted: a loose script one level higher is
-	# never found. The failure is quiet, because "Loading and executing script
-	# file" is logged before the read is attempted and a miss logs nothing.
-	$looseDir = Join-Path $gameRoot "Data\Scripts\Startup"
-	$loosePath = Join-Path $looseDir "HorseCollisionMod.lua"
-
-	New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
-	Copy-Item "HorseCollisionMod.lua" -Destination $loosePath -Force
-
-	Write-Host "[DEPLOY] script also placed loose at Scripts\Startup\ for hot reload"
+	Copy-LooseFiles -Root $gameRoot -Script -Anim
 
 	$cfg = Join-Path $gameRoot "system.cfg"
 	$priority = $null

@@ -138,11 +138,18 @@ RELOAD_COMMANDS = [
     "#HorseCollisionMod:uiActionListener('sys_loadingimagescreen', 'OnEnd', nil)",
 ]
 
-# The animation half. Mannequin owns the databases the stagger options live in,
-# so if either of these takes effect the ADB changes hotload too and animation
-# edits stop costing a restart. Untested: both are listed so a refusal can be
-# told apart from a reload that ran and did nothing.
+# The animation half. Mannequin owns the databases the stagger options live in.
+#
+# mn_allowEditableDatabasesInPureGame is the reason mn_reload appeared to do
+# nothing: a shipping build treats its Mannequin databases as read only, and
+# this build ships the CVar at 0. It is sent first, every time, because it is a
+# runtime value that resets with the game exactly like log_Verbosity does.
+#
+# The reload only sees new data if the ADB files are also on disk loose, under
+# Data/Animations/Mannequin/ADB, and sys_PakPriority is 0. dev_deploy.ps1
+# -AnimOnly puts them there.
 ANIM_RELOAD_COMMANDS = [
+    "mn_allowEditableDatabasesInPureGame 1",
     "mn_reload",
     "wh_am_ReloadDB",
 ]
@@ -314,17 +321,23 @@ class Console(object):
             if event == EV_AUTOCOMPLETE_LIST:
                 self.commands.append(text)
 
-                # The list runs to thousands of entries. Printing it would
-                # bury the log, so it is collected and only counted here.
-                if self.collecting:
-                    if len(self.commands) % 500 == 0:
-                        show("... %d console commands so far" % len(self.commands))
+                # The server sends its whole autocomplete list, every command
+                # and CVar in the build, on connect. That is 4545 entries here,
+                # so printing them buries whatever was actually asked for: a
+                # one-command query scrolls its own answer off the screen.
+                # They are collected either way, because --commands wants them,
+                # but only --commands prints progress and only --raw shows the
+                # entries themselves.
+                if self.collecting and len(self.commands) % 500 == 0:
+                    show("... %d console commands so far" % len(self.commands))
 
-                    continue
+                continue
 
             if event == EV_AUTOCOMPLETE_DONE:
                 self.autocomplete_done = True
-                show("[autocomplete] complete, %d entries" % len(self.commands))
+                if self.collecting or self.raw:
+                    show("[autocomplete] complete, %d entries"
+                         % len(self.commands))
                 continue
 
             # Keepalives are never printed as lines, not even under --raw. The
