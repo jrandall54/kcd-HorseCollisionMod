@@ -59,6 +59,21 @@ HorseCollisionMod = {}
 
 HorseCollisionMod.Version = "2.0.0"
 
+--- Loop generation counter, deliberately kept outside the table above.
+--
+-- `lua_reload_script` re-executes this file, and its first act is to rebuild
+-- HorseCollisionMod from scratch, which takes TimerTick with it. A counter
+-- stored on the table therefore restarts at 1 on every reload, while any loop
+-- still running from before compares its own generation against that same 1,
+-- matches, and carries on. Each reload would leave another loop sweeping for
+-- collisions ten times a second, all of them writing to the same cooldown
+-- table.
+--
+-- The `or 0` is what makes this survive a reload: the global is already set by
+-- then, so the count continues instead of restarting, and every stale loop
+-- sees a generation that no longer matches and stops on its next tick.
+HorseCollisionModGeneration = HorseCollisionModGeneration or 0
+
 --- Tuning values. Safe to edit in place; nothing here is derived at runtime.
 --
 -- @field SpeedWalk lower bound of the walk tier, in meters per second
@@ -124,7 +139,7 @@ HorseCollisionMod.Config = {
 	MaxSweepExtra = 0.35,
 	Knockback = 50.0,
 	Uplift = 30.0,
-	ProtectMutt = true,
+	ProtectMutt = false,
 	-- Measured against a full horse stamina pool of 210. At these values a
 	-- gallop costs roughly three bodies and a trot roughly five before the
 	-- horse is spent and Henry is thrown. The previous 20/40 allowed ten
@@ -919,7 +934,9 @@ end
 -- @tparam table argTable event arguments, unused
 function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 	if actionName == "sys_loadingimagescreen" and eventName == "OnEnd" then
-		local currentTick = (self.TimerTick or 0) + 1
+		HorseCollisionModGeneration = HorseCollisionModGeneration + 1
+
+		local currentTick = HorseCollisionModGeneration
 
 		self.TimerTick = currentTick
 
