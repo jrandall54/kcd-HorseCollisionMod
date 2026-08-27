@@ -3153,3 +3153,75 @@ the `AnimDatabase3P` property. Every one of those is a path the engine has to
 resolve out of a pak.
 
 Not merging until a packaged build is tested at `sys_PakPriority = 2`.
+
+---
+
+## Build 2.1.0: the additive layout FAILS in a player configuration
+
+**Hypothesis**: the additive layout, verified across five builds with loose
+files, also works from inside a pak in a shipping configuration.
+
+**Setup.** As close to a player as the machine gets:
+
+```
+sys_PakPriority = 2                        shipping default, paks only
+mn_allowEditableDatabasesInPureGame = 0    shipping default
+no loose files at all                      the pak is the only source
+launched KingdomCome.exe directly          no -devmode
+```
+
+**User reported**: "both women and men had the single frame glitched animation
+snap back behavior."
+
+**Result: it does not work.** That signature is precisely documented in this
+diary as *a valid call with no matching option*: the action is accepted, the
+pose visibly begins, and it reverts within one frame because
+`StartInteractiveActionByName` found no option matching the FragTags. The
+mod's fragments are not being seen.
+
+Everything in this session up to here was verified with loose files at
+`sys_PakPriority = 0` and `mn_allowEditableDatabasesInPureGame = 1`. Not one of
+those results transferred.
+
+### My testing was badly designed and that cost the answer
+
+Four variables changed at once between the last passing test and this failing
+one: pak priority, the Mannequin CVar, loose versus packed, and dev mode. A
+failure with four simultaneous changes says only that something in the set is
+responsible.
+
+The correct approach was one variable at a time, and it was available: the
+whole session had already established that the hot-reload loop makes single
+changes cheap. Recording this because the same mistake would otherwise be made
+again, and because the earlier `ColliderMode` conclusion in this project failed
+for the same reason - a change plus an outcome, with no control.
+
+### The suspects, in order
+
+1. **`mn_allowEditableDatabasesInPureGame = 0`.** The strongest candidate. This
+   CVar already has form: it is why `mn_reload` appeared to be a no-op for a
+   whole session. If the "pure game" path assembles databases differently, for
+   instance from a precompiled or cached form that never processes `<SubADBs>`,
+   then SubADB works only in a development configuration and is useless for
+   shipping. Every additive test in this session ran with it at 1.
+
+2. **Pak path resolution.** The additive layout resolves paths in three places
+   the old one did not: `SubADB File`, `FragDef` and `subTagDef` references, and
+   `AnimDatabase3P`. Pak entry names were verified to use forward slashes, which
+   rules out the specific bug this project hit before, but not the general class.
+
+3. **Dev mode.** Least likely. It gates `VF_CHEAT` console commands, and nothing
+   in the load path obviously depends on it.
+
+### What this means for shipping
+
+**2.1.0 must not be published, and must not merge to main as the default
+layout.** Whatever the cause, in the only configuration that matters the mod
+currently does nothing at all.
+
+`build_adb.py --replace` still builds the 2.0.0 layout, which is known to work
+in a player configuration because it is what shipped. That is the fallback if
+the cause turns out to be unfixable.
+
+Next: isolate. `mn_allowEditableDatabasesInPureGame` back to 1, changing
+nothing else, still packed and still without dev mode.
