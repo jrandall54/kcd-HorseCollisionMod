@@ -2579,3 +2579,123 @@ Not yet established, and worth knowing before committing to this:
 3. Whether the same path exists for the female smart objects, since the bucket
    carriers are women and the female animation data has needed separate work
    throughout this project.
+
+---
+
+## Mod compatibility, researched rather than assumed
+
+Prompted by a fair challenge: mod collections stack dozens of mods that must
+overlap constantly, so is this mod actually unusual or is the conflict worry
+overstated? Answered from the installed mods, the game's own data, and the
+game binary.
+
+### The three open questions on the drop-and-pickup path
+
+**Q1. Does `dropItems` depend on combat?** No. The tree is 7,356 characters and
+references exactly four variables: `hand`, `item`, `itemCategory`, `__null`.
+Not one combat variable, and the node types are all generic (`AddLink`,
+`GetItemType`, `HandCheck`, `InstantDoPlace`, `IfCondition`, `Switch`, `While`,
+`Expression`). It lives in `sb_combat.xml` by filing, not by dependency, and
+should run anywhere.
+
+**Q2. Does the pickup restart the NPC's day?** Not on its own.
+`daycycle:restartRequest` appears **zero** times in `so_slot.xml`. The restart
+lives in the `Hit` branch of `sb_switch_hitreactions.xml`, not in the retrieval
+path, so invoking the drop and letting the smart object recover the item does
+not inherently abandon the activity. The four relevant trees are substantial
+and real: `pickItem` (9,327 chars), `findPickedItem` (7,590),
+`slotRecoveryCheck` (5,551), `pickFromGround` (4,784).
+
+**Q3. Do the female smart objects use the same path?** Yes. `so_slot.xml`
+contains no gender branching whatsoever, so item handling is shared. The
+gendered split in this project has only ever been in the animation databases.
+
+All three answers are favourable. Nothing in the AI data blocks the goal.
+
+### What this mod actually conflicts with
+
+Every mod installed on this machine, by the files it overrides:
+
+| Mod | Overrides | Subsystem |
+| --- | --- | --- |
+| Perkaholic | 6 `Libs/Tables/rpg/*__perkaholic.xml` + localization | RPG tables |
+| RealisticFootprints | `Libs/MaterialEffects/FXLibs/*`, decal materials and textures | material effects |
+| HighFPSFX | 8 `Libs/Particles/*.xml` | particles |
+| CutsceneFPSFix | one `.ent` and two Lua files, all its own | new entity |
+| EasyToSeeHerbs | one `.dds` | texture |
+| XboxToPS3controller | `Libs/UI/Textures/*.dds` | UI textures |
+| **HorseCollisionMod** | **`kcd_male_database.adb` (5.5 MB), `wh_female_database.adb`, 2 tag/fragment XMLs** | **animation databases** |
+
+**Overlap between all six other mods: zero.** Not one shared file, excluding
+Vortex's own bookkeeping. They stack cleanly because each lives in a different
+subsystem, and several add new files rather than replacing existing ones.
+
+So mods do stack by the dozen, and the reason is not that the engine merges
+them. It is that most mods touch small leaf assets, and the chance of two mods
+picking the same texture or particle file is low.
+
+### This mod is genuinely different, and here is the specific reason
+
+There are two categories, and they are not the same:
+
+**Data with a merge path.** Perkaholic does not replace `perk.xml`. It ships
+`perk__perkaholic.xml` alongside it. Those files are row tables
+(`<database name="hammerheart"><table name="perk">` with typed columns), and
+the loader combines rows from every matching file. Vanilla ships **zero**
+`__suffixed` table files, confirming the suffix is a mod convention the loader
+supports rather than something copied from the game. Two perk mods can coexist.
+The community has built merge tools on top of this for the cases that do clash:
+KCDMerge, Letum's Mod Merger, Mod Merger, all of which work by matching row IDs
+and combining values.
+
+**Data with no merge path.** Mannequin animation databases are one XML document
+per character type. There is no row identity to match, no `__suffix`
+convention, and none of the merge tools handle `.adb`. Two mods that both add a
+fragment to `kcd_male_database.adb` cannot both win. The later one in
+`mod_order.txt` replaces the file outright and the other's changes vanish
+silently.
+
+That is the honest asymmetry. The mod is not unusually greedy, it is in the one
+data format the ecosystem has no answer for. Behavior trees, which the
+carried-item work would need, are in the same category.
+
+### SubADB: the engine supports splitting a database, and vanilla never uses it
+
+This is the finding that changes the options.
+
+Scanned all 28 vanilla `.adb` files: **zero** use `<SubADB>`. Easy to conclude
+from that alone that the fork dropped the feature. It did not. The strings are
+present in `WHGame.dll`:
+
+```
+SubADBs
+Loading subADB %s
+[CAnimationDatabaseManager::LoadDatabase] Unknown tags %s for subADB %s
+```
+
+Those are live code paths in `CAnimationDatabaseManager::LoadDatabase`,
+including a tag-validation error specific to sub-databases. The loader is
+implemented; the game simply never exercises it.
+
+**And the database is bound from Lua, not hardcoded.**
+`Scripts/Entities/actor/player.lua` sets:
+
+```lua
+ActionController = "Animations/Mannequin/ADB/kcd_male_controllerdefs.xml",
+AnimDatabase3P   = "Animations/Mannequin/ADB/kcd_male_database.adb",
+```
+
+Which raises a genuinely additive shape worth testing: a small parent `.adb`
+that declares the vanilla database and a mod fragment file as two SubADBs,
+with entities pointed at the parent. No vanilla animation file modified at all.
+
+Untested, and there are real unknowns: whether a SubADB can carry a whole
+database rather than a fragment subset, whether tag validation accepts it, and
+whether the entity property can be redirected without replacing `player.lua`
+and `BasicAI.lua`, which would only move the conflict rather than remove it.
+
+The cost of finding out is low, because animation data hot-reloads. This is
+exactly the kind of question that was expensive before that tooling existed.
+
+Recorded now so the option is not lost: **the current whole-database
+replacement is a choice, not a constraint.**
