@@ -90,6 +90,32 @@ EVENT_NAMES = {
 
 LOG_EVENTS = (EV_LOG_MESSAGE, EV_LOG_WARNING, EV_LOG_ERROR)
 
+# Backend chatter the game emits constantly and that says nothing about the
+# game itself. Both groups were read off a live session and confirmed to carry
+# no gameplay information before being muted here:
+#
+#   PROS: ...            Warhorse's own online backend (Pros.Global.Api.Auth).
+#                        It repeatedly fails Steam token validation and
+#                        reconnects. Nothing in the game waits on it.
+#   [Steam] ...          The Steam achievement and stats layer writing user
+#                        data. Bookkeeping only.
+#
+# At verbosity 4 these outnumber real log lines badly enough that a listening
+# session is unreadable, which is the whole reason the live log exists. They
+# are suppressed by default and counted, never dropped silently: --listen
+# reports how many were hidden, and --noisy turns the filter off. --raw is
+# unaffected, since raw means raw.
+NOISE = [
+    re.compile(r"^\s*PROS:"),
+    re.compile(r"^\s*\[Steam\]"),
+]
+
+
+def is_noise(text):
+    """True when a log line is backend chatter rather than game information."""
+    stripped = COLOUR_CODES.sub("", text).strip()
+    return any(pattern.search(stripped) for pattern in NOISE)
+
 # The mod's script as the engine's file system names it.
 MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
 
@@ -180,9 +206,11 @@ def unpack(buffer):
 class Console(object):
     """A client that answers the server's requests and prints what it says."""
 
-    def __init__(self, raw=False, quiet=False):
+    def __init__(self, raw=False, quiet=False, noisy=False):
         self.raw = raw
         self.quiet = quiet
+        self.noisy = noisy
+        self.muted = 0
         self.sock = None
         self.alive = False
         self.buffer = b""
@@ -291,6 +319,13 @@ class Console(object):
             if self.quiet and event not in LOG_EVENTS:
                 continue
 
+            # Counted rather than dropped, so the tally at the end can say
+            # how much was hidden and the filter never silently eats
+            # something that mattered.
+            if not self.noisy and event in LOG_EVENTS and is_noise(text):
+                self.muted = self.muted + 1
+                continue
+
             if CHEAT_REFUSAL in text:
                 self.refusals.append(COLOUR_CODES.sub("", text).strip())
 
@@ -300,6 +335,14 @@ class Console(object):
     def listen_forever(self):
         while self.alive:
             self.pump()
+
+    def report_muted(self):
+        """Says how much backend chatter was hidden, if any."""
+        if not self.muted:
+            return
+
+        show("[filtered] %d backend log lines hidden (PROS, Steam)."
+             " Use --noisy to see them." % self.muted)
 
     def close(self):
         self.alive = False
@@ -322,6 +365,8 @@ def main():
                         help="dump every byte received, to check the framing")
     parser.add_argument("--quiet", action="store_true",
                         help="show only log lines")
+    parser.add_argument("--noisy", action="store_true",
+                        help="do not hide the PROS and Steam backend chatter")
     parser.add_argument("--wait", type=float, default=3.0,
                         help="seconds to keep reading after the command is sent")
     parser.add_argument("--commands", metavar="FILE", nargs="?",
@@ -333,7 +378,7 @@ def main():
                         help="ask Mannequin to reload the animation databases")
     args = parser.parse_args()
 
-    console = Console(raw=args.raw, quiet=args.quiet)
+    console = Console(raw=args.raw, quiet=args.quiet, noisy=args.noisy)
 
     try:
         console.connect()
@@ -360,6 +405,7 @@ def main():
             pass
 
         console.close()
+        console.report_muted()
         return 0
 
     if args.diagnose:
@@ -395,6 +441,7 @@ def main():
         print("         re-run with --raw to see what it did send.")
 
     console.close()
+    console.report_muted()
     return 0
 
 
@@ -467,6 +514,7 @@ def interactive(console):
         pass
 
     console.close()
+    console.report_muted()
     return 0
 
 

@@ -46,6 +46,34 @@ telemetry arrives as it happens:
 [log] [HorseCollisionMod] Stagger action=hcm_stagger_back gender=1 ok=true err=nil
 ```
 
+
+### Backend chatter is filtered out
+
+Two things talk constantly and say nothing about the game:
+
+```
+PROS: authorization service state error = 3, Steam token validation failed, ...
+PROS: disconnected on server side. Trying to reconnect.
+[Steam] CrySteamStats: Stats stored
+[Steam] Stats StatsWriteUserData return 1
+```
+
+`PROS` is Warhorse's own online backend, `Pros.Global.Api.Auth`, failing to
+validate a Steam token and retrying forever. `[Steam]` is the achievement and
+stats layer writing user data. Nothing in the game waits on either, and at
+verbosity 4 they outnumber real log lines badly enough to make the live log
+useless, which is the one thing it exists for.
+
+Both are suppressed by default and **counted, never dropped silently**:
+
+```
+[filtered] 412 backend log lines hidden (PROS, Steam). Use --noisy to see them.
+```
+
+`--noisy` turns the filter off. `--raw` is unaffected, since raw means raw.
+The patterns live in `NOISE` at the top of `dev_console.py`; add to that list
+rather than filtering downstream, so the count stays accurate.
+
 ### Protocol notes
 
 Each packet is one event-type character, the payload, then a zero byte. The
