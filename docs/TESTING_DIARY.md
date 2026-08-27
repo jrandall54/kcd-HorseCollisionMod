@@ -2895,3 +2895,97 @@ One piece remains: pointing entities at a parent that references the
 `kcd_male_database.adb` with the parent. That is the difference between
 shrinking the conflict and removing it, and it is a Lua question rather than an
 animation one, since `AnimDatabase3P` is an entity-class property.
+
+---
+
+## Build 2.0.1-dev.17: fully additive animation deployment works
+
+**Hypothesis**: entities can be pointed at a small parent database that
+references the untouched vanilla file inside its own pak, so the mod overrides
+no vanilla animation file at all.
+
+**Setup.** Every loose `kcd_male_database.adb` override removed, so vanilla is
+served from `Animations-part1.pak`. In its place a new file:
+
+```
+hcm_male_database.adb   342 bytes
+  <SubADB File="Animations/Mannequin/ADB/kcd_male_database.adb" />   vanilla, from the pak
+  <SubADB File="Animations/Mannequin/ADB/hcm_male_stagger.adb" />    the mod's four options
+```
+
+Five male entity classes redirected at runtime through the remote console,
+confirmed by reading the property back:
+
+```
+NPC_x, NPC_NAI_x, NullAI_x, DummyTarget_x, Player
+  AnimDatabase3P = Animations/Mannequin/ADB/hcm_male_database.adb
+```
+
+Then a save load, because the property is read when an actor spawns and
+existing NPCs had already been built against the old value.
+
+**User reported**: "men staggered and everyone animating normally."
+
+**Result: confirmed.** The mod's fragments resolve, ordinary male animation is
+intact, and **not one vanilla animation file is overridden on the male path.**
+
+Worth stating what that changes. The compatibility entry above concluded that
+Mannequin databases have no merge path and that two mods touching human
+animations cannot coexist. That conclusion was correct about *replacement* and
+wrong as a limit. There is a supported way to add fragments without replacing
+anything, and it has now been demonstrated end to end.
+
+The chain of three results that got here, each of which could have been
+mistaken for a dead end:
+
+1. No vanilla `.adb` uses SubADB, but the loader is in `WHGame.dll`.
+2. SubADB resolves fragments, not just loads files.
+3. A SubADB can carry an entire database, and the database path is a Lua
+   entity-class property rather than something compiled in.
+
+### What is still replaced
+
+The male *database* path is clean. Three files are not yet:
+
+| File | Status |
+| --- | --- |
+| `kcd_male_database.adb` | **no longer overridden** |
+| `hcm_male_database.adb`, `hcm_male_stagger.adb` | new files, conflict with nothing |
+| `kcd_animationControlledTags.xml` | still a replacement, declares the four FragTags |
+| `wh_female_database.adb` | still a replacement, female side not yet converted |
+| `wh_female_fragmentids.xml` | still a replacement, declares the female fragment |
+
+The female side is unconverted on purpose: it was the control for this test.
+Converting it should be mechanical now.
+
+The two XML declaration files are the open question. Whether a sub-database can
+carry its own tag and fragment definitions, or whether those must be merged
+into the vanilla ones, has not been tested.
+
+### Deferred observations from this session
+
+Recorded now so they survive, not investigated yet at the user's direction.
+
+**Female staggers fire intermittently.** "Some of the woman stagger animations
+didn't fire and some did. It almost seemed random or maybe related to which
+side I hit them from."
+
+Not caused by the additive work: the female path was untouched in this test and
+still uses the inline splice. A side dependency would point at `GetImpactDir`
+and the four directional FragTags, where a direction that resolves to no
+matching option is dropped silently, which this diary records as the single
+most important failure mode in the project.
+
+**Speed tier misreported at gallop.** "Sometimes I'll be galloping full speed
+against someone and the animation/ragdoll don't fire and in the console it says
+it impacted them at walking speed but there's no way that's accurate."
+
+This is the same phenomenon as the earlier "gallop regression" entry, which was
+closed as not-a-bug on the grounds that the horse never exceeded 8.03 m/s
+against `SpeedGallop = 8.5`. That closure now looks premature. If the speed
+sampled at impact can read as walking pace during a full gallop, the telemetry
+that justified the tier boundaries is itself suspect, and so is the tuning
+derived from it. The likely suspect is when and how velocity is sampled
+relative to the impact rather than the thresholds themselves.
+
+Both belong to a tuning pass, after the deployment work.
