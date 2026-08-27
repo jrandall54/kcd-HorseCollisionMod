@@ -139,7 +139,7 @@ HorseCollisionMod.Config = {
 	MaxSweepExtra = 0.35,
 	Knockback = 50.0,
 	Uplift = 30.0,
-	ProtectMutt = false,
+	ProtectMutt = true,
 	-- Measured against a full horse stamina pool of 210. At these values a
 	-- gallop costs roughly three bodies and a trot roughly five before the
 	-- horse is spent and Henry is thrown. The previous 20/40 allowed ten
