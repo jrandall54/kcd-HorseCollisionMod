@@ -2186,3 +2186,36 @@ Version 2.0.0 is already on the page, uploaded 2026-08-26T05:08:54.000+00:00.
 All four lookups resolve, including the mod-file-version to mod-file hop, and
 the duplicate check reads live data. The upload, finalise and publish calls
 remain untested until a real release.
+
+### Storing the API key
+
+`$env:NEXUS_API_KEY` per session worked but meant retyping the key, and the
+obvious alternatives are all worse than they look. `setx` writes it to the
+registry as plaintext. A gitignored dotfile is plaintext on disk and one
+`git add -f` from leaking. Passing `-ApiKey` puts it in shell history.
+
+`Export-Clixml` on a `SecureString` encrypts with DPAPI under the current
+Windows account, needs no dependencies, and produces a file that other users on
+the machine cannot read and that is useless if copied elsewhere. It is stored
+at `%LOCALAPPDATA%\HorseCollisionMod\nexus.cred`, outside the repository, so no
+amount of carelessness with `git add` can commit it.
+
+Set with `-SaveApiKey`, removed with `-ForgetApiKey`. Resolution order is the
+`-ApiKey` parameter, then the environment variable, then the stored file, so a
+single session can override without disturbing what is saved.
+
+The honest limit: DPAPI does not defend against code already running as this
+user, which decrypts it exactly as the script does. It defends against the ways
+a key actually leaks in practice, which are a synced folder, a backup, a shared
+machine and an accidental commit.
+
+Verified by round-tripping a dummy value: stored, decrypted, sent, and rejected
+by the API with a 401, which proves the key reached the request rather than the
+call failing earlier for some other reason. Removing the file falls back to the
+message telling you how to store one.
+
+### When this runs
+
+Release step only, run by hand on a tagged version. Not wired to a push, a
+merge, or a schedule, which is also what keeps a personal API key inside the
+acceptable use policy: the action is initiated by the author every time.

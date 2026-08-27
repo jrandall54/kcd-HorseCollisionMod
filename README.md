@@ -183,13 +183,40 @@ Output goes to `releases\`. API reference, technical notes and the development l
 `tools/publish_nexus.ps1` uploads a built zip to the mod page through the Nexus Mods
 v3 API, so a release does not have to go through the browser.
 
-```
-$env:NEXUS_API_KEY = "<key from nexusmods.com/settings/api-keys>"
+Once, to store your API key:
 
+```
+.\tools\publish_nexus.ps1 -SaveApiKey
+```
+
+Then per release:
+
+```
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.1.0"
 .\tools\publish_nexus.ps1 -Version 2.1.0 -DryRun
 .\tools\publish_nexus.ps1 -Version 2.1.0 -ChangelogFile releases\notes-2.1.0.md
 ```
+
+This is a release step, run by hand on a tagged version. It is not wired into
+anything that runs on a push.
+
+### The API key
+
+`-SaveApiKey` prompts for the key and writes it to
+`%LOCALAPPDATA%\HorseCollisionMod\nexus.cred`, encrypted with DPAPI under your
+Windows account. That file is unreadable to other users on the machine and useless
+if copied to another one, which covers how a key realistically leaks: a synced
+folder, a backup, a shared machine, a stray `git add`. It lives outside the
+repository so it cannot be committed at all.
+
+What DPAPI does not defend against is code already running as you, which decrypts
+it exactly as the script does. That is a reasonable trade for a mod upload key,
+but it is a trade rather than the key being safe from everything.
+
+`-ForgetApiKey` deletes it. Key resolution is `-ApiKey`, then `$env:NEXUS_API_KEY`,
+then the stored file, so a single session can still override without touching what
+is saved. Prefer the stored key to `setx`, which puts it in the registry as
+plaintext, and to passing `-ApiKey`, which puts it in shell history.
 
 `-DryRun` resolves and validates everything, then stops before uploading. Without it
 the script prints what it is about to publish and asks you to type the version back

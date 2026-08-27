@@ -57,9 +57,19 @@
     tools\publish_nexus.ps1 -Version 2.1.0 -ChangelogFile releases\notes-2.1.0.md
 #>
 
+[CmdletBinding(DefaultParameterSetName = "Publish")]
 param (
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = "Publish")]
     [string]$Version,
+
+    # Prompts for the API key and stores it encrypted, then exits. One-time
+    # setup; afterwards no key has to be supplied at all.
+    [Parameter(Mandatory = $true, ParameterSetName = "SaveKey")]
+    [switch]$SaveApiKey,
+
+    # Deletes the stored key and exits.
+    [Parameter(Mandatory = $true, ParameterSetName = "ForgetKey")]
+    [switch]$ForgetApiKey,
 
     # Defaults to releases\HorseCollisionMod_v<Version>.zip.
     [string]$Zip,
@@ -75,8 +85,10 @@ param (
     [ValidateSet("main", "optional", "miscellaneous")]
     [string]$Category = "main",
 
-    # Read from the environment so the key never has to appear in a command
-    # line, in shell history, or in a file in the repository.
+    # Usually left unset. Resolution order is this parameter, then
+    # NEXUS_API_KEY in the environment, then the stored credential written by
+    # -SaveApiKey. Passing it here puts the key in shell history, so it exists
+    # for automation rather than for typing.
     [string]$ApiKey = $env:NEXUS_API_KEY,
 
     # Public identifiers, straight out of the mod's own URLs.
@@ -124,6 +136,83 @@ $AppName = "HorseCollisionMod-publish"
 $AppVersion = "1.0.0"
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+
+# ---------------------------------------------------------------------------
+# The stored API key
+# ---------------------------------------------------------------------------
+
+# Kept outside the repository so it cannot be committed by any amount of
+# carelessness with git add.
+$CredentialPath = Join-Path $env:LOCALAPPDATA "HorseCollisionMod\nexus.cred"
+
+# Export-Clixml on a SecureString encrypts with DPAPI under the current Windows
+# user account. The file is unreadable to other users on this machine and
+# useless if copied to another one, which covers the realistic ways a key
+# leaks: a synced folder, a backup, a shared machine, a stray git add.
+#
+# What it does not defend against is code already running as this user. DPAPI
+# decrypts for them exactly as it does for the script. That is an acceptable
+# trade for a mod upload key, and it is worth being clear that it is a trade
+# rather than pretending the key is safe from everything.
+function Save-ApiKey {
+    $directory = Split-Path -Parent $CredentialPath
+    if (-not (Test-Path $directory)) {
+        New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    }
+
+    Write-Host "Get a key from https://www.nexusmods.com/settings/api-keys"
+    $secure = Read-Host "Nexus Mods API key" -AsSecureString
+    if ($secure.Length -eq 0) {
+        Write-Host "Nothing entered, not saved." -ForegroundColor Yellow
+        exit 1
+    }
+
+    $secure | Export-Clixml -Path $CredentialPath
+
+    Write-Host "Saved, encrypted for $env:USERNAME on $env:COMPUTERNAME." -ForegroundColor Green
+    Write-Host "  $CredentialPath"
+    Write-Host "Publishing needs no key on the command line from now on."
+}
+
+function Get-StoredApiKey {
+    if (-not (Test-Path $CredentialPath)) { return $null }
+
+    try {
+        $secure = Import-Clixml -Path $CredentialPath
+    }
+    catch {
+        # The usual cause is the file having been copied from another machine
+        # or another account, where DPAPI cannot decrypt it by design.
+        Write-Host "[WARN] Could not read $CredentialPath. Re-save it with -SaveApiKey." -ForegroundColor Yellow
+        return $null
+    }
+
+    # Round-tripping a SecureString to plain text needs an unmanaged buffer,
+    # which is not garbage collected and has to be zeroed by hand.
+    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+    }
+}
+
+if ($PSCmdlet.ParameterSetName -eq "SaveKey") {
+    Save-ApiKey
+    exit 0
+}
+
+if ($PSCmdlet.ParameterSetName -eq "ForgetKey") {
+    if (Test-Path $CredentialPath) {
+        Remove-Item -Force $CredentialPath
+        Write-Host "Removed $CredentialPath" -ForegroundColor Green
+    }
+    else {
+        Write-Host "No stored key at $CredentialPath" -ForegroundColor Yellow
+    }
+    exit 0
+}
 
 # Turns a thrown message into a plain line instead of PowerShell's error record
 # with its source extent and CategoryInfo block, which buries the sentence that
@@ -283,10 +372,12 @@ if ($manifestVersion -ne $Version) {
     Write-Host "[WARN] $message" -ForegroundColor Yellow
 }
 
+if (-not $ApiKey) { $ApiKey = Get-StoredApiKey }
+
 if (-not $ApiKey) {
-    throw ("No API key. Get one from https://www.nexusmods.com/settings/api-keys, then:" +
-           "`n    " + '$env:NEXUS_API_KEY' + " = '<key>'" +
-           "`n  Set it in the session rather than committing it anywhere.")
+    throw ("No API key. Store one once, encrypted for this Windows account:" +
+           "`n    .\tools\publish_nexus.ps1 -SaveApiKey" +
+           "`n  Or set " + '$env:NEXUS_API_KEY' + " for a single session.")
 }
 
 # ---------------------------------------------------------------------------
