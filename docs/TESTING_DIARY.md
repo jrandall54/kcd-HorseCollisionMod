@@ -2320,3 +2320,62 @@ message telling you how to store one.
 Release step only, run by hand on a tagged version. Not wired to a push, a
 merge, or a schedule, which is also what keeps a personal API key inside the
 acceptable use policy: the action is initiated by the author every time.
+
+---
+
+## Build 2.0.1-dev.14: the branch, rebased onto the new layout
+
+`fix/carried-item-drop` was cut before the repository reorganization, so it
+edited `HorseCollisionMod.lua`, `build_adb.py` and `mod.manifest` at the old
+root paths. Merging main in resolved all three by rename detection with no
+manual intervention; only the diary conflicted, both sides having appended.
+
+Rebuilt from scratch with `mod_assets/` deleted first, and the generated data
+verified rather than assumed: all four `hcm_stagger_*` options carry
+`MovementControlMethod` and no `ColliderMode` layer, and the 32 vanilla
+`AnimationControlled` options are untouched.
+
+### The stated rationale for the fix is partly wrong
+
+Worth correcting before testing, because the reasoning is what the next
+decision rests on.
+
+The commit removing the layer justified it this way: "the clips these options
+play live on the HitDeath fragment in the stock database, and neither of the
+two options there declares a ColliderMode layer."
+
+Checked against the vanilla male database. **`HitDeath` has 105 options, not
+two**, and `so_forward+minor_hit` appears four separate times with
+*different* collider handling: some declare `ColliderMode`, some do not.
+
+The narrow claim survives. The specific fragment that owns
+`hitreaction_idle_medium_torso_stab_front`, the clip actually used, declares no
+`ColliderMode`. So removing the layer does match the option the clip comes
+from.
+
+The broad claim does not. "Matching vanilla" is not one thing here, because
+vanilla ships both variants of the same FragTags. Removing the layer is a
+defensible choice, not an obviously correct restoration.
+
+**This matters for the open question.** The recorded cause, that
+`ColliderMode="Disabled"` makes NPCs drop carried items, was already
+contradicted once: a woman kept her bucket during a session running the
+un-fixed data. Now it is also clear vanilla itself is inconsistent about the
+layer. Two possibilities the test has to separate:
+
+- Removing the layer fixes the drop, and the woman who kept her bucket was
+  something else, most likely a different item or a different reaction option.
+- The layer was never the cause, the fix is cosmetic, and the drop has another
+  source. In that case the change is still worth keeping for matching the
+  source option, but it does not close the issue.
+
+The A/B is cheap now that animation data hot-reloads: build both variants by
+flipping `COLLIDER_MODE` in `tools/build_adb.py`, deploy with `-AnimOnly`, and
+reload without leaving the game. That was not possible when the original
+conclusion was recorded, which is probably why it was drawn from one
+observation.
+
+### Not yet tested in game
+
+Everything above is static verification of the generated data. No build test
+has run.
