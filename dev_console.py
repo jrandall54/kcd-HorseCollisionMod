@@ -156,10 +156,24 @@ CHEAT_REFUSAL = "VF_CHEAT"
 # silent until it is raised again; a run that relied on a previous session
 # having set it looked like the command had vanished. con_restricted is cleared
 # in the same breath since it is the other thing that can refuse input.
-SETUP_COMMANDS = [
-    "log_Verbosity 4",
-    "con_restricted 0",
-]
+#
+# The level is deliberately not 4. The mod logs through System.LogAlways, which
+# does not consult verbosity, so its telemetry arrives either way. What level 4
+# adds is every engine message: formatted, written to the console, and then
+# forwarded over this socket one packet per frame exchange. With the PROS
+# backend failing twice a second and the Steam stats layer chattering
+# continuously that is a large amount of main thread work for output nothing
+# reads, and it is enough to starve the audio buffer and make the game sound
+# like it is underwater.
+#
+# --verbose asks for 4 when engine-level detail is actually wanted.
+SETUP_VERBOSITY = 2
+VERBOSE_VERBOSITY = 4
+
+
+def setup_commands(verbosity):
+    """The per-connection preamble at a given console verbosity."""
+    return ["log_Verbosity %d" % verbosity, "con_restricted 0"]
 
 # Why no log line ever came back on the first working session. The remote
 # console forwards console output, and a shipping build generally has console
@@ -206,10 +220,12 @@ def unpack(buffer):
 class Console(object):
     """A client that answers the server's requests and prints what it says."""
 
-    def __init__(self, raw=False, quiet=False, noisy=False):
+    def __init__(self, raw=False, quiet=False, noisy=False,
+                 verbosity=SETUP_VERBOSITY):
         self.raw = raw
         self.quiet = quiet
         self.noisy = noisy
+        self.verbosity = verbosity
         self.muted = 0
         self.sock = None
         self.alive = False
@@ -233,9 +249,12 @@ class Console(object):
 
     def setup(self):
         """Queues the per-connection preamble that makes output readable."""
-        for command in SETUP_COMMANDS:
+        commands = setup_commands(self.verbosity)
+
+        for command in commands:
             self.outbox.append(command)
-        self.setup_count = len(SETUP_COMMANDS)
+
+        self.setup_count = len(commands)
 
     def lua(self, code):
         # sys_DevMode = 1 makes the console evaluate a leading "#" as Lua.
@@ -367,6 +386,8 @@ def main():
                         help="show only log lines")
     parser.add_argument("--noisy", action="store_true",
                         help="do not hide the PROS and Steam backend chatter")
+    parser.add_argument("--verbose", action="store_true",
+                        help="raise console verbosity to 4 (costs frame time)")
     parser.add_argument("--wait", type=float, default=3.0,
                         help="seconds to keep reading after the command is sent")
     parser.add_argument("--commands", metavar="FILE", nargs="?",
@@ -378,7 +399,9 @@ def main():
                         help="ask Mannequin to reload the animation databases")
     args = parser.parse_args()
 
-    console = Console(raw=args.raw, quiet=args.quiet, noisy=args.noisy)
+    console = Console(raw=args.raw, quiet=args.quiet, noisy=args.noisy,
+                      verbosity=(VERBOSE_VERBOSITY if args.verbose
+                                 else SETUP_VERBOSITY))
 
     try:
         console.connect()
