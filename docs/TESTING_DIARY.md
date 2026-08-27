@@ -2009,3 +2009,213 @@ carries every documented function and table.
 standard tool, its output was not what LDoc produces despite a docstring
 claiming otherwise, and its existence was the reason the documentation setup
 was unclear in the first place.
+
+## Session: publishing to Nexus Mods from the IDE
+
+Not a build test. Recorded because it settles how releases get published and
+rules out an approach that looks obviously correct from the outside.
+
+### The GitHub Action cannot work for this mod
+
+Nexus Mods ship `Nexus-Mods/upload-action` and a sample repository,
+`Nexus-Mods/API-Example`, whose workflow checks out the repository, zips
+`src/`, and uploads the result. That shape is a good fit for a source-only mod
+and a bad fit for this one.
+
+`build.ps1` calls `tools/build_adb.py`, which reads
+`Data/Animations-part1.pak` out of a local game install to generate
+`mod_assets/`. `mod_assets/` is gitignored, so a fresh clone has nothing to
+package. A GitHub-hosted runner has no game install, and shipping Warhorse's
+paks to CI is both a licensing problem and a gigabyte-scale one.
+
+The workaround would be to build locally, attach the zip to a GitHub release,
+and have a workflow feed that artifact to the action. That still builds by
+hand, and adds a round trip through GitHub in order to run six HTTP calls. The
+only thing it buys is keeping the API key in GitHub secrets rather than in a
+shell variable.
+
+So: publish locally, from `tools/publish_nexus.ps1`. Revisit the action only if
+the additive/patch ADB deployment on the roadmap ever lands, since a repository
+that commits a small delta instead of regenerating whole databases would be
+buildable anywhere.
+
+Worth noting the action itself adds nothing over the API. Its inputs map
+one-for-one onto the v3 request bodies, `display_name` to `name`,
+`category` to `file_category`, `archive_existing_version` to
+`archive_existing_file`, and it runs the same six calls the script does.
+
+### The site's file_id is not the API's file id
+
+The number in `?tab=files&file_id=10219` names a mod file **version**, but an
+upload is claimed by the mod **file** that owns the version. The spec draws
+this distinction explicitly: a `ModFile` is "the persistent, updatable file on
+a mod page", and its `ModFileVersion`s are the individual uploads.
+
+Both site identifiers resolve in one call each:
+
+```
+GET /games/kingdomcomedeliverance/mods/2338              -> data.id
+GET /games/kingdomcomedeliverance/mod-file-versions/10219 -> data.file.id
+```
+
+The script resolves them at runtime rather than caching them, then calls
+`GET /mods/{id}/files` to confirm the mod file actually belongs to that mod. A
+wrong identifier would otherwise publish onto someone else's page quietly.
+
+### Python and .NET disagree about the release zip's entry names
+
+Found while writing the zip validation, and worth recording because it produced
+a confident wrong answer in both directions.
+
+`Compress-Archive` stores Windows path separators, so the release zip really
+contains `Data\HorseCollisionMod.pak` with a backslash. Confirmed by reading
+the raw central directory bytes.
+
+**Python's `zipfile` normalizes those to forward slashes on read. .NET's
+`ZipArchiveEntry.FullName` reports them as stored.** So the same file listed
+through Python and through PowerShell gives different names, and a check
+written against one library fails against the other. The validation normalizes
+separators before comparing.
+
+This is the same `Compress-Archive` behavior that `build.ps1` already documents
+for the pak, where it matters much more: CryEngine looks pak entries up by
+exact path with forward slashes, so a backslash pak silently overrides nothing.
+The pak is therefore built entry by entry. The outer release zip is unpacked by
+Vortex or by hand rather than looked up by path, so backslashes there are
+harmless and no change was made to how it is built.
+
+### Guards on the publish path
+
+Everything below runs before any network call, because a wrong release reaching
+a live mod page is slower to undo than to prevent:
+
+- The version string is checked against the API's own `^[a-zA-Z0-9.-]+$` and
+  50 character limit, so a typo fails immediately rather than after the upload.
+- The zip must contain `mod.manifest` and `Data/HorseCollisionMod.pak`.
+- **The `<version>` inside the zip's `mod.manifest` must match the version
+  being published.** `build.ps1` copies `src/mod.manifest` verbatim, so its
+  version is maintained by hand and can drift from the `-Version` the zip was
+  built with. The manifest is what the game reads.
+- A version string containing `dev`, `alpha`, `beta` or `rc` is refused.
+- `GET /mod-files/{id}/versions` is checked for the version already existing.
+- The run prints what it is about to do and requires the version typed back.
+
+`-Force` skips these. `-DryRun` stops after validation and resolution.
+
+Two operational details from the spec that are easy to get wrong: the presigned
+`PUT` must carry `Content-Disposition: attachment; filename="..."` matching the
+filename sent to `POST /uploads`, because the filename is part of the URL's
+signature; and the upload is processed asynchronously, so `GET /uploads/{id}`
+has to report `available` before the version can be created. If a run fails
+after the upload succeeded it prints the upload id, and `-ResumeUploadId` picks
+up from there without sending the file again.
+
+### Not covered by the API
+
+There is no endpoint to create a mod page, and none to edit a mod's
+description. `PATCH` exists for collections, not for mods. The Nexus page copy
+is still pasted in by hand on each release, which is what the local description
+file is for.
+
+`createModFile` and `createModFileVersion` are both marked **Experimental** in
+the spec, meaning they can change or be removed without the 90-day deprecation
+window the stable endpoints get. Worth re-reading the spec if a release ever
+fails for no apparent reason.
+
+### Acceptable use policy, and what it changed
+
+Checked against
+https://help.nexusmods.com/article/114-api-acceptable-use-policy after the
+first working dry run. Two things were wrong and one was worth writing down.
+
+**Missing required headers.** The policy requires every request to carry
+`Application-Name` and `Application-Version`, and explicitly forbids "sending
+request metadata which is either blank or impersonates another application".
+The script sent neither. Now sends `HorseCollisionMod-publish` and a version
+that moves independently of the mod's, since the policy asks that the name stay
+constant across releases of the tool.
+
+Worth noting the v3 spec is misleading here: `Application-Name` appears in it
+exactly once, as an *optional* header on `downloadRepackedModFileVersion`. The
+policy governs, not the spec.
+
+**The poll loop was the one place this script could be a bad citizen.** It sat
+at a fixed two second interval for up to sixty attempts. Now backs off from one
+second to five, reaching about three minutes of waiting in 40 requests rather
+than 90. Nexus do not publish a specific quota in the policy, only that
+excessive consumption may be rate limited, so the fix is to not need a number.
+
+**Personal key use is within policy, and would stop being so if this were
+generalized.** Nexus permit personal API keys for testing and personal use.
+This qualifies: one author publishing to one mod page, the key read from the
+environment at the moment of use, stored by nothing, never used without the
+author starting the run. The policy's prohibition on "storing user API keys on
+your own server and/or using them without the action being initiated by the
+user" is the one to stay on the right side of, and a local script that reads an
+environment variable does.
+
+If this ever became a tool other modders point at their own pages, that is a
+public-facing application, and the policy requires registering with Nexus Mods
+at support@nexusmods.com with a testing build before release rather than
+shipping on personal keys. Relevant because generalizing the dev tooling for
+other modders has come up before.
+
+### Error output
+
+A first working dry run ended on the duplicate-version check, which was correct,
+but PowerShell rendered the `throw` as a full error record: source extent,
+squiggly underline, `CategoryInfo`, `FullyQualifiedErrorId`, with the actual
+sentence split across the noise. Unreadable for something a person runs by hand.
+
+A script-scope `trap` now prints the message and exits, so every guard reports
+as one line. The already-published case is not really a failure and got its own
+yellow message and exit code 2, so a wrapper can tell "already there" from
+"went wrong".
+
+### Confirmed working
+
+First live run against the real mod page, dry run only, no writes:
+
+```
+mod:      Horse Collision Mod [9869834848546]
+mod file: HorseCollisionMod [7863762]
+versions: 1 (0 archived)
+Version 2.0.0 is already on the page, uploaded 2026-08-26T05:08:54.000+00:00.
+```
+
+All four lookups resolve, including the mod-file-version to mod-file hop, and
+the duplicate check reads live data. The upload, finalise and publish calls
+remain untested until a real release.
+
+### Storing the API key
+
+`$env:NEXUS_API_KEY` per session worked but meant retyping the key, and the
+obvious alternatives are all worse than they look. `setx` writes it to the
+registry as plaintext. A gitignored dotfile is plaintext on disk and one
+`git add -f` from leaking. Passing `-ApiKey` puts it in shell history.
+
+`Export-Clixml` on a `SecureString` encrypts with DPAPI under the current
+Windows account, needs no dependencies, and produces a file that other users on
+the machine cannot read and that is useless if copied elsewhere. It is stored
+at `%LOCALAPPDATA%\HorseCollisionMod\nexus.cred`, outside the repository, so no
+amount of carelessness with `git add` can commit it.
+
+Set with `-SaveApiKey`, removed with `-ForgetApiKey`. Resolution order is the
+`-ApiKey` parameter, then the environment variable, then the stored file, so a
+single session can override without disturbing what is saved.
+
+The honest limit: DPAPI does not defend against code already running as this
+user, which decrypts it exactly as the script does. It defends against the ways
+a key actually leaks in practice, which are a synced folder, a backup, a shared
+machine and an accidental commit.
+
+Verified by round-tripping a dummy value: stored, decrypted, sent, and rejected
+by the API with a 401, which proves the key reached the request rather than the
+call failing earlier for some other reason. Removing the file falls back to the
+message telling you how to store one.
+
+### When this runs
+
+Release step only, run by hand on a tagged version. Not wired to a push, a
+merge, or a schedule, which is also what keeps a personal API key inside the
+acceptable use policy: the action is initiated by the author every time.
