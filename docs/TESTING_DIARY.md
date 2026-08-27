@@ -3072,3 +3072,84 @@ suppress the correct reaction that follows.
 Deferred at the user's direction, but this now looks like the most valuable
 thing to fix next, ahead of any tuning. The tuning numbers were derived from
 telemetry this defect would have corrupted.
+
+---
+
+## Build 2.1.0-dev.1: the additive layout as a real build
+
+First test of the additive deployment through the actual build pipeline rather
+than hand-assembled probe files, and the first with the female side converted.
+
+**User reported**: "both worked."
+
+Men and women both stagger, with the redirect performed by the mod itself
+rather than by console commands.
+
+### What ships now
+
+```
+hcm_animationControlledTags.xml   1005 B   FragTags, under a mod name
+hcm_female_database.adb            347 B   parent, two references
+hcm_female_fragmentids.xml       14082 B   declares AnimationControlled
+hcm_female_stagger.adb            3409 B   the four options
+hcm_male_database.adb              342 B   parent, two references
+hcm_male_fragmentids.xml         35505 B   AnimationControlled repointed
+hcm_male_stagger.adb              3406 B   the four options
+```
+
+Against 2.0.0, which shipped `kcd_male_database.adb` (5,555,221 B),
+`wh_female_database.adb` (962,471 B), `kcd_animationControlledTags.xml` and
+`wh_female_fragmentids.xml`.
+
+| | 2.0.0 | 2.1.0 |
+| --- | --- | --- |
+| download | 195,284 B | **24,366 B** |
+| content in the pak | 6.5 MB | 92 KB |
+| vanilla filenames claimed | 4 | **0** |
+
+Eight times smaller, and it stops redistributing 6.4 MB of Warhorse's own data.
+
+### The redirect
+
+`HorseCollisionMod.AnimationDatabases` maps seven entity classes to the two
+parent databases. `RedirectAnimationDatabases` runs at **file scope**, not from
+the load screen, because `AnimDatabase3P` is read when an actor spawns and the
+load screen ends after the world is already populated. It retries from the load
+screen for any class table that loaded late; the log reports `0 pending`, so all
+seven exist by the time a Startup script runs.
+
+Verified by reading the property back out of the running game:
+
+```
+NPC_x, NPC_NAI_x, NullAI_x, DummyTarget_x, Player -> hcm_male_database.adb
+NPC_Female_x, PlayerFemale                        -> hcm_female_database.adb
+```
+
+### Build guard
+
+`build.ps1` now fails if any file under a name not beginning `hcm_` would ship.
+A leftover from a `--replace` build would silently defeat the entire layout
+without changing a single line the build prints, and that class of silent
+override has cost this project several sessions already.
+
+### Not yet verified: the pak path
+
+**Everything above was tested with loose files.** `system.cfg` on the
+development machine carries `sys_PakPriority = 0`, so the file system is
+searched before the paks. A player has the shipped default of `2`, pak only,
+where loose files are ignored entirely.
+
+This is not a theoretical gap. This diary records a build where the mod pak
+stored Windows path separators, so CryEngine looked entries up by a path that
+did not match and the pak silently overrode nothing, while the same files
+deployed loose worked correctly. Startup Lua still ran, because that folder is
+enumerated rather than looked up by path, which is what made it so slow to
+find.
+
+The additive layout is more exposed to that class of failure than the old one,
+not less, because it depends on paths resolving in three places rather than
+one: the `SubADB File` attributes, the `FragDef` and `subTagDef` references, and
+the `AnimDatabase3P` property. Every one of those is a path the engine has to
+resolve out of a pak.
+
+Not merging until a packaged build is tested at `sys_PakPriority = 2`.

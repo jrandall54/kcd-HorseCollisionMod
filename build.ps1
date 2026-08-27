@@ -84,7 +84,7 @@ $luajit = Get-Command luajit -ErrorAction SilentlyContinue
 if ($luajit) {
     # Lua treats a backslash in a quoted string as an escape, so the path
     # handed to loadfile is converted to forward slashes.
-    $luaPath = $modScript.Replace([char]92, [char]47)
+    $luaPath = $modScript.Replace([char]92, [char]47)
     & $luajit.Source -e "assert(loadfile('$luaPath'))"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[SYNTAX ERROR] HorseCollisionMod.lua does not parse." -ForegroundColor Red
@@ -119,14 +119,39 @@ if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\kcd_male_dat
 Write-Host "Including data overrides from mod_assets ..."
 Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 
-# The animation chain needs all three files present or the stagger silently
+# The animation chain needs every one of these present or the stagger silently
 # no-ops in game, which is expensive to diagnose. Fail the build instead.
+#
+# These are the additive layout, which claims no vanilla filename: a parent
+# database per gender referencing the untouched vanilla file in its own pak,
+# the mod's own fragments, and the declarations those fragments need.
+# `build_adb.py --replace` builds the old whole-database layout instead, and
+# would fail this check, which is intentional: the two must not be mixed, since
+# a leftover vanilla-named override silently defeats the additive one.
+$adb = "$buildDir\pak\Animations\Mannequin\ADB"
 $required = @(
-    "$buildDir\pak\Animations\Mannequin\ADB\kcd_male_database.adb",
-    "$buildDir\pak\Animations\Mannequin\ADB\kcd_animationControlledTags.xml",
-    "$buildDir\pak\Animations\Mannequin\ADB\wh_female_database.adb",
-    "$buildDir\pak\Animations\Mannequin\ADB\wh_female_fragmentids.xml"
+    "$adb\hcm_male_database.adb",
+    "$adb\hcm_male_stagger.adb",
+    "$adb\hcm_male_fragmentids.xml",
+    "$adb\hcm_female_database.adb",
+    "$adb\hcm_female_stagger.adb",
+    "$adb\hcm_female_fragmentids.xml",
+    "$adb\hcm_animationControlledTags.xml"
 )
+
+# Nothing under a vanilla name may ship. That is the property the whole layout
+# exists to provide, and a stale file from a --replace build would quietly undo
+# it without changing anything the build prints.
+$vanillaNames = Get-ChildItem "$adb" -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -notlike "hcm_*" }
+
+if ($vanillaNames) {
+    foreach ($f in $vanillaNames) {
+        Write-Host "[BUILD ERROR] ships a vanilla filename: $($f.Name)" -ForegroundColor Red
+    }
+    Write-Host "Delete mod_assets\ and rebuild." -ForegroundColor Red
+    exit 1
+}
 foreach ($f in $required) {
     if (-not (Test-Path $f)) {
         Write-Host "[BUILD ERROR] missing required asset: $f" -ForegroundColor Red
@@ -163,7 +188,7 @@ finally {
 
 # 3. Structure the Mod contents
 Copy-Item (Join-Path $srcDir "mod.manifest") -Destination "$modDir\"
-$readme = Join-Path $repoRoot "README.md"
+$readme = Join-Path $repoRoot "README.md"
 if (Test-Path $readme) { Copy-Item $readme -Destination "$modDir\" }
 
 # 4. Create the final Release ZIP

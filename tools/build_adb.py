@@ -176,26 +176,56 @@ OUT_DIR = os.path.join(REPO_ROOT, "mod_assets", "Animations", "Mannequin", "ADB"
 ADB_OUT = os.path.join(OUT_DIR, "kcd_male_database.adb")
 TAGS_OUT = os.path.join(OUT_DIR, "kcd_animationControlledTags.xml")
 
-# SubADB mode. Off by default: the shipped 2.0.0 layout splices the stagger
-# options directly into the vanilla database, which is proven to work.
+# Additive deployment.
 #
-# With it on, the options go into their own database and the vanilla file gets
-# a three-line reference to it instead. That is worth having because a whole
-# Mannequin database cannot be merged, so any other mod touching human
-# animations currently wins outright and this mod's fragments vanish silently.
-# A three-line reference is something a person can reapply; 5.5 MB of spliced
-# XML is not.
+# The shipped 2.0.0 layout splices the stagger options into copies of the
+# vanilla databases and ships those copies, which means any other mod touching
+# human animations either loses its changes to this one or takes this one's
+# away, depending only on mod_order.txt. Mannequin databases cannot be merged.
 #
-# Enable with --subadb. Untested as of writing, which is the point of the flag.
-USE_SUBADB = "--subadb" in sys.argv
+# Additive mode claims no vanilla filename at all. Each gender gets:
+#
+#   hcm_<g>_database.adb        a ~340 byte parent, two SubADB references
+#     -> the vanilla database, untouched, read from its own pak
+#     -> hcm_<g>_stagger.adb, the mod's fragments
+#
+# and the declarations the fragments need travel under mod names too. Entities
+# are pointed at the parent by HorseCollisionMod.lua at startup.
+#
+# Confirmed in game across four probes; see TESTING_DIARY.md builds
+# 2.0.1-dev.15 through dev.19. Opt out with --replace to build the 2.0.0 layout.
+ADDITIVE = "--replace" not in sys.argv
+
+# Per gender: vanilla database, vanilla fragment ids, vanilla tag definition.
+GENDERS = {
+    "male": {
+        "db": "Animations/Mannequin/ADB/kcd_male_database.adb",
+        "ids": "Animations/Mannequin/ADB/kcd_male_fragmentids.xml",
+        "tags": "Animations/Mannequin/ADB/kcd_male_tags.xml",
+    },
+    "female": {
+        "db": "Animations/Mannequin/ADB/wh_female_database.adb",
+        "ids": "Animations/Mannequin/ADB/wh_female_fragmentids.xml",
+        "tags": "Animations/Mannequin/ADB/wh_female_tags.xml",
+    },
+}
+
+# The one tag file both genders share, holding the four hcm_stagger_* FragTags.
+# A copy of vanilla plus our group rather than a reference: unlike a database,
+# a tag definition has no include mechanism. It never collides, because the
+# name is ours, but it also cannot pick up another mod's additions to the same
+# group. Acceptable here because nothing else is likely to extend
+# AnimationControlled; it would not be for a mod that had to share a group.
+SHARED_TAGS_NAME = "hcm_animationControlledTags.xml"
+
+# Taken from the vanilla male header so the sub-database resolves fragment ids
+# and tags against exactly the same definitions.
+FRAG_DEF = "Animations/Mannequin/ADB/kcd_male_fragmentids.xml"
+TAG_DEF = "Animations/Mannequin/ADB/kcd_male_tags.xml"
 
 SUBADB_ENTRY = "Animations/Mannequin/ADB/hcm_male_stagger.adb"
 SUBADB_OUT = os.path.join(OUT_DIR, "hcm_male_stagger.adb")
 
-# Taken from the vanilla database header so the sub-database resolves fragment
-# ids and tags against exactly the same definitions.
-FRAG_DEF = "Animations/Mannequin/ADB/kcd_male_fragmentids.xml"
-TAG_DEF = "Animations/Mannequin/ADB/kcd_male_tags.xml"
 FEM_ADB_OUT = os.path.join(OUT_DIR, "wh_female_database.adb")
 FEM_IDS_OUT = os.path.join(OUT_DIR, "wh_female_fragmentids.xml")
 
@@ -482,8 +512,149 @@ def write_female():
     print("wrote %s (%d bytes)" % (FEM_ADB_OUT, os.path.getsize(FEM_ADB_OUT)))
 
 
+def out(name):
+    """Path of a generated file in mod_assets."""
+    return os.path.join(OUT_DIR, name)
+
+
+def write_shared_tags(nl):
+    """The FragTags the stagger options carry, under a name nothing else uses.
+
+    A copy of the vanilla AnimationControlled tag definition plus one group.
+    Tag definitions have no include mechanism, so unlike a database this cannot
+    be a reference to the vanilla file. It never collides, because the filename
+    is ours, but it also cannot see another mod's additions to the same group.
+    """
+    raw = read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace")
+
+    group = ['    <Group name="HcmReaction">']
+    group += ['      <Tag name="%s" />' % tags for tags, _ in STAGGERS]
+    group += ["    </Group>"]
+
+    anchor = nl + "  </Tags>"
+    patched = raw.replace(anchor, nl + nl.join(group) + anchor, 1)
+
+    if patched == raw:
+        raise SystemExit("shared tag anchor not matched")
+
+    with io.open(out(SHARED_TAGS_NAME), "wb") as handle:
+        handle.write(patched.encode("ascii"))
+
+    return "Animations/Mannequin/ADB/" + SHARED_TAGS_NAME
+
+
+def write_additive_gender(gender, paths, shared_tags, nl):
+    """Writes the three files one gender needs, claiming no vanilla name."""
+    ids_name = "hcm_%s_fragmentids.xml" % gender
+    stagger_name = "hcm_%s_stagger.adb" % gender
+    parent_name = "hcm_%s_database.adb" % gender
+
+    ids = read_pak_entry(PAK, paths["ids"]).decode("ascii", "replace")
+
+    # The women have the same hit-reaction clips but no AnimationControlled
+    # fragment at all, so it has to be declared before anything can be added to
+    # it. The men already have one, and only its subTagDef needs repointing.
+    if "AnimationControlled" not in ids:
+        declaration = ('    <Tag name="AnimationControlled" subTagDef="%s" />'
+                       % shared_tags)
+        anchor = nl + "  </Tags>"
+        ids = ids.replace(anchor, nl + declaration + anchor, 1)
+
+        if declaration not in ids:
+            raise SystemExit("%s fragmentids anchor not matched" % gender)
+    else:
+        ids = ids.replace(TAGS_ENTRY, shared_tags)
+
+        if shared_tags not in ids:
+            raise SystemExit("%s subTagDef reference not found" % gender)
+
+    with io.open(out(ids_name), "wb") as handle:
+        handle.write(ids.encode("ascii"))
+
+    # Every referenced clip must already exist in that gender's database, or
+    # the option resolves to nothing silently.
+    db = read_pak_entry(PAK, paths["db"]).decode("ascii", "replace")
+    present = set(re.findall(r'<Animation name="([^"]*)"', db))
+    missing = [clip for _, clip in STAGGERS if clip not in present]
+
+    if missing:
+        raise SystemExit("clips absent from the %s database: %s"
+                         % (gender, missing))
+
+    options = nl.join(render_option(tags, clip, nl) for tags, clip in STAGGERS)
+
+    stagger = nl.join([
+        '<?xml version="1.0" encoding="us-ascii"?>',
+        '<AnimDB FragDef="Animations/Mannequin/ADB/%s" TagDef="%s">'
+        % (ids_name, paths["tags"]),
+        "  <FragmentList>",
+        "    <AnimationControlled>",
+        options,
+        "    </AnimationControlled>",
+        "  </FragmentList>",
+        "</AnimDB>",
+        "",
+    ])
+
+    with io.open(out(stagger_name), "wb") as handle:
+        handle.write(stagger.encode("ascii"))
+
+    # The parent holds no fragments of its own. The vanilla database is read
+    # from its own pak and is never overridden, which is the whole point.
+    parent = nl.join([
+        '<?xml version="1.0" encoding="us-ascii"?>',
+        '<AnimDB FragDef="%s" TagDef="%s">' % (paths["ids"], paths["tags"]),
+        "  <SubADBs>",
+        '    <SubADB File="%s" />' % paths["db"],
+        '    <SubADB File="Animations/Mannequin/ADB/%s" />' % stagger_name,
+        "  </SubADBs>",
+        "</AnimDB>",
+        "",
+    ])
+
+    with io.open(out(parent_name), "wb") as handle:
+        handle.write(parent.encode("ascii"))
+
+    print("  %-6s %s (%d B), %s (%d B), %s (%d B)"
+          % (gender, parent_name, os.path.getsize(out(parent_name)),
+             stagger_name, os.path.getsize(out(stagger_name)),
+             ids_name, os.path.getsize(out(ids_name))))
+
+
+def write_additive():
+    """Generates the whole additive layout, overriding no vanilla file."""
+    nl = newline_of(read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace"))
+    shared_tags = write_shared_tags(nl)
+
+    print("Additive layout, %d options per gender:" % len(STAGGERS))
+
+    for gender, paths in sorted(GENDERS.items()):
+        write_additive_gender(gender, paths, shared_tags, nl)
+
+    print("  shared %s (%d B)"
+          % (SHARED_TAGS_NAME, os.path.getsize(out(SHARED_TAGS_NAME))))
+
+    for tags, clip in STAGGERS:
+        print("  + %-22s -> %s" % (tags, clip))
+
+    # A file left over from a previous --replace build would still be an
+    # override, and would quietly undo everything this mode is for.
+    for stale in ["kcd_male_database.adb", "kcd_animationControlledTags.xml",
+                  "wh_female_database.adb", "wh_female_fragmentids.xml"]:
+        path = out(stale)
+
+        if os.path.exists(path):
+            os.remove(path)
+            print("  removed stale override: %s" % stale)
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
+
+    if ADDITIVE:
+        write_additive()
+        return
+
     write_database()
     write_tags()
     write_female()

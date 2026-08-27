@@ -19,6 +19,11 @@ find it, it says so and lists everywhere it looked.
 
 Output goes to `releases\`.
 
+The build produces the additive layout by default: every file is named `hcm_*` and no
+vanilla filename is claimed. `tools/build_adb.py --replace` builds the pre-2.1.0 layout
+that replaced whole databases, and `build.ps1` will refuse it, since mixing the two
+silently defeats the additive one.
+
 `build.ps1` copies `src/mod.manifest` verbatim, so bump its `<version>` before
 building. The publish step refuses to upload a zip whose manifest disagrees with the
 version being published.
