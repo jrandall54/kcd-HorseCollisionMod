@@ -2779,3 +2779,53 @@ not require touching any animation file, though it would require touching
 
 Unknown, and the next thing to test: whether a SubADB can carry a whole
 database rather than a fragment subset.
+
+### Result: confirmed in game
+
+**User reported**: "both staggered."
+
+Men staggered from a fragment defined only in `hcm_male_stagger.adb`, reached
+through the `<SubADBs>` reference. Women staggered from the female database,
+which is still built with the options spliced inline and served as the control.
+
+**SubADB works end to end in KCD 1.9.7.** The fragments resolve, not merely the
+file being read, and they resolve through a mechanism no vanilla file uses.
+
+That settles the mechanism. What it changes:
+
+| | inline splice | SubADB |
+| --- | --- | --- |
+| diff against vanilla `kcd_male_database.adb` | ~3,200 bytes spliced into `FragmentList` | 96 bytes appended before `</AnimDB>` |
+| another animation mod's copy | mod's fragments vanish silently | three lines a person can reapply |
+| where the mod's content lives | inside a 5.5 MB vanilla file | its own 3.4 KB file |
+
+This does not yet remove the conflict. `kcd_male_database.adb` is still
+replaced, so load order still decides. It converts an unresolvable conflict
+into a trivially resolvable one, which is worth having on its own.
+
+### The remaining step, and its one unknown
+
+Full additivity needs the vanilla database left untouched entirely. The shape:
+
+```
+hcm_male_database.adb        tiny parent, two SubADB references
+  -> kcd_male_database.adb   vanilla, untouched, still in its pak
+  -> hcm_male_stagger.adb    the mod's fragments
+```
+
+with entities pointed at the parent instead of the vanilla file.
+
+Two things have to hold, and only the first is a genuine unknown:
+
+1. **Can a SubADB carry a whole database rather than a fragment subset?**
+   Nothing observed so far says no, but nothing tested says yes either.
+2. **Can `AnimDatabase3P` be redirected without replacing a vanilla file?**
+   It is a Lua entity-class property, set in
+   `Scripts/Entities/actor/player.lua` for the player and in the AI equivalents
+   for NPCs. Replacing those files would only move the conflict from an
+   animation database to a Lua script, which is better but not free. Setting it
+   from this mod's own Startup Lua before entities spawn would be free, and
+   this mod already runs Startup Lua. Untested.
+
+If both hold, the mod replaces **no vanilla file at all** and the animation
+conflict disappears rather than shrinking.
