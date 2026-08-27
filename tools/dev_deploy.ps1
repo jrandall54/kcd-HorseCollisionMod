@@ -5,11 +5,11 @@
 # of that needs a mod manager, and doing it directly removes four manual steps
 # from every test cycle.
 #
-#   .\dev_deploy.ps1                      build, deploy
-#   .\dev_deploy.ps1 -Launch              build, deploy, start the game
-#   .\dev_deploy.ps1 -NoBuild -Launch     deploy what was built last, start the game
-#   .\dev_deploy.ps1 -ParkVortexMod       move the Vortex-installed copy aside first
-#   .\dev_deploy.ps1 -GameRoot "D:\..."   use an install somewhere else
+#   .\tools\dev_deploy.ps1                      build, deploy
+#   .\tools\dev_deploy.ps1 -Launch              build, deploy, start the game
+#   .\tools\dev_deploy.ps1 -NoBuild -Launch     deploy what was built last, start the game
+#   .\tools\dev_deploy.ps1 -ParkVortexMod       move the Vortex-installed copy aside first
+#   .\tools\dev_deploy.ps1 -GameRoot "D:\..."   use an install somewhere else
 #
 # The game folder is found automatically: -GameRoot, then the KCD_PATH
 # environment variable, then the usual Steam and GOG install locations.
@@ -30,6 +30,11 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
+
+# This script lives in tools/, so the repository root is one level up. Every
+# project path below is built from it rather than from the working directory,
+# so the script can be run from anywhere.
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 
 # Where the game is installed. Resolved rather than hardcoded, because a clone
 # only works when this matches, and it matches on exactly one machine.
@@ -112,7 +117,7 @@ function Resolve-GameRoot {
 
 	Write-Host ""
 	Write-Host "         Point at it with either of:"
-	Write-Host '           .\dev_deploy.ps1 -GameRoot "D:\path\to\game"'
+	Write-Host '           .\tools\dev_deploy.ps1 -GameRoot "D:\path\to\game"'
 	Write-Host '           $env:KCD_PATH = "D:\path\to\game"'
 	exit 1
 }
@@ -153,14 +158,14 @@ function Copy-LooseFiles {
 		$looseDir = Join-Path $Root "Data\Scripts\Startup"
 
 		New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
-		Copy-Item "HorseCollisionMod.lua" `
+		Copy-Item (Join-Path $repoRoot "src\HorseCollisionMod.lua") `
 			-Destination (Join-Path $looseDir "HorseCollisionMod.lua") -Force
 
 		Write-Host "[DEPLOY] loose script updated"
 	}
 
 	if ($Anim) {
-		$source = "mod_assets\Animations\Mannequin\ADB"
+		$source = Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB"
 
 		if (-not (Test-Path $source)) {
 			Write-Host "[DEPLOY] no mod_assets yet. Run build.ps1 first." -ForegroundColor Yellow
@@ -186,11 +191,11 @@ if ($ScriptOnly -or $AnimOnly) {
 	Write-Host "[DEPLOY] reload it with:" -ForegroundColor Green
 
 	if ($ScriptOnly) {
-		Write-Host "         python dev_console.py --reload"
+		Write-Host "         python tools\dev_console.py --reload"
 	}
 
 	if ($AnimOnly) {
-		Write-Host "         python dev_console.py --anim-reload"
+		Write-Host "         python tools\dev_console.py --anim-reload"
 	}
 
 	exit 0
@@ -199,20 +204,21 @@ if ($ScriptOnly -or $AnimOnly) {
 # Read the version from the manifest when none is given, so the two cannot
 # drift apart and deploy a build that is not the one just made.
 if ($Version -eq "") {
-	$manifest = [xml](Get-Content "mod.manifest")
+	$manifest = [xml](Get-Content (Join-Path $repoRoot "src\mod.manifest"))
 	$Version = $manifest.kcd_mod.info.version
 	Write-Host "[DEPLOY] version from mod.manifest: $Version"
 }
 
 if (-not $NoBuild) {
-	& powershell.exe -ExecutionPolicy Bypass -File .\build.ps1 -Version $Version
+	& powershell.exe -ExecutionPolicy Bypass ``
+		-File (Join-Path $repoRoot "build.ps1") -Version $Version
 	if ($LASTEXITCODE -ne 0) {
 		Write-Host "[DEPLOY] build failed, nothing deployed" -ForegroundColor Red
 		exit 1
 	}
 }
 
-$zip = "releases\HorseCollisionMod_v$Version.zip"
+$zip = Join-Path $repoRoot "releases\HorseCollisionMod_v$Version.zip"
 
 if (-not (Test-Path $zip)) {
 	Write-Host "[DEPLOY] no build at $zip" -ForegroundColor Red

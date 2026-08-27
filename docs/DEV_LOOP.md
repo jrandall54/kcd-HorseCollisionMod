@@ -11,12 +11,12 @@ that folder in `Mods\mod_order.txt`. Nothing about that needs a mod manager, so
 `dev_deploy.ps1` does it directly:
 
 ```
-.\dev_deploy.ps1 -Launch             build, install, start the game
-.\dev_deploy.ps1 -NoBuild -Launch    install what was built last
-.\dev_deploy.ps1 -ScriptOnly         push only the Lua, game may be running
-.\dev_deploy.ps1 -AnimOnly           push only the animation data, same
-.\dev_deploy.ps1 -ParkVortexMod      move the Vortex-installed copy to mods_old\
-.\dev_deploy.ps1 -GameRoot "D:\..."  use an install somewhere else
+.\tools\dev_deploy.ps1 -Launch             build, install, start the game
+.\tools\dev_deploy.ps1 -NoBuild -Launch    install what was built last
+.\tools\dev_deploy.ps1 -ScriptOnly         push only the Lua, game may be running
+.\tools\dev_deploy.ps1 -AnimOnly           push only the animation data, same
+.\tools\dev_deploy.ps1 -ParkVortexMod      move the Vortex-installed copy to mods_old\
+.\tools\dev_deploy.ps1 -GameRoot "D:\..."  use an install somewhere else
 ```
 
 It installs to one fixed folder, `HorseCollisionMod_dev`, rather than a
@@ -40,12 +40,12 @@ CryEngine embeds a console server. With `log_EnableRemoteConsole = 1` in
 it, and streams its console output back. `dev_console.py` speaks it:
 
 ```
-python dev_console.py --listen           watch the log stream live
-python dev_console.py --reload           reload the mod's Lua
-python dev_console.py --anim-reload      reload the Mannequin databases
-python dev_console.py --commands         dump every command and CVar the build has
-python dev_console.py "MemInfo"          run one command
-python dev_console.py --lua "CODE"       evaluate Lua in the running game
+python tools\dev_console.py --listen           watch the log stream live
+python tools\dev_console.py --reload           reload the mod's Lua
+python tools\dev_console.py --anim-reload      reload the Mannequin databases
+python tools\dev_console.py --commands         dump every command and CVar the build has
+python tools\dev_console.py "MemInfo"          run one command
+python tools\dev_console.py --lua "CODE"       evaluate Lua in the running game
 ```
 
 Two flags affect what is shown rather than what is sent. `--noisy` stops the
@@ -57,7 +57,7 @@ reads (see below).
 game, which settles questions that guessing does not.
 
 ```
-python dev_console.py --quiet --lua "System.LogAlways(tostring(HorseCollisionMod.Config.Knockback))"
+python tools\dev_console.py --quiet --lua "System.LogAlways(tostring(HorseCollisionMod.Config.Knockback))"
 ```
 
 Live streaming replaces reading `kcd.log` after the fact. The mod's own
@@ -182,15 +182,15 @@ one level up it did not.
 ## The loop
 
 ```
-.\dev_deploy.ps1 -Launch          once, at the start of a session
+.\tools\dev_deploy.ps1 -Launch          once, at the start of a session
 
-                                  edit HorseCollisionMod.lua
-.\dev_deploy.ps1 -ScriptOnly      push the script to the running game
-python dev_console.py --reload    new code live, keep playing
+                                  edit src/HorseCollisionMod.lua
+.\tools\dev_deploy.ps1 -ScriptOnly      push the script to the running game
+python tools\dev_console.py --reload    new code live, keep playing
 
-                                  edit build_adb.py, then regenerate
-.\dev_deploy.ps1 -AnimOnly        push the animation databases
-python dev_console.py --anim-reload
+                                  edit tools/build_adb.py, regenerate
+.\tools\dev_deploy.ps1 -AnimOnly        push the animation databases
+python tools\dev_console.py --anim-reload
 ```
 
 Nothing here restarts the game. Both halves can change in one pass too: push the
@@ -242,9 +242,9 @@ which is why it read as an engine limitation:
 Either one alone changes nothing.
 
 ```
-python build_adb.py                  regenerate from the game's own paks
-.\dev_deploy.ps1 -AnimOnly           push the databases to the running game
-python dev_console.py --anim-reload
+python tools\build_adb.py                  regenerate from the game's own paks
+.\tools\dev_deploy.ps1 -AnimOnly           push the databases to the running game
+python tools\dev_console.py --anim-reload
 ```
 
 Confirmed by pointing the male stagger fragments at `ringing_alarm_bell` and

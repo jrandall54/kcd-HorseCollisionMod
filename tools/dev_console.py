@@ -30,12 +30,12 @@ The wire format, confirmed against the running game:
 
 Usage:
 
-    python dev_console.py                          interactive
-    python dev_console.py "e_TimeOfDay"            one command
-    python dev_console.py --lua "System.LogAlways('hi')"
-    python dev_console.py --reload                 reload the mod's Lua
-    python dev_console.py --listen                 watch the log stream only
-    python dev_console.py --raw                    also dump the bytes
+    python tools/dev_console.py                          interactive
+    python tools/dev_console.py "e_TimeOfDay"            one command
+    python tools/dev_console.py --lua "System.LogAlways('hi')"
+    python tools/dev_console.py --reload                 reload the mod's Lua
+    python tools/dev_console.py --listen                 watch the log stream only
+    python tools/dev_console.py --raw                    also dump the bytes
 
 Setup, once, in the game's system.cfg:
 

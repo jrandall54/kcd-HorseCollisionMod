@@ -31,7 +31,7 @@ Four files are generated and must all ship together:
 4. wh_female_database.adb - the fragment block itself, added wholesale since
    the female database has no existing one to append to.
 
-Run: python build_adb.py
+Run: python tools/build_adb.py
 """
 
 import io
@@ -148,7 +148,7 @@ def find_game_root():
         "No Kingdom Come: Deliverance install found.\n\n"
         "Looked for %s under:\n  %s\n\n"
         "Point at it with either of:\n"
-        '  python build_adb.py --game-root "D:\\path\\to\\game"\n'
+        '  python tools/build_adb.py --game-root "D:\\path\\to\\game"\n'
         "  set KCD_PATH=D:\\path\\to\\game" % (PAK_RELATIVE, tried))
 
 
@@ -167,7 +167,12 @@ TAGS_ENTRY = "Animations/Mannequin/ADB/kcd_animationControlledTags.xml"
 FEM_ADB_ENTRY = "Animations/Mannequin/ADB/wh_female_database.adb"
 FEM_IDS_ENTRY = "Animations/Mannequin/ADB/wh_female_fragmentids.xml"
 
-OUT_DIR = os.path.join("mod_assets", "Animations", "Mannequin", "ADB")
+# Output lands in mod_assets/ at the repository root, never in the working
+# directory. This script lives in tools/ and is run both directly and by
+# build.ps1 from elsewhere, so the destination cannot depend on wherever it
+# happened to be invoked from.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT_DIR = os.path.join(REPO_ROOT, "mod_assets", "Animations", "Mannequin", "ADB")
 ADB_OUT = os.path.join(OUT_DIR, "kcd_male_database.adb")
 TAGS_OUT = os.path.join(OUT_DIR, "kcd_animationControlledTags.xml")
 FEM_ADB_OUT = os.path.join(OUT_DIR, "wh_female_database.adb")

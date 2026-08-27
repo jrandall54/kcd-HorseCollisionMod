@@ -4,11 +4,20 @@ param (
 
 Write-Host "Building HorseCollisionMod version $Version..."
 
-$buildDir = "build_temp"
+# Everything resolves from the repository root rather than the working
+# directory, so the script behaves the same run as .\build.ps1 from the root
+# or invoked by another tool from somewhere else.
+$repoRoot = Split-Path -Parent $PSCommandPath
+$srcDir = Join-Path $repoRoot "src"
+$toolsDir = Join-Path $repoRoot "tools"
+$assetsDir = Join-Path $repoRoot "mod_assets"
+$modScript = Join-Path $srcDir "HorseCollisionMod.lua"
+
+$buildDir = Join-Path $repoRoot "build_temp"
 $pakDir = "$buildDir\pak\Scripts\Startup"
 $modDir = "$buildDir\HorseCollisionMod"
 $dataDir = "$modDir\Data"
-$releasesDir = "releases"
+$releasesDir = Join-Path $repoRoot "releases"
 
 # Clean previous temp build
 if (Test-Path $buildDir) { Remove-Item -Recurse -Force $buildDir }
@@ -16,7 +25,7 @@ New-Item -ItemType Directory -Force -Path $pakDir | Out-Null
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
 Write-Host "Running Code Style Hooks..."
-$lines = Get-Content "HorseCollisionMod.lua"
+$lines = Get-Content $modScript
 $errors = 0
 $maxLineLength = 90
 
@@ -73,7 +82,10 @@ Write-Host "Code Style Check Passed ($($lines.Count) lines)."
 $luajit = Get-Command luajit -ErrorAction SilentlyContinue
 
 if ($luajit) {
-    & $luajit.Source -e "assert(loadfile('HorseCollisionMod.lua'))"
+    # Lua treats a backslash in a quoted string as an escape, so the path
+    # handed to loadfile is converted to forward slashes.
+    $luaPath = $modScript.Replace([char]92, [char]47)
+    & $luajit.Source -e "assert(loadfile('$luaPath'))"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[SYNTAX ERROR] HorseCollisionMod.lua does not parse." -ForegroundColor Red
         exit 1
@@ -85,7 +97,7 @@ else {
 }
 
 # 1. Structure the PAK contents
-Copy-Item "HorseCollisionMod.lua" -Destination "$pakDir\"
+Copy-Item $modScript -Destination "$pakDir\"
 
 # Data overrides live under mod_assets/ mirroring the game's own layout and
 # are copied in wholesale. They are derived from the game's paks, so they are
@@ -95,9 +107,9 @@ Copy-Item "HorseCollisionMod.lua" -Destination "$pakDir\"
 # Tests for the generated file rather than the directory, because a failed or
 # interrupted run can leave mod_assets/ present but empty, which would
 # otherwise skip generation and fail later with a less obvious message.
-if (-not (Test-Path "mod_assets\Animations\Mannequin\ADB\kcd_male_database.adb")) {
+if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\kcd_male_database.adb"))) {
     Write-Host "Animation data missing - generating..."
-    python build_adb.py
+    python (Join-Path $toolsDir "build_adb.py")
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[BUILD ERROR] build_adb.py failed. Check the game path at the top of it." -ForegroundColor Red
         exit 1
@@ -105,7 +117,7 @@ if (-not (Test-Path "mod_assets\Animations\Mannequin\ADB\kcd_male_database.adb")
 }
 
 Write-Host "Including data overrides from mod_assets ..."
-Copy-Item "mod_assets\*" -Destination "$buildDir\pak\" -Recurse -Force
+Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 
 # The animation chain needs all three files present or the stagger silently
 # no-ops in game, which is expensive to diagnose. Fail the build instead.
@@ -150,8 +162,9 @@ finally {
 }
 
 # 3. Structure the Mod contents
-Copy-Item "mod.manifest" -Destination "$modDir\"
-if (Test-Path "README.md") { Copy-Item "README.md" -Destination "$modDir\" }
+Copy-Item (Join-Path $srcDir "mod.manifest") -Destination "$modDir\"
+$readme = Join-Path $repoRoot "README.md"
+if (Test-Path $readme) { Copy-Item $readme -Destination "$modDir\" }
 
 # 4. Create the final Release ZIP
 if (-not (Test-Path $releasesDir)) { New-Item -ItemType Directory -Force -Path $releasesDir | Out-Null }
