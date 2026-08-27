@@ -2989,3 +2989,86 @@ derived from it. The likely suspect is when and how velocity is sampled
 relative to the impact rather than the thresholds themselves.
 
 Both belong to a tuning pass, after the deployment work.
+
+---
+
+## Build 2.0.1-dev.19: the declaration files go additive too
+
+**Hypothesis**: a SubADB entry's own `FragDef` is honoured rather than inherited
+from the parent, so the mod can bring its own fragment id and tag definitions
+under its own filenames and stop claiming vanilla ones.
+
+**Setup.** Three files, none of them a vanilla name:
+
+```
+hcm_male_stagger.adb        FragDef -> hcm_male_fragmentids.xml
+hcm_male_fragmentids.xml    AnimationControlled subTagDef -> hcm_animationControlledTags.xml
+hcm_animationControlledTags.xml   vanilla tags plus the four hcm_stagger_* tags
+```
+
+The `kcd_animationControlledTags.xml` override was deleted.
+
+**User reported**: "men staggered and everyone animating normally."
+
+**Result: confirmed.** The sub-database's own `FragDef` is used, the chain
+resolves through it, and the male path now overrides **no vanilla file at all**:
+
+```
+hcm_male_database.adb              342 bytes
+hcm_male_stagger.adb              3319 bytes
+hcm_male_fragmentids.xml         35505 bytes
+hcm_animationControlledTags.xml   1005 bytes
+```
+
+Against the shipped 2.0.0 layout, which replaced `kcd_male_database.adb`
+(5.5 MB) and `kcd_animationControlledTags.xml`.
+
+### The weakness, stated plainly
+
+`hcm_male_fragmentids.xml` and `hcm_animationControlledTags.xml` are **copies**
+of vanilla with additions, not references to it. The database got something
+strictly better: a genuine reference to the untouched file inside its pak.
+
+A copy never collides, which is the property being bought. A copy also cannot
+pick up another mod's additions, so it buys non-collision without buying
+composability. Two mods each shipping their own copy would each see their own
+additions and neither would see the other's.
+
+For this mod that is acceptable, because the only thing read out of those files
+is the `AnimationControlled` fragment and its FragTags, which nothing else is
+likely to extend. It would not be acceptable for a mod that needed to compose
+with others in the same tag group. Worth writing down so the limitation is not
+rediscovered as a surprise.
+
+Copies also go stale against a game patch. At 1.9.7 being the final build, that
+risk is close to zero here.
+
+### Still not converted
+
+The female side: `wh_female_database.adb` and `wh_female_fragmentids.xml` are
+still replacements. Kept deliberately as the control through all four probes,
+and mechanical to convert now that the male pattern is proven.
+
+### Third report of reactions not firing
+
+**User reported**: "Again noticing some of the reactions from all three speed
+categories are getting eaten or something."
+
+Escalating, and worth flagging as a real defect rather than tuning. Earlier in
+this session it was reported as intermittent female staggers, possibly
+direction-dependent. Now it is **all three speed tiers**, so it is not specific
+to the walk-tier interactive action, and not specific to women.
+
+The three tiers use two different mechanisms, the stagger being an interactive
+action and the knockdowns being a physics impulse, so a fault common to both
+points upstream of either: detection, the impact-direction resolution, or the
+per-victim cooldown.
+
+Related and probably the same root: a gallop impact reporting walking speed,
+recorded earlier this session. If the speed sampled at impact can be wrong,
+tier selection is wrong, and `HitCooldownMs = 3000` would then silently
+suppress the correct reaction that follows.
+
+Deferred at the user's direction, but this now looks like the most valuable
+thing to fix next, ahead of any tuning. The tuning numbers were derived from
+telemetry this defect would have corrupted.
