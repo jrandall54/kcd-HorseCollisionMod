@@ -8,6 +8,6 @@
     <created_on>2026-08-22</created_on>
   </info>
   <supports>
-    <kcd_version>1.*</kcd_version>
+    <kcd_version>1.9.7</kcd_version>
   </supports>
 </kcd_mod>

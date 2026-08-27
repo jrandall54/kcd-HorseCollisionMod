@@ -9,11 +9,16 @@
 #   .\dev_deploy.ps1 -Launch              build, deploy, start the game
 #   .\dev_deploy.ps1 -NoBuild -Launch     deploy what was built last, start the game
 #   .\dev_deploy.ps1 -ParkVortexMod       move the Vortex-installed copy aside first
+#   .\dev_deploy.ps1 -GameRoot "D:\..."   use an install somewhere else
+#
+# The game folder is found automatically: -GameRoot, then the KCD_PATH
+# environment variable, then the usual Steam and GOG install locations.
 #
 # The release build for Nexus still goes through build.ps1 on its own. This is
 # a development path only, and the folder it writes is never what ships.
 
 param (
+	[string]$GameRoot = "",
 	[string]$Version = "",
 	[switch]$NoBuild,
 	[switch]$Launch,
@@ -25,7 +30,93 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-$gameRoot = "C:\Games\Kingdom Come - Deliverance"
+# Where the game is installed. Resolved rather than hardcoded, because a clone
+# only works when this matches, and it matches on exactly one machine.
+#
+# Order: -GameRoot, then KCD_PATH in the environment, then the usual install
+# locations, then every Steam library listed in libraryfolders.vdf, since a
+# Steam install can sit on any drive.
+function Resolve-GameRoot {
+	param ([string]$Explicit)
+
+	# An explicitly given path is authoritative. Falling through to a different
+	# install when it is wrong would deploy somewhere the caller did not mean,
+	# which is a far worse failure than stopping here and saying so.
+	foreach ($source in @(, @("-GameRoot", $Explicit)) + @(, @("KCD_PATH", $env:KCD_PATH))) {
+		$label = $source[0]
+		$given = $source[1]
+
+		if (-not $given) {
+			continue
+		}
+
+		if (Test-Path (Join-Path $given "Bin\Win64\KingdomCome.exe")) {
+			return $given
+		}
+
+		Write-Host "[DEPLOY] $label points at $given" -ForegroundColor Red
+		Write-Host "         but Bin\Win64\KingdomCome.exe is not there."
+		exit 1
+	}
+
+	$candidates = New-Object System.Collections.Generic.List[string]
+
+	$candidates.Add("C:\Games\Kingdom Come - Deliverance")
+	$candidates.Add("C:\Program Files (x86)\Steam\steamapps\common\KingdomComeDeliverance")
+	$candidates.Add("C:\Program Files\Steam\steamapps\common\KingdomComeDeliverance")
+	$candidates.Add("C:\GOG Games\Kingdom Come Deliverance")
+	$candidates.Add("C:\Program Files (x86)\GOG Galaxy\Games\Kingdom Come Deliverance")
+
+	foreach ($key in @("HKLM:\SOFTWARE\WOW6432Node\Valve\Steam",
+			"HKCU:\SOFTWARE\Valve\Steam")) {
+		$install = (Get-ItemProperty -Path $key -Name InstallPath `
+			-ErrorAction SilentlyContinue).InstallPath
+
+		if (-not $install) {
+			continue
+		}
+
+		$vdf = Join-Path $install "steamapps\libraryfolders.vdf"
+
+		if (-not (Test-Path $vdf)) {
+			continue
+		}
+
+		# Valve's key/value text format. Only the "path" entries matter, and
+		# they carry doubled backslashes.
+		$body = Get-Content -Raw $vdf
+
+		foreach ($match in [regex]::Matches($body, '"path"\s+"([^"]+)"')) {
+			$library = $match.Groups[1].Value -replace '\\', '\'
+			$candidates.Add((Join-Path $library "steamapps\common\KingdomComeDeliverance"))
+		}
+
+		break
+	}
+
+	# The executable is what identifies a directory as the game, rather than a
+	# folder that merely exists.
+	foreach ($candidate in $candidates) {
+		if ($candidate -and (Test-Path (Join-Path $candidate "Bin\Win64\KingdomCome.exe"))) {
+			return $candidate
+		}
+	}
+
+	Write-Host "[DEPLOY] no Kingdom Come: Deliverance install found." -ForegroundColor Red
+	Write-Host "         Looked for Bin\Win64\KingdomCome.exe under:"
+
+	foreach ($candidate in $candidates) {
+		Write-Host "           $candidate"
+	}
+
+	Write-Host ""
+	Write-Host "         Point at it with either of:"
+	Write-Host '           .\dev_deploy.ps1 -GameRoot "D:\path\to\game"'
+	Write-Host '           $env:KCD_PATH = "D:\path\to\game"'
+	exit 1
+}
+
+$gameRoot = Resolve-GameRoot -Explicit $GameRoot
 $modsDir = Join-Path $gameRoot "Mods"
 $parkDir = Join-Path $gameRoot "mods_old"
 $exe = Join-Path $gameRoot "Bin\Win64\KingdomCome.exe"
@@ -38,10 +129,7 @@ $exe = Join-Path $gameRoot "Bin\Win64\KingdomCome.exe"
 $devMod = "HorseCollisionMod_dev"
 $devDir = Join-Path $modsDir $devMod
 
-if (-not (Test-Path $gameRoot)) {
-	Write-Host "[DEPLOY] game not found at $gameRoot" -ForegroundColor Red
-	exit 1
-}
+Write-Host "[DEPLOY] game: $gameRoot"
 
 # The inner loop: push only the loose script, then reload it from the console.
 # This deliberately skips the running-game guard below, because that guard is
