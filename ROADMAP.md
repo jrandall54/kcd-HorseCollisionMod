@@ -28,6 +28,31 @@ Known gaps carried into later phases:
       past. Setting the animation's collider mode to `Disabled` did not resolve it, and it
       matches vanilla behavior when riding head-on into someone. Revisit with Phase 2
       momentum, if at all.
+- [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
+      physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
+- [ ] The `ColliderMode="Disabled"` explanation recorded for the walk-tier carried-item drop
+      needs re-testing. A woman kept her bucket during a session running the un-fixed
+      animation data, which the recorded cause does not account for. `fix/carried-item-drop`
+      is unmerged pending that.
+
+## Development tooling
+
+Complete, merged after 2.0.0. Not a gameplay phase, but it changes how every phase below
+gets tested.
+
+- [x] Deploy straight into `Mods\` without Vortex, with the game path resolved rather than
+      hardcoded so a clone builds on any machine.
+- [x] Hot reload the mod's Lua into a running game, no restart and no save reload.
+- [x] Hot reload the Mannequin animation databases the same way. Needed the ADB files
+      written loose *and* `mn_allowEditableDatabasesInPureGame`, which ships at 0.
+- [x] Live telemetry over CryEngine's remote console, with backend chatter filtered out.
+- [x] Read the mod's live state out of the running game, which settles questions that
+      guessing does not.
+- [x] Publish a release to Nexus Mods without the browser, through their v3 API.
+      Not a GitHub Action: the build reads the game's own paks, so it cannot run on a
+      hosted runner. Revisit if additive ADB deployment below ever lands.
+
+See `docs/DEV_LOOP.md`, and `README.md` for publishing.
 
 ## Phase 2: Mass, armor and momentum
 

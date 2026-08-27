@@ -1808,3 +1808,515 @@ cheap.
 **The drop still happens at trot and gallop.** Those tiers use the physics ragdoll, not this
 fragment, so they were never covered by this change and the behavior predates 2.0.0. That is
 a separate issue against the ragdoll path and should not be folded into this one.
+
+---
+
+## Session: development loop tooling
+
+No build under test. The whole session went into the loop used to test builds,
+which had become the slowest part of the project: close the game, remove the
+old mod in Vortex, install the new archive, deploy, launch, clear a prompt,
+wait for the main menu, load a save. Every iteration.
+
+Two tools came out of it, `dev_deploy.ps1` and `dev_console.py`, and both
+halves of the mod now reload into a running game. `docs/DEV_LOOP.md` is the
+reference; this entry records what had to be discovered to get there.
+
+### The remote console
+
+CryEngine embeds a console server on port 4600, enabled with
+`log_EnableRemoteConsole = 1`. Three things about it cost time:
+
+- The event type is written as an **ASCII digit**, `'0' + type`, not a raw
+  byte. The server's opening `b"1\x00"` is type 1, not 49.
+- The exchange is **server-driven and strictly alternating**. The server sends
+  one packet and waits. A client that answers only explicit requests gets one
+  packet and then silence. Answer every packet.
+- `log_Verbosity` resets with the game, so a session started after a restart is
+  silent until it is raised again. That reads exactly like commands vanishing.
+
+### Dev mode is a command line switch
+
+`sys_DevMode` is **not a CVar in this build**; querying it answers "Unknown
+command", so the `sys_DevMode = 1` line that used to sit in `system.cfg` never
+did anything. Dev mode comes from `-devmode` on the command line. Without it
+the console refuses everything marked `VF_CHEAT`, which includes
+`lua_reload_script`.
+
+### Loose files go under Data
+
+`sys_game_folder` is `Data`, so the engine's file system is rooted at
+`<game>\Data`. A loose script belongs at `Data\Scripts\Startup\`. One level
+higher is never found, and **the failure is silent**: "Loading and executing
+script file" is logged *before* the read is attempted, and a miss logs nothing
+at all. That reads exactly like a script that loaded and did nothing.
+
+Loose files also require `sys_PakPriority = 0`. It ships as 2, pak-only, under
+which loose files are ignored entirely and a reload re-reads the same packed
+bytes. It is flagged `REQUIRE_APP_RESTART`.
+
+### Animation data reloads too - **WORKING**
+
+`mn_reload` had appeared to be a no-op for as long as it had been tried. It
+needed two fixes together, which is why it looked like an engine limitation:
+
+1. The ADB files existed only inside the pak, so the reload re-read the same
+   packed bytes. They now deploy loose to `Data\Animations\Mannequin\ADB`.
+2. **`mn_allowEditableDatabasesInPureGame` ships at 0.** A shipping build
+   treats its Mannequin databases as read only, so the reload ran and was never
+   permitted to replace anything. It is now set in `system.cfg` and sent again
+   before every `mn_reload`.
+
+Either alone does nothing. Confirmed in game by pointing the male stagger
+fragments at `ringing_alarm_bell` and watching NPCs ring an invisible bell,
+then reverting, without the game ever restarting. A combined test changing the
+Lua (`Knockback` 50 to 2000) and the animation data in one pass also worked.
+
+Note for future tests: `ringing_alarm_bell` and `library_cabinet_open` exist
+only in the male database, which is why the stagger work used hit reactions.
+A female-visible test needs a clip present in `wh_female_database.adb`.
+
+### Reloading has to restart the detection loop
+
+Re-executing the script is not enough. The loop is started only by the UI
+listener when a loading screen ends, because a Startup script has no "game
+loaded" hook. A reload rebuilds the table with `TimerTick` unset, the running
+loop sees its generation no longer match and stops, and nothing starts a new
+one. The mod goes silent and the game looks completely vanilla until a save is
+loaded. `--reload` therefore calls the entry point directly afterwards.
+
+That exposed a second bug. The generation counter lived on the table that
+`lua_reload_script` rebuilds, so it restarted at 1 on every reload while the
+loop still running was also generation 1: its guard matched and it kept going.
+The counter now lives in a global that a reload does not rebuild. The
+generation in the log line is now a real signal that a reload took.
+
+### The gallop "regression" that was not one
+
+**User report**: after turning `ProtectMutt` off, gallop appeared to stop
+ragdolling.
+
+**Not reproducible as described, and the telemetry explains it.** Across the
+session: Gallop 17 impacts at 8.84-10.75 m/s, Trot 27 at 4.51-8.03, Walk 14 at
+2.38-3.96. Gallop fired throughout, including nine times after the reload.
+
+The stretch that prompted the report is eleven consecutive non-gallop impacts
+where the horse never exceeded **8.03 m/s** against a `SpeedGallop` threshold
+of **8.5**. The horse was trotting. Stamina was not the limiter either: it read
+210.0, 190.7, 190.5 and 182.5 during that run, at or near a full pool.
+
+`ProtectMutt` is one isolated line and cannot affect the gallop path.
+
+**Worth revisiting as tuning**: trot impacts cluster at 6.5-7.0 and top out at
+8.03; gallop starts at 8.84. Almost nothing lands between, so the boundary is a
+visible cliff in reaction strength right where the horse spends much of its
+time.
+
+### Measurement errors worth not repeating
+
+Three conclusions in this session were drawn from signals that had never been
+verified, and all three were wrong:
+
+- **"194 ticks in 10 s proves two loops running."** It assumed
+  `Script.SetTimer(100, ...)` yields 10 ticks a second. It fires roughly every
+  54 ms in this build. Tracing the generation directly showed one loop. The
+  duplicate-loop race is real in the code but was not occurring.
+- **"26 FPS, the game is starved."** `System.GetFrameTime()` was sampled while
+  the game sat unfocused and windowed, where it is throttled. The user's own
+  counter reads 50+ in Rattay. The reading was meaningless as a proxy for play.
+- **Three separate causes proposed for the audio bug**, all wrong, when the
+  answer was already written in this file (see below).
+
+The pattern: prove the signal itself works before drawing a conclusion from it.
+
+### Audio: already answered, in this file
+
+**Re-diagnosed from scratch and got it wrong three times** before finding the
+existing entry from build 2.1.0-dev5. The cause is Warhorse's PROS online
+service failing to reach its backend and retrying on the main thread every half
+second, which stalls the audio buffer. `kcd.log` shows the pair every 0.5 s
+with no gap:
+
+```
+ERROR: operation 'Do connect' takes too much time. Duration 0.500069 sec
+PROS: disconnected on server side. Trying to reconnect.
+```
+
+It is **intermittent**, which is what made it look new each time: whether the
+retry loop engages depends on what the backend does on that launch. Some
+launches are clean with nothing changed. That is a reason to search the record
+harder, not a reason to assume the symptom is new.
+
+Nothing in the mod is involved. Blocking the game outbound in the firewall
+stops it.
+
+### Environment findings
+
+- **`Bin\Win64\user.cfg` was never being read.** It held performance tuning
+  that therefore never applied, plus a dead `hcm_*` CVar block left over from
+  1.x: the mod reads none of those and the build registers no `hcm_` CVars at
+  all. Consolidated into the single `user.cfg` beside `system.cfg`.
+- `r_TexturesStreamPoolSize` reads 4096 regardless of either file, so **KCD's
+  own graphics profile overrides `user.cfg`** for it.
+- The manifest declared `1.*`. The game matches `<kcd_version>` against
+  `wh_sys_version` and **disables the mod when nothing matches**, so that
+  claimed compatibility the mod cannot honor: it ships whole animation
+  databases generated from 1.9.7. Now pinned to `1.9.7`, which fails safe.
+- The install is a Steam build at 1.9.7 with only the auth DLL replaced
+  (`steam_api64.rne` is the original, preserved). Game data is stock, so the
+  generated databases match what a retail owner on 1.9.7 has.
+
+### Still open
+
+- Carried items are still dropped at trot and gallop, on the physics ragdoll
+  path. Separate from the walk-tier stagger fix and predates 2.0.0.
+- During this session a woman **kept her bucket** while running the *un-fixed*
+  animation data, which does not fit the `ColliderMode="Disabled"` explanation
+  recorded for the carried-item drop. Worth re-testing before that fix merges.
+- `sys_PakPriority = 0` and `mn_allowEditableDatabasesInPureGame = 1` are
+  development settings now live in `system.cfg`. Set `sys_PakPriority` back to
+  2 for normal play.
+
+### Repository layout
+
+Not a build test. Recorded because it changes where everything lives and how
+the scripts find each other.
+
+Eleven tracked files sat at the repository root, of which four were scripts and
+two were the mod itself. Nothing distinguished the mod from the tooling that
+builds it. The layout is now:
+
+```
+build.ps1                 the one build entry point
+src/    HorseCollisionMod.lua, mod.manifest
+tools/  build_adb.py, dev_deploy.ps1, dev_console.py
+docs/
+```
+
+**Every script now resolves paths from the repository root rather than the
+working directory.** That was the real work; moving the files was the easy
+part. `build.ps1` derives its root from `$PSCommandPath`, `dev_deploy.ps1`
+takes one level up from its own location since it lives in `tools/`, and
+`build_adb.py` uses `os.path.dirname` twice on `__file__`.
+
+Before this, `build_adb.py` wrote `mod_assets/` relative to whatever directory
+it was invoked from. Running it from `C:\` created `C:\mod_assets` and reported
+success, which is the kind of quiet wrong behavior that is hard to notice.
+Verified afterwards by running both `build.ps1` and `tools/build_adb.py` from
+`C:\`: output lands in the repository, and no stray directory is created.
+
+Two traps found while rewiring:
+
+- **LuaJIT's syntax check needs forward slashes.** `build.ps1` hands the script
+  path to `loadfile` inside a single-quoted Lua string, and Lua treats a
+  backslash there as an escape. The path is converted with
+  `.Replace([char]92, [char]47)`.
+- **`git status --porcelain` prints a rename as `old -> new`.** Anything
+  matching paths against that output has to reduce it to the destination first
+  or the match silently fails while a rename is staged.
+
+The build artifact is unchanged: same three files in the zip, same five entries
+in the pak, same sizes.
+
+### Config readability, and the LDoc situation
+
+**User report**: the tuning table is hard to read. "I couldn't find the
+ProtectMutt setting for almost a minute because it was hard to read."
+
+Fair, and worse than it sounds. The table was **71 lines holding 24 settings**,
+with multi-paragraph rationale interleaved between fields. `ProtectMutt = true`
+sat alone between a six-line comment and a five-line comment, with nothing
+grouping it.
+
+The rationale was also triple-documented: once in the `@field` block above the
+table, once inline, and once in the README settings table. One of those three
+copies was actively obstructing the thing people open the file to edit.
+
+The table is now 37 lines, grouped by what each setting affects, one aligned
+line per setting, with a short header per group. All 24 settings and every
+value verified unchanged by diffing the parsed assignments against the previous
+commit. The reasoning moved to `TECHNICAL_DETAILS.md` under "Tuning rationale",
+where the telemetry that produced the numbers can be read as prose.
+
+The principle worth keeping: a config table is a control surface, not a
+document. Explain elsewhere.
+
+### The LDoc comments are correct
+
+Checked rather than assumed, by parsing the file and comparing documentation
+against code:
+
+- 13 documented functions, **every `@tparam` name and count matching the actual
+  signature**, in order.
+- 4 documented tables, every `@field` present in the table and every table field
+  documented. No phantom fields, no undocumented ones.
+- Tags in use are all standard: `@module`, `@author`, `@release`, `@table`,
+  `@field`, `@tparam`, `@treturn`.
+
+An earlier version of that check reported six functions "returning a value with
+no `@treturn`". False positives: the pattern used `\s+` where it needed
+`[ \t]+`, so it matched across a newline and flagged bare `return` guards. All
+six confirmed to have no value-returning statement.
+
+### docs/api is not generated by LDoc
+
+Worth stating plainly because it looked like it was. `docs/generate_api_docs.py`
+is a 295-line custom Python renderer that reads LDoc tags and emits its own
+HTML. Its docstring claimed `ldoc HorseCollisionMod.lua` "produces the same
+content", which overstates it: the script implements only the tags this project
+uses and its markup is its own.
+
+**Real LDoc cannot currently be installed on this machine.** It depends on
+penlight, which depends on luafilesystem, which is a C module. `luarocks
+install ldoc` gets as far as compiling `lfs.c` and fails, because there is no C
+compiler on the box at all. The route is `choco install mingw` first.
+
+What was done instead: `config.ld` added at the repository root so the project
+is properly configured for LDoc and `ldoc .` works for anyone who has it; the
+Python script's docstring rewritten to say what it actually is; and the README
+given an "API documentation" section stating which is canonical.
+
+Also fixed there: the repository reorganization had broken the generator, which
+still pointed at `HorseCollisionMod.lua` at the root. It now resolves from the
+repository root like the other scripts, and was verified from an unrelated
+working directory.
+
+### Real LDoc, installed
+
+`docs/api/` is now generated by LDoc itself rather than by a bespoke renderer.
+
+The blocker was that LDoc depends on penlight, which depends on luafilesystem,
+which is a C module, and this machine had no C compiler at all: no gcc, no
+clang, no MSVC build tools. Chocolatey was present but the shell was not
+elevated, and `choco install mingw` writes under `C:\ProgramData`.
+
+`winget` turned out to be the way, since WinLibs installs a full mingw-w64
+toolchain into the user profile with no elevation:
+
+```
+winget install BrechtSanders.WinLibs.POSIX.UCRT --scope user
+luarocks install ldoc
+```
+
+The compiler is only needed to build luafilesystem during that install. `ldoc`
+lands in the luarocks bin directory, which is already on PATH, and `ldoc .`
+runs afterwards in a clean shell with no mingw on PATH. Verified.
+
+`config.ld` at the repository root configures the project. The output is
+30,920 bytes plus `ldoc.css`, against 22,207 for the Python renderer, and
+carries every documented function and table.
+
+`docs/generate_api_docs.py` is removed. It was 295 lines reimplementing a
+standard tool, its output was not what LDoc produces despite a docstring
+claiming otherwise, and its existence was the reason the documentation setup
+was unclear in the first place.
+
+## Session: publishing to Nexus Mods from the IDE
+
+Not a build test. Recorded because it settles how releases get published and
+rules out an approach that looks obviously correct from the outside.
+
+### The GitHub Action cannot work for this mod
+
+Nexus Mods ship `Nexus-Mods/upload-action` and a sample repository,
+`Nexus-Mods/API-Example`, whose workflow checks out the repository, zips
+`src/`, and uploads the result. That shape is a good fit for a source-only mod
+and a bad fit for this one.
+
+`build.ps1` calls `tools/build_adb.py`, which reads
+`Data/Animations-part1.pak` out of a local game install to generate
+`mod_assets/`. `mod_assets/` is gitignored, so a fresh clone has nothing to
+package. A GitHub-hosted runner has no game install, and shipping Warhorse's
+paks to CI is both a licensing problem and a gigabyte-scale one.
+
+The workaround would be to build locally, attach the zip to a GitHub release,
+and have a workflow feed that artifact to the action. That still builds by
+hand, and adds a round trip through GitHub in order to run six HTTP calls. The
+only thing it buys is keeping the API key in GitHub secrets rather than in a
+shell variable.
+
+So: publish locally, from `tools/publish_nexus.ps1`. Revisit the action only if
+the additive/patch ADB deployment on the roadmap ever lands, since a repository
+that commits a small delta instead of regenerating whole databases would be
+buildable anywhere.
+
+Worth noting the action itself adds nothing over the API. Its inputs map
+one-for-one onto the v3 request bodies, `display_name` to `name`,
+`category` to `file_category`, `archive_existing_version` to
+`archive_existing_file`, and it runs the same six calls the script does.
+
+### The site's file_id is not the API's file id
+
+The number in `?tab=files&file_id=10219` names a mod file **version**, but an
+upload is claimed by the mod **file** that owns the version. The spec draws
+this distinction explicitly: a `ModFile` is "the persistent, updatable file on
+a mod page", and its `ModFileVersion`s are the individual uploads.
+
+Both site identifiers resolve in one call each:
+
+```
+GET /games/kingdomcomedeliverance/mods/2338              -> data.id
+GET /games/kingdomcomedeliverance/mod-file-versions/10219 -> data.file.id
+```
+
+The script resolves them at runtime rather than caching them, then calls
+`GET /mods/{id}/files` to confirm the mod file actually belongs to that mod. A
+wrong identifier would otherwise publish onto someone else's page quietly.
+
+### Python and .NET disagree about the release zip's entry names
+
+Found while writing the zip validation, and worth recording because it produced
+a confident wrong answer in both directions.
+
+`Compress-Archive` stores Windows path separators, so the release zip really
+contains `Data\HorseCollisionMod.pak` with a backslash. Confirmed by reading
+the raw central directory bytes.
+
+**Python's `zipfile` normalizes those to forward slashes on read. .NET's
+`ZipArchiveEntry.FullName` reports them as stored.** So the same file listed
+through Python and through PowerShell gives different names, and a check
+written against one library fails against the other. The validation normalizes
+separators before comparing.
+
+This is the same `Compress-Archive` behavior that `build.ps1` already documents
+for the pak, where it matters much more: CryEngine looks pak entries up by
+exact path with forward slashes, so a backslash pak silently overrides nothing.
+The pak is therefore built entry by entry. The outer release zip is unpacked by
+Vortex or by hand rather than looked up by path, so backslashes there are
+harmless and no change was made to how it is built.
+
+### Guards on the publish path
+
+Everything below runs before any network call, because a wrong release reaching
+a live mod page is slower to undo than to prevent:
+
+- The version string is checked against the API's own `^[a-zA-Z0-9.-]+$` and
+  50 character limit, so a typo fails immediately rather than after the upload.
+- The zip must contain `mod.manifest` and `Data/HorseCollisionMod.pak`.
+- **The `<version>` inside the zip's `mod.manifest` must match the version
+  being published.** `build.ps1` copies `src/mod.manifest` verbatim, so its
+  version is maintained by hand and can drift from the `-Version` the zip was
+  built with. The manifest is what the game reads.
+- A version string containing `dev`, `alpha`, `beta` or `rc` is refused.
+- `GET /mod-files/{id}/versions` is checked for the version already existing.
+- The run prints what it is about to do and requires the version typed back.
+
+`-Force` skips these. `-DryRun` stops after validation and resolution.
+
+Two operational details from the spec that are easy to get wrong: the presigned
+`PUT` must carry `Content-Disposition: attachment; filename="..."` matching the
+filename sent to `POST /uploads`, because the filename is part of the URL's
+signature; and the upload is processed asynchronously, so `GET /uploads/{id}`
+has to report `available` before the version can be created. If a run fails
+after the upload succeeded it prints the upload id, and `-ResumeUploadId` picks
+up from there without sending the file again.
+
+### Not covered by the API
+
+There is no endpoint to create a mod page, and none to edit a mod's
+description. `PATCH` exists for collections, not for mods. The Nexus page copy
+is still pasted in by hand on each release, which is what the local description
+file is for.
+
+`createModFile` and `createModFileVersion` are both marked **Experimental** in
+the spec, meaning they can change or be removed without the 90-day deprecation
+window the stable endpoints get. Worth re-reading the spec if a release ever
+fails for no apparent reason.
+
+### Acceptable use policy, and what it changed
+
+Checked against
+https://help.nexusmods.com/article/114-api-acceptable-use-policy after the
+first working dry run. Two things were wrong and one was worth writing down.
+
+**Missing required headers.** The policy requires every request to carry
+`Application-Name` and `Application-Version`, and explicitly forbids "sending
+request metadata which is either blank or impersonates another application".
+The script sent neither. Now sends `HorseCollisionMod-publish` and a version
+that moves independently of the mod's, since the policy asks that the name stay
+constant across releases of the tool.
+
+Worth noting the v3 spec is misleading here: `Application-Name` appears in it
+exactly once, as an *optional* header on `downloadRepackedModFileVersion`. The
+policy governs, not the spec.
+
+**The poll loop was the one place this script could be a bad citizen.** It sat
+at a fixed two second interval for up to sixty attempts. Now backs off from one
+second to five, reaching about three minutes of waiting in 40 requests rather
+than 90. Nexus do not publish a specific quota in the policy, only that
+excessive consumption may be rate limited, so the fix is to not need a number.
+
+**Personal key use is within policy, and would stop being so if this were
+generalized.** Nexus permit personal API keys for testing and personal use.
+This qualifies: one author publishing to one mod page, the key read from the
+environment at the moment of use, stored by nothing, never used without the
+author starting the run. The policy's prohibition on "storing user API keys on
+your own server and/or using them without the action being initiated by the
+user" is the one to stay on the right side of, and a local script that reads an
+environment variable does.
+
+If this ever became a tool other modders point at their own pages, that is a
+public-facing application, and the policy requires registering with Nexus Mods
+at support@nexusmods.com with a testing build before release rather than
+shipping on personal keys. Relevant because generalizing the dev tooling for
+other modders has come up before.
+
+### Error output
+
+A first working dry run ended on the duplicate-version check, which was correct,
+but PowerShell rendered the `throw` as a full error record: source extent,
+squiggly underline, `CategoryInfo`, `FullyQualifiedErrorId`, with the actual
+sentence split across the noise. Unreadable for something a person runs by hand.
+
+A script-scope `trap` now prints the message and exits, so every guard reports
+as one line. The already-published case is not really a failure and got its own
+yellow message and exit code 2, so a wrapper can tell "already there" from
+"went wrong".
+
+### Confirmed working
+
+First live run against the real mod page, dry run only, no writes:
+
+```
+mod:      Horse Collision Mod [9869834848546]
+mod file: HorseCollisionMod [7863762]
+versions: 1 (0 archived)
+Version 2.0.0 is already on the page, uploaded 2026-08-26T05:08:54.000+00:00.
+```
+
+All four lookups resolve, including the mod-file-version to mod-file hop, and
+the duplicate check reads live data. The upload, finalise and publish calls
+remain untested until a real release.
+
+### Storing the API key
+
+`$env:NEXUS_API_KEY` per session worked but meant retyping the key, and the
+obvious alternatives are all worse than they look. `setx` writes it to the
+registry as plaintext. A gitignored dotfile is plaintext on disk and one
+`git add -f` from leaking. Passing `-ApiKey` puts it in shell history.
+
+`Export-Clixml` on a `SecureString` encrypts with DPAPI under the current
+Windows account, needs no dependencies, and produces a file that other users on
+the machine cannot read and that is useless if copied elsewhere. It is stored
+at `%LOCALAPPDATA%\HorseCollisionMod\nexus.cred`, outside the repository, so no
+amount of carelessness with `git add` can commit it.
+
+Set with `-SaveApiKey`, removed with `-ForgetApiKey`. Resolution order is the
+`-ApiKey` parameter, then the environment variable, then the stored file, so a
+single session can override without disturbing what is saved.
+
+The honest limit: DPAPI does not defend against code already running as this
+user, which decrypts it exactly as the script does. It defends against the ways
+a key actually leaks in practice, which are a synced folder, a backup, a shared
+machine and an accidental commit.
+
+Verified by round-tripping a dummy value: stored, decrypted, sent, and rejected
+by the API with a 401, which proves the key reached the request rather than the
+call failing earlier for some other reason. Removing the file falls back to the
+message telling you how to store one.
+
+### When this runs
+
+Release step only, run by hand on a tagged version. Not wired to a push, a
+merge, or a schedule, which is also what keeps a personal API key inside the
+acceptable use policy: the action is initiated by the author every time.

@@ -59,7 +59,27 @@ HorseCollisionMod = {}
 
 HorseCollisionMod.Version = "2.0.1"
 
+--- Loop generation counter, deliberately kept outside the table above.
+--
+-- `lua_reload_script` re-executes this file, and its first act is to rebuild
+-- HorseCollisionMod from scratch, which takes TimerTick with it. A counter
+-- stored on the table therefore restarts at 1 on every reload, while any loop
+-- still running from before compares its own generation against that same 1,
+-- matches, and carries on. Each reload would leave another loop sweeping for
+-- collisions ten times a second, all of them writing to the same cooldown
+-- table.
+--
+-- The `or 0` is what makes this survive a reload: the global is already set by
+-- then, so the count continues instead of restarting, and every stale loop
+-- sees a generation that no longer matches and stops on its next tick.
+HorseCollisionModGeneration = HorseCollisionModGeneration or 0
+
 --- Tuning values. Safe to edit in place; nothing here is derived at runtime.
+--
+-- Grouped by what they affect, and deliberately kept terse: this is the table
+-- people open to change a setting, not to read. Where the defaults came from,
+-- including the impact telemetry several were derived from, is in
+-- docs/TECHNICAL_DETAILS.md under "Tuning rationale".
 --
 -- @field SpeedWalk lower bound of the walk tier, in meters per second
 -- @field SpeedTrot lower bound of the trot tier
@@ -87,76 +107,45 @@ HorseCollisionMod.Version = "2.0.1"
 -- @field LogTelemetry write diagnostics to kcd.log
 -- @table Config
 HorseCollisionMod.Config = {
-	-- KCD horses have three speed plateaus, not four. Telemetry across 90+
-	-- logged impacts clustered at 2.05-3.74, 6.38-7.03 and 9.18-10.81 m/s,
-	-- so these thresholds sit in the empty gaps between those clusters.
-	SpeedWalk = 1.8,
-	SpeedTrot = 4.5,
-	SpeedGallop = 8.5,
-	-- Broad-phase cull only. Everything inside this sphere is then tested
-	-- against the horse footprint below, so this can stay generous without
-	-- NPCs reacting from an unnatural distance.
-	HitRadius = 2.5,
-	HitCooldownMs = 3000,
-	-- Horse footprint, in meters from the horse's origin. A horse is long
-	-- and narrow, so a sphere catches people alongside and behind it who
-	-- were never actually struck.
-	--
-	-- Tuned from 103 logged impacts rather than from guessed dimensions.
-	-- Lateral distances were pressed hard against the previous 0.55 cap
-	-- (median 0.30, 90th percentile 0.51), which is what let NPCs half a
-	-- meter clear of the flank still react. 0.35 is about a horse chest's
-	-- half-width and keeps the impacts genuinely in front of the animal.
-	HorseFrontReach = 1.05,
-	HorseRearReach = 0.20,
-	HorseHalfWidth = 0.35,
-	HorseMaxVerticalDiff = 2.35,
-	-- The footprint is extended forward by the distance the horse covers in
-	-- one tick, so victims are not missed between frames.
-	--
-	-- This was the single biggest cause of over-reach: 45 of 103 logged
-	-- impacts landed beyond the front reach and were admitted by the sweep
-	-- alone, which sat pinned at its old 0.95 cap a quarter of the time and
-	-- pushed the effective reach out past two meters. Halved and capped
-	-- much lower; it only needs to cover one tick of travel, not a stride.
-	TickSeconds = 0.1,
-	SweepMultiplier = 0.50,
-	MaxSweepExtra = 0.35,
-	Knockback = 50.0,
-	Uplift = 30.0,
-	ProtectMutt = true,
-	-- Measured against a full horse stamina pool of 210. At these values a
-	-- gallop costs roughly three bodies and a trot roughly five before the
-	-- horse is spent and Henry is thrown. The previous 20/40 allowed ten
-	-- and five, which made plowing through a crowd close to free.
-	-- A walking bump is not hard enough to tire a horse at all.
-	StaminaDrainWalk = 0.0,
-	StaminaDrainTrot = 45.0,
-	StaminaDrainGallop = 75.0,
+	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
+	SpeedWalk                = 1.8,
+	SpeedTrot                = 4.5,
+	SpeedGallop              = 8.5,
+
+	-- Detection. HitRadius is a broad-phase sphere; everything inside it is
+	-- then tested against the horse footprint, in meters from the horse
+	-- origin. The sweep extends the footprint forward by one tick of travel.
+	HitRadius                = 2.5,
+	HorseFrontReach          = 1.05,
+	HorseRearReach           = 0.20,
+	HorseHalfWidth           = 0.35,
+	HorseMaxVerticalDiff     = 2.35,
+	TickSeconds              = 0.1,
+	SweepMultiplier          = 0.50,
+	MaxSweepExtra            = 0.35,
+	HitCooldownMs            = 3000,
+
+	-- Knockdown impulse. Trot and gallop only; the walk tier never ragdolls.
+	Knockback                = 50.0,
+	Uplift                   = 30.0,
+
+	-- Horse stamina, against a full pool of roughly 210.
+	StaminaDrainWalk         = 0.0,
+	StaminaDrainTrot         = 45.0,
+	StaminaDrainGallop       = 75.0,
 	ThrowRiderOnStaminaEmpty = true,
-	-- Stamina cost is multiplied by this while the player is in a fight.
-	--
-	-- Riding through a market at speed is meant to be fun and cheap. Using
-	-- the horse as a crowd-control weapon mid-battle is not: without this,
-	-- charging a group of four leaves them ragdolled and the rider free to
-	-- shoot or swing at no cost. At 2.5 a galloping charge into combat
-	-- spends the horse in a single impact, so it is a committed move rather
-	-- than a repeatable one.
-	CombatStaminaMultiplier = 2.5,
-	-- Skip the stagger animation while the player is fighting.
-	--
-	-- The stagger hands the victim's body to an interactive action, which
-	-- pulls them out of their combat behavior. On return they have lost
-	-- track of the player and bark lines like "Where did he go?" while he
-	-- is standing in front of them. Suppressing it in combat keeps their
-	-- perception intact; the knockdown tiers are unaffected either way.
-	SuppressStaggerInCombat = true,
-	SendHitReaction = true,
-	-- Turn off to compare against vanilla collision handling without
-	-- uninstalling the mod. The knockdown tiers are unaffected.
-	WalkStagger = true,
-	LogTelemetry = true
+
+	-- Combat.
+	CombatStaminaMultiplier  = 2.5,
+	SuppressStaggerInCombat  = true,
+
+	-- Switches.
+	ProtectMutt              = true,
+	WalkStagger              = true,
+	SendHitReaction          = true,
+	LogTelemetry             = true
 }
+
 
 --- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
 --
@@ -919,7 +908,9 @@ end
 -- @tparam table argTable event arguments, unused
 function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 	if actionName == "sys_loadingimagescreen" and eventName == "OnEnd" then
-		local currentTick = (self.TimerTick or 0) + 1
+		HorseCollisionModGeneration = HorseCollisionModGeneration + 1
+
+		local currentTick = HorseCollisionModGeneration
 
 		self.TimerTick = currentTick
 
