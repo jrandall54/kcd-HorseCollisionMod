@@ -2829,3 +2829,69 @@ Two things have to hold, and only the first is a genuine unknown:
 
 If both hold, the mod replaces **no vanilla file at all** and the animation
 conflict disappears rather than shrinking.
+
+---
+
+## Build 2.0.1-dev.16: a SubADB can carry a whole database
+
+**Hypothesis**: the loader will accept an entire animation database through a
+`<SubADB>` reference, not just a small fragment subset.
+
+**Setup.** The loose `kcd_male_database.adb` was replaced with a **341 byte**
+parent holding nothing but two references:
+
+```xml
+<AnimDB FragDef="..." TagDef="...">
+  <SubADBs>
+    <SubADB File="Animations/Mannequin/ADB/hcm_male_vanilla.adb" />
+    <SubADB File="Animations/Mannequin/ADB/hcm_male_stagger.adb" />
+  </SubADBs>
+</AnimDB>
+```
+
+`hcm_male_vanilla.adb` is a byte-for-byte copy of the vanilla 5.5 MB database.
+Shipping that copy is obviously not the end state; the point was to isolate one
+variable and leave the Lua redirect out of it.
+
+**User reported**: "men staggered and everyone is animating normally."
+
+**Result: confirmed.** The entire male animation set reached the game through
+two SubADB references, from a parent document containing no fragments of its
+own. Both loads were logged and no subADB error appeared.
+
+The second half of that report is the load-bearing one. Had the vanilla SubADB
+failed to merge, every male in the world would have lost their whole fragment
+set, which is not a subtle failure.
+
+### The warnings were a false alarm, and were checked rather than assumed
+
+The reload logs a batch of `Warning missing fragmentID` lines
+(`DiceGameStart`, `CorpseGrab`, `PickingHerbs`, and others), which read like
+the probe having broken something.
+
+Fingerprinted the full warning set under both the probe and the previous
+working build and diffed them:
+
+```
+missing fragmentID       total=14    unique=12
+unknown tags fragID      total=16    unique=2
+skipping unknown frag    total=103   unique=103
+invalid tag              total=16    unique=2
+```
+
+**Identical**, the extra `Loading subADB` line aside. All of it is vanilla's own
+noise. Worth the two minutes: the alternative was reporting a regression that
+was always there, which this project has done before.
+
+### Where this leaves the additive question
+
+Both unknowns from the previous entry are now settled in favour:
+
+1. SubADB works, and fragments defined only in a sub-database resolve.
+2. A SubADB can carry a whole database.
+
+One piece remains: pointing entities at a parent that references the
+**untouched** vanilla file inside its pak, rather than replacing
+`kcd_male_database.adb` with the parent. That is the difference between
+shrinking the conflict and removing it, and it is a Lua question rather than an
+animation one, since `AnimDatabase3P` is an entity-class property.
