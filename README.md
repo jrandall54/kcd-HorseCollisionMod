@@ -38,6 +38,16 @@ at any speed. This version tries to make collisions behave like part of the game
   fight is a decision rather than a default.
 - Nothing is hardcoded. Every threshold, force and cost is a value at the top of one file.
 
+## Requirements
+
+**Kingdom Come: Deliverance 1.9.7.** The mod declares that version in its
+manifest, and the game disables any mod whose declared version does not match
+`wh_sys_version` in `system.cfg`. That is deliberate: the mod ships whole
+animation databases generated from 1.9.7, so a mismatch failing to load is
+safer than it loading and overwriting a different version's animation data.
+
+1.9.7 is the final build, so in practice this means any up-to-date copy.
+
 ## Install
 
 Vortex, or extract the zip into `Kingdom Come - Deliverance\Mods\`.
@@ -77,7 +87,11 @@ internals for the detection and the collision bark, commented in place if you wa
 ## Compatibility
 
 - **Replaces `kcd_male_database.adb` and `wh_female_database.adb`.** Conflicts with any mod
-  that edits human animations. Mannequin databases cannot be merged, only replaced.
+  that edits human animations. Mannequin databases cannot be merged, only replaced, so
+  whichever mod loads last wins outright and the other's changes vanish with no error.
+- Also replaces `kcd_animationControlledTags.xml` and `wh_female_fragmentids.xml`.
+- The replaced files are the game's own, with roughly 3 KB of added fragments. Everything
+  else in them is byte-identical to vanilla 1.9.7.
 - Does not touch AI behavior trees, quests, or RPG tables.
 
 ## Planned
@@ -132,8 +146,14 @@ Requires PowerShell and Python 3. LuaJIT is optional and adds a syntax check.
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.0.0"
 ```
 
-Animation data is generated from your own game install. Output goes to `releases\`.
-API reference, technical notes and development log are in `docs/`.
+Animation data is generated from your own game install rather than committed, so the first
+build runs `build_adb.py` for you. It finds the game automatically: `--game-root`, then the
+`KCD_PATH` environment variable, then the usual Steam and GOG locations, then every Steam
+library listed in `libraryfolders.vdf`. If none of those find it, it says so and lists
+everywhere it looked.
+
+Output goes to `releases\`. API reference, technical notes and the development log are in
+`docs/`, and `docs/DEV_LOOP.md` covers the hot-reload tooling.
 
 ## License
 

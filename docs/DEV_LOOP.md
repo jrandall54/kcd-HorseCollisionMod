@@ -11,15 +11,24 @@ that folder in `Mods\mod_order.txt`. Nothing about that needs a mod manager, so
 `dev_deploy.ps1` does it directly:
 
 ```
-.\dev_deploy.ps1 -Launch          build, install, start the game
-.\dev_deploy.ps1 -NoBuild -Launch  install what was built last
-.\dev_deploy.ps1 -ParkVortexMod    move the Vortex-installed copy to mods_old\
+.\dev_deploy.ps1 -Launch             build, install, start the game
+.\dev_deploy.ps1 -NoBuild -Launch    install what was built last
+.\dev_deploy.ps1 -ScriptOnly         push only the Lua, game may be running
+.\dev_deploy.ps1 -AnimOnly           push only the animation data, same
+.\dev_deploy.ps1 -ParkVortexMod      move the Vortex-installed copy to mods_old\
+.\dev_deploy.ps1 -GameRoot "D:\..."  use an install somewhere else
 ```
 
 It installs to one fixed folder, `HorseCollisionMod_dev`, rather than a
 versioned one, so each build overwrites the last instead of accumulating. It
 refuses to run while the game holds its paks open, and it launches with
 `-devmode` (see below).
+
+The game folder is resolved rather than hardcoded: `-GameRoot`, then `KCD_PATH`
+in the environment, then the usual Steam and GOG locations, then every Steam
+library in `libraryfolders.vdf`. An explicitly given path that is wrong stops
+the run rather than silently falling through to a different install.
+`build_adb.py` resolves the same way, with `--game-root`.
 
 The release build for Nexus still goes through `build.ps1`. The dev folder is
 never what ships.
@@ -36,6 +45,19 @@ python dev_console.py --reload           reload the mod's Lua
 python dev_console.py --anim-reload      reload the Mannequin databases
 python dev_console.py --commands         dump every command and CVar the build has
 python dev_console.py "MemInfo"          run one command
+python dev_console.py --lua "CODE"       evaluate Lua in the running game
+```
+
+Two flags affect what is shown rather than what is sent. `--noisy` stops the
+PROS and Steam chatter being filtered out. `--verbose` raises console verbosity
+to 4, which is off by default because it costs frame time for output nothing
+reads (see below).
+
+`--lua` is worth knowing about: it reads the mod's live state out of the running
+game, which settles questions that guessing does not.
+
+```
+python dev_console.py --quiet --lua "System.LogAlways(tostring(HorseCollisionMod.Config.Knockback))"
 ```
 
 Live streaming replaces reading `kcd.log` after the fact. The mod's own
@@ -103,10 +125,18 @@ Related: the console expression prefix is `!`, not `#` (`wh_con_expr_prefix`).
 
 `log_Verbosity` is a runtime value. A session started after a game restart is
 silent until it is raised again, which looks exactly like commands vanishing
-into nothing. `dev_console.py` therefore sends `log_Verbosity 4` and
+into nothing. `dev_console.py` therefore sends `log_Verbosity` and
 `con_restricted 0` on every connection before anything else.
 
-## Both halves reload, but the pak is in the way
+**The level is 2, deliberately not 4.** The mod logs through
+`System.LogAlways`, which does not consult verbosity at all, so its telemetry
+arrives either way. What 4 adds is every engine message, formatted, written to
+the console, and forwarded over the socket one packet per frame exchange. With
+the PROS backend failing twice a second that is a lot of main thread work for
+output nothing reads. `--verbose` asks for 4 when engine-level detail is
+actually wanted.
+
+## Both halves reload without a restart
 
 Reloading works, tested:
 
@@ -116,13 +146,14 @@ Reloading works, tested:
 [log] Loaded Scripts/Startup/HorseCollisionMod.lua
 ```
 
-`mn_reload` likewise re-parses the Mannequin databases, which is the subsystem
-that owns the stagger fragments, so animation data is not restart-only either.
+`mn_reload` re-parses the Mannequin databases, the subsystem that owns the
+stagger fragments, so animation data is not restart-only either. Getting it to
+actually take needed two separate fixes, covered below.
 
-What blocks a true edit-and-reload loop is **`sys_PakPriority = 2`**, which
-means pak-only: loose files on disk are ignored entirely. A reload therefore
-re-reads the same packed bytes and nothing changes. The CVar is flagged
-`REQUIRE_APP_RESTART` so it cannot be flipped live.
+The first is **`sys_PakPriority = 2`**, which means pak-only: loose files on
+disk are ignored entirely. A reload therefore re-reads the same packed bytes and
+nothing changes. The CVar is flagged `REQUIRE_APP_RESTART` so it cannot be
+flipped live.
 
 `system.cfg` therefore now carries `sys_PakPriority = 0`, loose files first,
 which takes effect on the next restart. `dev_deploy.ps1` writes the script loose
@@ -156,11 +187,18 @@ one level up it did not.
                                   edit HorseCollisionMod.lua
 .\dev_deploy.ps1 -ScriptOnly      push the script to the running game
 python dev_console.py --reload    new code live, keep playing
+
+                                  edit build_adb.py, then regenerate
+.\dev_deploy.ps1 -AnimOnly        push the animation databases
+python dev_console.py --anim-reload
 ```
 
-`-ScriptOnly` deliberately skips the running-game guard, because that guard is
-about the pak, which the engine holds open. A loose `.lua` is not locked and can
-be replaced underneath a running game.
+Nothing here restarts the game. Both halves can change in one pass too: push the
+script and the databases, then send both reloads.
+
+`-ScriptOnly` and `-AnimOnly` deliberately skip the running-game guard, because
+that guard is about the pak, which the engine holds open. A loose file is not
+locked and can be replaced underneath a running game.
 
 ### Reloading has to restart the detection loop
 
@@ -187,11 +225,51 @@ A successful reload now ends with the mod announcing its new loop:
 Both console Lua prefixes, `#` and `!`, work once the game is in dev mode. They
 do nothing without it, which is what made `#` look broken earlier.
 
-Animation data changes need a rebuild and `--anim-reload`, since the ADB files
-live in the pak rather than loose.
+### Animation data reloads too
+
+For a long time `mn_reload` looked like a no-op. It needed two things at once,
+which is why it read as an engine limitation:
+
+1. **The ADB files have to be on disk loose.** They only existed inside the pak,
+   so the reload re-read the same packed bytes. `dev_deploy.ps1` now writes them
+   to `Data\Animations\Mannequin\ADB` alongside the script, and `-AnimOnly`
+   pushes just those under a running game.
+2. **`mn_allowEditableDatabasesInPureGame` ships at 0.** A shipping build treats
+   its Mannequin databases as read only, so the reload ran and was never
+   permitted to replace anything. It is set in `system.cfg` and sent again ahead
+   of every `mn_reload`, since it is a runtime value that resets with the game.
+
+Either one alone changes nothing.
+
+```
+python build_adb.py                  regenerate from the game's own paks
+.\dev_deploy.ps1 -AnimOnly           push the databases to the running game
+python dev_console.py --anim-reload
+```
+
+Confirmed by pointing the male stagger fragments at `ringing_alarm_bell` and
+watching NPCs ring an invisible bell, then reverting, without the game
+restarting. `ringing_alarm_bell` and `library_cabinet_open` exist only in the
+male database, so a female-visible test needs a clip present in
+`wh_female_database.adb`.
 
 ## Watch out for
 
-`Bin\Win64\user.cfg` sets `sys_PakStreamCache = 1` and `sys_preload = 1`. Those
-are aggressive caching settings and are the first suspects if a loose-file
-override does not take even at priority 0.
+**There is only one `user.cfg` now.** There used to be a second in `Bin\Win64`,
+and it was never read: settings placed there, `sys_PakStreamCache` and
+`sys_preload` among them, had no effect at all. Everything lives in
+`<game>\user.cfg` beside `system.cfg`. KCD's own graphics profile also overrides
+`user.cfg` for some values, `r_TexturesStreamPoolSize` among them, so read a
+CVar back rather than assuming a config line took.
+
+**`sys_PakPriority = 0` and `mn_allowEditableDatabasesInPureGame = 1` are
+development settings**, both in `system.cfg`. Priority 0 makes the engine check
+the file system before the paks on every lookup, which costs a little load time.
+Set it back to 2 for normal play.
+
+**Audio going underwater is neither this mod nor this tooling.** It is
+Warhorse's PROS service failing to reach its backend and retrying on the main
+thread every half second, which stalls the audio buffer. It is intermittent
+because whether the retry loop engages depends on what the backend does that
+launch. Recorded in `TESTING_DIARY.md`; three separate wrong causes were
+proposed before anyone looked there.
