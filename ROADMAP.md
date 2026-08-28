@@ -60,37 +60,49 @@ See `docs/DEV_LOOP.md`, and `docs/RELEASING.md` for publishing.
 
 ## Additive deployment
 
-Stop replacing vanilla animation files, so the mod cannot be silently overwritten by
-another animation mod and cannot silently overwrite one.
+Shipped in 2.1.0. The mod no longer replaces the animation databases.
 
-Proven in game rather than assumed. CryEngine's Mannequin loader supports sub-databases,
-no vanilla KCD file uses one, and the loader is present in `WHGame.dll` regardless. A
-342 byte parent that references the untouched vanilla database in its own pak, plus the
-mod's own fragment file, works end to end. The database path is a Lua entity-class
-property, so entities can be redirected without touching a vanilla script.
+It ships its own small database carrying vanilla's `AnimationControlled` options
+alongside its four, and references the untouched 5.5 MB vanilla file where it sits
+inside its own pak. The human entity classes are pointed at it from Startup Lua.
+Download drops from 195,284 to 21,953 bytes.
 
-- [x] Confirm the engine loads a SubADB at all.
-- [x] Confirm fragments defined only in a sub-database resolve.
-- [x] Confirm a SubADB can carry a whole database, not just a fragment subset.
-- [x] Confirm entities can be redirected to a parent, replacing no vanilla file.
-- [x] Move the redirect from a console command into the mod's Startup Lua.
-- [x] Convert the female side, which was kept as the control during testing.
-- [x] Carry the tag and fragment id declarations under mod filenames too. A sub-database
-      does use its own `FragDef`, so nothing vanilla is claimed. These are copies rather
-      than references, so they never collide but also cannot compose with another mod
-      adding to the same tag group.
-- [ ] Verify a packaged build at `sys_PakPriority = 2`. Everything so far was tested
-      with loose files, and this project has already lost time to a pak that silently
-      overrode nothing while the same files worked loose.
-- [ ] Ship it, which changes the install from a database replacement to an addition.
+- [x] Reference the vanilla databases instead of replacing them.
+- [x] Redirect the classes the engine spawns, not the templates they are built
+      from. `NPC = CreateAI(NPC_x)` copies fields, so redirecting `NPC_x` has no
+      effect on what spawns.
+- [x] Verify a packaged build at shipping pak priority, from a Vortex install.
+- [ ] Publish 2.1.0, and rewrite the mod page, which still describes the old
+      database-replacement install.
 
-Honest limit: this moves the contested resource from a 5.5 MB database no one can merge
-to a single Lua string. Two mods redirecting the same property still collide, but a
-cooperative mod can chain by referencing the current value. Small and fixable rather
-than total and silent.
+Two small declaration files keep vanilla names, 15 KB in total. Avoiding those
+names requires restating 123 KB of fragment and controller definitions under mod
+names, which places the mod in the resolution path of every human animation rather
+than one fragment. An earlier 2.1.0 layout did that and unrelated animations
+stopped playing.
 
-See `docs/TESTING_DIARY.md`, builds 2.0.1-dev.15 through 2.1.0-dev.1.
+Remaining limit: two mods redirecting the same class still collide, but the
+contested resource is a Lua string rather than a database no one can merge, and a
+cooperative mod can chain by referencing the current value.
 
+See `docs/HOW_IT_WORKS.md` and `docs/TECHNICAL_DETAILS.md`.
+
+## Reaction reliability
+
+The largest open defect, reported three times and not yet investigated.
+
+- [ ] Reactions are sometimes not firing, across all three speed tiers. The walk
+      tier uses an interactive action and the other two use a physics impulse, so
+      a fault common to both is upstream of either: detection, impact direction,
+      or the per-victim cooldown.
+- [ ] A gallop impact has been observed reporting walking speed. If the speed
+      sampled at impact can be wrong, tier selection is wrong.
+- [ ] Kneeling NPCs are detected but produce no reaction. `HorseHalfWidth` is
+      0.35, a footprint 0.7 m wide, which may simply be too narrow.
+
+This outranks tuning: the numbers in `TECHNICAL_DETAILS.md` were derived from
+logged impacts, and a defect that drops or mismeasures impacts corrupts the sample
+they came from.
 ## Phase 2: Mass, armor and momentum
 
 Scale the high-speed reaction to what the target is actually made of.

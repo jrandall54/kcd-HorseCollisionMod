@@ -273,3 +273,24 @@ thread every half second, which stalls the audio buffer. It is intermittent
 because whether the retry loop engages depends on what the backend does that
 launch. Recorded in `TESTING_DIARY.md`; three separate wrong causes were
 proposed before anyone looked there.
+
+## Regenerating the API reference
+
+The doc comments in `src/HorseCollisionMod.lua` are standard LDoc, and
+`config.ld` configures the project. Regenerate `docs/api/` with:
+
+```
+ldoc .
+```
+
+LDoc needs a C compiler to install, because it depends on penlight which
+depends on luafilesystem. On Windows without one:
+
+```
+winget install BrechtSanders.WinLibs.POSIX.UCRT --scope user
+luarocks install ldoc
+```
+
+The compiler is only needed for that install; `ldoc .` runs on its own
+afterwards. LDoc stamps a generation time into the output, so regenerating
+always produces a one-line diff even when nothing else changed.

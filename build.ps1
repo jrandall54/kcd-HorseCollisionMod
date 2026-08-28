@@ -72,6 +72,37 @@ if ($errors -gt 0) {
     Write-Host "Build failed: $errors style violation(s). Fix them before packaging." -ForegroundColor Red
     exit 1
 }
+
+# Stray control characters in any tracked text file.
+#
+# A scripted edit that writes a path like ".\build.ps1" through a tool that
+# interprets escapes turns the \b into a literal backspace, and \v into a
+# vertical tab. The result is invisible in an editor, survives review, and has
+# reached this repository four times: it broke dev_deploy.ps1's build path and
+# corrupted two documented commands. Cheaper to fail the build than to keep
+# noticing it by hand.
+$controlChars = @()
+
+foreach ($tracked in (git ls-files)) {
+    if ($tracked -notmatch '\.(md|ps1|py|lua|ld|json|manifest|css|html|xml)$') { continue }
+
+    $full = Join-Path $repoRoot $tracked
+    if (-not (Test-Path $full)) { continue }
+
+    $hits = [regex]::Matches([System.IO.File]::ReadAllText($full),
+                             '[\x00-\x08\x0B\x0C\x0E-\x1F]')
+    foreach ($h in $hits) {
+        $controlChars += "{0}: 0x{1:X2} at offset {2}" -f $tracked, [int][char]$h.Value, $h.Index
+    }
+}
+
+if ($controlChars.Count -gt 0) {
+    foreach ($c in $controlChars) {
+        Write-Host "[LINT] control character - $c" -ForegroundColor Red
+    }
+    Write-Host "Build failed: stray control characters." -ForegroundColor Red
+    exit 1
+}
 Write-Host "Code Style Check Passed ($($lines.Count) lines)."
 
 # Syntax check. KCD runs Lua 5.1, and LuaJIT shares its syntax, so it can

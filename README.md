@@ -103,46 +103,12 @@ Before 2.1.0 this mod did replace `kcd_male_database.adb` and `wh_female_databas
 If you are upgrading, delete the old version rather than installing over it.
 ## Planned
 
-Not promises, just what is being worked on next.
+Mass and momentum, so armor decides how far someone flies. Blunt damage and
+injuries. Horsemanship reducing the chance of being thrown. Morale shock, so a
+charge through a line breaks it. And crime, so that riding someone down in a
+village is finally something the game notices.
 
-**Mass and momentum**
-
-- Knockback scaled to what the target is wearing, so an unarmored peasant flies and a man in
-  plate barely moves.
-- Hitting a heavy target costs the horse its momentum, not just stamina.
-- Stamina cost scaled to armor weight. Riding down a knight should be far more expensive than
-  riding down a farmhand.
-
-**RPG systems**
-
-- Blunt damage and injuries from high-speed impacts.
-- Horsemanship reducing stamina cost and the chance of being thrown.
-- Horse barding increasing impact force.
-- Bracing against a drawn polearm stopping a charge outright.
-
-**AI reactions**
-
-- Morale shock, so lightly armored enemies break and run after a charge through their line.
-
-**Crime**
-
-Right now nothing you do on a horse is ever a crime, which is convenient but wrong. Vanilla
-already has most of the parts, including separate dialog lines for a light collision and a
-heavy one, and its own handling for being ridden down by the player. The plan is to use them
-rather than invent a parallel system.
-
-- Severity scaled to speed. A bump at walking pace is a nuisance, trampling someone at a
-  gallop is assault.
-- Witnesses and location deciding whether anything comes of it, through the vanilla crime
-  system rather than an instant bounty.
-- Reputation damage for minor incidents, so being careless in a village costs you standing
-  before it costs you money.
-- Guards reacting differently from civilians, and reacting more strongly if you do it twice.
-
-**Other**
-
-- Reactions for dogs and other animals.
-
+`ROADMAP.md` has the detail.
 ## Repository layout
 
 ```
@@ -177,14 +143,13 @@ Requires PowerShell and Python 3.
 powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.1.0"
 ```
 
-Animation data is generated from your own game install rather than committed, so the
-first build runs `tools/build_adb.py` for you and resolves the game folder itself.
-Output goes to `releases\`.
+Animation data is generated from your own game install rather than committed, so
+the first build runs `tools/build_adb.py` for you and resolves the game folder
+itself. Output goes to `releases\`.
 
-`docs/HOW_IT_WORKS.md` explains what the mod does and how it is put together.
-`docs/RELEASING.md` covers publishing to Nexus Mods and regenerating the API reference.
-`docs/DEV_LOOP.md` covers the hot-reload development loop.
-
+`docs/HOW_IT_WORKS.md` explains how the mod is put together,
+`docs/RELEASING.md` covers publishing, and `docs/DEV_LOOP.md` covers the
+hot-reload development loop.
 ## License
 
 MIT. See `LICENSE`.
