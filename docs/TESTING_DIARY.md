@@ -4244,3 +4244,88 @@ question the previous entry left open. The CryEngine `inventory` ScriptBind has
 15 methods and none of them returns a weight, so the equipped set has to come
 from `GetCurrentItem`, `GetItemByClass` or an equivalent KCD-specific bind, and
 that is the next thing to establish.
+
+## Roadmap ordering: the native path already carries damage and crime
+
+**Question**: does the roadmap order corner the project, specifically by
+building armor scaling in Phase 2 before the damage and crime work in Phases 3
+and 4.
+
+It does, and the reason is in vanilla's own behavior tree rather than in
+anything the mod does.
+
+### What vanilla does with the collision hit
+
+`Libs/AI/final/sb_switch_hitreactions.xml`, inside `Scripts.pak`, branches on
+`$hitReaction.hitType == $enum:HitReactionType.Collision`. Inside that branch it
+resolves the horse's `rider` link into `riderPlayer`, and when that is the
+player it sends:
+
+```
+<InstantSendMessageToNPC target="this.id" type="combat:hit"
+  values="attacker($__player), strength($hitReaction.hitStrength),
+          hitType($enum:HitReactionType.Melee), real(true)" />
+```
+
+`real(true)`, attributed to the player, carrying the strength the collision
+arrived with. `SendHitReaction` already sends
+`hitType(HitReactionType.Collision)` with the horse as attacker and a per-tier
+`HitReactionStrength`, so the mod is already feeding that path: MinorInjury at
+trot, MajorInjury at gallop.
+
+Two roadmap items therefore describe wiring that already exists rather than
+work to be built. Phase 3's native blunt damage and Phase 4's trampling crime
+both hang off a real, player-attributed `combat:hit` that the mod already
+causes.
+
+`CollisionVelocityDeltaToDmgR = 0.25` in `Libs/Tables/rpg/rpg_param.xml`
+confirms collision velocity to damage is a parameterized vanilla concept, not
+something the mod would be introducing. `HorseMoraleToThrowOffRider = 0.2` and
+`HorseMountMaxRelativeEncumberance = 1.5` sit in the same table for the Phase 3
+Horsemanship and barding work.
+
+### The double-counting trap
+
+KCD resolves a real hit against the target's armor itself, through `smash_def`
+on `armor.xml` and `body_base_armor` on `soul_archetype.xml`. Since the mod
+already causes a real hit, **armor mitigation is already being applied
+downstream of the mod, on every trot and gallop impact.**
+
+Phase 2 as written says "unarmored targets take proportionally heavier
+knockback" and "heavily armored targets are moved less". Built as a general
+"armor scales the outcome" rule, that stacks a second armor model on top of the
+one the engine is already applying, and the error would only show up as
+mistuned damage long after the scaling was written.
+
+The boundary that avoids it:
+
+- **The engine owns armor against damage.** Nothing in the mod should reduce
+  damage by armor, and `hitStrength` should stay chosen by speed alone, because
+  the engine resolves that strength against armor after receiving it.
+- **The mod owns the physical response.** The `impulseScale` passed to
+  `Ragdoll`, and the horse's side of the impact, its stamina cost and its
+  momentum loss. The engine derives none of those from armor, so scaling them
+  by the victim's mass and armor weight adds something rather than duplicating
+  it.
+
+### What this changes about the order
+
+The cheapest step with the largest effect on the rest of the roadmap is not
+building armor scaling. It is establishing, in game, what the existing build
+already does: whether damage lands, whether injuries and bleeding follow,
+whether a bounty is registered, and whether armored targets already take less.
+That test needs no new code, and its result decides whether Phases 3 and 4 are
+mostly verification or mostly construction.
+
+**Unverified until that test runs**: everything above is read out of the
+behavior tree and the tables. That the tree sends `real(true)` is not proof the
+damage lands, that the crime system accepts it, or that armor mitigates it.
+
+### A note on the carried-item gap
+
+Phase 1's remaining carried-item work needs `sb_combat.xml` shipped for its
+`dropItems` tree. `sb_switch_hitreactions.xml` is 132,889 bytes and
+`sb_combat.xml` is the same order, with no additive path for either. Shipping
+one reintroduces exactly the whole-file conflict surface that 3.0.0 removed, in
+exchange for a cosmetic fix. It should stay parked unless an additive approach
+to behavior trees appears.
