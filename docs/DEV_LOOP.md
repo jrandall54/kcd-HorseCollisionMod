@@ -265,6 +265,7 @@ So a packaged build has to be tested as one:
 - no loose files under `Data\Animations\` or `Data\Scripts\Startup\`
 - installed from the zip
 - launched without `-devmode`
+
 ## Watch out for
 
 **There is only one `user.cfg` now.** There used to be a second in `Bin\Win64`,
