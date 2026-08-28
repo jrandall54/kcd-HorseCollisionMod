@@ -173,6 +173,19 @@ if ($isRelease) {
         exit 1
     }
 
+    # The LDoc header carries the version too, and it is the one that goes
+    # stale unnoticed because nothing reads it back.
+    $releaseTag = $null
+
+    if ((Get-Content $modScript -Raw) -match '@release\s+([^\s]+)') {
+        $releaseTag = $Matches[1]
+    }
+
+    if ($releaseTag -ne $Version) {
+        Write-Host "Build failed: the @release tag is $releaseTag, building $Version." -ForegroundColor Red
+        exit 1
+    }
+
     # A diagnostic left on writes thousands of lines to a player's kcd.log.
     # The settings file ships and overrides the default, so the default being
     # correct is not enough.
@@ -189,6 +202,15 @@ if ($isRelease) {
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Build failed: version and changelog disagree." -ForegroundColor Red
+        exit 1
+    }
+
+    # Documentation that describes a build the project has moved past is what
+    # a reader meets first, and nothing else checks it.
+    python (Join-Path $toolsDir "pre_release_check.py")
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Build failed: stale references to an older build." -ForegroundColor Red
         exit 1
     }
 } else {

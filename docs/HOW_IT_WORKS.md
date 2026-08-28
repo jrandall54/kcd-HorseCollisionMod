@@ -66,13 +66,13 @@ authored; the clips are the game's own.
 That list lives inside `kcd_male_database.adb`, a single 5.5 MB file. Mannequin
 databases cannot be merged and no tool in the KCD ecosystem merges them.
 
-The obvious approach is to ship a modified copy of the whole file. Before 2.1.0
+The obvious approach is to ship a modified copy of the whole file. Before 3.0.0
 this mod did exactly that, and it has a serious consequence: **two mods cannot
 both do it.** Whichever loads later in `mod_order.txt` wins, the other's changes
 vanish, and nothing is logged. Neither author finds out, and neither does the
 player.
 
-## What 2.1.0 does instead
+## What 3.0.0 does instead
 
 Mannequin can assemble one database out of several. A database may say "also
 load this other one", which means the vanilla file can be *pointed at* where it
