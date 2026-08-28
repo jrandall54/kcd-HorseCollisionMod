@@ -233,6 +233,41 @@ def check_download_size(paths, version):
     return found
 
 
+def check_file_description(version):
+    """The Files tab entry against the 255 characters the mod page keeps.
+
+    The description is sent in the request that creates the version, and the
+    API has no endpoint to add one afterwards, so a missing file publishes a
+    blank entry that can only be fixed in the browser.
+
+    Gated on the release zip existing, for the same reason as the size check:
+    a clone with nothing built is not mid-release.
+    """
+    zip_path = os.path.join(REPO_ROOT, "releases",
+                            "HorseCollisionMod_v%s.zip" % version)
+
+    if not os.path.exists(zip_path):
+        return []
+
+    path = "releases/file-description-%s.txt" % version
+
+    if not os.path.exists(os.path.join(REPO_ROOT, path)):
+        return [(path, 0, "missing",
+                 "the Files tab entry would publish with no description")]
+
+    text = read(path).strip()
+
+    if not text:
+        return [(path, 0, "empty",
+                 "the Files tab entry would publish with no description")]
+
+    if len(text) > 255:
+        return [(path, 0, "%d characters" % len(text),
+                 "the mod page keeps 255")]
+
+    return []
+
+
 def main():
     paths = tracked_files()
     version = current_version()
@@ -246,7 +281,8 @@ def main():
                 + check_links(paths)
                 + check_config_docs()
                 + check_nexus_page(version)
-                + check_download_size(paths, version))
+                + check_download_size(paths, version)
+                + check_file_description(version))
 
     for path, line, found, message in problems:
         where = "%s:%d" % (path, line) if line else path
