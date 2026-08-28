@@ -38,8 +38,10 @@ HorseCollisionModSettings = {
 	ProtectMutt              = true,  -- whether your dog is immune
 	LogTelemetry             = true,  -- diagnostics in kcd.log
 
-	-- Names the reason a nearby NPC produced no reaction. Noisy, and only
-	-- useful while investigating why an impact did nothing.
-	DiagnoseMisses           = true
+	-- Names the reason a nearby NPC produced no reaction. Writes a line for
+	-- every entity near the horse, including doors and audio areas, which is
+	-- thousands per session. Only useful while investigating why a specific
+	-- impact did nothing. `build.ps1` refuses a release build with this on.
+	DiagnoseMisses           = false
 
 }

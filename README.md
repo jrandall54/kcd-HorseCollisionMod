@@ -105,6 +105,7 @@ village is finally something the game notices.
 
 ```
 build.ps1                 the one build entry point
+CHANGELOG.md              what changed in each release
 config.ld                 LDoc configuration for the API reference
 src/
   HorseCollisionMod.lua            the mod
