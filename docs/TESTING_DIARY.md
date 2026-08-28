@@ -1963,12 +1963,6 @@ stops it.
   `wh_sys_version` and **disables the mod when nothing matches**, so that
   claimed compatibility the mod cannot honor: it ships whole animation
   databases generated from 1.9.7. Now pinned to `1.9.7`, which fails safe.
-- The install is a Steam build at 1.9.7 with only the auth DLL replaced
-  (`steam_api64.rne` is the original, preserved). Game data is stock, so the
-  generated databases match what a retail owner on 1.9.7 has.
-
-### Still open
-
 - Carried items are still dropped at trot and gallop, on the physics ragdoll
   path. Separate from the walk-tier stagger fix and predates 2.0.0.
 - During this session a woman **kept her bucket** while running the *un-fixed*

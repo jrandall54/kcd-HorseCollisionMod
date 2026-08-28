@@ -95,7 +95,7 @@ LOG_EVENTS = (EV_LOG_MESSAGE, EV_LOG_WARNING, EV_LOG_ERROR)
 # no gameplay information before being muted here:
 #
 #   PROS: ...            Warhorse's own online backend (Pros.Global.Api.Auth).
-#                        It repeatedly fails Steam token validation and
+#                        It retries whenever it cannot reach its service, and
 #                        reconnects. Nothing in the game waits on it.
 #   [Steam] ...          The Steam achievement and stats layer writing user
 #                        data. Bookkeeping only.

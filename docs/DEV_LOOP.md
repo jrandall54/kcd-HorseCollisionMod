@@ -74,14 +74,14 @@ telemetry arrives as it happens:
 Two things talk constantly and say nothing about the game:
 
 ```
-PROS: authorization service state error = 3, Steam token validation failed, ...
+PROS: authorization service state error = 3, ...
 PROS: disconnected on server side. Trying to reconnect.
 [Steam] CrySteamStats: Stats stored
 [Steam] Stats StatsWriteUserData return 1
 ```
 
-`PROS` is Warhorse's own online backend, `Pros.Global.Api.Auth`, failing to
-validate a Steam token and retrying forever. `[Steam]` is the achievement and
+`PROS` is Warhorse's own online backend, `Pros.Global.Api.Auth`, retrying a
+connection it cannot make. `[Steam]` is the achievement and
 stats layer writing user data. Nothing in the game waits on either, and at
 verbosity 4 they outnumber real log lines badly enough to make the live log
 useless, which is the one thing it exists for.
