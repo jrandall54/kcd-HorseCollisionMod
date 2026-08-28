@@ -39,6 +39,18 @@ Once, to store your API key:
 .\tools\publish_nexus.ps1 -SaveApiKey
 ```
 
+Before publishing, prove the release still deploys additively:
+
+```
+python toolserify_additive.py
+```
+
+It checks every claim in `docs/TECHNICAL_DETAILS.md` against the game's own paks
+and the packaged zip: that no vanilla filename is claimed, that nothing is lost
+from the fragment the mod takes authority over, that every reference in the chain
+resolves, and that the Lua redirects the classes the engine actually spawns. It
+reads those class names out of `Scripts.pak` rather than trusting the mod.
+
 Then per release:
 
 ```

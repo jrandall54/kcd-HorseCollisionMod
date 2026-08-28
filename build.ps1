@@ -125,9 +125,9 @@ Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 # These are the additive layout, which claims no vanilla filename: a parent
 # database per gender referencing the untouched vanilla file in its own pak,
 # the mod's own fragments, and the declarations those fragments need.
-# `build_adb.py --replace` builds the old whole-database layout instead, and
-# would fail this check, which is intentional: the two must not be mixed, since
-# a leftover vanilla-named override silently defeats the additive one.
+# Any file under a vanilla name is a bug, not an alternative layout: it would
+# override the file the parent database references, silently defeating the
+# whole arrangement without changing anything this build prints.
 $adb = "$buildDir\pak\Animations\Mannequin\ADB"
 $required = @(
     "$adb\hcm_male_database.adb",
@@ -140,8 +140,8 @@ $required = @(
 )
 
 # Nothing under a vanilla name may ship. That is the property the whole layout
-# exists to provide, and a stale file from a --replace build would quietly undo
-# it without changing anything the build prints.
+# exists to provide, and a stale file left in mod_assets would quietly undo it
+# without changing anything the build prints.
 $vanillaNames = Get-ChildItem "$adb" -File -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -notlike "hcm_*" }
 
