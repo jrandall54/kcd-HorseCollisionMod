@@ -427,6 +427,68 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	end)
 end
 
+--- Samples the victim's health across an impact.
+--
+-- Vanilla converts a collision hit whose rider is the player into a real
+-- `combat:hit` attributed to the player, carrying the `hitStrength` sent
+-- here. The engine resolves damage and the reputation change from that
+-- strength, and applies both after the message is handled, so neither is
+-- readable at the moment of the hit. The health state is sampled again on a
+-- timer instead.
+--
+-- Two samples, because they answer different questions. The first shows what
+-- the impact itself cost. The second shows whether anything continues, which
+-- is what bleeding looks like.
+--
+-- @tparam table npc victim entity
+-- @tparam string tierName the tier the impact scored
+-- @tparam number strength the `HitReactionStrength` sent with the hit
+function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
+	if not self.Config.LogTelemetry or not npc or not npc.soul then
+		return
+	end
+
+	local ok, before = pcall(function()
+		return npc.soul:GetState("health")
+	end)
+
+	if not ok or type(before) ~= "number" then
+		return
+	end
+
+	local name = "?"
+	pcall(function()
+		name = npc:GetName() or "?"
+	end)
+
+	self:Log("ImpactCost " .. name .. " tier=" .. tierName
+			.. " strength=" .. tostring(strength)
+			.. " health=" .. string.format("%.4f", before))
+
+	local function sample(label)
+		local okAfter, after = pcall(function()
+			return npc.soul:GetState("health")
+		end)
+
+		if not okAfter or type(after) ~= "number" then
+			return
+		end
+
+		self:Log("ImpactCost " .. name .. " " .. label
+				.. " health=" .. string.format("%.4f", after)
+				.. " delta=" .. string.format("%+.4f", after - before))
+	end
+
+	Script.SetTimer(500, function()
+		sample("t+500ms")
+	end)
+
+	Script.SetTimer(3000, function()
+		sample("t+3000ms")
+	end)
+end
+
+
 --- Tests whether a victim is actually under the horse.
 --
 -- The sphere search is a broad-phase cull and nothing more. A horse is about
@@ -889,6 +951,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			self:PlayStagger(npc, velocity, speed)
 		end
 
+		self:ProbeImpactCost(npc, "Walk", strength.Tickle)
 		self:SendHitReaction(npc, horseWuid, strength.Tickle)
 		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainWalk * combatScale)
 		return
@@ -896,6 +959,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	if tierName == "Trot" then
 		self:Ragdoll(npc, velocity, speed, 0.6)
+		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainTrot * combatScale)
 		return
@@ -903,6 +967,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	if tierName == "Gallop" then
 		self:Ragdoll(npc, velocity, speed, 1.0)
+		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainGallop * combatScale)
 		return
