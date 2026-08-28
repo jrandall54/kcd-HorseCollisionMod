@@ -94,6 +94,15 @@ param (
     # Public identifiers, straight out of the mod's own URLs.
     [string]$GameDomain = "kingdomcomedeliverance",
     [string]$ModPageId = "2338",
+
+    # The mod file an upload attaches to, as the API numbers it. Preferred
+    # over -FilePageId: a file version id names one release, so archiving that
+    # release can take the lookup with it. Resolved once and kept here.
+    [string]$ModFileId = "7863762",
+
+    # Fallback when the mod file id is not known: a file version id out of the
+    # site's ?tab=files&file_id= URL, which is resolved to the file that owns
+    # it. Only used when -ModFileId is cleared.
     [string]$FilePageId = "10219",
 
     # Release defaults: the new file becomes the mod manager download and the
@@ -389,11 +398,15 @@ Write-Host "Resolving mod $ModPageId on $GameDomain ..."
 $mod = (Invoke-NexusApi GET "/games/$GameDomain/mods/$ModPageId").data
 $modId = $mod.id
 
-$fileVersion = (Invoke-NexusApi GET "/games/$GameDomain/mod-file-versions/$FilePageId").data
-$modFileId = $fileVersion.file.id
-
 Write-Host "  mod:      $($mod.name) [$modId]"
-Write-Host "  mod file: $($fileVersion.file.name) [$modFileId]"
+
+if ($ModFileId) {
+    $modFileId = $ModFileId
+}
+else {
+    $fileVersion = (Invoke-NexusApi GET "/games/$GameDomain/mod-file-versions/$FilePageId").data
+    $modFileId = $fileVersion.file.id
+}
 
 # Confirms the file belongs to this mod. Publishing a version onto a mod file
 # from someone else's page is exactly the sort of thing a wrong id would do
@@ -404,6 +417,7 @@ if (-not $owned) {
     throw ("Mod file $modFileId is not on mod $ModPageId. Check -FilePageId." +
            "`n  Files on this mod: " + (($modFiles | ForEach-Object { "$($_.name) [$($_.id)]" }) -join ", "))
 }
+Write-Host "  mod file: $($owned.name) [$modFileId]"
 Write-Host "  versions: $($owned.versions_count) ($($owned.archived_count) archived)"
 
 $existing = (Invoke-NexusApi GET "/mod-files/$modFileId/versions").data.versions
