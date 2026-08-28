@@ -103,6 +103,7 @@ The largest open defect, reported three times and not yet investigated.
 This outranks tuning: the numbers in `TECHNICAL_DETAILS.md` were derived from
 logged impacts, and a defect that drops or mismeasures impacts corrupts the sample
 they came from.
+
 ## Phase 2: Mass, armor and momentum
 
 Scale the high-speed reaction to what the target is actually made of.

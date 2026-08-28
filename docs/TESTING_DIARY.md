@@ -939,6 +939,7 @@ The named-attacker hypothesis is disproven.
 `hitReaction` at Exhausting strength to the horse also produced no visible horse reaction.
 
 **Cumulative: every message-based and stat-based lever is now exhausted.**
+
 | Lever | Layer reached | Result |
 |---|---|---|
 | `hitReaction` message | AI observer tree | delivered, no animation |

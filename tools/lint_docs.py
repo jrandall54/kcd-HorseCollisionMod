@@ -137,6 +137,39 @@ def prose_lines(path):
         yield i, body
 
 
+def broken_markdown(path):
+    """Yields structure that will not render.
+
+    A table or a heading needs a blank line before it. Without one the parser
+    treats the row as ordinary text in the preceding paragraph, and the table
+    silently renders as a line of pipe characters. Scripted edits that splice
+    blocks into a file drop that separator easily, and the result looks correct
+    in the source.
+    """
+    if not path.endswith(".md"):
+        return
+
+    text = io.open(os.path.join(REPO_ROOT, path), encoding="utf-8",
+                   errors="replace").read()
+    lines = text.splitlines()
+    fenced = False
+
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+
+        if fenced or i == 0 or not lines[i - 1].strip():
+            continue
+
+        previous = lines[i - 1].strip()
+
+        if line.startswith("|") and not previous.startswith("|"):
+            yield i + 1, "table needs a blank line before it"
+        elif line.startswith("#"):
+            yield i + 1, "heading needs a blank line before it"
+
+
 def long_sentences(path):
     if not path.endswith(".md"):
         return
@@ -181,6 +214,11 @@ def main():
             warnings.append((path, line_no, "%d words" % count,
                              "sentence over %d words: %s..."
                              % (MAX_SENTENCE_WORDS, opening)))
+
+        # An error, not a warning: this one is visible to every reader of the
+        # rendered page, unlike a filler word.
+        for line_no, message in broken_markdown(path):
+            errors.append((path, line_no, "markdown", message))
 
     for path, line, found, message in errors:
         print("[STYLE] %s:%d  %r  %s" % (path, line, found, message))

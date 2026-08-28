@@ -57,6 +57,7 @@ keeps them together.
 
 A misspelled or mistyped setting is ignored and named in `kcd.log` rather than
 breaking the mod. Deleting a line restores its default.
+
 | Setting | Default | Effect |
 | --- | --- | --- |
 | `SpeedWalk` | 1.8 | Meters per second. Below this nothing happens at all. |

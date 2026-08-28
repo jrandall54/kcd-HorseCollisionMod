@@ -240,6 +240,7 @@ so the vanilla file is referenced where it sits inside `Animations-part1.pak`.
 **The database an entity uses is a Lua property**, not compiled in.
 `Scripts/Entities/AI/NPC_x.lua` declares `AnimDatabase3P`, so a Startup script
 can point it elsewhere.
+
 ### The layout
 
 Seven files, all named `hcm_*`, so none collides with anything:
@@ -327,6 +328,7 @@ after the world is populated.
   of the controller def and the fragment id file, which places this mod in
   the resolution path of every human animation. An earlier layout did that
   and unrelated animations stopped playing.
+
 ### Verifying it
 
 `tools/verify_additive.py` checks every claim above against the game's own paks
