@@ -107,7 +107,7 @@ Copy-Item $modScript -Destination "$pakDir\"
 # Tests for the generated file rather than the directory, because a failed or
 # interrupted run can leave mod_assets/ present but empty, which would
 # otherwise skip generation and fail later with a less obvious message.
-if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\kcd_male_database.adb"))) {
+if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\hcm_male_database.adb"))) {
     Write-Host "Animation data missing - generating..."
     python (Join-Path $toolsDir "build_adb.py")
     if ($LASTEXITCODE -ne 0) {
@@ -131,11 +131,11 @@ Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 $adb = "$buildDir\pak\Animations\Mannequin\ADB"
 $required = @(
     "$adb\hcm_male_database.adb",
-    "$adb\hcm_male_stagger.adb",
     "$adb\hcm_male_fragmentids.xml",
+    "$adb\hcm_male_controllerdefs.xml",
     "$adb\hcm_female_database.adb",
-    "$adb\hcm_female_stagger.adb",
     "$adb\hcm_female_fragmentids.xml",
+    "$adb\hcm_female_controllerdefs.xml",
     "$adb\hcm_animationControlledTags.xml"
 )
 

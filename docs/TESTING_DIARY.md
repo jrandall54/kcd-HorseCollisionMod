@@ -3302,3 +3302,99 @@ Worth listing, because each looked like a complete explanation at the time:
 
 All three were genuine defects. None was sufficient alone, which is why each
 fix produced no visible change and looked like a dead end.
+
+---
+
+## Build 2.1.0: additive deployment WORKS, and the real root cause
+
+**User reported**: "both men and women staggered! Seemed to work great."
+
+Packed, `sys_PakPriority = 2`, cold start, no dev mode, no loose files. The mod
+overrides **no vanilla file at all**.
+
+### The root cause, after five failed cold starts
+
+Entity classes are built from templates, and the template is not what spawns:
+
+```lua
+-- Scripts/Entities/AI/NPC.lua
+NPC = CreateAI(NPC_x);
+
+-- Scripts/Entities/AI/Shared/BasicAI.lua
+function CreateAI(child)
+    local newt = {}
+    mergef(newt, child, 1);   -- copies the fields
+```
+
+`NPC_x` is a template. `CreateAI` builds a fresh table and **copies** fields
+into it, so the live class holds a snapshot of `AnimDatabase3P` and
+`ActionController` taken when its script loaded. A Startup script mutating
+`NPC_x` afterwards changes nothing about what spawns.
+
+Every NPC was on the stock animation chain for five test cycles.
+
+**Why it hid so effectively.** `Player` is declared directly as a table rather
+than through `CreateAI`, so redirecting it genuinely worked. That made the
+mod's own controller def and sub-databases load and appear in the log, which
+read as proof the redirect worked. It only ever proved the *player's* redirect
+worked. It also explains why `hcm_female_database.adb` never loaded at all:
+`PlayerFemale` does not spawn in normal play and `NPC_Female` was never
+redirected.
+
+**The mistake.** `Redirected 7 animation databases, 0 pending` was treated as
+evidence the redirect had taken effect. It is only evidence the property was
+written. Those are different claims and the second was never checked. The cheap
+test skipped was querying a *spawned NPC's* database rather than the class
+table just written to. This project has a standing rule about proving a signal
+works before drawing conclusions from it, and this is the third time in one
+session it was broken.
+
+### The three earlier fixes were all real, and all invisible
+
+Each was a genuine defect in code that was never being reached, which is why
+none changed the symptom:
+
+1. The parent's `FragDef` pointed at vanilla's fragment ids, so `hcm_stagger_*`
+   was undeclared at load-time validation.
+2. `ActionController` was not redirected, so runtime name resolution used
+   vanilla's tag chain. A database's `FragDef` governs validation only.
+3. Sub-databases do not merge options into a fragment another one defines. The
+   mod's `AnimationControlled` has to be authoritative and carry vanilla's own
+   options, or redirected NPCs lose every door, cabinet and wardrobe
+   interaction.
+
+Fixing plumbing downstream of a closed valve produces identical symptoms every
+time, which is exactly what a chain of dependent defects looks like from the
+outside.
+
+### What ships
+
+```
+hcm_animationControlledTags.xml    1005 B   16 vanilla tags + 4 of ours
+hcm_female_controllerdefs.xml     22798 B
+hcm_female_database.adb            3507 B   4 options + SubADB to vanilla
+hcm_female_fragmentids.xml        14082 B   declares AnimationControlled
+hcm_male_controllerdefs.xml       87818 B
+hcm_male_database.adb             72468 B   30 vanilla + 4 options, SubADB to vanilla
+hcm_male_fragmentids.xml          35505 B
+Scripts/Startup/HorseCollisionMod.lua
+```
+
+Verified against vanilla: all 16 `AnimationControlled` tags present plus the
+mod's 4, and all 30 vanilla options present plus the mod's 4. Nothing dropped.
+
+| | 2.0.0 | 2.1.0 |
+| --- | --- | --- |
+| vanilla files replaced | 4 | **0** |
+| `kcd_male_database.adb` | 5,555,221 B shipped | untouched in its pak |
+| `wh_female_database.adb` | 962,471 B shipped | untouched in its pak |
+
+### Open, not investigated
+
+**A beggar in Rattay stood instead of kneeling.** Reported as "may or may not be
+a thing." Checked and not explained by the fragment replacement: nothing
+beggar-related lives in `AnimationControlled`, and no vanilla tag or option is
+missing from the mod's copy. Candidates are the controller def copy, the
+fragment id copy, or the NPC's schedule being unrelated to the mod entirely.
+Needs a controlled comparison against a run with the mod disabled before
+anything is concluded.

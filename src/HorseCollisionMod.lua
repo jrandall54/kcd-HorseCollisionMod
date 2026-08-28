@@ -912,6 +912,17 @@ end
 --- Entity classes whose animation database this mod redirects.
 --
 -- Each entry maps an entity class table to the character set it belongs to.
+--
+-- Both the exposed classes and the `_x` templates they came from are listed,
+-- and the distinction is the whole reason this works. `NPC_x` is a template;
+-- `NPC.lua` does `NPC = CreateAI(NPC_x)`, and `CreateAI` builds a fresh table
+-- and *copies* the fields in. So the live class holds a snapshot of the stock
+-- paths taken when its script loaded, and redirecting only the template
+-- changes nothing about what spawns.
+--
+-- That cost four cold-start test cycles. The player class is declared
+-- directly rather than through CreateAI, so redirecting it did work, which
+-- made the mod's own files load and hid the fault.
 -- The parent database is a few hundred bytes and holds no
 -- fragments of its own; it references the untouched vanilla database inside its
 -- own pak, plus this mod's fragment file.
@@ -924,15 +935,25 @@ end
 --
 -- @table AnimationDatabases
 HorseCollisionMod.AnimationDatabases = {
+	-- The exposed classes. These are what the engine spawns, and what has to
+	-- be redirected for any of this to take effect.
+	NPC           = "male",
+	NPC_NAI       = "male",
+	NullAI        = "male",
+	DummyTarget   = "male",
+	Player        = "male",
+	NPC_Female    = "female",
+	PlayerFemale  = "female",
+
+	-- The templates they were built from. Redirected too, so that anything
+	-- calling CreateAI after this point inherits the right paths rather than
+	-- the stock ones.
 	NPC_x         = "male",
 	NPC_NAI_x     = "male",
 	NullAI_x      = "male",
 	DummyTarget_x = "male",
-	Player        = "male",
-	NPC_Female_x  = "female",
-	PlayerFemale  = "female"
+	NPC_Female_x  = "female"
 }
-
 --- The two properties each redirected class needs, per character set.
 --
 -- Both matter, and only one of them is obvious. `AnimDatabase3P` decides which

@@ -635,7 +635,18 @@ def write_additive_gender(gender, paths, shared_tags, nl):
         print("  %-6s inherits %d vanilla options"
               % (gender, inherited.count("<Fragment")))
 
-    stagger = nl.join([
+    # The mod's fragment goes in the PARENT's own FragmentList, not in a
+    # sub-database.
+    #
+    # Sub-databases were tried both first and last, and vanilla's copy of the
+    # AnimationControlled fragment won either way, so ordering is not what
+    # decides it. A parent is the primary database and its sub-databases
+    # supplement what it does not itself define, which makes the parent the
+    # only place a definition can be authoritative.
+    #
+    # It carries vanilla's own options as well as the mod's, or a redirected
+    # NPC loses every door, cabinet and wardrobe interaction.
+    parent = nl.join([
         '<?xml version="1.0" encoding="us-ascii"?>',
         '<AnimDB FragDef="Animations/Mannequin/ADB/%s" TagDef="%s">'
         % (ids_name, paths["tags"]),
@@ -644,39 +655,8 @@ def write_additive_gender(gender, paths, shared_tags, nl):
         options,
         "    </AnimationControlled>",
         "  </FragmentList>",
-        "</AnimDB>",
-        "",
-    ])
-
-    with io.open(out(stagger_name), "wb") as handle:
-        handle.write(stagger.encode("ascii"))
-
-    # The parent holds no fragments of its own. The vanilla database is read
-    # from its own pak and is never overridden, which is the whole point.
-    #
-    # FragDef must be OUR fragment ids, not vanilla's. The parent's FragDef is
-    # what the loader resolves FragTags against; a sub-database's own FragDef
-    # does not govern that, despite being honoured for other purposes. With
-    # vanilla's here the chain reaches vanilla's tag file, which declares no
-    # hcm_stagger_* tag, and every option is rejected with:
-    #
-    #   [CAnimationDatabaseManager::LoadDatabase] Unknown tags for fragmentID
-    #       AnimationControlled tag  fragTags hcm_stagger_forward
-    #
-    # which reads in game as the one-frame snap back, the signature of a valid
-    # call with no matching option.
-    parent = nl.join([
-        '<?xml version="1.0" encoding="us-ascii"?>',
-        '<AnimDB FragDef="Animations/Mannequin/ADB/%s" TagDef="%s">'
-        % (ids_name, paths["tags"]),
         "  <SubADBs>",
-        # Order matters: both sub-databases define the AnimationControlled
-        # fragment, vanilla with 30 options and this mod with 4. If a
-        # fragment, and the later one replaces the earlier outright rather
-        # than merging. This mod's file therefore goes last, and carries
-        # vanilla's options as well as its own.
         '    <SubADB File="%s" />' % paths["db"],
-        '    <SubADB File="Animations/Mannequin/ADB/%s" />' % stagger_name,
         "  </SubADBs>",
         "</AnimDB>",
         "",
@@ -685,9 +665,14 @@ def write_additive_gender(gender, paths, shared_tags, nl):
     with io.open(out(parent_name), "wb") as handle:
         handle.write(parent.encode("ascii"))
 
-    print("  %-6s %s (%d B), %s (%d B), %s (%d B), %s (%d B)"
+    # No separate stagger file in this layout; remove a stale one so it cannot
+    # be mistaken for part of the build.
+    stale_stagger = out(stagger_name)
+
+    if os.path.exists(stale_stagger):
+        os.remove(stale_stagger)
+    print("  %-6s %s (%d B), %s (%d B), %s (%d B)"
           % (gender, parent_name, os.path.getsize(out(parent_name)),
-             stagger_name, os.path.getsize(out(stagger_name)),
              ids_name, os.path.getsize(out(ids_name)),
              ctrl_name, os.path.getsize(out(ctrl_name))))
 
