@@ -93,34 +93,19 @@ The 5.5 MB database is never copied and never replaced. The mod's own file is
 
 ## What the mod does still replace
 
-Two small files, and they are small on purpose:
+Two small declaration files:
 
 | File | Size | Why |
 | --- | --- | --- |
-| `kcd_animationControlledTags.xml` | 1 KB | Lists the names an option may use. The four new names have to be declared somewhere, and this is the file the game already looks in. |
-| `wh_female_fragmentids.xml` | 14 KB | Female characters have the same animations but no `AnimationControlled` list at all, so one has to be declared for them. |
+| `kcd_animationControlledTags.xml` | 1 KB | Lists the names an option may use, and the four new names have to be declared where the game looks. |
+| `wh_female_fragmentids.xml` | 14 KB | Female characters have the same animations but no `AnimationControlled` list, so one has to be declared. |
 
-An earlier version of 2.1.0 avoided both by shipping renamed copies of the
-files that point at them. That removed the two names at the cost of restating
-123 KB of the game's own definitions, and it put the mod in the path of every
-human animation rather than just its own. Unrelated animations broke.
-
-Fifteen kilobytes of declarations is a smaller thing to own than the machinery
-required to avoid owning it, and small enough that another author can reconcile
-it by hand.
-
-## What this means in practice
-
-- The mod coexists with other mods that touch human animations, because the
-  large files everyone would otherwise fight over are shared, not copied.
-- If another mod does replace one of those two small files, one of them loses,
-  the same as any other file conflict in KCD. The difference is that the loss is
-  15 KB of declarations rather than a whole animation set, and it can be merged
-  by hand.
-- Nothing about the game's own animation behaviour travels through mod code.
+If another mod replaces one of these, whichever loads later wins, as with any
+file conflict in KCD. The loss is 15 KB of declarations rather than a whole
+animation set, and it can be reconciled by hand.
 
 ## Verifying it
 
 `python tools/verify_additive.py` checks every claim on this page against the
-game's own data files and the packaged release, rather than trusting the
-documentation. It is a release step, described in `RELEASING.md`.
+game's own data files and the packaged release. It is a release step, described
+in `RELEASING.md`.

@@ -123,12 +123,6 @@ away than looks right. Replacing it with an oriented box is a known improvement.
 A per-victim cooldown is required. The sphere is tested ten times a second, so without it
 the same NPC's reaction restarts every tick and they never finish staggering.
 
-## Speed tiers
-
-KCD horses have three speed plateaus, not four. Telemetry across roughly 90 logged impacts
-clustered at 2.05 to 3.74, 6.38 to 7.03, and 9.18 to 10.81 m/s. The thresholds sit in the
-empty gaps between those clusters rather than at invented round numbers.
-
 ## Tuning rationale
 
 Where the numbers in `HorseCollisionMod.Config` came from. The config table
@@ -331,10 +325,8 @@ after the world is populated.
 
 ### Verifying it
 
-`tools/verify_additive.py` checks every claim above against the game's own paks
-and the packaged release, rather than trusting the documentation. It confirms no
-vanilla filename is claimed, nothing is dropped from the fragment the mod takes
-over, every reference in the chain resolves, pak entry names use forward
-slashes, and the Lua redirects the classes the engine actually spawns. It
-discovers those classes by reading `Scripts.pak` rather than taking the mod's
-word for them. Run it before publishing.
+`tools/verify_additive.py` checks the packaged release against the game's own
+paks: which vanilla names are claimed, that nothing is dropped from the
+fragment the mod takes over, that every reference resolves, that pak entry
+names use forward slashes, and that the Lua redirects the classes the engine
+spawns. It reads those class names out of `Scripts.pak`.

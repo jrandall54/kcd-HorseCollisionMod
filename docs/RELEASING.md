@@ -36,8 +36,7 @@ Thirty-one checks against the game's own paks and the packaged zip:
 - nothing is lost from the fragment the mod takes authority over
 - every reference in the chain resolves
 - pak entries use forward slashes
-- the Lua redirects the classes the engine spawns, read out of `Scripts.pak`
-  rather than taken on trust
+- the Lua redirects the classes the engine spawns
 
 All must pass.
 
@@ -77,34 +76,18 @@ and `-ResumeUploadId` retries without sending the file again.
 The API has no endpoint for a mod's description, so page copy is edited in the
 browser. The local draft is kept outside the repository.
 
----
-
 ## The API key
 
-`.\tools\publish_nexus.ps1 -SaveApiKey` prompts once and writes the key to
-`%LOCALAPPDATA%\HorseCollisionMod\nexus.cred`, encrypted with DPAPI under the
-current Windows account. The file is unreadable to other users on the machine,
-useless if copied to another one, and outside the repository so it cannot be
+`.	ools\publish_nexus.ps1 -SaveApiKey` prompts once and writes the key to
+`%LOCALAPPDATA%\HorseCollisionMod
+exus.cred`, encrypted with DPAPI under the
+current Windows account. It is outside the repository, so it cannot be
 committed. `-ForgetApiKey` deletes it.
 
-DPAPI does not defend against code already running as that user. It defends
-against how a key leaks in practice: a synced folder, a backup, a shared machine,
-an accidental commit.
-
 Resolution order is `-ApiKey`, then `$env:NEXUS_API_KEY`, then the stored file.
-Prefer the stored key to `setx`, which writes plaintext to the registry, and to
-`-ApiKey`, which lands in shell history.
 
-## Why publishing stays manual
-
-Nexus Mods permit a personal API key only when the action is initiated by the
-user. Every request identifies itself with `Application-Name` and
-`Application-Version`, as their
+Nexus Mods permit a personal key only for actions the user starts, which is why
+there is no automated publish. Their
 [acceptable use policy](https://help.nexusmods.com/article/114-api-acceptable-use-policy)
-requires. A tool other people pointed at their own mod pages would be a
-public-facing application and would have to be registered with Nexus Mods first.
-
-Automation is also impractical: `build.ps1` reads the game's own
-`Animations-part1.pak` and `mod_assets/` is not committed, so a hosted runner has
-no game install. Shipping Warhorse's paks to CI is both a licensing and a size
-problem, and building locally to feed a workflow would still build by hand.
+also requires the `Application-Name` and `Application-Version` headers the script
+sends.

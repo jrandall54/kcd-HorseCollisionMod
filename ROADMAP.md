@@ -33,11 +33,7 @@ Known gaps carried into later phases:
       momentum, if at all.
 - [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
       physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
-- [ ] Reactions are sometimes not firing, across all three speed tiers, and a gallop impact
-      has been seen reporting walking speed. The two reaction mechanisms are different, so a
-      fault common to both is upstream of either: detection, impact direction, or the
-      per-victim cooldown. This matters more than tuning, because the tuning numbers were
-      derived from telemetry this defect would have corrupted.
+- [ ] Reactions are sometimes not firing. See Reaction reliability below.
 
 ## Development tooling
 
@@ -50,8 +46,7 @@ gets tested.
 - [x] Hot reload the Mannequin animation databases the same way. Needed the ADB files
       written loose *and* `mn_allowEditableDatabasesInPureGame`, which ships at 0.
 - [x] Live telemetry over CryEngine's remote console, with backend chatter filtered out.
-- [x] Read the mod's live state out of the running game, which settles questions that
-      guessing does not.
+- [x] Read the mod's live state out of the running game.
 - [x] Publish a release to Nexus Mods without the browser, through their v3 API.
       Not a GitHub Action: the build reads the game's own paks, so it cannot run on a
       hosted runner. Revisit if additive ADB deployment below ever lands.
@@ -75,17 +70,9 @@ Download drops from 195,284 to 21,953 bytes.
 - [ ] Publish 2.1.0, and rewrite the mod page, which still describes the old
       database-replacement install.
 
-Two small declaration files keep vanilla names, 15 KB in total. Avoiding those
-names requires restating 123 KB of fragment and controller definitions under mod
-names, which places the mod in the resolution path of every human animation rather
-than one fragment. An earlier 2.1.0 layout did that and unrelated animations
-stopped playing.
-
-Remaining limit: two mods redirecting the same class still collide, but the
-contested resource is a Lua string rather than a database no one can merge, and a
-cooperative mod can chain by referencing the current value.
-
-See `docs/HOW_IT_WORKS.md` and `docs/TECHNICAL_DETAILS.md`.
+Two small declaration files keep vanilla names, 15 KB in total, and two mods
+redirecting the same class still collide. `docs/HOW_IT_WORKS.md` and
+`docs/TECHNICAL_DETAILS.md` cover both.
 
 ## Reaction reliability
 

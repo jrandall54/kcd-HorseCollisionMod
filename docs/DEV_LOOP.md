@@ -24,11 +24,9 @@ versioned one, so each build overwrites the last instead of accumulating. It
 refuses to run while the game holds its paks open, and it launches with
 `-devmode` (see below).
 
-The game folder is resolved rather than hardcoded: `-GameRoot`, then `KCD_PATH`
-in the environment, then the usual Steam and GOG locations, then every Steam
-library in `libraryfolders.vdf`. An explicitly given path that is wrong stops
-the run rather than silently falling through to a different install.
-`build_adb.py` resolves the same way, with `--game-root`.
+The game folder is resolved, not hardcoded, the same way `build_adb.py` resolves
+it. See `RELEASING.md`. An explicitly given path that is wrong stops the run
+instead of falling through to a different install.
 
 The release build for Nexus still goes through `build.ps1`. The dev folder is
 never what ships.
