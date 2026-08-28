@@ -3856,3 +3856,93 @@ and watching it fail:
 
 This is the same class as `NPC = CreateAI(NPC_x)` copying fields: a language
 rule about when a name refers to what, invisible at the call site.
+
+## Reaction reliability: the tier is chosen from a speed the impact already destroyed
+
+**Hypothesis going in**: reactions fail to fire because a candidate is dropped
+silently somewhere between `GetEntitiesInSphere` and `TriggerCollision`. Eight
+drop points were instrumented with `LogRejection`, plus a ten-sample speed
+history so the speed at impact could be compared against the speed just before
+it.
+
+**User report**: reinstalled after the crash, rode around the city making every
+kind of impact on every type of NPC.
+
+`kcd.log` from that session, 2000 mod lines:
+
+| Outcome | Count |
+| --- | --- |
+| Miss not-human | 1783 |
+| Footprint pass | 83 |
+| Miss outside-footprint | 65 |
+| Impact | 25 |
+| Miss cooldown | 4 |
+| Miss no-actor | 2 |
+| Miss dead | 1 |
+| Miss below-walk-speed | 0 |
+
+The hypothesis was wrong. Nothing is being dropped silently.
+
+The 1783 not-human rejections are all `AudioAreaRandom`, `BasicEntity`,
+`TagPoint`, `AudioAreaAmbience` and similar. No NPC appears among them, so the
+human filter is not the fault. The names that look like NPCs in that list, such
+as `rat_city_horseParkingSpot1` and `tp_rat_cityWalk16`, are Rattay location
+markers.
+
+The gap between 83 footprint passes and 25 impacts is an artifact of the
+diagnostic, not a defect. `LogRejection` throttles to one line per NPC per
+second, and `HitCooldownMs` is 3000, so one NPC struck once and then walked
+alongside the horse passes the footprint repeatedly while logging at most one
+cooldown line per second.
+
+**The actual defect is in tier selection.** Comparing the speed each impact was
+classified on against the peak of the previous ten samples:
+
+| tier assigned | speed | peak | tier the peak implies |
+| --- | --- | --- | --- |
+| Walk | 3.67 | 6.92 | Trot |
+| Walk | 3.76 | 10.58 | Gallop |
+| Walk | 4.12 | 10.70 | Gallop |
+| Trot | 5.57 | 10.64 | Gallop |
+| Trot | 6.62 | 10.70 | Gallop |
+| Trot | 7.13 | 12.73 | Gallop |
+| Trot | 7.97 | 10.38 | Gallop |
+| Trot | 8.13 | 12.73 | Gallop |
+
+Eight of 25 impacts, 32%, were classified below the speed the horse was
+carrying. Counting by true tier: 11 impacts happened at gallop speed and 6 of
+them, 55%, did not produce a gallop reaction.
+
+Two of those read `Walk` while the horse had been at 10.58 and 10.70 m/s. That
+is the exact report that opened this investigation, reproduced with figures: a
+gallop impact reporting walking speed.
+
+**Cause**: the horse decelerates on contact. Detection samples velocity once
+per 100 ms tick, and by the time the tick that notices the victim reads
+`GetVectorLength(velocity)`, the collision has already bled speed off the horse.
+The instantaneous speed at detection is a measurement taken after the event it
+is supposed to describe.
+
+**Why this reads as "the reaction did not fire".** Every one of the 6 walk-tier
+staggers returned `ok=true err=nil`, so the animation path is not failing. A
+gallop impact misclassified as Walk plays a small stagger instead of a
+knockdown. From the saddle that is indistinguishable from nothing happening,
+which is why the defect was reported as reactions not firing rather than as
+reactions firing at the wrong strength.
+
+**Two cautions for the fix.** `peak` is not simply the right value to
+substitute. One impact logged `speed=15.63`, and two logged `peak=12.73`, all
+above the 10.81 m/s ceiling of the gallop plateau, so the peak carries physics
+spikes that instantaneous sampling does not. And the history window is ten
+samples, a full second, long enough that a rider who gallops up and deliberately
+slows to nudge someone would still be charged gallop.
+
+A shorter window is the direction: the speed that matters is the one on the tick
+before contact, not the highest of the last second.
+
+**Not the fault, ruled out this session**: the human filter, the dead check, the
+below-walk-speed gate (zero rejections), and the footprint on its lateral axis.
+The footprint still rejects NPCs standing directly ahead at `fwd` 1.7 to 2.4
+with `lat` under 0.35, which is a separate question about front reach and is not
+what causes a reaction to be missed, since the horse closes that distance within
+one or two ticks.
