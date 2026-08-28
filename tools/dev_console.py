@@ -264,7 +264,10 @@ class Console(object):
         self.setup_count = len(commands)
 
     def lua(self, code):
-        # sys_DevMode = 1 makes the console evaluate a leading "#" as Lua.
+        # The remote console evaluates a leading "#" as Lua. This is separate
+        # from wh_con_expr_prefix, which reads "!" and governs the in-game
+        # console; "#" works here regardless. An earlier comment credited
+        # sys_DevMode, which is not a CVar in this build at all.
         self.queue("#" + code)
 
     def reload_mod(self):

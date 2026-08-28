@@ -32,22 +32,31 @@ Vortex, or extract the zip into `Kingdom Come - Deliverance\Mods\`.
 
 ## Settings
 
-Settings live in their own file, `HorseCollisionMod_Settings.lua`. It contains
-nothing but the values below, so there is no code to read around.
+Settings live in their own file, `HorseCollisionMod_Settings.lua`, inside the
+mod's pak. It contains nothing but the values below.
 
-1. Open `Kingdom Come - Deliverance\Mods\HorseCollisionMod\Data\HorseCollisionMod.pak`
-   with 7-Zip or WinRAR. Use **Open archive**, not Extract.
-2. Inside it, go to `Scripts\Startup\` and open
-   `HorseCollisionMod_Settings.lua` (not `HorseCollisionMod.lua`, which is the
-   mod itself).
-3. Change the values you want. Keep the `=` and the comma.
-4. Save and close the editor. 7-Zip asks whether to update the archive: say yes.
-5. Load a save. Settings are read when the loading screen ends, so a restart is
-   not needed, but an already-loaded game will not pick them up.
+Install the mod, then edit the pak that is inside the mods folder. Opening the downloaded
+zip and going into the pak inside it does not work.
+
+1. Open the installed pak with 7-Zip or WinRAR, using **Open archive** rather
+   than Extract:
+   - installed by hand: `Mods\HorseCollisionMod\Data\HorseCollisionMod.pak`
+   - installed by Vortex: right click the mod, **Open in File Manager**, then
+     `Data\HorseCollisionMod.pak`
+2. Go to `Scripts\Startup\` and open `HorseCollisionMod_Settings.lua`, not
+   `HorseCollisionMod.lua`, which is the mod itself.
+3. Change the values you want, keeping the `=` and the comma.
+4. Save and close. When 7-Zip asks whether to update the archive, say yes.
+5. Load a save.
+
+Vortex users: edit the copy in its staging folder, reached by **Open in File
+Manager**, rather than the one under `Mods\`. Vortex deploys by hard link, and
+an archive tool replaces the file rather than editing it in place, so the two
+copies come apart. Editing the staging copy and then running **Deploy Mods**
+keeps them together.
 
 A misspelled or mistyped setting is ignored and named in `kcd.log` rather than
 breaking the mod. Deleting a line restores its default.
-
 | Setting | Default | Effect |
 | --- | --- | --- |
 | `SpeedWalk` | 1.8 | Meters per second. Below this nothing happens at all. |

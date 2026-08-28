@@ -3601,3 +3601,168 @@ Tested against LuaJIT with the engine globals stubbed: a changed value applies, 
 one-letter typo is rejected without being added to Config, a string where a
 number belongs is rejected, the real setting nearby is untouched, and an absent
 settings file leaves the defaults alone.
+
+### Settings cannot live outside the pak
+
+**User report**: editing the deployed pak through 7-Zip gives a read-only error.
+
+The cause is worse than the symptom. **Vortex deploys by hard link**, not by
+copying:
+
+```
+\Users\...\AppData\Roaming\Vortex\...\mods\HorseCollisionMod_v2.1.0\Data\HorseCollisionMod.pak
+\Games\Kingdom Come - Deliverance\Mods\HorseCollisionMod_v210\Data\HorseCollisionMod.pak
+```
+
+Reproduced with a hard link outside the game folder. 7-Zip rewrites an archive
+by writing a temporary file and renaming over the original, which severs the
+link:
+
+```
+7-Zip:  Everything is Ok      reports success
+staging size : 22499          unchanged
+deployed size: 22635          updated
+linked names : 1              link destroyed
+```
+
+Vortex's staging copy keeps the original, so the next deploy or purge reverts
+the change with no warning. The read-only error was the better outcome of the
+two.
+
+### user.cfg was a dead end, and the earlier note did not establish that
+
+An earlier entry concluded the engine ignores unknown CVar names, based on a
+`hcm_*` block that did nothing. **That block was in `Bin\Win64\user.cfg`, which
+the same entry records as never being read at all.** A conclusion drawn from a
+file the game does not load establishes nothing, and the question was still open.
+
+Tested properly, from the `user.cfg` beside `system.cfg` that the game does
+read:
+
+```
+CVar probe: hcm_speedgallop  ok=true value=nil   type=nil
+CVar probe: hcm_test         ok=true value=nil   type=nil
+CVar probe: sys_PakPriority  ok=true value=2     type=number
+```
+
+`System.GetCVar` works. The engine discards names it does not know. Settled.
+
+### mod.cfg does not help either
+
+The log carries `Config file mods/HorseCollisionMod_v210/mod.cfg not found!`,
+which looked promising: a per-mod file in the mod folder, outside the pak.
+
+The official modding guide is explicit about what it is for:
+
+> Another optional file in the mod's root is "mod.cfg". When present, it will be
+> loaded after "system.cfg", but before "user.cfg" [...] You can use the
+> "mod.cfg" in simple mods when all you want to do is set some CVars.
+
+It sets CVars, and it loads before any Lua runs, so a mod cannot register its
+own names first. Combined with the probe above, it cannot carry mod settings.
+
+There is also no file API: `io` appears nowhere in the game's own Lua, and
+nothing in `System.*` reads a file.
+
+### Conclusion
+
+Settings have to be inside a pak, which makes editing them a mod-manager
+problem rather than something this mod can design around. Every KCD mod with
+in-pak configuration has it. What remains is documenting the workflow that
+actually works instead of the one that silently loses changes.
+
+### Correction: the read-only error was a nested archive, not the hard link
+
+The previous entry blamed Vortex's hard-link deployment. That was wrong, and the
+user's objection was the right one: editing mod settings is a basic thing that
+works for other mods, so an explanation that made it impossible was suspect.
+
+Tested rather than assumed this time.
+
+**The deployed pak is writable.** Attributes are `Archive`, not `ReadOnly`, and
+it opens `ReadWrite` with no error while Vortex is running.
+
+**7-Zip cannot update an archive nested inside another archive.**
+
+```
+A: update Data/HorseCollisionMod.pak INSIDE the release zip
+     Error: cannot open file / The system cannot find the path specified
+
+B: extract that pak, then update it standalone
+     Everything is Ok
+```
+
+That is the read-only error. Opening the downloaded zip and going into the pak
+inside it is the obvious thing to try, and it cannot work. Nothing to do with
+Vortex, hard links, or the settings living in a pak.
+
+**What the hard link actually costs.** It is real but secondary: an archive tool
+replaces the pak rather than editing it in place, so the deployed and staging
+copies come apart. Editing the staging copy and redeploying keeps them together.
+The earlier claim that the next deploy "silently reverts the change with no
+warning" was asserted without testing what Vortex does on external changes, and
+should not have been stated as fact.
+
+**What was right.** `user.cfg` and `mod.cfg` genuinely cannot carry mod settings,
+both established by probe and by the official modding guide. Settings do have to
+live in a pak. That part stands; the conclusion drawn from it did not.
+
+The general failure: an explanation was built on the first plausible mechanism
+found, and the far simpler one was never tested. A counter-example from ordinary
+use, in this case that people edit mod settings all the time, outranks an
+analysis that says they cannot.
+
+### Settings cannot leave the pak, and here is every route that was tried
+
+The question was whether a player could change settings from a plain text file
+rather than an archive. Six routes, all tested rather than reasoned about.
+
+| Route | Result |
+| --- | --- |
+| Unregistered CVar names in `user.cfg` | discarded by the engine |
+| `System.SetCVar` creating a name | not available |
+| `mod.cfg` | CVars only, and loads before any Lua |
+| `exec` called from Lua | **works**, not cheat gated, reaches the mod folder |
+| The console expression prefix inside a cfg | not honoured |
+| A file API in Lua | `io` does not exist |
+
+**`SetCVar` cannot create a name.** Reading back a name it had just set returns
+nil, while the same call against `log_Verbosity` reads back 4. So the call
+works and creation is what is unavailable.
+
+**`exec` was the surprise, and it works.**
+
+```
+[CONSOLE] Executing console command 'exec Mods/HorseCollisionMod_v210/settings.cfg'
+Executing console batch file (try game,config,root): "settings.cfg" found in game/ ...
+[Warning] Unknown command: hcm_probe_value
+```
+
+`System.ExecuteCommand` runs it, it is not cheat gated, and it finds a file in
+the mod folder outside any pak. It just has nothing useful to carry: a cfg run
+this way is a batch of CVar assignments, and the mod cannot have CVars.
+
+**The expression prefix does not work in a cfg.** `wh_con_expr_prefix` reads
+`!`, and neither `!` nor `#` reached Lua from the file. The log warns about the
+unknown CVar name on the first line and says nothing at all about the two
+prefixed lines, so the batch parser handles `name = value` and ignores the rest.
+The prefix works on the interactive and remote console, not here.
+
+### Where that leaves settings
+
+Inside the pak, in `Scripts/Startup/HorseCollisionMod_Settings.lua`, edited with
+an archive tool after the mod is installed. That works and is what the README
+documents.
+
+The original complaint had two halves and both are addressed: the settings were
+hard to find, which the separate file fixes, and editing them appeared to fail,
+which was an archive nested inside the downloaded zip rather than anything about
+the design.
+
+### A correction in dev_console.py
+
+Its comment credited `sys_DevMode = 1` for making the console evaluate a leading
+`#` as Lua. `sys_DevMode` is not a CVar in this build. The remote console
+accepts `#` regardless, separately from `wh_con_expr_prefix`, which reads `!`
+and governs the in-game console. The behaviour was right and the explanation was
+invented.
