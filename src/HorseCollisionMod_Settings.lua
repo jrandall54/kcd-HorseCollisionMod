@@ -36,6 +36,10 @@ HorseCollisionModSettings = {
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
-	LogTelemetry             = true   -- diagnostics in kcd.log
+	LogTelemetry             = true,  -- diagnostics in kcd.log
+
+	-- Names the reason a nearby NPC produced no reaction. Noisy, and only
+	-- useful while investigating why an impact did nothing.
+	DiagnoseMisses           = true
 
 }
