@@ -10,6 +10,8 @@
 #   .\tools\dev_deploy.ps1 -NoBuild -Launch     deploy what was built last, start the game
 #   .\tools\dev_deploy.ps1 -ParkVortexMod       move the Vortex-installed copy aside first
 #   .\tools\dev_deploy.ps1 -GameRoot "D:\..."   use an install somewhere else
+#   .\tools\dev_deploy.ps1 -SetDevEnvironment    switch system.cfg to development values
+#   .\tools\dev_deploy.ps1 -SetPlayEnvironment   switch it back to shipping values
 #
 # The game folder is found automatically: -GameRoot, then the KCD_PATH
 # environment variable, then the usual Steam and GOG install locations.
@@ -26,7 +28,10 @@ param (
 	[switch]$NoDevMode,
 	[switch]$NoLooseScript,
 	[switch]$ScriptOnly,
-	[switch]$AnimOnly
+	[switch]$AnimOnly,
+	[switch]$SetDevEnvironment,
+	[switch]$SetPlayEnvironment,
+	[switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -132,6 +137,125 @@ $exe = Join-Path $gameRoot "Bin\Win64\KingdomCome.exe"
 # the old one has to be removed by hand. One stable folder makes deployment a
 # straight overwrite.
 $devMod = "HorseCollisionMod_dev"
+
+# ---------------------------------------------------------------------------
+# Which configuration the install is in
+# ---------------------------------------------------------------------------
+
+# Verifying a release switches this install to shipping values, and nothing
+# switches it back, so an install left over from a release is configured for
+# play rather than for development.
+#
+# That failure is invisible. At sys_PakPriority = 2 the engine ignores loose
+# files completely and logs nothing about it, so a deploy, a reload and a
+# console command all report success while the game keeps running the packed
+# build. A warning is not enough, because the deploy that follows it looks like
+# it worked.
+$DevEnvironment = @(
+	@{ Name = "sys_PakPriority"; Dev = "0"; Play = "2"
+	   Why = "loose files under Data\ are ignored at any other value" },
+	@{ Name = "mn_allowEditableDatabasesInPureGame"; Dev = "1"; Play = "0"
+	   Why = "Mannequin refuses to reload its animation databases" },
+	@{ Name = "log_EnableRemoteConsole"; Dev = "1"; Play = "1"
+	   Why = "dev_console.py has no port to connect to" }
+)
+
+function Get-CfgValue {
+	param ([string]$Text, [string]$Name)
+
+	# Last assignment wins, the way the engine reads the file.
+	$found = [regex]::Matches($Text, "(?m)^\s*$([regex]::Escape($Name))\s*=\s*(\S+)")
+
+	if ($found.Count -eq 0) { return $null }
+
+	return $found[$found.Count - 1].Groups[1].Value
+}
+
+function Set-CfgValues {
+	param ([string]$Root, [string]$Which)
+
+	$cfg = Join-Path $Root "system.cfg"
+
+	if (-not (Test-Path $cfg)) {
+		Write-Host "[DEPLOY] no system.cfg at $cfg" -ForegroundColor Red
+		exit 1
+	}
+
+	$text = Get-Content $cfg -Raw
+
+	foreach ($rule in $DevEnvironment) {
+		$want = $rule[$Which]
+		$pattern = "(?m)^(\s*$([regex]::Escape($rule.Name))\s*=\s*)\S+"
+
+		if ([regex]::IsMatch($text, $pattern)) {
+			$text = [regex]::Replace($text, $pattern, "`${1}$want")
+		}
+		else {
+			$text = $text.TrimEnd() + "`r`n$($rule.Name) = $want`r`n"
+		}
+
+		Write-Host "  $($rule.Name) = $want"
+	}
+
+	Set-Content -Path $cfg -Value $text -Encoding UTF8 -NoNewline
+	Write-Host "[DEPLOY] system.cfg switched to $Which values." -ForegroundColor Green
+	Write-Host "         sys_PakPriority is read at startup, so restart the game."
+}
+
+function Assert-DevEnvironment {
+	param ([string]$Root)
+
+	$cfg = Join-Path $Root "system.cfg"
+
+	if (-not (Test-Path $cfg)) {
+		Write-Host "[DEPLOY] no system.cfg at $cfg" -ForegroundColor Red
+		exit 1
+	}
+
+	$text = Get-Content $cfg -Raw
+	$wrong = @()
+
+	foreach ($rule in $DevEnvironment) {
+		$have = Get-CfgValue -Text $text -Name $rule.Name
+
+		if ($null -eq $have) { $have = "unset" }
+
+		if ($have -ne $rule.Dev) {
+			$wrong += "         $($rule.Name) is $have, needs $($rule.Dev), or $($rule.Why)"
+		}
+	}
+
+	if ($wrong.Count -eq 0) { return }
+
+	Write-Host "[DEPLOY] this install is not configured for development." -ForegroundColor Red
+	$wrong | ForEach-Object { Write-Host $_ }
+	Write-Host ""
+	Write-Host "         Switch it:  .\tools\dev_deploy.ps1 -SetDevEnvironment"
+	Write-Host "         then restart the game."
+	Write-Host "         -Force deploys anyway, into an install that will ignore it."
+	exit 1
+}
+
+if ($SetDevEnvironment -and $SetPlayEnvironment) {
+	Write-Host "[DEPLOY] pick one of -SetDevEnvironment and -SetPlayEnvironment." -ForegroundColor Red
+	exit 1
+}
+
+if ($SetDevEnvironment) {
+	Set-CfgValues -Root $gameRoot -Which "Dev"
+	exit 0
+}
+
+if ($SetPlayEnvironment) {
+	Set-CfgValues -Root $gameRoot -Which "Play"
+	exit 0
+}
+
+# Every deploy path runs this, including -ScriptOnly and -AnimOnly, which are
+# the ones most likely to be aimed at an install left in shipping values.
+if (-not $Force) {
+	Assert-DevEnvironment -Root $gameRoot
+}
 $devDir = Join-Path $modsDir $devMod
 
 Write-Host "[DEPLOY] game: $gameRoot"
@@ -330,22 +454,6 @@ Write-Host "[DEPLOY] load order: $($order -join ' -> ')"
 if (-not $NoLooseScript) {
 	Copy-LooseFiles -Root $gameRoot -Script -Anim
 
-	$cfg = Join-Path $gameRoot "system.cfg"
-	$priority = $null
-
-	if (Test-Path $cfg) {
-		$match = Select-String -Path $cfg -Pattern '^\s*sys_PakPriority\s*=\s*(\d)' |
-			Select-Object -Last 1
-
-		if ($match) {
-			$priority = $match.Matches[0].Groups[1].Value
-		}
-	}
-
-	if ($priority -ne "0") {
-		Write-Host "[DEPLOY] warning: sys_PakPriority is '$priority', not 0." -ForegroundColor Yellow
-		Write-Host "         Loose files are ignored, so --reload will re-read the packed copy."
-	}
 }
 
 if ($Launch) {
