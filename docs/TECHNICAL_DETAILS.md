@@ -206,3 +206,133 @@ unaffected either way.
 
 Turning it off compares against vanilla collision handling without uninstalling
 the mod. The knockdown tiers are unaffected.
+
+## Additive animation deployment
+
+How this mod adds Mannequin fragments without replacing a single vanilla file,
+and why each part of it is necessary. Introduced in 2.1.0.
+
+`HOW_IT_WORKS.md` covers the purpose and the trade-offs. This section is the
+reference for changing it.
+
+### Engine facts it relies on
+
+None of the three is exercised by the base game.
+
+**Mannequin supports sub-databases.** A database may reference others:
+
+```xml
+<AnimDB FragDef="..." TagDef="...">
+  <SubADBs>
+    <SubADB File="Animations/Mannequin/ADB/kcd_male_database.adb" />
+  </SubADBs>
+</AnimDB>
+```
+
+No vanilla `.adb` uses it; all 28 splice everything into one document. The
+loader is present regardless, and `WHGame.dll` carries its strings:
+`SubADBs`, `Loading subADB %s`, and
+`[CAnimationDatabaseManager::LoadDatabase] Unknown tags %s for subADB %s`.
+
+**A sub-database can carry an entire database**, not just a fragment subset,
+so the vanilla file is referenced where it sits inside `Animations-part1.pak`.
+
+**The database an entity uses is a Lua property**, not compiled in.
+`Scripts/Entities/AI/NPC_x.lua` declares `AnimDatabase3P`, so a Startup script
+can point it elsewhere.
+### The layout
+
+Seven files, all named `hcm_*`, so none collides with anything:
+
+```
+hcm_<set>_database.adb          the parent
+  AnimationControlled           vanilla's 30 options + this mod's 4
+  SubADB -> kcd_male_database.adb   untouched, in its own pak
+hcm_<set>_fragmentids.xml       vanilla's ids, AnimationControlled repointed
+hcm_<set>_controllerdefs.xml    vanilla's controller def, Fragments repointed
+hcm_animationControlledTags.xml vanilla's 16 FragTags + this mod's 4
+```
+
+`HorseCollisionMod.lua` then points the human entity classes at the parent.
+
+### The four things that must all hold
+
+Each was found by a failing cold-start test, and each produced the identical
+symptom: a one-frame twitch, with `StartInteractiveActionByName` returning
+success. Fixing any one alone changes nothing visible, because the next fault
+is still ahead of it.
+
+**1. The parent must define `AnimationControlled` itself.** Sub-databases do not
+merge options into a fragment another database already defines; the definition
+comes from one place. Putting the mod's options in a sub-database leaves them
+unreachable no matter which order the subs are listed in.
+
+**2. The parent must carry vanilla's own options too.** Because it takes
+authority over the fragment, anything it omits is gone. Without vanilla's 30
+options a redirected NPC loses every door, cabinet and wardrobe interaction in
+the game. The fragment is 69 KB, 1.24% of the database, so this is cheap.
+
+**3. The parent's `FragDef` must be the mod's fragment ids.** That is what the
+loader validates FragTags against. Pointing it at vanilla's gives:
+
+```
+[CAnimationDatabaseManager::LoadDatabase] Unknown tags for fragmentID
+    AnimationControlled tag  fragTags hcm_stagger_forward
+```
+
+**4. `ActionController` must be redirected as well as `AnimDatabase3P`.** The
+controller def owns the fragment and tag definitions an entity resolves names
+through *at runtime*. A database's `FragDef` governs load-time validation only.
+Redirect the database alone and the options load and validate cleanly, then
+every call against them resolves to nothing.
+
+### Redirect the exposed class, not the template
+
+The least obvious requirement, and the one with no visible symptom of its own.
+
+```lua
+-- Scripts/Entities/AI/NPC.lua
+NPC = CreateAI(NPC_x);
+
+-- Scripts/Entities/AI/Shared/BasicAI.lua
+function CreateAI(child)
+    local newt = {}
+    mergef(newt, child, 1);   -- copies the fields
+```
+
+`NPC_x` is a **template**. `CreateAI` builds a fresh table and copies fields into
+it, so the live class holds a snapshot taken when its script loaded. A Startup
+script that mutates `NPC_x` changes nothing about what spawns.
+
+The classes that must be redirected are therefore `NPC`, `NPC_Female`,
+`NPC_NAI`, `NullAI`, `DummyTarget`, plus `Player` and `PlayerFemale`, which are
+declared directly rather than through `CreateAI`. The `_x` templates are
+redirected as well, so anything calling `CreateAI` later inherits correctly.
+
+`RedirectAnimationDatabases` runs at **file scope**, not from the load screen,
+because `AnimDatabase3P` is read when an actor spawns and the load screen ends
+after the world is populated.
+
+### Constraints on any change here
+
+- `kcd_animationControlledTags.xml` and `wh_female_fragmentids.xml` are
+  copies of vanilla with additions, not references. A copy cannot pick up
+  another mod's additions to the same file. Acceptable because nothing else
+  is likely to extend `AnimationControlled`; it would not be for a mod that
+  had to share a tag group.
+- Two mods redirecting `AnimDatabase3P` on the same class conflict. The
+  contested resource is a Lua string rather than a binary, so a cooperative
+  mod can chain by referencing whatever is already set.
+- `ActionController` must be left on vanilla. Redirecting it requires a copy
+  of the controller def and the fragment id file, which places this mod in
+  the resolution path of every human animation. An earlier layout did that
+  and unrelated animations stopped playing.
+### Verifying it
+
+`tools/verify_additive.py` checks every claim above against the game's own paks
+and the packaged release, rather than trusting the documentation. It confirms no
+vanilla filename is claimed, nothing is dropped from the fragment the mod takes
+over, every reference in the chain resolves, pak entry names use forward
+slashes, and the Lua redirects the classes the engine actually spawns. It
+discovers those classes by reading `Scripts.pak` rather than taking the mod's
+word for them. Run it before publishing.

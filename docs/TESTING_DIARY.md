@@ -1710,6 +1710,107 @@ morale, and the horse-NPC tangling when walking head-on into someone.
 
 ---
 
+## Build 2.0.1-dev.1: carried items dropped during the stagger
+
+**Reported after 2.0.0 shipped**: a woman carrying a basket staggered, left the basket on
+the ground, and walked off without it.
+
+### The UseHand hypothesis was wrong
+
+The note written when this was first observed guessed that the cause was the `UseHand`
+procedural layer, which the stagger template dropped when it was modeled on vanilla's
+`cabinet_o` option. Reading the data says otherwise.
+
+`UseHand` appears in seven fragments in `kcd_male_database.adb` and nowhere else:
+`LedgeGrab`, `Door`, `Door_Locked`, `Door_LockUnlock`, `Door_CloseLock`, `Door_UnlockOpen`
+and `AnimationControlled`. Every one is an animation where the character needs their hands
+for something. No hit reaction declares it. So the layer means "this animation requires the
+hands", which is a reason for the engine to empty them, not to preserve what they hold.
+Adding it back would have been more likely to cause the drop than to fix it.
+
+### Two other candidates ruled out
+
+**The `hitReaction` message is not responsible.** `sb_switch_hitreactions.xml` does contain
+a path that matches the symptom exactly: on entering the `Hit` state it runs the `dropItems`
+tree from `sb_combat.xml`, which places every non-weapon held item on the ground, links it
+to the NPC with the tag `panicDrop` so a later activity can retrieve it, and then posts
+`daycycle:restartRequest` so the NPC abandons what they were doing. That whole block is
+gated behind the `Hit` state machine state. The `HitReactionType.Collision` branch this mod
+posts into only fires barks and an awareness impulse and never touches the state machine.
+
+Worth recording for later anyway: the gate is `!$b_context['suppressDaycycleRestartAfterHit']`,
+so there is a sanctioned context flag for turning that behavior off if a future build ever
+does put an NPC into the `Hit` state.
+
+**Scope displacement is not responsible.** Carrying is expressed as an override on
+`MotionMovement`, for example `tags="walk+r_basket"` with
+`scopes="FullBody+HoldItemLeft+HoldItemRight+HoldItem+Looking"`. The hold itself lives in
+the `HoldItemLeft` and `HoldItemRight` scopes, which are separate `AutoReinstall` fragments.
+`AnimationControlled` claims `FullBody+HoldItem+Looking` and never touches either.
+
+### What the template should have been modeled on
+
+`hitreaction_idle_medium_torso_stab_front` is not an orphan clip. It is an option on the
+vanilla `HitDeath` fragment under FragTags `so_forward+minor_hit`, which is where
+`GetImpactDir`'s `so_` prefix came from in the first place. That option is the correct model
+for ours, and it is much barer than `cabinet_o`:
+
+| Layer | vanilla `HitDeath` | 2.0.0 `AnimationControlled` |
+| --- | --- | --- |
+| AnimLayer | the clip | the clip |
+| `AnimateCamera` | yes | no |
+| `MovementControlMethod` | no | yes |
+| `ColliderMode` | no | `Disabled` |
+
+`ColliderMode="Disabled"` is the change under suspicion. Vanilla never disables an actor's
+colliders during a hit reaction, and a carried basket is a physicalized entity attached to
+the hand. It was added in the first place to stop the horse snagging on a victim who is
+mid-stagger, and this diary already records that it did not achieve that, so reverting it
+costs nothing that was working.
+
+`MovementControlMethod` is kept. An interactive action needs the animation to drive the body
+in a way a natively triggered hit reaction does not. The camera layer stays out because it
+aims the player's camera and the victim here is never the player.
+
+### The change
+
+`COLLIDER_MODE` in `build_adb.py` now accepts `None`, meaning declare no `ColliderMode`
+layer at all, and that is the new default. Setting it to `"Disabled"` or `"Interactive"`
+still works and should now require an in-game result to justify.
+
+**Hypothesis**: with no `ColliderMode` layer the victim stays physically as they are for the
+duration of the stagger, and whatever they are carrying stays in their hands.
+
+**To test**: find a woman carrying a basket, walk a horse into her, and watch the basket.
+Also worth confirming the stagger still plays and reads the same otherwise, since this
+touches the fragment every stagger uses.
+
+**If the basket still drops**, the remaining suspect is `StartInteractiveActionByName`
+itself interrupting the smart object activity that owns the item, in which case the place to
+look is the `panicDrop` recovery paths in `so_slot.xml` and `so_tool.xml` and whether the
+action can be started without cancelling the activity.
+
+### Result
+
+**Tested in game.** The basket stays in her hands through the stagger. Removing the
+`ColliderMode` layer was the fix, and the `UseHand` hypothesis recorded earlier would have
+been the wrong change.
+
+Two qualifications, both from the same test:
+
+**It looks slightly glitchy.** The clip is a hit reaction authored for someone with empty
+hands, so the arms swing through a pose the basket was never meant to follow. The item is
+kept rather than lost, which is the behavior that matters, but it does not read as natural.
+Fixing that properly means either a carried-item variant of the reaction or declaring the
+carry tag on the fragment, and neither is worth doing before the tooling makes iteration
+cheap.
+
+**The drop still happens at trot and gallop.** Those tiers use the physics ragdoll, not this
+fragment, so they were never covered by this change and the behavior predates 2.0.0. That is
+a separate issue against the ragdoll path and should not be folded into this one.
+
+---
+
 ## Session: development loop tooling
 
 No build under test. The whole session went into the loop used to test builds,
@@ -2219,3 +2320,1251 @@ message telling you how to store one.
 Release step only, run by hand on a tagged version. Not wired to a push, a
 merge, or a schedule, which is also what keeps a personal API key inside the
 acceptable use policy: the action is initiated by the author every time.
+
+---
+
+## Build 2.0.1-dev.14: the branch, rebased onto the new layout
+
+`fix/carried-item-drop` was cut before the repository reorganization, so it
+edited `HorseCollisionMod.lua`, `build_adb.py` and `mod.manifest` at the old
+root paths. Merging main in resolved all three by rename detection with no
+manual intervention; only the diary conflicted, both sides having appended.
+
+Rebuilt from scratch with `mod_assets/` deleted first, and the generated data
+verified rather than assumed: all four `hcm_stagger_*` options carry
+`MovementControlMethod` and no `ColliderMode` layer, and the 32 vanilla
+`AnimationControlled` options are untouched.
+
+### The stated rationale for the fix is partly wrong
+
+Worth correcting before testing, because the reasoning is what the next
+decision rests on.
+
+The commit removing the layer justified it this way: "the clips these options
+play live on the HitDeath fragment in the stock database, and neither of the
+two options there declares a ColliderMode layer."
+
+Checked against the vanilla male database. **`HitDeath` has 105 options, not
+two**, and `so_forward+minor_hit` appears four separate times with
+*different* collider handling: some declare `ColliderMode`, some do not.
+
+The narrow claim survives. The specific fragment that owns
+`hitreaction_idle_medium_torso_stab_front`, the clip actually used, declares no
+`ColliderMode`. So removing the layer does match the option the clip comes
+from.
+
+The broad claim does not. "Matching vanilla" is not one thing here, because
+vanilla ships both variants of the same FragTags. Removing the layer is a
+defensible choice, not an obviously correct restoration.
+
+**This matters for the open question.** The recorded cause, that
+`ColliderMode="Disabled"` makes NPCs drop carried items, was already
+contradicted once: a woman kept her bucket during a session running the
+un-fixed data. Now it is also clear vanilla itself is inconsistent about the
+layer. Two possibilities the test has to separate:
+
+- Removing the layer fixes the drop, and the woman who kept her bucket was
+  something else, most likely a different item or a different reaction option.
+- The layer was never the cause, the fix is cosmetic, and the drop has another
+  source. In that case the change is still worth keeping for matching the
+  source option, but it does not close the issue.
+
+The A/B is cheap now that animation data hot-reloads: build both variants by
+flipping `COLLIDER_MODE` in `tools/build_adb.py`, deploy with `-AnimOnly`, and
+reload without leaving the game. That was not possible when the original
+conclusion was recorded, which is probably why it was drawn from one
+observation.
+
+### Not yet tested in game
+
+Everything above is static verification of the generated data. No build test
+has run.
+
+### The deploy tool could not build, and nothing caught it
+
+Reported on trying to start a test session:
+
+```
+-File : The term '-File' is not recognized as the name of a cmdlet
+```
+
+`dev_deploy.ps1` invoked the build across two lines, and the first ended with
+**two** backticks instead of one. PowerShell reads the first as escaping the
+second, so the line yielded a literal backtick and no continuation, and
+`-File ...` on the next line was parsed as its own command.
+
+Two things are worth keeping from this.
+
+**The untested path was the one everyone uses.** `-NoBuild`, `-ScriptOnly` and
+`-AnimOnly` all skip that block. Those were the only three exercised after the
+repository reorganization, so the default path and `-Launch`, which is how a
+test session actually starts, were both broken for the whole interval. A parse
+check does not catch it either: the result is syntactically valid, just wrong.
+The only thing that would have caught it is running the tool the way it is
+normally run.
+
+**The cause was a scripted edit mangling an escape.** The same class of damage
+put a literal backspace character into the README, where `.\build.ps1` had
+rendered as `.uild.ps1`, because a `\b` in a generated string was interpreted
+as an escape rather than a path separator. Both came from writing file content
+through a shell heredoc.
+
+A sweep of every tracked text file for control characters in the
+`\x00-\x08\x0B\x0C\x0E-\x1F` range found no others. Worth repeating that sweep
+after any bulk scripted edit, since the corruption is invisible in an editor
+and survives review.
+
+---
+
+## Build 2.0.1-dev.14: the ColliderMode A/B, and a wrong conclusion corrected
+
+First controlled test of the carried-item question, using the animation
+hot-reload to run both variants against the same NPCs in one session.
+
+**Hypothesis under test**: removing the `ColliderMode` layer is what stops NPCs
+dropping carried items during the walk-tier stagger.
+
+**User reported**: "During the initial and after the hotswap the bucket
+remained in their hand for women and the animation played normally for men."
+
+**Result: the hypothesis is wrong, and so was the conclusion recorded for
+2.0.1-dev.1.** The bucket stays in hand *both* with `COLLIDER_MODE = None` and
+with `COLLIDER_MODE = "Disabled"`. The layer makes no difference to whether the
+item is held.
+
+### Why the earlier conclusion was wrong
+
+The 2.0.1-dev.1 entry states plainly: "The basket stays in her hands through
+the stagger. Removing the `ColliderMode` layer was the fix." That was drawn
+from a single observation with no control. The un-fixed variant was never run
+against the same NPC, so there was nothing to attribute the result to.
+
+The contradiction was already on the record. A later session noted a woman
+keeping her bucket while running the *un-fixed* data, which the recorded cause
+could not account for. That should have been treated as falsifying evidence at
+the time rather than as an anomaly to re-test later.
+
+The general lesson, and it has now cost two sessions: **a change plus a good
+outcome is not a cause.** Where an A/B is possible, run it. It is possible
+here, and cheap, precisely because of the hot-reload work.
+
+### What this means for the branch
+
+`COLLIDER_MODE = None` stays, but on much narrower grounds than the commit
+claimed. It is not a bug fix. It matches the vanilla `HitDeath` option that
+owns the clip, which is a reasonable default, and it is not observably worse.
+It does not fix anything, because on current evidence nothing was broken.
+
+The carried-item drop at trot and gallop is untouched by any of this. That is
+the physics ragdoll path and predates 2.0.0.
+
+### The real remaining issue is that the stagger ignores the item
+
+**User reported**: "it looks a little unnatural because the animation that we
+are forcing doesn't take into account the bucket in their hand."
+
+Which is correct and was already recorded in dev-1: the clip is authored for
+empty hands, so the arms swing through a pose the item was never meant to
+follow. Keeping the item is not the same as the item looking right.
+
+### The goal now stated
+
+Rather than the item staying glued through a pose that does not fit it, the
+target behavior is: the stagger plays, the item is dropped naturally, the NPC
+does their reaction and bark, and then picks the item back up and resumes the
+behavior loop it was in.
+
+**There is vanilla precedent, and this diary already found it.** From the
+dev-1 entry: `sb_switch_hitreactions.xml`, on entering the `Hit` state, runs
+the `dropItems` tree from `sb_combat.xml`, which places every non-weapon held
+item on the ground, **links it to the NPC with the tag `panicDrop` so a later
+activity can retrieve it**, and posts `daycycle:restartRequest`.
+
+That is precisely drop, then retrieve. It was ruled out as the *cause* of the
+old symptom, correctly, because the branch is gated behind the `Hit` state and
+the `HitReactionType.Collision` path this mod posts into never touches the
+state machine. Being ruled out as a cause is not the same as being unavailable
+as a mechanism.
+
+Also already noted there: the restart is gated on
+`!$b_context['suppressDaycycleRestartAfterHit']`, so there is a sanctioned flag
+for suppressing the abandon-what-you-were-doing half while keeping the drop.
+That matters, because the goal is to resume the behavior loop, not restart the
+day cycle.
+
+Open questions, in order:
+
+1. Can the `dropItems` tree be invoked without putting the NPC into the full
+   `Hit` state, which would bring combat behavior with it?
+2. Does the `panicDrop` retrieval actually run for a non-combat NPC, and what
+   drives it? The places to look are the `panicDrop` recovery paths in
+   `so_slot.xml` and `so_tool.xml`.
+3. Does the pickup return them to their previous activity or restart it?
+
+### Vanilla does have drop-and-pick-back-up, and it is complete
+
+Read out of `Scripts.pak` rather than inferred. The answer to "is there
+precedent for a woman dropping her bucket and picking it back up" is yes, and
+the whole loop already exists.
+
+**The drop.** `Libs/AI/final/sb_combat.xml` declares
+`<BehaviorTree name="dropItems">` with variables `hand` (0 right, 1 left),
+`item` and `itemCategory`, plus a forward-declared `t_dropItems_dropWeapons`
+bool. It places held items on the ground, and for anything whose
+`itemCategory` is neither `melee_weapon` nor `missile_weapon` it runs:
+
+```
+AddLink From="this.id" To="item" Tag="panicDrop"
+```
+
+so the dropped item stays linked to the NPC that dropped it.
+
+**The retrieval.** `Libs/AI/final/so_slot.xml` holds 24 item-handling trees,
+among them `pickItem`, `pickFromGround`, `findPickedItem`, `safePickItem` and
+`slotRecoveryCheck`. The `panicDrop` recovery lives in the `placeItem` tree and
+does exactly the expected three steps:
+
+```
+GraphSearch ... SubGraph="panicDrop"
+RemoveLink From="this.id" To="handCheck" Tag="panicDrop"
+SmartObjSetBehaviorState behaviors="pickItem" state="Enabled"
+```
+
+`so_tool.xml` has a parallel path that filters the graph with
+`LinkTagFilter tag="panicDrop"`.
+
+So: drop, tag, later find by tag, untag, enable the pick-up behavior. That is
+the behavior described as the goal, and it ships with the game.
+
+**`dropItems` is not welded to the `Hit` state.** It is a named tree, invoked
+by `<IncludeTree File="final/sb_combat.xml" Name="dropItems" />`. The `Hit`
+state is one caller, not the definition. An earlier entry ruled the `Hit` path
+out as the *cause* of the old symptom, which was correct, but that is not the
+same as the tree being unavailable as a mechanism.
+
+**Where the mod's message lands.** `sb_switch_hitreactions.xml` line 260 is the
+branch guarded by `$hitReaction.hitType == $enum:HitReactionType.Collision`.
+That branch currently does a dead check, some barks gated on
+`!$b_inCombat & !$b_context['suppressCollisionsBark']`, and an awareness
+impulse. Adding an `IncludeTree` of `dropItems` there is the shape of the
+change.
+
+### The cost, which is the real decision
+
+`sb_switch_hitreactions.xml` is 132,889 bytes, and **the mod deliberately
+stopped shipping it.** The current pak contains only the four animation files
+and `Scripts/Startup/HorseCollisionMod.lua`. Re-adding it means:
+
+- A hard conflict with any other mod that edits hit reactions. Behavior trees
+  cannot be merged, only replaced, exactly like the Mannequin databases.
+- A second whole-file replacement pinned to 1.9.7, doubling the surface that
+  a game patch would invalidate.
+- This diary already records a failed attempt to drive animation from this
+  file: "A `PlayAnimation` node added to `sb_switch_hitreactions.xml`: node
+  runs, animation fails." That was a different goal, but it is a reminder that
+  editing the tree is not automatically effective.
+
+Against that, the payoff is real: the current stagger clip is authored for
+empty hands, so an NPC keeping a bucket through it looks wrong. Dropping the
+item, reacting, and picking it up is both more natural and vanilla-sanctioned.
+
+Not yet established, and worth knowing before committing to this:
+
+1. Whether `dropItems` runs correctly outside a combat subbrain, given it lives
+   in `sb_combat.xml` and forward-declares a combat variable.
+2. What drives the `pickItem` behavior once enabled, and whether it returns the
+   NPC to their previous activity or restarts it. The day-cycle restart in the
+   `Hit` path is gated on `!$b_context['suppressDaycycleRestartAfterHit']`, so
+   there is a sanctioned flag for keeping the drop without the restart.
+3. Whether the same path exists for the female smart objects, since the bucket
+   carriers are women and the female animation data has needed separate work
+   throughout this project.
+
+---
+
+## Mod compatibility, researched rather than assumed
+
+Prompted by a fair challenge: mod collections stack dozens of mods that must
+overlap constantly, so is this mod actually unusual or is the conflict worry
+overstated? Answered from the installed mods, the game's own data, and the
+game binary.
+
+### The three open questions on the drop-and-pickup path
+
+**Q1. Does `dropItems` depend on combat?** No. The tree is 7,356 characters and
+references exactly four variables: `hand`, `item`, `itemCategory`, `__null`.
+Not one combat variable, and the node types are all generic (`AddLink`,
+`GetItemType`, `HandCheck`, `InstantDoPlace`, `IfCondition`, `Switch`, `While`,
+`Expression`). It lives in `sb_combat.xml` by filing, not by dependency, and
+should run anywhere.
+
+**Q2. Does the pickup restart the NPC's day?** Not on its own.
+`daycycle:restartRequest` appears **zero** times in `so_slot.xml`. The restart
+lives in the `Hit` branch of `sb_switch_hitreactions.xml`, not in the retrieval
+path, so invoking the drop and letting the smart object recover the item does
+not inherently abandon the activity. The four relevant trees are substantial
+and real: `pickItem` (9,327 chars), `findPickedItem` (7,590),
+`slotRecoveryCheck` (5,551), `pickFromGround` (4,784).
+
+**Q3. Do the female smart objects use the same path?** Yes. `so_slot.xml`
+contains no gender branching whatsoever, so item handling is shared. The
+gendered split in this project has only ever been in the animation databases.
+
+All three answers are favourable. Nothing in the AI data blocks the goal.
+
+### What this mod actually conflicts with
+
+Every mod installed on this machine, by the files it overrides:
+
+| Mod | Overrides | Subsystem |
+| --- | --- | --- |
+| Perkaholic | 6 `Libs/Tables/rpg/*__perkaholic.xml` + localization | RPG tables |
+| RealisticFootprints | `Libs/MaterialEffects/FXLibs/*`, decal materials and textures | material effects |
+| HighFPSFX | 8 `Libs/Particles/*.xml` | particles |
+| CutsceneFPSFix | one `.ent` and two Lua files, all its own | new entity |
+| EasyToSeeHerbs | one `.dds` | texture |
+| XboxToPS3controller | `Libs/UI/Textures/*.dds` | UI textures |
+| **HorseCollisionMod** | **`kcd_male_database.adb` (5.5 MB), `wh_female_database.adb`, 2 tag/fragment XMLs** | **animation databases** |
+
+**Overlap between all six other mods: zero.** Not one shared file, excluding
+Vortex's own bookkeeping. They stack cleanly because each lives in a different
+subsystem, and several add new files rather than replacing existing ones.
+
+So mods do stack by the dozen, and the reason is not that the engine merges
+them. It is that most mods touch small leaf assets, and the chance of two mods
+picking the same texture or particle file is low.
+
+### This mod is genuinely different, and here is the specific reason
+
+There are two categories, and they are not the same:
+
+**Data with a merge path.** Perkaholic does not replace `perk.xml`. It ships
+`perk__perkaholic.xml` alongside it. Those files are row tables
+(`<database name="hammerheart"><table name="perk">` with typed columns), and
+the loader combines rows from every matching file. Vanilla ships **zero**
+`__suffixed` table files, confirming the suffix is a mod convention the loader
+supports rather than something copied from the game. Two perk mods can coexist.
+The community has built merge tools on top of this for the cases that do clash:
+KCDMerge, Letum's Mod Merger, Mod Merger, all of which work by matching row IDs
+and combining values.
+
+**Data with no merge path.** Mannequin animation databases are one XML document
+per character type. There is no row identity to match, no `__suffix`
+convention, and none of the merge tools handle `.adb`. Two mods that both add a
+fragment to `kcd_male_database.adb` cannot both win. The later one in
+`mod_order.txt` replaces the file outright and the other's changes vanish
+silently.
+
+That is the honest asymmetry. The mod is not unusually greedy, it is in the one
+data format the ecosystem has no answer for. Behavior trees, which the
+carried-item work would need, are in the same category.
+
+### SubADB: the engine supports splitting a database, and vanilla never uses it
+
+This is the finding that changes the options.
+
+Scanned all 28 vanilla `.adb` files: **zero** use `<SubADB>`. Easy to conclude
+from that alone that the fork dropped the feature. It did not. The strings are
+present in `WHGame.dll`:
+
+```
+SubADBs
+Loading subADB %s
+[CAnimationDatabaseManager::LoadDatabase] Unknown tags %s for subADB %s
+```
+
+Those are live code paths in `CAnimationDatabaseManager::LoadDatabase`,
+including a tag-validation error specific to sub-databases. The loader is
+implemented; the game simply never exercises it.
+
+**And the database is bound from Lua, not hardcoded.**
+`Scripts/Entities/actor/player.lua` sets:
+
+```lua
+ActionController = "Animations/Mannequin/ADB/kcd_male_controllerdefs.xml",
+AnimDatabase3P   = "Animations/Mannequin/ADB/kcd_male_database.adb",
+```
+
+Which raises a genuinely additive shape worth testing: a small parent `.adb`
+that declares the vanilla database and a mod fragment file as two SubADBs,
+with entities pointed at the parent. No vanilla animation file modified at all.
+
+Untested, and there are real unknowns: whether a SubADB can carry a whole
+database rather than a fragment subset, whether tag validation accepts it, and
+whether the entity property can be redirected without replacing `player.lua`
+and `BasicAI.lua`, which would only move the conflict rather than remove it.
+
+The cost of finding out is low, because animation data hot-reloads. This is
+exactly the kind of question that was expensive before that tooling existed.
+
+Recorded now so the option is not lost: **the current whole-database
+replacement is a choice, not a constraint.**
+
+---
+
+## Build 2.0.1-dev.15: SubADB loads
+
+**Hypothesis**: the Mannequin loader in this build supports sub-databases, so
+the mod's fragments can live in their own `.adb` and the vanilla database only
+needs a reference to it.
+
+Background is in the compatibility entry above: no vanilla `.adb` uses
+`<SubADB>`, but `WHGame.dll` carries `SubADBs`, `Loading subADB %s` and a
+subADB-specific tag error, and `SubADB` exists as a standalone string
+alongside `File` and `Tags`.
+
+### The build
+
+`build_adb.py --subadb` writes two files instead of one:
+
+- `hcm_male_stagger.adb`, 3,406 bytes, a complete `AnimDB` with the same
+  `FragDef` and `TagDef` as the parent and an `AnimationControlled`
+  `FragmentList` holding the four stagger options.
+- `kcd_male_database.adb`, vanilla plus **96 bytes**:
+
+```xml
+  <SubADBs>
+    <SubADB File="Animations/Mannequin/ADB/hcm_male_stagger.adb" />
+  </SubADBs>
+```
+
+Emitted without a `Tags` filter on purpose. The loader validates `Tags` against
+the tag definition, so an unfiltered reference is the case least likely to fail
+for a reason unrelated to the question.
+
+Compare that 96-byte diff with the roughly 3,200 bytes the inline splice adds.
+
+### Result: the engine loads it
+
+Reloaded into the running game with `--anim-reload --verbose`. Verbosity
+mattered: at the default the line does not appear at all, which made the first
+attempt read as a silent failure when it was a logging level.
+
+```
+[log] Loading subADB Animations/Mannequin/ADB/hcm_male_stagger.adb
+```
+
+No `Unknown tags ... for subADB` error accompanied it. The `Unknown tags`
+lines that do appear are the pre-existing vanilla noise for
+`CombatStealthAttackSuccess` and `CombatStealthHitSuccess` with `stealthLying*`
+tags, and their format is "for fragmentID", not "for subADB".
+
+**So the feature is live in this build despite no vanilla file using it.** Worth
+noting how close this came to a wrong negative: 28 vanilla databases using zero
+SubADBs is exactly the kind of complete-looking sample that justifies "the fork
+removed it".
+
+### The in-game control is built in
+
+The female database is still built with the options spliced inline, and only
+the male one uses the SubADB. So a single test separates the two cleanly:
+
+- Women stagger, men do not: SubADB parsed but its fragments did not resolve.
+- Both stagger: SubADB works end to end.
+- Neither: something unrelated broke.
+
+### Still to establish
+
+Loading is not the whole prize. The reference still lives inside a replaced
+`kcd_male_database.adb`, so this does not yet remove the conflict, it shrinks
+it from 5.5 MB of spliced XML to three lines another author could reapply by
+hand.
+
+Removing the conflict entirely needs the second half: a small parent `.adb`
+that declares *both* the vanilla database and the mod's file as SubADBs, with
+entities pointed at the parent. The database path is a Lua entity property,
+`AnimDatabase3P` in `Scripts/Entities/actor/player.lua`, so redirecting it does
+not require touching any animation file, though it would require touching
+`player.lua` and `BasicAI.lua` unless it can be set at runtime.
+
+Unknown, and the next thing to test: whether a SubADB can carry a whole
+database rather than a fragment subset.
+
+### Result: confirmed in game
+
+**User reported**: "both staggered."
+
+Men staggered from a fragment defined only in `hcm_male_stagger.adb`, reached
+through the `<SubADBs>` reference. Women staggered from the female database,
+which is still built with the options spliced inline and served as the control.
+
+**SubADB works end to end in KCD 1.9.7.** The fragments resolve, not merely the
+file being read, and they resolve through a mechanism no vanilla file uses.
+
+That settles the mechanism. What it changes:
+
+| | inline splice | SubADB |
+| --- | --- | --- |
+| diff against vanilla `kcd_male_database.adb` | ~3,200 bytes spliced into `FragmentList` | 96 bytes appended before `</AnimDB>` |
+| another animation mod's copy | mod's fragments vanish silently | three lines a person can reapply |
+| where the mod's content lives | inside a 5.5 MB vanilla file | its own 3.4 KB file |
+
+This does not yet remove the conflict. `kcd_male_database.adb` is still
+replaced, so load order still decides. It converts an unresolvable conflict
+into a trivially resolvable one, which is worth having on its own.
+
+### The remaining step, and its one unknown
+
+Full additivity needs the vanilla database left untouched entirely. The shape:
+
+```
+hcm_male_database.adb        tiny parent, two SubADB references
+  -> kcd_male_database.adb   vanilla, untouched, still in its pak
+  -> hcm_male_stagger.adb    the mod's fragments
+```
+
+with entities pointed at the parent instead of the vanilla file.
+
+Two things have to hold, and only the first is a genuine unknown:
+
+1. **Can a SubADB carry a whole database rather than a fragment subset?**
+   Nothing observed so far says no, but nothing tested says yes either.
+2. **Can `AnimDatabase3P` be redirected without replacing a vanilla file?**
+   It is a Lua entity-class property, set in
+   `Scripts/Entities/actor/player.lua` for the player and in the AI equivalents
+   for NPCs. Replacing those files would only move the conflict from an
+   animation database to a Lua script, which is better but not free. Setting it
+   from this mod's own Startup Lua before entities spawn would be free, and
+   this mod already runs Startup Lua. Untested.
+
+If both hold, the mod replaces **no vanilla file at all** and the animation
+conflict disappears rather than shrinking.
+
+---
+
+## Build 2.0.1-dev.16: a SubADB can carry a whole database
+
+**Hypothesis**: the loader will accept an entire animation database through a
+`<SubADB>` reference, not just a small fragment subset.
+
+**Setup.** The loose `kcd_male_database.adb` was replaced with a **341 byte**
+parent holding nothing but two references:
+
+```xml
+<AnimDB FragDef="..." TagDef="...">
+  <SubADBs>
+    <SubADB File="Animations/Mannequin/ADB/hcm_male_vanilla.adb" />
+    <SubADB File="Animations/Mannequin/ADB/hcm_male_stagger.adb" />
+  </SubADBs>
+</AnimDB>
+```
+
+`hcm_male_vanilla.adb` is a byte-for-byte copy of the vanilla 5.5 MB database.
+Shipping that copy is obviously not the end state; the point was to isolate one
+variable and leave the Lua redirect out of it.
+
+**User reported**: "men staggered and everyone is animating normally."
+
+**Result: confirmed.** The entire male animation set reached the game through
+two SubADB references, from a parent document containing no fragments of its
+own. Both loads were logged and no subADB error appeared.
+
+The second half of that report is the load-bearing one. Had the vanilla SubADB
+failed to merge, every male in the world would have lost their whole fragment
+set, which is not a subtle failure.
+
+### The warnings were a false alarm, and were checked rather than assumed
+
+The reload logs a batch of `Warning missing fragmentID` lines
+(`DiceGameStart`, `CorpseGrab`, `PickingHerbs`, and others), which read like
+the probe having broken something.
+
+Fingerprinted the full warning set under both the probe and the previous
+working build and diffed them:
+
+```
+missing fragmentID       total=14    unique=12
+unknown tags fragID      total=16    unique=2
+skipping unknown frag    total=103   unique=103
+invalid tag              total=16    unique=2
+```
+
+**Identical**, the extra `Loading subADB` line aside. All of it is vanilla's own
+noise. Worth the two minutes: the alternative was reporting a regression that
+was always there, which this project has done before.
+
+### Where this leaves the additive question
+
+Both unknowns from the previous entry are now settled in favour:
+
+1. SubADB works, and fragments defined only in a sub-database resolve.
+2. A SubADB can carry a whole database.
+
+One piece remains: pointing entities at a parent that references the
+**untouched** vanilla file inside its pak, rather than replacing
+`kcd_male_database.adb` with the parent. That is the difference between
+shrinking the conflict and removing it, and it is a Lua question rather than an
+animation one, since `AnimDatabase3P` is an entity-class property.
+
+---
+
+## Build 2.0.1-dev.17: fully additive animation deployment works
+
+**Hypothesis**: entities can be pointed at a small parent database that
+references the untouched vanilla file inside its own pak, so the mod overrides
+no vanilla animation file at all.
+
+**Setup.** Every loose `kcd_male_database.adb` override removed, so vanilla is
+served from `Animations-part1.pak`. In its place a new file:
+
+```
+hcm_male_database.adb   342 bytes
+  <SubADB File="Animations/Mannequin/ADB/kcd_male_database.adb" />   vanilla, from the pak
+  <SubADB File="Animations/Mannequin/ADB/hcm_male_stagger.adb" />    the mod's four options
+```
+
+Five male entity classes redirected at runtime through the remote console,
+confirmed by reading the property back:
+
+```
+NPC_x, NPC_NAI_x, NullAI_x, DummyTarget_x, Player
+  AnimDatabase3P = Animations/Mannequin/ADB/hcm_male_database.adb
+```
+
+Then a save load, because the property is read when an actor spawns and
+existing NPCs had already been built against the old value.
+
+**User reported**: "men staggered and everyone animating normally."
+
+**Result: confirmed.** The mod's fragments resolve, ordinary male animation is
+intact, and **not one vanilla animation file is overridden on the male path.**
+
+Worth stating what that changes. The compatibility entry above concluded that
+Mannequin databases have no merge path and that two mods touching human
+animations cannot coexist. That conclusion was correct about *replacement* and
+wrong as a limit. There is a supported way to add fragments without replacing
+anything, and it has now been demonstrated end to end.
+
+The chain of three results that got here, each of which could have been
+mistaken for a dead end:
+
+1. No vanilla `.adb` uses SubADB, but the loader is in `WHGame.dll`.
+2. SubADB resolves fragments, not just loads files.
+3. A SubADB can carry an entire database, and the database path is a Lua
+   entity-class property rather than something compiled in.
+
+### What is still replaced
+
+The male *database* path is clean. Three files are not yet:
+
+| File | Status |
+| --- | --- |
+| `kcd_male_database.adb` | **no longer overridden** |
+| `hcm_male_database.adb`, `hcm_male_stagger.adb` | new files, conflict with nothing |
+| `kcd_animationControlledTags.xml` | still a replacement, declares the four FragTags |
+| `wh_female_database.adb` | still a replacement, female side not yet converted |
+| `wh_female_fragmentids.xml` | still a replacement, declares the female fragment |
+
+The female side is unconverted on purpose: it was the control for this test.
+Converting it should be mechanical now.
+
+The two XML declaration files are the open question. Whether a sub-database can
+carry its own tag and fragment definitions, or whether those must be merged
+into the vanilla ones, has not been tested.
+
+### Deferred observations from this session
+
+Recorded now so they survive, not investigated yet at the user's direction.
+
+**Female staggers fire intermittently.** "Some of the woman stagger animations
+didn't fire and some did. It almost seemed random or maybe related to which
+side I hit them from."
+
+Not caused by the additive work: the female path was untouched in this test and
+still uses the inline splice. A side dependency would point at `GetImpactDir`
+and the four directional FragTags, where a direction that resolves to no
+matching option is dropped silently, which this diary records as the single
+most important failure mode in the project.
+
+**Speed tier misreported at gallop.** "Sometimes I'll be galloping full speed
+against someone and the animation/ragdoll don't fire and in the console it says
+it impacted them at walking speed but there's no way that's accurate."
+
+This is the same phenomenon as the earlier "gallop regression" entry, which was
+closed as not-a-bug on the grounds that the horse never exceeded 8.03 m/s
+against `SpeedGallop = 8.5`. That closure now looks premature. If the speed
+sampled at impact can read as walking pace during a full gallop, the telemetry
+that justified the tier boundaries is itself suspect, and so is the tuning
+derived from it. The likely suspect is when and how velocity is sampled
+relative to the impact rather than the thresholds themselves.
+
+Both belong to a tuning pass, after the deployment work.
+
+---
+
+## Build 2.0.1-dev.19: the declaration files go additive too
+
+**Hypothesis**: a SubADB entry's own `FragDef` is honoured rather than inherited
+from the parent, so the mod can bring its own fragment id and tag definitions
+under its own filenames and stop claiming vanilla ones.
+
+**Setup.** Three files, none of them a vanilla name:
+
+```
+hcm_male_stagger.adb        FragDef -> hcm_male_fragmentids.xml
+hcm_male_fragmentids.xml    AnimationControlled subTagDef -> hcm_animationControlledTags.xml
+hcm_animationControlledTags.xml   vanilla tags plus the four hcm_stagger_* tags
+```
+
+The `kcd_animationControlledTags.xml` override was deleted.
+
+**User reported**: "men staggered and everyone animating normally."
+
+**Result: confirmed.** The sub-database's own `FragDef` is used, the chain
+resolves through it, and the male path now overrides **no vanilla file at all**:
+
+```
+hcm_male_database.adb              342 bytes
+hcm_male_stagger.adb              3319 bytes
+hcm_male_fragmentids.xml         35505 bytes
+hcm_animationControlledTags.xml   1005 bytes
+```
+
+Against the shipped 2.0.0 layout, which replaced `kcd_male_database.adb`
+(5.5 MB) and `kcd_animationControlledTags.xml`.
+
+### The weakness, stated plainly
+
+`hcm_male_fragmentids.xml` and `hcm_animationControlledTags.xml` are **copies**
+of vanilla with additions, not references to it. The database got something
+strictly better: a genuine reference to the untouched file inside its pak.
+
+A copy never collides, which is the property being bought. A copy also cannot
+pick up another mod's additions, so it buys non-collision without buying
+composability. Two mods each shipping their own copy would each see their own
+additions and neither would see the other's.
+
+For this mod that is acceptable, because the only thing read out of those files
+is the `AnimationControlled` fragment and its FragTags, which nothing else is
+likely to extend. It would not be acceptable for a mod that needed to compose
+with others in the same tag group. Worth writing down so the limitation is not
+rediscovered as a surprise.
+
+Copies also go stale against a game patch. At 1.9.7 being the final build, that
+risk is close to zero here.
+
+### Still not converted
+
+The female side: `wh_female_database.adb` and `wh_female_fragmentids.xml` are
+still replacements. Kept deliberately as the control through all four probes,
+and mechanical to convert now that the male pattern is proven.
+
+### Third report of reactions not firing
+
+**User reported**: "Again noticing some of the reactions from all three speed
+categories are getting eaten or something."
+
+Escalating, and worth flagging as a real defect rather than tuning. Earlier in
+this session it was reported as intermittent female staggers, possibly
+direction-dependent. Now it is **all three speed tiers**, so it is not specific
+to the walk-tier interactive action, and not specific to women.
+
+The three tiers use two different mechanisms, the stagger being an interactive
+action and the knockdowns being a physics impulse, so a fault common to both
+points upstream of either: detection, the impact-direction resolution, or the
+per-victim cooldown.
+
+Related and probably the same root: a gallop impact reporting walking speed,
+recorded earlier this session. If the speed sampled at impact can be wrong,
+tier selection is wrong, and `HitCooldownMs = 3000` would then silently
+suppress the correct reaction that follows.
+
+Deferred at the user's direction, but this now looks like the most valuable
+thing to fix next, ahead of any tuning. The tuning numbers were derived from
+telemetry this defect would have corrupted.
+
+---
+
+## Build 2.1.0-dev.1: the additive layout as a real build
+
+First test of the additive deployment through the actual build pipeline rather
+than hand-assembled probe files, and the first with the female side converted.
+
+**User reported**: "both worked."
+
+Men and women both stagger, with the redirect performed by the mod itself
+rather than by console commands.
+
+### What ships now
+
+```
+hcm_animationControlledTags.xml   1005 B   FragTags, under a mod name
+hcm_female_database.adb            347 B   parent, two references
+hcm_female_fragmentids.xml       14082 B   declares AnimationControlled
+hcm_female_stagger.adb            3409 B   the four options
+hcm_male_database.adb              342 B   parent, two references
+hcm_male_fragmentids.xml         35505 B   AnimationControlled repointed
+hcm_male_stagger.adb              3406 B   the four options
+```
+
+Against 2.0.0, which shipped `kcd_male_database.adb` (5,555,221 B),
+`wh_female_database.adb` (962,471 B), `kcd_animationControlledTags.xml` and
+`wh_female_fragmentids.xml`.
+
+| | 2.0.0 | 2.1.0 |
+| --- | --- | --- |
+| download | 195,284 B | **24,366 B** |
+| content in the pak | 6.5 MB | 92 KB |
+| vanilla filenames claimed | 4 | **0** |
+
+Eight times smaller, and it stops redistributing 6.4 MB of Warhorse's own data.
+
+### The redirect
+
+`HorseCollisionMod.AnimationDatabases` maps seven entity classes to the two
+parent databases. `RedirectAnimationDatabases` runs at **file scope**, not from
+the load screen, because `AnimDatabase3P` is read when an actor spawns and the
+load screen ends after the world is already populated. It retries from the load
+screen for any class table that loaded late; the log reports `0 pending`, so all
+seven exist by the time a Startup script runs.
+
+Verified by reading the property back out of the running game:
+
+```
+NPC_x, NPC_NAI_x, NullAI_x, DummyTarget_x, Player -> hcm_male_database.adb
+NPC_Female_x, PlayerFemale                        -> hcm_female_database.adb
+```
+
+### Build guard
+
+`build.ps1` now fails if any file under a name not beginning `hcm_` would ship.
+A leftover from a `--replace` build would silently defeat the entire layout
+without changing a single line the build prints, and that class of silent
+override has cost this project several sessions already.
+
+### Not yet verified: the pak path
+
+**Everything above was tested with loose files.** `system.cfg` on the
+development machine carries `sys_PakPriority = 0`, so the file system is
+searched before the paks. A player has the shipped default of `2`, pak only,
+where loose files are ignored entirely.
+
+This is not a theoretical gap. This diary records a build where the mod pak
+stored Windows path separators, so CryEngine looked entries up by a path that
+did not match and the pak silently overrode nothing, while the same files
+deployed loose worked correctly. Startup Lua still ran, because that folder is
+enumerated rather than looked up by path, which is what made it so slow to
+find.
+
+The additive layout is more exposed to that class of failure than the old one,
+not less, because it depends on paths resolving in three places rather than
+one: the `SubADB File` attributes, the `FragDef` and `subTagDef` references, and
+the `AnimDatabase3P` property. Every one of those is a path the engine has to
+resolve out of a pak.
+
+Not merging until a packaged build is tested at `sys_PakPriority = 2`.
+
+---
+
+## Build 2.1.0: the additive layout FAILS in a player configuration
+
+**Hypothesis**: the additive layout, verified across five builds with loose
+files, also works from inside a pak in a shipping configuration.
+
+**Setup.** As close to a player as the machine gets:
+
+```
+sys_PakPriority = 2                        shipping default, paks only
+mn_allowEditableDatabasesInPureGame = 0    shipping default
+no loose files at all                      the pak is the only source
+launched KingdomCome.exe directly          no -devmode
+```
+
+**User reported**: "both women and men had the single frame glitched animation
+snap back behavior."
+
+**Result: it does not work.** That signature is precisely documented in this
+diary as *a valid call with no matching option*: the action is accepted, the
+pose visibly begins, and it reverts within one frame because
+`StartInteractiveActionByName` found no option matching the FragTags. The
+mod's fragments are not being seen.
+
+Everything in this session up to here was verified with loose files at
+`sys_PakPriority = 0` and `mn_allowEditableDatabasesInPureGame = 1`. Not one of
+those results transferred.
+
+### My testing was badly designed and that cost the answer
+
+Four variables changed at once between the last passing test and this failing
+one: pak priority, the Mannequin CVar, loose versus packed, and dev mode. A
+failure with four simultaneous changes says only that something in the set is
+responsible.
+
+The correct approach was one variable at a time, and it was available: the
+whole session had already established that the hot-reload loop makes single
+changes cheap. Recording this because the same mistake would otherwise be made
+again, and because the earlier `ColliderMode` conclusion in this project failed
+for the same reason - a change plus an outcome, with no control.
+
+### The suspects, in order
+
+1. **`mn_allowEditableDatabasesInPureGame = 0`.** The strongest candidate. This
+   CVar already has form: it is why `mn_reload` appeared to be a no-op for a
+   whole session. If the "pure game" path assembles databases differently, for
+   instance from a precompiled or cached form that never processes `<SubADBs>`,
+   then SubADB works only in a development configuration and is useless for
+   shipping. Every additive test in this session ran with it at 1.
+
+2. **Pak path resolution.** The additive layout resolves paths in three places
+   the old one did not: `SubADB File`, `FragDef` and `subTagDef` references, and
+   `AnimDatabase3P`. Pak entry names were verified to use forward slashes, which
+   rules out the specific bug this project hit before, but not the general class.
+
+3. **Dev mode.** Least likely. It gates `VF_CHEAT` console commands, and nothing
+   in the load path obviously depends on it.
+
+### What this means for shipping
+
+**2.1.0 must not be published, and must not merge to main as the default
+layout.** Whatever the cause, in the only configuration that matters the mod
+currently does nothing at all.
+
+`build_adb.py --replace` still builds the 2.0.0 layout, which is known to work
+in a player configuration because it is what shipped. That is the fallback if
+the cause turns out to be unfixable.
+
+Next: isolate. `mn_allowEditableDatabasesInPureGame` back to 1, changing
+nothing else, still packed and still without dev mode.
+
+---
+
+## Build 2.1.0-dev.5: the canary, and how SubADB merging actually works
+
+Three cold-start failures in a row, each with every file demonstrably loading,
+so the question became whether the mod's options ever reach the fragment at
+all. The diary records the technique that settles it: build 2.0.0-dev8 used a
+canary that repointed a vanilla tag at a stagger clip.
+
+**Setup.** One extra option was added to the mod's sub-database carrying the
+**vanilla** FragTag `cabinet_o`, pointing at a stagger clip instead of the
+cabinet animation. Because that tag is declared in vanilla's tag file and in the
+mod's, tag declaration stops being a variable. The mod was temporarily made to
+ask for `cabinet_o`. Sub-database order at the time: the mod's file first,
+vanilla's second.
+
+**User reported**: "so women remain with single frame glitched but the cupboard
+animation fires on men."
+
+Two separate results, both valuable.
+
+### Men: the later sub-database replaces the fragment, it does not merge
+
+The men played vanilla's cabinet animation, not the mod's clip. So vanilla's
+`cabinet_o` option won while vanilla's sub-database was listed **second**.
+
+That is the answer to the whole failure. **When two sub-databases define the
+same fragment id, the later one replaces it outright. Options are not merged.**
+
+Every earlier symptom follows from it. With vanilla listed last, its 32-option
+`AnimationControlled` fragment replaced the mod's entirely, so the four
+`hcm_stagger_*` options were simply absent, and every call against them
+resolved to nothing. That is the one-frame snap back, and it produces no error
+because `StartInteractiveActionByName` returns success either way.
+
+It also explains why the loader has to be given the mod's file last **and** that
+file has to carry vanilla's own options, or redirected NPCs lose every door,
+cabinet and wardrobe interaction in the game. The cost of carrying them is
+modest: the `AnimationControlled` fragment is 68,966 bytes, **1.24% of the
+5.5 MB database**.
+
+### Women: the female parent database is never loaded at all
+
+The log lists exactly two sub-database loads, both male:
+
+```
+Loading subADB Animations/Mannequin/ADB/hcm_male_stagger.adb
+Loading subADB Animations/Mannequin/ADB/kcd_male_database.adb
+```
+
+No `hcm_female_stagger.adb`, no `wh_female_database.adb`. The female parent was
+never opened, even though `NPC_Female_x.lua` loads and the redirect reports all
+seven classes claimed with none pending.
+
+So the female failure is a different bug from the male one and was masked by it.
+Unresolved: whether female NPCs are actually instances of `NPC_Female_x`, or
+whether some other class serves them and is not in the redirect table.
+
+### What was wrong with the earlier attempts, in order
+
+Worth listing, because each looked like a complete explanation at the time:
+
+1. **Parent `FragDef` pointed at vanilla's fragment ids.** Real, and fixed. The
+   parent's FragDef is what the loader validates FragTags against, and vanilla's
+   chain does not declare `hcm_stagger_*`. Fixing it removed the `Unknown tags`
+   errors and changed nothing visible, because the next fault was still ahead.
+2. **`ActionController` still pointed at vanilla's controller def.** Also real,
+   also fixed. The controller def owns the fragment and tag definitions an
+   entity resolves names through at runtime; a database's FragDef governs
+   load-time validation only. Fixing it changed nothing visible either.
+3. **Sub-database ordering.** Tested both ways before understanding the
+   semantics, which is why neither order worked: one loses the mod's options,
+   the other loses vanilla's.
+
+All three were genuine defects. None was sufficient alone, which is why each
+fix produced no visible change and looked like a dead end.
+
+---
+
+## Build 2.1.0: additive deployment WORKS, and the real root cause
+
+**User reported**: "both men and women staggered! Seemed to work great."
+
+Packed, `sys_PakPriority = 2`, cold start, no dev mode, no loose files. The mod
+overrides **no vanilla file at all**.
+
+### The root cause, after five failed cold starts
+
+Entity classes are built from templates, and the template is not what spawns:
+
+```lua
+-- Scripts/Entities/AI/NPC.lua
+NPC = CreateAI(NPC_x);
+
+-- Scripts/Entities/AI/Shared/BasicAI.lua
+function CreateAI(child)
+    local newt = {}
+    mergef(newt, child, 1);   -- copies the fields
+```
+
+`NPC_x` is a template. `CreateAI` builds a fresh table and **copies** fields
+into it, so the live class holds a snapshot of `AnimDatabase3P` and
+`ActionController` taken when its script loaded. A Startup script mutating
+`NPC_x` afterwards changes nothing about what spawns.
+
+Every NPC was on the stock animation chain for five test cycles.
+
+**Why it hid so effectively.** `Player` is declared directly as a table rather
+than through `CreateAI`, so redirecting it genuinely worked. That made the
+mod's own controller def and sub-databases load and appear in the log, which
+read as proof the redirect worked. It only ever proved the *player's* redirect
+worked. It also explains why `hcm_female_database.adb` never loaded at all:
+`PlayerFemale` does not spawn in normal play and `NPC_Female` was never
+redirected.
+
+**The mistake.** `Redirected 7 animation databases, 0 pending` was treated as
+evidence the redirect had taken effect. It is only evidence the property was
+written. Those are different claims and the second was never checked. The cheap
+test skipped was querying a *spawned NPC's* database rather than the class
+table just written to. This project has a standing rule about proving a signal
+works before drawing conclusions from it, and this is the third time in one
+session it was broken.
+
+### The three earlier fixes were all real, and all invisible
+
+Each was a genuine defect in code that was never being reached, which is why
+none changed the symptom:
+
+1. The parent's `FragDef` pointed at vanilla's fragment ids, so `hcm_stagger_*`
+   was undeclared at load-time validation.
+2. `ActionController` was not redirected, so runtime name resolution used
+   vanilla's tag chain. A database's `FragDef` governs validation only.
+3. Sub-databases do not merge options into a fragment another one defines. The
+   mod's `AnimationControlled` has to be authoritative and carry vanilla's own
+   options, or redirected NPCs lose every door, cabinet and wardrobe
+   interaction.
+
+Fixing plumbing downstream of a closed valve produces identical symptoms every
+time, which is exactly what a chain of dependent defects looks like from the
+outside.
+
+### What ships
+
+```
+hcm_animationControlledTags.xml    1005 B   16 vanilla tags + 4 of ours
+hcm_female_controllerdefs.xml     22798 B
+hcm_female_database.adb            3507 B   4 options + SubADB to vanilla
+hcm_female_fragmentids.xml        14082 B   declares AnimationControlled
+hcm_male_controllerdefs.xml       87818 B
+hcm_male_database.adb             72468 B   30 vanilla + 4 options, SubADB to vanilla
+hcm_male_fragmentids.xml          35505 B
+Scripts/Startup/HorseCollisionMod.lua
+```
+
+Verified against vanilla: all 16 `AnimationControlled` tags present plus the
+mod's 4, and all 30 vanilla options present plus the mod's 4. Nothing dropped.
+
+| | 2.0.0 | 2.1.0 |
+| --- | --- | --- |
+| vanilla files replaced | 4 | **0** |
+| `kcd_male_database.adb` | 5,555,221 B shipped | untouched in its pak |
+| `wh_female_database.adb` | 962,471 B shipped | untouched in its pak |
+
+### Open, not investigated
+
+**A beggar in Rattay stood instead of kneeling.** Reported as "may or may not be
+a thing." Checked and not explained by the fragment replacement: nothing
+beggar-related lives in `AnimationControlled`, and no vanilla tag or option is
+missing from the mod's copy. Candidates are the controller def copy, the
+fragment id copy, or the NPC's schedule being unrelated to the mod entirely.
+Needs a controlled comparison against a run with the mod disabled before
+anything is concluded.
+
+### A Vortex install test that used the wrong build
+
+Reported: installing `v2.1.0-dev.1.zip` through Vortex produced no staggers,
+only the one-frame glitch.
+
+That build is from 12:00 and the working one is from 17:10. It predates every
+fix: no `ActionController` redirect, no exposed-class redirect, and it still
+used the separate `hcm_<set>_stagger.adb` files whose options a parent
+overrides. Any one of those alone produces exactly that symptom, and all three
+were missing. The result says nothing about the current build.
+
+The cause is a release directory holding **49 zips**, thirteen of them named
+`2.0.1-dev.*` or `2.1.0-dev.1`, with no indication which was current. Everything
+superseded is now under `releases/archive/`, leaving only 2.0.0 and 2.1.0 where
+they can be picked up by hand.
+
+Worth generalising: intermediate builds from a debugging session are a hazard
+once the session ends, because the only thing distinguishing a working build
+from a broken one is a timestamp nobody checks.
+
+### The beggar, and a confound in the control
+
+Reported earlier: a beggar in Rattay stood instead of kneeling with the mod
+installed. A control run with the mod removed entirely, same save, had him
+kneeling.
+
+Structurally the mod does not explain it. `Beggar`, `BeggarOut` and `BeggarVAR`
+are fragment ids preserved verbatim in the mod's fragment id copy, their
+fragments live in the vanilla database and are reached through the SubADB
+reference like every other working animation, and the mod's controller def
+differs from vanilla by exactly one line, the `Fragments` filename.
+
+**The control has a confound.** In the mod-on run the player had been riding
+around for some time; in the control the save was loaded and the beggar observed
+straight away. Beggars follow a daily schedule, so elapsed in-game time was not
+held constant between the two runs.
+
+A protocol that would settle it: load the save, observe immediately, quit. Then
+change exactly one variable and repeat with the same elapsed time. Until that is
+done this is an open question rather than a known regression, and it should not
+be recorded as either.
+
+---
+
+## Build 2.1.0 (second design): the beggar, and why the copies had to go
+
+**User reported**, after a proper Vortex install of the working build: staggers
+and ragdolls all fine, but Rattay's beggar stands instead of kneeling. He still
+plays the barks that belong to the begging animation. Waiting in game did not
+restore it. Same save on pure vanilla, he begs.
+
+Barks playing without the animation is the same signature as the stagger
+failure: the behaviour runs, requests a fragment, and Mannequin resolves it to
+nothing.
+
+### Why the mod was in that path at all
+
+The beggar animation has nothing to do with this mod. It resolves through the
+fragment ids `BeggarIn`, `BeggarGive` and `BeggarTake`, whose subTagDef is
+`kcd_beggar_tags.xml`. Vanilla's `AnimationControlled` fragment, the only one
+this mod touches, contains nothing beggar-related: its 30 options are doors,
+cabinets, wardrobes and one alarm bell.
+
+But the first 2.1.0 design shipped **copies** of two large vanilla files:
+
+```
+hcm_male_fragmentids.xml     35 KB
+hcm_male_controllerdefs.xml  88 KB
+```
+
+They existed for one reason: to make a tag file named `hcm_*` reachable. The
+controller def had to point at the ids copy, and the ids copy at the tag file.
+And because `ActionController` was redirected to that copy, **every fragment a
+human uses resolved through files this mod restated**, not just its own.
+
+123 KB of vanilla data restated under mod names, sitting in the resolution path
+of animations the mod has no interest in. The beggar is what noticed.
+
+### The design that replaces it
+
+Ship the tag additions under **vanilla's own name** instead:
+
+```
+hcm_male_database.adb            72 KB   parent, 30 vanilla options + 4 added
+hcm_female_database.adb           3 KB   parent, 4 added
+kcd_animationControlledTags.xml   1 KB   16 vanilla tags + 4 added
+wh_female_fragmentids.xml        14 KB   declares AnimationControlled
+```
+
+`ActionController` is no longer redirected at all. Entities stay on vanilla's
+controller def, which reaches vanilla's fragment ids, which reach
+`kcd_animationControlledTags.xml` - the one small file this mod extends. Every
+other fragment resolves through vanilla's own path, untouched.
+
+The trade, stated plainly: this claims two vanilla filenames totalling 15,087
+bytes, where the previous design claimed none. Against that, it stops
+restating 123 KB of vanilla definitions and stops interposing itself in
+unrelated animations. Fifteen kilobytes of declarations is a far smaller thing
+to own, and small enough that another author can merge it by hand in a minute.
+The property that actually mattered is intact: **the 6.4 MB of animation
+databases are still referenced, never replaced.**
+
+### The general lesson
+
+"Replaces no vanilla file" turned out to be the wrong thing to optimise for.
+Avoiding a filename by restating the file under another name does not reduce
+what the mod owns, it just moves it, and it can widen the blast radius: the
+copies were in the path of every human animation rather than one fragment.
+
+What matters is **how much of the game's behaviour travels through code the mod
+restated**. By that measure the second design is strictly better despite
+claiming two names, and the first design was worse than 2.0.0 in one respect
+that nobody would have predicted from its file list.
+
+### Also fixed
+
+A Vortex install test earlier in the day used `v2.1.0-dev.1.zip`, five hours
+older than the working build and missing every fix, because `releases/` held 49
+zips with nothing marking which was current. Everything superseded is now under
+`releases/archive/`.
+
+### Result: the second design works
+
+**User reported**, installed through Vortex: "the beggar animation is back and
+staggers and ragdolls firing as they should."
+
+The additive deployment is confirmed working from a real user install: staggers
+and knockdowns for both character sets, and no regression in unrelated
+animations. The design is settled.
+
+### Three observations about the beggar, which are not deployment issues
+
+Reported alongside: the stagger did not fire on the beggar while he was in his
+begging pose; a gallop knockdown left him standing and walking away rather than
+returning to begging; and after a reload neither reaction fired on him at all.
+
+None of these is about the animation layout. Taken in turn.
+
+**Reactions not firing while he is in the begging pose.** The detection log
+shows the mod does see him. `IsInHorseFootprint` only logs when its test
+passes, and this run logged 53 accepted candidates against 14 impacts. The
+candidates immediately before the beggar tests carry `dz=-0.48`, `-0.76` and
+`-0.72`, against a typical `-0.04` to `-0.14` for a standing NPC, which is what
+a kneeling one looks like: his origin sits much lower.
+
+`HorseMaxVerticalDiff` is 2.35 so the height is not what rejects him. The
+narrow gate is `HorseHalfWidth = 0.35`, a footprint 0.7 m wide in total, and
+`HitCooldownMs = 3000` accounts for most of the 53-to-14 gap because an NPC
+stays inside the footprint for many ticks after being hit.
+
+This looks like the same defect already recorded twice this session: reactions
+being eaten across all three speed tiers, and a gallop impact once reporting
+walking speed. It belongs to that investigation, not to this one.
+
+**Knocked down, then walking away instead of resuming.** Almost certainly
+correct behaviour rather than a bug. The vanilla `Hit` state posts
+`daycycle:restartRequest`, which is precisely "abandon what you were doing".
+An NPC ridden down at a gallop giving up on begging is what the game does to
+its own NPCs.
+
+**The stagger specifically not firing while he is mid-pose.** An NPC already
+running an interactive action very likely cannot be given a second one.
+`StartInteractiveActionByName` returns success either way, so this would look
+identical to every other silent failure in this project. Untested, and worth
+knowing before any attempt to "fix" it: refusing to interrupt a scripted
+activity may well be the right behaviour.
+
+All three are deferred to the reaction-reliability work, which is now the
+largest open item in the project.

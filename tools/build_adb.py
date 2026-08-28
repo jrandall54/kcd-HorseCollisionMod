@@ -1,35 +1,46 @@
-"""Generates the modded animation data for the walk-speed stagger.
+"""Generates this mod's animation data.
 
 `actor:StartInteractiveActionByName(name, ...)` resolves `name` against the
 FragTags of exactly one fragment, `AnimationControlled`. Vanilla ships 30
 options there and every one is an object interaction (cabinet_o, alarmBell,
-door_*), which is why calling it with a hit-reaction name acquired the NPC's
-body and then aborted within a frame - a valid call with no matching option.
+door_*), so calling it with a hit-reaction name acquires the NPC's body and
+aborts within a frame: a valid call with no matching option.
 
-Build 2.1.0-dev6 proved the mechanism holds: NPCs played cabinet_o and
-alarmBell in full and returned to normal behavior afterwards. Build dev8
-proved a modded database really is loaded from a mod pak, using a canary that
-repointed cabinet_o at a stagger clip.
+Before 2.1.0, adding an option meant shipping a modified copy of the 5.5 MB
+vanilla database under its own name. Two mods cannot both do that: the later
+one in mod_order.txt wins and the other's changes vanish with no error.
 
-Four files are generated and must all ship together:
+Four files are generated now, and the two large databases are referenced
+rather than replaced:
 
-1. kcd_male_database.adb - adds our options to `AnimationControlled`, each
-   pointing at a standing hit-reaction clip the game already contains. The
-   hitreaction_idle_* clips are non-additive full-body reactions, so they read
-   as a stagger on their own; the combat_hit_small_*_add clips are additive
-   and expect a base pose underneath.
+  hcm_<set>_database.adb           the parent, and the authoritative
+                                   definition of AnimationControlled. Carries
+                                   vanilla's own options plus this mod's, and
+                                   references the untouched vanilla database
+                                   as a SubADB for every other fragment.
+  kcd_animationControlledTags.xml  vanilla's 16 FragTags plus this mod's 4.
+  wh_female_fragmentids.xml        declares AnimationControlled for the
+                                   women, who have no such fragment at all.
 
-2. kcd_animationControlledTags.xml - the fragment's subTagDef, declared at
-   kcd_male_fragmentids.xml line 131. **A FragTags value is inert unless it is
-   declared here.** Missing this is why dev8's hcm_* options still aborted
-   after one frame while the repointed vanilla cabinet_o played correctly.
+The last two keep vanilla's names deliberately. Giving them mod names means
+restating the fragment id and controller definitions, 123 KB of vanilla data,
+and putting this mod in the resolution path of every human animation rather
+than just its own, which is what broke unrelated animations in an earlier
+layout. Owning 15 KB of declarations is the smaller thing to own.
 
-3. wh_female_fragmentids.xml - the women have the same hit-reaction clips but
-   no `AnimationControlled` fragment at all, so it has to be declared before
-   anything can be added to it. It reuses the same subTagDef as the men.
+HorseCollisionMod.lua then points the human entity classes' AnimDatabase3P
+at the parent. ActionController is deliberately left alone.
 
-4. wh_female_database.adb - the fragment block itself, added wholesale since
-   the female database has no existing one to append to.
+Three conditions have to hold at once. See
+TESTING_DIARY.md, builds 2.0.1-dev.15 through 2.1.0.
+
+1. The parent must be the one defining AnimationControlled. Sub-databases do
+   not merge options into a fragment another database already defines.
+2. The parent must therefore carry vanilla's options too, or redirected NPCs
+   lose every door, cabinet and wardrobe interaction in the game.
+3. The classes redirected must be the ones the engine spawns. NPC_x is a
+   template; NPC = CreateAI(NPC_x) copies its fields, so redirecting the
+   template changes nothing about what spawns.
 
 Run: python tools/build_adb.py
 """
@@ -154,18 +165,10 @@ def find_game_root():
 
 GAME_ROOT = find_game_root()
 PAK = os.path.join(GAME_ROOT, PAK_RELATIVE)
-ADB_ENTRY = "Animations/Mannequin/ADB/kcd_male_database.adb"
-TAGS_ENTRY = "Animations/Mannequin/ADB/kcd_animationControlledTags.xml"
 
-# Female NPCs need more work than the men. Their database has the same
-# hitreaction clips, but wh_female_fragmentids.xml never declares an
-# AnimationControlled fragment at all, so there is nothing for
-# StartInteractiveActionByName to resolve against. Without this the call is
-# accepted and aborts after one frame, which reads in game as a brief twitch.
-# Both files therefore have to be patched: the fragment declared, and the
-# fragment block added to the database.
-FEM_ADB_ENTRY = "Animations/Mannequin/ADB/wh_female_database.adb"
-FEM_IDS_ENTRY = "Animations/Mannequin/ADB/wh_female_fragmentids.xml"
+# The subTagDef for the AnimationControlled fragment. This mod ships its own
+# version of this file, under this same name, with four tags added.
+TAGS_ENTRY = "Animations/Mannequin/ADB/kcd_animationControlledTags.xml"
 
 # Output lands in mod_assets/ at the repository root, never in the working
 # directory. This script lives in tools/ and is run both directly and by
@@ -173,10 +176,31 @@ FEM_IDS_ENTRY = "Animations/Mannequin/ADB/wh_female_fragmentids.xml"
 # happened to be invoked from.
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(REPO_ROOT, "mod_assets", "Animations", "Mannequin", "ADB")
-ADB_OUT = os.path.join(OUT_DIR, "kcd_male_database.adb")
-TAGS_OUT = os.path.join(OUT_DIR, "kcd_animationControlledTags.xml")
-FEM_ADB_OUT = os.path.join(OUT_DIR, "wh_female_database.adb")
-FEM_IDS_OUT = os.path.join(OUT_DIR, "wh_female_fragmentids.xml")
+
+# Every vanilla file this reads, per character set. All three are read only.
+#
+#   db    the stock animation database, referenced from the mod's parent as a
+#         SubADB so it is never copied or replaced
+#   ids   the fragment id definitions, copied so AnimationControlled can be
+#         pointed at the mod's tag file
+#   ctrl  the controller def, copied so the ids copy above is what entities
+#         resolve names through at runtime
+#   tags  the character set's tag definitions, referenced unchanged
+GENDERS = {
+    "male": {
+        "db": "Animations/Mannequin/ADB/kcd_male_database.adb",
+        "ids": "Animations/Mannequin/ADB/kcd_male_fragmentids.xml",
+        "tags": "Animations/Mannequin/ADB/kcd_male_tags.xml",
+        "ctrl": "Animations/Mannequin/ADB/kcd_male_controllerdefs.xml",
+    },
+    "female": {
+        "db": "Animations/Mannequin/ADB/wh_female_database.adb",
+        "ids": "Animations/Mannequin/ADB/wh_female_fragmentids.xml",
+        "tags": "Animations/Mannequin/ADB/wh_female_tags.xml",
+        "ctrl": "Animations/Mannequin/ADB/wh_female_controllerdefs.xml",
+    },
+}
+
 
 # FragTags name -> clip. The direction suffix matches what the Lua sends,
 # which is GetImpactDir's so_* result with "so_" stripped, hence "forward"
@@ -193,20 +217,27 @@ STAGGERS = [
     ("hcm_stagger_right", "hitreaction_idle_medium_torso_stab_right"),
 ]
 
-# Collider mode held for the duration of the stagger.
+# Collider mode held for the duration of the stagger, or None to declare no
+# ColliderMode layer at all.
 #
-# The vanilla object-interaction options all use "Interactive", which keeps
-# the actor solid. That is right for someone standing at a cabinet and wrong
-# here: it makes the horse snag on a victim who is mid-stagger and cannot step
-# aside, which reads as getting stuck inside them. "Disabled" lets the horse
-# continue through for the second or so the animation lasts.
+# Build 2.0.0 shipped "Disabled" on the theory that it would stop the horse
+# snagging on a victim who is mid-stagger and cannot step aside. It did not,
+# and it is a departure from vanilla: the clips these options play live on the
+# HitDeath fragment in the stock database, and neither of the two options
+# there declares a ColliderMode layer. Disabling an actor's colliders while a
+# physicalized item is attached to their hand is the leading explanation for
+# NPCs dropping baskets and buckets when they stagger.
 #
-# Set back to "Interactive" if the pass-through looks worse than the snag.
-COLLIDER_MODE = "Disabled"
+# None therefore matches vanilla. Set to "Disabled" or "Interactive" only with
+# an in-game result to justify it.
+COLLIDER_MODE = None
 
-# Modeled on the vanilla cabinet_o option, minus the object-alignment,
-# camera and hand-usage layers, which only make sense against a physical
-# object. MovementControlMethod is kept so the animation drives the body.
+# Modeled on the vanilla HitDeath option that plays these same clips
+# (FragTags "so_forward+minor_hit"), rather than on an object interaction.
+# The camera layer is dropped because it aims the player's camera and the
+# victim here is never the player. MovementControlMethod is added so the
+# animation drives the body, which an interactive action needs and a natively
+# triggered hit reaction does not.
 TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
         <AnimLayer>
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
@@ -225,16 +256,18 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
               <Inertia value="0" />
             </ProceduralParams>
           </Procedural>
-        </ProcLayer>
+        </ProcLayer>{collider}
+      </Fragment>"""
+
+COLLIDER_LAYER = """
         <ProcLayer>
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
           <Procedural type="ColliderMode">
             <ProceduralParams>
-              <ColliderMode value="{collider}" />
+              <ColliderMode value="%s" />
             </ProceduralParams>
           </Procedural>
-        </ProcLayer>
-      </Fragment>"""
+        </ProcLayer>"""
 
 
 def read_pak_entry(pak, entry):
@@ -272,119 +305,175 @@ def newline_of(text):
     return "\n"
 
 
-def write_database():
-    raw = read_pak_entry(PAK, ADB_ENTRY).decode("ascii", "replace")
-    nl = newline_of(raw)
+def render_option(tags, clip, nl):
+    """Renders one Fragment option with the file's own line endings."""
+    collider = ""
 
-    # Every referenced clip must already exist, otherwise the option resolves
-    # to nothing silently - the exact failure mode this project spent a dozen
-    # builds chasing.
-    present = set(re.findall(r'<Animation name="([^"]*)"', raw))
-    missing = [clip for _, clip in STAGGERS if clip not in present]
+    if COLLIDER_MODE:
+        collider = COLLIDER_LAYER % COLLIDER_MODE
 
-    if missing:
-        raise SystemExit("clips absent from the database: %s" % missing)
+    option = TEMPLATE.format(tags=tags, clip=clip, collider=collider)
 
-    block = re.search(
-        r"\n    <AnimationControlled>(.*?)\n    </AnimationControlled>", raw, re.S)
-
-    if not block:
-        raise SystemExit("AnimationControlled fragment not found")
-
-    added = nl.join(
-        TEMPLATE.format(tags=tags, clip=clip, collider=COLLIDER_MODE).replace("\n", nl)
-        for tags, clip in STAGGERS)
-    anchor = nl + "    </AnimationControlled>"
-    patched = raw.replace(anchor, nl + added + anchor, 1)
-
-    if patched == raw:
-        raise SystemExit("database insertion anchor not matched")
-
-    with io.open(ADB_OUT, "wb") as handle:
-        handle.write(patched.encode("ascii"))
-
-    before = len(re.findall(r"<Fragment", block.group(1)))
-    print("AnimationControlled options: %d -> %d" % (before, before + len(STAGGERS)))
-
-    for tags, clip in STAGGERS:
-        print("  + %-22s -> %s" % (tags, clip))
-
-    print("wrote %s (%d bytes)" % (ADB_OUT, os.path.getsize(ADB_OUT)))
+    return option.replace("\n", nl)
 
 
-def write_tags():
+def out(name):
+    """Path of a generated file in mod_assets."""
+    return os.path.join(OUT_DIR, name)
+
+
+def write_shared_tags(nl):
+    """Adds the stagger FragTags to the AnimationControlled tag definition.
+
+    Written under vanilla's own name, deliberately.
+
+    The alternative, shipping it as hcm_animationControlledTags.xml, means
+    every entity has to be pointed at a copy of the fragment id file to reach
+    it, and that file at a copy of the controller def. Those two copies are
+    123 KB of vanilla data restated under mod names, and they sit in the
+    resolution path of every fragment a human uses, not just this mod's.
+    An earlier layout did that, and unrelated animations stopped playing: the
+    beggar's kneeling resolves through BeggarIn and kcd_beggar_tags.xml,
+    nothing to do with this mod, but it travels through the same copied
+    files.
+
+    Replacing 1 KB of tag names is a far smaller thing to own than restating
+    the whole fragment and controller definitions, and it leaves every
+    unrelated animation on vanilla's own path.
+    """
     raw = read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace")
-    nl = newline_of(raw)
 
     group = ['    <Group name="HcmReaction">']
-    group = group + ['      <Tag name="%s" />' % tags for tags, _ in STAGGERS]
-    group = group + ["    </Group>"]
+    group += ['      <Tag name="%s" />' % tags for tags, _ in STAGGERS]
+    group += ["    </Group>"]
 
     anchor = nl + "  </Tags>"
     patched = raw.replace(anchor, nl + nl.join(group) + anchor, 1)
 
     if patched == raw:
-        raise SystemExit("tag insertion anchor not matched")
+        raise SystemExit("shared tag anchor not matched")
 
-    with io.open(TAGS_OUT, "wb") as handle:
+    name = TAGS_ENTRY.rsplit("/", 1)[-1]
+
+    with io.open(out(name), "wb") as handle:
         handle.write(patched.encode("ascii"))
 
-    print("wrote %s (%d tags declared)" % (TAGS_OUT, len(STAGGERS)))
+    print("  tags   %s (%d B, %d vanilla + %d added)"
+          % (name, os.path.getsize(out(name)),
+             raw.count("<Tag "), len(STAGGERS)))
 
 
-def write_female():
-    """Adds an AnimationControlled fragment to the female character set."""
-    ids = read_pak_entry(PAK, FEM_IDS_ENTRY).decode("ascii", "replace")
-    nl = newline_of(ids)
+def write_female_declaration(paths, nl):
+    """Declares AnimationControlled for the women, who have no such fragment.
 
-    if "AnimationControlled" not in ids:
-        declaration = ('    <Tag name="AnimationControlled" subTagDef="%s" />'
-                       % TAGS_ENTRY)
-        anchor = nl + "  </Tags>"
-        ids = ids.replace(anchor, nl + declaration + anchor, 1)
+    Also under vanilla's name. The men already declare it and need no change
+    here at all.
+    """
+    ids = read_pak_entry(PAK, paths["ids"]).decode("ascii", "replace")
 
-        if anchor not in ids:
-            raise SystemExit("female fragmentids anchor not matched")
+    if "AnimationControlled" in ids:
+        raise SystemExit("the female fragment ids already declare it; "
+                         "this patch is no longer needed")
 
-    with io.open(FEM_IDS_OUT, "wb") as handle:
-        handle.write(ids.encode("ascii"))
+    declaration = ('    <Tag name="AnimationControlled" subTagDef="%s" />'
+                   % TAGS_ENTRY)
+    anchor = nl + "  </Tags>"
+    patched = ids.replace(anchor, nl + declaration + anchor, 1)
 
-    raw = read_pak_entry(PAK, FEM_ADB_ENTRY).decode("ascii", "replace")
-    nl = newline_of(raw)
+    if patched == ids:
+        raise SystemExit("female fragment ids anchor not matched")
 
-    present = set(re.findall(r'<Animation name="([^"]*)"', raw))
+    name = paths["ids"].rsplit("/", 1)[-1]
+
+    with io.open(out(name), "wb") as handle:
+        handle.write(patched.encode("ascii"))
+
+    print("  female %s (%d B, declares AnimationControlled)"
+          % (name, os.path.getsize(out(name))))
+
+
+def write_parent(gender, paths, nl):
+    """Writes the one file that carries this mod's options.
+
+    It is the authoritative definition of AnimationControlled, so it has to
+    carry vanilla's own options as well as this mod's: a sub-database does not
+    merge into a fragment another database defines, and without them a
+    redirected NPC loses every door, cabinet and wardrobe interaction.
+
+    Everything else a human animates with is reached by reference, through a
+    SubADB pointing at the untouched vanilla database inside its own pak.
+    """
+    db = read_pak_entry(PAK, paths["db"]).decode("ascii", "replace")
+
+    present = set(re.findall(r'<Animation name="([^"]*)"', db))
     missing = [clip for _, clip in STAGGERS if clip not in present]
 
     if missing:
-        raise SystemExit("clips absent from the female database: %s" % missing)
+        raise SystemExit("clips absent from the %s database: %s"
+                         % (gender, missing))
 
-    options = nl.join(
-        TEMPLATE.format(tags=tags, clip=clip, collider=COLLIDER_MODE).replace("\n", nl)
-        for tags, clip in STAGGERS)
-    block = (nl + "    <AnimationControlled>"
-             + nl + options
-             + nl + "    </AnimationControlled>")
+    options = nl.join(render_option(tags, clip, nl) for tags, clip in STAGGERS)
 
-    anchor = nl + "  </FragmentList>"
+    existing = re.search(
+        "\n    <AnimationControlled>(.*?)\n    </AnimationControlled>", db, re.S)
 
-    if anchor not in raw:
-        raise SystemExit("female FragmentList anchor not matched")
+    inherited = 0
 
-    patched = raw.replace(anchor, block + anchor, 1)
+    if existing:
+        block = existing.group(1).strip("\r\n")
+        inherited = block.count("<Fragment ")
+        options = block + nl + options
 
-    with io.open(FEM_ADB_OUT, "wb") as handle:
-        handle.write(patched.encode("ascii"))
+    name = "hcm_%s_database.adb" % gender
+    parent = nl.join([
+        '<?xml version="1.0" encoding="us-ascii"?>',
+        '<AnimDB FragDef="%s" TagDef="%s">' % (paths["ids"], paths["tags"]),
+        "  <FragmentList>",
+        "    <AnimationControlled>",
+        options,
+        "    </AnimationControlled>",
+        "  </FragmentList>",
+        "  <SubADBs>",
+        '    <SubADB File="%s" />' % paths["db"],
+        "  </SubADBs>",
+        "</AnimDB>",
+        "",
+    ])
 
-    print("female: declared AnimationControlled and added %d options"
-          % len(STAGGERS))
-    print("wrote %s (%d bytes)" % (FEM_ADB_OUT, os.path.getsize(FEM_ADB_OUT)))
+    with io.open(out(name), "wb") as handle:
+        handle.write(parent.encode("ascii"))
 
+    print("  %-6s %s (%d B, %d vanilla options + %d added)"
+          % (gender, name, os.path.getsize(out(name)), inherited, len(STAGGERS)))
+
+def write_additive():
+    """Generates the whole layout."""
+    nl = newline_of(read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace"))
+
+    print("Additive layout, %d options per character set:" % len(STAGGERS))
+
+    for gender, paths in sorted(GENDERS.items()):
+        write_parent(gender, paths, nl)
+
+    write_shared_tags(nl)
+    write_female_declaration(GENDERS["female"], nl)
+
+    for tags, clip in STAGGERS:
+        print("  + %-22s -> %s" % (tags, clip))
+
+    # A file from an earlier layout would still be an override and would
+    # quietly change which chain entities resolve through.
+    keep = set(["hcm_male_database.adb", "hcm_female_database.adb",
+                TAGS_ENTRY.rsplit("/", 1)[-1],
+                GENDERS["female"]["ids"].rsplit("/", 1)[-1]])
+
+    for stale in sorted(set(os.listdir(OUT_DIR)) - keep):
+        os.remove(out(stale))
+        print("  removed stale file: %s" % stale)
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    write_database()
-    write_tags()
-    write_female()
+    write_additive()
 
 
 if __name__ == "__main__":

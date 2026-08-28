@@ -19,6 +19,11 @@ find it, it says so and lists everywhere it looked.
 
 Output goes to `releases\`.
 
+The build produces the additive layout by default: every file is named `hcm_*` and no
+vanilla filename is claimed. `tools/build_adb.py --replace` builds the pre-2.1.0 layout
+that replaced whole databases, and `build.ps1` will refuse it, since mixing the two
+silently defeats the additive one.
+
 `build.ps1` copies `src/mod.manifest` verbatim, so bump its `<version>` before
 building. The publish step refuses to upload a zip whose manifest disagrees with the
 version being published.
@@ -33,6 +38,18 @@ Once, to store your API key:
 ```
 .\tools\publish_nexus.ps1 -SaveApiKey
 ```
+
+Before publishing, prove the release still deploys additively:
+
+```
+python tools\verify_additive.py
+```
+
+It checks every claim in `docs/TECHNICAL_DETAILS.md` against the game's own paks
+and the packaged zip: that no vanilla filename is claimed, that nothing is lost
+from the fragment the mod takes authority over, that every reference in the chain
+resolves, and that the Lua redirects the classes the engine actually spawns. It
+reads those class names out of `Scripts.pak` rather than trusting the mod.
 
 Then per release:
 

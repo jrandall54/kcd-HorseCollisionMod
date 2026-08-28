@@ -84,7 +84,7 @@ $luajit = Get-Command luajit -ErrorAction SilentlyContinue
 if ($luajit) {
     # Lua treats a backslash in a quoted string as an escape, so the path
     # handed to loadfile is converted to forward slashes.
-    $luaPath = $modScript.Replace([char]92, [char]47)
+    $luaPath = $modScript.Replace([char]92, [char]47)
     & $luajit.Source -e "assert(loadfile('$luaPath'))"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[SYNTAX ERROR] HorseCollisionMod.lua does not parse." -ForegroundColor Red
@@ -107,7 +107,7 @@ Copy-Item $modScript -Destination "$pakDir\"
 # Tests for the generated file rather than the directory, because a failed or
 # interrupted run can leave mod_assets/ present but empty, which would
 # otherwise skip generation and fail later with a less obvious message.
-if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\kcd_male_database.adb"))) {
+if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\hcm_male_database.adb"))) {
     Write-Host "Animation data missing - generating..."
     python (Join-Path $toolsDir "build_adb.py")
     if ($LASTEXITCODE -ne 0) {
@@ -119,21 +119,50 @@ if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\kcd_male_dat
 Write-Host "Including data overrides from mod_assets ..."
 Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 
-# The animation chain needs all three files present or the stagger silently
+# The animation chain needs every one of these present or the stagger silently
 # no-ops in game, which is expensive to diagnose. Fail the build instead.
+#
+# These are the additive layout, which claims no vanilla filename: a parent
+# database per gender referencing the untouched vanilla file in its own pak,
+# the mod's own fragments, and the declarations those fragments need.
+# Any file under a vanilla name is a bug, not an alternative layout: it would
+# override the file the parent database references, silently defeating the
+# whole arrangement without changing anything this build prints.
+$adb = "$buildDir\pak\Animations\Mannequin\ADB"
+
+# The exact file set the mod ships. Two of these carry vanilla names on
+# purpose: they are small declaration files, and owning them is far cheaper
+# than the alternative of restating 123 KB of fragment and controller
+# definitions under mod names, which put this mod in the resolution path of
+# every human animation and broke unrelated ones. See TECHNICAL_DETAILS.md.
 $required = @(
-    "$buildDir\pak\Animations\Mannequin\ADB\kcd_male_database.adb",
-    "$buildDir\pak\Animations\Mannequin\ADB\kcd_animationControlledTags.xml",
-    "$buildDir\pak\Animations\Mannequin\ADB\wh_female_database.adb",
-    "$buildDir\pak\Animations\Mannequin\ADB\wh_female_fragmentids.xml"
+    "$adb\hcm_male_database.adb",
+    "$adb\hcm_female_database.adb",
+    "$adb\kcd_animationControlledTags.xml",
+    "$adb\wh_female_fragmentids.xml"
 )
+
+# Nothing beyond that set may ship. A leftover from an earlier layout would
+# still be an override and would quietly change which chain entities resolve
+# through, without altering a single line this build prints.
+$allowed = $required | ForEach-Object { Split-Path -Leaf $_ }
+$unexpected = Get-ChildItem $adb -File -ErrorAction SilentlyContinue |
+    Where-Object { $allowed -notcontains $_.Name }
+
+if ($unexpected) {
+    foreach ($f in $unexpected) {
+        Write-Host "[BUILD ERROR] unexpected animation file: $($f.Name)" -ForegroundColor Red
+    }
+    Write-Host "Delete mod_assets\ and rebuild." -ForegroundColor Red
+    exit 1
+}
+
 foreach ($f in $required) {
     if (-not (Test-Path $f)) {
         Write-Host "[BUILD ERROR] missing required asset: $f" -ForegroundColor Red
         exit 1
     }
 }
-
 # 2. Create the PAK (zip file)
 # Compress-Archive writes Windows path separators into the zip entry names
 # (Libs\AI\final\x.xml). CryEngine looks pak entries up by exact path with
@@ -163,7 +192,7 @@ finally {
 
 # 3. Structure the Mod contents
 Copy-Item (Join-Path $srcDir "mod.manifest") -Destination "$modDir\"
-$readme = Join-Path $repoRoot "README.md"
+$readme = Join-Path $repoRoot "README.md"
 if (Test-Path $readme) { Copy-Item $readme -Destination "$modDir\" }
 
 # 4. Create the final Release ZIP

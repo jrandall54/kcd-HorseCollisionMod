@@ -86,14 +86,21 @@ internals for the detection and the collision bark, commented in place if you wa
 
 ## Compatibility
 
-- **Replaces `kcd_male_database.adb` and `wh_female_database.adb`.** Conflicts with any mod
-  that edits human animations. Mannequin databases cannot be merged, only replaced, so
-  whichever mod loads last wins outright and the other's changes vanish with no error.
-- Also replaces `kcd_animationControlledTags.xml` and `wh_female_fragmentids.xml`.
-- The replaced files are the game's own, with roughly 3 KB of added fragments. Everything
-  else in them is byte-identical to vanilla 1.9.7.
+- **Replaces no vanilla file.** Every file the mod ships is named `hcm_*`, so there is
+  nothing for another mod to collide with. It adds its animations by pointing the game
+  at a small database of its own that references the untouched vanilla one.
+- This is why it works alongside other animation mods. A mod that replaced
+  `kcd_male_database.adb` would win or lose outright depending on load order, and the
+  loser's changes would vanish with no error, because Mannequin databases cannot be
+  merged.
+- The one thing it does claim is the `AnimDatabase3P` property on seven human entity
+  classes. Another mod redirecting the same property would still conflict, though that
+  is a single value rather than a 5 MB file, and a cooperative mod can chain by
+  referencing whatever is already there.
 - Does not touch AI behavior trees, quests, or RPG tables.
 
+Before 2.1.0 this mod did replace `kcd_male_database.adb` and `wh_female_database.adb`.
+If you are upgrading, delete the old version rather than installing over it.
 ## Planned
 
 Not promises, just what is being worked on next.
@@ -135,8 +142,6 @@ rather than invent a parallel system.
 **Other**
 
 - Reactions for dogs and other animals.
-- A way to patch the animation data at install time instead of replacing it, so the mod stops
-  conflicting with other animation mods.
 
 ## Repository layout
 
@@ -151,7 +156,9 @@ tools/
   dev_deploy.ps1          installs into the game without Vortex
   dev_console.py          talks to the running game over its remote console
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
+  verify_additive.py      proves the release overrides no vanilla file
 docs/
+  HOW_IT_WORKS.md         plain-language overview of the mod and its layout
   DEV_LOOP.md             the hot-reload development loop
   RELEASING.md            building, publishing to Nexus, regenerating the API docs
   TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
@@ -174,6 +181,7 @@ Animation data is generated from your own game install rather than committed, so
 first build runs `tools/build_adb.py` for you and resolves the game folder itself.
 Output goes to `releases\`.
 
+`docs/HOW_IT_WORKS.md` explains what the mod does and how it is put together.
 `docs/RELEASING.md` covers publishing to Nexus Mods and regenerating the API reference.
 `docs/DEV_LOOP.md` covers the hot-reload development loop.
 
