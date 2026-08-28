@@ -19,8 +19,8 @@ CHANGELOG = os.path.join(REPO_ROOT, "CHANGELOG.md")
 MANIFEST = os.path.join(REPO_ROOT, "src", "mod.manifest")
 
 # Changes under these paths are visible to a player and must be described in
-# the changelog. Everything else is development tooling, which is why a hundred
-# commits can correctly leave the version alone.
+# the changelog. Everything else is development tooling, so a hundred commits
+# can correctly leave the version alone.
 USER_FACING = ("src/",)
 
 BREAKING = "**BREAKING**"
