@@ -182,6 +182,19 @@ if ($isRelease) {
     }
 
     Write-Host "Release Checks Passed (version $Version, diagnostics off)."
+
+    # The number has to follow from what changed, not from a guess made at
+    # release time.
+    python (Join-Path $toolsDir "version_check.py") --release $Version
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Build failed: version and changelog disagree." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    # Advisory on every development build, so player-visible work that has not
+    # been written down is noticed while it is still fresh.
+    python (Join-Path $toolsDir "version_check.py")
 }
 
 # Syntax check. KCD runs Lua 5.1, and LuaJIT shares its syntax, so it can

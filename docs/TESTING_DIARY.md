@@ -4036,3 +4036,20 @@ the ground a stagger is easy to miss entirely.
 That makes every symptom filed under reaction reliability the same defect. The
 walk tier, the gallop-reporting-walk case and the kneeling case all resolve to
 scoring a collision on the speed left after the collision.
+
+## 3.0.0 verified in game
+
+**Hypothesis**: with collisions scored on the peak of the last few ticks, every
+tier plays the reaction its speed calls for, and the missed reactions reported
+across three sessions are gone.
+
+**User report**: all animations firing, no dropped collisions, no mismatched
+reactions.
+
+That closes the reaction reliability defect. All three reported symptoms, the
+missing reactions across every tier, the gallop impact reporting walking speed,
+and the kneeling NPC producing nothing, were one cause: a collision scored on
+the speed left after the collision had already slowed the horse.
+
+The build carries `DiagnoseMisses` off, so this was the first session tested
+with the shipping log volume rather than the diagnostic one.

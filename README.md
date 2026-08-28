@@ -117,6 +117,7 @@ tools/
   dev_console.py          talks to the running game over its remote console
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
+  version_check.py        derives the next version from CHANGELOG.md
 docs/
   HOW_IT_WORKS.md         plain-language overview of the mod and its layout
   DEV_LOOP.md             the hot-reload development loop

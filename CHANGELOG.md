@@ -9,14 +9,21 @@ the reactions a player sees in game. A change that forces a player to redo their
 configuration, or that changes how the mod sits alongside other mods, is a major
 change even when nothing about it looks like an API.
 
+Entries land under `## [Unreleased]` as the work does, and move under a version
+heading at release. An entry that breaks an existing install is marked
+**BREAKING**. `tools/version_check.py` derives the next version from these
+sections and refuses a release built at any other number.
+
+## [Unreleased]
+
 ## [3.0.0] - Unreleased
 
 ### Changed
 
-- Settings live in `HorseCollisionMod_Settings.lua`. Values edited in
-  `HorseCollisionMod.lua` under 2.x are no longer read. **Reapply any
-  customization in the new file after upgrading.**
-- The mod deploys additively and claims no vanilla filename. It carries a small
+- **BREAKING** Settings live in `HorseCollisionMod_Settings.lua`. Values edited
+  in `HorseCollisionMod.lua` under 2.x are no longer read. Reapply any
+  customization in the new file after upgrading.
+- **BREAKING** The mod deploys additively and claims no vanilla filename. It carries a small
   database referencing the untouched vanilla one where it sits inside its own
   pak, instead of shipping a replacement copy. Download size drops from 195,284
   to 21,953 bytes, and mods that touch unrelated human animations no longer
