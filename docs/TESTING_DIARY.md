@@ -4136,3 +4136,36 @@ flag, mirroring `notes-<version>.md` for the changelog. The report prints the
 length before the upload, and `pre_release_check.py` fails a release whose
 description file is missing, empty or over 255, because a blank entry is
 invisible in the report of a run that otherwise succeeded.
+
+## Next: Phase 2, starting with armor weight
+
+Everything in Phase 2 depends on knowing what the victim is wearing, so that is
+the first piece. Groundwork already established, carried forward so it is not
+re-derived. All four code references below were re-checked against the 3.0.0
+source.
+
+**Where it plugs in.** `TriggerCollision` already computes a `combatScale`
+multiplier and passes a per-tier stamina cost into `DrainHorseStamina`. Armor
+scaling is a second multiplier applied at the same point, and `Ragdoll` already
+takes an `impulseScale` argument for the knockback side. Neither needs
+restructuring.
+
+**Reading the armor.** Entities carry an `inventory` extension, confirmed when
+enumerating a live horse's fields. Vanilla scripts use
+`inventory:GetCurrentItem`, `GetItemByClass`, `FindItem` and `GetCountOfClass`.
+What is not established is how to get from an equipped item to its weight, and
+whether a per-actor aggregate exists rather than having to sum pieces.
+
+**Where the data lives.** `Data/Tables.pak` carries
+`Libs/Tables/item/armor.xml` at 479 KB, plus `armor_archetype.xml`,
+`armor_type.xml` and `armor_subtype.xml`. Those are readable with the
+`read_pak_entry` helper in `build_adb.py`, which handles the backslash local
+headers that break Python's `zipfile`.
+
+**Reference material**: `references/Nexus_KCD_Wiki/RPG_params_in_KCD.md` and
+`RPG_stats_in_KCD.md`, plus `references/kcd-documentation/` for the Soul and
+Inventory ScriptBind pages.
+
+**The trap to avoid**, given this project's history: a call that returns a value
+is not proof the value is right. Log the weights read off real NPCs and check
+them against the tables before building any scaling on top.
