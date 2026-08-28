@@ -16,7 +16,7 @@ sections and refuses a release built at any other number.
 
 ## [Unreleased]
 
-## [3.0.0] - Unreleased
+## [3.0.0] - 2026-08-28
 
 ### Changed
 

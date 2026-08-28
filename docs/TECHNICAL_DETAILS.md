@@ -216,7 +216,7 @@ the mod. The knockdown tiers are unaffected.
 
 ## Additive animation deployment
 
-Since 2.1.0 the mod adds Mannequin fragments without replacing a vanilla file.
+Since 3.0.0 the mod adds Mannequin fragments without replacing a vanilla file.
 `docs/HOW_IT_WORKS.md` covers the purpose and the trade-offs. What follows is
 the reference for changing it.
 

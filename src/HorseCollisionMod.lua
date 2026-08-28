@@ -47,22 +47,19 @@
 --   and redirecting the database alone is not enough.
 -- * `hcm_animationControlledTags.xml` - declares those FragTags. An option
 --   whose tag is not declared aborts after one frame.
----- Before 2.1.0 the same fragments were spliced into copies of the vanilla
--- databases and those copies shipped, which made the mod incompatible with
--- any other mod touching human animations, in both directions and silently.
---
--- See `docs/TESTING_DIARY.md` for the full investigation.
+-- See `docs/HOW_IT_WORKS.md` for why this indirection is worth the trouble.
 --
 -- ## Limitations
 --
 -- * Dogs and other animals do not react. They use separate animation
 --   databases which this mod does not touch.
--- * Ships full replacements of the male and female animation databases, so
---   it conflicts with any mod that edits human animations.
+-- * Two mods redirecting `AnimDatabase3P` on the same entity class conflict.
+--   The contested value is a Lua string, so a cooperative mod can chain by
+--   referencing whatever is already set.
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 2.1.0
+-- @release 3.0.0
 
 HorseCollisionMod = {}
 
@@ -86,9 +83,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --- Tuning values. Safe to edit in place; nothing here is derived at runtime.
 --
 -- Grouped by what they affect, and deliberately kept terse: this is the table
--- people open to change a setting, not to read. Where the defaults came from,
--- including the impact telemetry several were derived from, is in
--- docs/TECHNICAL_DETAILS.md under "Tuning rationale".
+-- people open to change a setting, not to read. The reasoning behind the
+-- defaults is in docs/TECHNICAL_DETAILS.md under "Reaction defaults".
 --
 -- @field SpeedWalk lower bound of the walk tier, in meters per second
 -- @field SpeedTrot lower bound of the trot tier
@@ -102,6 +98,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field SweepMultiplier how far ahead to sweep, per meter per second
 -- @field MaxSweepExtra cap on the forward sweep, in meters
 -- @field HitCooldownMs minimum gap between reactions on the same victim
+-- @field ImpactSpeedSamples ticks of speed history a collision is scored from
+-- @field MaxImpactSpeed ceiling on the speed a collision is scored at
 -- @field Knockback horizontal ragdoll impulse at full strength
 -- @field Uplift vertical ragdoll impulse at full strength
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
@@ -1214,12 +1212,12 @@ HorseCollisionMod.AnimationDatabases = {
 -- this mod's resolves through vanilla's own files, and the mod never appears
 -- in the resolution path of animations it has nothing to do with.
 --
--- 2.1.0 briefly redirected both, so that the stagger FragTags could live in a
--- file named hcm_*. That resolved correctly, but it also stopped the beggar
--- kneeling, because his animation resolves through BeggarIn and
--- kcd_beggar_tags.xml by way of the same copied fragment id file. The tags
--- are declared in vanilla's own tag file instead now, which is 1 KB and costs
--- nothing else its own resolution path.
+-- Redirecting `ActionController` as well would let the stagger FragTags live
+-- in a file named hcm_*, and it resolves correctly, but it puts a copied
+-- fragment id file in the path of unrelated animations: the beggar's kneeling
+-- resolves through BeggarIn and kcd_beggar_tags.xml by way of that same file,
+-- and stops. The FragTags are declared in vanilla's own tag file instead,
+-- which is 1 KB and costs no other animation its resolution path.
 --
 -- @table AnimationSets
 HorseCollisionMod.AnimationSets = {

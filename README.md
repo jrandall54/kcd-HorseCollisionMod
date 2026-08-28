@@ -89,7 +89,7 @@ overwritten by. It does not touch AI behavior trees, quests or RPG tables.
 
 `docs/HOW_IT_WORKS.md` explains how, and what the remaining limits are.
 
-Upgrading from before 2.1.0: delete the old version rather than installing over
+Upgrading from 2.x: delete the old version rather than installing over
 it, since it replaced files this one does not.
 
 ## Planned
@@ -134,7 +134,7 @@ resolves paths from the repository root, so they can be run from any directory.
 Requires PowerShell and Python 3.
 
 ```
-powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "2.1.0"
+powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "3.0.0"
 ```
 
 Animation data is generated from your own game install rather than committed, so

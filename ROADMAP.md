@@ -56,7 +56,7 @@ See `docs/DEV_LOOP.md`.
 
 ## Additive deployment
 
-Shipped in 2.1.0. The mod no longer replaces the animation databases.
+Shipped in 3.0.0. The mod no longer replaces the animation databases.
 
 It ships its own small database carrying vanilla's `AnimationControlled` options
 alongside its four, and references the untouched 5.5 MB vanilla file where it sits
@@ -68,7 +68,7 @@ Download drops from 195,284 to 21,953 bytes.
       from. `NPC = CreateAI(NPC_x)` copies fields, so redirecting `NPC_x` has no
       effect on what spawns.
 - [x] Verify a packaged build at shipping pak priority, from a Vortex install.
-- [ ] Publish 2.1.0, and rewrite the mod page, which still describes the old
+- [ ] Publish 3.0.0, and rewrite the mod page, which still describes the old
       database-replacement install.
 
 Two small declaration files keep vanilla names, 15 KB in total, and two mods

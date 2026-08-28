@@ -102,7 +102,7 @@ listener, so a bare re-execution leaves the mod silent until a save is loaded. A
 successful reload ends with:
 
 ```
-[log] [HorseCollisionMod] Load screen ended. v2.1.0 initializing physics timer loop 1
+[log] [HorseCollisionMod] Load screen ended. v3.0.0 initializing physics timer loop 1
 ```
 
 ## Testing a packaged build
