@@ -152,6 +152,51 @@ def check_config_docs():
     return found
 
 
+def check_nexus_page(version):
+    """The public mod page against the build it describes.
+
+    The page is what a player reads before downloading, and it is the easiest
+    thing in the project to forget. Two things have to hold: it names this
+    release, and its settings block lists exactly the keys that ship.
+    """
+    page_path = "nexus_description.txt"
+    found = []
+
+    # The page copy is a local working file rather than part of the
+    # repository, so a fresh clone has nothing to check and that is correct.
+    if not os.path.exists(os.path.join(REPO_ROOT, page_path)):
+        return []
+
+    page = read(page_path)
+
+    if version not in page:
+        found.append((page_path, 0, version,
+                      "the page does not mention this release"))
+
+    block = re.search(r"\[code\](.*?)\[/code\]", page, re.S)
+
+    if not block:
+        found.append((page_path, 0, "settings",
+                      "no settings block on the page"))
+
+        return found
+
+    listed = set(re.findall(r"^(\w+)\s", block.group(1), re.M))
+    shipped = set(re.findall(
+        r"^	(\w+)\s*=",
+        read(os.path.join("src", "HorseCollisionMod_Settings.lua")), re.M))
+
+    for key in sorted(listed - shipped):
+        found.append((page_path, 0, key, "page documents a setting that does "
+                                         "not ship"))
+
+    for key in sorted(shipped - listed):
+        found.append((page_path, 0, key, "shipped setting is missing from the "
+                                         "page"))
+
+    return found
+
+
 def main():
     paths = tracked_files()
     version = current_version()
@@ -163,7 +208,8 @@ def main():
     problems = (check_versions(paths, version)
                 + check_claims(paths)
                 + check_links(paths)
-                + check_config_docs())
+                + check_config_docs()
+                + check_nexus_page(version))
 
     for path, line, found, message in problems:
         where = "%s:%d" % (path, line) if line else path
