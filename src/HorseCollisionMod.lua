@@ -135,6 +135,12 @@ HorseCollisionMod.Config = {
 	MaxSweepExtra            = 0.35,
 	HitCooldownMs            = 3000,
 
+	-- A collision is scored on the peak of the last ImpactSpeedSamples ticks,
+	-- not on the speed read when the victim is noticed. MaxImpactSpeed is the
+	-- ceiling on that value, a little above the top of the gallop plateau.
+	ImpactSpeedSamples       = 3,
+	MaxImpactSpeed           = 11.0,
+
 	-- Knockdown impulse. Trot and gallop only; the walk tier never ragdolls.
 	Knockback                = 50.0,
 	Uplift                   = 30.0,
@@ -231,10 +237,9 @@ local function GetVectorLength(v)
 	return math.sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z))
 end
 
---- Records a speed sample and returns the highest in recent history.
+--- Records one speed sample.
 --
 -- @tparam number speed the current sample, in meters per second
--- @treturn number the highest sample still in the window
 function HorseCollisionMod:TrackSpeed(speed)
 	local history = self.SpeedHistory
 
@@ -243,13 +248,76 @@ function HorseCollisionMod:TrackSpeed(speed)
 	while #history > self.SpeedHistorySize do
 		table.remove(history, 1)
 	end
+end
 
-	local peak = speed
+--- The peak of the last `count` speed samples.
+--
+-- @tparam number count how many of the most recent samples to consider
+-- @treturn number the highest speed among them, in meters per second
+function HorseCollisionMod:RecentPeak(count)
+	local history = self.SpeedHistory
+	local first = #history - count + 1
+	local peak = 0
 
-	for _, sample in ipairs(history) do
-		if sample > peak then
-			peak = sample
+	if first < 1 then
+		first = 1
+	end
+
+	for i = first, #history do
+		if history[i] > peak then
+			peak = history[i]
 		end
+	end
+
+	return peak
+end
+
+--- The recent speed samples, oldest first, as a compact string.
+--
+-- Printed on every impact while diagnosing. The width of the deceleration on
+-- contact is what sets `ImpactSpeedSamples`, and it is only visible in the
+-- samples either side of the collision.
+--
+-- @tparam number count how many of the most recent samples to include
+-- @treturn string the samples, space separated, to two decimal places
+function HorseCollisionMod:SpeedTrail(count)
+	local history = self.SpeedHistory
+	local first = #history - count + 1
+	local parts = {}
+
+	if first < 1 then
+		first = 1
+	end
+
+	for i = first, #history do
+		parts[#parts + 1] = string.format("%.2f", history[i])
+	end
+
+	return table.concat(parts, " ")
+end
+
+--- The speed a collision should be scored at.
+--
+-- A horse loses speed the moment it hits someone. Detection samples velocity
+-- once per tick, so the speed read on the tick that notices a victim has
+-- already been reduced by the collision it is meant to describe, and a gallop
+-- impact can be scored as a walk. The peak of the last few samples brackets
+-- the moment of contact instead.
+--
+-- The window is deliberately short. Taken over a whole second it would charge
+-- gallop to a rider who galloped up and then slowed deliberately to nudge
+-- someone.
+--
+-- Capped because the physics system reports occasional speeds above anything a
+-- horse holds, and this value scales knockback force as well as selecting the
+-- tier.
+--
+-- @treturn number the speed to score the impact at, in meters per second
+function HorseCollisionMod:ImpactSpeed()
+	local peak = self:RecentPeak(self.Config.ImpactSpeedSamples)
+
+	if peak > self.Config.MaxImpactSpeed then
+		return self.Config.MaxImpactSpeed
 	end
 
 	return peak
@@ -306,7 +374,7 @@ function HorseCollisionMod:Log(message)
 end
 
 --- Resolves a speed to its gait name.
--- @tparam number speed horse speed in meters per second
+-- @tparam number speed speed in meters per second
 -- @treturn string one of "Gallop", "Trot", "Walk" or "Idle"
 function HorseCollisionMod:GetSpeedTier(speed)
 	local cfg = self.Config
@@ -772,12 +840,14 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number speed horse speed in meters per second
+-- @tparam number speed speed to score the impact at, in meters per second
 -- @tparam table horseEnt the player's horse entity
 -- @tparam table playerEnt the player entity
 -- @tparam userdata horseWuid WUID of the horse
+-- @tparam number sampledSpeed speed read on this tick, recorded in the log so
+--   the correction for collision deceleration stays visible
 function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, playerEnt,
-		horseWuid, peakSpeed)
+		horseWuid, sampledSpeed)
 	local npcId = tostring(npc.id)
 	local now = GetTimeMs()
 
@@ -807,7 +877,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	self:Log("Impact tier=" .. tierName
 			.. " speed=" .. string.format("%.2f", speed)
-			.. " peak=" .. string.format("%.2f", peakSpeed or speed)
+			.. " sampled=" .. string.format("%.2f", sampledSpeed or speed)
+			.. (cfg.DiagnoseMisses
+					and (" trail=[" .. self:SpeedTrail(self.SpeedHistorySize) .. "]")
+					or "")
 			.. " combatScale=" .. string.format("%.1f", combatScale)
 			.. " " .. combatDetail)
 
@@ -897,13 +970,15 @@ function HorseCollisionMod:SafeUpdate()
 	end)
 
 	local speed = GetVectorLength(velocity)
-	local peakSpeed = self:TrackSpeed(speed)
+	self:TrackSpeed(speed)
+
+	local impactSpeed = self:ImpactSpeed()
 
 	-- Below walking pace nothing can happen, so the loop normally stops here
 	-- before looking at a single entity. While diagnosing it keeps going, or
 	-- an impact lost because the collision itself slowed the horse would leave
 	-- no trace at all.
-	if speed < self.Config.SpeedWalk and not self.Config.DiagnoseMisses then
+	if impactSpeed < self.Config.SpeedWalk and not self.Config.DiagnoseMisses then
 		return
 	end
 
@@ -997,13 +1072,13 @@ function HorseCollisionMod:SafeUpdate()
 					elseif not inFootprint then
 						self:LogRejection(ent, "outside-footprint",
 								self:FootprintDetail(ent, horsePos, horseForward, speed))
-					elseif speed < self.Config.SpeedWalk then
+					elseif impactSpeed < self.Config.SpeedWalk then
 						self:LogRejection(ent, "below-walk-speed",
-								"speed=" .. string.format("%.2f", speed)
-								.. " peak=" .. string.format("%.2f", peakSpeed))
+								"impact=" .. string.format("%.2f", impactSpeed)
+								.. " sampled=" .. string.format("%.2f", speed))
 					else
-						self:TriggerCollision(ent, velocity, speed, horseEnt, player,
-								horseWuid, peakSpeed)
+						self:TriggerCollision(ent, velocity, impactSpeed, horseEnt,
+								player, horseWuid, speed)
 					end
 				end
 			end
