@@ -4053,3 +4053,86 @@ the speed left after the collision had already slowed the horse.
 
 The build carries `DiagnoseMisses` off, so this was the first session tested
 with the shipping log volume rather than the diagnostic one.
+
+## Publishing 3.0.0: the mod file id resolves, the upload path is still untested
+
+**Hypothesis**: addressing the mod file by its own id, `-ModFileId 7863762`,
+resolves without the mod-file-version hop, and 3.0.0 has not reached the page.
+
+Dry run against the live mod page, no writes:
+
+```
+mod:      Horse Collision Mod [9869834848546]
+mod file: HorseCollisionMod [7863762]
+versions: 1 (0 archived)
+```
+
+The id resolves and still passes the ownership check against `/mods/{id}/files`,
+so the direct id costs nothing that the `?file_id=` lookup provided. No
+duplicate-version message means 3.0.0 is not published; the single listed
+version is 2.0.0 from 2026-08-26, unchanged since the first dry run.
+
+`archive_existing_file` is a field on the create-version request rather than a
+call of its own, so archiving 2.0.0 happens in the same request that publishes
+3.0.0. There is no window in which the page lists nothing, which is the failure
+that would matter on a first use of `-ArchiveExisting`.
+
+**Still untested**: `POST /uploads`, the presigned `PUT`, `finalise`, the
+availability poll and `POST /mod-files/{id}/versions`. Every one of them runs
+for the first time on the 3.0.0 release, and the flow prints an upload id on a
+post-upload failure so `-ResumeUploadId` can retry without re-sending the zip.
+
+## 3.0.0 published: the upload path works, and three things it got wrong
+
+First real use of `tools/publish_nexus.ps1`. Every call that had never run
+before ran: `POST /uploads`, the presigned `PUT`, `finalise`, the availability
+poll, `POST /mod-files/{id}/versions` with `archive_existing_file`, and the
+changelog append. The version is live and a later dry run reports `versions: 2
+(1 archived)`, so archiving 2.0.0 in the same request as publishing 3.0.0 did
+what the spec says it does.
+
+Three defects, none of which a dry run could have found, because all three sit
+past the point a dry run stops.
+
+**The upload stopped on a prompt.** `Invoke-WebRequest` on Windows PowerShell
+5.1 parses the response through the Internet Explorer engine, and asks the
+operator to confirm before doing so when IE has no first-run configuration:
+
+```
+Security Warning: Script Execution Risk
+[Y] Yes  [A] Yes to All  [N] No  [L] No to All  [S] Suspend  [?] Help
+(default is "N"):
+```
+
+Answering `N`, which is the default, would have failed the upload after the
+session was already created. `-UseBasicParsing` skips the parse and the prompt.
+The call is a `PUT` to S3 whose response body is not read at all, so nothing is
+lost by never parsing it.
+
+**The published version id printed empty.** The create-version response is
+`CreateModFileVersionSuccess`, which is `{ file, version }`, and the id is on
+`data.version.id`. The script read `data.id`, which does not exist. Cosmetic in
+that the publish had already succeeded, but the printed id is what a failed run
+would be diagnosed from.
+
+**The Files tab entry published blank.** `description` on the create-version
+request is the text shown under the file on the mod page's Files tab, and is
+separate from the mod's front-page description that `nexus_description.txt`
+holds. The parameter existed and nothing passed it.
+
+### The Files tab description cannot be added after the fact
+
+`/mod-file-versions/{id}` is GET only. There is no `PATCH` or `PUT` on a mod
+file version anywhere in the v3 spec, and `/mod-files/{id}/versions` only
+creates. So a description missing at publish time can be added only through the
+browser, which is the only route left for 3.0.0's.
+
+The spec declares no `maxLength` on the field, so the API accepts more than the
+page keeps. The 255 character limit is the site's, and the overflow is lost
+without an error.
+
+Now `releases\file-description-<version>.txt`, read by convention without a
+flag, mirroring `notes-<version>.md` for the changelog. The report prints the
+length before the upload, and `pre_release_check.py` fails a release whose
+description file is missing, empty or over 255, because a blank entry is
+invisible in the report of a run that otherwise succeeded.

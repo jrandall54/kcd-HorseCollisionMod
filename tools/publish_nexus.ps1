@@ -80,7 +80,14 @@ param (
     # Shown as the file name on the mod page. The API caps this at 50
     # characters and allows only [a-zA-Z0-9 _'().-].
     [string]$DisplayName = "HorseCollisionMod",
+
+    # Shown under the file on the mod page's Files tab. Sent with the version
+    # that creates it, because there is no endpoint to add one afterwards.
     [string]$Description,
+
+    # Read the description from a file instead. Defaults to
+    # releases\file-description-<Version>.txt when neither is passed.
+    [string]$DescriptionFile,
 
     [ValidateSet("main", "optional", "miscellaneous")]
     [string]$Category = "main",
@@ -335,6 +342,23 @@ if ($ChangelogFile) {
     $Changelog = Get-Content $ChangelogFile -Raw
 }
 
+if (-not $Description -and -not $DescriptionFile) {
+    $conventional = Join-Path $repoRoot "releases\file-description-$Version.txt"
+    if (Test-Path $conventional) { $DescriptionFile = $conventional }
+}
+
+if ($DescriptionFile) {
+    if (-not (Test-Path $DescriptionFile)) { throw "No description file at $DescriptionFile." }
+    $Description = (Get-Content $DescriptionFile -Raw).Trim()
+}
+
+# The site truncates at 255. The spec declares no maximum on this field, so
+# the API accepts more and the overflow is lost silently on the page.
+if ($Description.Length -gt 255) {
+    throw ("The file description is $($Description.Length) characters, over the 255 the mod page keeps." +
+           "`n  Shorten $DescriptionFile.")
+}
+
 # A dev build reaching the mod page is the expensive mistake this script could
 # otherwise make faster than the browser did.
 if (-not $Force -and $Version -match 'dev|alpha|beta|rc') {
@@ -452,6 +476,12 @@ if ($Changelog) {
 else {
     Write-Host "  changelog     none"
 }
+if ($Description) {
+    Write-Host "  description   $($Description.Length)/255 chars, files tab"
+}
+else {
+    Write-Host "  description   none, the files tab entry publishes blank" -ForegroundColor Yellow
+}
 Write-Host ""
 
 if ($DryRun) {
@@ -505,7 +535,10 @@ else {
     $ProgressPreference = "SilentlyContinue"
     try {
         Write-Host "Uploading $([math]::Round($zipBytes / 1KB, 1)) KB ..."
-        Invoke-WebRequest -Uri $upload.presigned_url -Method Put `
+        # Without -UseBasicParsing, 5.1 parses the response through the IE
+        # engine and stops to ask about script execution, which halts an
+        # otherwise unattended upload on a prompt.
+        Invoke-WebRequest -Uri $upload.presigned_url -Method Put -UseBasicParsing `
             -InFile $zipItem.FullName `
             -Headers @{ "Content-Disposition" = $disposition } `
             -ContentType "application/octet-stream" | Out-Null
@@ -569,7 +602,7 @@ catch {
     throw
 }
 
-Write-Host "  version id $($published.id)" -ForegroundColor Green
+Write-Host "  version id $($published.version.id)" -ForegroundColor Green
 
 # Last, and separately, because it is additive: a failed publish should not
 # leave changelog text on the page for a version that does not exist, and a
