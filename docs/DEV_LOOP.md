@@ -33,25 +33,43 @@ ignore what it is given.
 ## Deploying
 
 ```
+.\tools\dev_deploy.ps1 -Reload             push what changed and reload it
 .\tools\dev_deploy.ps1 -Launch             build, install, start the game
 .\tools\dev_deploy.ps1 -NoBuild -Launch    install what was built last
-.\tools\dev_deploy.ps1 -ScriptOnly         push only the Lua, game may be running
-.\tools\dev_deploy.ps1 -AnimOnly           push only the animation data, same
+.\tools\dev_deploy.ps1 -ScriptOnly         push the Lua whether or not it changed
+.\tools\dev_deploy.ps1 -AnimOnly           push the animation data, same
 .\tools\dev_deploy.ps1 -ParkVortexMod      move the Vortex-installed copy to mods_old\
 .\tools\dev_deploy.ps1 -GameRoot "D:\..."  use an install somewhere else
 ```
 
 It installs to `Mods\HorseCollisionMod_dev`, overwriting the last build, and
 launches with `-devmode`. It refuses to run while the game holds its paks open.
-`-ScriptOnly` and `-AnimOnly` skip that guard, because loose files are not
-locked and can be replaced under a running game.
+`-Reload`, `-ScriptOnly` and `-AnimOnly` skip that guard, because loose files
+are not locked and can be replaced under a running game.
+
+`-Reload` compares every loose file against its source, copies the ones whose
+contents differ, and runs the console reload for whichever halves moved. It
+reports `nothing changed since the last deploy` when they all match, and says so
+rather than reloading when the game is not running. The comparison is on
+contents rather than timestamps, because `build.ps1` rewrites all four animation
+databases on every run and a Mannequin reload is a visible hitch in the running
+game.
+
+`-ScriptOnly` and `-AnimOnly` name one half and skip the comparison. Use them
+for a file that has been reverted to a state matching the installed copy, or
+when only one subsystem should be disturbed.
 
 Loose files go under `<game>\Data`, mirroring the pak layout:
 
 ```
 Data\Scripts\Startup\HorseCollisionMod.lua
+Data\Scripts\Startup\HorseCollisionMod_Settings.lua
 Data\Animations\Mannequin\ADB\*.adb
 ```
+
+The settings file is a Startup script in its own right. Left out, the running
+game reads the packed values while the edited file sits on disk looking
+applied.
 
 A file one level higher is never read, and nothing is logged when that happens.
 
@@ -92,20 +110,18 @@ Cheat-marked commands, `lua_reload_script` among them, need `-devmode`, which
 ## The loop
 
 ```
-.\tools\dev_deploy.ps1 -Launch          once, at the start of a session
+.\tools\dev_deploy.ps1 -Launch      once, at the start of a session
 
-                                  edit src/HorseCollisionMod.lua
-.\tools\dev_deploy.ps1 -ScriptOnly      push the script
-python tools\dev_console.py --reload    new code live
-
-                                  edit tools/build_adb.py, regenerate
-.\tools\dev_deploy.ps1 -AnimOnly        push the animation databases
-python tools\dev_console.py --anim-reload
+                              edit src/, or regenerate the databases
+.\tools\dev_deploy.ps1 -Reload      push what moved, reload it live
 ```
 
-Both halves can change in one pass. Nothing here restarts the game.
+Both halves can change in one pass, and Mannequin is reloaded before the Lua, so
+the detection loop restarts against databases that are already current. Nothing
+here restarts the game.
 
-`--reload` re-executes the script and then calls the mod's entry point:
+`--reload` re-executes the settings file and the mod script, then calls the
+mod's entry point:
 
 ```
 #HorseCollisionMod:uiActionListener('sys_loadingimagescreen', 'OnEnd', nil)
