@@ -18,6 +18,23 @@ horse's speed at the moment of contact and picks a reaction to match:
 The horse pays for it in stamina, more so during combat, and an exhausted horse
 throws its rider.
 
+## The approach
+
+The first version was a physics hack: every impact applied a raw impulse and
+threw a ragdoll, at any speed. This version tries to make collisions behave
+like part of the game.
+
+- Reactions are the game's own animations. The stagger, the knockdown and the
+  rear-and-throw all exist in vanilla already.
+- Speed thresholds come from measured in-game gaits, not round numbers. KCD
+  horses have three speed plateaus, so the tiers sit in the gaps between them.
+- The detection area is shaped like a horse, and was narrowed after logging
+  where impacts were landing.
+- Stamina limits how much is possible in one run, and costs more in combat, so
+  charging into a fight is a decision rather than a default.
+- Nothing is hardcoded. Every threshold, force and cost is a value at the top of
+  one file.
+
 ## The three parts
 
 **A timer loop, in Lua.** Roughly twenty times a second the mod asks the game
