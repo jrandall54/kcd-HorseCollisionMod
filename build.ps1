@@ -147,6 +147,56 @@ if ($controlChars.Count -gt 0) {
 
 Write-Host "Code Style Check Passed ($luaLineCount lines, 2 files)."
 
+# Release gate. A release version is anything without a prerelease suffix, so
+# -dev and -diag builds skip every check below and stay free to carry
+# diagnostics and a mismatched version.
+$isRelease = $Version -match '^\d+\.\d+\.\d+$'
+
+if ($isRelease) {
+    # The version lives in three places and a release needs all three to agree.
+    # publish_nexus.ps1 catches a manifest mismatch, but only once the zip is
+    # already built and only for the manifest.
+    $manifestVersion = ([xml](Get-Content (Join-Path $srcDir "mod.manifest"))).kcd_mod.info.version
+    $luaVersion = $null
+
+    if ((Get-Content $modScript -Raw) -match 'HorseCollisionMod\.Version\s*=\s*"([^"]+)"') {
+        $luaVersion = $Matches[1]
+    }
+
+    if ($manifestVersion -ne $Version) {
+        Write-Host "Build failed: mod.manifest says $manifestVersion, building $Version." -ForegroundColor Red
+        exit 1
+    }
+
+    if ($luaVersion -ne $Version) {
+        Write-Host "Build failed: HorseCollisionMod.Version is $luaVersion, building $Version." -ForegroundColor Red
+        exit 1
+    }
+
+    # A diagnostic left on writes thousands of lines to a player's kcd.log.
+    # The settings file ships and overrides the default, so the default being
+    # correct is not enough.
+    if ((Get-Content $settingsScript -Raw) -match 'DiagnoseMisses\s*=\s*true') {
+        Write-Host "Build failed: DiagnoseMisses is on in the shipped settings." -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "Release Checks Passed (version $Version, diagnostics off)."
+
+    # The number has to follow from what changed, not from a guess made at
+    # release time.
+    python (Join-Path $toolsDir "version_check.py") --release $Version
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Build failed: version and changelog disagree." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    # Advisory on every development build, so player-visible work that has not
+    # been written down is noticed while it is still fresh.
+    python (Join-Path $toolsDir "version_check.py")
+}
+
 # Syntax check. KCD runs Lua 5.1, and LuaJIT shares its syntax, so it can
 # parse the script without the game being involved. A syntax error otherwise
 # only shows up as the mod silently not loading, which costs a whole test
