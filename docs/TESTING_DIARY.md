@@ -3440,3 +3440,82 @@ A protocol that would settle it: load the save, observe immediately, quit. Then
 change exactly one variable and repeat with the same elapsed time. Until that is
 done this is an open question rather than a known regression, and it should not
 be recorded as either.
+
+---
+
+## Build 2.1.0 (second design): the beggar, and why the copies had to go
+
+**User reported**, after a proper Vortex install of the working build: staggers
+and ragdolls all fine, but Rattay's beggar stands instead of kneeling. He still
+plays the barks that belong to the begging animation. Waiting in game did not
+restore it. Same save on pure vanilla, he begs.
+
+Barks playing without the animation is the same signature as the stagger
+failure: the behaviour runs, requests a fragment, and Mannequin resolves it to
+nothing.
+
+### Why the mod was in that path at all
+
+The beggar animation has nothing to do with this mod. It resolves through the
+fragment ids `BeggarIn`, `BeggarGive` and `BeggarTake`, whose subTagDef is
+`kcd_beggar_tags.xml`. Vanilla's `AnimationControlled` fragment, the only one
+this mod touches, contains nothing beggar-related: its 30 options are doors,
+cabinets, wardrobes and one alarm bell.
+
+But the first 2.1.0 design shipped **copies** of two large vanilla files:
+
+```
+hcm_male_fragmentids.xml     35 KB
+hcm_male_controllerdefs.xml  88 KB
+```
+
+They existed for one reason: to make a tag file named `hcm_*` reachable. The
+controller def had to point at the ids copy, and the ids copy at the tag file.
+And because `ActionController` was redirected to that copy, **every fragment a
+human uses resolved through files this mod restated**, not just its own.
+
+123 KB of vanilla data restated under mod names, sitting in the resolution path
+of animations the mod has no interest in. The beggar is what noticed.
+
+### The design that replaces it
+
+Ship the tag additions under **vanilla's own name** instead:
+
+```
+hcm_male_database.adb            72 KB   parent, 30 vanilla options + 4 added
+hcm_female_database.adb           3 KB   parent, 4 added
+kcd_animationControlledTags.xml   1 KB   16 vanilla tags + 4 added
+wh_female_fragmentids.xml        14 KB   declares AnimationControlled
+```
+
+`ActionController` is no longer redirected at all. Entities stay on vanilla's
+controller def, which reaches vanilla's fragment ids, which reach
+`kcd_animationControlledTags.xml` - the one small file this mod extends. Every
+other fragment resolves through vanilla's own path, untouched.
+
+The trade, stated plainly: this claims two vanilla filenames totalling 15,087
+bytes, where the previous design claimed none. Against that, it stops
+restating 123 KB of vanilla definitions and stops interposing itself in
+unrelated animations. Fifteen kilobytes of declarations is a far smaller thing
+to own, and small enough that another author can merge it by hand in a minute.
+The property that actually mattered is intact: **the 6.4 MB of animation
+databases are still referenced, never replaced.**
+
+### The general lesson
+
+"Replaces no vanilla file" turned out to be the wrong thing to optimise for.
+Avoiding a filename by restating the file under another name does not reduce
+what the mod owns, it just moves it, and it can widen the blast radius: the
+copies were in the path of every human animation rather than one fragment.
+
+What matters is **how much of the game's behaviour travels through code the mod
+restated**. By that measure the second design is strictly better despite
+claiming two names, and the first design was worse than 2.0.0 in one respect
+that nobody would have predicted from its file list.
+
+### Also fixed
+
+A Vortex install test earlier in the day used `v2.1.0-dev.1.zip`, five hours
+older than the working build and missing every fix, because `releases/` held 49
+zips with nothing marking which was current. Everything superseded is now under
+`releases/archive/`.

@@ -1,22 +1,25 @@
-"""Proves the additive animation layout is correct and complete.
+"""Proves the animation layout is correct and complete.
 
-Every claim the mod makes about its own deployment is checked here against the
-game's own paks and against the packaged release, rather than being asserted in
-documentation. Run it before publishing.
+Every claim the mod makes about its own deployment is checked here against
+the game's own paks and against the packaged release, rather than being
+asserted in documentation. Run it before publishing.
 
 The claims, in order:
 
- 1. The release overrides no vanilla filename.
- 2. Every file the release ships is one the mod is supposed to ship.
+ 1. The only vanilla names claimed are the two small declaration files, and
+    what is claimed stays small enough for another author to merge by hand.
+    No animation database is claimed.
+ 2. The release ships exactly the intended file set, no more.
  3. Nothing is lost from the fragment the mod takes authority over: every
     vanilla FragTag and every vanilla option survives.
  4. The mod's own options are present and point at clips the game contains.
- 5. The reference chain resolves end to end, every path in it exists, and the
-    vanilla database is referenced rather than copied.
- 6. Pak entry names use forward slashes, or CryEngine looks them up by a path
-    that does not match and the pak silently overrides nothing.
- 7. The Lua redirects the classes the engine actually spawns, not the templates
-    those classes were built from.
+ 5. The chain resolves through vanilla's own fragment and tag definitions,
+    so no unrelated animation travels through anything this mod restated.
+ 6. Pak entry names use forward slashes, or CryEngine looks them up by a
+    path that does not match and the pak silently overrides nothing.
+ 7. The Lua redirects the classes the engine actually spawns, not the
+    templates those classes were built from, and leaves ActionController on
+    vanilla.
 
 Run: python tools/verify_additive.py [path/to/release.zip]
 """
@@ -82,23 +85,34 @@ def main():
     with zipfile.ZipFile(build_adb.PAK) as anim:
         vanilla_names = set(n.replace("\\", "/") for n in anim.namelist())
 
-    claimed = [n for n in shipped if n in vanilla_names]
-    check(not claimed, "no shipped path exists in the vanilla animation pak",
-          "overlap: %s" % claimed if claimed else "%d entries checked" % len(shipped))
+    intended_vanilla = {
+        build_adb.TAGS_ENTRY,
+        build_adb.GENDERS["female"]["ids"],
+    }
+    claimed = set(n for n in shipped if n in vanilla_names)
+    check(claimed == intended_vanilla,
+          "the only vanilla names claimed are the two small declaration files",
+          "unexpected=%s missing=%s"
+          % (sorted(claimed - intended_vanilla) or "none",
+             sorted(intended_vanilla - claimed) or "none"))
 
-    adb_files = [n for n in shipped if n.startswith(ADB_PREFIX)]
-    bad = [n for n in adb_files if not n.rsplit("/", 1)[-1].startswith("hcm_")]
-    check(not bad, "every animation file is named hcm_*", bad or "%d files" % len(adb_files))
+    claimed_bytes = sum(shipped[n].file_size for n in claimed)
+    check(claimed_bytes < 32 * 1024,
+          "what is claimed stays small enough to merge by hand",
+          "%d bytes" % claimed_bytes)
+
+    databases = [n for n in shipped if n.endswith(".adb")]
+    check(all(n.rsplit("/", 1)[-1].startswith("hcm_") for n in databases),
+          "no animation database is claimed", databases)
 
     # ---- 2. the file set is exactly what is intended ----------------------
     heading("2. The release ships exactly the intended file set")
 
-    expected = set()
-    for gender in build_adb.GENDERS:
-        expected.add("hcm_%s_database.adb" % gender)
-        expected.add("hcm_%s_fragmentids.xml" % gender)
-        expected.add("hcm_%s_controllerdefs.xml" % gender)
-    expected.add(build_adb.SHARED_TAGS_NAME)
+    adb_files = [n for n in shipped if n.startswith(ADB_PREFIX)]
+
+    expected = set("hcm_%s_database.adb" % g for g in build_adb.GENDERS)
+    expected.add(build_adb.TAGS_ENTRY.rsplit("/", 1)[-1])
+    expected.add(build_adb.GENDERS["female"]["ids"].rsplit("/", 1)[-1])
 
     got = set(n.rsplit("/", 1)[-1] for n in adb_files)
     check(got == expected, "animation file set matches the generator's contract",
@@ -151,45 +165,42 @@ def main():
               % (len(vanilla_db) // 1024),
               "%d KB" % (len(parent) // 1024))
 
-        # FragDef must be the mod's ids, or options fail load-time validation.
+        # The parent must resolve through VANILLA's definitions, so that no
+        # unrelated animation travels through anything this mod restated.
         frag_def = re.search(r'<AnimDB FragDef="([^"]*)"', parent).group(1)
-        ids_name = "hcm_%s_fragmentids.xml" % gender
-        check(frag_def.endswith(ids_name),
-              "parent FragDef points at the mod's fragment ids", frag_def)
+        check(frag_def == paths["ids"],
+              "parent FragDef is vanilla's own fragment ids", frag_def)
 
-        # The ids file must reach the mod's tag file.
-        ids = pak.read(ADB_PREFIX + ids_name).decode("ascii", "replace")
+        tag_def = re.search(r'TagDef="([^"]*)"', parent).group(1)
+        check(tag_def == paths["tags"],
+              "parent TagDef is vanilla's own tag definitions", tag_def)
+
+        ids_name = paths["ids"].rsplit("/", 1)[-1]
+        ids = (pak.read(ADB_PREFIX + ids_name).decode("ascii", "replace")
+               if ADB_PREFIX + ids_name in shipped
+               else read_pak_text(build_adb.PAK, paths["ids"]))
         m = re.search(r'<Tag name="AnimationControlled" subTagDef="([^"]*)"', ids)
-        check(m is not None and m.group(1).endswith(build_adb.SHARED_TAGS_NAME),
-              "fragment ids point AnimationControlled at the mod's tag file",
+        check(m is not None and m.group(1) == build_adb.TAGS_ENTRY,
+              "AnimationControlled resolves to the tag file the mod extends",
               m.group(1) if m else "not declared")
 
-        van_ids = read_pak_text(build_adb.PAK, paths["ids"])
-        van_id_tags = set(re.findall(r'<Tag name="([^"]+)"', van_ids))
-        our_id_tags = set(re.findall(r'<Tag name="([^"]+)"', ids))
-        check(not (van_id_tags - our_id_tags), "no vanilla fragment id dropped",
-              sorted(van_id_tags - our_id_tags) or "%d ids" % len(van_id_tags))
+        if ADB_PREFIX + ids_name in shipped:
+            van_ids = read_pak_text(build_adb.PAK, paths["ids"])
+            vset = set(re.findall(r'<Tag name="([^"]+)"', van_ids))
+            oset = set(re.findall(r'<Tag name="([^"]+)"', ids))
+            check(not (vset - oset), "no vanilla fragment id dropped",
+                  sorted(vset - oset) or "%d ids" % len(vset))
 
-        # The controller def must reach that ids file.
-        ctrl_name = "hcm_%s_controllerdefs.xml" % gender
-        ctrl = pak.read(ADB_PREFIX + ctrl_name).decode("ascii", "replace")
-        m = re.search(r'<Fragments filename="([^"]*)"', ctrl)
-        check(m is not None and m.group(1).endswith(ids_name),
-              "controller def points at the mod's fragment ids",
-              m.group(1) if m else "no Fragments element")
-
-        # Every path referenced must actually resolve, in the mod pak or vanilla.
         refs = set(re.findall(r'(?:File|filename|subTagDef)="([^"]+)"',
-                              parent + ids + ctrl))
+                              parent + ids))
         unresolved = [r for r in refs
-                      if r not in shipped and r.replace("/", "\\") not in vanilla_names
-                      and r not in vanilla_names]
+                      if r not in shipped and r not in vanilla_names
+                      and r.replace("/", chr(92)) not in vanilla_names]
         check(not unresolved, "every referenced path resolves", unresolved)
-
     # ---- 6. tags -----------------------------------------------------------
     heading("Tag definitions")
 
-    our_tags = pak.read(ADB_PREFIX + build_adb.SHARED_TAGS_NAME).decode("ascii", "replace")
+    our_tags = pak.read(build_adb.TAGS_ENTRY).decode("ascii", "replace")
     van_tags = read_pak_text(build_adb.PAK, build_adb.TAGS_ENTRY)
     vt = set(re.findall(r'<Tag name="([^"]+)"', van_tags))
     ot = set(re.findall(r'<Tag name="([^"]+)"', our_tags))
@@ -233,8 +244,10 @@ def main():
           "every exposed class built from a redirected template is itself redirected",
           unredirected or "%d classes: %s" % (len(human), ", ".join(sorted(human))))
 
-    check("ActionController" in lua and "AnimDatabase3P" in lua,
-          "both properties are redirected, not just the database")
+    assigns = re.findall(r"target\.(\w+)\s*=", lua)
+    check("ActionController" not in assigns,
+          "ActionController is left on vanilla, so unrelated animations"
+          " never resolve through this mod", assigns)
 
     # ---- verdict -----------------------------------------------------------
     print()

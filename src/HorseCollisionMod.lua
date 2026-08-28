@@ -954,29 +954,24 @@ HorseCollisionMod.AnimationDatabases = {
 	DummyTarget_x = "male",
 	NPC_Female_x  = "female"
 }
---- The two properties each redirected class needs, per character set.
+--- The parent database each character set uses.
 --
--- Both matter, and only one of them is obvious. `AnimDatabase3P` decides which
--- fragments exist. `ActionController` decides how a name is resolved into one,
--- because it owns the fragment and tag definitions the entity looks names up
--- in. A database's own `FragDef` governs load-time validation only.
+-- Only `AnimDatabase3P` is redirected. `ActionController` deliberately is not:
+-- leaving entities on vanilla's controller def means every fragment except
+-- this mod's resolves through vanilla's own files, and the mod never appears
+-- in the resolution path of animations it has nothing to do with.
 --
--- Redirecting the database alone loads the stagger options cleanly and then
--- fails every call against them, because the entity is still resolving
--- `hcm_stagger_*` in vanilla's tag file, where it is not declared. That reads
--- in game as a one-frame twitch and produces no error at the call site: it
--- returns success.
+-- 2.1.0 briefly redirected both, so that the stagger FragTags could live in a
+-- file named hcm_*. That worked, and it also stopped Rattay's beggar
+-- kneeling, because his animation resolves through BeggarIn and
+-- kcd_beggar_tags.xml by way of the same copied fragment id file. The tags
+-- are declared in vanilla's own tag file instead now, which is 1 KB and costs
+-- nothing else its own resolution path.
 --
 -- @table AnimationSets
 HorseCollisionMod.AnimationSets = {
-	male = {
-		AnimDatabase3P   = "Animations/Mannequin/ADB/hcm_male_database.adb",
-		ActionController = "Animations/Mannequin/ADB/hcm_male_controllerdefs.xml"
-	},
-	female = {
-		AnimDatabase3P   = "Animations/Mannequin/ADB/hcm_female_database.adb",
-		ActionController = "Animations/Mannequin/ADB/hcm_female_controllerdefs.xml"
-	}
+	male   = "Animations/Mannequin/ADB/hcm_male_database.adb",
+	female = "Animations/Mannequin/ADB/hcm_female_database.adb"
 }
 
 --- Points the human entity classes at this mod's parent databases.
@@ -997,14 +992,12 @@ function HorseCollisionMod:RedirectAnimationDatabases()
 
 	for class, set in pairs(self.AnimationDatabases) do
 		local target = rawget(_G, class)
-		local paths = self.AnimationSets[set]
+		local database = self.AnimationSets[set]
 
 		if type(target) ~= "table" then
 			pending = pending + 1
-		elseif target.AnimDatabase3P ~= paths.AnimDatabase3P
-				or target.ActionController ~= paths.ActionController then
-			target.AnimDatabase3P = paths.AnimDatabase3P
-			target.ActionController = paths.ActionController
+		elseif target.AnimDatabase3P ~= database then
+			target.AnimDatabase3P = database
 			redirected = redirected + 1
 		end
 	end

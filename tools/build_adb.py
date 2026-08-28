@@ -1,4 +1,4 @@
-"""Generates this mod's animation data, without replacing any vanilla file.
+"""Generates this mod's animation data.
 
 `actor:StartInteractiveActionByName(name, ...)` resolves `name` against the
 FragTags of exactly one fragment, `AnimationControlled`. Vanilla ships 30
@@ -6,43 +6,41 @@ options there and every one is an object interaction (cabinet_o, alarmBell,
 door_*), so calling it with a hit-reaction name acquires the NPC's body and
 aborts within a frame: a valid call with no matching option.
 
-Adding an option to that fragment used to mean shipping a modified copy of
-the 5.5 MB vanilla database under its own name, which meant any other mod
-touching human animations either lost its changes to this one or took this
-one's away, silently, decided only by mod_order.txt.
+Before 2.1.0, adding an option meant shipping a modified copy of the 5.5 MB
+vanilla database under its own name. Two mods cannot both do that: the later
+one in mod_order.txt wins and the other's changes vanish with no error.
 
-This generates an additive layout instead. Seven files, all named hcm_*, so
-none of them collides with anything:
+Four files are generated now, and the two large databases are referenced
+rather than replaced:
 
-  hcm_<set>_database.adb        the parent, and the authoritative definition
-                                of AnimationControlled. Carries vanilla's own
-                                30 options plus this mod's 4, and references
-                                the untouched vanilla database as a SubADB
-                                for every other fragment.
-  hcm_<set>_fragmentids.xml     vanilla's fragment ids, with
-                                AnimationControlled's subTagDef pointed at
-                                the tag file below. For the female set it
-                                also declares that fragment, which vanilla
-                                does not have at all.
-  hcm_<set>_controllerdefs.xml  vanilla's controller def, with its Fragments
-                                element pointed at the ids file above.
-  hcm_animationControlledTags.xml   vanilla's 16 FragTags plus this mod's 4.
+  hcm_<set>_database.adb           the parent, and the authoritative
+                                   definition of AnimationControlled. Carries
+                                   vanilla's own options plus this mod's, and
+                                   references the untouched vanilla database
+                                   as a SubADB for every other fragment.
+  kcd_animationControlledTags.xml  vanilla's 16 FragTags plus this mod's 4.
+  wh_female_fragmentids.xml        declares AnimationControlled for the
+                                   women, who have no such fragment at all.
 
-HorseCollisionMod.lua then points the human entity classes at the parent
-through their AnimDatabase3P and ActionController properties.
+The last two keep vanilla's names deliberately. Giving them mod names means
+restating the fragment id and controller definitions, 123 KB of vanilla data,
+and putting this mod in the resolution path of every human animation rather
+than just its own. A build that did exactly that stopped Rattay's beggar
+kneeling. Owning 15 KB of declarations is the smaller thing to own.
 
-Four things have to hold at once, and each was found the hard way. See
+HorseCollisionMod.lua then points the human entity classes' AnimDatabase3P
+at the parent. ActionController is deliberately left alone.
+
+Three things have to hold at once, each found the hard way. See
 TESTING_DIARY.md, builds 2.0.1-dev.15 through 2.1.0.
 
 1. The parent must be the one defining AnimationControlled. Sub-databases do
    not merge options into a fragment another database already defines.
 2. The parent must therefore carry vanilla's options too, or redirected NPCs
    lose every door, cabinet and wardrobe interaction in the game.
-3. The parent's FragDef must be the mod's fragment ids, or the options fail
-   load-time validation with 'Unknown tags for fragmentID AnimationControlled'.
-4. ActionController must be redirected as well as AnimDatabase3P. The
-   controller def owns what an entity resolves names through at runtime; a
-   database's FragDef governs load-time validation only.
+3. The classes redirected must be the ones the engine spawns. NPC_x is a
+   template; NPC = CreateAI(NPC_x) copies its fields, so redirecting the
+   template changes nothing about what spawns.
 
 Run: python tools/build_adb.py
 """
@@ -168,8 +166,8 @@ def find_game_root():
 GAME_ROOT = find_game_root()
 PAK = os.path.join(GAME_ROOT, PAK_RELATIVE)
 
-# The vanilla subTagDef for the AnimationControlled fragment. Read to build
-# the mod's own copy of it, never overwritten.
+# The subTagDef for the AnimationControlled fragment. This mod ships its own
+# version of this file, under this same name, with four tags added.
 TAGS_ENTRY = "Animations/Mannequin/ADB/kcd_animationControlledTags.xml"
 
 # Output lands in mod_assets/ at the repository root, never in the working
@@ -203,12 +201,6 @@ GENDERS = {
     },
 }
 
-# The one tag file both character sets share, holding the four hcm_stagger_*
-# FragTags. A copy of vanilla plus the mod's group rather than a reference:
-# unlike a database, a tag definition has no include mechanism. It never
-# collides, because the name is the mod's, but it also cannot pick up another
-# mod's additions to the same group.
-SHARED_TAGS_NAME = "hcm_animationControlledTags.xml"
 
 # FragTags name -> clip. The direction suffix matches what the Lua sends,
 # which is GetImpactDir's so_* result with "so_" stripped, hence "forward"
@@ -331,12 +323,22 @@ def out(name):
 
 
 def write_shared_tags(nl):
-    """The FragTags the stagger options carry, under a name nothing else uses.
+    """Adds the stagger FragTags to the AnimationControlled tag definition.
 
-    A copy of the vanilla AnimationControlled tag definition plus one group.
-    Tag definitions have no include mechanism, so unlike a database this cannot
-    be a reference to the vanilla file. It never collides, because the filename
-    is ours, but it also cannot see another mod's additions to the same group.
+    Written under vanilla's own name, deliberately.
+
+    The alternative, shipping it as hcm_animationControlledTags.xml, means
+    every entity has to be pointed at a copy of the fragment id file to reach
+    it, and that file at a copy of the controller def. Those two copies are
+    123 KB of vanilla data restated under mod names, and they sit in the
+    resolution path of every fragment a human uses, not just this mod's.
+    Build 2.1.0 did that and Rattay's beggar stopped kneeling: his animation
+    resolves through BeggarIn and kcd_beggar_tags.xml, nothing to do with
+    this mod, but it travels through the same copied files.
+
+    Replacing 1 KB of tag names is a far smaller thing to own than restating
+    the whole fragment and controller definitions, and it leaves every
+    unrelated animation on vanilla's own path.
     """
     raw = read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace")
 
@@ -350,59 +352,58 @@ def write_shared_tags(nl):
     if patched == raw:
         raise SystemExit("shared tag anchor not matched")
 
-    with io.open(out(SHARED_TAGS_NAME), "wb") as handle:
+    name = TAGS_ENTRY.rsplit("/", 1)[-1]
+
+    with io.open(out(name), "wb") as handle:
         handle.write(patched.encode("ascii"))
 
-    return "Animations/Mannequin/ADB/" + SHARED_TAGS_NAME
+    print("  tags   %s (%d B, %d vanilla + %d added)"
+          % (name, os.path.getsize(out(name)),
+             raw.count("<Tag "), len(STAGGERS)))
 
 
-def write_additive_gender(gender, paths, shared_tags, nl):
-    """Writes the three files one gender needs, claiming no vanilla name."""
-    ids_name = "hcm_%s_fragmentids.xml" % gender
-    stagger_name = "hcm_%s_stagger.adb" % gender
-    parent_name = "hcm_%s_database.adb" % gender
+def write_female_declaration(paths, nl):
+    """Declares AnimationControlled for the women, who have no such fragment.
 
+    Also under vanilla's name. The men already declare it and need no change
+    here at all.
+    """
     ids = read_pak_entry(PAK, paths["ids"]).decode("ascii", "replace")
 
-    # The women have the same hit-reaction clips but no AnimationControlled
-    # fragment at all, so it has to be declared before anything can be added to
-    # it. The men already have one, and only its subTagDef needs repointing.
-    if "AnimationControlled" not in ids:
-        declaration = ('    <Tag name="AnimationControlled" subTagDef="%s" />'
-                       % shared_tags)
-        anchor = nl + "  </Tags>"
-        ids = ids.replace(anchor, nl + declaration + anchor, 1)
+    if "AnimationControlled" in ids:
+        raise SystemExit("the female fragment ids already declare it; "
+                         "this patch is no longer needed")
 
-        if declaration not in ids:
-            raise SystemExit("%s fragmentids anchor not matched" % gender)
-    else:
-        ids = ids.replace(TAGS_ENTRY, shared_tags)
+    declaration = ('    <Tag name="AnimationControlled" subTagDef="%s" />'
+                   % TAGS_ENTRY)
+    anchor = nl + "  </Tags>"
+    patched = ids.replace(anchor, nl + declaration + anchor, 1)
 
-        if shared_tags not in ids:
-            raise SystemExit("%s subTagDef reference not found" % gender)
+    if patched == ids:
+        raise SystemExit("female fragment ids anchor not matched")
 
-    with io.open(out(ids_name), "wb") as handle:
-        handle.write(ids.encode("ascii"))
+    name = paths["ids"].rsplit("/", 1)[-1]
 
-    # The controller def is what an entity actually resolves fragments and
-    # tags through at runtime, by way of its ActionController property. A
-    # database's own FragDef governs load-time validation only. Without this
-    # the stagger options load and validate cleanly, and then every call
-    # against them resolves to nothing, because the entity is still looking
-    # them up in vanilla's tag file where hcm_stagger_* is not declared.
-    ctrl_name = "hcm_%s_controllerdefs.xml" % gender
-    ctrl = read_pak_entry(PAK, paths["ctrl"]).decode("ascii", "replace")
-    ctrl = ctrl.replace(paths["ids"], "Animations/Mannequin/ADB/" + ids_name)
+    with io.open(out(name), "wb") as handle:
+        handle.write(patched.encode("ascii"))
 
-    if ids_name not in ctrl:
-        raise SystemExit("%s controller def Fragments element not matched" % gender)
+    print("  female %s (%d B, declares AnimationControlled)"
+          % (name, os.path.getsize(out(name))))
 
-    with io.open(out(ctrl_name), "wb") as handle:
-        handle.write(ctrl.encode("ascii"))
 
-    # Every referenced clip must already exist in that gender's database, or
-    # the option resolves to nothing silently.
+def write_parent(gender, paths, nl):
+    """Writes the one file that carries this mod's options.
+
+    It is the authoritative definition of AnimationControlled, so it has to
+    carry vanilla's own options as well as this mod's: a sub-database does not
+    merge into a fragment another database defines, and without them a
+    redirected NPC loses every door, cabinet and wardrobe interaction.
+
+    Everything else a human animates with is reached by reference, through a
+    SubADB pointing at the untouched vanilla database inside its own pak.
+    """
     db = read_pak_entry(PAK, paths["db"]).decode("ascii", "replace")
+
     present = set(re.findall(r'<Animation name="([^"]*)"', db))
     missing = [clip for _, clip in STAGGERS if clip not in present]
 
@@ -412,39 +413,20 @@ def write_additive_gender(gender, paths, shared_tags, nl):
 
     options = nl.join(render_option(tags, clip, nl) for tags, clip in STAGGERS)
 
-    # Sub-databases do not merge options into a fragment another one already
-    # defines: the later sub replaces that fragment outright. Proven with a
-    # canary carrying the vanilla cabinet_o tag, which played vanilla's
-    # cabinet animation rather than this mod's clip while vanilla's
-    # sub-database was listed second.
-    #
-    # So this file has to carry vanilla's own options too, or redirected
-    # entities lose every door, cabinet and wardrobe interaction. It is still
-    # only the one fragment: 69 KB against the 5.5 MB whole database.
     existing = re.search(
         "\n    <AnimationControlled>(.*?)\n    </AnimationControlled>", db, re.S)
 
-    if existing:
-        inherited = existing.group(1).strip("\r\n")
-        options = inherited + nl + options
-        print("  %-6s inherits %d vanilla options"
-              % (gender, inherited.count("<Fragment")))
+    inherited = 0
 
-    # The mod's fragment goes in the PARENT's own FragmentList, not in a
-    # sub-database.
-    #
-    # Sub-databases were tried both first and last, and vanilla's copy of the
-    # AnimationControlled fragment won either way, so ordering is not what
-    # decides it. A parent is the primary database and its sub-databases
-    # supplement what it does not itself define, which makes the parent the
-    # only place a definition can be authoritative.
-    #
-    # It carries vanilla's own options as well as the mod's, or a redirected
-    # NPC loses every door, cabinet and wardrobe interaction.
+    if existing:
+        block = existing.group(1).strip("\r\n")
+        inherited = block.count("<Fragment ")
+        options = block + nl + options
+
+    name = "hcm_%s_database.adb" % gender
     parent = nl.join([
         '<?xml version="1.0" encoding="us-ascii"?>',
-        '<AnimDB FragDef="Animations/Mannequin/ADB/%s" TagDef="%s">'
-        % (ids_name, paths["tags"]),
+        '<AnimDB FragDef="%s" TagDef="%s">' % (paths["ids"], paths["tags"]),
         "  <FragmentList>",
         "    <AnimationControlled>",
         options,
@@ -457,47 +439,36 @@ def write_additive_gender(gender, paths, shared_tags, nl):
         "",
     ])
 
-    with io.open(out(parent_name), "wb") as handle:
+    with io.open(out(name), "wb") as handle:
         handle.write(parent.encode("ascii"))
 
-    # No separate stagger file in this layout; remove a stale one so it cannot
-    # be mistaken for part of the build.
-    stale_stagger = out(stagger_name)
-
-    if os.path.exists(stale_stagger):
-        os.remove(stale_stagger)
-    print("  %-6s %s (%d B), %s (%d B), %s (%d B)"
-          % (gender, parent_name, os.path.getsize(out(parent_name)),
-             ids_name, os.path.getsize(out(ids_name)),
-             ctrl_name, os.path.getsize(out(ctrl_name))))
-
+    print("  %-6s %s (%d B, %d vanilla options + %d added)"
+          % (gender, name, os.path.getsize(out(name)), inherited, len(STAGGERS)))
 
 def write_additive():
-    """Generates the whole additive layout, overriding no vanilla file."""
+    """Generates the whole layout."""
     nl = newline_of(read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace"))
-    shared_tags = write_shared_tags(nl)
 
-    print("Additive layout, %d options per gender:" % len(STAGGERS))
+    print("Additive layout, %d options per character set:" % len(STAGGERS))
 
     for gender, paths in sorted(GENDERS.items()):
-        write_additive_gender(gender, paths, shared_tags, nl)
+        write_parent(gender, paths, nl)
 
-    print("  shared %s (%d B)"
-          % (SHARED_TAGS_NAME, os.path.getsize(out(SHARED_TAGS_NAME))))
+    write_shared_tags(nl)
+    write_female_declaration(GENDERS["female"], nl)
 
     for tags, clip in STAGGERS:
         print("  + %-22s -> %s" % (tags, clip))
 
-    # A file left over from a previous --replace build would still be an
-    # override, and would quietly undo everything this mode is for.
-    for stale in ["kcd_male_database.adb", "kcd_animationControlledTags.xml",
-                  "wh_female_database.adb", "wh_female_fragmentids.xml"]:
-        path = out(stale)
+    # A file from an earlier layout would still be an override and would
+    # quietly change which chain entities resolve through.
+    keep = set(["hcm_male_database.adb", "hcm_female_database.adb",
+                TAGS_ENTRY.rsplit("/", 1)[-1],
+                GENDERS["female"]["ids"].rsplit("/", 1)[-1]])
 
-        if os.path.exists(path):
-            os.remove(path)
-            print("  removed stale override: %s" % stale)
-
+    for stale in sorted(set(os.listdir(OUT_DIR)) - keep):
+        os.remove(out(stale))
+        print("  removed stale file: %s" % stale)
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)

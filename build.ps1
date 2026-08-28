@@ -129,36 +129,40 @@ Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 # override the file the parent database references, silently defeating the
 # whole arrangement without changing anything this build prints.
 $adb = "$buildDir\pak\Animations\Mannequin\ADB"
+
+# The exact file set the mod ships. Two of these carry vanilla names on
+# purpose: they are small declaration files, and owning them is far cheaper
+# than the alternative of restating 123 KB of fragment and controller
+# definitions under mod names, which put this mod in the resolution path of
+# every human animation and broke unrelated ones. See TECHNICAL_DETAILS.md.
 $required = @(
     "$adb\hcm_male_database.adb",
-    "$adb\hcm_male_fragmentids.xml",
-    "$adb\hcm_male_controllerdefs.xml",
     "$adb\hcm_female_database.adb",
-    "$adb\hcm_female_fragmentids.xml",
-    "$adb\hcm_female_controllerdefs.xml",
-    "$adb\hcm_animationControlledTags.xml"
+    "$adb\kcd_animationControlledTags.xml",
+    "$adb\wh_female_fragmentids.xml"
 )
 
-# Nothing under a vanilla name may ship. That is the property the whole layout
-# exists to provide, and a stale file left in mod_assets would quietly undo it
-# without changing anything the build prints.
-$vanillaNames = Get-ChildItem "$adb" -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -notlike "hcm_*" }
+# Nothing beyond that set may ship. A leftover from an earlier layout would
+# still be an override and would quietly change which chain entities resolve
+# through, without altering a single line this build prints.
+$allowed = $required | ForEach-Object { Split-Path -Leaf $_ }
+$unexpected = Get-ChildItem $adb -File -ErrorAction SilentlyContinue |
+    Where-Object { $allowed -notcontains $_.Name }
 
-if ($vanillaNames) {
-    foreach ($f in $vanillaNames) {
-        Write-Host "[BUILD ERROR] ships a vanilla filename: $($f.Name)" -ForegroundColor Red
+if ($unexpected) {
+    foreach ($f in $unexpected) {
+        Write-Host "[BUILD ERROR] unexpected animation file: $($f.Name)" -ForegroundColor Red
     }
     Write-Host "Delete mod_assets\ and rebuild." -ForegroundColor Red
     exit 1
 }
+
 foreach ($f in $required) {
     if (-not (Test-Path $f)) {
         Write-Host "[BUILD ERROR] missing required asset: $f" -ForegroundColor Red
         exit 1
     }
 }
-
 # 2. Create the PAK (zip file)
 # Compress-Archive writes Windows path separators into the zip entry names
 # (Libs\AI\final\x.xml). CryEngine looks pak entries up by exact path with
