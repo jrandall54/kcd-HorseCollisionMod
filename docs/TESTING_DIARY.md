@@ -3946,3 +3946,73 @@ The footprint still rejects NPCs standing directly ahead at `fwd` 1.7 to 2.4
 with `lat` under 0.35, which is a separate question about front reach and is not
 what causes a reaction to be missed, since the horse closes that distance within
 one or two ticks.
+
+## Reaction reliability: the correction holds, and the deceleration is one tick wide
+
+**Hypothesis**: scoring a collision on the peak of the last three ticks instead
+of the speed sampled when the victim is noticed removes the tier
+misclassification. The impact line now prints the scored speed, the sampled
+speed and the full ten-sample trail, so the width of the deceleration can be
+read directly rather than guessed at.
+
+**User report**: installed and rode around.
+
+31 impacts, against 25 in the previous session.
+
+**No impact was misclassified.** The correction changed the tier on three of
+them:
+
+| trail, last three samples | sampled | scored | tier without the fix | tier with it |
+| --- | --- | --- | --- | --- |
+| 10.57 10.67 5.91 | 5.91 | 10.67 | Trot | Gallop |
+| 10.08 10.55 4.71 | 4.71 | 10.55 | Trot | Gallop |
+| 4.04 4.50 4.07 | 4.07 | 4.50 | Walk | Trot |
+
+The two gallop cases are the defect that opened this investigation, caught in
+the act. Both would have delivered a trot knockdown for a 10.6 m/s impact.
+
+**The deceleration is one tick wide, sometimes two.** Every trail shows the same
+shape: speed flat, then a single sample collapsing.
+
+```
+[10.68 10.63 10.68 10.74 10.73 10.68 10.58 10.57 10.67 5.91]
+[10.71 10.74 10.75 10.76 10.76 10.74 10.10 10.08 10.55 4.71]
+[ 2.77  2.82  2.94  3.00  3.59  4.49  5.47  6.32  6.16 4.75]
+```
+
+The largest single-tick loss was 5.84 m/s, from 10.55 to 4.71 in 100 ms. Only
+the third trail above spreads the loss across two samples. Nothing observed
+needs more than two, so `ImpactSpeedSamples = 3` covers the deceleration with a
+tick of margin, and there is no case for widening it.
+
+The short window also proved necessary rather than merely cautious. One trail
+runs `[4.53 3.76 3.07 2.82 2.78 2.88 3.10 3.93 4.94 5.46]`: a rider who slowed
+from 4.53, then accelerated back into the victim. Scored on three samples this
+is 5.46, which is correct. Scored on the full second it would still have been
+5.46 here, but the 4.53 sits close enough to the front of the window to show how
+a genuine deliberate slowdown would be charged the earlier, higher gait.
+
+`MaxImpactSpeed` never bound. The highest speed recorded was 10.78, inside the
+gallop plateau, and the 15.63 and 12.73 spikes from the previous session did not
+recur. The cap stays as insurance, since it costs nothing and a spike scales
+knockback force.
+
+**The footprint is not a source of missed reactions.** Of 99 rejections:
+
+- 64 were beside the horse, past the 0.35 lateral half-width. Correct.
+- 34 were dead ahead past the front reach, median 2.23 m. **30 of those 34 were
+  followed by an impact within a few ticks**, so they are early detections
+  inside the 2.5 m sphere that convert once the horse closes. The remaining 4
+  are consistent with an NPC stepping aside. Front reach needs no change.
+- 1 was behind the horse.
+
+**Everything downstream is clean.** Five walk-tier impacts produced five
+staggers, all returning `ok=true err=nil`. The one `below-walk-speed` rejection
+scored 0.75 m/s on a nearly stationary horse, which is correct. The gap between
+91 footprint passes and 31 impacts is the per-victim cooldown absorbing about
+two follow-up ticks per impact while the horse rides past, and those are
+invisible in the log because `LogRejection` throttles to one line per NPC per
+second.
+
+**Still open**: kneeling NPCs detected without producing a reaction. Nothing in
+this session identifies a kneeling victim, so it needs a test aimed at it.

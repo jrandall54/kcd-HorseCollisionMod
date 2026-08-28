@@ -136,6 +136,21 @@ The gap between 8.03 and 8.84 m/s is empty, which places the trot-to-gallop
 boundary at 8.5 in open space. Reaction strength changes sharply across it, at a
 speed the horse passes through often.
 
+### The speed a collision is scored at
+
+A horse loses speed the moment it hits someone, and detection samples velocity
+once per tick. The speed read on the tick that notices a victim has therefore
+already been reduced by the collision it is meant to describe, which scores a
+gallop impact as a walk and plays a stagger where a knockdown belongs.
+
+The tier comes from the peak of the last `ImpactSpeedSamples` ticks instead.
+The window is short by design: taken over a longer span it would charge gallop
+to a rider who galloped up and then slowed deliberately to nudge someone.
+
+`MaxImpactSpeed` caps the result. The value scales knockback force as well as
+selecting the tier, and the physics system reports occasional speeds above
+anything a horse holds.
+
 ### Footprint
 
 A horse is long and narrow. A sphere alone catches people alongside and behind
