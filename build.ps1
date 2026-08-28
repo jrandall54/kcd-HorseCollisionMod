@@ -80,6 +80,40 @@ if ($errors -gt 0) {
     exit 1
 }
 
+# A local helper used before it is declared.
+#
+# `local function f` is visible only from its declaration onward. A function
+# written above it that calls `f` resolves the name as a global instead, which
+# is nil, and the call throws at runtime. It is valid syntax, so the LuaJIT
+# parse below accepts it, and the mod loads and then errors on every tick.
+$scopeErrors = @()
+
+foreach ($luaFile in @($modScript, $settingsScript)) {
+    $text = Get-Content $luaFile
+    $shortName = Split-Path -Leaf $luaFile
+
+    for ($i = 0; $i -lt $text.Count; $i++) {
+        if ($text[$i] -notmatch '^local function (\w+)') { continue }
+
+        $name = $Matches[1]
+
+        for ($j = 0; $j -lt $i; $j++) {
+            if ($text[$j] -match '^\s*(--|local function)') { continue }
+            if ($text[$j] -match ("\b" + $name + "\s*\(")) {
+                $scopeErrors += "{0} line {1}: {2} used before its declaration on line {3}" -f `
+                        $shortName, ($j + 1), $name, ($i + 1)
+            }
+        }
+    }
+}
+
+if ($scopeErrors.Count -gt 0) {
+    foreach ($e in $scopeErrors) {
+        Write-Host "[LINT] $e" -ForegroundColor Red
+    }
+    Write-Host "Build failed: a local helper is used above where it is declared." -ForegroundColor Red
+    exit 1
+}
 # Stray control characters in any tracked text file.
 #
 # A scripted edit that writes a path like ".\build.ps1" through a tool that

@@ -3821,3 +3821,38 @@ recorded under tuning, not a new finding.
 Every number here comes from impacts that were accepted. The rejected ones are
 what the question is about, and they are exactly what this log cannot show. The
 diagnostic build names them.
+
+### The diagnostic build errored on every tick
+
+**User report**: the game hung on the first run, and on the second nothing
+worked and the console filled with errors.
+
+`kcd.log` carried the mod's own handler 125 times:
+
+```
+[HorseCollisionMod] CRITICAL ERROR IN UPDATE TIMER:
+    scripts/startup/horsecollisionmod.lua:0: [Error] Lua error.
+```
+
+`LogRejection` was inserted at line 262 and calls `GetTimeMs()`, which is
+declared `local function` at line 284. A `local function` is visible only from
+its declaration onward, so the call resolved the name as a global, found nil,
+and threw. Every tick, for every rejected candidate.
+
+Two things made it expensive to notice. It is valid syntax, so the LuaJIT parse
+in `build.ps1` accepted it. And the failure surfaced through the mod's own error
+handler as a generic Lua error with no line number, because the engine needs
+`-lua_storedebug 1` for that.
+
+The functions now sit below the helpers they use.
+
+`build.ps1` gained a check for it: for every `local function`, any call to that
+name above its declaration fails the build. Verified by reintroducing the bug
+and watching it fail:
+
+```
+[LINT] HorseCollisionMod.lua line 221: GetTimeMs used before its declaration on line 224
+```
+
+This is the same class as `NPC = CreateAI(NPC_x)` copying fields: a language
+rule about when a name refers to what, invisible at the call site.

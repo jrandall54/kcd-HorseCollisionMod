@@ -217,6 +217,21 @@ HorseCollisionMod.SpeedHistory = {}
 
 HorseCollisionMod.SpeedHistorySize = 10
 
+local function GetTimeMs()
+	return System.GetCurrTime() * 1000
+end
+
+--- Magnitude of a CryEngine vector.
+-- @tparam ?table v vector with x, y and z components, or nil
+-- @treturn number length, or 0 when v is nil
+local function GetVectorLength(v)
+	if not v then
+		return 0
+	end
+
+	return math.sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z))
+end
+
 --- Records a speed sample and returns the highest in recent history.
 --
 -- @tparam number speed the current sample, in meters per second
@@ -281,21 +296,6 @@ end
 
 --- Current time in milliseconds.
 -- @treturn number milliseconds since the game session started
-local function GetTimeMs()
-	return System.GetCurrTime() * 1000
-end
-
---- Magnitude of a CryEngine vector.
--- @tparam ?table v vector with x, y and z components, or nil
--- @treturn number length, or 0 when v is nil
-local function GetVectorLength(v)
-	if not v then
-		return 0
-	end
-
-	return math.sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z))
-end
-
 --- Writes a prefixed line to kcd.log when telemetry is enabled.
 -- @tparam string message text to log
 function HorseCollisionMod:Log(message)
