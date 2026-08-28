@@ -4136,3 +4136,196 @@ flag, mirroring `notes-<version>.md` for the changelog. The report prints the
 length before the upload, and `pre_release_check.py` fails a release whose
 description file is missing, empty or over 255, because a blank entry is
 invisible in the report of a run that otherwise succeeded.
+
+## Next: Phase 2, starting with armor weight
+
+Everything in Phase 2 depends on knowing what the victim is wearing, so that is
+the first piece. Groundwork already established, carried forward so it is not
+re-derived. All four code references below were re-checked against the 3.0.0
+source.
+
+**Where it plugs in.** `TriggerCollision` already computes a `combatScale`
+multiplier and passes a per-tier stamina cost into `DrainHorseStamina`. Armor
+scaling is a second multiplier applied at the same point, and `Ragdoll` already
+takes an `impulseScale` argument for the knockback side. Neither needs
+restructuring.
+
+**Reading the armor.** Entities carry an `inventory` extension, confirmed when
+enumerating a live horse's fields. Vanilla scripts use
+`inventory:GetCurrentItem`, `GetItemByClass`, `FindItem` and `GetCountOfClass`.
+What is not established is how to get from an equipped item to its weight, and
+whether a per-actor aggregate exists rather than having to sum pieces.
+
+**Where the data lives.** `Data/Tables.pak` carries
+`Libs/Tables/item/armor.xml` at 479 KB, plus `armor_archetype.xml`,
+`armor_type.xml` and `armor_subtype.xml`. Those are readable with the
+`read_pak_entry` helper in `build_adb.py`, which handles the backslash local
+headers that break Python's `zipfile`.
+
+**Reference material**: `references/Nexus_KCD_Wiki/RPG_params_in_KCD.md` and
+`RPG_stats_in_KCD.md`, plus `references/kcd-documentation/` for the Soul and
+Inventory ScriptBind pages.
+
+**The trap to avoid**, given this project's history: a call that returns a value
+is not proof the value is right. Log the weights read off real NPCs and check
+them against the tables before building any scaling on top.
+
+## Phase 2: where armor weight and body mass actually live
+
+**Hypothesis**: `Libs/Tables/item/armor.xml` carries the weight of each armor
+piece, so scaling knockback by what a victim wears means reading that table.
+
+Wrong on the first half. `armor.xml` has 28 columns and none of them is weight.
+What it carries is `slash_def`, `stab_def`, `smash_def`, `noise`, `max_status`
+and `str_req`, keyed by `item_id`.
+
+**Weight is on `Libs/Tables/item/pickable_item.xml`**, which every item joins
+to by `item_id`, alongside `price`, `model` and `material`. All 796 rows in
+`armor.xml` join to it and all 796 have a weight, so the join is total and
+needs no fallback. `item.xml` is only a name and category lookup, three columns
+wide.
+
+Per-piece weight by armor type, from that join:
+
+```
+horse_saddle     n=20    20.00 - 35.00   mean 27.75
+chain            n=31     1.00 - 21.00   mean 11.83
+horse_bridle     n=12     2.00 - 20.00   mean  7.50
+heavy leather    n=35     4.00 -  9.00   mean  6.97
+plate            n=127    0.00 - 12.00   mean  6.30
+light leather    n=24     0.00 - 10.00   mean  4.46
+horse_shoe       n=4      4.00 -  4.00   mean  4.00
+cloth            n=329    0.50 - 14.00   mean  3.48
+default cloth    n=159    0.00 - 17.90   mean  3.46
+shoe             n=32     2.00 -  4.80   mean  2.62
+spur             n=5      1.00 -  1.00   mean  1.00
+decorated        n=18     0.00 -  0.50   mean  0.08
+```
+
+Two things in that table matter for scaling. **Chain outweighs plate per
+piece**, mean 11.83 against 6.30, so a rule that treats plate as the heavy end
+of the scale would be backwards. And **horse tack is filed as armor**, so any
+sum over a target's armor must exclude saddle, bridle, shoe and spur or a
+mounted victim reads as heavier than a knight.
+
+`str_req` on `armor.xml` is a designer-set strength requirement and tracks
+heaviness independently of the weight column. It is a candidate proxy worth
+comparing against summed weight before either is chosen.
+
+### Body mass comes from the soul archetype, not the inventory
+
+`Libs/Tables/rpg/soul_archetype.xml` carries `normal_body_weight` across 16
+archetypes:
+
+```
+NPC 160    NPC_Female 120    NPC_Child 80    Hero 160    Hero_female 120
+Horse 1000    Cow 400    Boar 300    Pig 250    RedDeer 185    DeerDoe 165
+Sheep 140    Dog 50    RoeBuck 27    Hare 6    Hen 2
+```
+
+This is the mass term Phase 2 needs for the target, and it requires no
+inventory enumeration at all. It also supplies the ratio the momentum work
+depends on: a horse at 1000 against an adult NPC at 160 is 6.25 to 1, and
+against a child at 80 is 12.5 to 1. The same table carries `base_stamina`,
+`body_base_armor` and `unarmed_attack_base`, which Phase 3 will want.
+
+`normal_body_weight` also appears in the decompiled binary as
+`NormalBodyWeight`, so the engine reads it rather than it being unused data.
+
+**Not this**: `equippable_item.xml` has an `rpg_buff_weight` column. That is a
+weighting factor on buff selection, not a mass, and the name invites exactly
+the wrong join.
+
+**Still open**: nothing above is reachable from Lua yet. The tables are build
+time data, and `build_adb.py` already reads paks, so an item-name to weight
+table can be generated into the mod. What that does not answer is which pieces
+a given NPC has equipped at the moment of impact, which is the inventory
+question the previous entry left open. The CryEngine `inventory` ScriptBind has
+15 methods and none of them returns a weight, so the equipped set has to come
+from `GetCurrentItem`, `GetItemByClass` or an equivalent KCD-specific bind, and
+that is the next thing to establish.
+
+## Roadmap ordering: the native path already carries damage and crime
+
+**Question**: does the roadmap order corner the project, specifically by
+building armor scaling in Phase 2 before the damage and crime work in Phases 3
+and 4.
+
+It does, and the reason is in vanilla's own behavior tree rather than in
+anything the mod does.
+
+### What vanilla does with the collision hit
+
+`Libs/AI/final/sb_switch_hitreactions.xml`, inside `Scripts.pak`, branches on
+`$hitReaction.hitType == $enum:HitReactionType.Collision`. Inside that branch it
+resolves the horse's `rider` link into `riderPlayer`, and when that is the
+player it sends:
+
+```
+<InstantSendMessageToNPC target="this.id" type="combat:hit"
+  values="attacker($__player), strength($hitReaction.hitStrength),
+          hitType($enum:HitReactionType.Melee), real(true)" />
+```
+
+`real(true)`, attributed to the player, carrying the strength the collision
+arrived with. `SendHitReaction` already sends
+`hitType(HitReactionType.Collision)` with the horse as attacker and a per-tier
+`HitReactionStrength`, so the mod is already feeding that path: MinorInjury at
+trot, MajorInjury at gallop.
+
+Two roadmap items therefore describe wiring that already exists rather than
+work to be built. Phase 3's native blunt damage and Phase 4's trampling crime
+both hang off a real, player-attributed `combat:hit` that the mod already
+causes.
+
+`CollisionVelocityDeltaToDmgR = 0.25` in `Libs/Tables/rpg/rpg_param.xml`
+confirms collision velocity to damage is a parameterized vanilla concept, not
+something the mod would be introducing. `HorseMoraleToThrowOffRider = 0.2` and
+`HorseMountMaxRelativeEncumberance = 1.5` sit in the same table for the Phase 3
+Horsemanship and barding work.
+
+### The double-counting trap
+
+KCD resolves a real hit against the target's armor itself, through `smash_def`
+on `armor.xml` and `body_base_armor` on `soul_archetype.xml`. Since the mod
+already causes a real hit, **armor mitigation is already being applied
+downstream of the mod, on every trot and gallop impact.**
+
+Phase 2 as written says "unarmored targets take proportionally heavier
+knockback" and "heavily armored targets are moved less". Built as a general
+"armor scales the outcome" rule, that stacks a second armor model on top of the
+one the engine is already applying, and the error would only show up as
+mistuned damage long after the scaling was written.
+
+The boundary that avoids it:
+
+- **The engine owns armor against damage.** Nothing in the mod should reduce
+  damage by armor, and `hitStrength` should stay chosen by speed alone, because
+  the engine resolves that strength against armor after receiving it.
+- **The mod owns the physical response.** The `impulseScale` passed to
+  `Ragdoll`, and the horse's side of the impact, its stamina cost and its
+  momentum loss. The engine derives none of those from armor, so scaling them
+  by the victim's mass and armor weight adds something rather than duplicating
+  it.
+
+### What this changes about the order
+
+The cheapest step with the largest effect on the rest of the roadmap is not
+building armor scaling. It is establishing, in game, what the existing build
+already does: whether damage lands, whether injuries and bleeding follow,
+whether a bounty is registered, and whether armored targets already take less.
+That test needs no new code, and its result decides whether Phases 3 and 4 are
+mostly verification or mostly construction.
+
+**Unverified until that test runs**: everything above is read out of the
+behavior tree and the tables. That the tree sends `real(true)` is not proof the
+damage lands, that the crime system accepts it, or that armor mitigates it.
+
+### A note on the carried-item gap
+
+Phase 1's remaining carried-item work needs `sb_combat.xml` shipped for its
+`dropItems` tree. `sb_switch_hitreactions.xml` is 132,889 bytes and
+`sb_combat.xml` is the same order, with no additive path for either. Shipping
+one reintroduces exactly the whole-file conflict surface that 3.0.0 removed, in
+exchange for a cosmetic fix. It should stay parked unless an additive approach
+to behavior trees appears.

@@ -26,7 +26,9 @@ Known gaps carried into later phases:
       item stays in hand with and without it. The goal is now the vanilla behavior instead,
       drop the item, react, pick it back up. `sb_combat.xml` has a `dropItems` tree that tags
       the dropped item `panicDrop`, and `so_slot.xml` recovers it. Cost is shipping a 133 KB
-      behavior tree, which has no additive path.
+      behavior tree, which has no additive path, so it reintroduces the whole-file conflict
+      surface 3.0.0 removed in exchange for a cosmetic fix. Parked unless an additive
+      approach to behavior trees appears.
 - [ ] The horse and a staggering NPC can still push against each other instead of clearing
       past. Setting the animation's collider mode to `Disabled` did not resolve it, and it
       matches vanilla behavior when riding head-on into someone. Revisit with Phase 2
@@ -68,7 +70,7 @@ Download drops from 195,284 to 24,847 bytes.
       from. `NPC = CreateAI(NPC_x)` copies fields, so redirecting `NPC_x` has no
       effect on what spawns.
 - [x] Verify a packaged build at shipping pak priority, from a Vortex install.
-- [ ] Publish 3.0.0, and rewrite the mod page, which still describes the old
+- [x] Publish 3.0.0, and rewrite the mod page, which described the old
       database-replacement install.
 
 Two small declaration files keep vanilla names, 15 KB in total, and two mods
@@ -91,20 +93,46 @@ and both axes of the footprint were each cleared against logged sessions.
 
 ## Phase 2: Mass, armor and momentum
 
-Scale the high-speed reaction to what the target is actually made of.
+Scale the physical response to what the target is made of.
 
-- [ ] Read the target's equipped armor weight.
-- [ ] Unarmored targets take proportionally heavier knockback.
-- [ ] Heavily armored targets are moved less.
+**Scope boundary.** Vanilla converts a collision hit whose rider is the player into a real,
+player-attributed `combat:hit`, carrying the `hitStrength` this mod sends. The engine then
+resolves that hit against the target's armor itself. Armor therefore already mitigates
+damage downstream of the mod, and a second armor model here would double-count. The engine
+owns armor against damage, and `hitStrength` stays chosen by speed alone. This phase owns
+the impulse and the horse's side of the impact, neither of which the engine derives from
+armor.
+
+- [ ] Establish in game what the current build already causes: whether damage lands, whether
+      injury and bleeding follow, whether a bounty is registered, and whether armored targets
+      already take less. Needs no new code, and the result rescopes Phases 3 and 4.
+- [ ] Read an entity's equipped items and their weights, generic over the entity so Phase 3
+      barding uses the same call on the horse.
+- [ ] Unarmored targets take proportionally heavier knockback, through `Ragdoll`'s
+      `impulseScale`.
+- [ ] Heavily armored targets are moved less, by the same multiplier.
 - [ ] Striking a heavy target strips the horse's momentum rather than only its stamina.
 - [ ] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
+      A multiplier on the existing per-tier cost, composing with the Phase 3 Horsemanship
+      multiplier, not a parallel rule set.
+
+Data located. Armor weight is on `Libs/Tables/item/pickable_item.xml`, joined by `item_id`,
+not on `armor.xml`. Target body mass is `normal_body_weight` on `soul_archetype.xml`: 160
+for an adult NPC, 120 female, 80 child, against 1000 for a horse. Two traps in that data:
+chain outweighs plate per piece, and horse tack is filed as armor, so any sum over a
+target's armor must exclude saddle, bridle, shoe and spur.
 
 Prerequisite met: pak asset overrides now work, which Phase 2 needs for any table data.
 
 ## Phase 3: RPG integration
 
+Scope depends on the Phase 2 verification step. The first item below may already be wired
+rather than missing.
+
 - [ ] Apply native blunt damage on high-speed impacts, with the injury system handling the
-      consequences.
+      consequences. Vanilla already re-sends a player-ridden collision as a real `combat:hit`
+      carrying this mod's `hitStrength`, so this may be verification rather than
+      construction.
 - [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
 - [ ] Horse barding increases impact force and reduces momentum loss.
 - [ ] A braced polearm hit head-on acts as a wall: heavy stamina cost, near-certain dismount.
@@ -114,6 +142,8 @@ Prerequisite met: pak asset overrides now work, which Phase 2 needs for any tabl
 - [ ] Riding through a packed group inflicts a morale shock, so lightly armored enemies
       break and flee using native AI.
 - [ ] Bumping someone at walking pace annoys them; trampling triggers the crime system.
+      The crime half rides on the same real `combat:hit` as Phase 3's damage, so it may
+      already be wired.
 
 The `hitReaction` message the mod already sends is the hook for both, and vanilla
 distinguishes light from normal collisions through the `KOLIZE_S_HRACEM` and
