@@ -84,9 +84,9 @@ See `docs/HOW_IT_WORKS.md` and `docs/TECHNICAL_DETAILS.md`.
       a knockdown. Impacts are now scored on the peak of the last few ticks
       rather than on the speed sampled after the collision has slowed the horse.
 - [x] A gallop impact reporting walking speed. Same cause, same fix.
-- [ ] Kneeling NPCs are detected but produce no reaction. `HorseHalfWidth` is
-      0.35, a footprint 0.7 m wide, which may be too narrow. Needs a test aimed
-      at it; no logged session has identified a kneeling victim.
+- [x] Kneeling NPCs producing no reaction. The footprint accepts them as it
+      stands; the cause was the same misscoring, and a reaction one tier too
+      small is easy to miss on a target already close to the ground.
 
 Detection itself is sound: the human filter, the dead check, the below-walk gate
 and both axes of the footprint were each cleared against logged sessions.

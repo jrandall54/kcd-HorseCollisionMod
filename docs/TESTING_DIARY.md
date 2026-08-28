@@ -4016,3 +4016,23 @@ second.
 
 **Still open**: kneeling NPCs detected without producing a reaction. Nothing in
 this session identifies a kneeling victim, so it needs a test aimed at it.
+
+## Kneeling NPCs react
+
+**Hypothesis**: a kneeling NPC sits low enough, or is offset far enough from the
+horse origin, that the 0.7 m wide footprint rejects them, so they are detected
+without producing a reaction.
+
+**User report**: tested against the beggar in the same session as the
+impact-speed verification. He staggered at walking pace and ragdolled at the
+higher tiers.
+
+The footprint accepts a kneeling target as it stands, and `HorseHalfWidth` needs
+no change. The earlier report of kneeling NPCs producing no reaction is
+explained by the tier misclassification rather than by detection: an impact
+scored a tier too low plays a smaller reaction, and on a target already close to
+the ground a stagger is easy to miss entirely.
+
+That makes every symptom filed under reaction reliability the same defect. The
+walk tier, the gallop-reporting-walk case and the kneeling case all resolve to
+scoring a collision on the speed left after the collision.
