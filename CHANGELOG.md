@@ -26,7 +26,7 @@ sections and refuses a release built at any other number.
 - **BREAKING** The mod deploys additively and claims no vanilla filename. It carries a small
   database referencing the untouched vanilla one where it sits inside its own
   pak, instead of shipping a replacement copy. Download size drops from 195,284
-  to 21,953 bytes, and mods that touch unrelated human animations no longer
+  to 24,847 bytes, and mods that touch unrelated human animations no longer
   conflict.
 - Collisions are scored on the peak speed of the last few detection ticks
   rather than on the speed sampled when a victim is noticed. A horse loses

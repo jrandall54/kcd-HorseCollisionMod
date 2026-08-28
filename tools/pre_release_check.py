@@ -197,6 +197,42 @@ def check_nexus_page(version):
     return found
 
 
+def check_download_size(paths, version):
+    """Documented byte counts against the zip that was actually built.
+
+    A size quoted in prose is a claim a reader can verify by downloading, and
+    it drifts every time the script changes.
+    """
+    zip_path = os.path.join(REPO_ROOT, "releases",
+                            "HorseCollisionMod_v%s.zip" % version)
+
+    if not os.path.exists(zip_path):
+        return []
+
+    actual = os.path.getsize(zip_path)
+    found = []
+
+    for path in paths:
+        if path in VERSION_EXEMPT or os.path.splitext(path)[1] not in (
+                ".md", ".txt"):
+            continue
+
+        for i, line in enumerate(read(path).splitlines(), 1):
+            for m in re.finditer(r"\b(\d{1,3}(?:,\d{3})+) bytes\b", line):
+                claimed = int(m.group(1).replace(",", ""))
+
+                # The old deployment model's size is quoted as a comparison
+                # and is not this build.
+                if claimed > actual * 3:
+                    continue
+
+                if claimed != actual:
+                    found.append((path, i, m.group(1),
+                                  "the built zip is %d bytes" % actual))
+
+    return found
+
+
 def main():
     paths = tracked_files()
     version = current_version()
@@ -209,7 +245,8 @@ def main():
                 + check_claims(paths)
                 + check_links(paths)
                 + check_config_docs()
-                + check_nexus_page(version))
+                + check_nexus_page(version)
+                + check_download_size(paths, version))
 
     for path, line, found, message in problems:
         where = "%s:%d" % (path, line) if line else path

@@ -89,7 +89,7 @@ hcm_male_database.adb          the mod's file: 30 vanilla options + 4 new
 ```
 
 The 5.5 MB database is never copied and never replaced. The mod's own file is
-72 KB, and the whole download is about 22 KB compressed against 195 KB before.
+72 KB, and the whole download is about 24 KB compressed against 195 KB before.
 
 ## What the mod does still replace
 

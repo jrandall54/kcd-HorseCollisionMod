@@ -61,7 +61,7 @@ Shipped in 3.0.0. The mod no longer replaces the animation databases.
 It ships its own small database carrying vanilla's `AnimationControlled` options
 alongside its four, and references the untouched 5.5 MB vanilla file where it sits
 inside its own pak. The human entity classes are pointed at it from Startup Lua.
-Download drops from 195,284 to 21,953 bytes.
+Download drops from 195,284 to 24,847 bytes.
 
 - [x] Reference the vanilla databases instead of replacing them.
 - [x] Redirect the classes the engine spawns, not the templates they are built
