@@ -3767,3 +3767,63 @@ Its comment credited `sys_DevMode = 1` for making the console evaluate a leading
 accepts `#` regardless, separately from `wh_con_expr_prefix`, which reads `!`
 and governs the in-game console. The behaviour was right and the explanation was
 invented.
+
+---
+
+## Reaction reliability: the accepted impacts are censored at the footprint edge
+
+The diagnostic build was not the one installed for this session, so there are no
+`Miss` lines. The build that ran still logs accepted footprints and impacts, and
+those alone carry a signal.
+
+**Session totals**: 143 footprint accepts, 60 impacts, 25 staggers.
+
+The gap from 143 to 60 is the per-victim cooldown. An NPC stays inside the
+footprint for several ticks at 20 Hz, so one impact accounts for several
+accepts. Staggers equal Walk impacts exactly, 25 and 25, so the stagger path
+fires on every walk-tier impact it is given.
+
+### Both footprint dimensions are clipped at their limits
+
+```
+lateral   median 0.16   90th 0.30   max 0.35     limit HorseHalfWidth   0.35
+forward   min  -0.17    median 0.93  max 1.39    limit 1.05 + sweep <= 1.40
+```
+
+Neither distribution tails off. Both stop dead at the configured limit, which is
+what a censored sample looks like: contacts beyond the boundary exist and are
+being rejected, so the recorded maximum is the boundary itself rather than the
+largest real value.
+
+Ten percent of accepted impacts sat within 0.05 m of the lateral edge. A
+distribution pressed that hard against a limit usually has mass on the other
+side of it.
+
+This matches the prediction made when the footprint was narrowed for 2.0.0-rc.2:
+replaying 103 impacts through the new shape accepted 40, and the note recorded
+at the time was that if genuine contacts started being missed, half-width was
+the first value to relax.
+
+### Gallop is under-represented
+
+```
+Walk    25 impacts   1.90 to 3.98
+Trot    28 impacts   4.62 to 8.42
+Gallop   7 impacts   8.89 to 10.75
+```
+
+The session was described as making every kind of impact on every kind of NPC,
+which does not fit 7 gallops against 53 at lower tiers. Two candidates, and the
+diagnostic build separates them: gallop contacts are being rejected by the
+footprint more often, since a faster approach crosses the corridor in fewer
+ticks, or they are landing but being recorded at a lower tier because the speed
+sampled after the collision is lower than the speed that caused it.
+
+The 8.42 to 8.89 hole around `SpeedGallop = 8.5` is the dead zone already
+recorded under tuning, not a new finding.
+
+### Not yet evidence
+
+Every number here comes from impacts that were accepted. The rejected ones are
+what the question is about, and they are exactly what this log cannot show. The
+diagnostic build names them.
