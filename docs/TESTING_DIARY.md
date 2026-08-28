@@ -4169,3 +4169,78 @@ Inventory ScriptBind pages.
 **The trap to avoid**, given this project's history: a call that returns a value
 is not proof the value is right. Log the weights read off real NPCs and check
 them against the tables before building any scaling on top.
+
+## Phase 2: where armor weight and body mass actually live
+
+**Hypothesis**: `Libs/Tables/item/armor.xml` carries the weight of each armor
+piece, so scaling knockback by what a victim wears means reading that table.
+
+Wrong on the first half. `armor.xml` has 28 columns and none of them is weight.
+What it carries is `slash_def`, `stab_def`, `smash_def`, `noise`, `max_status`
+and `str_req`, keyed by `item_id`.
+
+**Weight is on `Libs/Tables/item/pickable_item.xml`**, which every item joins
+to by `item_id`, alongside `price`, `model` and `material`. All 796 rows in
+`armor.xml` join to it and all 796 have a weight, so the join is total and
+needs no fallback. `item.xml` is only a name and category lookup, three columns
+wide.
+
+Per-piece weight by armor type, from that join:
+
+```
+horse_saddle     n=20    20.00 - 35.00   mean 27.75
+chain            n=31     1.00 - 21.00   mean 11.83
+horse_bridle     n=12     2.00 - 20.00   mean  7.50
+heavy leather    n=35     4.00 -  9.00   mean  6.97
+plate            n=127    0.00 - 12.00   mean  6.30
+light leather    n=24     0.00 - 10.00   mean  4.46
+horse_shoe       n=4      4.00 -  4.00   mean  4.00
+cloth            n=329    0.50 - 14.00   mean  3.48
+default cloth    n=159    0.00 - 17.90   mean  3.46
+shoe             n=32     2.00 -  4.80   mean  2.62
+spur             n=5      1.00 -  1.00   mean  1.00
+decorated        n=18     0.00 -  0.50   mean  0.08
+```
+
+Two things in that table matter for scaling. **Chain outweighs plate per
+piece**, mean 11.83 against 6.30, so a rule that treats plate as the heavy end
+of the scale would be backwards. And **horse tack is filed as armor**, so any
+sum over a target's armor must exclude saddle, bridle, shoe and spur or a
+mounted victim reads as heavier than a knight.
+
+`str_req` on `armor.xml` is a designer-set strength requirement and tracks
+heaviness independently of the weight column. It is a candidate proxy worth
+comparing against summed weight before either is chosen.
+
+### Body mass comes from the soul archetype, not the inventory
+
+`Libs/Tables/rpg/soul_archetype.xml` carries `normal_body_weight` across 16
+archetypes:
+
+```
+NPC 160    NPC_Female 120    NPC_Child 80    Hero 160    Hero_female 120
+Horse 1000    Cow 400    Boar 300    Pig 250    RedDeer 185    DeerDoe 165
+Sheep 140    Dog 50    RoeBuck 27    Hare 6    Hen 2
+```
+
+This is the mass term Phase 2 needs for the target, and it requires no
+inventory enumeration at all. It also supplies the ratio the momentum work
+depends on: a horse at 1000 against an adult NPC at 160 is 6.25 to 1, and
+against a child at 80 is 12.5 to 1. The same table carries `base_stamina`,
+`body_base_armor` and `unarmed_attack_base`, which Phase 3 will want.
+
+`normal_body_weight` also appears in the decompiled binary as
+`NormalBodyWeight`, so the engine reads it rather than it being unused data.
+
+**Not this**: `equippable_item.xml` has an `rpg_buff_weight` column. That is a
+weighting factor on buff selection, not a mass, and the name invites exactly
+the wrong join.
+
+**Still open**: nothing above is reachable from Lua yet. The tables are build
+time data, and `build_adb.py` already reads paks, so an item-name to weight
+table can be generated into the mod. What that does not answer is which pieces
+a given NPC has equipped at the moment of impact, which is the inventory
+question the previous entry left open. The CryEngine `inventory` ScriptBind has
+15 methods and none of them returns a weight, so the equipped set has to come
+from `GetCurrentItem`, `GetItemByClass` or an equivalent KCD-specific bind, and
+that is the next thing to establish.
