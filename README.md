@@ -114,15 +114,12 @@ tools/
   build_adb.py            generates the animation data from a game install
   dev_deploy.ps1          installs into the game without Vortex
   dev_console.py          talks to the running game over its remote console
-  lint_docs.py            enforces docs/STYLE.md on prose and comments
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
 docs/
   HOW_IT_WORKS.md         plain-language overview of the mod and its layout
-  STYLE.md                documentation rules, enforced by tools/lint_docs.py
   DEV_LOOP.md             the hot-reload development loop
-  RELEASING.md            building, publishing to Nexus, regenerating the API docs
-  TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
+  TECHNICAL_DETAILS.md    engine behavior and the constraints on changing it
   TESTING_DIARY.md        every build tested, what was expected, what happened
   api/                    generated Lua API reference (ldoc .)
 ```
@@ -142,9 +139,8 @@ Animation data is generated from your own game install rather than committed, so
 the first build runs `tools/build_adb.py` for you and resolves the game folder
 itself. Output goes to `releases\`.
 
-`docs/HOW_IT_WORKS.md` explains how the mod is put together,
-`docs/RELEASING.md` covers publishing, and `docs/DEV_LOOP.md` covers the
-hot-reload development loop.
+`docs/HOW_IT_WORKS.md` explains how the mod is put together, and
+`docs/DEV_LOOP.md` covers the hot-reload development loop.
 
 ## License
 

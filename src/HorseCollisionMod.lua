@@ -560,8 +560,8 @@ end
 --
 -- Used at trot and gallop. `actor:Fall` switches the victim to a ragdoll,
 -- after which an impulse can be applied. Impulses are ignored on an upright,
--- animation-driven actor, which is why the order matters and why the impulse
--- is deferred by a tick.
+-- animation-driven actor, so the order matters and the impulse is deferred
+-- by a tick.
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
@@ -630,10 +630,9 @@ end
 -- Two independent signals, because neither alone is reliable:
 --
 -- * `player.soul:IsInCombatDanger()` is what vanilla scripts use, but it
---   reflects immediate danger rather than "a fight is happening", and it was
---   observed reading false through a whole session the player described as
---   being in combat with guards. Mounted and moving, the player may simply
---   not be in danger at the instant of each impact.
+--   reflects immediate danger rather than "a fight is happening", and reads
+--   false for long stretches of an ongoing fight. Mounted and moving, the
+--   player may not be in danger at the instant of each impact.
 -- * The victim having a weapon drawn. Townsfolk do not walk around armed, so
 --   this catches the case the first signal misses: charging someone who is
 --   actively fighting.

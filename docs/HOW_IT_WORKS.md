@@ -119,4 +119,4 @@ it by hand.
 
 `python tools/verify_additive.py` checks every claim on this page against the
 game's own data files and the packaged release, rather than trusting the
-documentation. It is a release step, described in `RELEASING.md`.
+documentation. Run it before publishing.
