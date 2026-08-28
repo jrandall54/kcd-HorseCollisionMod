@@ -1,7 +1,12 @@
 # Horse Collision Mod
 
-Vanilla horse collisions produce a shout and nothing else. This adds a reaction scaled to
-your speed, and a cost so it is not free.
+Vanilla horse collisions produce a shout and nothing else. This adds a reaction
+scaled to your speed, and a cost so it is not free.
+
+> The reactions are the game's own animations.
+> The thresholds were measured, not chosen.
+> Every impact costs the horse something.
+> Nothing vanilla is replaced that could be referenced instead.
 
 ## What happens
 
