@@ -3519,3 +3519,52 @@ A Vortex install test earlier in the day used `v2.1.0-dev.1.zip`, five hours
 older than the working build and missing every fix, because `releases/` held 49
 zips with nothing marking which was current. Everything superseded is now under
 `releases/archive/`.
+
+### Result: the second design works
+
+**User reported**, installed through Vortex: "the beggar animation is back and
+staggers and ragdolls firing as they should."
+
+The additive deployment is confirmed working from a real user install: staggers
+and knockdowns for both character sets, and no regression in unrelated
+animations. The design is settled.
+
+### Three observations about the beggar, which are not deployment issues
+
+Reported alongside: the stagger did not fire on the beggar while he was in his
+begging pose; a gallop knockdown left him standing and walking away rather than
+returning to begging; and after a reload neither reaction fired on him at all.
+
+None of these is about the animation layout. Taken in turn.
+
+**Reactions not firing while he is in the begging pose.** The detection log
+shows the mod does see him. `IsInHorseFootprint` only logs when its test
+passes, and this run logged 53 accepted candidates against 14 impacts. The
+candidates immediately before the beggar tests carry `dz=-0.48`, `-0.76` and
+`-0.72`, against a typical `-0.04` to `-0.14` for a standing NPC, which is what
+a kneeling one looks like: his origin sits much lower.
+
+`HorseMaxVerticalDiff` is 2.35 so the height is not what rejects him. The
+narrow gate is `HorseHalfWidth = 0.35`, a footprint 0.7 m wide in total, and
+`HitCooldownMs = 3000` accounts for most of the 53-to-14 gap because an NPC
+stays inside the footprint for many ticks after being hit.
+
+This looks like the same defect already recorded twice this session: reactions
+being eaten across all three speed tiers, and a gallop impact once reporting
+walking speed. It belongs to that investigation, not to this one.
+
+**Knocked down, then walking away instead of resuming.** Almost certainly
+correct behaviour rather than a bug. The vanilla `Hit` state posts
+`daycycle:restartRequest`, which is precisely "abandon what you were doing".
+An NPC ridden down at a gallop giving up on begging is what the game does to
+its own NPCs.
+
+**The stagger specifically not firing while he is mid-pose.** An NPC already
+running an interactive action very likely cannot be given a second one.
+`StartInteractiveActionByName` returns success either way, so this would look
+identical to every other silent failure in this project. Untested, and worth
+knowing before any attempt to "fix" it: refusing to interrupt a scripted
+activity may well be the right behaviour.
+
+All three are deferred to the reaction-reliability work, which is now the
+largest open item in the project.
