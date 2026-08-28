@@ -461,8 +461,8 @@ def write_additive():
     for tags, clip in STAGGERS:
         print("  + %-22s -> %s" % (tags, clip))
 
-    # A file from an earlier layout would still be an override and would
-    # quietly change which chain entities resolve through.
+    # A stale file here is still an override, and would quietly change which
+    # chain entities resolve through.
     keep = set(["hcm_male_database.adb", "hcm_female_database.adb",
                 TAGS_ENTRY.rsplit("/", 1)[-1],
                 GENDERS["female"]["ids"].rsplit("/", 1)[-1]])

@@ -16,9 +16,8 @@
 --
 -- ## How the walk stagger works
 --
--- This part has no precedent in other KCD mods, so it is worth stating
--- plainly. Lua cannot drive an NPC's animation directly. Everything obvious
--- was tried and fails silently: `human:PlayAnim` is accepted but never
+-- Lua cannot drive an NPC's animation directly, and every obvious approach
+-- fails silently: `human:PlayAnim` is accepted but never
 -- renders, physics impulses are ignored because actors are animation-driven,
 -- `soul:DealDamage` only moves stat numbers, and the `hitReaction` and
 -- `combat:hit` brain messages reach a behavior tree that cannot drive the
@@ -115,6 +114,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field LogTelemetry write diagnostics to kcd.log
+-- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
@@ -135,6 +135,12 @@ HorseCollisionMod.Config = {
 	MaxSweepExtra            = 0.35,
 	HitCooldownMs            = 3000,
 
+	-- A collision is scored on the peak of the last ImpactSpeedSamples ticks,
+	-- not on the speed read when the victim is noticed. MaxImpactSpeed is the
+	-- ceiling on that value, a little above the top of the gallop plateau.
+	ImpactSpeedSamples       = 3,
+	MaxImpactSpeed           = 11.0,
+
 	-- Knockdown impulse. Trot and gallop only; the walk tier never ragdolls.
 	Knockback                = 50.0,
 	Uplift                   = 30.0,
@@ -153,7 +159,13 @@ HorseCollisionMod.Config = {
 	ProtectMutt              = true,
 	WalkStagger              = true,
 	SendHitReaction          = true,
-	LogTelemetry             = true
+	LogTelemetry             = true,
+
+	-- Names the reason a nearby NPC produced no reaction. Every test in the
+	-- detection loop rejects silently, so a missed impact and an impact that
+	-- never happened look identical. Off by default: it is noisy and only
+	-- useful while investigating.
+	DiagnoseMisses           = false
 }
 
 
@@ -192,8 +204,24 @@ HorseCollisionMod.HitReactionStrength = {
 -- @table RecentHits
 HorseCollisionMod.RecentHits = {}
 
---- Current time in milliseconds.
--- @treturn number milliseconds since the game session started
+--- Last time each entity was reported as a miss, keyed by entity id.
+HorseCollisionMod.RecentRejections = {}
+
+--- Recent horse speeds, newest last, for spotting deceleration on impact.
+--
+-- Speed is sampled once per tick at the top of the loop. A collision slows the
+-- horse, so if a victim only enters the footprint on the tick after contact
+-- begins, the speed read is the speed after the impact rather than the speed
+-- that caused it. That would explain a gallop being recorded as a walk, and it
+-- would also drop the reaction entirely whenever the loss takes the horse under
+-- `SpeedWalk`, because that test returns before any entity is examined.
+--
+-- Kept deliberately short. Half a second of history is enough to see a
+-- deceleration and not so much that an earlier gallop colours a later walk.
+HorseCollisionMod.SpeedHistory = {}
+
+HorseCollisionMod.SpeedHistorySize = 10
+
 local function GetTimeMs()
 	return System.GetCurrTime() * 1000
 end
@@ -209,6 +237,132 @@ local function GetVectorLength(v)
 	return math.sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z))
 end
 
+--- Records one speed sample.
+--
+-- @tparam number speed the current sample, in meters per second
+function HorseCollisionMod:TrackSpeed(speed)
+	local history = self.SpeedHistory
+
+	history[#history + 1] = speed
+
+	while #history > self.SpeedHistorySize do
+		table.remove(history, 1)
+	end
+end
+
+--- The peak of the last `count` speed samples.
+--
+-- @tparam number count how many of the most recent samples to consider
+-- @treturn number the highest speed among them, in meters per second
+function HorseCollisionMod:RecentPeak(count)
+	local history = self.SpeedHistory
+	local first = #history - count + 1
+	local peak = 0
+
+	if first < 1 then
+		first = 1
+	end
+
+	for i = first, #history do
+		if history[i] > peak then
+			peak = history[i]
+		end
+	end
+
+	return peak
+end
+
+--- The recent speed samples, oldest first, as a compact string.
+--
+-- Printed on every impact while diagnosing. The width of the deceleration on
+-- contact is what sets `ImpactSpeedSamples`, and it is only visible in the
+-- samples either side of the collision.
+--
+-- @tparam number count how many of the most recent samples to include
+-- @treturn string the samples, space separated, to two decimal places
+function HorseCollisionMod:SpeedTrail(count)
+	local history = self.SpeedHistory
+	local first = #history - count + 1
+	local parts = {}
+
+	if first < 1 then
+		first = 1
+	end
+
+	for i = first, #history do
+		parts[#parts + 1] = string.format("%.2f", history[i])
+	end
+
+	return table.concat(parts, " ")
+end
+
+--- The speed a collision should be scored at.
+--
+-- A horse loses speed the moment it hits someone. Detection samples velocity
+-- once per tick, so the speed read on the tick that notices a victim has
+-- already been reduced by the collision it is meant to describe, and a gallop
+-- impact can be scored as a walk. The peak of the last few samples brackets
+-- the moment of contact instead.
+--
+-- The window is deliberately short. Taken over a whole second it would charge
+-- gallop to a rider who galloped up and then slowed deliberately to nudge
+-- someone.
+--
+-- Capped because the physics system reports occasional speeds above anything a
+-- horse holds, and this value scales knockback force as well as selecting the
+-- tier.
+--
+-- @treturn number the speed to score the impact at, in meters per second
+function HorseCollisionMod:ImpactSpeed()
+	local peak = self:RecentPeak(self.Config.ImpactSpeedSamples)
+
+	if peak > self.Config.MaxImpactSpeed then
+		return self.Config.MaxImpactSpeed
+	end
+
+	return peak
+end
+
+--- Logs why a candidate was passed over, at most once per second per entity.
+--
+-- Every rejection in the detection loop is silent, so an impact that produces
+-- no reaction is indistinguishable from one that was never detected. This
+-- names the reason.
+--
+-- Rate limited because the loop runs about twenty times a second and the
+-- detection sphere returns everything nearby, including crates and doors.
+--
+-- @tparam table npc the entity that was rejected
+-- @tparam string reason short label for which test rejected it
+-- @tparam string detail the measurement behind that decision
+function HorseCollisionMod:LogRejection(npc, reason, detail)
+	if not self.Config.DiagnoseMisses then
+		return
+	end
+
+	local id = tostring(npc and npc.id or "?")
+	local now = GetTimeMs()
+	local last = self.RecentRejections[id]
+
+	if last and (now - last) < 1000 then
+		return
+	end
+
+	self.RecentRejections[id] = now
+
+	local name = "?"
+
+	pcall(function()
+		name = npc:GetName() or "?"
+	end)
+
+	self:Log("Miss " .. reason .. " name=" .. tostring(name)
+			.. " " .. tostring(detail))
+end
+
+
+--- Current time in milliseconds.
+-- @treturn number milliseconds since the game session started
 --- Writes a prefixed line to kcd.log when telemetry is enabled.
 -- @tparam string message text to log
 function HorseCollisionMod:Log(message)
@@ -220,7 +374,7 @@ function HorseCollisionMod:Log(message)
 end
 
 --- Resolves a speed to its gait name.
--- @tparam number speed horse speed in meters per second
+-- @tparam number speed speed in meters per second
 -- @treturn string one of "Gallop", "Trot", "Walk" or "Idle"
 function HorseCollisionMod:GetSpeedTier(speed)
 	local cfg = self.Config
@@ -331,14 +485,32 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 			and forwardDistance <= (cfg.HorseFrontReach + sweepExtra)
 			and lateralDistance <= cfg.HorseHalfWidth
 
+	local detail = "fwd=" .. string.format("%.2f", forwardDistance)
+			.. " lat=" .. string.format("%.2f", lateralDistance)
+			.. " dz=" .. string.format("%.2f", dz)
+			.. " sweep=" .. string.format("%.2f", sweepExtra)
+			.. " limits=" .. string.format("%.2f/%.2f/%.2f",
+					cfg.HorseFrontReach + sweepExtra, cfg.HorseHalfWidth,
+					cfg.HorseMaxVerticalDiff)
+
 	if inside then
-		self:Log("Footprint fwd=" .. string.format("%.2f", forwardDistance)
-				.. " lat=" .. string.format("%.2f", lateralDistance)
-				.. " dz=" .. string.format("%.2f", dz)
-				.. " sweep=" .. string.format("%.2f", sweepExtra))
+		self:Log("Footprint " .. detail)
 	end
 
-	return inside
+	return inside, detail
+end
+
+
+--- Measurements for a candidate the footprint test rejected.
+--
+-- Same geometry as the test itself rather than a second copy of it, so the
+-- numbers reported are the numbers the decision was made on.
+--
+-- @treturn string the distances and the limits they were checked against
+function HorseCollisionMod:FootprintDetail(npc, horsePos, horseForward, speed)
+	local _, detail = self:IsInHorseFootprint(npc, horsePos, horseForward, speed)
+
+	return detail or "unmeasurable"
 end
 
 --- Works out which side of the victim the impact lands on.
@@ -456,8 +628,8 @@ end
 --
 -- Used at trot and gallop. `actor:Fall` switches the victim to a ragdoll,
 -- after which an impulse can be applied. Impulses are ignored on an upright,
--- animation-driven actor, which is why the order matters and why the impulse
--- is deferred by a tick.
+-- animation-driven actor, so the order matters and the impulse is deferred
+-- by a tick.
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
@@ -526,10 +698,9 @@ end
 -- Two independent signals, because neither alone is reliable:
 --
 -- * `player.soul:IsInCombatDanger()` is what vanilla scripts use, but it
---   reflects immediate danger rather than "a fight is happening", and it was
---   observed reading false through a whole session the player described as
---   being in combat with guards. Mounted and moving, the player may simply
---   not be in danger at the instant of each impact.
+--   reflects immediate danger rather than "a fight is happening", and reads
+--   false for long stretches of an ongoing fight. Mounted and moving, the
+--   player may not be in danger at the instant of each impact.
 -- * The victim having a weapon drawn. Townsfolk do not walk around armed, so
 --   this catches the case the first signal misses: charging someone who is
 --   actively fighting.
@@ -669,12 +840,14 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number speed horse speed in meters per second
+-- @tparam number speed speed to score the impact at, in meters per second
 -- @tparam table horseEnt the player's horse entity
 -- @tparam table playerEnt the player entity
 -- @tparam userdata horseWuid WUID of the horse
+-- @tparam number sampledSpeed speed read on this tick, recorded in the log so
+--   the correction for collision deceleration stays visible
 function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, playerEnt,
-		horseWuid)
+		horseWuid, sampledSpeed)
 	local npcId = tostring(npc.id)
 	local now = GetTimeMs()
 
@@ -684,6 +857,9 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	local lastHit = self.RecentHits[npcId]
 
 	if lastHit and (now - lastHit) < self.Config.HitCooldownMs then
+		self:LogRejection(npc, "cooldown",
+				"since=" .. tostring(now - lastHit) .. "ms")
+
 		return
 	end
 
@@ -701,6 +877,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	self:Log("Impact tier=" .. tierName
 			.. " speed=" .. string.format("%.2f", speed)
+			.. " sampled=" .. string.format("%.2f", sampledSpeed or speed)
+			.. (cfg.DiagnoseMisses
+					and (" trail=[" .. self:SpeedTrail(self.SpeedHistorySize) .. "]")
+					or "")
 			.. " combatScale=" .. string.format("%.1f", combatScale)
 			.. " " .. combatDetail)
 
@@ -790,8 +970,15 @@ function HorseCollisionMod:SafeUpdate()
 	end)
 
 	local speed = GetVectorLength(velocity)
+	self:TrackSpeed(speed)
 
-	if speed < self.Config.SpeedWalk then
+	local impactSpeed = self:ImpactSpeed()
+
+	-- Below walking pace nothing can happen, so the loop normally stops here
+	-- before looking at a single entity. While diagnosing it keeps going, or
+	-- an impact lost because the collision itself slowed the horse would leave
+	-- no trace at all.
+	if impactSpeed < self.Config.SpeedWalk and not self.Config.DiagnoseMisses then
 		return
 	end
 
@@ -858,6 +1045,14 @@ function HorseCollisionMod:SafeUpdate()
 							or (ent.Properties and ent.Properties.esFaction))
 				end)
 
+				if not isHuman then
+					self:LogRejection(ent, "not-human",
+							"class=" .. tostring(ent.class))
+				elseif not ent.actor then
+					self:LogRejection(ent, "no-actor",
+							"class=" .. tostring(ent.class))
+				end
+
 				if isHuman and ent.actor then
 					local isDead = false
 
@@ -872,8 +1067,18 @@ function HorseCollisionMod:SafeUpdate()
 					local inFootprint = self:IsInHorseFootprint(ent, horsePos,
 							horseForward, speed)
 
-					if not isDead and inFootprint then
-						self:TriggerCollision(ent, velocity, speed, horseEnt, player, horseWuid)
+					if isDead then
+						self:LogRejection(ent, "dead", "")
+					elseif not inFootprint then
+						self:LogRejection(ent, "outside-footprint",
+								self:FootprintDetail(ent, horsePos, horseForward, speed))
+					elseif impactSpeed < self.Config.SpeedWalk then
+						self:LogRejection(ent, "below-walk-speed",
+								"impact=" .. string.format("%.2f", impactSpeed)
+								.. " sampled=" .. string.format("%.2f", speed))
+					else
+						self:TriggerCollision(ent, velocity, impactSpeed, horseEnt,
+								player, horseWuid, speed)
 					end
 				end
 			end

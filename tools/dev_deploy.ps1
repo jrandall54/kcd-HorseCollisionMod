@@ -128,8 +128,7 @@ $parkDir = Join-Path $gameRoot "mods_old"
 $exe = Join-Path $gameRoot "Bin\Win64\KingdomCome.exe"
 
 # A fixed folder name, deliberately not versioned. Vortex names its folders
-# after the archive it installed, which is why the game currently holds
-# HorseCollisionMod_v200; that means every new build lands in a new folder and
+# after the archive it installed, so every new build lands in a new folder and
 # the old one has to be removed by hand. One stable folder makes deployment a
 # straight overwrite.
 $devMod = "HorseCollisionMod_dev"

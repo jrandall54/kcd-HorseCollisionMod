@@ -1,200 +1,213 @@
 # Technical Details
 
-Notes on how this mod works and what the engine does or does not allow. Everything here
-was verified by testing in game, not inferred. The build-by-build record is in
-`docs/TESTING_DIARY.md`.
+What the engine allows, and how the mod works within it. The build-by-build
+record is in `docs/TESTING_DIARY.md`.
 
 ## Making an NPC play an animation
 
-This is the hard part, and most of the obvious approaches do not work.
-
-An NPC's body is driven by the animation system, which is in turn driven by the AI. Lua
-cannot simply tell a skeleton what to do. The following were all tried and all failed:
+An NPC's body is driven by the animation system, which is driven by the AI. Lua
+cannot address a skeleton directly, and none of these produce a reaction:
 
 | Approach | Result |
 | --- | --- |
-| `human:PlayAnim(fragment, tag)` | Call is accepted, nothing ever renders |
+| `human:PlayAnim(fragment, tag)` | Call is accepted, nothing renders |
 | `entity:AddImpulse` on a standing NPC | Ignored; actors are animation-driven, not physics-driven |
-| `soul:DealDamage` with the player as attacker | Changes stat numbers only, no reaction |
-| `hitReaction` brain message | Delivered, but handled by a tree that cannot drive the body |
+| `soul:DealDamage` with the player as attacker | Changes stat numbers only |
+| `hitReaction` brain message | Delivered, handled by a tree that cannot drive the body |
 | `combat:hit` brain message | Same |
-| A `PlayAnimation` node added to `sb_switch_hitreactions.xml` | Node runs, animation fails |
+| A `PlayAnimation` node in `sb_switch_hitreactions.xml` | Node runs, animation fails |
 
-The last one is worth explaining, because it looks like it should work. Behavior trees
-named `sb_switch_*` are passive observers running alongside whatever the NPC is actually
-doing. They react to events, send messages and set variables, but they do not own the
-body. Across all 31 switch trees in the game there is not a single `PlayAnimation` node.
-Warhorse never does this, which is why there was no working example to copy.
+Trees named `sb_switch_*` are passive observers running alongside whatever the
+NPC is doing. They react to events, send messages and set variables, but they do
+not own the body. None of the 31 switch trees in the game contains a
+`PlayAnimation` node.
 
-### What does work
+### The call that works
 
-`actor:StartInteractiveActionByName(name, objectId, updateVisibility, animSpeed)`
+```
+actor:StartInteractiveActionByName(name, objectId, updateVisibility, animSpeed)
+```
 
-This is the call vanilla uses to make someone mime opening a door. It takes over the body,
-plays a whole animation, and hands control back cleanly.
+This is what vanilla uses to make someone mime opening a door. It takes over the
+body, plays a whole animation, and hands control back cleanly.
 
-The catch is `name`. It is matched against the FragTags of exactly one Mannequin fragment,
-`AnimationControlled`, and vanilla only ships object interactions there: `cabinet_o`,
-`alarmBell`, `door_l_f_o` and so on. Passing a name that is not in that set is accepted
-silently and aborts after a single frame, which looks like a one-frame twitch in game.
+`name` is matched against the FragTags of exactly one Mannequin fragment,
+`AnimationControlled`. Vanilla ships only object interactions there: `cabinet_o`,
+`alarmBell`, `door_l_f_o` and so on. A name outside that set is accepted
+silently and aborts after a single frame, which reads in game as a one-frame
+twitch.
 
-So the mod adds its own entries. Three kinds of file are involved, and every one is
-required. Miss any of them and the call still succeeds while nothing plays.
+### Files required to add a FragTag
 
-1. **Fragment IDs** declare which fragments exist and point each at its tag definition file.
-   `kcd_male_fragmentids.xml` already declares `AnimationControlled`, so it is left alone.
-   `wh_female_fragmentids.xml` does not, so it is patched to add it.
-2. **The tag definition** (`kcd_animationControlledTags.xml`) declares the valid FragTags.
-   **A FragTags value that is not declared here does nothing**, even when the database entry
-   exists. Both sexes share this file.
-3. **The databases** hold the options. The added ones point at
-   `hitreaction_idle_medium_torso_stab_{front,back,left,right}`, standing hit reactions the
-   game already contains. `kcd_male_database.adb` has an existing `AnimationControlled`
-   block to append to; `wh_female_database.adb` has none, so the whole block is added.
+Three kinds of file, all mandatory. Omitting any one leaves the call succeeding
+while nothing plays.
 
-`build_adb.py` generates all four modified files from the game's own paks. It checks that
-every clip it references actually exists first, because a missing clip resolves to nothing
-without any error.
+1. **Fragment IDs** declare which fragments exist and point each at its tag
+   definition file. `kcd_male_fragmentids.xml` already declares
+   `AnimationControlled`. `wh_female_fragmentids.xml` does not, and is patched
+   to add it.
+2. **The tag definition** (`kcd_animationControlledTags.xml`) declares the valid
+   FragTags. A FragTags value absent from this file does nothing, even when the
+   database entry exists. Both sexes share the file.
+3. **The databases** hold the options. The mod's four point at
+   `hitreaction_idle_medium_torso_stab_{front,back,left,right}`, standing hit
+   reactions already in the game. `kcd_male_database.adb` has an existing
+   `AnimationControlled` block to append to. `wh_female_database.adb` has none,
+   so the whole block is added.
+
+`tools/build_adb.py` generates all four files from the game's own paks. It
+checks that every clip it references exists, because a missing clip resolves to
+nothing without an error.
 
 ## Pak packaging
 
-Mod paks are zip files, and the entry names inside them must use forward slashes:
+Mod paks are zip files. Entry names inside them must use forward slashes:
 
 ```
 Libs/AI/final/x.xml     works
 Libs\AI\final\x.xml     silently does nothing
 ```
 
-CryEngine looks entries up by exact path. PowerShell's `Compress-Archive` writes Windows
-separators, so a pak built with it fails to override anything.
+CryEngine looks entries up by exact path. `Compress-Archive` writes Windows
+separators, so a pak built with it overrides nothing.
 
-This is easy to miss because `Scripts/Startup/*.lua` still works either way. That folder is
-enumerated rather than looked up by path, so the Lua half of a mod loads normally while
-every asset override silently fails. The log shows the pak opening successfully and there
-is no error anywhere.
+`Scripts/Startup/*.lua` still works either way, because that folder is
+enumerated instead of looked up by path. A mod packed with backslashes therefore
+loads its Lua normally while every asset override fails. The log shows the pak
+opening successfully and reports no error.
 
-`build.ps1` builds the pak entry by entry through `System.IO.Compression` to avoid this,
-and prints each entry name so the separators are visible.
+`build.ps1` writes the pak entry by entry through `System.IO.Compression`, and
+prints each entry name so the separators are visible.
 
-Note also that the game's own paks store forward slashes in the central directory but
-backslashes in the local file headers. Python's `zipfile` treats that as corruption and
-refuses to read them, so `build_adb.py` inflates entries from the local header directly.
+The game's own paks store forward slashes in the central directory and
+backslashes in the local file headers. Python's `zipfile` treats that as
+corruption and refuses to read them, so `build_adb.py` inflates entries from the
+local header directly.
 
 ## Engine and Lua limits
 
 - The `io` library is restricted. Scripts cannot write files.
-- `os.clock()` returns nil. Use `System.GetCurrTime()`, which returns seconds as a float.
-- Reading properties on C++ userdata entities outside `pcall` can throw fatal errors.
-  Entities stream in and out constantly, so every engine call in this mod is wrapped.
-- `soul:DealDamage(stamina, health, attacker, flag)` takes stamina first. Vanilla's own
-  debug helper `Quick.lua` names the parameters health-first, which is wrong. Earlier
-  builds of this mod dealt 25 health damage to the horse on every impact because of it.
-  Use `soul:SetState` when adjusting a specific stat.
-- Brain messages sent with `XGenAIModule.SendMessageToEntity` are not guaranteed to
-  arrive. Handlers declared `Atomic="true"` drop messages while busy; measured delivery was
-  about 3 in 19 under load. There is no return value to check.
-- The behavior tree node `LogToConsole` does not write to `kcd.log`. Use an `ExecuteLua`
-  node calling `System.LogAlways` instead.
+- `os.clock()` returns nil. `System.GetCurrTime()` returns seconds as a float.
+- Reading properties on C++ userdata entities outside `pcall` can throw fatal
+  errors. Entities stream in and out constantly, so every engine call in this
+  mod is wrapped.
+- `soul:DealDamage(stamina, health, attacker, flag)` takes stamina first.
+  Vanilla's debug helper `Quick.lua` names the parameters health-first, which is
+  wrong. Use `soul:SetState` when adjusting a specific stat.
+- Brain messages sent with `XGenAIModule.SendMessageToEntity` are not guaranteed
+  to arrive. Handlers declared `Atomic="true"` drop messages while busy, and
+  most messages sent under load are lost. There is no return value to check.
+- The behavior tree node `LogToConsole` does not write to `kcd.log`. An
+  `ExecuteLua` node calling `System.LogAlways` does.
 
-A recurring theme: **most of these failures are silent**. A call returns without error, a
-log line never appears, an animation does not play. Three separate times this
-project drew a wrong conclusion from an unverified signal. Before concluding anything from
-a signal, confirm the signal itself works.
+Most of these failures are silent. A call returns without error, a log line
+never appears, an animation does not play. Confirm that a signal works before
+drawing a conclusion from its absence.
 
 ## Timers and save reloads
 
-KCD clears Lua timers when a save is loaded, but not always completely. A script that
-starts a new timer loop on every load screen can end up with several running at once, which
-costs performance and can disrupt audio.
+KCD clears Lua timers when a save is loaded, but not always completely. A script
+that starts a new timer loop on every load screen can accumulate several running
+at once, which costs performance and can disrupt audio.
 
-The mod increments a counter on each load screen and passes that value into the timer
-closure. Any loop whose value no longer matches the current one stops on its next
-iteration, so at most one loop is ever live.
+The mod increments a counter on each load screen and passes that value into the
+timer closure. Any loop whose value no longer matches the current one stops on
+its next iteration, so at most one loop is live.
 
-Detection runs at 100 ms. Each tick checks whether the player is mounted and moving at
-least at walking pace before doing anything else, so the cost while on foot is negligible.
+Detection runs at 100 ms. Each tick checks that the player is mounted and moving
+at least at walking pace before doing anything else, so the cost while on foot
+is negligible.
 
-## Collision detection
+## Detection
 
-`System.GetEntitiesInSphere` around the horse, filtered to living humans. The sphere is a
-crude approximation of a horse's shape, which is why NPCs can react from slightly further
-away than looks right. Replacing it with an oriented box is a known improvement.
-
-A per-victim cooldown is required. The sphere is tested ten times a second, so without it
-the same NPC's reaction restarts every tick and they never finish staggering.
-
-## Tuning rationale
-
-Where the numbers in `HorseCollisionMod.Config` came from. The config table
-itself is kept scannable, because people go there to change a setting rather
-than to read; this is the reasoning behind the defaults.
+Two stages. `System.GetEntitiesInSphere` around the horse, filtered to living
+humans, then an oriented-box test against the horse's footprint. The sphere is a
+broad phase only, so `HitRadius` can stay generous without NPCs reacting from an
+unnatural distance.
 
 ### Speed tiers
 
-KCD horses have three speed plateaus, not four. Telemetry across 90+ logged
-impacts clustered at 2.05-3.74, 6.38-7.03 and 9.18-10.81 m/s, so `SpeedWalk`,
-`SpeedTrot` and `SpeedGallop` sit in the empty gaps between those clusters
-rather than on round numbers.
+Horse speed occupies three plateaus: 2.05 to 3.74, 6.38 to 7.03, and 9.18 to
+10.81 m/s. `SpeedWalk`, `SpeedTrot` and `SpeedGallop` sit in the empty gaps
+between them instead of on round numbers, so a threshold is never set at a speed
+the horse holds.
 
-One consequence worth knowing: almost nothing lands between 8.03 and 8.84 m/s,
-so the trot-to-gallop boundary at 8.5 is a sharp cliff in reaction strength at
-a speed the horse spends a lot of time near.
+The gap between 8.03 and 8.84 m/s is empty, which places the trot-to-gallop
+boundary at 8.5 in open space. Reaction strength changes sharply across it, at a
+speed the horse passes through often.
 
-### Detection footprint
+### The speed a collision is scored at
 
-`HitRadius` is a broad-phase sphere only. Everything inside it is then tested
-against the horse footprint, so the sphere can stay generous without NPCs
-reacting from an unnatural distance.
+A horse loses speed the moment it hits someone, and detection samples velocity
+once per tick. The speed read on the tick that notices a victim has therefore
+already been reduced by the collision it is meant to describe, which scores a
+gallop impact as a walk and plays a stagger where a knockdown belongs.
 
-The footprint numbers were tuned from **103 logged impacts** rather than
-guessed dimensions. A horse is long and narrow, so a sphere alone catches
-people alongside and behind it who were never actually struck.
+The tier comes from the peak of the last `ImpactSpeedSamples` ticks instead.
+The window is short by design: taken over a longer span it would charge gallop
+to a rider who galloped up and then slowed deliberately to nudge someone.
 
-Lateral distances were pressed hard against the previous 0.55 cap, with a
-median of 0.30 and a 90th percentile of 0.51, which is what let NPCs half a
-meter clear of the flank still react. `HorseHalfWidth = 0.35` is about a horse
-chest's half-width and keeps impacts genuinely in front of the animal.
+`MaxImpactSpeed` caps the result. The value scales knockback force as well as
+selecting the tier, and the physics system reports occasional speeds above
+anything a horse holds.
 
-### The forward sweep
+### Footprint
+
+A horse is long and narrow. A sphere alone catches people alongside and behind
+it who were never struck, so the second stage tests an oriented box.
+
+`HorseHalfWidth = 0.35` is about a horse chest's half-width, giving a footprint
+0.7 m wide. Anything wider admits NPCs standing clear of the flank.
+
+### Forward sweep
 
 The footprint is extended forward by the distance the horse covers in one tick,
 so victims are not missed between frames.
 
-This was the single biggest cause of over-reach. **45 of those 103 impacts
-landed beyond the front reach** and were admitted by the sweep alone, which sat
-pinned at its old 0.95 cap a quarter of the time and pushed the effective reach
-past two meters. `SweepMultiplier` was halved and `MaxSweepExtra` capped much
-lower: the sweep only needs to cover one tick of travel, not a stride.
+The sweep is the dominant term in the effective reach and needs a ceiling.
+`SweepMultiplier` scales it and `MaxSweepExtra` caps it. Uncapped at gallop the
+extension alone can push the effective reach past two meters, which admits NPCs
+well ahead of the animal. The sweep only has to cover one tick of travel, not a
+stride.
+
+### Per-victim cooldown
+
+The footprint is tested ten times a second. Without a cooldown the same NPC's
+reaction restarts every tick and they never finish staggering.
+
+## Reaction defaults
+
+Why the defaults in `HorseCollisionMod.Config` are set where they are. The
+config table itself is kept scannable, since it is read to change a setting.
 
 ### Stamina
 
-Measured against a full horse stamina pool of 210. At the current values a
-gallop costs roughly three bodies and a trot roughly five before the horse is
-spent and Henry is thrown. The previous 20/40 allowed ten and five, which made
-plowing through a crowd close to free. A walking bump is not hard enough to
-tire a horse at all, hence `StaminaDrainWalk = 0`.
+A full horse stamina pool is 210. At the current values a gallop costs roughly
+three bodies and a trot roughly five before the horse is spent and Henry is
+thrown. Stamina regenerates quickly between impacts, so the number of people
+that can be put down in one run depends on the horse and on how fast the hits
+are strung together.
 
-Stamina regenerates quickly between impacts, so how many people can be put down
-in one run depends on the horse and on how fast the hits are strung together.
+A walking bump is not hard enough to tire a horse, hence `StaminaDrainWalk = 0`.
 
 ### Combat multiplier
 
-Riding through a market at speed is meant to be fun and cheap. Using the horse
-as a crowd-control weapon mid-battle is not: without a penalty, charging a group
-of four leaves them ragdolled and the rider free to shoot or swing at no cost.
+Riding through a market at speed is meant to be cheap. Using the horse as crowd
+control mid-battle is not: with no penalty, charging a group of four leaves them
+ragdolled and the rider free to shoot or swing at no cost.
 
 At `CombatStaminaMultiplier = 2.5` a galloping charge into combat spends the
-horse in a single impact, making it a committed move rather than a repeatable
+horse in a single impact, making it a committed move instead of a repeatable
 one.
 
-### Suppressing the stagger in combat
+### SuppressStaggerInCombat
 
 The stagger hands the victim's body to an interactive action, which pulls them
 out of their combat behavior. On return they have lost track of the player and
-bark lines like "Where did he go?" while he is standing in front of them.
+bark lines like "Where did he go?" while he stands in front of them.
 
-`SuppressStaggerInCombat` keeps their perception intact. The knockdown tiers are
-unaffected either way.
+Suppressing it keeps their perception intact. The knockdown tiers are unaffected
+either way.
 
 ### WalkStagger
 
@@ -203,11 +216,9 @@ the mod. The knockdown tiers are unaffected.
 
 ## Additive animation deployment
 
-How this mod adds Mannequin fragments without replacing a single vanilla file,
-and why each part of it is necessary. Introduced in 2.1.0.
-
-`HOW_IT_WORKS.md` covers the purpose and the trade-offs. This section is the
-reference for changing it.
+Since 2.1.0 the mod adds Mannequin fragments without replacing a vanilla file.
+`docs/HOW_IT_WORKS.md` covers the purpose and the trade-offs. What follows is
+the reference for changing it.
 
 ### Engine facts it relies on
 
@@ -224,12 +235,12 @@ None of the three is exercised by the base game.
 ```
 
 No vanilla `.adb` uses it; all 28 splice everything into one document. The
-loader is present regardless, and `WHGame.dll` carries its strings:
-`SubADBs`, `Loading subADB %s`, and
+loader is present regardless, and `WHGame.dll` carries its strings: `SubADBs`,
+`Loading subADB %s`, and
 `[CAnimationDatabaseManager::LoadDatabase] Unknown tags %s for subADB %s`.
 
-**A sub-database can carry an entire database**, not just a fragment subset,
-so the vanilla file is referenced where it sits inside `Animations-part1.pak`.
+**A sub-database can carry an entire database**, not only a fragment subset, so
+the vanilla file is referenced where it sits inside `Animations-part1.pak`.
 
 **The database an entity uses is a Lua property**, not compiled in.
 `Scripts/Entities/AI/NPC_x.lua` declares `AnimDatabase3P`, so a Startup script
@@ -250,22 +261,20 @@ hcm_animationControlledTags.xml vanilla's 16 FragTags + this mod's 4
 
 `HorseCollisionMod.lua` then points the human entity classes at the parent.
 
-### The four things that must all hold
+### The four requirements
 
-Each was found by a failing cold-start test, and each produced the identical
-symptom: a one-frame twitch, with `StartInteractiveActionByName` returning
-success. Fixing any one alone changes nothing visible, because the next fault
-is still ahead of it.
+All four must hold. Each produces the same symptom on its own: a one-frame
+twitch, with `StartInteractiveActionByName` returning success.
 
 **1. The parent must define `AnimationControlled` itself.** Sub-databases do not
 merge options into a fragment another database already defines; the definition
-comes from one place. Putting the mod's options in a sub-database leaves them
-unreachable no matter which order the subs are listed in.
+comes from one place. Options placed in a sub-database are unreachable no matter
+which order the subs are listed in.
 
-**2. The parent must carry vanilla's own options too.** Because it takes
-authority over the fragment, anything it omits is gone. Without vanilla's 30
-options a redirected NPC loses every door, cabinet and wardrobe interaction in
-the game. The fragment is 69 KB, 1.24% of the database, so this is cheap.
+**2. The parent must carry vanilla's options too.** It takes authority over the
+fragment, so anything it omits is gone. Without vanilla's 30 options a
+redirected NPC loses every door, cabinet and wardrobe interaction in the game.
+The fragment is 69 KB, 1.24% of the database.
 
 **3. The parent's `FragDef` must be the mod's fragment ids.** That is what the
 loader validates FragTags against. Pointing it at vanilla's gives:
@@ -277,13 +286,13 @@ loader validates FragTags against. Pointing it at vanilla's gives:
 
 **4. `ActionController` must be redirected as well as `AnimDatabase3P`.** The
 controller def owns the fragment and tag definitions an entity resolves names
-through *at runtime*. A database's `FragDef` governs load-time validation only.
+through at runtime. A database's `FragDef` governs load-time validation only.
 Redirect the database alone and the options load and validate cleanly, then
 every call against them resolves to nothing.
 
 ### Redirect the exposed class, not the template
 
-The least obvious requirement, and the one with no visible symptom of its own.
+This requirement has no symptom of its own.
 
 ```lua
 -- Scripts/Entities/AI/NPC.lua
@@ -295,33 +304,33 @@ function CreateAI(child)
     mergef(newt, child, 1);   -- copies the fields
 ```
 
-`NPC_x` is a **template**. `CreateAI` builds a fresh table and copies fields into
+`NPC_x` is a template. `CreateAI` builds a fresh table and copies fields into
 it, so the live class holds a snapshot taken when its script loaded. A Startup
 script that mutates `NPC_x` changes nothing about what spawns.
 
-The classes that must be redirected are therefore `NPC`, `NPC_Female`,
-`NPC_NAI`, `NullAI`, `DummyTarget`, plus `Player` and `PlayerFemale`, which are
-declared directly rather than through `CreateAI`. The `_x` templates are
-redirected as well, so anything calling `CreateAI` later inherits correctly.
+The classes to redirect are `NPC`, `NPC_Female`, `NPC_NAI`, `NullAI`,
+`DummyTarget`, plus `Player` and `PlayerFemale`, which are declared directly
+instead of through `CreateAI`. The `_x` templates are redirected as well, so
+anything calling `CreateAI` later inherits correctly.
 
-`RedirectAnimationDatabases` runs at **file scope**, not from the load screen,
+`RedirectAnimationDatabases` runs at file scope, not from the load screen,
 because `AnimDatabase3P` is read when an actor spawns and the load screen ends
 after the world is populated.
 
 ### Constraints on any change here
 
-- `kcd_animationControlledTags.xml` and `wh_female_fragmentids.xml` are
-  copies of vanilla with additions, not references. A copy cannot pick up
-  another mod's additions to the same file. Acceptable because nothing else
-  is likely to extend `AnimationControlled`; it would not be for a mod that
-  had to share a tag group.
+- `kcd_animationControlledTags.xml` and `wh_female_fragmentids.xml` are copies
+  of vanilla with additions, not references. A copy cannot pick up another mod's
+  additions to the same file. This is acceptable while nothing else extends
+  `AnimationControlled`, and would not be for a mod that had to share a tag
+  group.
 - Two mods redirecting `AnimDatabase3P` on the same class conflict. The
-  contested resource is a Lua string rather than a binary, so a cooperative
-  mod can chain by referencing whatever is already set.
-- `ActionController` must be left on vanilla. Redirecting it requires a copy
-  of the controller def and the fragment id file, which places this mod in
-  the resolution path of every human animation. An earlier layout did that
-  and unrelated animations stopped playing.
+  contested resource is a Lua string, not a binary, so a cooperative mod can
+  chain by referencing whatever is already set.
+- `ActionController` must be left on vanilla. Redirecting it requires copies of
+  the controller def and the fragment id file, which puts this mod in the
+  resolution path of every human animation instead of one fragment, and breaks
+  unrelated ones.
 
 ### Verifying it
 

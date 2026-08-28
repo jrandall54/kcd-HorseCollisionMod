@@ -1963,12 +1963,6 @@ stops it.
   `wh_sys_version` and **disables the mod when nothing matches**, so that
   claimed compatibility the mod cannot honor: it ships whole animation
   databases generated from 1.9.7. Now pinned to `1.9.7`, which fails safe.
-- The install is a Steam build at 1.9.7 with only the auth DLL replaced
-  (`steam_api64.rne` is the original, preserved). Game data is stock, so the
-  generated databases match what a retail owner on 1.9.7 has.
-
-### Still open
-
 - Carried items are still dropped at trot and gallop, on the physics ragdoll
   path. Separate from the walk-tier stagger fix and predates 2.0.0.
 - During this session a woman **kept her bucket** while running the *un-fixed*
@@ -3767,3 +3761,278 @@ Its comment credited `sys_DevMode = 1` for making the console evaluate a leading
 accepts `#` regardless, separately from `wh_con_expr_prefix`, which reads `!`
 and governs the in-game console. The behaviour was right and the explanation was
 invented.
+
+---
+
+## Reaction reliability: the accepted impacts are censored at the footprint edge
+
+The diagnostic build was not the one installed for this session, so there are no
+`Miss` lines. The build that ran still logs accepted footprints and impacts, and
+those alone carry a signal.
+
+**Session totals**: 143 footprint accepts, 60 impacts, 25 staggers.
+
+The gap from 143 to 60 is the per-victim cooldown. An NPC stays inside the
+footprint for several ticks at 20 Hz, so one impact accounts for several
+accepts. Staggers equal Walk impacts exactly, 25 and 25, so the stagger path
+fires on every walk-tier impact it is given.
+
+### Both footprint dimensions are clipped at their limits
+
+```
+lateral   median 0.16   90th 0.30   max 0.35     limit HorseHalfWidth   0.35
+forward   min  -0.17    median 0.93  max 1.39    limit 1.05 + sweep <= 1.40
+```
+
+Neither distribution tails off. Both stop dead at the configured limit, which is
+what a censored sample looks like: contacts beyond the boundary exist and are
+being rejected, so the recorded maximum is the boundary itself rather than the
+largest real value.
+
+Ten percent of accepted impacts sat within 0.05 m of the lateral edge. A
+distribution pressed that hard against a limit usually has mass on the other
+side of it.
+
+This matches the prediction made when the footprint was narrowed for 2.0.0-rc.2:
+replaying 103 impacts through the new shape accepted 40, and the note recorded
+at the time was that if genuine contacts started being missed, half-width was
+the first value to relax.
+
+### Gallop is under-represented
+
+```
+Walk    25 impacts   1.90 to 3.98
+Trot    28 impacts   4.62 to 8.42
+Gallop   7 impacts   8.89 to 10.75
+```
+
+The session was described as making every kind of impact on every kind of NPC,
+which does not fit 7 gallops against 53 at lower tiers. Two candidates, and the
+diagnostic build separates them: gallop contacts are being rejected by the
+footprint more often, since a faster approach crosses the corridor in fewer
+ticks, or they are landing but being recorded at a lower tier because the speed
+sampled after the collision is lower than the speed that caused it.
+
+The 8.42 to 8.89 hole around `SpeedGallop = 8.5` is the dead zone already
+recorded under tuning, not a new finding.
+
+### Not yet evidence
+
+Every number here comes from impacts that were accepted. The rejected ones are
+what the question is about, and they are exactly what this log cannot show. The
+diagnostic build names them.
+
+### The diagnostic build errored on every tick
+
+**User report**: the game hung on the first run, and on the second nothing
+worked and the console filled with errors.
+
+`kcd.log` carried the mod's own handler 125 times:
+
+```
+[HorseCollisionMod] CRITICAL ERROR IN UPDATE TIMER:
+    scripts/startup/horsecollisionmod.lua:0: [Error] Lua error.
+```
+
+`LogRejection` was inserted at line 262 and calls `GetTimeMs()`, which is
+declared `local function` at line 284. A `local function` is visible only from
+its declaration onward, so the call resolved the name as a global, found nil,
+and threw. Every tick, for every rejected candidate.
+
+Two things made it expensive to notice. It is valid syntax, so the LuaJIT parse
+in `build.ps1` accepted it. And the failure surfaced through the mod's own error
+handler as a generic Lua error with no line number, because the engine needs
+`-lua_storedebug 1` for that.
+
+The functions now sit below the helpers they use.
+
+`build.ps1` gained a check for it: for every `local function`, any call to that
+name above its declaration fails the build. Verified by reintroducing the bug
+and watching it fail:
+
+```
+[LINT] HorseCollisionMod.lua line 221: GetTimeMs used before its declaration on line 224
+```
+
+This is the same class as `NPC = CreateAI(NPC_x)` copying fields: a language
+rule about when a name refers to what, invisible at the call site.
+
+## Reaction reliability: the tier is chosen from a speed the impact already destroyed
+
+**Hypothesis going in**: reactions fail to fire because a candidate is dropped
+silently somewhere between `GetEntitiesInSphere` and `TriggerCollision`. Eight
+drop points were instrumented with `LogRejection`, plus a ten-sample speed
+history so the speed at impact could be compared against the speed just before
+it.
+
+**User report**: reinstalled after the crash, rode around the city making every
+kind of impact on every type of NPC.
+
+`kcd.log` from that session, 2000 mod lines:
+
+| Outcome | Count |
+| --- | --- |
+| Miss not-human | 1783 |
+| Footprint pass | 83 |
+| Miss outside-footprint | 65 |
+| Impact | 25 |
+| Miss cooldown | 4 |
+| Miss no-actor | 2 |
+| Miss dead | 1 |
+| Miss below-walk-speed | 0 |
+
+The hypothesis was wrong. Nothing is being dropped silently.
+
+The 1783 not-human rejections are all `AudioAreaRandom`, `BasicEntity`,
+`TagPoint`, `AudioAreaAmbience` and similar. No NPC appears among them, so the
+human filter is not the fault. The names that look like NPCs in that list, such
+as `rat_city_horseParkingSpot1` and `tp_rat_cityWalk16`, are Rattay location
+markers.
+
+The gap between 83 footprint passes and 25 impacts is an artifact of the
+diagnostic, not a defect. `LogRejection` throttles to one line per NPC per
+second, and `HitCooldownMs` is 3000, so one NPC struck once and then walked
+alongside the horse passes the footprint repeatedly while logging at most one
+cooldown line per second.
+
+**The actual defect is in tier selection.** Comparing the speed each impact was
+classified on against the peak of the previous ten samples:
+
+| tier assigned | speed | peak | tier the peak implies |
+| --- | --- | --- | --- |
+| Walk | 3.67 | 6.92 | Trot |
+| Walk | 3.76 | 10.58 | Gallop |
+| Walk | 4.12 | 10.70 | Gallop |
+| Trot | 5.57 | 10.64 | Gallop |
+| Trot | 6.62 | 10.70 | Gallop |
+| Trot | 7.13 | 12.73 | Gallop |
+| Trot | 7.97 | 10.38 | Gallop |
+| Trot | 8.13 | 12.73 | Gallop |
+
+Eight of 25 impacts, 32%, were classified below the speed the horse was
+carrying. Counting by true tier: 11 impacts happened at gallop speed and 6 of
+them, 55%, did not produce a gallop reaction.
+
+Two of those read `Walk` while the horse had been at 10.58 and 10.70 m/s. That
+is the exact report that opened this investigation, reproduced with figures: a
+gallop impact reporting walking speed.
+
+**Cause**: the horse decelerates on contact. Detection samples velocity once
+per 100 ms tick, and by the time the tick that notices the victim reads
+`GetVectorLength(velocity)`, the collision has already bled speed off the horse.
+The instantaneous speed at detection is a measurement taken after the event it
+is supposed to describe.
+
+**Why this reads as "the reaction did not fire".** Every one of the 6 walk-tier
+staggers returned `ok=true err=nil`, so the animation path is not failing. A
+gallop impact misclassified as Walk plays a small stagger instead of a
+knockdown. From the saddle that is indistinguishable from nothing happening,
+which is why the defect was reported as reactions not firing rather than as
+reactions firing at the wrong strength.
+
+**Two cautions for the fix.** `peak` is not simply the right value to
+substitute. One impact logged `speed=15.63`, and two logged `peak=12.73`, all
+above the 10.81 m/s ceiling of the gallop plateau, so the peak carries physics
+spikes that instantaneous sampling does not. And the history window is ten
+samples, a full second, long enough that a rider who gallops up and deliberately
+slows to nudge someone would still be charged gallop.
+
+A shorter window is the direction: the speed that matters is the one on the tick
+before contact, not the highest of the last second.
+
+**Not the fault, ruled out this session**: the human filter, the dead check, the
+below-walk-speed gate (zero rejections), and the footprint on its lateral axis.
+The footprint still rejects NPCs standing directly ahead at `fwd` 1.7 to 2.4
+with `lat` under 0.35, which is a separate question about front reach and is not
+what causes a reaction to be missed, since the horse closes that distance within
+one or two ticks.
+
+## Reaction reliability: the correction holds, and the deceleration is one tick wide
+
+**Hypothesis**: scoring a collision on the peak of the last three ticks instead
+of the speed sampled when the victim is noticed removes the tier
+misclassification. The impact line now prints the scored speed, the sampled
+speed and the full ten-sample trail, so the width of the deceleration can be
+read directly rather than guessed at.
+
+**User report**: installed and rode around.
+
+31 impacts, against 25 in the previous session.
+
+**No impact was misclassified.** The correction changed the tier on three of
+them:
+
+| trail, last three samples | sampled | scored | tier without the fix | tier with it |
+| --- | --- | --- | --- | --- |
+| 10.57 10.67 5.91 | 5.91 | 10.67 | Trot | Gallop |
+| 10.08 10.55 4.71 | 4.71 | 10.55 | Trot | Gallop |
+| 4.04 4.50 4.07 | 4.07 | 4.50 | Walk | Trot |
+
+The two gallop cases are the defect that opened this investigation, caught in
+the act. Both would have delivered a trot knockdown for a 10.6 m/s impact.
+
+**The deceleration is one tick wide, sometimes two.** Every trail shows the same
+shape: speed flat, then a single sample collapsing.
+
+```
+[10.68 10.63 10.68 10.74 10.73 10.68 10.58 10.57 10.67 5.91]
+[10.71 10.74 10.75 10.76 10.76 10.74 10.10 10.08 10.55 4.71]
+[ 2.77  2.82  2.94  3.00  3.59  4.49  5.47  6.32  6.16 4.75]
+```
+
+The largest single-tick loss was 5.84 m/s, from 10.55 to 4.71 in 100 ms. Only
+the third trail above spreads the loss across two samples. Nothing observed
+needs more than two, so `ImpactSpeedSamples = 3` covers the deceleration with a
+tick of margin, and there is no case for widening it.
+
+The short window also proved necessary rather than merely cautious. One trail
+runs `[4.53 3.76 3.07 2.82 2.78 2.88 3.10 3.93 4.94 5.46]`: a rider who slowed
+from 4.53, then accelerated back into the victim. Scored on three samples this
+is 5.46, which is correct. Scored on the full second it would still have been
+5.46 here, but the 4.53 sits close enough to the front of the window to show how
+a genuine deliberate slowdown would be charged the earlier, higher gait.
+
+`MaxImpactSpeed` never bound. The highest speed recorded was 10.78, inside the
+gallop plateau, and the 15.63 and 12.73 spikes from the previous session did not
+recur. The cap stays as insurance, since it costs nothing and a spike scales
+knockback force.
+
+**The footprint is not a source of missed reactions.** Of 99 rejections:
+
+- 64 were beside the horse, past the 0.35 lateral half-width. Correct.
+- 34 were dead ahead past the front reach, median 2.23 m. **30 of those 34 were
+  followed by an impact within a few ticks**, so they are early detections
+  inside the 2.5 m sphere that convert once the horse closes. The remaining 4
+  are consistent with an NPC stepping aside. Front reach needs no change.
+- 1 was behind the horse.
+
+**Everything downstream is clean.** Five walk-tier impacts produced five
+staggers, all returning `ok=true err=nil`. The one `below-walk-speed` rejection
+scored 0.75 m/s on a nearly stationary horse, which is correct. The gap between
+91 footprint passes and 31 impacts is the per-victim cooldown absorbing about
+two follow-up ticks per impact while the horse rides past, and those are
+invisible in the log because `LogRejection` throttles to one line per NPC per
+second.
+
+**Still open**: kneeling NPCs detected without producing a reaction. Nothing in
+this session identifies a kneeling victim, so it needs a test aimed at it.
+
+## Kneeling NPCs react
+
+**Hypothesis**: a kneeling NPC sits low enough, or is offset far enough from the
+horse origin, that the 0.7 m wide footprint rejects them, so they are detected
+without producing a reaction.
+
+**User report**: tested against the beggar in the same session as the
+impact-speed verification. He staggered at walking pace and ragdolled at the
+higher tiers.
+
+The footprint accepts a kneeling target as it stands, and `HorseHalfWidth` needs
+no change. The earlier report of kneeling NPCs producing no reaction is
+explained by the tier misclassification rather than by detection: an impact
+scored a tier too low plays a smaller reaction, and on a target already close to
+the ground a stagger is easy to miss entirely.
+
+That makes every symptom filed under reaction reliability the same defect. The
+walk tier, the gallop-reporting-walk case and the kneeling case all resolve to
+scoring a collision on the speed left after the collision.

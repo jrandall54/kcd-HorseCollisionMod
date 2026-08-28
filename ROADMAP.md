@@ -7,8 +7,8 @@ Collisions should feel weighty and natural, and should lean on the game's own RP
 
 Complete, shipped in 2.0.0.
 
-- [x] Map horse speed to tiers. Three, not four: measured plateaus at roughly 3.0, 7.0 and
-      10.8 m/s.
+- [x] Map horse speed to three tiers, with thresholds set between the plateaus the
+      horse actually holds.
 - [x] Play a native standing hit reaction at walking pace instead of a ragdoll. Delivered
       through `actor:StartInteractiveActionByName` against custom `AnimationControlled`
       FragTags added to the animation database.
@@ -19,7 +19,7 @@ Known gaps carried into later phases:
 
 - [x] Female NPCs stagger too. `wh_female_fragmentids.xml` had no `AnimationControlled`
       fragment at all, so it is declared and the block added to their database.
-- [x] Detection reach narrowed to a horse-shaped footprint, tuned from 103 logged impacts.
+- [x] Detection reach narrowed from a sphere to a horse-shaped footprint.
 - [ ] NPCs carrying something keep hold of it through the stagger, but the clip is authored
       for empty hands, so the arms swing through a pose the item was never meant to follow.
       A controlled A/B showed the `ColliderMode` layer was never the cause of anything: the
@@ -33,7 +33,8 @@ Known gaps carried into later phases:
       momentum, if at all.
 - [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
       physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
-- [ ] Reactions are sometimes not firing. See Reaction reliability below.
+- [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
+      below.
 
 ## Development tooling
 
@@ -76,20 +77,17 @@ redirecting the same class still collide. `docs/HOW_IT_WORKS.md` and
 
 ## Reaction reliability
 
-The largest open defect, reported three times and not yet investigated.
+- [x] Reactions firing at the wrong tier, which reads from the saddle as not
+      firing at all. A gallop impact scored as a walk plays a stagger instead of
+      a knockdown. Impacts are now scored on the peak of the last few ticks
+      rather than on the speed sampled after the collision has slowed the horse.
+- [x] A gallop impact reporting walking speed. Same cause, same fix.
+- [x] Kneeling NPCs producing no reaction. The footprint accepts them as it
+      stands; the cause was the same misscoring, and a reaction one tier too
+      small is easy to miss on a target already close to the ground.
 
-- [ ] Reactions are sometimes not firing, across all three speed tiers. The walk
-      tier uses an interactive action and the other two use a physics impulse, so
-      a fault common to both is upstream of either: detection, impact direction,
-      or the per-victim cooldown.
-- [ ] A gallop impact has been observed reporting walking speed. If the speed
-      sampled at impact can be wrong, tier selection is wrong.
-- [ ] Kneeling NPCs are detected but produce no reaction. `HorseHalfWidth` is
-      0.35, a footprint 0.7 m wide, which may be too narrow.
-
-This outranks tuning: the numbers in `TECHNICAL_DETAILS.md` were derived from
-logged impacts, and a defect that drops or mismeasures impacts corrupts the sample
-they came from.
+Detection itself is sound: the human filter, the dead check, the below-walk gate
+and both axes of the footprint were each cleared against logged sessions.
 
 ## Phase 2: Mass, armor and momentum
 

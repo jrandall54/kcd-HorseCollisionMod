@@ -119,7 +119,7 @@ tools/
 docs/
   HOW_IT_WORKS.md         plain-language overview of the mod and its layout
   DEV_LOOP.md             the hot-reload development loop
-  TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
+  TECHNICAL_DETAILS.md    engine behavior and the constraints on changing it
   TESTING_DIARY.md        every build tested, what was expected, what happened
   api/                    generated Lua API reference (ldoc .)
 ```
