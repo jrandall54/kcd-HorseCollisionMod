@@ -42,7 +42,7 @@ Once, to store your API key:
 Before publishing, prove the release still deploys additively:
 
 ```
-python toolserify_additive.py
+python tools\verify_additive.py
 ```
 
 It checks every claim in `docs/TECHNICAL_DETAILS.md` against the game's own paks

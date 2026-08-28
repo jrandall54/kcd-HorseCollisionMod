@@ -212,26 +212,12 @@ the mod. The knockdown tiers are unaffected.
 How this mod adds Mannequin fragments without replacing a single vanilla file,
 and why each part of it is necessary. Introduced in 2.1.0.
 
-### The problem
+`HOW_IT_WORKS.md` covers the purpose and the trade-offs. This section is the
+reference for changing it.
 
-`actor:StartInteractiveActionByName(name, ...)` resolves `name` against the
-FragTags of exactly one fragment, `AnimationControlled`. Adding an option there
-is the only way to make an NPC play a chosen animation on demand.
+### Engine facts it relies on
 
-Mannequin databases are single XML documents. There is no include mechanism, no
-row identity, and no merge tool in the KCD ecosystem handles `.adb`. So the
-obvious way to add an option is to ship a modified copy of the whole file under
-its own name, which is what 2.0.0 did with `kcd_male_database.adb`, all 5.5 MB
-of it.
-
-The cost of that is not the size. It is that two mods cannot both do it. Whichever
-loads later in `mod_order.txt` wins outright, the other's changes vanish, and
-nothing is logged. The loser does not find out.
-
-### The mechanism
-
-Three engine facts make an additive layout possible. None is used by the base
-game, and the first two are not documented anywhere in it.
+None of the three is exercised by the base game.
 
 **Mannequin supports sub-databases.** A database may reference others:
 
@@ -243,25 +229,17 @@ game, and the first two are not documented anywhere in it.
 </AnimDB>
 ```
 
-No vanilla `.adb` uses this; all 28 splice everything into one document. The
+No vanilla `.adb` uses it; all 28 splice everything into one document. The
 loader is present regardless, and `WHGame.dll` carries its strings:
 `SubADBs`, `Loading subADB %s`, and
 `[CAnimationDatabaseManager::LoadDatabase] Unknown tags %s for subADB %s`.
 
-**A sub-database can carry an entire database, not just a fragment subset.**
-So the vanilla file can be referenced where it sits, inside
-`Animations-part1.pak`, and never copied.
+**A sub-database can carry an entire database**, not just a fragment subset,
+so the vanilla file is referenced where it sits inside `Animations-part1.pak`.
 
-**The database and controller def an entity uses are Lua properties, not
-compiled in.** `Scripts/Entities/AI/NPC_x.lua`:
-
-```lua
-ActionController = "Animations/Mannequin/ADB/kcd_male_controllerdefs.xml",
-AnimDatabase3P   = "Animations/Mannequin/ADB/kcd_male_database.adb",
-```
-
-Which means a Startup script can point them somewhere else.
-
+**The database an entity uses is a Lua property**, not compiled in.
+`Scripts/Entities/AI/NPC_x.lua` declares `AnimDatabase3P`, so a Startup script
+can point it elsewhere.
 ### The layout
 
 Seven files, all named `hcm_*`, so none collides with anything:
@@ -310,7 +288,7 @@ every call against them resolves to nothing.
 
 ### Redirect the exposed class, not the template
 
-The subtlest part, and the one that cost the most.
+The least obvious requirement, and the one with no visible symptom of its own.
 
 ```lua
 -- Scripts/Entities/AI/NPC.lua
@@ -335,26 +313,20 @@ redirected as well, so anything calling `CreateAI` later inherits correctly.
 because `AnimDatabase3P` is read when an actor spawns and the load screen ends
 after the world is populated.
 
-### What this does and does not buy
+### Constraints on any change here
 
-It buys non-collision. Every file is named `hcm_*`, so no other mod can
-overwrite one or be overwritten by one.
-
-It does not buy composability, in two places:
-
-- `hcm_<set>_fragmentids.xml`, `hcm_<set>_controllerdefs.xml` and
-  `hcm_animationControlledTags.xml` are **copies** of vanilla with additions,
-  not references. A copy cannot pick up another mod's additions to the same
-  file. Acceptable here because nothing else is likely to extend
-  `AnimationControlled`; it would not be for a mod that had to share a tag group.
-- Two mods redirecting `AnimDatabase3P` on the same class still conflict. The
-  contested resource is a Lua string rather than a 5.5 MB binary, so a
-  cooperative mod can chain by referencing whatever is already there, but the
-  conflict is not gone.
-
-The honest summary: the conflict went from total and silent to small and
-fixable.
-
+- `kcd_animationControlledTags.xml` and `wh_female_fragmentids.xml` are
+  copies of vanilla with additions, not references. A copy cannot pick up
+  another mod's additions to the same file. Acceptable because nothing else
+  is likely to extend `AnimationControlled`; it would not be for a mod that
+  had to share a tag group.
+- Two mods redirecting `AnimDatabase3P` on the same class conflict. The
+  contested resource is a Lua string rather than a binary, so a cooperative
+  mod can chain by referencing whatever is already set.
+- `ActionController` must be left on vanilla. Redirecting it requires a copy
+  of the controller def and the fragment id file, which places this mod in
+  the resolution path of every human animation. An earlier layout did that
+  and unrelated animations stopped playing.
 ### Verifying it
 
 `tools/verify_additive.py` checks every claim above against the game's own paks

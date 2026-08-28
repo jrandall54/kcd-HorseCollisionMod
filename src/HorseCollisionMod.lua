@@ -920,7 +920,7 @@ end
 -- paths taken when its script loaded, and redirecting only the template
 -- changes nothing about what spawns.
 --
--- That cost four cold-start test cycles. The player class is declared
+-- The player class is declared
 -- directly rather than through CreateAI, so redirecting it did work, which
 -- made the mod's own files load and hid the fault.
 -- The parent database is a few hundred bytes and holds no
@@ -962,7 +962,7 @@ HorseCollisionMod.AnimationDatabases = {
 -- in the resolution path of animations it has nothing to do with.
 --
 -- 2.1.0 briefly redirected both, so that the stagger FragTags could live in a
--- file named hcm_*. That worked, and it also stopped Rattay's beggar
+-- file named hcm_*. That resolved correctly, but it also stopped the beggar
 -- kneeling, because his animation resolves through BeggarIn and
 -- kcd_beggar_tags.xml by way of the same copied fragment id file. The tags
 -- are declared in vanilla's own tag file instead now, which is 1 KB and costs

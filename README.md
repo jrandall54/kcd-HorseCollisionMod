@@ -158,6 +158,7 @@ tools/
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
 docs/
+  HOW_IT_WORKS.md         plain-language overview of the mod and its layout
   DEV_LOOP.md             the hot-reload development loop
   RELEASING.md            building, publishing to Nexus, regenerating the API docs
   TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
@@ -180,6 +181,7 @@ Animation data is generated from your own game install rather than committed, so
 first build runs `tools/build_adb.py` for you and resolves the game folder itself.
 Output goes to `releases\`.
 
+`docs/HOW_IT_WORKS.md` explains what the mod does and how it is put together.
 `docs/RELEASING.md` covers publishing to Nexus Mods and regenerating the API reference.
 `docs/DEV_LOOP.md` covers the hot-reload development loop.
 

@@ -25,13 +25,13 @@ rather than replaced:
 The last two keep vanilla's names deliberately. Giving them mod names means
 restating the fragment id and controller definitions, 123 KB of vanilla data,
 and putting this mod in the resolution path of every human animation rather
-than just its own. A build that did exactly that stopped Rattay's beggar
-kneeling. Owning 15 KB of declarations is the smaller thing to own.
+than just its own, which is what broke unrelated animations in an earlier
+layout. Owning 15 KB of declarations is the smaller thing to own.
 
 HorseCollisionMod.lua then points the human entity classes' AnimDatabase3P
 at the parent. ActionController is deliberately left alone.
 
-Three things have to hold at once, each found the hard way. See
+Three conditions have to hold at once. See
 TESTING_DIARY.md, builds 2.0.1-dev.15 through 2.1.0.
 
 1. The parent must be the one defining AnimationControlled. Sub-databases do
@@ -332,9 +332,10 @@ def write_shared_tags(nl):
     it, and that file at a copy of the controller def. Those two copies are
     123 KB of vanilla data restated under mod names, and they sit in the
     resolution path of every fragment a human uses, not just this mod's.
-    Build 2.1.0 did that and Rattay's beggar stopped kneeling: his animation
-    resolves through BeggarIn and kcd_beggar_tags.xml, nothing to do with
-    this mod, but it travels through the same copied files.
+    An earlier layout did that, and unrelated animations stopped playing: the
+    beggar's kneeling resolves through BeggarIn and kcd_beggar_tags.xml,
+    nothing to do with this mod, but it travels through the same copied
+    files.
 
     Replacing 1 KB of tag names is a far smaller thing to own than restating
     the whole fragment and controller definitions, and it leaves every
