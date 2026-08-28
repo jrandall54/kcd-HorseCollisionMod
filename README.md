@@ -106,7 +106,8 @@ village is finally something the game notices.
 build.ps1                 the one build entry point
 config.ld                 LDoc configuration for the API reference
 src/
-  HorseCollisionMod.lua   the mod
+  HorseCollisionMod.lua            the mod
+  HorseCollisionMod_Settings.lua   the values a player edits
   mod.manifest
 tools/
   build_adb.py            generates the animation data from a game install
