@@ -3,10 +3,9 @@
 Vanilla horse collisions produce a shout and nothing else. This adds a reaction
 scaled to your speed, and a cost so it is not free.
 
-> The reactions are the game's own animations.
-> The thresholds were measured, not chosen.
-> Every impact costs the horse something.
-> Nothing vanilla is replaced that could be referenced instead.
+The goal is that none of it feels bolted on. Every reaction already exists in the
+game, the speed thresholds match how a horse actually moves, and the stamina cost
+keeps riding through a crowd from becoming a toy.
 
 ## What happens
 
