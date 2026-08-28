@@ -119,7 +119,6 @@ tools/
 docs/
   HOW_IT_WORKS.md         plain-language overview of the mod and its layout
   DEV_LOOP.md             the hot-reload development loop
-  RELEASING.md            building, publishing to Nexus, regenerating the API docs
   TECHNICAL_DETAILS.md    engine behavior worth knowing before changing things
   TESTING_DIARY.md        every build tested, what was expected, what happened
   api/                    generated Lua API reference (ldoc .)
@@ -140,9 +139,8 @@ Animation data is generated from your own game install rather than committed, so
 the first build runs `tools/build_adb.py` for you and resolves the game folder
 itself. Output goes to `releases\`.
 
-`docs/HOW_IT_WORKS.md` explains how the mod is put together,
-`docs/RELEASING.md` covers publishing, and `docs/DEV_LOOP.md` covers the
-hot-reload development loop.
+`docs/HOW_IT_WORKS.md` explains how the mod is put together, and
+`docs/DEV_LOOP.md` covers the hot-reload development loop.
 
 ## License
 

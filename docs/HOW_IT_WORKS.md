@@ -107,5 +107,4 @@ animation set, and it can be reconciled by hand.
 ## Verifying it
 
 `python tools/verify_additive.py` checks every claim on this page against the
-game's own data files and the packaged release. It is a release step, described
-in `RELEASING.md`.
+game's own data files and the packaged release.

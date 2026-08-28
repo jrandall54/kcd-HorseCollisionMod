@@ -51,7 +51,7 @@ gets tested.
       Not a GitHub Action: the build reads the game's own paks, so it cannot run on a
       hosted runner. Revisit if additive ADB deployment below ever lands.
 
-See `docs/DEV_LOOP.md`, and `docs/RELEASING.md` for publishing.
+See `docs/DEV_LOOP.md`.
 
 ## Additive deployment
 

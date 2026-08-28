@@ -25,7 +25,7 @@ refuses to run while the game holds its paks open, and it launches with
 `-devmode` (see below).
 
 The game folder is resolved, not hardcoded, the same way `build_adb.py` resolves
-it. See `RELEASING.md`. An explicitly given path that is wrong stops the run
+it. An explicitly given path that is wrong stops the run
 instead of falling through to a different install.
 
 The release build for Nexus still goes through `build.ps1`. The dev folder is
@@ -251,6 +251,20 @@ restarting. `ringing_alarm_bell` and `library_cabinet_open` exist only in the
 male database, so a female-visible test needs a clip present in
 `wh_female_database.adb`.
 
+## Loose files hide pak faults
+
+The dev loop deploys loose files at `sys_PakPriority = 0`. A player runs at
+`2`, where loose files are ignored and only the pak is read. A pak whose entry
+names or reference paths are wrong overrides nothing and logs nothing, and the
+loose copies mask that completely.
+
+So a packaged build has to be tested as one:
+
+- `sys_PakPriority = 2` and `mn_allowEditableDatabasesInPureGame = 0`, both
+  shipping defaults
+- no loose files under `Data\Animations\` or `Data\Scripts\Startup\`
+- installed from the zip
+- launched without `-devmode`
 ## Watch out for
 
 **There is only one `user.cfg` now.** There used to be a second in `Bin\Win64`,
