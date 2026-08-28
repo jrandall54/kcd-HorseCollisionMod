@@ -30,12 +30,16 @@ Output lands in `releases\`.
 python tools\verify_additive.py
 ```
 
-Thirty-one checks against the game's own paks and the packaged zip: that only the
-two intended declaration files carry vanilla names, that nothing is lost from the
-fragment the mod takes authority over, that every reference resolves, that pak
-entries use forward slashes, and that the Lua redirects the classes the engine
-spawns. It reads those class names out of `Scripts.pak` rather than trusting the
-mod. All must pass.
+Thirty-one checks against the game's own paks and the packaged zip:
+
+- only the two intended declaration files carry vanilla names
+- nothing is lost from the fragment the mod takes authority over
+- every reference in the chain resolves
+- pak entries use forward slashes
+- the Lua redirects the classes the engine spawns, read out of `Scripts.pak`
+  rather than taken on trust
+
+All must pass.
 
 ## 4. Test the packaged build
 

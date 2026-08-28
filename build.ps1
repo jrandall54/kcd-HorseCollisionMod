@@ -103,6 +103,16 @@ if ($controlChars.Count -gt 0) {
     Write-Host "Build failed: stray control characters." -ForegroundColor Red
     exit 1
 }
+
+# Documentation style, per docs/STYLE.md. Written down rules are not enforced
+# rules, and the ones this catches had each been corrected by hand more than
+# once before it existed.
+python (Join-Path $toolsDir "lint_docs.py")
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Build failed: documentation style. See docs/STYLE.md." -ForegroundColor Red
+    exit 1
+}
 Write-Host "Code Style Check Passed ($($lines.Count) lines)."
 
 # Syntax check. KCD runs Lua 5.1, and LuaJIT shares its syntax, so it can

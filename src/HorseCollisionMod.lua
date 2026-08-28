@@ -569,7 +569,7 @@ end
 -- Prefers the horse's own `RearAndThrowDown`, which plays the animation of
 -- the animal rearing and unseating its rider. Falls back to ragdolling the
 -- player, which is what earlier builds did and which reads as the player
--- simply collapsing rather than being thrown.
+-- collapsing rather than being thrown.
 --
 -- `RearAndThrowDown` is undocumented. It sits on the horse entity's `horse`
 -- extension, alongside `HasRider` and `IsMountable`.

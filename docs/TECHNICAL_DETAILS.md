@@ -47,7 +47,7 @@ required. Miss any of them and the call still succeeds while nothing plays.
 2. **The tag definition** (`kcd_animationControlledTags.xml`) declares the valid FragTags.
    **A FragTags value that is not declared here does nothing**, even when the database entry
    exists. Both sexes share this file.
-3. **The databases** hold the options. Ours point at
+3. **The databases** hold the options. The added ones point at
    `hitreaction_idle_medium_torso_stab_{front,back,left,right}`, standing hit reactions the
    game already contains. `kcd_male_database.adb` has an existing `AnimationControlled`
    block to append to; `wh_female_database.adb` has none, so the whole block is added.
@@ -97,7 +97,7 @@ refuses to read them, so `build_adb.py` inflates entries from the local header d
   node calling `System.LogAlways` instead.
 
 A recurring theme: **most of these failures are silent**. A call returns without error, a
-log line never appears, an animation simply does not play. Three separate times this
+log line never appears, an animation does not play. Three separate times this
 project drew a wrong conclusion from an unverified signal. Before concluding anything from
 a signal, confirm the signal itself works.
 

@@ -98,7 +98,7 @@ The largest open defect, reported three times and not yet investigated.
 - [ ] A gallop impact has been observed reporting walking speed. If the speed
       sampled at impact can be wrong, tier selection is wrong.
 - [ ] Kneeling NPCs are detected but produce no reaction. `HorseHalfWidth` is
-      0.35, a footprint 0.7 m wide, which may simply be too narrow.
+      0.35, a footprint 0.7 m wide, which may be too narrow.
 
 This outranks tuning: the numbers in `TECHNICAL_DETAILS.md` were derived from
 logged impacts, and a defect that drops or mismeasures impacts corrupts the sample

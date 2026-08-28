@@ -339,7 +339,7 @@ if (-not $Force -and $Version -match 'dev|alpha|beta|rc') {
 Add-Type -AssemblyName System.IO.Compression.FileSystem | Out-Null
 $archive = [System.IO.Compression.ZipFile]::OpenRead($zipItem.FullName)
 try {
-    # Compress-Archive stores Windows separators, so the release zip really
+    # Compress-Archive stores Windows separators, so the release zip does
     # does hold "Data\HorseCollisionMod.pak". Harmless for the outer zip, which
     # is unpacked by Vortex or by hand rather than looked up by path, and the
     # pak inside it is built entry by entry to get forward slashes. Worth
