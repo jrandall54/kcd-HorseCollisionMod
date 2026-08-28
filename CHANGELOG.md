@@ -16,6 +16,13 @@ sections and refuses a release built at any other number.
 
 ## [Unreleased]
 
+### Added
+
+- Impact telemetry. Each collision logs the victim's health at the moment of
+  impact and again shortly after, so a reaction that looks wrong in game can be
+  checked against what the hit actually cost. Written to `kcd.log` under the
+  existing `LogTelemetry` setting.
+
 ## [3.0.0] - 2026-08-28
 
 ### Changed
