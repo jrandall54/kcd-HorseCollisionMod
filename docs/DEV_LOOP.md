@@ -16,6 +16,20 @@ mn_allowEditableDatabasesInPureGame = 1  allow Mannequin reloads
 At its shipping value of `2` the engine reads only paks, and every loose file
 below is ignored.
 
+Verifying a release requires the shipping values, so an install used for a
+release is left configured for play. `dev_deploy.ps1` switches between the two
+and refuses to deploy into an install configured for play, because at
+`sys_PakPriority = 2` a deploy, a reload and a console command all report
+success while the game keeps running the packed build.
+
+```
+.\tools\dev_deploy.ps1 -SetDevEnvironment     development values
+.\tools\dev_deploy.ps1 -SetPlayEnvironment    shipping values
+```
+
+Restart the game after either. `-Force` deploys into an install that will
+ignore what it is given.
+
 ## Deploying
 
 ```
