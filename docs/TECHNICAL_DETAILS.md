@@ -1,15 +1,12 @@
 # Technical Details
 
-Notes on how this mod works and what the engine does or does not allow. Everything here
-was verified by testing in game, not inferred. The build-by-build record is in
+How this mod works and what the engine allows. The build-by-build record is in
 `docs/TESTING_DIARY.md`.
 
 ## Making an NPC play an animation
 
-This is the hard part, and most of the obvious approaches do not work.
-
-An NPC's body is driven by the animation system, which is in turn driven by the AI. Lua
-cannot simply tell a skeleton what to do. The following were all tried and all failed:
+An NPC's body is driven by the animation system, which is driven by the AI. Lua cannot
+tell a skeleton what to do directly, and these do not work:
 
 | Approach | Result |
 | --- | --- |
@@ -20,11 +17,10 @@ cannot simply tell a skeleton what to do. The following were all tried and all f
 | `combat:hit` brain message | Same |
 | A `PlayAnimation` node added to `sb_switch_hitreactions.xml` | Node runs, animation fails |
 
-The last one is worth explaining, because it looks like it should work. Behavior trees
-named `sb_switch_*` are passive observers running alongside whatever the NPC is actually
-doing. They react to events, send messages and set variables, but they do not own the
-body. Across all 31 switch trees in the game there is not a single `PlayAnimation` node.
-Warhorse never does this, which is why there was no working example to copy.
+The behavior tree entry is the least obvious. Trees named `sb_switch_*` are passive
+observers running alongside whatever the NPC is doing. They react to events, send
+messages and set variables, but they do not own the body. None of the 31 switch trees
+in the game contains a `PlayAnimation` node.
 
 ### What does work
 
@@ -324,10 +320,10 @@ after the world is populated.
 - Two mods redirecting `AnimDatabase3P` on the same class conflict. The
   contested resource is a Lua string rather than a binary, so a cooperative
   mod can chain by referencing whatever is already set.
-- `ActionController` must be left on vanilla. Redirecting it requires a copy
-  of the controller def and the fragment id file, which places this mod in
-  the resolution path of every human animation. An earlier layout did that
-  and unrelated animations stopped playing.
+- `ActionController` must be left on vanilla. Redirecting it requires copies
+  of the controller def and the fragment id file, which puts this mod in the
+  resolution path of every human animation instead of one fragment, and breaks
+  unrelated ones.
 
 ### Verifying it
 

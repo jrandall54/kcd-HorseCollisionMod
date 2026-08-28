@@ -16,9 +16,8 @@
 --
 -- ## How the walk stagger works
 --
--- This part has no precedent in other KCD mods, so it is worth stating
--- plainly. Lua cannot drive an NPC's animation directly. Everything obvious
--- was tried and fails silently: `human:PlayAnim` is accepted but never
+-- Lua cannot drive an NPC's animation directly, and every obvious approach
+-- fails silently: `human:PlayAnim` is accepted but never
 -- renders, physics impulses are ignored because actors are animation-driven,
 -- `soul:DealDamage` only moves stat numbers, and the `hitReaction` and
 -- `combat:hit` brain messages reach a behavior tree that cannot drive the

@@ -75,15 +75,8 @@ Download drops from 195,284 to 21,953 bytes.
 - [ ] Publish 2.1.0, and rewrite the mod page, which still describes the old
       database-replacement install.
 
-Two small declaration files keep vanilla names, 15 KB in total. Avoiding those
-names requires restating 123 KB of fragment and controller definitions under mod
-names, which places the mod in the resolution path of every human animation rather
-than one fragment. An earlier 2.1.0 layout did that and unrelated animations
-stopped playing.
-
-Remaining limit: two mods redirecting the same class still collide, but the
-contested resource is a Lua string rather than a database no one can merge, and a
-cooperative mod can chain by referencing the current value.
+Two small declaration files keep vanilla names, 15 KB in total, and two mods
+redirecting the same class still collide. See `docs/HOW_IT_WORKS.md`.
 
 See `docs/HOW_IT_WORKS.md` and `docs/TECHNICAL_DETAILS.md`.
 

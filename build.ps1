@@ -227,9 +227,9 @@ $required = @(
     "$adb\wh_female_fragmentids.xml"
 )
 
-# Nothing beyond that set may ship. A leftover from an earlier layout would
-# still be an override and would quietly change which chain entities resolve
-# through, without altering a single line this build prints.
+# Nothing beyond that set may ship. A stale file left in mod_assets is still an
+# override, and would quietly change which chain entities resolve through
+# without altering a single line this build prints.
 $allowed = $required | ForEach-Object { Split-Path -Leaf $_ }
 $unexpected = Get-ChildItem $adb -File -ErrorAction SilentlyContinue |
     Where-Object { $allowed -notcontains $_.Name }

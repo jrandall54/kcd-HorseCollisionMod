@@ -100,10 +100,6 @@ Two small files, and they are small on purpose:
 | `kcd_animationControlledTags.xml` | 1 KB | Lists the names an option may use. The four new names have to be declared somewhere, and this is the file the game already looks in. |
 | `wh_female_fragmentids.xml` | 14 KB | Female characters have the same animations but no `AnimationControlled` list at all, so one has to be declared for them. |
 
-An earlier version of 2.1.0 avoided both by shipping renamed copies of the
-files that point at them. That removed the two names at the cost of restating
-123 KB of the game's own definitions, and it put the mod in the path of every
-human animation rather than just its own. Unrelated animations broke.
 
 Fifteen kilobytes of declarations is a smaller thing to own than the machinery
 required to avoid owning it, and small enough that another author can reconcile
