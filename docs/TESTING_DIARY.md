@@ -3398,3 +3398,45 @@ missing from the mod's copy. Candidates are the controller def copy, the
 fragment id copy, or the NPC's schedule being unrelated to the mod entirely.
 Needs a controlled comparison against a run with the mod disabled before
 anything is concluded.
+
+### A Vortex install test that used the wrong build
+
+Reported: installing `v2.1.0-dev.1.zip` through Vortex produced no staggers,
+only the one-frame glitch.
+
+That build is from 12:00 and the working one is from 17:10. It predates every
+fix: no `ActionController` redirect, no exposed-class redirect, and it still
+used the separate `hcm_<set>_stagger.adb` files whose options a parent
+overrides. Any one of those alone produces exactly that symptom, and all three
+were missing. The result says nothing about the current build.
+
+The cause is a release directory holding **49 zips**, thirteen of them named
+`2.0.1-dev.*` or `2.1.0-dev.1`, with no indication which was current. Everything
+superseded is now under `releases/archive/`, leaving only 2.0.0 and 2.1.0 where
+they can be picked up by hand.
+
+Worth generalising: intermediate builds from a debugging session are a hazard
+once the session ends, because the only thing distinguishing a working build
+from a broken one is a timestamp nobody checks.
+
+### The beggar, and a confound in the control
+
+Reported earlier: a beggar in Rattay stood instead of kneeling with the mod
+installed. A control run with the mod removed entirely, same save, had him
+kneeling.
+
+Structurally the mod does not explain it. `Beggar`, `BeggarOut` and `BeggarVAR`
+are fragment ids preserved verbatim in the mod's fragment id copy, their
+fragments live in the vanilla database and are reached through the SubADB
+reference like every other working animation, and the mod's controller def
+differs from vanilla by exactly one line, the `Fragments` filename.
+
+**The control has a confound.** In the mod-on run the player had been riding
+around for some time; in the control the save was loaded and the beggar observed
+straight away. Beggars follow a daily schedule, so elapsed in-game time was not
+held constant between the two runs.
+
+A protocol that would settle it: load the save, observe immediately, quit. Then
+change exactly one variable and repeat with the same elapsed time. Until that is
+done this is an open question rather than a known regression, and it should not
+be recorded as either.
