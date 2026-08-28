@@ -1,0 +1,41 @@
+--- Settings for HorseCollisionMod. This is the file to edit.
+--
+-- Change a value, save, and let the archive update when prompted. Nothing else
+-- in the mod needs touching, and anything left out or misspelled falls back to
+-- the default rather than breaking.
+--
+-- Speeds are meters per second. Distances are meters from the horse's centre.
+--
+-- @script HorseCollisionMod_Settings
+
+HorseCollisionModSettings = {
+
+	-- Speed tiers. Below SpeedWalk nothing happens at all.
+	SpeedWalk                = 1.8,   -- staggers, no damage, no stamina cost
+	SpeedTrot                = 4.5,   -- knocked down
+	SpeedGallop              = 8.5,   -- knocked down harder
+
+	-- What counts as contact. Lower these if NPCs react when you ride past.
+	HorseFrontReach          = 1.05,  -- meters ahead of the horse
+	HorseHalfWidth           = 0.35,  -- meters to either side
+	HorseRearReach           = 0.20,  -- meters behind
+	HitCooldownMs            = 3000,  -- before the same NPC can react again
+
+	-- Knockdown force, trot and gallop only.
+	Knockback                = 50.0,  -- horizontal, higher throws further
+	Uplift                   = 30.0,  -- vertical, higher throws upward
+
+	-- Stamina, against a full pool of roughly 210.
+	StaminaDrainWalk         = 0.0,
+	StaminaDrainTrot         = 45.0,
+	StaminaDrainGallop       = 75.0,
+	CombatStaminaMultiplier  = 2.5,   -- 1.0 removes the combat penalty
+	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
+
+	-- Switches.
+	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
+	WalkStagger              = true,  -- false gives vanilla behavior at a walk
+	ProtectMutt              = true,  -- whether your dog is immune
+	LogTelemetry             = true   -- diagnostics in kcd.log
+
+}

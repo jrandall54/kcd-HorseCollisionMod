@@ -909,6 +909,54 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	end
 end
 
+--- Applies HorseCollisionMod_Settings.lua over the defaults above.
+--
+-- Settings live in their own file so that changing one does not mean finding a
+-- table partway down a thousand-line script. That file ships alongside this one
+-- in `Scripts/Startup/` and defines a single global.
+--
+-- Startup scripts are loaded in name order, so the settings file runs after
+-- this one and its global does not exist at the time this file is executed.
+-- The merge therefore happens from the load screen, by which point everything
+-- in `Scripts/Startup/` has run.
+--
+-- A key that is not already in Config is rejected rather than added. Config is
+-- the list of settings that exist, so an unknown key means a typo, and adding
+-- it would be silently ignored by whatever was supposed to read it. A wrong
+-- type is rejected for the same reason. Both are logged, because a setting that
+-- quietly does nothing is worse than one that visibly fails.
+--
+-- @treturn number settings applied
+-- @treturn number entries rejected
+function HorseCollisionMod:ApplySettings()
+	local settings = rawget(_G, "HorseCollisionModSettings")
+
+	if type(settings) ~= "table" then
+		return 0, 0
+	end
+
+	local applied = 0
+	local rejected = 0
+
+	for key, value in pairs(settings) do
+		local current = self.Config[key]
+
+		if current == nil then
+			self:Log("Setting '" .. tostring(key) .. "' is not a setting, ignored")
+			rejected = rejected + 1
+		elseif type(value) ~= type(current) then
+			self:Log("Setting '" .. tostring(key) .. "' wants a "
+					.. type(current) .. ", got " .. type(value) .. ", ignored")
+			rejected = rejected + 1
+		elseif value ~= current then
+			self.Config[key] = value
+			applied = applied + 1
+		end
+	end
+
+	return applied, rejected
+end
+
 --- Entity classes whose animation database this mod redirects.
 --
 -- Each entry maps an entity class table to the character set it belongs to.
@@ -1020,6 +1068,13 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		local currentTick = HorseCollisionModGeneration
 
 		self.TimerTick = currentTick
+
+		local applied, rejected = self:ApplySettings()
+
+		if applied > 0 or rejected > 0 then
+			self:Log("Settings: " .. tostring(applied) .. " applied, "
+					.. tostring(rejected) .. " ignored")
+		end
 
 		local again = self:RedirectAnimationDatabases()
 

@@ -1,11 +1,9 @@
 # Horse Collision Mod
 
-Vanilla horse collisions produce a shout and nothing else. This adds a reaction
-scaled to your speed, and a cost so it is not free.
-
-The goal is that none of it feels bolted on. Every reaction already exists in the
-game, the speed thresholds match how a horse actually moves, and the stamina cost
-keeps riding through a crowd from becoming a toy.
+Vanilla horse collisions produce a shout and nothing else. This mod adds existing animations 
+and physical reactions when Henry collides with NPCs while on horseback. The goal of this mod 
+is to increase immersion by adding a feature that would feel right at home being included 
+in vanilla. 
 
 ## What happens
 
@@ -25,7 +23,7 @@ keeps riding through a crowd from becoming a toy.
 
 ## Requirements
 
-Kingdom Come: Deliverance 1.9.7, the final build. The mod declares that version
+Kingdom Come: Deliverance 1.9.7. The mod declares that version
 and the game refuses to load it against any other.
 
 ## Install
@@ -34,10 +32,21 @@ Vortex, or extract the zip into `Kingdom Come - Deliverance\Mods\`.
 
 ## Settings
 
-1. Go to `Mods\HorseCollisionMod\Data\`
-2. Right click `HorseCollisionMod.pak`, open with 7-Zip or WinRAR (open, do not extract)
-3. Edit `Scripts\Startup\HorseCollisionMod.lua` inside the archive
-4. Save, and let the archive update when prompted
+Settings live in their own file, `HorseCollisionMod_Settings.lua`. It contains
+nothing but the values below, so there is no code to read around.
+
+1. Open `Kingdom Come - Deliverance\Mods\HorseCollisionMod\Data\HorseCollisionMod.pak`
+   with 7-Zip or WinRAR. Use **Open archive**, not Extract.
+2. Inside it, go to `Scripts\Startup\` and open
+   `HorseCollisionMod_Settings.lua` (not `HorseCollisionMod.lua`, which is the
+   mod itself).
+3. Change the values you want. Keep the `=` and the comma.
+4. Save and close the editor. 7-Zip asks whether to update the archive: say yes.
+5. Load a save. Settings are read when the loading screen ends, so a restart is
+   not needed, but an already-loaded game will not pick them up.
+
+A misspelled or mistyped setting is ignored and named in `kcd.log` rather than
+breaking the mod. Deleting a line restores its default.
 
 | Setting | Default | Effect |
 | --- | --- | --- |

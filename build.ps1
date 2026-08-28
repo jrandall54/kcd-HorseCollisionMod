@@ -12,6 +12,7 @@ $srcDir = Join-Path $repoRoot "src"
 $toolsDir = Join-Path $repoRoot "tools"
 $assetsDir = Join-Path $repoRoot "mod_assets"
 $modScript = Join-Path $srcDir "HorseCollisionMod.lua"
+$settingsScript = Join-Path $srcDir "HorseCollisionMod_Settings.lua"
 
 $buildDir = Join-Path $repoRoot "build_temp"
 $pakDir = "$buildDir\pak\Scripts\Startup"
@@ -25,9 +26,14 @@ New-Item -ItemType Directory -Force -Path $pakDir | Out-Null
 New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
 Write-Host "Running Code Style Hooks..."
-$lines = Get-Content $modScript
 $errors = 0
 $maxLineLength = 90
+$luaLineCount = 0
+
+foreach ($luaFile in @($modScript, $settingsScript)) {
+$shortName = Split-Path -Leaf $luaFile
+$lines = Get-Content $luaFile
+$luaLineCount += $lines.Count
 
 # Checks run per line so violations can be reported with a line number, and
 # so comment lines can be excluded from the code-shape rules. A doc comment
@@ -38,24 +44,24 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     $isComment = $line.TrimStart().StartsWith("--")
 
     if ($line -match '^ ') {
-        Write-Host "[LINT] line ${num}: space indentation, use hard tabs" -ForegroundColor Red
+        Write-Host "[LINT] ${shortName} line ${num}: space indentation, use hard tabs" -ForegroundColor Red
         $errors++
     }
 
     if (-not $isComment -and $line -match '\bif\b.*\bthen\b.*\bend\b') {
-        Write-Host "[LINT] line ${num}: single-line if/then/end block" -ForegroundColor Red
+        Write-Host "[LINT] ${shortName} line ${num}: single-line if/then/end block" -ForegroundColor Red
         $errors++
     }
 
     if ($line -match '[ \t]+$') {
-        Write-Host "[LINT] line ${num}: trailing whitespace" -ForegroundColor Red
+        Write-Host "[LINT] ${shortName} line ${num}: trailing whitespace" -ForegroundColor Red
         $errors++
     }
 
     # Tabs are counted as one character here, which is close enough for
     # spotting the long trailing lines the style guide warns about.
     if ($line.Length -gt $maxLineLength) {
-        Write-Host "[LINT] line ${num}: $($line.Length) chars, over $maxLineLength" -ForegroundColor Red
+        Write-Host "[LINT] ${shortName} line ${num}: $($line.Length) chars, over $maxLineLength" -ForegroundColor Red
         $errors++
     }
 
@@ -63,9 +69,10 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     # assumption the engine's Lua and the animation data both rely on, and
     # they are invisible in most editors.
     if ($line -cmatch '[^\x00-\x7F]') {
-        Write-Host "[LINT] line ${num}: non-ASCII character" -ForegroundColor Red
+        Write-Host "[LINT] ${shortName} line ${num}: non-ASCII character" -ForegroundColor Red
         $errors++
     }
+}
 }
 
 if ($errors -gt 0) {
@@ -113,7 +120,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed: documentation style. See docs/STYLE.md." -ForegroundColor Red
     exit 1
 }
-Write-Host "Code Style Check Passed ($($lines.Count) lines)."
+Write-Host "Code Style Check Passed ($luaLineCount lines, 2 files)."
 
 # Syntax check. KCD runs Lua 5.1, and LuaJIT shares its syntax, so it can
 # parse the script without the game being involved. A syntax error otherwise
@@ -125,11 +132,13 @@ $luajit = Get-Command luajit -ErrorAction SilentlyContinue
 if ($luajit) {
     # Lua treats a backslash in a quoted string as an escape, so the path
     # handed to loadfile is converted to forward slashes.
-    $luaPath = $modScript.Replace([char]92, [char]47)
-    & $luajit.Source -e "assert(loadfile('$luaPath'))"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[SYNTAX ERROR] HorseCollisionMod.lua does not parse." -ForegroundColor Red
-        exit 1
+    foreach ($script in @($modScript, $settingsScript)) {
+        $luaPath = $script.Replace([char]92, [char]47)
+        & $luajit.Source -e "assert(loadfile('$luaPath'))"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[SYNTAX ERROR] $(Split-Path -Leaf $script) does not parse." -ForegroundColor Red
+            exit 1
+        }
     }
     Write-Host "Lua Syntax Check Passed."
 }
@@ -139,6 +148,7 @@ else {
 
 # 1. Structure the PAK contents
 Copy-Item $modScript -Destination "$pakDir\"
+Copy-Item $settingsScript -Destination "$pakDir\"
 
 # Data overrides live under mod_assets/ mirroring the game's own layout and
 # are copied in wholesale. They are derived from the game's paks, so they are

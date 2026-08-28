@@ -3568,3 +3568,36 @@ activity may well be the right behaviour.
 
 All three are deferred to the reaction-reliability work, which is now the
 largest open item in the project.
+
+### Settings move to their own file
+
+**User report**, after editing settings as a player would: "the actual settings
+are really hard to find without ctrl-f."
+
+Correct. The config table sat at line 119 of a 1,051 line file, behind 111 lines
+of module documentation, inside a pak that has to be opened with 7-Zip first.
+
+**A game-root .cfg is not available.** The engine ignores unregistered CVar
+names in `user.cfg`, and this mod registers none. A `hcm_*` block left over from
+1.x was found in `user.cfg` earlier and removed for exactly that reason: nothing
+read it. Registering CVars from Lua was not attempted, and would still leave the
+values in a file shared with graphics tuning.
+
+Mod folders are mounted by their `.pak`, so a loose settings file beside it is
+not read either. Whatever a user edits has to be inside the archive.
+
+So: `Scripts/Startup/HorseCollisionMod_Settings.lua`, containing one table and
+nothing else. Startup scripts load in name order and `.` sorts before `_`, so it
+runs after the mod. `ApplySettings` merges it from the load screen, by which
+point everything in that folder has executed.
+
+The merge validates rather than copying. A key absent from `Config` is a typo,
+since `Config` is the list of settings that exist, and a wrong type is a mistake
+for the same reason. Both are rejected and named in `kcd.log`. A setting that
+quietly does nothing is worse than one that visibly fails, and this project has
+lost time to enough silent failures already.
+
+Tested against LuaJIT with the engine globals stubbed: a changed value applies, a
+one-letter typo is rejected without being added to Config, a string where a
+number belongs is rejected, the real setting nearby is untouched, and an absent
+settings file leaves the defaults alone.
