@@ -58,6 +58,70 @@ Known gaps carried into later phases:
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
+## Start here
+
+Two separate defects, found by testing rather than reading, and neither is what
+earlier entries in this file assumed. Both are open.
+
+### 1. Collisions damage the victim, and the mod causes it
+
+The mod ragdolls its victim, which turns them from an animation-driven actor
+into a physics object. The moving horse then collides with that body and the
+engine charges damage from the velocity delta, at
+`CollisionVelocityDeltaToDmgR = 0.25` in `Libs/Tables/rpg/rpg_param.xml`.
+
+Proven twice. Ragdolling an NPC 7.3 m away with no horse nearby costs nothing.
+Setting that parameter to 0 in a loose table gives 15 impacts at exactly zero
+damage.
+
+- [ ] Throw the victim sideways. `Ragdoll` currently aims its impulse along the
+      horse's velocity, driving the victim down the horse's own line of travel
+      and maximising the overlap. A lateral component clears them instead.
+      Cheapest fix, changes nothing else, and the impact telemetry makes a
+      before-and-after unambiguous.
+- [ ] If that is not enough, delay the ragdoll a few hundred milliseconds so the
+      horse has passed before the body becomes physical.
+- [ ] Last resort, an animated knockdown through the `AnimationControlled` path
+      the walk stagger already uses, which never creates a physics body. Walk
+      impacts have cost zero health all session, which is the existence proof.
+
+Overriding `rpg_param.xml` is rejected: one global value read by everything that
+resolves a physical collision, including the player's own, and shipping a
+vanilla table reintroduces the conflict surface 3.0.0 removed.
+
+### 2. Repeatedly ragdolled NPCs wedge, and it is not the damage
+
+An NPC hit enough times stops responding: alive, undamaged, holding whatever
+idle it was in, refusing to resume its schedule. Combat claims it normally and
+hands it back to the wedge afterwards.
+
+With collision damage zeroed, a victim still wedged **at 96.4 health**, in an
+ordinary standing idle rather than a wounded pose. So this is independent of
+damage, of health, and of the wounded animation.
+
+Ruled out by test, not by reading: injury buffs, the Energy stat, the animation
+queue, the mod's Mannequin data, unconsciousness buffs, damage, and health.
+
+- [ ] Raise `KnockdownRecoveryMs` well above 6000 and see whether the wedge
+      stops. A victim hit again while still recovering is the most plausible way
+      to wedge the state machine, and it is one setting and one ride.
+- [ ] If that is not it, instrument what the victim's behavior tree is doing.
+      `XGenAIModule.GetBrainVariable(entity, name)` reads a tree's variables and
+      is the only unexplored route; twelve `b_` names returned nil against an
+      entity id, so the addressing needs settling first, WUID against entity id.
+
+### Three things to remove before either fix lands
+
+All three treat symptoms of causes since disproven, and all three are committed
+on `fix/collision-exhaustion`:
+
+- [ ] `MinVictimHealth` and `HoldVictimAboveFloor`. Cannot fix the lockup, which
+      happens at full health.
+- [ ] `ClearInjuries` and the injury buff table. Injuries are not the cause and
+      the cure never released a victim.
+- [ ] `LimitExhaustion`, `EnforceExhaustLimits` and `ExhaustWatch`. Built on an
+      inverted reading of the Energy stat, already disabled by default.
+
 ## Development tooling
 
 Complete, merged after 2.0.0. Not a gameplay phase, but it changes how every phase below
