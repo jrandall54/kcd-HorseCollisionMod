@@ -839,8 +839,12 @@ end
 -- path to any of those, so an injury an NPC receives lasts for the life of the
 -- save.
 --
--- The two tags are what the AI reads, through `buff_ai_tag_id`, and are why an
--- injured NPC holds a wounded pose and will not fight.
+-- The tags among them are what the AI reads, through `buff_ai_tag_id`, and are
+-- why an injured NPC holds a wounded pose and will not fight.
+--
+-- Listed for reference. They are not removed one by one: the game cures
+-- injuries by applying a buff of its own, which is what `RemoveInjuriesBuff`
+-- below is.
 -- @table InjuryBuffs
 HorseCollisionMod.InjuryBuffs = {
 	"37d59205-3782-446d-b32e-89a9f786725d",  -- injured_torso
@@ -852,6 +856,18 @@ HorseCollisionMod.InjuryBuffs = {
 	"3d530e43-375f-4739-a6ee-3bbcf9292601",  -- injured_tag
 	"83ef27f9-4ce2-4894-bd42-d2cc61a6f758",  -- injured_tag_persistent
 }
+
+--- The buff that cures injuries, `remove_injuries` from `buff.xml`.
+--
+-- One second of `Cpp:BasicTimed` whose whole effect is clearing the injury
+-- class. Vanilla applies it to a duel opponent once the duel ends, in
+-- `sb_duel`, which is the game's own idiom for undoing injuries it caused:
+--
+--     entity.soul:AddBuff("46683e3b-e261-412f-b402-99ee17dda62a")
+--
+-- Removing each injury by its guid does not work. `RemoveAllBuffsByGuid`
+-- accepts the call and reports success without clearing anything.
+HorseCollisionMod.RemoveInjuriesBuff = "46683e3b-e261-412f-b402-99ee17dda62a"
 
 
 --- Removes the injuries a collision gave its victim.
@@ -878,25 +894,14 @@ function HorseCollisionMod:ClearInjuries(npc)
 	end
 
 	local function clear(label)
-		local removed = 0
-
-		for _, guid in ipairs(self.InjuryBuffs) do
-			-- Per buff. A guid the engine does not recognise should not stop
-			-- the rest from being cleared.
-			local ok = pcall(function()
-				npc.soul:RemoveAllBuffsByGuid(guid)
-			end)
-
-			if ok then
-				removed = removed + 1
-			end
-		end
+		local ok = pcall(function()
+			npc.soul:AddBuff(self.RemoveInjuriesBuff)
+		end)
 
 		if cfg.LogTelemetry then
 			self:Log("Injuries " .. tostring(npc:GetName())
 					.. " " .. label
-					.. " cleared=" .. tostring(removed)
-					.. "/" .. tostring(#self.InjuryBuffs))
+					.. " cure=" .. tostring(ok))
 		end
 	end
 
