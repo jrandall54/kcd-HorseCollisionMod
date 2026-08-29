@@ -151,14 +151,14 @@ HorseCollisionMod.Config = {
 	ArmorImpulseExponent     = 0.5,
 	MinArmorImpulse          = 0.35,
 	MaxArmorImpulse          = 1.5,
-	ArmorStaminaExponent     = 0.5,
+	ArmorStaminaExponent     = 0.4,
 	MinArmorStamina          = 0.75,
 	MaxArmorStamina          = 3.0,
 
 	-- Horse stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 45.0,
-	StaminaDrainGallop       = 75.0,
+	StaminaDrainTrot         = 30.0,
+	StaminaDrainGallop       = 45.0,
 	ThrowRiderOnStaminaEmpty = true,
 
 	-- Combat.

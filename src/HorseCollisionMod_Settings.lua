@@ -29,8 +29,8 @@ HorseCollisionModSettings = {
 
 	-- Stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 45.0,
-	StaminaDrainGallop       = 75.0,
+	StaminaDrainTrot         = 30.0,
+	StaminaDrainGallop       = 45.0,
 	CombatStaminaMultiplier  = 2.5,   -- 1.0 removes the combat penalty
 	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
 
@@ -44,7 +44,7 @@ HorseCollisionModSettings = {
 	ArmorImpulseExponent     = 0.5,   -- higher means armor plants them harder
 	MinArmorImpulse          = 0.35,  -- a knight is never immovable
 	MaxArmorImpulse          = 1.5,   -- nor is a naked peasant weightless
-	ArmorStaminaExponent     = 0.5,   -- higher means armor tires the horse more
+	ArmorStaminaExponent     = 0.4,   -- higher means armor tires the horse more
 	MinArmorStamina          = 0.75,
 	MaxArmorStamina          = 3.0,
 
