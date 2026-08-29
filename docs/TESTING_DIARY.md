@@ -5715,3 +5715,63 @@ removing the damage and the lockup together.
 
 That is a design change rather than a patch, and it is where the next branch
 should start.
+
+## Root cause: the horse runs over the body the ragdoll created
+
+Ragdolling an NPC 7.3 m away, with no horse anywhere near, costs nothing:
+
+```
+rat_activity_vagabund at 7.3m health=100.00 -- ragdolling with NO horse contact
+4s after ragdoll: health=100.00 (was 100.00)
+```
+
+So `actor:Fall()` is not the damage either. The damage needs the horse.
+
+**The mechanism, in order.** The mod ragdolls the victim, which converts them
+from an animation-driven actor into a physics object. The horse is still moving
+through that space. The engine resolves horse against body as a collision and
+applies damage from the velocity delta, at
+`CollisionVelocityDeltaToDmgR = 0.25` in `rpg_param.xml`. The victim is run
+over, repeatedly, by the thing that knocked them down.
+
+Every observation fits it:
+
+| Observation | Explained by |
+| --- | --- |
+| Walk costs zero, always | Stagger does not ragdoll, so no physics body exists |
+| Vanilla costs zero | Vanilla never ragdolls a pedestrian |
+| `SendHitReaction` off changes nothing | Not combat damage |
+| Impulse zeroed changes nothing | The horse still arrives |
+| `death_protection`, `tough_guy` bypassed | Not routed through combat damage |
+| `fall_damage` with `fdm=0` bypassed | Not fall damage |
+| Gallop 17 to 24, trot 3 to 8 | Damage scales with velocity delta |
+
+That last row had been sitting in the logs all session as an unexplained tier
+difference. It is the signature of the parameter.
+
+### Why the impulse makes it worse rather than better
+
+`Ragdoll` directs the impulse along the horse's velocity, so the victim is
+driven **forward, down the horse's own line of travel**. They are pushed along
+the path the horse is about to occupy, which maximises the number of frames the
+two overlap. A lateral component would clear them instead.
+
+### The candidate fixes, in the order they are worth trying
+
+1. **Throw the victim sideways.** Add a lateral component to the impulse so a
+   clipped pedestrian is knocked aside rather than punted along the horse's
+   line. Cheap, physically sensible, and changes nothing else.
+2. **Delay the ragdoll** by a couple of hundred milliseconds so the horse has
+   passed before the body becomes physical.
+3. **Animated knockdown** through the `AnimationControlled` path, as the walk
+   stagger already does, which never creates a physics body at all.
+
+Overriding `CollisionVelocityDeltaToDmgR` is possible but rejected: it is a
+global table, it would change the player's own collision damage, and shipping
+`rpg_param.xml` reintroduces exactly the whole-file conflict surface 3.0.0
+removed.
+
+### What this retires
+
+The energy limit, the injury cure and the health floor all treated symptoms of
+this and none of them touch it. They come out.
