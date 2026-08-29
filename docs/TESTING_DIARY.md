@@ -5333,3 +5333,73 @@ This is the `soul_archetype.xml` data the roadmap listed as needing extraction,
 available at runtime with no generated table. Phase 2's mass scaling can read
 `NormalBodyWeight` directly, and `BodyBaseArmor` is the engine's own base armor
 for the body underneath whatever is worn.
+
+## The lockup is an injury buff, and it never heals on its own
+
+**User request**: deep research into `references/`, the decompile, and the game's
+own data, to find what the animation is and where it comes from.
+
+It is not an animation state, a stat, or anything Mannequin selects on its own.
+It is a **buff**, which is what the user guessed before this search began.
+
+### The trail
+
+`Libs/Tables/action/actor_action_standup.xml` names the fragment that stands an
+actor up after a ragdoll: `mn_fragment_id="BlendRagdoll"` with
+`mn_tags="blendOut+standup"`. That fragment lives in `kcd_male_database.adb` and
+`wh_female_database.adb`, both of which this mod reaches through its `SubADB`
+chain, and both declared in fragment id files the mod either does not override
+or overrides as a strict superset. **The mod removes nothing the recovery needs**,
+which clears the animation data as a suspect:
+
+```
+kcd_animationControlledTags.xml   vanilla 20 names, ours 25, none missing
+wh_female_fragmentids.xml         vanilla 276 names, ours 277, none missing
+```
+
+`WHGame_Decompiled.c` then names the real mechanism: `C_InjuredSoulBuffInstance`,
+`C_InjuredBuffInitParams`, `C_InjuredTagSoulBuffInstance` and `InjuredTag`.
+Injury is a soul buff, not a state.
+
+### The buffs
+
+`Libs/Tables/rpg/buff.xml`, class 5, `Injury`:
+
+| Buff | GUID | Params |
+| --- | --- | --- |
+| `injured_torso` | `37d59205-3782-446d-b32e-89a9f786725d` | `str*0.75,agi*0.75` |
+| `injured_head` | `c48e48e2-ae85-4429-9dd6-4fb94c388001` | `src+1,srg*0.75` |
+| `injured_left_arm` | `34f0885b-7287-4881-907f-f19751a5e831` | `defense*0.75` |
+| `injured_right_arm` | `ce3737db-b0a3-459d-8d47-d58695d58be3` | `asp*0.75` |
+| `injured_left_leg` | `10fc25ca-c095-44c6-b88b-d54ad58ab0a6` | `Run-1,Walk-0.5,LimitSprint` |
+| `injured_right_leg` | `738f8a07-c5fd-4687-9408-34ffb0bcd17e` | `Run-1,Walk-0.5,LimitSprint` |
+| `injured_tag_persistent` | `83ef27f9-4ce2-4894-bd42-d2cc61a6f758` | `Cpp:InjuredTag` |
+| `remove_injuries` | `46683e3b-e261-412f-b402-99ee17dda62a` | `Cpp:BasicTimed`, duration 1 |
+
+Every injury carries `duration="-1"` and `is_persistent="True"`. **They do not
+expire.** A human player treats them with bandages, potions or sleep. An NPC has
+no such path, so an injury applied to an NPC is permanent for the life of the
+save.
+
+`buff_ai_tag_id="7"` on each of them is what the AI reads, which is how a buff
+ends up driving both the animation and the unwillingness to fight.
+
+That closes every observation. The guard holding his stomach has
+`injured_torso`, `str*0.75,agi*0.75`, forever. He was healthy, rested and
+healing because health, stamina and energy are unrelated to it. Repeated
+collisions apply more injuries, which is why the effect accumulates, and why an
+untouched NPC on a fresh save reaches it after enough impacts.
+
+### What it means for the mod
+
+**This is the mod's own doing.** Vanilla converts a player-ridden collision into
+a real `combat:hit`, the engine resolves an injury from it, and nothing ever
+removes it. A rider can permanently cripple every NPC in a town, which is the
+exploit and the immersion break in one.
+
+`soul:AddInjury` and `soul:RemoveAllBuffsByGuid` are both in the bind list, and
+`remove_injuries` exists as a buff of its own, so the mod can act on this
+directly rather than by weakening the hit.
+
+Nothing here is tested in game yet. The next step is to confirm that removing
+`injured_torso` from the stuck guard returns him to normal.
