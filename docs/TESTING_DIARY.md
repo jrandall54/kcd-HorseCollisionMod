@@ -5559,3 +5559,42 @@ A future version can separate the two, by letting a hit that would be lethal
 resolve as a death rather than being floored, so that trampling can kill while
 never stranding. That needs the crime work to be meaningful and is not worth
 building before it.
+
+## Combat takes ownership of a stuck NPC, and hands it back
+
+**User report**: "when I was testing a guard who was stuck, i swung the sword at
+him and his combat enables and then I surrendered and paid the fine and then he
+returned to the stuck state."
+
+This is the clearest confirmation of the mechanism in the whole session, and it
+was observed rather than reasoned.
+
+A stuck guard **fights normally** once combat starts. Nothing about him is
+broken: the animation, the AI and the willingness to fight are all intact while
+the combat tree owns him. When combat ends he falls straight back into the
+wounded state, because his health is still below the gate and the combat tree
+has released him.
+
+So the wounded state is the fallback an NPC sits in whenever nothing else claims
+them, and combat is one of the things that claims them. It confirms that the
+state is not damage, not a broken tree and not a stuck animation, and that
+health is the only thing deciding whether they can leave it.
+
+### What it means for repairing existing saves
+
+A save carrying stuck NPCs is repaired by riding into them again:
+`HoldVictimAboveFloor` runs on every impact and does not care what state the
+victim was in beforehand, and a lift was already recorded from as low as 21.2.
+No extra check is needed for that, and the check the user proposed, testing on
+collision whether the victim is below the threshold, is exactly what the floor
+already does.
+
+Hooking the moment a fine is paid would work for that one case but not for the
+general one, and a broader sweep that lifts every wounded NPC near the player
+carries a real hazard: **an NPC scripted to be wounded for a quest would be
+healed by it.** The game has several. Repairing only what the mod collides with
+is targeted and cannot touch anyone the rider never touched.
+
+Untested: whether an NPC stuck from before the fix is released by a single
+impact under it. The mechanism says yes, and that is not the same as having
+seen it.
