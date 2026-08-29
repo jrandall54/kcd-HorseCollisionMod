@@ -161,6 +161,11 @@ HorseCollisionMod.Config = {
 	StaminaDrainGallop       = 45.0,
 	ThrowRiderOnStaminaEmpty = true,
 
+	-- Exhaustion added by collisions.
+	LimitCollisionExhaust    = true,
+	MaxExhaustPerImpact      = 8.0,
+	MaxExhaustFromCollisions = 70.0,
+
 	-- Combat.
 	CombatStaminaMultiplier  = 2.5,
 	SuppressStaggerInCombat  = true,
@@ -708,6 +713,87 @@ function HorseCollisionMod:ArmorStaminaScale(armor)
 end
 
 
+--- Bounds the exhaustion a collision adds to its victim.
+--
+-- The engine raises exhaustion for the real `combat:hit` a player-ridden
+-- collision becomes, and it recovers slowly. Repeated impacts drive it to its
+-- ceiling, where an NPC can swing a weapon without threatening anyone and can
+-- stop responding altogether. A rider who knocks down enough guards is then
+-- safe from all of them, which is the exploit this exists to close.
+--
+-- The stat is readable and writable through `soul:GetState` and
+-- `soul:SetState`, so the limit is applied to the stat itself rather than by
+-- weakening the hit. Damage, the reaction and the crime the hit causes are
+-- left exactly as they are, which keeps this separate from the systems that
+-- scale those.
+--
+-- Only the rise this impact caused is removed. Exhaustion the victim earned
+-- fighting is never given back, because the baseline is read at the moment of
+-- the impact and the value is only ever clamped down to it.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:LimitExhaustion(npc)
+	local cfg = self.Config
+
+	if not cfg.LimitCollisionExhaust or not npc or not npc.soul then
+		return
+	end
+
+	local ok, before = pcall(function()
+		return npc.soul:GetState("exhaust")
+	end)
+
+	if not ok or type(before) ~= "number" then
+		return
+	end
+
+	-- The ceiling never lowers a victim who is already past it. Someone
+	-- exhausted by a fight stays that way; this only declines to add more.
+	local allowed = before + cfg.MaxExhaustPerImpact
+
+	if allowed > cfg.MaxExhaustFromCollisions then
+		allowed = cfg.MaxExhaustFromCollisions
+	end
+
+	if allowed < before then
+		allowed = before
+	end
+
+	local function clamp(label)
+		local okNow, now = pcall(function()
+			return npc.soul:GetState("exhaust")
+		end)
+
+		if not okNow or type(now) ~= "number" or now <= allowed then
+			return
+		end
+
+		pcall(function()
+			npc.soul:SetState("exhaust", allowed)
+		end)
+
+		if cfg.LogTelemetry then
+			self:Log("Exhaust " .. tostring(npc:GetName())
+					.. " " .. label
+					.. " was=" .. string.format("%.1f", before)
+					.. " rose=" .. string.format("%.1f", now)
+					.. " held=" .. string.format("%.1f", allowed))
+		end
+	end
+
+	-- Twice, because the engine applies the hit after the message is handled
+	-- and the exact frame is not observable from here. The second pass costs
+	-- one state read when the first already held the value.
+	Script.SetTimer(500, function()
+		clamp("t+500ms")
+	end)
+
+	Script.SetTimer(2000, function()
+		clamp("t+2000ms")
+	end)
+end
+
+
 --- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -770,11 +856,17 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	end
 
 	local baseZ = height()
+	local exhaust = -1
+
+	pcall(function()
+		exhaust = npc.soul:GetState("exhaust") or -1
+	end)
 
 	self:Log("ImpactCost " .. name .. " tier=" .. tierName
 			.. " strength=" .. tostring(strength)
 			.. " health=" .. string.format("%.4f", before)
 			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?")
+			.. " exhaust=" .. string.format("%.1f", exhaust)
 			.. " " .. self:DescribeArmor(armor or self:ArmorOf(npc)))
 
 	local function sample(label)
@@ -1278,6 +1370,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	end
 
 	self.RecentHits[npcId] = now + recovery
+
+	-- Every tier, including walk. A stagger needs no run-up, so it is the
+	-- cheapest way to accumulate exhaustion on a chosen victim.
+	self:LimitExhaustion(npc)
 
 	-- Walked once per impact. Every use below wants the same totals, and
 	-- enumerating an inventory per use would repeat the work three times.

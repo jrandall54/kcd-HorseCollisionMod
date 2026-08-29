@@ -48,6 +48,15 @@ HorseCollisionModSettings = {
 	MinArmorStamina          = 0.75,
 	MaxArmorStamina          = 3.0,
 
+	-- Exhaustion. The engine adds it for every collision, and it recovers
+	-- slowly, so a rider who knocks the same guards down repeatedly leaves
+	-- them unable to fight and eventually frozen in place. These bound what
+	-- collisions alone can do; nothing here touches exhaustion from any
+	-- other source.
+	LimitCollisionExhaust    = true,  -- false restores vanilla accumulation
+	MaxExhaustPerImpact      = 8.0,   -- most one collision may add, of 100
+	MaxExhaustFromCollisions = 70.0,  -- collisions never push past this
+
 	-- Switches.
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk

@@ -5083,3 +5083,58 @@ The 6000 ms default is above the measured recovery rather than derived from it.
 Height samples put a trot victim prone at 500 ms and standing by 3000 ms, which
 bounds the recovery at 3 seconds for that tier and says nothing about gallop,
 which throws them further.
+
+## Exhaustion is writable, so the exploit is fixable at the stat
+
+**User report**: "The exhaustion side effect from being hit is a huge problem
+because like we've observed it builds up an then potentially locks up the NPCs
+which breaks immersion and also if I hit enough guards I can literally put the
+controll down for minutes and they can't actually kill me."
+
+**Question**: whether exhaustion can be controlled directly, rather than by
+weakening the hit that causes it.
+
+It can. On a live NPC:
+
+```
+[exh] rat_castlemaid2 before=100
+[exh] SetState ok=true err=nil
+[exh] rat_castlemaid2 after=20
+```
+
+`soul:SetState("exhaust", value)` is accepted and the new value reads back, and
+it persists: the same NPC still read 20 several minutes later.
+
+That matters beyond this fix. Exhaustion is the first stat found that the mod
+can set directly rather than influence through `hitStrength`, so the limit is
+applied to the stat itself and the damage, the reaction and the crime the hit
+causes are untouched. Anything built later that scales those is independent of
+this.
+
+### The limit
+
+`LimitExhaustion` records the victim's exhaustion at the impact and clamps it
+twice afterwards, at 500 ms and 2000 ms, since the engine applies the hit after
+the message is handled and the exact frame is not observable from Lua.
+
+Only the rise caused by that impact is removed. The baseline is read at the
+moment of the impact and the value is only ever clamped down to it, so
+exhaustion earned in a fight is never given back, and a victim already past the
+ceiling is left alone rather than lowered.
+
+Three settings: `LimitCollisionExhaust`, `MaxExhaustPerImpact` at 8 of 100, and
+`MaxExhaustFromCollisions` at 70. The ceiling is the important one: it means
+collisions alone can never render a guard harmless, whatever the rider does.
+
+The caps are chosen rather than measured. How much the engine actually adds per
+collision is not yet known, so the impact line now carries the victim's
+exhaustion and a clamp writes a line naming what it held back.
+
+Applied on every tier including walk, because a stagger needs no run-up and is
+the cheapest way to accumulate exhaustion on a chosen victim.
+
+### The test area was reset
+
+Every NPC near the testing area read `exhaust=100` from earlier sessions, which
+would have hidden any change. 88 NPCs within 120 m were set to 0 so the next
+ride starts from a fair state.
