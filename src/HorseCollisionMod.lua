@@ -1068,16 +1068,22 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	end
 
 	if tierName == "Trot" then
-		self:Ragdoll(npc, velocity, speed, 0.6)
+		-- Sampled before the impulse, not after. Ragdoll can cost the
+		-- victim health of its own, and a probe that reads afterwards
+		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury)
+		self:Ragdoll(npc, velocity, speed, 0.6)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainTrot * combatScale)
 		return
 	end
 
 	if tierName == "Gallop" then
-		self:Ragdoll(npc, velocity, speed, 1.0)
+		-- Sampled before the impulse, not after. Ragdoll can cost the
+		-- victim health of its own, and a probe that reads afterwards
+		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury)
+		self:Ragdoll(npc, velocity, speed, 1.0)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainGallop * combatScale)
 		return

@@ -4757,3 +4757,66 @@ with an `Impact` line is an ordinary hit.
 
 It takes the same generation guard as the detection loop, so a watch does not
 survive a load screen holding a stale entity.
+
+## The delayed loss was the probe reading health too late
+
+**User report**: "ok I just guessed which one it's not like rat_woman43 has a
+nametag or something lol"
+
+The guess was right. The watch recorded four changes on `rat_woman43` during a
+two-minute ride:
+
+| Event | Health | Change |
+| --- | --- | --- |
+| Watch started | 100.0000 | |
+| Walk impact, `strength=2` | 100.0000 | none |
+| Trot impact | 97.6762 | -2.3238 |
+| Trot impact | 89.7660 | -7.9101 |
+| No impact logged | 69.4161 | **-20.3499** |
+| Gallop impact, starting health already 69.4161 | | |
+
+The 20.35 is larger than any logged impact recorded in this project, and no
+`Impact` line accounts for it. What identifies it is where it sits: the gallop
+impact that follows reads the victim's starting health as 69.4161, so the loss
+had already happened by the time that impact was measured.
+
+### The cause is in the mod, not the engine
+
+`HandleImpact` called `Ragdoll` before `ProbeImpactCost` on both the trot and
+the gallop paths. The probe therefore read the victim's health **after** the
+impulse had been applied.
+
+If the impulse costs the victim health, that cost is invisible to the impact
+that caused it and instead shows up as an unexplained loss in the interval
+before the *next* impact, since it is baked into that impact's starting figure.
+
+That accounts for every property of the mystery:
+
+- The magnitude matches an impact, because it is caused by one.
+- It never appeared between the 500 ms and 10000 ms samples, because it happens
+  at the moment of the next impact rather than during the recovery.
+- It appeared in roughly one interval in five, which is how often the impulse
+  costs the victim anything worth recording.
+- Extending the sampling window could not catch it, which is why the previous
+  two entries could not find it.
+
+The order is now reversed on both paths, so the probe reads before the impulse.
+
+### What this means for the figures already recorded
+
+**Every per-impact cost measured so far understates the impact**, by whatever
+the impulse took. The armor comparison used the same instrument on both sides,
+so its ratio is not invalidated, but the absolute figures in all four rides are
+low.
+
+It also revises the Phase 2 boundary question again. The impulse costing the
+victim health is now the leading reading of the data, which is the same
+conclusion the fall damage hypothesis reached by a route that turned out to be
+wrong: scaling `impulseScale` by armor and mass would scale damage with it.
+
+### The instrument also needs a way to name its target
+
+Watching one entity by name asks the rider to identify an NPC that carries no
+visible name. The watch happened to land on a target that was ridden at anyway.
+Watching every living human near the horse would remove the guess, and is the
+shape to build if a watch is needed again.
