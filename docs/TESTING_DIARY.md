@@ -5181,3 +5181,45 @@ from, and it does not exist yet.
 established.** Sampling only at impacts would show 0 and 100 either way, since
 those are the states a victim spends time in. The watch samples ten times a
 second and will settle it.
+
+## The limit works, and the test population was the problem
+
+**User report**: tested, and the guard still reached full exhaustion.
+
+24 impacts, no clamps, and every impact read `exhaust=100.0` **before** the hit.
+The victims were already at the ceiling from earlier sessions, and the code
+declined to lower anyone already past it, so the limit could never engage. The
+whole test population was spent before it began.
+
+### The mechanism was never the problem
+
+Forced directly, with the watch armed by hand:
+
+```
+[test] rat_woman21 forced to 100 with a watch armed at 8
+Exhaust rat_woman21 after=128ms was=0.0 rose=100.0 held=8.0
+[test] after 600ms exhaust=8
+[test] after 3000ms exhaust=8
+```
+
+Caught in 128 ms and held. The watch loop does what it should.
+
+That test is worth keeping as a pattern: forcing the state the mod is meant to
+react to, from the console, verifies the reaction without a ride. It answered in
+seconds what a ride could not answer at all, because the ride could not produce
+a victim below the ceiling to begin with.
+
+### The ceiling now applies to victims already above it
+
+The rule that spared them was wrong. A victim the mod pinned at 100 in an
+earlier session could never come back, so the exploit would survive the fix in
+every save it had already reached. The clamp now pulls such a victim down to
+`MaxExhaustFromCollisions` on the next collision:
+
+```
+Exhaust rat_woman21 after=112ms was=100.0 rose=100.0 held=70.0
+```
+
+Nothing goes below the ceiling, so a victim exhausted by a fight still ends up
+tired and a collision is never a favor. What it guarantees is that a guard the
+rider knocks down is always left able to fight, whatever state the save was in.

@@ -752,16 +752,17 @@ function HorseCollisionMod:LimitExhaustion(npc)
 		return
 	end
 
-	-- The ceiling never lowers a victim who is already past it. Someone
-	-- exhausted by a fight stays that way; this only declines to add more.
+	-- The ceiling applies to a victim already past it, which is a deliberate
+	-- reduction rather than an oversight. Left alone, a victim the mod
+	-- pinned at 100 in an earlier session could never come back, so the
+	-- exploit would survive the fix in every save it had already reached.
+	--
+	-- Nothing is taken below the ceiling. A victim exhausted by a fight
+	-- still ends up tired, and a collision is never a favor.
 	local allowed = before + cfg.MaxExhaustPerImpact
 
 	if allowed > cfg.MaxExhaustFromCollisions then
 		allowed = cfg.MaxExhaustFromCollisions
-	end
-
-	if allowed < before then
-		allowed = before
 	end
 
 	-- Watched rather than clamped on a timer. Samples at 500 ms and 2000 ms
