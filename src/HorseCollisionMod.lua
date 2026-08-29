@@ -165,6 +165,7 @@ HorseCollisionMod.Config = {
 	LimitCollisionExhaust    = true,
 	MaxExhaustPerImpact      = 8.0,
 	MaxExhaustFromCollisions = 70.0,
+	ExhaustWatchMs           = 20000,
 
 	-- Combat.
 	CombatStaminaMultiplier  = 2.5,
@@ -214,6 +215,10 @@ HorseCollisionMod.HitReactionStrength = {
 	MajorInjury = 6,
 	Fatal = 7
 }
+
+--- Victims whose exhaustion is being held down, keyed by entity id.
+-- @table ExhaustWatch
+HorseCollisionMod.ExhaustWatch = {}
 
 --- When each victim may react again, in milliseconds, keyed by entity id.
 --
@@ -759,38 +764,66 @@ function HorseCollisionMod:LimitExhaustion(npc)
 		allowed = before
 	end
 
-	local function clamp(label)
-		local okNow, now = pcall(function()
-			return npc.soul:GetState("exhaust")
-		end)
+	-- Watched rather than clamped on a timer. Samples at 500 ms and 2000 ms
+	-- caught nothing across 53 impacts while victims still reached the
+	-- ceiling, so the rise is not the hit landing: it accumulates over the
+	-- seconds afterwards, while the victim gets up and runs.
+	self.ExhaustWatch[tostring(npc.id)] = {
+		entity = npc,
+		allowed = allowed,
+		before = before,
+		until_ = GetTimeMs() + cfg.ExhaustWatchMs,
+	}
+end
 
-		if not okNow or type(now) ~= "number" or now <= allowed then
-			return
-		end
 
-		pcall(function()
-			npc.soul:SetState("exhaust", allowed)
-		end)
+--- Holds watched victims below what their impact allowed them to reach.
+--
+-- Runs from the update loop, ahead of the mounted and moving test, because a
+-- victim keeps accumulating after the rider has stopped.
+--
+-- @treturn number entries still being watched
+function HorseCollisionMod:EnforceExhaustLimits()
+	local cfg = self.Config
 
-		if cfg.LogTelemetry then
-			self:Log("Exhaust " .. tostring(npc:GetName())
-					.. " " .. label
-					.. " was=" .. string.format("%.1f", before)
-					.. " rose=" .. string.format("%.1f", now)
-					.. " held=" .. string.format("%.1f", allowed))
+	if not cfg.LimitCollisionExhaust then
+		return 0
+	end
+
+	local now = GetTimeMs()
+	local live = 0
+
+	for id, watch in pairs(self.ExhaustWatch) do
+		if now > watch.until_ then
+			self.ExhaustWatch[id] = nil
+		else
+			live = live + 1
+
+			pcall(function()
+				local value = watch.entity.soul:GetState("exhaust")
+
+				if type(value) == "number" and value > watch.allowed then
+					watch.entity.soul:SetState("exhaust", watch.allowed)
+
+					if cfg.LogTelemetry and not watch.logged then
+						watch.logged = true
+
+						self:Log("Exhaust "
+								.. tostring(watch.entity:GetName())
+								.. " after="
+								.. tostring(now - (watch.until_ - cfg.ExhaustWatchMs))
+								.. "ms was="
+								.. string.format("%.1f", watch.before)
+								.. " rose=" .. string.format("%.1f", value)
+								.. " held="
+								.. string.format("%.1f", watch.allowed))
+					end
+				end
+			end)
 		end
 	end
 
-	-- Twice, because the engine applies the hit after the message is handled
-	-- and the exact frame is not observable from here. The second pass costs
-	-- one state read when the first already held the value.
-	Script.SetTimer(500, function()
-		clamp("t+500ms")
-	end)
-
-	Script.SetTimer(2000, function()
-		clamp("t+2000ms")
-	end)
+	return live
 end
 
 
@@ -1627,6 +1660,14 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	-- afterwards would end the mod for the rest of the session.
 	Script.SetTimer(100, function()
 		HorseCollisionMod:UpdateTimer(assignedTick)
+	end)
+
+	-- Ahead of SafeUpdate, which returns early when the player is on foot
+	-- or standing still. A victim keeps accumulating after the rider has
+	-- stopped, and that is exactly when a rider walks away from a guard
+	-- they have finished with.
+	pcall(function()
+		self:EnforceExhaustLimits()
 	end)
 
 	local success, err = pcall(function()

@@ -5138,3 +5138,46 @@ the cheapest way to accumulate exhaustion on a chosen victim.
 Every NPC near the testing area read `exhaust=100` from earlier sessions, which
 would have hidden any change. 88 NPCs within 120 m were set to 0 so the next
 ride starts from a fair state.
+
+## The exhaustion rise is gradual, not part of the hit
+
+**User report**: "I was able to hit a guard and get him into full exhaustion. I
+tested for for last 10 minutes or so hitting a lot of people."
+
+53 impacts, **zero clamps**, and victims still reached the ceiling.
+
+The exhaustion figures now carried on the impact line explain why. Every reading
+is one of two values:
+
+```
+33  exhaust=0.0
+20  exhaust=100.0
+```
+
+Nothing between, across 53 impacts. A victim is either untouched or at the
+ceiling by the time the next impact reads them, and neither sample at 500 ms nor
+at 2000 ms ever caught a value above what the cap allowed.
+
+So the rise is not the hit landing. Exhaustion accumulates over the seconds
+after an impact, while the victim gets up and runs, and it is finished long
+before the rider comes round for another pass. Two one-shot timers were never
+going to see it.
+
+### Watching instead of sampling
+
+`LimitExhaustion` now registers the victim in `ExhaustWatch` with the value its
+impact allowed, and `EnforceExhaustLimits` holds it there on every tick of the
+update loop until `ExhaustWatchMs` expires, 20 seconds by default.
+
+It runs ahead of the mounted and moving test in `UpdateTimer`. A victim keeps
+accumulating after the rider has stopped, and stopping is exactly what a rider
+does once they are finished with a guard.
+
+The clamp logs once per victim rather than once per tick, naming how long after
+the impact the rise appeared. That measurement is what the caps should be set
+from, and it does not exist yet.
+
+**Whether the two readings mean the stat is effectively binary is not
+established.** Sampling only at impacts would show 0 and 100 either way, since
+those are the states a victim spends time in. The watch samples ten times a
+second and will settle it.

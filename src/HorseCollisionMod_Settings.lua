@@ -56,6 +56,8 @@ HorseCollisionModSettings = {
 	LimitCollisionExhaust    = true,  -- false restores vanilla accumulation
 	MaxExhaustPerImpact      = 8.0,   -- most one collision may add, of 100
 	MaxExhaustFromCollisions = 70.0,  -- collisions never push past this
+	ExhaustWatchMs           = 20000, -- how long a victim is held down
+	                                  -- for, since the rise is gradual
 
 	-- Switches.
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
