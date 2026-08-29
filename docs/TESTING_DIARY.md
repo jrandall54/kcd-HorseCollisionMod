@@ -5598,3 +5598,56 @@ is targeted and cannot touch anyone the rider never touched.
 Untested: whether an NPC stuck from before the fix is released by a single
 impact under it. The mechanism says yes, and that is not the same as having
 seen it.
+
+## The lockup could not be reproduced with both protections off
+
+**User report**: "I've hit this guy like 20 times and he's not getting stuck",
+then, after the injury cure was disabled too, "uhh, he died?"
+
+An attempt to manufacture a stuck NPC, so that repairing one could be tested,
+failed and produced a more important result than the test it was for.
+
+`rat_guardJanik`, 12 armor pieces at 74 weight, was ridden into 25 times with
+`MinVictimHealth` at 0 and, for the last four, `ClearCollisionInjuries` off as
+well. That is exactly what 3.0.0 does. Health fell steadily to 15.5, then 13.8,
+12.2, and a gallop took him to 0.115, at which point he died.
+
+**He never entered the stuck state**, at any health, across the whole run,
+including nine impacts below 32.6, which is lower than most of the values at
+which victims were seen stuck earlier in the session.
+
+### What that costs the previous conclusion
+
+The state is **intermittent**, not a deterministic consequence of collisions at
+low health. The model recorded two entries ago, that a collision plus low health
+puts a victim into a wounded state, is at best incomplete: the same inputs
+produced death here and a lockup earlier.
+
+So the health floor cannot be claimed to fix the lockup by mechanism. What can
+honestly be said is narrower:
+
+- Raising a stuck victim's health releases them. Seen twice, on demand.
+- Keeping victims above 60 keeps them out of the range where every observed
+  lockup happened, between 19.6 and 51.8.
+- A 19 impact run with the floor on produced no lockup, but so did a 25 impact
+  run with it off, so that run proves less than it appeared to.
+
+What still distinguishes a victim who locks up from one who dies is not known.
+Archetype, whether combat was entered, and a roll inside the engine are all
+candidates and none has been tested.
+
+### A 3.0.0 behavior worth naming
+
+**A trampled NPC can die.** Four impacts took a guard from 13.8 to dead, the
+last one a gallop for roughly 12 health. That is what the released version does,
+and killing a guard is a murder the crime system will notice.
+
+The floor prevents it as a side effect, which is the trade already recorded, but
+until now nothing in this project had established that collisions were lethal at
+all.
+
+### The repair test is still unrun
+
+Producing a stuck NPC on demand is the prerequisite, and it could not be done.
+Whether one impact under the floor releases an NPC stuck from before remains
+untested.
