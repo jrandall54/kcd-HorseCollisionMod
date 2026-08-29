@@ -116,14 +116,21 @@ def is_noise(text):
     stripped = COLOUR_CODES.sub("", text).strip()
     return any(pattern.search(stripped) for pattern in NOISE)
 
-# The mod's script as the engine's file system names it.
+# The mod's scripts as the engine's file system names them.
 MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
+SETTINGS_SCRIPT = "Scripts/Startup/HorseCollisionMod_Settings.lua"
 
 # Reloading the mod's Lua without restarting. `lua_reload_script` is a native
 # console command this build registers, which is a better bet than driving
 # Script.ReloadScript through the "#" Lua prefix. Both are listed so a failure
 # of the first can be told apart from a failure of the mechanism.
 RELOAD_COMMANDS = [
+    # The settings file defines the global table the mod reads while applying
+    # settings, and it is a separate file, so it is re-executed first.
+    # Reloading only the mod script leaves an edited value on disk with the
+    # previous one still live, which reads in game as a setting that does
+    # nothing.
+    "lua_reload_script " + SETTINGS_SCRIPT,
     "lua_reload_script " + MOD_SCRIPT,
     # Re-executing the script is not enough on its own. The mod's detection
     # loop is only started by its UI listener when a loading screen ends,
@@ -147,7 +154,7 @@ RELOAD_COMMANDS = [
 #
 # The reload only sees new data if the ADB files are also on disk loose, under
 # Data/Animations/Mannequin/ADB, and sys_PakPriority is 0. dev_deploy.ps1
-# -AnimOnly puts them there.
+# -Reload puts them there.
 ANIM_RELOAD_COMMANDS = [
     "mn_allowEditableDatabasesInPureGame 1",
     "mn_reload",
@@ -450,12 +457,18 @@ def main():
     if args.diagnose:
         for command in DIAGNOSE_COMMANDS:
             console.queue(command)
-    elif args.reload:
-        for command in RELOAD_COMMANDS:
-            console.queue(command)
-    elif args.anim_reload:
-        for command in ANIM_RELOAD_COMMANDS:
-            console.queue(command)
+    elif args.reload or args.anim_reload:
+        # The two halves compose rather than exclude each other, so a change
+        # touching both is reloaded over one connection. Mannequin goes first:
+        # the Lua half ends by restarting the detection loop, which should run
+        # against databases that are already current.
+        if args.anim_reload:
+            for command in ANIM_RELOAD_COMMANDS:
+                console.queue(command)
+
+        if args.reload:
+            for command in RELOAD_COMMANDS:
+                console.queue(command)
     elif args.lua:
         console.lua(args.lua)
     elif args.command:

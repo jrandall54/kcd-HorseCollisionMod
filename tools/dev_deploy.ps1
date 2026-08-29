@@ -6,6 +6,7 @@
 # from every test cycle.
 #
 #   .\tools\dev_deploy.ps1                      build, deploy
+#   .\tools\dev_deploy.ps1 -Reload              push what changed into the running game
 #   .\tools\dev_deploy.ps1 -Launch              build, deploy, start the game
 #   .\tools\dev_deploy.ps1 -NoBuild -Launch     deploy what was built last, start the game
 #   .\tools\dev_deploy.ps1 -ParkVortexMod       move the Vortex-installed copy aside first
@@ -27,6 +28,7 @@ param (
 	[switch]$ParkVortexMod,
 	[switch]$NoDevMode,
 	[switch]$NoLooseScript,
+	[switch]$Reload,
 	[switch]$ScriptOnly,
 	[switch]$AnimOnly,
 	[switch]$SetDevEnvironment,
@@ -270,21 +272,34 @@ Write-Host "[DEPLOY] game: $gameRoot"
 # Neither is what ships. The packed copies inside the pak stay exactly as they
 # are; these are only what a running game reads first, and only while
 # sys_PakPriority is 0.
-function Copy-LooseFiles {
+#
+# Returns which halves were written, as @{ Script = $bool; Anim = $bool }, so
+# the caller reloads only the subsystem that needs it.
+function Sync-LooseFiles {
 	param (
 		[string]$Root,
 		[switch]$Script,
-		[switch]$Anim
+		[switch]$Anim,
+		[switch]$ChangedOnly
 	)
 
+	$changed = @{ Script = $false; Anim = $false }
+	$files = @()
+
+	# The settings file belongs here as much as the mod script does. It is a
+	# separate Startup script, so a settings edit that is not copied leaves the
+	# running game reading the packed values while the edited file sits on disk
+	# looking applied.
 	if ($Script) {
-		$looseDir = Join-Path $Root "Data\Scripts\Startup"
+		$startup = Join-Path $Root "Data\Scripts\Startup"
 
-		New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
-		Copy-Item (Join-Path $repoRoot "src\HorseCollisionMod.lua") `
-			-Destination (Join-Path $looseDir "HorseCollisionMod.lua") -Force
-
-		Write-Host "[DEPLOY] loose script updated"
+		foreach ($name in @("HorseCollisionMod.lua", "HorseCollisionMod_Settings.lua")) {
+			$files += @{
+				Half = "Script"
+				From = Join-Path $repoRoot "src\$name"
+				To   = Join-Path $startup $name
+			}
+		}
 	}
 
 	if ($Anim) {
@@ -292,35 +307,106 @@ function Copy-LooseFiles {
 
 		if (-not (Test-Path $source)) {
 			Write-Host "[DEPLOY] no mod_assets yet. Run build.ps1 first." -ForegroundColor Yellow
-			return
+		}
+		else {
+			$adbDir = Join-Path $Root "Data\Animations\Mannequin\ADB"
+
+			foreach ($file in Get-ChildItem -Path $source -File) {
+				$files += @{
+					Half = "Anim"
+					From = $file.FullName
+					To   = Join-Path $adbDir $file.Name
+				}
+			}
+		}
+	}
+
+	foreach ($file in $files) {
+		if (-not (Test-Path $file.From)) {
+			continue
 		}
 
-		$looseDir = Join-Path $Root "Data\Animations\Mannequin\ADB"
+		# Compared by content rather than by timestamp. build.ps1 regenerates
+		# every animation database on each run whether or not the bytes moved,
+		# and a Mannequin reload is a visible hitch in the running game, so a
+		# rebuild that changed nothing should not cause one.
+		if ($ChangedOnly -and (Test-Path $file.To)) {
+			$from = (Get-FileHash $file.From -Algorithm SHA256).Hash
+			$to = (Get-FileHash $file.To -Algorithm SHA256).Hash
 
-		New-Item -ItemType Directory -Force -Path $looseDir | Out-Null
-		Copy-Item "$source\*" -Destination $looseDir -Force
+			if ($from -eq $to) {
+				continue
+			}
+		}
 
-		Write-Host "[DEPLOY] loose animation databases updated"
+		$dir = Split-Path -Parent $file.To
+
+		if (-not (Test-Path $dir)) {
+			New-Item -ItemType Directory -Force -Path $dir | Out-Null
+		}
+
+		Copy-Item $file.From -Destination $file.To -Force
+		Write-Host "[DEPLOY] updated $(Split-Path -Leaf $file.To)"
+		$changed[$file.Half] = $true
 	}
+
+	return $changed
+}
+
+# Reloads the halves that were written. The console commands are known here, so
+# printing them to be pasted into a second shell would put a manual step in the
+# middle of a loop that is run many times in a testing session.
+function Invoke-LiveReload {
+	param ([hashtable]$Changed)
+
+	$flags = @()
+
+	if ($Changed.Anim) {
+		$flags += "--anim-reload"
+	}
+
+	if ($Changed.Script) {
+		$flags += "--reload"
+	}
+
+	if ($flags.Count -eq 0) {
+		return
+	}
+
+	# Nothing to reload into. The files are in place and the engine reads them
+	# at startup, so this is a note rather than a failure.
+	if (-not (Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue)) {
+		Write-Host "[DEPLOY] the game is not running. The files are in place for the next start."
+		return
+	}
+
+	Write-Host "[DEPLOY] reloading in the running game..." -ForegroundColor Green
+	& python (Join-Path $repoRoot "tools\dev_console.py") @flags
 }
 
 # The inner loops: push what changed, then reload it from the console. Both
 # deliberately skip the running-game guard below, because that guard is about
 # the pak, which the engine holds open. A loose file is not locked and can be
 # replaced underneath a running game.
-if ($ScriptOnly -or $AnimOnly) {
-	Copy-LooseFiles -Root $gameRoot -Script:$ScriptOnly -Anim:$AnimOnly
+if ($Reload -or $ScriptOnly -or $AnimOnly) {
+	# -Reload is the everyday form: it works out which halves moved and reloads
+	# those. -ScriptOnly and -AnimOnly name one half and skip the comparison,
+	# which is what is wanted when a file has been reverted to a state matching
+	# the copy already installed, or when only one subsystem should be
+	# disturbed.
+	$named = $ScriptOnly -or $AnimOnly
 
-	Write-Host "[DEPLOY] reload it with:" -ForegroundColor Green
+	$changed = Sync-LooseFiles -Root $gameRoot `
+		-Script:($ScriptOnly -or -not $named) `
+		-Anim:($AnimOnly -or -not $named) `
+		-ChangedOnly:(-not $named)
 
-	if ($ScriptOnly) {
-		Write-Host "         python tools\dev_console.py --reload"
+	if (-not ($changed.Script -or $changed.Anim)) {
+		Write-Host "[DEPLOY] nothing changed since the last deploy."
+		exit 0
 	}
 
-	if ($AnimOnly) {
-		Write-Host "         python tools\dev_console.py --anim-reload"
-	}
-
+	Invoke-LiveReload -Changed $changed
 	exit 0
 }
 
@@ -452,8 +538,7 @@ Write-Host "[DEPLOY] load order: $($order -join ' -> ')"
 # the same packed bytes. The check below says so rather than leaving a silent
 # no-op to be discovered later.
 if (-not $NoLooseScript) {
-	Copy-LooseFiles -Root $gameRoot -Script -Anim
-
+	Sync-LooseFiles -Root $gameRoot -Script -Anim | Out-Null
 }
 
 if ($Launch) {

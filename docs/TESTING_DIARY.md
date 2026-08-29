@@ -4329,3 +4329,49 @@ Phase 1's remaining carried-item work needs `sb_combat.xml` shipped for its
 one reintroduces exactly the whole-file conflict surface that 3.0.0 removed, in
 exchange for a cosmetic fix. It should stay parked unless an additive approach
 to behavior trees appears.
+
+## The settings file was never reaching the running game
+
+**Hypothesis**: the inner development loop can be one command instead of two,
+because `dev_deploy.ps1` can determine which half of the mod an edit belongs to
+by comparing the files it would copy.
+
+The consolidation itself was routine. What it exposed was not.
+
+`Copy-LooseFiles` pushed `src/HorseCollisionMod.lua` and the four Mannequin
+databases, and nothing else. `HorseCollisionMod_Settings.lua` was never among
+them, and it is a Startup script in its own right rather than something the mod
+script pulls in. The first `-Reload` run reported:
+
+```
+[DEPLOY] updated HorseCollisionMod_Settings.lua
+```
+
+That was the first time the file had ever been placed loose. Every settings edit
+made during a live session up to this point changed a file the running game was
+not reading: at `sys_PakPriority = 0` the loose mod script was picked up on
+reload while the settings came from the pak, so the packed value stayed live
+while the edited file sat on disk looking applied.
+
+Two consequences worth carrying:
+
+- **`lua_reload_script` reloads one file.** Reloading the mod script alone
+  leaves `HorseCollisionModSettings` holding whatever the last executed copy of
+  the settings file defined. The reload sequence now re-executes the settings
+  file first, since `ApplySettings` reads that global.
+- **Any tuning conclusion drawn from a settings change made mid-session, without
+  a game restart, is suspect.** The change did not take effect. Conclusions from
+  values that shipped inside a build are unaffected, since those were packed.
+
+`--reload` and `--anim-reload` in `dev_console.py` were also mutually exclusive
+in the argument chain, so a change touching both halves silently reloaded only
+the Lua. They now compose, Mannequin first.
+
+**Verified in game**: console reload against a running save returned
+
+```
+[log] [HorseCollisionMod] Load screen ended. v3.1.0-dev.2 initializing physics timer loop 2
+```
+
+and a Lua query confirmed the loose settings are the ones in effect:
+`telemetry=true knockback=50 gallop=8.5 settingsGlobal=true`.
