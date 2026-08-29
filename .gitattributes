@@ -1,0 +1,30 @@
+# How git stores this repository's files, so that line endings do not depend on
+# whatever each machine has configured. Without this, every file operation on a
+# Windows checkout reports "LF will be replaced by CRLF", and that noise trains
+# a reader to ignore warnings generally.
+
+# Normalise text to LF in the repository. Working-tree endings still follow the
+# platform, so nothing about editing changes.
+* text=auto
+
+# Files the engine, the interpreter or another tool reads directly, where the
+# ending is not a matter of local preference.
+*.lua   text eol=lf
+*.py    text eol=lf
+*.xml   text eol=lf
+*.adb   text eol=lf
+*.manifest text eol=lf
+
+# PowerShell is edited and run on Windows only.
+*.ps1   text eol=crlf
+
+# Never touched. A modified byte here is a corrupted asset.
+*.pak   binary
+*.zip   binary
+*.png   binary
+*.jpg   binary
+*.mp4   binary
+*.pdf   binary
+
+# Generated API documentation, which is diffed only to see that it regenerated.
+docs/api/** linguist-generated=true
