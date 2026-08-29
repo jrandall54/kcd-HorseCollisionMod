@@ -48,6 +48,16 @@ HorseCollisionModSettings = {
 	MinArmorStamina          = 0.75,
 	MaxArmorStamina          = 3.0,
 
+	-- Injuries. The engine rolls one from the hit a collision becomes, and
+	-- an injury never expires: a player clears one with a bandage, a potion
+	-- or sleep, and an NPC has none of those. Left alone, every villager a
+	-- rider knocks down is crippled for the life of the save.
+	--
+	-- Clearing them keeps the damage, the reaction and the crime, and takes
+	-- back only the permanent part. Turning this off restores the behavior
+	-- 3.0.0 shipped with.
+	ClearCollisionInjuries   = true,
+
 	-- Exhaustion. The engine adds it for every collision, and it recovers
 	-- slowly, so a rider who knocks the same guards down repeatedly leaves
 	-- them unable to fight and eventually frozen in place. These bound what

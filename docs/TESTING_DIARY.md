@@ -5403,3 +5403,48 @@ directly rather than by weakening the hit.
 
 Nothing here is tested in game yet. The next step is to confirm that removing
 `injured_torso` from the stuck guard returns him to normal.
+
+## Vanilla has no horse collision, so the injuries are the mod's
+
+**User report**: "there is no vanilla horse collision though... I know there is
+a recognition that henry is on a horse and collides but I didn't think it had
+anything attached to it besides the bark. I just did the test and of course
+vanilla doesn't have collisons so I didn't see anything happen."
+
+The mod was parked completely for this: the pak, its manifest, all three loose
+Lua files, all four loose animation files, and its entry in `mod_order.txt`. The
+log confirms the session ran with no mod line at all.
+
+Riding into NPCs produced nothing. No knockdown, no reaction, no injury.
+
+**An earlier claim in this session that horse collisions are vanilla behaviour
+was wrong.** `sb_switch_hitreactions.xml` contains a collision branch, and that
+branch is what converts a player-ridden collision into a real `combat:hit`, but
+nothing in vanilla ever feeds it a strength that injures. The branch exists for a
+bark. The mod is what sends `MinorInjury` at trot and `MajorInjury` at gallop
+into it.
+
+So the permanent injuries are caused by this mod, and by the released 3.0.0 as
+well, which sends the same two strengths.
+
+### Cleared rather than prevented
+
+The strength that rolls the injury is the same strength that carries the damage
+and the crime. Lowering it to stop the injury would take those with it, and the
+damage is a Phase 3 feature that already works.
+
+`ClearInjuries` removes the eight injury buffs from a victim at 1500 ms and
+5000 ms after an impact, the second pass covering an injury that arrives late
+the way the damage sometimes does. Only victims of a collision are touched, and
+only in the seconds after one, so an NPC injured by anything else keeps what it
+earned.
+
+`ClearCollisionInjuries` defaults to on. Turning it off restores what 3.0.0
+shipped.
+
+An existing save repairs itself as the rider rides: any NPC hit again has its
+injuries cleared. That is a partial repair rather than a complete one, since an
+NPC never hit again keeps what it has, but it needs no separate migration and
+no action from the player.
+
+**Untested in game.** The mod was parked when this was written.

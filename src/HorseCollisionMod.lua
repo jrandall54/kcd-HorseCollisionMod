@@ -161,6 +161,9 @@ HorseCollisionMod.Config = {
 	StaminaDrainGallop       = 45.0,
 	ThrowRiderOnStaminaEmpty = true,
 
+	-- Injuries caused by collisions.
+	ClearCollisionInjuries   = true,
+
 	-- Exhaustion added by collisions.
 	LimitCollisionExhaust    = false,
 	MaxExhaustPerImpact      = 8.0,
@@ -828,6 +831,88 @@ function HorseCollisionMod:EnforceExhaustLimits()
 end
 
 
+--- The injury buffs the engine rolls from a collision.
+--
+-- Taken from `Libs/Tables/rpg/buff.xml`, buff class 5. Every one of them
+-- carries `duration="-1"` and `is_persistent="True"`, so none expires. A
+-- player clears an injury with a bandage, a potion or sleep. An NPC has no
+-- path to any of those, so an injury an NPC receives lasts for the life of the
+-- save.
+--
+-- The two tags are what the AI reads, through `buff_ai_tag_id`, and are why an
+-- injured NPC holds a wounded pose and will not fight.
+-- @table InjuryBuffs
+HorseCollisionMod.InjuryBuffs = {
+	"37d59205-3782-446d-b32e-89a9f786725d",  -- injured_torso
+	"c48e48e2-ae85-4429-9dd6-4fb94c388001",  -- injured_head
+	"34f0885b-7287-4881-907f-f19751a5e831",  -- injured_left_arm
+	"ce3737db-b0a3-459d-8d47-d58695d58be3",  -- injured_right_arm
+	"10fc25ca-c095-44c6-b88b-d54ad58ab0a6",  -- injured_left_leg
+	"738f8a07-c5fd-4687-9408-34ffb0bcd17e",  -- injured_right_leg
+	"3d530e43-375f-4739-a6ee-3bbcf9292601",  -- injured_tag
+	"83ef27f9-4ce2-4894-bd42-d2cc61a6f758",  -- injured_tag_persistent
+}
+
+
+--- Removes the injuries a collision gave its victim.
+--
+-- Vanilla turns a player-ridden collision into a real `combat:hit` carrying
+-- the strength this mod sends, and the engine rolls an injury from it. Nothing
+-- in the game then removes it from an NPC, so a rider leaves a trail of
+-- permanently crippled villagers, which is both the exploit and the reason a
+-- victim can end up holding a wounded pose forever.
+--
+-- Cleared rather than prevented, because the strength that causes the injury
+-- is the same strength that carries the damage and the crime. Lowering it to
+-- stop the injury would take those with it.
+--
+-- Only victims of a collision are touched, and only in the seconds after one,
+-- so an NPC injured by anything else keeps what it earned.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:ClearInjuries(npc)
+	local cfg = self.Config
+
+	if not cfg.ClearCollisionInjuries or not npc or not npc.soul then
+		return
+	end
+
+	local function clear(label)
+		local removed = 0
+
+		for _, guid in ipairs(self.InjuryBuffs) do
+			-- Per buff. A guid the engine does not recognise should not stop
+			-- the rest from being cleared.
+			local ok = pcall(function()
+				npc.soul:RemoveAllBuffsByGuid(guid)
+			end)
+
+			if ok then
+				removed = removed + 1
+			end
+		end
+
+		if cfg.LogTelemetry then
+			self:Log("Injuries " .. tostring(npc:GetName())
+					.. " " .. label
+					.. " cleared=" .. tostring(removed)
+					.. "/" .. tostring(#self.InjuryBuffs))
+		end
+	end
+
+	-- The engine resolves the hit after the message is handled, so the injury
+	-- does not exist yet at the moment of the impact. The second pass covers
+	-- an injury that arrives late, the way the damage does.
+	Script.SetTimer(1500, function()
+		clear("t+1500ms")
+	end)
+
+	Script.SetTimer(5000, function()
+		clear("t+5000ms")
+	end)
+end
+
+
 --- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -1408,6 +1493,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- Every tier, including walk. A stagger needs no run-up, so it is the
 	-- cheapest way to accumulate exhaustion on a chosen victim.
 	self:LimitExhaustion(npc)
+
+	-- Every tier as well. The walk tier sends Tickle, which should never
+	-- injure anyone, and clearing costs nothing when there is nothing to
+	-- clear.
+	self:ClearInjuries(npc)
 
 	-- Walked once per impact. Every use below wants the same totals, and
 	-- enumerating an inventory per use would repeat the work three times.
