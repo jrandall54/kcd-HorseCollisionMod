@@ -6168,3 +6168,393 @@ never leaves the animation system. The work is to author or locate knockdown
 fragments for the trot and gallop tiers, in the same way the stagger fragments
 were added, so those tiers displace the victim through Mannequin rather than
 through physics.
+
+## RPG parameters can be overridden per character, not only globally
+
+`CollisionVelocityDeltaToDmgR` is confirmed in `Libs/Tables/rpg/rpg_param.xml`
+inside `Tables.pak`, as
+`<row rpg_param_key="CollisionVelocityDeltaToDmgR" rpg_param_value="0.25" />`.
+
+That table was treated as global, and overriding it was rejected on the grounds
+that it changes the value for everything in the game including the player's own
+collisions. A second table alongside it changes that reading.
+`Libs/Tables/rpg/perk_rpg_param_override.xml` maps a perk to an RPG parameter
+and a replacement value:
+
+```
+<column name="perk_id" type="uuid" />
+<column name="rpg_param_key" type="character varying" />
+<column name="rpg_param_value" type="real" />
+```
+
+So a parameter's effective value is resolved per character, against the perks
+that character holds, and Warhorse ships the mechanism for doing it. Vanilla
+uses it sparingly: one perk, twenty five keys, and no vanilla perk touches
+`CollisionVelocityDeltaToDmgR`.
+
+If a perk can be attached to a soul at runtime, a victim can carry a perk that
+zeroes their own collision damage for the second the horse is on top of them,
+and the player's collisions are untouched. Two things are unverified: whether
+the parameter is resolved against the damaged character rather than the
+attacker, and whether perks can be added and removed from Lua at all. No
+`AddPerk` or `RemovePerk` appears in the Lua state dump, so the second question
+has to be settled by enumerating the live `soul` methods.
+
+Note also that reading vanilla tables needs a manual decompress.
+`Tables.pak` stores backslash separators in its local file headers while its
+central directory uses forward slashes, and Python's `zipfile` refuses the
+mismatch.
+
+## The damage may not be a defect
+
+Worth recording before more work goes into removing it. The trample damage was
+first investigated because it was believed to cause the lockup. It does not: a
+victim wedges at full health with collision damage zeroed. Meanwhile Phase 3
+lists "apply native blunt damage on high-speed impacts" as a wanted feature and
+marks it already delivered.
+
+Measured, the damage is 3 to 5 at trot and 16 to 25 at gallop against an
+unarmored villager, scaling with the horse's speed at contact and costing
+nothing when the horse has already slowed. That is close to what the design
+asks for. The open question is therefore whether this needs removing at all, or
+only tuning, and the answer decides whether any of the remaining approaches are
+worth building.
+
+## The lockup is vanilla's auto-cure daycycle, and the animation is PretendingIllness
+
+Located in the game's own behavior tree data, in
+`Libs/AI/final/sb_daycycles_cure.xml` inside `Scripts.pak`. The file declares
+five trees: `cureStart`, `cure`, `cureLookHurt`, `cureFastStartCheck` and
+`cureApplyPatch`. `cureLookHurt` is the state, and it is short enough to quote
+whole:
+
+```xml
+<DecoratorBuff BuffId="e3edccf9-fb68-4399-b66d-0a06271a6b81" SoulWUID="this.id">
+  <Parallel successMode="All" failureMode="Any">
+    <LODGuardian LODTerm="OnBoth" StatProp="PropagateChild">
+      <LOD>    <Wait duration="-1" timeType="GameTime" /> </LOD>
+      <Detail> <PlayAnimation animation="PretendingIllness" /> </Detail>
+    </LODGuardian>
+    <Wait duration="-1" timeType="GameTime" />
+  </Parallel>
+</DecoratorBuff>
+```
+
+An NPC in this node plays `PretendingIllness` and waits **forever**. The wait
+has no timeout, so nothing inside the subtree ends it. It ends only when the
+parent withdraws it.
+
+The buff it decorates itself with is `autoCure`, from `Libs/Tables/rpg/buff.xml`:
+
+```xml
+buff_name="autoCure" implementation="Cpp:Constant" duration="-1"
+params="health+0.02/s"
+```
+
+So the node regenerates health at 0.02 per second, or 1.2 per minute of game
+time, while the NPC stands there looking ill.
+
+**The gate is health, and its value is 40.** `Libs/AI/final/sb_daycycles.xml`
+declares `<Variable name="t_autoCureLowHealthLimit" type="_float" values="40.0" />`,
+and `sb_daycycles_cure.xml` gates the cure on `NPCStateGate State="Health"
+Target="this.id" Low="$t_autoCureLowHealthLimit"`.
+
+### Every observation this explains
+
+| Observation | Explanation |
+| --- | --- |
+| Victim stands in a looping hurt animation | `PlayAnimation "PretendingIllness"` under `Wait duration="-1"` |
+| Alive, undamaged further, will not resume its schedule | The daycycle is running this activity instead of the NPC's own |
+| Raising health releases it immediately | Health is the gate the parent re-evaluates |
+| Setting a healthy NPC to 25 did not freeze it | The gate is read when the daycycle re-evaluates, not on a health write |
+| It never recovers on its own | It does, at 1.2 health per game-minute, which reads as never |
+| Combat claims the NPC normally and hands it back | The combat tree preempts the daycycle, then returns to it |
+| `MinVictimHealth = 60` prevented it across 19 impacts | 60 is above the 40 gate |
+| Stuck NPCs measured at 19.6, 26.0, 32.6 and 34.1 | All below 40 |
+| Vanilla never shows it | Vanilla rarely leaves a non-combat NPC under 40 health standing in a street |
+
+### What it is not
+
+It is not an AI failing to resolve an attacker. The proposal that KCD's AI reads
+damage with no valid `shooterId` and falls into an injured loop for that reason
+does not survive the data: nothing in the cure trees examines a shooter, an
+attacker or a hit at all. The trigger is one float compared against health.
+
+It is also not a defect. This is designed vanilla behavior for a wounded NPC
+with no other context, and the mod meets it only because the mod is the one
+thing in the game that leaves ordinary townspeople badly hurt in the open.
+
+### The levers, all of them Warhorse's own
+
+- **Health above 40.** Already proven by `MinVictimHealth`, and the cheapest.
+- **`$b_context['suppressAutoCure']`.** Both `sb_daycycles.xml` and
+  `sb_daycycles_cure.xml` gate the entire cure on `!$b_context['suppressAutoCure']`,
+  and eleven quest files set it, so it is the sanctioned way to exempt a
+  character. `XGenAIModule.SetBrainVariable()` exists in the Lua state and is the
+  candidate for reaching it.
+- **`XGenAIModule.RemoveDaycyclePatch()`.** The cure installs itself through
+  `cureApplyPatch`, and `t_daycycleCureInProgress` is marked `isPersistent="1"`,
+  so a patch that never completes persists. This is the route to releasing an
+  NPC already stuck.
+- **A stronger regen.** The vanilla 0.02/s is what makes the state look
+  permanent.
+
+### The second state is still unexplained
+
+A victim was recorded wedged at **96.4 health in an ordinary standing idle**,
+not in `PretendingIllness`. That is above the 40 gate and in the wrong
+animation, so it is not this. Two distinct states have been recorded under one
+name, and only the low-health one is now understood.
+
+## Low health alone does not start the cure, and the trigger needs a buff
+
+**Test, from the console with no horse involved.** A healthy `rat_man97` at
+100 health was set to 20, well under the 40 gate, and its animation state polled
+every five seconds for a minute.
+
+```
+[IND] target=rat_man97 health=100.0 anim=MotionMovement
+[IND] set health=20 -> now 20.0
+[IND] t+5s  health=20.0 anim=MotionMovement
+[IND] t+15s health=20.0 anim=MoveToIdle
+[IND] t+55s health=20.0 anim=MotionMovement
+```
+
+**No `PretendingIllness`, and no regeneration.** Health held at exactly 20.0 for
+the whole minute, so the `autoCure` buff was never applied either, which is
+independent confirmation that the cure never started. The NPC walked its
+schedule normally. This reproduces the earlier report that a guard set to 25
+health "didn't freeze, he's acting normal", and it corrects the entry above:
+**health below 40 is necessary but not sufficient.**
+
+The full entry condition, read out of `cureStart`, is a gate followed by a
+parallel:
+
+```
+IfGate    !$t_daycycleCureInProgress & !$b_context['suppressAutoCure']
+  BuffTagCheck buffAITagId="4"  then buffAITagId="3"
+  or ProcessMessage buffAdded where tagId in (poison, bleed, sleep)
+  and NPCStateGate State="Health" Low/High="$t_autoCureLowHealthLimit"   (40.0)
+```
+
+So the cure needs **a buff and low health together**. A collision supplies the
+buff, which is what earlier entries were pointing at when they called this "the
+injury buff", and removing that buff afterwards does not help because by then
+the cure activity is already running.
+
+## The context option that suppresses the cure works, and it is vanilla's own
+
+`Scripts/Script/Context.lua` ships a public API over the `b_context` brain
+variable the trees read, and vanilla uses it for exactly this purpose.
+`sa_event_wanderer.xml` calls:
+
+```lua
+Contexts.SetNonpersistentOption(wanderer, 'suppressAutoCure', 'event_wanderer')
+```
+
+and `sa_duel.xml` uses the message form, which expires on its own:
+
+```
+InstantSendMessageToNPC target="this.id" type="context:timedOptionRequest"
+  values="option('suppressAutoCure'),expiration(30),handle('sa_duel')"
+```
+
+**Both were exercised live against an NPC and both were accepted**, and the
+option was read back rather than trusted to a return value:
+
+```
+[CTX] check before ok=true val=false
+[CTX] SetNonpersistentOption ok=true err=nil
+[CTX] check after  ok=true val=true
+[CTX] timedOptionRequest ok=true err=nil
+```
+
+`Contexts.CheckOption` reports the option is set, so the state really changed.
+Whether it prevents the lockup is a separate question and needs a ride.
+
+The message form is the better fit. It carries its own expiration, so a victim
+cannot be left permanently exempt if the mod misses its cleanup, and the mod
+already sends brain messages this way for `hitReaction`.
+
+`XGenAIModule.GetBrainVariable(entity.id, 'b_context')` returns nil, so the
+brain variable is not readable directly by that name from Lua. `Contexts`
+maintains its own table and is the supported route. `SetBrainVariable`,
+`GetBrainVariable` and `RemoveDaycyclePatch` are all present on this build.
+
+## The lockup reproduced on demand, and suppressed on demand
+
+A controlled A/B, run entirely from the console with no horse and no collision.
+Two guards standing in the street. Both were set to 20 health and given the
+`bleeding` buff, `0c903899-fcc9-4cf2-9ee3-1130ac08b0fc`, which carries
+`buff_ai_tag_id="4"`, one of the two tags `cureStart` checks. The only
+difference between them was one line:
+
+```lua
+Contexts.SetNonpersistentOption(B, 'suppressAutoCure', 'hcm')
+```
+
+Result, five seconds later:
+
+```
+[AB] A=villageGuard suppress=false
+[AB] B=rat_guard24   suppress=true
+[AB] A health=20.0 addBuff=true
+[AB] B health=20.0 addBuff=true
+[AB] t+5s  A 20.1 PretendingIllness  |  B 20.0 MotionMovement
+```
+
+**A entered `PretendingIllness`. B carried on walking.**
+
+Three things are settled by that line:
+
+- **The lockup is `cureLookHurt`, and it reproduces on demand.** Bleeding plus
+  health under 40 is the whole trigger. No horse, no ragdoll, no collision, no
+  attacker, and five seconds from a standing start.
+- **`suppressAutoCure` prevents it.** Same health, same buff, same second, and
+  the only difference was the context option.
+- **The `autoCure` buff confirms which subtree is running.** A's health had
+  already moved from 20.0 to 20.1 while B's had not, which is the 0.02 per
+  second regeneration the `DecoratorBuff` on `cureLookHurt` applies. Nothing
+  else in the game was healing A.
+
+That last point matters as evidence, because it is a number moving on a later
+sample rather than a function reporting success, which is the standard this
+project settled on after several ScriptBinds were found to accept calls and do
+nothing.
+
+### What this means for the mod
+
+The mod does not need to avoid ragdolls, avoid damage, or keep victims above a
+health floor to avoid the lockup. It needs to tell the game that a trampled
+villager is not a candidate for the auto-cure daycycle, using the same call
+vanilla uses for a duellist or a scripted wanderer.
+
+The message form is preferable to the direct call because it expires by itself:
+
+```
+XGenAIModule.SendMessageToEntity(npc.id, 'context:timedOptionRequest',
+    "option('suppressAutoCure'),expiration(30),handle('HorseCollisionMod')")
+```
+
+`MinVictimHealth` and `HoldVictimAboveFloor` can then come out. They worked, but
+they bought the fix by preventing a collision from ever being able to kill,
+which was a real change to what the mod does in play.
+
+## The auto-cure exemption holds in play, and trampling can kill again
+
+**Build**: every impact sends the victim
+`context:timedOptionRequest option('suppressAutoCure') expiration(30)`.
+`MinVictimHealth` at 0 and `ClearCollisionInjuries` off, so nothing else was
+protecting the victim.
+
+**User report**: "I hit her maybe 5 times in total. I didn't see any change in
+behavior that wasn't what was expected. No lockup. Just kept getting up and
+returning to walking. I did eventually kill her though and now the guards are
+pissed and trying to kill me."
+
+Five gallop impacts on `rat_bailiff_wife`, an unarmored villager:
+
+| Impact | Speed at contact | Health before | Delta |
+| --- | --- | --- | --- |
+| 1 | 5.08 | 78.08 | +0.0000 |
+| 2 | 10.76 | 78.08 | -18.1326 |
+| 3 | 6.36 | 38.11 | +0.0000 |
+| 4 | 10.66 | 38.11 | -30.9845 |
+| 5 | 10.72 | 7.12 | -7.1229, dead |
+
+**She was at 38.11 health across two impacts, under the 40 gate, and did not
+enter `PretendingIllness`.** That is the condition which produced the lockup on
+demand in the controlled A/B, and the exemption held through it. `SuppressAutoCure`
+logged on all five impacts.
+
+Two things follow beyond the lockup:
+
+- **A collision can kill again.** The last impact took her from 7.12 to 0. The
+  old `MinVictimHealth` floor made that impossible, so removing it restores
+  something the mod is meant to be able to do.
+- **The crime system engages on its own.** Guards turned hostile after the
+  death with no code in the mod for it, which is the Phase 3 behavior arriving
+  without being built.
+
+### The gap this ride did not test
+
+The victim died shortly after falling under 40, so the exemption never had to
+outlast her. The realistic case is different: a rider knocks someone down twice,
+leaves them alive at 30 health, and rides away. Thirty seconds later the
+exemption lapses while they are still under the threshold and still bleeding,
+which is exactly the entry condition again. Whether the cure starts at that
+point is untested and is the next thing to settle.
+
+## The exemption expires cleanly, and the cure has a branch that works
+
+**Test**: `rat_swordsmith_helper` set to 20 health with the `bleeding` buff and
+a 30 second `suppressAutoCure` exemption, then polled for 70 seconds, which is
+40 seconds past the expiry.
+
+```
+[EXP] t+5s  health=20.0 anim=MotionIdle
+[EXP] t+30s health=20.0 anim=MotionIdle
+[EXP] t+70s health=20.0 anim=MotionIdle
+```
+
+Followed by a direct check:
+
+```
+[EXPCHK] rat_swordsmith_helper health=43.6 anim=MotionIdle suppressStillSet=false
+```
+
+Two results. **The timed option really does expire**, so the message form is
+safe to use and cannot strand a victim outside the daycycle. And **no lockup
+followed the expiry**: the NPC never entered `PretendingIllness` at any point.
+
+Health then moved from 20.0 to 43.6. That is far too large a step for the
+`autoCure` regeneration of 0.02 per second, which would have produced about 0.8
+over the same window, so something else restored it. The likely candidate is
+the branch of `cureStart` that actually treats the injury rather than the one
+that stands still: the file declares `cure` and `cureApplyPatch` alongside
+`cureLookHurt`, and `bandage` appears 27 times in it. **This is unconfirmed**,
+and the only firm claims are the two above.
+
+If that reading is right, `cureLookHurt` is the fallback for an NPC that cannot
+treat itself, and whether a victim locks up depends on the victim. The guard in
+the earlier A/B entered `PretendingIllness` within five seconds and stayed there
+for the full ninety, while this NPC recovered on its own. That difference is
+worth settling, because guards are the most likely thing a rider tramples
+repeatedly.
+
+## The message form of the context request can be dropped
+
+An attempt to repeat the expiry test on a guard failed before it started, and
+the failure is worth more than the test would have been:
+
+```
+[GRD] target=villageGuard health=20.0 anim=<unknown> sup=false
+[GRD] t+5s  health=20.0 anim=<unknown> sup=false
+[GRD] t+55s health=20.0 anim=<unknown> sup=false
+```
+
+`Contexts.CheckOption` read **false immediately after** the
+`context:timedOptionRequest` message was sent, so the option was never set. The
+guard was hostile at the time, following a kill earlier in the session, and
+`GetCurrentAnimationState` returned `<unknown>` throughout, which is consistent
+with combat owning the actor.
+
+The direct call does not behave this way. Earlier in the session
+`Contexts.SetNonpersistentOption` was applied to this same `villageGuard` and
+`CheckOption` read back true immediately.
+
+**A brain message is a request, and a busy brain can drop it.** The direct call
+writes the Contexts table itself and does not depend on the brain accepting a
+message. This is the same trap recorded earlier in this diary, where a
+ScriptBind accepted a call and did nothing: the mod logged
+`SuppressAutoCure ... for=30s` on all five impacts of the successful ride, and
+that line only proves the message was sent.
+
+The implementation should therefore use `Contexts.SetNonpersistentOption` with
+its own scheduled `ClearOption`, and verify with `CheckOption` rather than
+trusting either. Non-persistent is the right form for a second reason: it does
+not survive a save, so an exemption the mod fails to clear cannot become
+permanent in a player's game.
+
+A guard in combat is also an invalid subject for any cure test, since combat
+preempts the daycycle. Tests of this kind need a calm area.
