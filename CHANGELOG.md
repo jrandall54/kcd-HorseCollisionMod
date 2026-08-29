@@ -23,6 +23,20 @@ sections and refuses a release built at any other number.
   checked against what the hit actually cost. Written to `kcd.log` under the
   existing `LogTelemetry` setting.
 
+## [3.0.1] - 2026-08-29
+
+### Fixed
+
+- The release archive stored its entries with Windows path separators, so the
+  pak arrived as a single file named `Data\HorseCollisionMod.pak` in the mod
+  root rather than a `Data` folder containing the pak, and the mod did not
+  load. File Explorer treats the backslash as a separator and extracts the
+  archive correctly, which is why it looked right, but the ZIP format requires
+  forward slashes and conforming tools including 7-Zip and Vortex extract one
+  oddly named file. Affects 2.0.0 and 3.0.0. Reinstalling with this archive is
+  the whole fix; nothing in the mod itself changed. The build now reads its own
+  archive back and refuses to ship one whose entries contain a backslash.
+
 ## [3.0.0] - 2026-08-28
 
 ### Changed

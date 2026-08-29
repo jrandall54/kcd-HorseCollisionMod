@@ -74,6 +74,14 @@ def check_versions(paths, version):
                 if other in (version, "2.0.0", "1.9.7", "1.1.0", "3.0.3"):
                     continue
 
+                # A patch release ships the behavior of the feature release it
+                # follows, so documentation naming that release is still
+                # describing what is installed. "Since 3.0.0 the mod adds
+                # fragments without replacing a file" stays true in 3.0.1, and
+                # rewriting it to name the patch would make it false.
+                if other.rsplit(".", 1)[0] == version.rsplit(".", 1)[0]:
+                    continue
+
                 found.append((path, i, other,
                               "names a release that is not %s" % version))
 
