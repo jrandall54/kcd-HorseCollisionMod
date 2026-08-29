@@ -427,6 +427,76 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	end)
 end
 
+--- Logs a named entity's health whenever it changes.
+--
+-- Health has moved in every ride with no impact to account for it, and an
+-- impact the footprint rejects writes no line at all, so there is nothing to
+-- correlate the loss against. Watching one target records the moment health
+-- moves, whether or not the mod caused it.
+--
+-- A diagnostic, started from the console rather than from play. It samples
+-- twice a second and writes only on a change, so a quiet watch costs two
+-- lines.
+--
+-- @tparam string name entity name to watch
+-- @tparam number seconds how long to watch, default 90
+function HorseCollisionMod:WatchHealth(name, seconds)
+	local ent = System.GetEntityByName(name)
+
+	if not ent or not ent.soul then
+		self:Log("Watch " .. tostring(name) .. " not found")
+		return
+	end
+
+	-- The same generation guard the detection loop uses. A watch left running
+	-- across a load screen would otherwise hold a stale entity forever.
+	local generation = self.TimerTick
+	local deadline = System.GetCurrTime() + (seconds or 90)
+	local last = nil
+
+	local function tick()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local ok, health = pcall(function()
+			return ent.soul:GetState("health")
+		end)
+
+		if not ok or type(health) ~= "number" then
+			self:Log("Watch " .. name .. " lost")
+			return
+		end
+
+		if last and health ~= last then
+			local z = "?"
+
+			pcall(function()
+				z = string.format("%.2f", ent:GetWorldPos().z)
+			end)
+
+			self:Log("Watch " .. name
+					.. " health=" .. string.format("%.4f", health)
+					.. " delta=" .. string.format("%+.4f", health - last)
+					.. " z=" .. z)
+		end
+
+		last = health
+
+		if System.GetCurrTime() < deadline then
+			Script.SetTimer(500, tick)
+		else
+			self:Log("Watch " .. name .. " ended health="
+					.. string.format("%.4f", health))
+		end
+	end
+
+	self:Log("Watch " .. name .. " started health="
+			.. string.format("%.4f", ent.soul:GetState("health")))
+	tick()
+end
+
+
 --- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the

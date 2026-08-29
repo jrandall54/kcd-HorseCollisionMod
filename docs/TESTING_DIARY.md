@@ -4708,14 +4708,51 @@ the magnitude, which is in the range of a real collision. It also predicts
 something specific: **health should drop on a pass that produces no log line at
 all.** That needs no stairs and no elevation.
 
-### Moving an actor from the console does not work
+### Moving an actor from the console does work, and fall damage is real
 
-An attempt to test falling directly, by raising an NPC and letting it drop,
-failed on the same limitation already recorded for `AddImpulse`. `SetWorldPos`
-on the player's horse returned it to a height identical to the one it started
-at, and health did not change. Actors are animation-driven and the engine puts
-them back.
+An earlier reading of this test was wrong and is corrected here.
 
-Ragdolling the target with `actor:Fall` first and raising it on a short timer
-did not produce its log line either, and the level was unloaded partway through
-the measurement, so that variant is untested rather than disproven.
+`SetWorldPos` raised the player's horse 12 m. The height read back afterwards
+was identical to the starting height, which was taken as the engine reverting
+the move, in line with the limitation already recorded for `AddImpulse`. It was
+not. The horse had already fallen and landed on the same ground, so the sample
+was taken after the fall rather than instead of it.
+
+What settles it is that the player was mounted at the time and was killed on
+landing, with the game reporting fall height as the cause.
+
+So:
+
+- **Actors can be repositioned from the console**, and a repositioned actor
+  falls. The animation-driven limitation recorded for standing NPCs does not
+  extend to this.
+- **Fall damage is applied**, and 12 m is lethal to the player.
+- **The horse took none of it.** Its health read 100 before the drop and 100
+  after, while its rider died. Fall damage is therefore not uniform across
+  entities, and the horse either resists it or is exempt.
+
+The NPC variant, ragdolling with `actor:Fall` first and raising on a timer,
+never produced its log line, and the level was unloaded partway through the
+measurement. NPC fall damage remains untested rather than disproven, and there
+is no longer any reason to believe the approach cannot work.
+
+## A watch on one target, because the graze test cannot be ridden
+
+**User report**: "I loaded a save because I was checking in on you and when I
+came back I was on the death screen saying I died from fall height lol ths test
+is damn near impossible to actually play out. NPCs don't really just stand there
+for very long espeicaly not enough for me to trot past without hitting them or
+anyone."
+
+The graze test as designed asks for something the game does not allow. NPCs walk
+their schedules, the streets are busy, and a controlled near miss on a chosen
+target cannot be held still long enough to repeat.
+
+The answer is to instrument rather than choreograph. `HorseCollisionMod:WatchHealth(name, seconds)` samples one entity twice a second and writes a line only
+when its health changes, so a quiet watch costs two lines and any loss is
+timestamped. Riding normally near the target is then enough: a health drop with
+no `Impact` line beside it is the graze the previous entry predicted, and one
+with an `Impact` line is an ordinary hit.
+
+It takes the same generation guard as the detection loop, so a watch does not
+survive a load screen holding a stale entity.
