@@ -5448,3 +5448,39 @@ NPC never hit again keeps what it has, but it needs no separate migration and
 no action from the player.
 
 **Untested in game.** The mod was parked when this was written.
+
+## The stuck state is curable, and it is not the injury buff
+
+**User report**: "he snapped out of it!"
+
+Four things were applied to a stuck `villageGuard` at once: the
+`remove_injuries` buff, the `miraculous_cure` buff, `health=100` and
+`stamina=200`. He returned to normal behavior immediately.
+
+That settles the most important question. **The state is reversible from Lua**,
+so whatever it is, the mod can undo it.
+
+### What the same session rules out
+
+The mod applied `remove_injuries` after every one of 16 impacts on that guard,
+logging `cure=true` for all 32 calls, and he became stuck anyway. **So the
+injury buff is not what holds him**, or at least clearing it is not enough. The
+identification in the earlier entry was built on the decompile and the buff
+table rather than on a test, and this is the test.
+
+Stamina is unlikely for the same reason: earlier stuck guards read 124 and 138,
+which is most of a pool.
+
+That leaves `miraculous_cure` and health, and health is the stronger candidate.
+Every stuck NPC measured has been low: 19.6, 26.0, 32.6, 34.1 and 49.4 against
+a hundred.
+
+### A caution carried from this round
+
+`cure=true` was logged 32 times while nothing changed, exactly as
+`cleared=8/8` had been before it. Both were counting calls that did not throw.
+A ScriptBind that accepts a call and reports success proves only that the
+function exists, and on this build several of them do nothing observable.
+**Nothing in this project should be recorded as working on the strength of a
+return value.** The only evidence that has held up all session is a change
+someone can see on screen or a number that moves in a later sample.
