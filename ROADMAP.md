@@ -103,9 +103,15 @@ owns armor against damage, and `hitStrength` stays chosen by speed alone. This p
 the impulse and the horse's side of the impact, neither of which the engine derives from
 armor.
 
-- [ ] Establish in game what the current build already causes: whether damage lands, whether
-      injury and bleeding follow, whether a bounty is registered, and whether armored targets
-      already take less. Needs no new code, and the result rescopes Phases 3 and 4.
+- [x] Establish in game what the current build already causes. Damage lands with no damage
+      code in the mod. Nothing continues after the hit, so no bleeding follows. No bounty is
+      registered. Armor mitigation cannot be read yet, because one gallop impact cost the
+      victim nothing at all while still knocking her down.
+- [ ] Establish how often the damage half fails. The impulse is applied by the mod and the
+      damage by the engine, downstream of a `combat:hit` that is not guaranteed to arrive,
+      and a knockdown looks the same either way. Repeated impacts on one target, reading
+      health rather than the reaction. This gates the two impulse items below, since a
+      dropped hit and a well-armored target are indistinguishable in the current data.
 - [ ] Read an entity's equipped items and their weights, generic over the entity so Phase 3
       barding uses the same call on the horse.
 - [ ] Unarmored targets take proportionally heavier knockback, through `Ragdoll`'s
@@ -129,10 +135,13 @@ Prerequisite met: pak asset overrides now work, which Phase 2 needs for any tabl
 Scope depends on the Phase 2 verification step. The first item below may already be wired
 rather than missing.
 
-- [ ] Apply native blunt damage on high-speed impacts, with the injury system handling the
-      consequences. Vanilla already re-sends a player-ridden collision as a real `combat:hit`
-      carrying this mod's `hitStrength`, so this may be verification rather than
-      construction.
+- [x] Apply native blunt damage on high-speed impacts. Already wired: vanilla re-sends a
+      player-ridden collision as a real `combat:hit` carrying this mod's `hitStrength`, and
+      health drops on impact with no damage code in the mod. The step across the tier
+      boundary is steep, roughly fivefold from trot to gallop on the same target.
+- [ ] The injury system does not handle the consequences. Damage resolves within half a
+      second and then stops, so no bleeding or continuing effect follows an impact. Reaching
+      the injury system is separate work from causing the damage.
 - [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
 - [ ] Horse barding increases impact force and reduces momentum loss.
 - [ ] A braced polearm hit head-on acts as a wall: heavy stamina cost, near-certain dismount.
@@ -142,8 +151,9 @@ rather than missing.
 - [ ] Riding through a packed group inflicts a morale shock, so lightly armored enemies
       break and flee using native AI.
 - [ ] Bumping someone at walking pace annoys them; trampling triggers the crime system.
-      The crime half rides on the same real `combat:hit` as Phase 3's damage, so it may
-      already be wired.
+      Construction rather than verification: a gallop impact that knocks a guard down
+      registers no bounty, so a player-attributed `real(true)` hit is not on its own enough
+      for the crime system. Whether a witness or a fatal outcome changes that is untested.
 
 The `hitReaction` message the mod already sends is the hook for both, and vanilla
 distinguishes light from normal collisions through the `KOLIZE_S_HRACEM` and

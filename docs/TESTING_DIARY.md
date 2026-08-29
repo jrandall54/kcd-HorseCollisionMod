@@ -4383,10 +4383,7 @@ player-attributed `combat:hit` carrying this mod's `hitStrength`, so the current
 build already causes damage, injury and a crime without any new code. The
 impact telemetry added in 3.1.0-dev.2 shows what each impact actually costs.
 
-**User report**: outstanding. The ride was run and the session ended before the
-in-game observations were given, so knockdown behavior, visible bleeding and
-any guard or bounty reaction are not yet recorded. Everything below comes from
-`kcd.log` alone.
+**User report**: "they all got knocked down, no bounty."
 
 Four impacts. `speed` is the peak-window value that selects the tier and scales
 knockback; `sampled` is the instantaneous reading on the detecting tick.
@@ -4456,10 +4453,38 @@ the reliability question prior to the armor question. Sampling one impact per
 target cannot tell a mitigated hit from a dropped one; repeated impacts on the
 same target can.
 
+### The knockdown separates the mod's half from the engine's
+
+All four victims were knocked down, `rat_woman34` among them, and she lost no
+health at all. The impulse comes from the mod's own `Ragdoll` call and does not
+depend on the `combat:hit` reaching anything. The damage is resolved by the
+engine after that message is handled. On the same impact one landed and the
+other did not, which places the failure in the message path rather than in
+detection, tier selection, the footprint or the impulse.
+
+It follows that **a knockdown is not evidence the hit was delivered.** A
+reliability test has to read health; the reaction on screen looks identical
+either way.
+
+### No crime is registered
+
+No bounty followed any of the four impacts, including the one that knocked down
+`rat_guard18` at gallop.
+
+Phase 4's trampling crime is therefore construction rather than verification,
+which is the opposite of what the behavior tree suggested. A `combat:hit` marked
+`real(true)` and attributed to the player is not on its own enough for the crime
+system to register anything.
+
+Two conditions were not controlled for and are worth eliminating before that is
+settled: a crime generally needs a witness who reports it, and a non-lethal
+outcome may not be a crime under the vanilla rules at all. Neither was varied
+here.
+
 ### What is still unanswered
 
-- Whether a bounty or crime is registered. Nothing appears in `kcd.log` at
-  verbosity 2, and the mod does not log it, so this needs either an in-game
-  observation or a Lua query against the crime system.
-- Whether the victim is knocked down as opposed to merely damaged, which only
-  the in-game observation gives.
+- Whether the zero-damage impact is a dropped message or something specific to
+  the target. Repeated impacts on one target answer this; one impact per target
+  cannot.
+- Whether a crime registers when a collision is witnessed by a third party, or
+  when it is fatal.
