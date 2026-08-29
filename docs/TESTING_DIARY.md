@@ -4869,3 +4869,49 @@ inferring it from the interval, and it now records the rider's distance and the
 horse's recent peak speed at that moment. A loss with the horse alongside is the
 rejected contact of explanation 2. A loss with the horse thirty metres away is
 none of the three.
+
+## Reading what an NPC is wearing
+
+**Question**: how to get an entity's equipped items and their weights, which
+every remaining Phase 2 item depends on.
+
+### The API
+
+`inventory:GetInventoryTable()` returns an array of item WUIDs.
+`ItemManager.GetItem(wuid)` returns a table of `amount`, `class`, `entity`,
+`health` and `id`, where `class` is the item class GUID that joins to
+`Libs/Tables/item/`. `ItemManager.GetItemUIName(class)` gives a readable name.
+
+The ScriptBind tables are C++ userdata with metatable indexing, so `pairs()`
+lists nothing on them. Probing candidate names with `type(tbl[name])` works, and
+`references/kcd-documentation/` holds the full generated bind documentation,
+which is the faster source of the two.
+
+### There is no equipped-items accessor, and it does not matter
+
+Neither the live game nor the bind documentation has one. `Actor` and `Human`
+have `EquipInventoryItem`, `EquipItemInSlot` and their unequip counterparts,
+all setters. `Soul` has `GetDerivedStat`, whose valid names are not in
+`statistic.xml` and have not been located.
+
+What removes the problem is what an NPC actually carries. `led_woman6` carries
+eight items: an apple, a quarter loaf, money, two keys, a head wreath, shoes and
+a cotte. Everything except the food, keys and money is what she is wearing. The
+player carries 179 items and is the exception, not the rule.
+
+So for a collision target, **filtering the whole inventory to armor and clothing
+classes is equivalent to reading the equipped set**, and needs no bind that does
+not exist. The player would need the real equipped set, but the player is never
+the victim here.
+
+The traps already recorded still apply: weight is on `pickable_item.xml` joined
+by `item_id` rather than on `armor.xml`, chain outweighs plate per piece, and
+horse tack is filed as armor so saddle, bridle, shoe and spur must be excluded.
+
+### An incidental finding on the stuck guard
+
+While a guard was being ridden at repeatedly the engine logged
+`Animation-queue overflow. More then 16 entries` against
+`objects/characters/humans/skeleton/male.chr` continuously. The guard that
+stopped responding earlier in the session is more likely queued reactions
+accumulating faster than they play than vanilla's injured state.

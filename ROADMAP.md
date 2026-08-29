@@ -42,8 +42,10 @@ Known gaps carried into later phases:
       fragment. It coincides with the get-up, which is also when delayed health loss appears.
       Cosmetic.
 - [ ] An NPC beaten to low health can stop responding: a guard at 19.6 health held a hurt
-      animation in place for several minutes without moving. Whether this is vanilla's
-      injured state or an AI state broken by repeated ragdolls is untested.
+      animation in place for several minutes without moving. The engine logs
+      `Animation-queue overflow. More then 16 entries` against the male skeleton continuously
+      while it happens, which points at queued reactions accumulating faster than they play
+      rather than at vanilla's injured state.
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
@@ -136,8 +138,12 @@ armor.
       by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
       and the split between what the engine owns and what the mod owns does not hold as written
       at the top of this phase.
-- [ ] Read an entity's equipped items and their weights, generic over the entity so Phase 3
-      barding uses the same call on the horse.
+- [ ] Read an entity's carried items and their weights, generic over the entity so Phase 3
+      barding uses the same call on the horse. `inventory:GetInventoryTable()` returns the
+      item WUIDs and `ItemManager.GetItem(wuid)` returns `class`, which joins to the item
+      tables for weight. No bind reports which items are equipped, but an NPC carries only
+      what it wears plus a few trinkets, so filtering the whole inventory to armor classes
+      is equivalent for a target.
 - [ ] Unarmored targets take proportionally heavier knockback, through `Ragdoll`'s
       `impulseScale`.
 - [ ] Heavily armored targets are moved less, by the same multiplier.
