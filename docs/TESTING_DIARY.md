@@ -4967,3 +4967,73 @@ a mail guard upward costs the horse the same. That is a tuning decision rather
 than a limit, and the ceiling exists because the curve has none of its own.
 
 Untested in play. The figures come from the curve, not from riding.
+
+## Ten minutes of free riding, and what repeated impacts do
+
+**User report**: "It's hard to say one way or the other. I did notice a lot of
+dropped animations, especially from the women at one point I tried to walk
+stagger like 5 times in a row and it wouldn't do anything. I did test galloping
+into heavy armored in combat and it did throw me immediately like you had said
+which for now is probably okay and would tune later."
+
+Sixty-two impacts: 9 at walk, 35 at trot, 18 at gallop.
+
+### The armor scaling works, and the stamina half is too strong
+
+The multipliers land where the curve says they should. An armored guard reads
+`armorImpulse=0.37 armorStamina=2.00` at 58 weight, a villager
+`armorImpulse=1.26 armorStamina=0.79` at 5.
+
+The cost is the problem. A single trot into a guard drained the horse from
+207.1 to 117.1, and the largest recorded drain took the whole 210 pool. The
+rider was thrown **nine times in ten minutes**. The stamina multiplier composes
+with the combat multiplier already there, so a gallop into an armored target in
+combat asks for 75 x 2.5 x 2.0, which is more than the pool holds.
+
+### The dropped animations and the missing damage are the same thing
+
+Every one of the nine walk impacts called the stagger and every call returned
+`ok=true`, so the mod attempted all of them and the engine accepted all of them.
+Nothing was dropped by the mod.
+
+What separates this session from the controlled rides is how quickly the same
+NPC is hit again. `HitCooldownMs` is 3000 ms, and a victim spends longer than
+that on the ground: the height samples show them prone at 500 ms and standing by
+3000 ms, which is the earliest they could be upright and is measured from the
+impact rather than from when the ragdoll settles.
+
+An impact that lands on someone still down cannot play a standing stagger,
+because they are not standing, and the numbers agree:
+
+| | Zero damage |
+| --- | --- |
+| Trot | 10 of 35 (29%) |
+| Gallop | 8 of 18 (44%) |
+| Controlled rides, 12 s apart | 2 of 45 (4%) |
+
+Walk was 9 of 9, which is by design rather than a failure: the walk tier sends
+`Tickle`, which is not meant to cost anything.
+
+The rider being thrown is not the cause. Zero-damage impacts sit near a throw at
+much the same rate as damaging ones, 16 of 27 against 21 of 35.
+
+So the earlier four per cent failure rate is a floor measured under ideal
+spacing, and free play is far worse. Whether the fix is a longer cooldown or a
+check that the target is upright is a design question, but the mod currently
+delivers a reaction to people who cannot perform one.
+
+### The console noise
+
+Neither warning the user asked about belongs to the mod.
+
+`Agent '_Sheep21' ... failed to turn towards ... within 8.000000 seconds` is
+vanilla AI pathing, and every instance in the log names a sheep.
+
+`PROS:` is Warhorse's own online backend failing to reach its service and
+retrying about twice a second. It accounted for 965 of 1940 lines in the play
+window, half of everything written. There is no CVar that switches the service
+off, but `log_SpamDelay` collapses repeats of an identical line and takes it to
+roughly one line per thirty seconds. It is now part of the environment
+`dev_deploy.ps1` writes, in both the development and shipping sets, since it
+costs nothing in play. The mod's own telemetry carries changing numbers on
+every line, so none of it is suppressed.

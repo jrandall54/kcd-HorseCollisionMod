@@ -153,9 +153,16 @@ armor.
       A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
       target in mail, multiplying with the combat multiplier already applied and with the
       Phase 3 Horsemanship multiplier when it arrives.
-- [ ] Tune the two curves in play. The defaults are derived from the weights rather than from
-      how they feel, and the stamina multiplier reaches its ceiling at around weight 32, so a
-      guard in mail and a knight in full plate currently cost the horse the same.
+- [ ] Tune the two curves in play. The stamina half is too strong at its defaults: ten
+      minutes of free riding threw the rider nine times, a single trot into a guard drains 90
+      of a 210 pool, and a gallop into an armored target in combat empties it outright. The
+      multiplier also reaches its ceiling at around weight 32, so a guard in mail and a knight
+      in full plate cost the same.
+- [ ] Skip or soften an impact against a target that has not recovered from the last one.
+      `HitCooldownMs` is 3000, which is shorter than the time a victim spends on the ground,
+      so a second impact lands on someone already prone: no reaction plays, because they are
+      not standing, and a third of those impacts cost no health. Controlled rides with twelve
+      seconds between impacts produce neither symptom.
 
 Data located. Armor weight is on `Libs/Tables/item/pickable_item.xml`, joined by `item_id`,
 not on `armor.xml`. Target body mass is `normal_body_weight` on `soul_archetype.xml`: 160
