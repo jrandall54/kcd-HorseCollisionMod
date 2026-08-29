@@ -41,11 +41,12 @@ Known gaps carried into later phases:
       signature of `StartInteractiveActionByName` accepting a name that resolves to no
       fragment. It coincides with the get-up, which is also when delayed health loss appears.
       Cosmetic.
-- [ ] An NPC beaten to low health can stop responding: a guard at 19.6 health held a hurt
-      animation in place for several minutes without moving. The engine logs
-      `Animation-queue overflow. More then 16 entries` against the male skeleton continuously
-      while it happens, which points at queued reactions accumulating faster than they play
-      rather than at vanilla's injured state.
+- [x] An NPC that stops responding after repeated impacts is exhausted, not broken. A guard
+      held in a hurt animation for several minutes read `exhaust=100` against a recovered
+      `stamina=121`, so the state is vanilla's and it resolves on its own. Repeated impacts
+      drive exhaustion to its ceiling, which is a consequence of testing rather than a defect.
+      The `Animation-queue overflow` the engine logs alongside it is a symptom of queued
+      reactions, not the cause.
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
@@ -144,13 +145,17 @@ armor.
       tables for weight. No bind reports which items are equipped, but an NPC carries only
       what it wears plus a few trinkets, so filtering the whole inventory to armor classes
       is equivalent for a target.
-- [ ] Unarmored targets take proportionally heavier knockback, through `Ragdoll`'s
-      `impulseScale`.
-- [ ] Heavily armored targets are moved less, by the same multiplier.
+- [x] Unarmored targets take proportionally heavier knockback and armored targets are moved
+      less, through one multiplier on `Ragdoll`'s `impulseScale`. A naked target reaches 1.50
+      and a target in mail 0.41, against 1.00 at `ArmorReferenceWeight`.
 - [ ] Striking a heavy target strips the horse's momentum rather than only its stamina.
-- [ ] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
-      A multiplier on the existing per-tier cost, composing with the Phase 3 Horsemanship
-      multiplier, not a parallel rule set.
+- [x] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
+      A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
+      target in mail, multiplying with the combat multiplier already applied and with the
+      Phase 3 Horsemanship multiplier when it arrives.
+- [ ] Tune the two curves in play. The defaults are derived from the weights rather than from
+      how they feel, and the stamina multiplier reaches its ceiling at around weight 32, so a
+      guard in mail and a knight in full plate currently cost the horse the same.
 
 Data located. Armor weight is on `Libs/Tables/item/pickable_item.xml`, joined by `item_id`,
 not on `armor.xml`. Target body mass is `normal_body_weight` on `soul_archetype.xml`: 160

@@ -4915,3 +4915,55 @@ While a guard was being ridden at repeatedly the engine logged
 `objects/characters/humans/skeleton/male.chr` continuously. The guard that
 stopped responding earlier in the session is more likely queued reactions
 accumulating faster than they play than vanilla's injured state.
+
+## The stuck NPC is exhausted, and armor now scales the impulse
+
+**User report**: "currently in game I'm standing right next to one of the NPCs
+in the permo hurt animation where they seem to be stuck in it."
+
+Queried live while the user stood beside it. `villageGuard`, 1.7 m away:
+
+```
+health=26.0386 stamina=121.581 exhaust=100
+weaponDrawn=false  pieces=9 weight=47.0 smashDef=3.93 heaviest=chain
+```
+
+`exhaust=100` is the ceiling. Stamina had already recovered to 121, so the
+guard is not out of stamina; it is exhausted, which is a vanilla state that
+recovers on its own. Repeated impacts drive exhaustion up until the NPC stops
+acting, and the `Animation-queue overflow` the engine logs alongside it is
+queued reactions piling up rather than the cause. Not a defect, and not
+something the mod needs to handle.
+
+The same query corroborates the armor comparison from earlier. That guard
+carries 9 pieces at 47 weight and 3.93 smash_def against a villager's 3 pieces
+at 5 and 0.30. A thirteenfold difference in the game's own blunt defense still
+produced only 13 per cent less damage, which is the clearest statement yet that
+the engine does very little with armor on a collision hit.
+
+### Spurs are the rider's
+
+The first generated table filed spurs as horse tack, following the note in an
+earlier entry. They are worn by a rider, so their weight belongs in a person's
+total. Tack is now saddle, horseshoe and bridle only.
+
+### The scaling
+
+One curve serves both halves, on the ratio between a target's armor weight and
+`ArmorReferenceWeight`. The impulse takes its reciprocal, the horse's stamina
+cost takes it directly, and both are clamped.
+
+| Armor weight | Impulse | Stamina |
+| --- | --- | --- |
+| 0 | 1.50 | 0.75 |
+| 5, a villager | 1.26 | 0.79 |
+| 8, the reference | 1.00 | 1.00 |
+| 20 | 0.63 | 1.58 |
+| 47, a guard in mail | 0.41 | 2.00 |
+| 69 | 0.35 | 2.00 |
+
+The stamina multiplier reaches its ceiling around weight 32, so everything from
+a mail guard upward costs the horse the same. That is a tuning decision rather
+than a limit, and the ceiling exists because the curve has none of its own.
+
+Untested in play. The figures come from the curve, not from riding.

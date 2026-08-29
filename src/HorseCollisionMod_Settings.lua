@@ -32,6 +32,20 @@ HorseCollisionModSettings = {
 	CombatStaminaMultiplier  = 2.5,   -- 1.0 removes the combat penalty
 	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
 
+	-- How much what a target is wearing changes the impact. Weight is the
+	-- sum of their armor, from the game's own item tables: a villager is
+	-- around 5, a mail-wearing guard around 47.
+	--
+	-- Both multipliers are 1.0 at ArmorReferenceWeight and move from there.
+	-- An exponent of 0 switches that half off and keeps the old behavior.
+	ArmorReferenceWeight     = 8.0,   -- the weight that changes nothing
+	ArmorImpulseExponent     = 0.5,   -- higher means armor plants them harder
+	MinArmorImpulse          = 0.35,  -- a knight is never immovable
+	MaxArmorImpulse          = 1.5,   -- nor is a naked peasant weightless
+	ArmorStaminaExponent     = 0.5,   -- higher means armor tires the horse more
+	MinArmorStamina          = 0.75,
+	MaxArmorStamina          = 2.0,
+
 	-- Switches.
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk

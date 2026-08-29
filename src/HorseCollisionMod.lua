@@ -143,6 +143,17 @@ HorseCollisionMod.Config = {
 	Knockback                = 50.0,
 	Uplift                   = 30.0,
 
+	-- What the target is wearing, as a multiplier on the impulse and on the
+	-- horse's stamina cost. Both are 1.0 at ArmorReferenceWeight; an
+	-- exponent of 0 switches that half off.
+	ArmorReferenceWeight     = 8.0,
+	ArmorImpulseExponent     = 0.5,
+	MinArmorImpulse          = 0.35,
+	MaxArmorImpulse          = 1.5,
+	ArmorStaminaExponent     = 0.5,
+	MinArmorStamina          = 0.75,
+	MaxArmorStamina          = 2.0,
+
 	-- Horse stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
 	StaminaDrainTrot         = 45.0,
@@ -607,6 +618,90 @@ function HorseCollisionMod:DescribeArmor(total)
 end
 
 
+--- How much a target's armor changes the impact it takes.
+--
+-- One curve serves both halves. `weight` is the target's armor weight and
+-- `reference` the weight that changes nothing, so the ratio between them is
+-- the whole signal; `exponent` sets how sharply it bites and 0 switches the
+-- scaling off entirely.
+--
+-- Armor makes a target harder to throw and more tiring to hit, so the impulse
+-- takes the reciprocal of the ratio and the stamina cost takes it directly.
+-- Both are clamped, because the curve has no natural floor or ceiling and an
+-- unclamped extreme reads in game as a target that cannot be moved at all, or
+-- one that flies out of sight.
+--
+-- @tparam number weight the target's armor weight
+-- @tparam number reference the weight that produces 1.0
+-- @tparam number exponent how strongly weight matters, 0 to disable
+-- @tparam boolean invert true for the impulse, false for the stamina cost
+-- @tparam number low the smallest multiplier allowed
+-- @tparam number high the largest
+-- @treturn number the multiplier
+function HorseCollisionMod:ArmorCurve(weight, reference, exponent, invert, low, high)
+	if exponent == 0 or reference <= 0 then
+		return 1.0
+	end
+
+	-- A target wearing nothing at all still has a body. Without a floor the
+	-- ratio goes to infinity and the clamp becomes the only thing deciding
+	-- the result, which hides the setting rather than applying it.
+	local w = weight
+
+	if w < 0.5 then
+		w = 0.5
+	end
+
+	local ratio = w / reference
+
+	if invert then
+		ratio = reference / w
+	end
+
+	local scale = math.pow(ratio, exponent)
+
+	if scale < low then
+		return low
+	end
+
+	if scale > high then
+		return high
+	end
+
+	return scale
+end
+
+
+--- The impulse multiplier for a target's armor.
+--
+-- @tparam table armor a table from `ArmorOf`
+-- @treturn number a multiplier on the tier's impulse scale
+function HorseCollisionMod:ArmorImpulseScale(armor)
+	local cfg = self.Config
+
+	return self:ArmorCurve(armor.weight, cfg.ArmorReferenceWeight,
+			cfg.ArmorImpulseExponent, true,
+			cfg.MinArmorImpulse, cfg.MaxArmorImpulse)
+end
+
+
+--- The stamina multiplier for a target's armor.
+--
+-- Composes with the combat multiplier already applied, and is the same shape
+-- the Phase 3 Horsemanship multiplier will take, so the three multiply rather
+-- than each becoming its own rule.
+--
+-- @tparam table armor a table from `ArmorOf`
+-- @treturn number a multiplier on the tier's stamina cost
+function HorseCollisionMod:ArmorStaminaScale(armor)
+	local cfg = self.Config
+
+	return self:ArmorCurve(armor.weight, cfg.ArmorReferenceWeight,
+			cfg.ArmorStaminaExponent, false,
+			cfg.MinArmorStamina, cfg.MaxArmorStamina)
+end
+
+
 --- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -637,7 +732,8 @@ HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
 -- @tparam table npc victim entity
 -- @tparam string tierName the tier the impact scored
 -- @tparam number strength the `HitReactionStrength` sent with the hit
-function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
+-- @tparam[opt] table armor totals from `ArmorOf`, read again when absent
+function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	if not self.Config.LogTelemetry or not npc or not npc.soul then
 		return
 	end
@@ -673,7 +769,7 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
 			.. " strength=" .. tostring(strength)
 			.. " health=" .. string.format("%.4f", before)
 			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?")
-			.. " " .. self:DescribeArmor(self:ArmorOf(npc)))
+			.. " " .. self:DescribeArmor(armor or self:ArmorOf(npc)))
 
 	local function sample(label)
 		local okAfter, after = pcall(function()
@@ -1152,6 +1248,12 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	local combatScale = 1.0
 	local isCombat, combatDetail = self:IsCombatCollision(npc)
 
+	-- Walked once per impact. Every use below wants the same totals, and
+	-- enumerating an inventory per use would repeat the work three times.
+	local armor = self:ArmorOf(npc)
+	local armorImpulse = self:ArmorImpulseScale(armor)
+	local armorStamina = self:ArmorStaminaScale(armor)
+
 	if isCombat then
 		combatScale = cfg.CombatStaminaMultiplier
 	end
@@ -1163,6 +1265,8 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 					and (" trail=[" .. self:SpeedTrail(self.SpeedHistorySize) .. "]")
 					or "")
 			.. " combatScale=" .. string.format("%.1f", combatScale)
+			.. " armorImpulse=" .. string.format("%.2f", armorImpulse)
+			.. " armorStamina=" .. string.format("%.2f", armorStamina)
 			.. " " .. combatDetail)
 
 	if tierName == "Walk" then
@@ -1172,9 +1276,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			self:PlayStagger(npc, velocity, speed)
 		end
 
-		self:ProbeImpactCost(npc, "Walk", strength.Tickle)
+		self:ProbeImpactCost(npc, "Walk", strength.Tickle, armor)
 		self:SendHitReaction(npc, horseWuid, strength.Tickle)
-		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainWalk * combatScale)
+		self:DrainHorseStamina(horseEnt, playerEnt,
+				cfg.StaminaDrainWalk * combatScale * armorStamina)
 		return
 	end
 
@@ -1182,10 +1287,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- Sampled before the impulse, not after. Ragdoll can cost the
 		-- victim health of its own, and a probe that reads afterwards
 		-- folds that into the starting figure instead of the delta.
-		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury)
-		self:Ragdoll(npc, velocity, speed, 0.6)
+		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury, armor)
+		self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
-		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainTrot * combatScale)
+		self:DrainHorseStamina(horseEnt, playerEnt,
+				cfg.StaminaDrainTrot * combatScale * armorStamina)
 		return
 	end
 
@@ -1193,10 +1299,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- Sampled before the impulse, not after. Ragdoll can cost the
 		-- victim health of its own, and a probe that reads afterwards
 		-- folds that into the starting figure instead of the delta.
-		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury)
-		self:Ragdoll(npc, velocity, speed, 1.0)
+		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
+		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
-		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainGallop * combatScale)
+		self:DrainHorseStamina(horseEnt, playerEnt,
+				cfg.StaminaDrainGallop * combatScale * armorStamina)
 		return
 	end
 end
