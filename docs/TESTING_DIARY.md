@@ -4748,8 +4748,9 @@ The graze test as designed asks for something the game does not allow. NPCs walk
 their schedules, the streets are busy, and a controlled near miss on a chosen
 target cannot be held still long enough to repeat.
 
-The answer is to instrument rather than choreograph. `HorseCollisionMod:WatchHealth(name, seconds)` samples one entity twice a second and writes a line only
-when its health changes, so a quiet watch costs two lines and any loss is
+The answer is to instrument rather than choreograph.
+`HorseCollisionMod:WatchHealth(name, seconds)` samples one entity twice a
+second and writes a line only when its health changes, so a quiet watch costs two lines and any loss is
 timestamped. Riding normally near the target is then enough: a health drop with
 no `Impact` line beside it is the graze the previous entry predicted, and one
 with an `Impact` line is an ordinary hit.
