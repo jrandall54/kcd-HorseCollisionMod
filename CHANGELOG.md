@@ -16,6 +16,16 @@ sections and refuses a release built at any other number.
 
 ## [Unreleased]
 
+### Fixed
+
+- NPCs no longer stand in the street playing a hurt animation after being ridden
+  down. A victim knocked under 40 health while bleeding was being taken over by
+  the game's own auto-cure behaviour, which holds them in place indefinitely
+  while healing them at a rate too slow to notice. Victims are now exempted from
+  it, using the same mechanism the game uses for its own characters, and an NPC
+  already stuck is released the next time a rider collides with them, so an
+  existing save repairs itself.
+
 ### Added
 
 - Impact telemetry. Each collision logs the victim's health at the moment of

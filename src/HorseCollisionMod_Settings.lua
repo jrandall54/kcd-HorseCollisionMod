@@ -48,6 +48,41 @@ HorseCollisionModSettings = {
 	MinArmorStamina          = 0.75,
 	MaxArmorStamina          = 3.0,
 
+	-- The floor a collision will not take a victim below. A collision puts
+	-- its victim into a wounded state whose exit is gated on health, and an
+	-- NPC never heals, so a victim left below that gate stays wounded for
+	-- good: rooted in place, unable to fight, permanently.
+	--
+	-- Damage still lands, and still accumulates, down to this figure. The
+	-- cost is that a collision can no longer kill: a victim cannot be
+	-- trampled past the floor, however many times they are ridden into.
+	-- Set it to 0 to restore the behavior 3.0.0 shipped with, lockup
+	-- included.
+	MinVictimHealth          = 0.0,
+	SuppressAutoCureSec      = 30,   -- exempt victims from the auto-cure daycycle
+
+	-- Injuries. The engine rolls one from the hit a collision becomes, and
+	-- an injury never expires: a player clears one with a bandage, a potion
+	-- or sleep, and an NPC has none of those. Left alone, every villager a
+	-- rider knocks down is crippled for the life of the save.
+	--
+	-- Clearing them keeps the damage, the reaction and the crime, and takes
+	-- back only the permanent part. Turning this off restores the behavior
+	-- 3.0.0 shipped with.
+	ClearCollisionInjuries   = false,
+
+	-- Exhaustion. The engine adds it for every collision, and it recovers
+	-- slowly, so a rider who knocks the same guards down repeatedly leaves
+	-- them unable to fight and eventually frozen in place. These bound what
+	-- collisions alone can do; nothing here touches exhaustion from any
+	-- other source.
+	LimitCollisionExhaust    = false, -- OFF: the stat is Energy, not
+	                                  -- exhaustion, and 100 means rested
+	MaxExhaustPerImpact      = 8.0,   -- most one collision may add, of 100
+	MaxExhaustFromCollisions = 70.0,  -- collisions never push past this
+	ExhaustWatchMs           = 20000, -- how long a victim is held down
+	                                  -- for, since the rise is gradual
+
 	-- Switches.
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk

@@ -161,6 +161,22 @@ HorseCollisionMod.Config = {
 	StaminaDrainGallop       = 45.0,
 	ThrowRiderOnStaminaEmpty = true,
 
+	-- The floor a collision will not take a victim below.
+	MinVictimHealth          = 60.0,
+
+	-- How long a victim is exempted from vanilla's auto-cure daycycle,
+	-- in seconds. Zero leaves them in it.
+	SuppressAutoCureSec      = 30,
+
+	-- Injuries caused by collisions.
+	ClearCollisionInjuries   = true,
+
+	-- Exhaustion added by collisions.
+	LimitCollisionExhaust    = false,
+	MaxExhaustPerImpact      = 8.0,
+	MaxExhaustFromCollisions = 70.0,
+	ExhaustWatchMs           = 20000,
+
 	-- Combat.
 	CombatStaminaMultiplier  = 2.5,
 	SuppressStaggerInCombat  = true,
@@ -209,6 +225,10 @@ HorseCollisionMod.HitReactionStrength = {
 	MajorInjury = 6,
 	Fatal = 7
 }
+
+--- Victims whose exhaustion is being held down, keyed by entity id.
+-- @table ExhaustWatch
+HorseCollisionMod.ExhaustWatch = {}
 
 --- When each victim may react again, in milliseconds, keyed by entity id.
 --
@@ -708,6 +728,267 @@ function HorseCollisionMod:ArmorStaminaScale(armor)
 end
 
 
+--- Bounds the exhaustion a collision adds to its victim.
+--
+-- The engine raises exhaustion for the real `combat:hit` a player-ridden
+-- collision becomes, and it recovers slowly. Repeated impacts drive it to its
+-- ceiling, where an NPC can swing a weapon without threatening anyone and can
+-- stop responding altogether. A rider who knocks down enough guards is then
+-- safe from all of them, which is the exploit this exists to close.
+--
+-- The stat is readable and writable through `soul:GetState` and
+-- `soul:SetState`, so the limit is applied to the stat itself rather than by
+-- weakening the hit. Damage, the reaction and the crime the hit causes are
+-- left exactly as they are, which keeps this separate from the systems that
+-- scale those.
+--
+-- Only the rise this impact caused is removed. Exhaustion the victim earned
+-- fighting is never given back, because the baseline is read at the moment of
+-- the impact and the value is only ever clamped down to it.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:LimitExhaustion(npc)
+	local cfg = self.Config
+
+	if not cfg.LimitCollisionExhaust or not npc or not npc.soul then
+		return
+	end
+
+	local ok, before = pcall(function()
+		return npc.soul:GetState("exhaust")
+	end)
+
+	if not ok or type(before) ~= "number" then
+		return
+	end
+
+	-- The ceiling applies to a victim already past it, which is a deliberate
+	-- reduction rather than an oversight. Left alone, a victim the mod
+	-- pinned at 100 in an earlier session could never come back, so the
+	-- exploit would survive the fix in every save it had already reached.
+	--
+	-- Nothing is taken below the ceiling. A victim exhausted by a fight
+	-- still ends up tired, and a collision is never a favor.
+	local allowed = before + cfg.MaxExhaustPerImpact
+
+	if allowed > cfg.MaxExhaustFromCollisions then
+		allowed = cfg.MaxExhaustFromCollisions
+	end
+
+	-- Watched rather than clamped on a timer. Samples at 500 ms and 2000 ms
+	-- caught nothing across 53 impacts while victims still reached the
+	-- ceiling, so the rise is not the hit landing: it accumulates over the
+	-- seconds afterwards, while the victim gets up and runs.
+	self.ExhaustWatch[tostring(npc.id)] = {
+		entity = npc,
+		allowed = allowed,
+		before = before,
+		until_ = GetTimeMs() + cfg.ExhaustWatchMs,
+	}
+end
+
+
+--- Holds watched victims below what their impact allowed them to reach.
+--
+-- Runs from the update loop, ahead of the mounted and moving test, because a
+-- victim keeps accumulating after the rider has stopped.
+--
+-- @treturn number entries still being watched
+function HorseCollisionMod:EnforceExhaustLimits()
+	local cfg = self.Config
+
+	if not cfg.LimitCollisionExhaust then
+		return 0
+	end
+
+	local now = GetTimeMs()
+	local live = 0
+
+	for id, watch in pairs(self.ExhaustWatch) do
+		if now > watch.until_ then
+			self.ExhaustWatch[id] = nil
+		else
+			live = live + 1
+
+			pcall(function()
+				local value = watch.entity.soul:GetState("exhaust")
+
+				if type(value) == "number" and value > watch.allowed then
+					watch.entity.soul:SetState("exhaust", watch.allowed)
+
+					if cfg.LogTelemetry and not watch.logged then
+						watch.logged = true
+
+						self:Log("Exhaust "
+								.. tostring(watch.entity:GetName())
+								.. " after="
+								.. tostring(now - (watch.until_ - cfg.ExhaustWatchMs))
+								.. "ms was="
+								.. string.format("%.1f", watch.before)
+								.. " rose=" .. string.format("%.1f", value)
+								.. " held="
+								.. string.format("%.1f", watch.allowed))
+					end
+				end
+			end)
+		end
+	end
+
+	return live
+end
+
+
+--- Keeps a victim above the health a collision leaves them stranded below.
+--
+-- A collision puts its victim into a wounded state, and the exit from that
+-- state is gated on health. Established by test rather than by reading: an
+-- NPC set to 25 health without being hit behaves normally, and a stuck victim
+-- returns to normal the moment health is raised, with no buff involved.
+--
+-- Nothing heals an NPC, so a victim left below the gate never leaves the
+-- state. It is rooted in place and will not fight, which is both an
+-- immersion break and an exploit, since a rider can render a town's guards
+-- harmless.
+--
+-- Vanilla never reaches this state because it never produces a badly wounded
+-- NPC outside combat. In a fight the combat tree owns the situation and has
+-- its own exits.
+--
+-- The floor is applied after the engine has resolved the hit, not before, so
+-- the damage still lands and still accumulates down to the floor.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:HoldVictimAboveFloor(npc)
+	local cfg = self.Config
+
+	if cfg.MinVictimHealth <= 0 or not npc or not npc.soul then
+		return
+	end
+
+	local function lift(label)
+		pcall(function()
+			local health = npc.soul:GetState("health")
+
+			-- A victim already dead is left alone. Reviving a corpse would be
+			-- a stranger bug than the one this fixes.
+			if type(health) ~= "number" or health <= 0 then
+				return
+			end
+
+			if health >= cfg.MinVictimHealth then
+				return
+			end
+
+			npc.soul:SetState("health", cfg.MinVictimHealth)
+
+			if cfg.LogTelemetry then
+				self:Log("Floor " .. tostring(npc:GetName())
+						.. " " .. label
+						.. " was=" .. string.format("%.1f", health)
+						.. " held=" .. string.format("%.1f", cfg.MinVictimHealth))
+			end
+		end)
+	end
+
+	-- After the engine resolves the hit, which the telemetry puts inside
+	-- 500 ms, and again once the late arrivals have landed.
+	Script.SetTimer(1000, function()
+		lift("t+1000ms")
+	end)
+
+	Script.SetTimer(4000, function()
+		lift("t+4000ms")
+	end)
+end
+
+
+--- The injury buffs the engine rolls from a collision.
+--
+-- Taken from `Libs/Tables/rpg/buff.xml`, buff class 5. Every one of them
+-- carries `duration="-1"` and `is_persistent="True"`, so none expires. A
+-- player clears an injury with a bandage, a potion or sleep. An NPC has no
+-- path to any of those, so an injury an NPC receives lasts for the life of the
+-- save.
+--
+-- The tags among them are what the AI reads, through `buff_ai_tag_id`, and are
+-- why an injured NPC holds a wounded pose and will not fight.
+--
+-- Listed for reference. They are not removed one by one: the game cures
+-- injuries by applying a buff of its own, which is what `RemoveInjuriesBuff`
+-- below is.
+-- @table InjuryBuffs
+HorseCollisionMod.InjuryBuffs = {
+	"37d59205-3782-446d-b32e-89a9f786725d",  -- injured_torso
+	"c48e48e2-ae85-4429-9dd6-4fb94c388001",  -- injured_head
+	"34f0885b-7287-4881-907f-f19751a5e831",  -- injured_left_arm
+	"ce3737db-b0a3-459d-8d47-d58695d58be3",  -- injured_right_arm
+	"10fc25ca-c095-44c6-b88b-d54ad58ab0a6",  -- injured_left_leg
+	"738f8a07-c5fd-4687-9408-34ffb0bcd17e",  -- injured_right_leg
+	"3d530e43-375f-4739-a6ee-3bbcf9292601",  -- injured_tag
+	"83ef27f9-4ce2-4894-bd42-d2cc61a6f758",  -- injured_tag_persistent
+}
+
+--- The buff that cures injuries, `remove_injuries` from `buff.xml`.
+--
+-- One second of `Cpp:BasicTimed` whose whole effect is clearing the injury
+-- class. Vanilla applies it to a duel opponent once the duel ends, in
+-- `sb_duel`, which is the game's own idiom for undoing injuries it caused:
+--
+--     entity.soul:AddBuff("46683e3b-e261-412f-b402-99ee17dda62a")
+--
+-- Removing each injury by its guid does not work. `RemoveAllBuffsByGuid`
+-- accepts the call and reports success without clearing anything.
+HorseCollisionMod.RemoveInjuriesBuff = "46683e3b-e261-412f-b402-99ee17dda62a"
+
+
+--- Removes the injuries a collision gave its victim.
+--
+-- Vanilla turns a player-ridden collision into a real `combat:hit` carrying
+-- the strength this mod sends, and the engine rolls an injury from it. Nothing
+-- in the game then removes it from an NPC, so a rider leaves a trail of
+-- permanently crippled villagers, which is both the exploit and the reason a
+-- victim can end up holding a wounded pose forever.
+--
+-- Cleared rather than prevented, because the strength that causes the injury
+-- is the same strength that carries the damage and the crime. Lowering it to
+-- stop the injury would take those with it.
+--
+-- Only victims of a collision are touched, and only in the seconds after one,
+-- so an NPC injured by anything else keeps what it earned.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:ClearInjuries(npc)
+	local cfg = self.Config
+
+	if not cfg.ClearCollisionInjuries or not npc or not npc.soul then
+		return
+	end
+
+	local function clear(label)
+		local ok = pcall(function()
+			npc.soul:AddBuff(self.RemoveInjuriesBuff)
+		end)
+
+		if cfg.LogTelemetry then
+			self:Log("Injuries " .. tostring(npc:GetName())
+					.. " " .. label
+					.. " cure=" .. tostring(ok))
+		end
+	end
+
+	-- The engine resolves the hit after the message is handled, so the injury
+	-- does not exist yet at the moment of the impact. The second pass covers
+	-- an injury that arrives late, the way the damage does.
+	Script.SetTimer(1500, function()
+		clear("t+1500ms")
+	end)
+
+	Script.SetTimer(5000, function()
+		clear("t+5000ms")
+	end)
+end
+
+
 --- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -739,6 +1020,99 @@ HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
 -- @tparam string tierName the tier the impact scored
 -- @tparam number strength the `HitReactionStrength` sent with the hit
 -- @tparam[opt] table armor totals from `ArmorOf`, read again when absent
+--- Exempts a collision victim from vanilla's auto-cure daycycle.
+--
+-- An NPC carrying a bleeding or poison buff whose health is under
+-- `t_autoCureLowHealthLimit`, which vanilla sets to 40, enters the
+-- `cureLookHurt` behavior in `Libs/AI/final/sb_daycycles_cure.xml`. That
+-- subtree plays the `PretendingIllness` animation under a wait with no
+-- timeout, and regenerates health at 0.02 per second. Nothing inside it ends,
+-- so a victim left under the threshold stands in the street until health
+-- climbs back over it, which takes a quarter of an hour of game time and
+-- reads as a permanently broken NPC.
+--
+-- Vanilla exempts its own characters from the daycycle through a context
+-- option, used for duellists and for scripted wanderers among others. The
+-- same option is requested here. The timed form is preferred to
+-- `Contexts.SetNonpersistentOption` because it expires by itself, so a victim
+-- cannot be left permanently outside a system the rest of the game depends on
+-- if the mod misses its own cleanup.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:SuppressAutoCure(npc)
+	local HANDLE = "HorseCollisionMod"
+	local seconds = self.Config.SuppressAutoCureSec
+
+	if type(seconds) ~= "number" or seconds <= 0 then
+		return
+	end
+
+	if not npc or not npc.id or type(XGenAIModule) ~= "table" then
+		return
+	end
+
+	if type(Contexts) ~= "table" then
+		return
+	end
+
+	-- The message form, `context:timedOptionRequest`, carries its own
+	-- expiration and reads as the tidier option, but it is a request to the
+	-- brain and a busy brain drops it: sent to a guard in combat, the option
+	-- read back false immediately. The direct call writes the Contexts table
+	-- and does not depend on the brain accepting anything.
+	--
+	-- Non-persistent is deliberate. The option does not survive a save, so an
+	-- exemption this code fails to clear cannot become permanent in a player's
+	-- game.
+	pcall(function()
+		Contexts.SetNonpersistentOption(npc, "suppressAutoCure", HANDLE)
+	end)
+
+	local held = false
+	pcall(function()
+		held = Contexts.CheckOption(npc, "suppressAutoCure")
+	end)
+
+	if self.Config.LogTelemetry then
+		local name = "?"
+		pcall(function() name = npc:GetName() or "?" end)
+		self:Log("SuppressAutoCure " .. name .. " for=" .. tostring(seconds)
+				.. "s set=" .. tostring(held))
+	end
+
+	if not held then
+		return
+	end
+
+	-- Releases a victim already held by the cure, which the exemption alone
+	-- cannot do: the gate admitting the subtree is only read on entry, so an
+	-- option set afterwards leaves a running cure running. The cure installs
+	-- itself as a daycycle patch under this handle, and removing it ends the
+	-- activity. The order matters, because removing the patch while the victim
+	-- is still bleeding under the threshold and not yet exempt lets the cure
+	-- start again immediately.
+	--
+	-- On a victim that was never stuck this reports false and costs nothing,
+	-- so it doubles as the repair path for a save carrying stuck NPCs: any
+	-- victim ridden into again is released.
+	pcall(function()
+		local wuid = XGenAIModule.GetMyWUID(npc)
+
+		if wuid then
+			XGenAIModule.RemoveDaycyclePatch(wuid, "curePatch")
+		end
+	end)
+
+	-- Cleared on a timer rather than left to expire, because the direct call
+	-- has no expiry of its own. A later impact reschedules its own clear, and
+	-- clearing an option that is already clear costs nothing.
+	Script.SetTimer(seconds * 1000, function()
+		pcall(function()
+			Contexts.ClearOption(npc, "suppressAutoCure", HANDLE)
+		end)
+	end)
+end
+
 function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	if not self.Config.LogTelemetry or not npc or not npc.soul then
 		return
@@ -770,11 +1144,17 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	end
 
 	local baseZ = height()
+	local exhaust = -1
+
+	pcall(function()
+		exhaust = npc.soul:GetState("exhaust") or -1
+	end)
 
 	self:Log("ImpactCost " .. name .. " tier=" .. tierName
 			.. " strength=" .. tostring(strength)
 			.. " health=" .. string.format("%.4f", before)
 			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?")
+			.. " exhaust=" .. string.format("%.1f", exhaust)
 			.. " " .. self:DescribeArmor(armor or self:ArmorOf(npc)))
 
 	local function sample(label)
@@ -1279,6 +1659,24 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	self.RecentHits[npcId] = now + recovery
 
+	-- Every tier, including walk. A stagger needs no run-up, so it is the
+	-- cheapest way to accumulate exhaustion on a chosen victim.
+	self:LimitExhaustion(npc)
+
+	-- Every tier as well. The walk tier sends Tickle, which should never
+	-- injure anyone, and clearing costs nothing when there is nothing to
+	-- clear.
+	self:ClearInjuries(npc)
+
+	-- What actually prevents the lockup. A victim under 40 health carrying a
+	-- bleeding buff is otherwise taken over by vanilla's auto-cure daycycle,
+	-- which stands them in the street playing `PretendingIllness`.
+	self:SuppressAutoCure(npc)
+
+	-- Superseded by the exemption above, and off by default. It prevented the
+	-- lockup only by making a collision unable to kill.
+	self:HoldVictimAboveFloor(npc)
+
 	-- Walked once per impact. Every use below wants the same totals, and
 	-- enumerating an inventory per use would repeat the work three times.
 	local armor = self:ArmorOf(npc)
@@ -1531,6 +1929,14 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	-- afterwards would end the mod for the rest of the session.
 	Script.SetTimer(100, function()
 		HorseCollisionMod:UpdateTimer(assignedTick)
+	end)
+
+	-- Ahead of SafeUpdate, which returns early when the player is on foot
+	-- or standing still. A victim keeps accumulating after the rider has
+	-- stopped, and that is exactly when a rider walks away from a guard
+	-- they have finished with.
+	pcall(function()
+		self:EnforceExhaustLimits()
 	end)
 
 	local success, err = pcall(function()

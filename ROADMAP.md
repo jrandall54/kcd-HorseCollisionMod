@@ -58,6 +58,74 @@ Known gaps carried into later phases:
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
+## Start here
+
+Two separate defects, found by testing rather than reading, and neither is what
+earlier entries in this file assumed. Both are open.
+
+### 1. Collisions damage the victim, and the mod causes it
+
+The mod ragdolls its victim, which turns them from an animation-driven actor
+into a physics object. The moving horse then collides with that body and the
+engine charges damage from the velocity delta, at
+`CollisionVelocityDeltaToDmgR = 0.25` in `Libs/Tables/rpg/rpg_param.xml`.
+
+Proven twice. Ragdolling an NPC 7.3 m away with no horse nearby costs nothing.
+Setting that parameter to 0 in a loose table gives 15 impacts at exactly zero
+damage.
+
+- [ ] Throw the victim sideways. `Ragdoll` currently aims its impulse along the
+      horse's velocity, driving the victim down the horse's own line of travel
+      and maximising the overlap. A lateral component clears them instead.
+      Cheapest fix, changes nothing else, and the impact telemetry makes a
+      before-and-after unambiguous.
+- [ ] If that is not enough, delay the ragdoll a few hundred milliseconds so the
+      horse has passed before the body becomes physical.
+- [ ] Last resort, an animated knockdown through the `AnimationControlled` path
+      the walk stagger already uses, which never creates a physics body. Walk
+      impacts have cost zero health all session, which is the existence proof.
+
+Overriding `rpg_param.xml` is rejected: one global value read by everything that
+resolves a physical collision, including the player's own, and shipping a
+vanilla table reintroduces the conflict surface 3.0.0 removed.
+
+### 2. Repeatedly ragdolled NPCs wedge. Fixed.
+
+The state is vanilla's auto-cure daycycle. An NPC carrying a bleeding or poison
+buff whose health falls under 40 enters `cureLookHurt`, in
+`Libs/AI/final/sb_daycycles_cure.xml`, which plays the `PretendingIllness`
+animation under a wait with no timeout and regenerates health at 0.02 per
+second. Nothing inside that subtree ends, so a victim left under the threshold
+stands in the street until health climbs back over it.
+
+It is designed behavior rather than a defect. The mod meets it because it is the
+one thing in the game that leaves ordinary townspeople badly hurt in the open.
+
+- [x] Exempt a collision victim from the daycycle, using the same context option
+      vanilla uses for duellists and scripted wanderers. Set at impact, which is
+      before collision damage resolves; the gate is only read on entry, so an
+      option set afterwards does not release a running cure.
+- [x] Release a victim already held, by removing the `curePatch` daycycle patch
+      after setting the option. This works at low health and without healing, so
+      a save carrying stuck NPCs repairs itself as the rider rides.
+- [x] Retire `MinVictimHealth`. It prevented the lockup only by making a
+      collision unable to kill.
+
+Produced far more readily on guards than on other NPCs, which is also where
+every report of it in this project has come from.
+
+### Three things to remove before either fix lands
+
+All three treat symptoms of causes since disproven, and all three are committed
+on `fix/collision-exhaustion`:
+
+- [ ] `MinVictimHealth` and `HoldVictimAboveFloor`. Cannot fix the lockup, which
+      happens at full health.
+- [ ] `ClearInjuries` and the injury buff table. Injuries are not the cause and
+      the cure never released a victim.
+- [ ] `LimitExhaustion`, `EnforceExhaustLimits` and `ExhaustWatch`. Built on an
+      inverted reading of the Energy stat, already disabled by default.
+
 ## Development tooling
 
 Complete, merged after 2.0.0. Not a gameplay phase, but it changes how every phase below

@@ -5083,3 +5083,1637 @@ The 6000 ms default is above the measured recovery rather than derived from it.
 Height samples put a trot victim prone at 500 ms and standing by 3000 ms, which
 bounds the recovery at 3 seconds for that tier and says nothing about gallop,
 which throws them further.
+
+## Exhaustion is writable, so the exploit is fixable at the stat
+
+**User report**: "The exhaustion side effect from being hit is a huge problem
+because like we've observed it builds up an then potentially locks up the NPCs
+which breaks immersion and also if I hit enough guards I can literally put the
+controll down for minutes and they can't actually kill me."
+
+**Question**: whether exhaustion can be controlled directly, rather than by
+weakening the hit that causes it.
+
+It can. On a live NPC:
+
+```
+[exh] rat_castlemaid2 before=100
+[exh] SetState ok=true err=nil
+[exh] rat_castlemaid2 after=20
+```
+
+`soul:SetState("exhaust", value)` is accepted and the new value reads back, and
+it persists: the same NPC still read 20 several minutes later.
+
+That matters beyond this fix. Exhaustion is the first stat found that the mod
+can set directly rather than influence through `hitStrength`, so the limit is
+applied to the stat itself and the damage, the reaction and the crime the hit
+causes are untouched. Anything built later that scales those is independent of
+this.
+
+### The limit
+
+`LimitExhaustion` records the victim's exhaustion at the impact and clamps it
+twice afterwards, at 500 ms and 2000 ms, since the engine applies the hit after
+the message is handled and the exact frame is not observable from Lua.
+
+Only the rise caused by that impact is removed. The baseline is read at the
+moment of the impact and the value is only ever clamped down to it, so
+exhaustion earned in a fight is never given back, and a victim already past the
+ceiling is left alone rather than lowered.
+
+Three settings: `LimitCollisionExhaust`, `MaxExhaustPerImpact` at 8 of 100, and
+`MaxExhaustFromCollisions` at 70. The ceiling is the important one: it means
+collisions alone can never render a guard harmless, whatever the rider does.
+
+The caps are chosen rather than measured. How much the engine actually adds per
+collision is not yet known, so the impact line now carries the victim's
+exhaustion and a clamp writes a line naming what it held back.
+
+Applied on every tier including walk, because a stagger needs no run-up and is
+the cheapest way to accumulate exhaustion on a chosen victim.
+
+### The test area was reset
+
+Every NPC near the testing area read `exhaust=100` from earlier sessions, which
+would have hidden any change. 88 NPCs within 120 m were set to 0 so the next
+ride starts from a fair state.
+
+## The exhaustion rise is gradual, not part of the hit
+
+**User report**: "I was able to hit a guard and get him into full exhaustion. I
+tested for for last 10 minutes or so hitting a lot of people."
+
+53 impacts, **zero clamps**, and victims still reached the ceiling.
+
+The exhaustion figures now carried on the impact line explain why. Every reading
+is one of two values:
+
+```
+33  exhaust=0.0
+20  exhaust=100.0
+```
+
+Nothing between, across 53 impacts. A victim is either untouched or at the
+ceiling by the time the next impact reads them, and neither sample at 500 ms nor
+at 2000 ms ever caught a value above what the cap allowed.
+
+So the rise is not the hit landing. Exhaustion accumulates over the seconds
+after an impact, while the victim gets up and runs, and it is finished long
+before the rider comes round for another pass. Two one-shot timers were never
+going to see it.
+
+### Watching instead of sampling
+
+`LimitExhaustion` now registers the victim in `ExhaustWatch` with the value its
+impact allowed, and `EnforceExhaustLimits` holds it there on every tick of the
+update loop until `ExhaustWatchMs` expires, 20 seconds by default.
+
+It runs ahead of the mounted and moving test in `UpdateTimer`. A victim keeps
+accumulating after the rider has stopped, and stopping is exactly what a rider
+does once they are finished with a guard.
+
+The clamp logs once per victim rather than once per tick, naming how long after
+the impact the rise appeared. That measurement is what the caps should be set
+from, and it does not exist yet.
+
+**Whether the two readings mean the stat is effectively binary is not
+established.** Sampling only at impacts would show 0 and 100 either way, since
+those are the states a victim spends time in. The watch samples ten times a
+second and will settle it.
+
+## The limit works, and the test population was the problem
+
+**User report**: tested, and the guard still reached full exhaustion.
+
+24 impacts, no clamps, and every impact read `exhaust=100.0` **before** the hit.
+The victims were already at the ceiling from earlier sessions, and the code
+declined to lower anyone already past it, so the limit could never engage. The
+whole test population was spent before it began.
+
+### The mechanism was never the problem
+
+Forced directly, with the watch armed by hand:
+
+```
+[test] rat_woman21 forced to 100 with a watch armed at 8
+Exhaust rat_woman21 after=128ms was=0.0 rose=100.0 held=8.0
+[test] after 600ms exhaust=8
+[test] after 3000ms exhaust=8
+```
+
+Caught in 128 ms and held. The watch loop does what it should.
+
+That test is worth keeping as a pattern: forcing the state the mod is meant to
+react to, from the console, verifies the reaction without a ride. It answered in
+seconds what a ride could not answer at all, because the ride could not produce
+a victim below the ceiling to begin with.
+
+### The ceiling now applies to victims already above it
+
+The rule that spared them was wrong. A victim the mod pinned at 100 in an
+earlier session could never come back, so the exploit would survive the fix in
+every save it had already reached. The clamp now pulls such a victim down to
+`MaxExhaustFromCollisions` on the next collision:
+
+```
+Exhaust rat_woman21 after=112ms was=100.0 rose=100.0 held=70.0
+```
+
+Nothing goes below the ceiling, so a victim exhausted by a fight still ends up
+tired and a collision is never a favor. What it guarantees is that a guard the
+rider knocks down is always left able to fight, whatever state the save was in.
+
+## The stat is Energy, and higher is better
+
+**User report**: "I'm falling asleep in game, so I'm assuming exhaustion and
+energy are the same thing because I don't see an exhaustion stat I see an energy
+state."
+
+Setting the player's `exhaust` to 0 made the player start falling asleep. The
+stat named `exhaust` in `soul:GetState` is the **Energy** stat the game shows in
+its own UI, and the scale runs the other way from the name: **100 is fully
+rested and 0 is spent.**
+
+Every conclusion drawn from it in the previous four entries is inverted.
+
+- NPCs reading `exhaust=100` were **fully rested**, not exhausted. The reading
+  that looked like a smoking gun was the default state of an untouched NPC.
+- The guards that could not fight were not exhausted at all. Whatever disables
+  them, this was never it, which is what the user suspected before this test.
+- `LimitExhaustion` was **draining** its victims. Holding a victim at 70 took 30
+  points of energy from someone who had none taken by the collision, and the
+  ceiling that was supposed to protect them was making them worse. The clamp
+  logged as `held=70.0` were reductions from full.
+
+The limit is switched off in both the defaults and the settings file. The code
+stays, because the mechanism is sound and the stat is genuinely writable; only
+the premise was wrong.
+
+The player was restored to the 95.5783 recorded before the test, and 55 NPCs
+whose energy the mod had lowered were returned to 100.
+
+### What this cost, and the check that would have caught it
+
+Four entries of reasoning rested on a stat whose direction was never verified.
+The name `exhaust` was taken to mean exhaustion, and every observation was fitted
+to it: a town of NPCs reading 100 looked like accumulated damage rather than
+untouched defaults, and NPCs reading 0 and 100 with nothing between looked like a
+binary stat rather than a rested population and a handful the mod had drained.
+
+The check that settles a stat's direction is to move it on the player and look at
+the screen, which took one command. It should come before any reasoning is built
+on a stat this project has not used before.
+
+### The lockup is still unexplained
+
+The guard remains stuck in a hurt animation, and it is not energy, not the
+animation queue, which logged no overflow at all on a clean save, and not
+anything the mod sets. `health=34.1 stamina=124.1` with no weapon drawn.
+
+## What the stuck guard is not
+
+**User report**: "It kind of reminds me like he's holding his stomach, is he
+hungry (nourishment) or maybe is he's poisoned? or is there some buff attached
+to him?"
+
+Interrogated live, standing next to him. None of those, and the elimination is
+worth more than it looks.
+
+- **Not hunger, poison or bleeding.** `soul:GetState` answers for exactly three
+  names on this build: `health`, `stamina` and `exhaust`. Every other name
+  tried, including `nourishment`, `poison`, `bleeding`, `injury`, `morale` and
+  `consciousness`, returns nil. Those states are not queryable and most likely
+  do not exist here.
+- **Not a buff.** `HasBuffDebug` is absent from `Soul` on this build, and the
+  documented bind list has no getter for buffs at all.
+- **Not injury or low condition.** `health=49.4 stamina=138.6 exhaust=100`, and
+  health was rising between samples, so he is healing normally. Energy is full,
+  which after the correction in the previous entry means rested.
+- **Not the animation queue.** Zero `Animation-queue overflow` lines on the
+  clean save.
+- **Not anything the mod writes.** He entered the state on a save that predates
+  the mod's installation, with the energy limit already disabled.
+
+`actor:StandUp()` is accepted and changes nothing.
+
+### The animation cannot be read from the entity
+
+`entity:GetCurAnimation(slot)` returns nil for every slot while
+`IsAnimationRunning` is true, so the animation is not playing through an entity
+animation slot. It is Mannequin or AI driven, which is consistent with
+everything else this project has found about actor animation, and it means the
+clip cannot be named from Lua.
+
+`ai_DebugAgent`, `ai_DebugDraw` and `ai_DebugBehaviorSelection` were set and
+drew nothing on screen.
+
+### The route that is left
+
+`XGenAIModule.GetBrainVariable(entity, name)` reads a behavior tree's variable
+store, and vanilla uses it from `LuaGate` nodes. Twelve persistent `b_` variable
+names taken from the `sb_switch_*` trees all returned nil against the guard's
+entity id, so either the addressing is wrong, vanilla passing a WUID in one call
+site and an entity id in another, or those variables are not set on him.
+
+Settling that addressing is the next step and it is cheap. What it would give is
+the tree's own view of the NPC, which is the only place left that can name the
+state.
+
+### Runtime archetype data, found incidentally
+
+`soul:GetArchetype()` returns a live table:
+
+```
+NormalBodyWeight=160  BodyBaseArmor=1.3  BaseStamina=110
+UnarmedAttackBase=2.6  InventoryCapacityMultiplier=3  GenderId=1
+```
+
+This is the `soul_archetype.xml` data the roadmap listed as needing extraction,
+available at runtime with no generated table. Phase 2's mass scaling can read
+`NormalBodyWeight` directly, and `BodyBaseArmor` is the engine's own base armor
+for the body underneath whatever is worn.
+
+## The lockup is an injury buff, and it never heals on its own
+
+**User request**: deep research into `references/`, the decompile, and the game's
+own data, to find what the animation is and where it comes from.
+
+It is not an animation state, a stat, or anything Mannequin selects on its own.
+It is a **buff**, which is what the user guessed before this search began.
+
+### The trail
+
+`Libs/Tables/action/actor_action_standup.xml` names the fragment that stands an
+actor up after a ragdoll: `mn_fragment_id="BlendRagdoll"` with
+`mn_tags="blendOut+standup"`. That fragment lives in `kcd_male_database.adb` and
+`wh_female_database.adb`, both of which this mod reaches through its `SubADB`
+chain, and both declared in fragment id files the mod either does not override
+or overrides as a strict superset. **The mod removes nothing the recovery needs**,
+which clears the animation data as a suspect:
+
+```
+kcd_animationControlledTags.xml   vanilla 20 names, ours 25, none missing
+wh_female_fragmentids.xml         vanilla 276 names, ours 277, none missing
+```
+
+`WHGame_Decompiled.c` then names the real mechanism: `C_InjuredSoulBuffInstance`,
+`C_InjuredBuffInitParams`, `C_InjuredTagSoulBuffInstance` and `InjuredTag`.
+Injury is a soul buff, not a state.
+
+### The buffs
+
+`Libs/Tables/rpg/buff.xml`, class 5, `Injury`:
+
+| Buff | GUID | Params |
+| --- | --- | --- |
+| `injured_torso` | `37d59205-3782-446d-b32e-89a9f786725d` | `str*0.75,agi*0.75` |
+| `injured_head` | `c48e48e2-ae85-4429-9dd6-4fb94c388001` | `src+1,srg*0.75` |
+| `injured_left_arm` | `34f0885b-7287-4881-907f-f19751a5e831` | `defense*0.75` |
+| `injured_right_arm` | `ce3737db-b0a3-459d-8d47-d58695d58be3` | `asp*0.75` |
+| `injured_left_leg` | `10fc25ca-c095-44c6-b88b-d54ad58ab0a6` | `Run-1,Walk-0.5,LimitSprint` |
+| `injured_right_leg` | `738f8a07-c5fd-4687-9408-34ffb0bcd17e` | `Run-1,Walk-0.5,LimitSprint` |
+| `injured_tag_persistent` | `83ef27f9-4ce2-4894-bd42-d2cc61a6f758` | `Cpp:InjuredTag` |
+| `remove_injuries` | `46683e3b-e261-412f-b402-99ee17dda62a` | `Cpp:BasicTimed`, duration 1 |
+
+Every injury carries `duration="-1"` and `is_persistent="True"`. **They do not
+expire.** A human player treats them with bandages, potions or sleep. An NPC has
+no such path, so an injury applied to an NPC is permanent for the life of the
+save.
+
+`buff_ai_tag_id="7"` on each of them is what the AI reads, which is how a buff
+ends up driving both the animation and the unwillingness to fight.
+
+That closes every observation. The guard holding his stomach has
+`injured_torso`, `str*0.75,agi*0.75`, forever. He was healthy, rested and
+healing because health, stamina and energy are unrelated to it. Repeated
+collisions apply more injuries, which is why the effect accumulates, and why an
+untouched NPC on a fresh save reaches it after enough impacts.
+
+### What it means for the mod
+
+**This is the mod's own doing.** Vanilla converts a player-ridden collision into
+a real `combat:hit`, the engine resolves an injury from it, and nothing ever
+removes it. A rider can permanently cripple every NPC in a town, which is the
+exploit and the immersion break in one.
+
+`soul:AddInjury` and `soul:RemoveAllBuffsByGuid` are both in the bind list, and
+`remove_injuries` exists as a buff of its own, so the mod can act on this
+directly rather than by weakening the hit.
+
+Nothing here is tested in game yet. The next step is to confirm that removing
+`injured_torso` from the stuck guard returns him to normal.
+
+## Vanilla has no horse collision, so the injuries are the mod's
+
+**User report**: "there is no vanilla horse collision though... I know there is
+a recognition that henry is on a horse and collides but I didn't think it had
+anything attached to it besides the bark. I just did the test and of course
+vanilla doesn't have collisons so I didn't see anything happen."
+
+The mod was parked completely for this: the pak, its manifest, all three loose
+Lua files, all four loose animation files, and its entry in `mod_order.txt`. The
+log confirms the session ran with no mod line at all.
+
+Riding into NPCs produced nothing. No knockdown, no reaction, no injury.
+
+**An earlier claim in this session that horse collisions are vanilla behaviour
+was wrong.** `sb_switch_hitreactions.xml` contains a collision branch, and that
+branch is what converts a player-ridden collision into a real `combat:hit`, but
+nothing in vanilla ever feeds it a strength that injures. The branch exists for a
+bark. The mod is what sends `MinorInjury` at trot and `MajorInjury` at gallop
+into it.
+
+So the permanent injuries are caused by this mod, and by the released 3.0.0 as
+well, which sends the same two strengths.
+
+### Cleared rather than prevented
+
+The strength that rolls the injury is the same strength that carries the damage
+and the crime. Lowering it to stop the injury would take those with it, and the
+damage is a Phase 3 feature that already works.
+
+`ClearInjuries` removes the eight injury buffs from a victim at 1500 ms and
+5000 ms after an impact, the second pass covering an injury that arrives late
+the way the damage sometimes does. Only victims of a collision are touched, and
+only in the seconds after one, so an NPC injured by anything else keeps what it
+earned.
+
+`ClearCollisionInjuries` defaults to on. Turning it off restores what 3.0.0
+shipped.
+
+An existing save repairs itself as the rider rides: any NPC hit again has its
+injuries cleared. That is a partial repair rather than a complete one, since an
+NPC never hit again keeps what it has, but it needs no separate migration and
+no action from the player.
+
+**Untested in game.** The mod was parked when this was written.
+
+## The stuck state is curable, and it is not the injury buff
+
+**User report**: "he snapped out of it!"
+
+Four things were applied to a stuck `villageGuard` at once: the
+`remove_injuries` buff, the `miraculous_cure` buff, `health=100` and
+`stamina=200`. He returned to normal behavior immediately.
+
+That settles the most important question. **The state is reversible from Lua**,
+so whatever it is, the mod can undo it.
+
+### What the same session rules out
+
+The mod applied `remove_injuries` after every one of 16 impacts on that guard,
+logging `cure=true` for all 32 calls, and he became stuck anyway. **So the
+injury buff is not what holds him**, or at least clearing it is not enough. The
+identification in the earlier entry was built on the decompile and the buff
+table rather than on a test, and this is the test.
+
+Stamina is unlikely for the same reason: earlier stuck guards read 124 and 138,
+which is most of a pool.
+
+That leaves `miraculous_cure` and health, and health is the stronger candidate.
+Every stuck NPC measured has been low: 19.6, 26.0, 32.6, 34.1 and 49.4 against
+a hundred.
+
+### A caution carried from this round
+
+`cure=true` was logged 32 times while nothing changed, exactly as
+`cleared=8/8` had been before it. Both were counting calls that did not throw.
+A ScriptBind that accepts a call and reports success proves only that the
+function exists, and on this build several of them do nothing observable.
+**Nothing in this project should be recorded as working on the strength of a
+return value.** The only evidence that has held up all session is a change
+someone can see on screen or a number that moves in a later sample.
+
+## It is the wounded state, and health is only the gate out of it
+
+**User report**: a guard set to 25 health without ever being hit "didn't
+freeze, he's acting normal". The same guard, stuck after a collision, returned
+to normal the moment health was raised.
+
+Two tests, one conclusion. **Low health does not cause the state, and raising
+health is what releases it.** A collision puts its victim into a wounded state
+whose exit is gated on health, and because nothing ever heals an NPC, a victim
+left below that gate never leaves.
+
+That reconciles the question the user raised about combat: an NPC beaten to low
+health in a fight does not freeze, because the combat tree owns the situation
+and has its own exits. This mod produces something vanilla never produces, a
+badly wounded NPC standing in the street with no combat context, and nothing
+owns that.
+
+It also means the fix does not need to understand the state at all. Keeping the
+victim above the gate is enough.
+
+### The floor
+
+`HoldVictimAboveFloor` reads the victim's health at 1000 ms and 4000 ms after
+an impact, after the engine has resolved the hit, and lifts it back to
+`MinVictimHealth` if it fell below. Damage still lands and still accumulates
+down to the floor, and a victim already dead is left alone.
+
+`MinVictimHealth` defaults to 60, above the highest health at which a victim
+has been seen stuck, which is 51.8. The exact gate is not known; 60 is a margin
+rather than a measurement, and the setting exists so it can move.
+
+The injury cure stays. A permanent injury is worth undoing on its own account,
+and the two are independent: the cure ran on all 16 impacts of the session that
+produced the stuck guard, and did not prevent it.
+
+### Where this leaves damage
+
+The user's reading is that this becomes moot once damage and crime are properly
+built, since a trampled villager should be hurt and should be a victim the world
+reacts to. That is likely right, and the floor is deliberately a setting rather
+than a rule so it can be lowered as the state acquires an owner.
+
+## The floor holds
+
+**User report**: "I smashed a guard like 15 times and he didn't seem to get
+stuck."
+
+19 impacts on `rat_guard18`, trot and gallop, 15 floor lifts, no lockup.
+
+```
+Floor rat_guard18 t+1000ms was=21.2 held=60.0
+Floor rat_guard18 t+1000ms was=43.3 held=60.0
+Floor rat_guard18 t+1000ms was=53.5 held=60.0
+```
+
+Damage lands on every impact, visible in the health carried on each impact
+line, between 44 and 57 through the run. Only the stranding is prevented.
+
+That closes the lockup. Four mechanisms were proposed and discarded on the way
+to it, and the one that worked was found by a test rather than by reading: low
+health does not cause the state, and health is only the gate out.
+
+### The trade-off, which is real
+
+A collision can no longer kill. A victim cannot be trampled below the floor
+however many times they are ridden into, so a rider cannot run someone down.
+That is a deliberate exchange for the lockup and it is a setting rather than a
+rule, but it should be understood before release: it is a change to what the
+mod does in play, not only a defect fix.
+
+A future version can separate the two, by letting a hit that would be lethal
+resolve as a death rather than being floored, so that trampling can kill while
+never stranding. That needs the crime work to be meaningful and is not worth
+building before it.
+
+## Combat takes ownership of a stuck NPC, and hands it back
+
+**User report**: "when I was testing a guard who was stuck, i swung the sword at
+him and his combat enables and then I surrendered and paid the fine and then he
+returned to the stuck state."
+
+This is the clearest confirmation of the mechanism in the whole session, and it
+was observed rather than reasoned.
+
+A stuck guard **fights normally** once combat starts. Nothing about him is
+broken: the animation, the AI and the willingness to fight are all intact while
+the combat tree owns him. When combat ends he falls straight back into the
+wounded state, because his health is still below the gate and the combat tree
+has released him.
+
+So the wounded state is the fallback an NPC sits in whenever nothing else claims
+them, and combat is one of the things that claims them. It confirms that the
+state is not damage, not a broken tree and not a stuck animation, and that
+health is the only thing deciding whether they can leave it.
+
+### What it means for repairing existing saves
+
+A save carrying stuck NPCs is repaired by riding into them again:
+`HoldVictimAboveFloor` runs on every impact and does not care what state the
+victim was in beforehand, and a lift was already recorded from as low as 21.2.
+No extra check is needed for that, and the check the user proposed, testing on
+collision whether the victim is below the threshold, is exactly what the floor
+already does.
+
+Hooking the moment a fine is paid would work for that one case but not for the
+general one, and a broader sweep that lifts every wounded NPC near the player
+carries a real hazard: **an NPC scripted to be wounded for a quest would be
+healed by it.** The game has several. Repairing only what the mod collides with
+is targeted and cannot touch anyone the rider never touched.
+
+Untested: whether an NPC stuck from before the fix is released by a single
+impact under it. The mechanism says yes, and that is not the same as having
+seen it.
+
+## The lockup could not be reproduced with both protections off
+
+**User report**: "I've hit this guy like 20 times and he's not getting stuck",
+then, after the injury cure was disabled too, "uhh, he died?"
+
+An attempt to manufacture a stuck NPC, so that repairing one could be tested,
+failed and produced a more important result than the test it was for.
+
+`rat_guardJanik`, 12 armor pieces at 74 weight, was ridden into 25 times with
+`MinVictimHealth` at 0 and, for the last four, `ClearCollisionInjuries` off as
+well. That is exactly what 3.0.0 does. Health fell steadily to 15.5, then 13.8,
+12.2, and a gallop took him to 0.115, at which point he died.
+
+**He never entered the stuck state**, at any health, across the whole run,
+including nine impacts below 32.6, which is lower than most of the values at
+which victims were seen stuck earlier in the session.
+
+### What that costs the previous conclusion
+
+The state is **intermittent**, not a deterministic consequence of collisions at
+low health. The model recorded two entries ago, that a collision plus low health
+puts a victim into a wounded state, is at best incomplete: the same inputs
+produced death here and a lockup earlier.
+
+So the health floor cannot be claimed to fix the lockup by mechanism. What can
+honestly be said is narrower:
+
+- Raising a stuck victim's health releases them. Seen twice, on demand.
+- Keeping victims above 60 keeps them out of the range where every observed
+  lockup happened, between 19.6 and 51.8.
+- A 19 impact run with the floor on produced no lockup, but so did a 25 impact
+  run with it off, so that run proves less than it appeared to.
+
+What still distinguishes a victim who locks up from one who dies is not known.
+Archetype, whether combat was entered, and a roll inside the engine are all
+candidates and none has been tested.
+
+### A 3.0.0 behavior worth naming
+
+**A trampled NPC can die.** Four impacts took a guard from 13.8 to dead, the
+last one a gallop for roughly 12 health. That is what the released version does,
+and killing a guard is a murder the crime system will notice.
+
+The floor prevents it as a side effect, which is the trade already recorded, but
+until now nothing in this project had established that collisions were lethal at
+all.
+
+### The repair test is still unrun
+
+Producing a stuck NPC on demand is the prerequisite, and it could not be done.
+Whether one impact under the floor releases an NPC stuck from before remains
+untested.
+
+## The damage is the ragdoll, and the walk tier proves it
+
+A methodical run from a clean baseline, one variable at a time, finally found
+the cause. It is not downstream of the hit at all. It is the mod's own
+`Ragdoll` call.
+
+### The sequence
+
+With `MinVictimHealth` at 0 and `ClearCollisionInjuries` off, a plain
+`villageGuard` locked up reliably at 18 impacts. That reproduction is what made
+everything after it possible.
+
+| Variable changed | Result |
+| --- | --- |
+| `remove_injuries` applied to a stuck victim, four times | no release |
+| health 52, then 76 | no release |
+| health 88, then 100 | releases |
+| health pulsed to 100 then back down after 700 ms | drops back in |
+| healed, allowed to walk normally, then damage restored | drops back in |
+| `remove_unconsciousness` applied, health untouched | no release |
+| `SendHitReaction` off | **damage continues** |
+| impulse zeroed, `Knockback` and `Uplift` at 0 | **damage continues** |
+| `horse_throwdown_protection` on the victim | **damage continues** |
+
+### What that leaves
+
+The walk tier costs nothing. Every walk impact all session, with the hit
+reaction on or off, left health unchanged:
+
+```
+villageGuard tier=Walk health=63.2079   next impact 63.2079
+villageGuard tier=Walk health=49.6894   next impact 49.6894
+```
+
+Walk calls `PlayStagger`. Trot and gallop call `Ragdoll`. That is the only
+difference between them, and trot damages every time.
+
+**`actor:Fall()` costs the victim health.** Not the impulse, which can be zero
+and still damage. Not the hit reaction, which can be off and still damage. The
+ragdoll itself.
+
+It also explains the vanilla test cleanly. Vanilla never ragdolls a pedestrian,
+so a victim stays animation-driven and a horse cannot touch them. The moment
+this mod ragdolls someone they become a physics object in the path of a horse.
+
+### What this retires
+
+Everything built earlier tonight was treating symptoms of a cause that had not
+been found: the energy limit, the injury cure, and the health floor. None of
+them addresses the ragdoll, and the floor cannot work anyway, since the release
+gate sits between 76 and 88 while a floor that high would cancel damage
+entirely. They should be removed rather than left in.
+
+### The direction that follows
+
+The walk tier is the existence proof. A staggering victim is animated rather
+than physical, takes no damage, and never locks up. Replacing the physics
+ragdoll with an animated knockdown, through the same `AnimationControlled`
+path the mod already uses for `hcm_stagger_*`, would keep the knockdown while
+removing the damage and the lockup together.
+
+That is a design change rather than a patch, and it is where the next branch
+should start.
+
+## Root cause: the horse runs over the body the ragdoll created
+
+Ragdolling an NPC 7.3 m away, with no horse anywhere near, costs nothing:
+
+```
+rat_activity_vagabund at 7.3m health=100.00 -- ragdolling with NO horse contact
+4s after ragdoll: health=100.00 (was 100.00)
+```
+
+So `actor:Fall()` is not the damage either. The damage needs the horse.
+
+**The mechanism, in order.** The mod ragdolls the victim, which converts them
+from an animation-driven actor into a physics object. The horse is still moving
+through that space. The engine resolves horse against body as a collision and
+applies damage from the velocity delta, at
+`CollisionVelocityDeltaToDmgR = 0.25` in `rpg_param.xml`. The victim is run
+over, repeatedly, by the thing that knocked them down.
+
+Every observation fits it:
+
+| Observation | Explained by |
+| --- | --- |
+| Walk costs zero, always | Stagger does not ragdoll, so no physics body exists |
+| Vanilla costs zero | Vanilla never ragdolls a pedestrian |
+| `SendHitReaction` off changes nothing | Not combat damage |
+| Impulse zeroed changes nothing | The horse still arrives |
+| `death_protection`, `tough_guy` bypassed | Not routed through combat damage |
+| `fall_damage` with `fdm=0` bypassed | Not fall damage |
+| Gallop 17 to 24, trot 3 to 8 | Damage scales with velocity delta |
+
+That last row had been sitting in the logs all session as an unexplained tier
+difference. It is the signature of the parameter.
+
+### Why the impulse makes it worse rather than better
+
+`Ragdoll` directs the impulse along the horse's velocity, so the victim is
+driven **forward, down the horse's own line of travel**. They are pushed along
+the path the horse is about to occupy, which maximises the number of frames the
+two overlap. A lateral component would clear them instead.
+
+### The candidate fixes, in the order they are worth trying
+
+1. **Throw the victim sideways.** Add a lateral component to the impulse so a
+   clipped pedestrian is knocked aside rather than punted along the horse's
+   line. Cheap, physically sensible, and changes nothing else.
+2. **Delay the ragdoll** by a couple of hundred milliseconds so the horse has
+   passed before the body becomes physical.
+3. **Animated knockdown** through the `AnimationControlled` path, as the walk
+   stagger already does, which never creates a physics body at all.
+
+Overriding `CollisionVelocityDeltaToDmgR` is possible but rejected: it is a
+global table, it would change the player's own collision damage, and shipping
+`rpg_param.xml` reintroduces exactly the whole-file conflict surface 3.0.0
+removed.
+
+### What this retires
+
+The energy limit, the injury cure and the health floor all treated symptoms of
+this and none of them touch it. They come out.
+
+## Two bugs, not one: the damage is collision velocity, the lockup is not
+
+With `CollisionVelocityDeltaToDmgR` set to 0 in a loose `rpg_param.xml`, and
+the mod otherwise in its normal configuration:
+
+```
+15 impacts, 15 zero deltas, health 96.3775 throughout
+```
+
+**The damage is proven.** Every trot and gallop impact cost exactly nothing. The
+source is the engine's collision damage, applied when the horse strikes the
+physics body the ragdoll creates, which is what the isolated ragdoll test at
+7.3 m predicted.
+
+**And the victim still locked up, at 96.4 health**, in a normal standing
+animation rather than a wounded one.
+
+That separates the two problems, and it corrects several entries above:
+
+- The lockup is **not caused by the damage**. A victim at full health reaches
+  it just as readily.
+- The wounded pose was never the state, only how a wounded NPC looks while in
+  it. With no damage, the same wedge shows in an ordinary idle.
+- The health gate between 76 and 88 is **not a gate**. Raising health released
+  victims, repeatedly and on demand, but a healthy victim can be stuck, so
+  writing health must jog the AI into re-evaluating rather than clearing a
+  threshold.
+- `MinVictimHealth` could never have fixed the lockup. It should be removed
+  along with the injury cure and the energy limit.
+
+### What the lockup now looks like
+
+An NPC repeatedly ragdolled ends up wedged in whatever idle it holds, alive and
+undamaged, and will not resume its schedule. Combat claims it normally and
+returns it to the wedge afterwards, which was recorded earlier and fits an AI
+state that never resumes rather than anything about health or animation.
+
+The obvious next variable is the interval between impacts.
+`KnockdownRecoveryMs` is 6000, and a victim hit again while still recovering is
+plausibly what wedges the state machine. That is one setting and one ride.
+
+### On shipping the collision parameter
+
+Proven as a diagnostic, rejected as a fix. It is a single global value read by
+everything in the game that resolves a physical collision, so zeroing it
+changes falling objects, carts and the player's own collisions, and shipping
+`rpg_param.xml` reintroduces the whole-file conflict surface 3.0.0 removed.
+The damage fix remains a lateral impulse, so the horse and the body stop
+overlapping at all.
+
+## BasicActor's collision damage getters are vestigial
+
+**Hypothesis**: `BasicActor.lua` gates collision damage through four per-entity
+getters, `GetSelfCollisionMult`, `GetForeignCollisionMult`,
+`GetColliderEnergyScale` and `GetCollisionDamageThreshold`, each returning a
+value stored on the entity. If the engine reads them, a victim's collision
+damage can be suppressed per entity at runtime, which would fix the trample
+damage without shipping `rpg_param.xml` and without the whole-file conflict
+surface that override carries.
+
+The properties are authored, not dead defaults. A live read of three NPCs
+returned `collisionDamageThreshold=2` on `rat_man95`, `villageGuard` and
+`rat_guard23`, matching `collisionDamageThreshold = 2` on
+`Scripts/Entities/AI/NPC_x.lua:163`. `Scripts/Entities/actor/BasicActor.lua`
+ships in `Scripts.pak` at 47,737 bytes. All four getters are present as
+functions on every live NPC entity.
+
+**Method**: each getter was replaced on the entity table with a wrapper that
+logs the call and returns a suppressing value, 0 for the three multipliers and
+10000 for the threshold. The hook was verified by direct invocation immediately
+before the ride:
+
+```
+[H3] rat_merchant_shop1 before selfMult=1 fnType=function
+[HOOK] GetSelfCollisionMult on rat_merchant_shop1 a=nil b=nil -> 0
+[H3] rat_merchant_shop1 after  selfMult=0 thresh=10000
+```
+
+**Results**: four impacts on the two verified-hooked entities, one trot and
+three gallop.
+
+| Victim | Tier | Delta |
+| --- | --- | --- |
+| rat_merchant_shop2 | Trot | -4.1089 |
+| rat_merchant_shop2 | Gallop | -26.6725 |
+| rat_merchant_shop1 | Gallop | +0.0000 |
+| rat_merchant_shop1 | Gallop | -21.6846 |
+
+**Not one `[HOOK]` line fired.** Damage landed at its normal magnitude and the
+last impact killed the victim. The engine does not call these getters when it
+resolves collision damage against an actor. The subsystem is vestigial in the
+same way `HitDeathReactions` is, and for the same reason: much of
+`BasicActor.lua` is inherited Crytek code, still carrying Nanosuit, Abrams tank
+and SmartMine references that KCD never uses.
+
+**Two further findings from the same session:**
+
+- **Patching the shared `BasicActor` table does not reach spawned entities.**
+  Global `BasicActor` was patched and a spawned NPC still returned the vanilla
+  value. Entity script tables are copies, which is the same mechanism recorded
+  under additive deployment, where redirecting `NPC_x` had no effect because
+  `NPC = CreateAI(NPC_x)` copies fields.
+- **A radius snapshot is not a reliable way to instrument a victim.** A first
+  pass hooked every NPC within 25 m and the two eventual victims were not among
+  them, which made the first ride worthless. Hook by entity name and verify by
+  direct invocation before treating a ride as valid.
+
+**What this retires**: overriding `BasicActor.lua` to gate collision damage, in
+any form. The file's damage plumbing is not what the engine runs.
+
+## KCD does not route actor damage through Lua `OnHit`
+
+**Hypothesis**: `BasicActor.Server:OnHit(hit)` receives every physical hit, so a
+gatekeeper at the top of it could discard a collision hit before anything
+downstream reads it. `BasicActor.lua` supports the reading: line 616 branches on
+`hit.type ~= "collision"`, and `SinglePlayer:ProcessActorDamage` is reached from
+inside `OnHit`.
+
+**Method**: `Server.OnHit` and `Client.OnHit` were replaced on the entity table
+with a wrapper that logs `hit.type`, `hit.damage` and `hit.shooterId` and then
+calls the original. A synthetic call confirmed the wrapper was reached. The hook
+re-armed on a two second timer against every NPC within 70 m of the player, so
+it followed the rider and covered any target rather than a chosen few. Sixty
+NPCs were instrumented.
+
+**Results**: four impacts, and the victims were checked for instrumentation
+afterwards rather than assumed.
+
+| Victim | Hooked | Tier | Armor weight | Delta |
+| --- | --- | --- | --- | --- |
+| rat_woman44 | no | Trot | 6 | -2.7146 |
+| rat_man19 | yes | Gallop | 8 | -22.7365 |
+| rat_guard24 | yes | Gallop | 46 | +0.0000 |
+| rat_guard_pazdera | yes | Trot | 55 | +0.0000 |
+
+`rat_man19` was verifiably hooked, lost 22.74 health to a gallop impact, and
+produced no wrapper call. The session counter finished at **zero OnHit calls
+against sixty hooked entities**.
+
+Actor damage in KCD does not pass through the Lua `OnHit` entry point. Warhorse
+resolves it natively. There is no Lua interception point on this path, so a
+`BasicActor.lua` override cannot gate collision damage however it is written,
+which matches the finding above that the file's collision multiplier getters are
+never called either.
+
+**Side observation, not pursued.** Both heavily armored victims took exactly
+zero damage while the cloth-clad victim took 22.74 at the same tier. Their
+`armorImpulse` values were 0.42 and 0.38 against 1.00 for the unarmored target.
+A target the impulse barely moves is a target that is not thrown along the
+horse's path, and it takes no trample damage. That is the trample mechanism
+predicting its own signature, and it is direct support for the lateral impulse
+fix: reduce the overlap and the damage goes with it. It also sits awkwardly
+against the earlier Phase 2 reading that armor mitigation "cannot be separated
+from zero", which was measured on damage rather than on impulse.
+
+## A lateral impulse does not reduce collision damage
+
+**Hypothesis**: `Ragdoll` aimed its impulse along the horse's heading, driving
+the victim down the line the horse was about to occupy and maximising the frames
+the two overlap. A sideways component should clear the victim instead, and the
+damage should fall with the overlap.
+
+**Change**: a `Lateral` term, default 40, applied along the perpendicular to the
+horse's heading, signed by which side of the line the victim already stands on.
+
+**Results**: no reduction. Gallop impacts on light targets cost as much as
+before or slightly more, against a pre-change baseline of -22.74 on a cloth-clad
+target.
+
+| Victim | Armor weight | armorImpulse | Tier | Delta |
+| --- | --- | --- | --- | --- |
+| rat_woman34 | 5 | 1.26 | Gallop | -25.8146 |
+| rat_woman34 | 5 | 1.26 | Gallop | -24.1469 |
+| rat_woman34 | 5 | 1.26 | Gallop | -29.2818 |
+| villageGuard | 59 | 0.37 | Trot | +0.0000 |
+
+**The change made the impulse larger, not sideways.** Knockback 50 and Uplift 30
+give a magnitude of 58.3. Adding a perpendicular 40 gives 70.7, a 21 per cent
+increase. Damage rose with it.
+
+**Damage tracks impulse magnitude across the whole session.** Ordering every
+gallop impact by `armorImpulse`, which is the only per-victim multiplier on the
+impulse, the correlation is tight: 0.37 to 0.42 costs nothing, 1.00 costs 22.74,
+and 1.26 costs 24 to 29. Armor weight is the input to that multiplier, so the
+same ordering was previously read as armor mitigating damage. The impulse is the
+better explanation, because the engine charges collision damage on a velocity
+delta and a larger impulse produces a larger one when the body lands.
+
+**What is still open.** An earlier session recorded "impulse zeroed, `Knockback`
+and `Uplift` at 0, damage continues" and concluded `actor:Fall()` alone costs the
+victim health. That test recorded whether damage occurred, not how much. If
+zeroing the impulse takes a gallop impact from 25 down to 3 rather than to 0, the
+ragdoll's own landing accounts for a little of the cost and the impulse accounts
+for most of it, and the conclusion drawn from that table needs revising. The
+magnitude was never measured, so it is being measured now.
+
+## The impulse contributes nothing to collision damage, and neither does armor
+
+**Method**: `Knockback`, `Uplift` and `Lateral` all set to 0 in the running
+game, so victims drop where they stand with no throw at all. Six gallop
+impacts.
+
+| Victim | Armor weight | armorImpulse | Speed at contact | Delta |
+| --- | --- | --- | --- | --- |
+| villageGuard | 50.5 | 0.40 | 10.48 | -25.4294 |
+| rat_man97 | 5 | 1.26 | 10.49 | -24.3547 |
+| rat_armorers_wife | 6 | 1.15 | 10.65 | -20.7616 |
+| rat_armorers_wife | 6 | 1.15 | 10.71 | -23.1778 |
+| rat_woman43 | 6 | 1.15 | 2.62 | +0.0000 |
+| rat_woman12 | 5 | 1.26 | 4.27 | +0.0000 |
+
+**Damage is unchanged with the impulse switched off**, at 20 to 25 against the
+22 to 29 recorded with it on. The impulse accounts for none of it. The earlier
+conclusion that `actor:Fall()` alone costs the victim health stands, and the
+magnitude measurement this test was run to obtain confirms it rather than
+overturning it.
+
+**Armor makes no difference either.** A guard in chain at 50.5 weight took
+25.43, the largest cost of the ride, while unarmored villagers took 20 to 24.
+The apparent armor mitigation recorded earlier was an artifact: `armorImpulse`
+scales the impulse, the impulse moved the victim, and a victim thrown further
+was read as a victim damaged more. With the impulse off the ordering vanishes.
+Phase 2's note that armor mitigation "cannot be separated from zero" was
+correct, and the later reading that armored targets take zero damage was wrong.
+
+**The one predictor is the horse's speed at contact**, and it separates the two
+groups perfectly. Every impact above 10 m/s cost 20 to 25. Both impacts under
+5 m/s cost exactly nothing, despite scoring as Gallop from the peak of the
+speed trail. That is the signature of `CollisionVelocityDeltaToDmgR` and it
+confirms the trample mechanism directly: the cost is the horse striking the
+body, scaled by how fast the horse is still going when it does.
+
+**What this retires**: the lateral impulse, reverted. Aiming the impulse
+differently cannot help when the impulse is not the cause. The remaining
+candidate is to keep the physics body from existing while the horse is on top
+of it, which is the deferred ragdoll.
+
+## Deferring the ragdoll costs the impact and does not fix the damage
+
+**Hypothesis**: an animation-driven actor cannot be struck by the horse and
+costs nothing, so holding the victim upright until the horse has passed, then
+ragdolling, removes the trample without changing anything else.
+`RagdollDelayMs` set to 300, which at 10.5 m/s puts the horse 3.1 m clear
+against a front reach of about 1.3 m.
+
+**Result**: rejected on feel. The user's report: "it doesn't feel or look
+natural and the horse basically sticks inside of them before they fall or I
+clip them as I ride by and it doesn't feel impactful at all".
+
+**And it does not buy much.** Gallop impacts at the 300 ms delay cost 13.9 to
+22.2 where the same impacts cost 20 to 25 undelayed, and only impacts already
+slow at contact reached zero. The delay narrows the window the horse and the
+body share without closing it, because a horse that has just struck someone is
+also decelerating into them. The trade is not feel against damage. It is feel
+against a partial reduction.
+
+Three hundred milliseconds is long enough for the horse to be visibly standing
+inside a victim who has not reacted yet, and the delay breaks the causal link a
+player reads between the strike and the fall. A collision that lands and then
+waits does not register as a collision at all. Shortening the delay trades feel
+back against damage along the same axis, because the damage window is exactly
+the window the horse and the body share.
+
+**What this leaves.** Both cheap fixes are now spent. The impulse does not cause
+the damage and its direction cannot help. Delaying the body costs the impact
+and only partly reduces the damage. The remaining approaches either stop the body existing at all, which is
+the animated knockdown through `AnimationControlled`, or stop the horse and the
+body colliding while both exist.
+
+**The second of those is unexplored and is not a last resort.** KCD's Lua
+exposes CryEngine collision filtering directly through
+`SetPhysicParams(PHYSICPARAM_COLLISION_CLASS, filtering)`, and the vanilla
+scripts use three fields on that table: `collisionClass` and
+`collisionClassUNSET` in `GeomEntity`, `PickableItem`, `Ladder`, `AnimObject`,
+`Bed` and `AlchemyTable`, and `collisionClassIgnore` in `TriggerBase`, which
+sets it to -1 to ignore everything. Named class constants exist as Lua globals:
+`BasicAnimal` declares `collisionClass = gcc_npc_ignored_type` and `Boar_x` and
+`Pig_x` declare `gcc_npc_reported_type`.
+
+If the victim's ragdoll can be told to ignore the horse for the second after it
+is created, the ragdoll stays immediate, the impact keeps its impulse and its
+timing, and the collision that charges the damage never resolves. That is the
+only candidate so far which does not trade feel for damage.
+
+## Filtering horse collisions off the ragdoll, first attempt
+
+**Hypothesis**: the victim's ragdoll can be told to ignore the horse collision
+class for a moment after it is created, so the ragdoll stays immediate and the
+impulse stays untouched while the collision that charges the damage never
+resolves.
+
+**Implementation**: after `actor:Fall`,
+`npc:SetPhysicParams(PHYSICPARAM_COLLISION_CLASS, { collisionClassIgnore = gcc_horse })`,
+restored with `collisionClassIgnoreUNSET` after `HorseIgnoreMs`, default 1500.
+Both field names are confirmed in the decompile, and both calls return cleanly
+against a live NPC. `gcc_horse` is 65536; the full set of class globals is
+`gcc_ai` 131072, `gcc_horse` 65536, `gcc_interactive` 262144, `gcc_ragdoll`
+16384, `gcc_rigid` 32768, `gcc_npc_ignored_type` 2097152,
+`gcc_npc_reported_type` 524288, `gcc_player_capsule` 1024, `gcc_player_body`
+2048, `gcc_vehicle` 4096.
+
+**Results**: a reduction, not a fix. Five gallop impacts cost 16.39, 16.53,
+17.05, 19.15 and 19.42, against a 20 to 25 baseline. Trot fell to 3.7 to 4.9.
+
+The user also reported seeing the horse phase through the victim on the first
+gallop only, and not on any impact after it.
+
+**Diagnosis: the filter is written before the body it is meant to apply to
+exists.** `actor:Fall` does not physicalize the ragdoll within the same tick,
+which the impulse code already accounts for by deferring itself by 50 ms. A
+collision class written immediately after `Fall` lands on the living entity's
+physics and is discarded when the ragdoll replaces it. That explains the
+partial reduction, since the filter takes effect only from whenever it happens
+to survive, and it explains the single visible phase-through: the one impact
+where the ordering happened to work is the one where the horse passed through.
+
+**Change**: the filter is now written three times, immediately, at 50 ms and at
+200 ms, so at least one write lands after physicalization and covers the frames
+where the horse is still on top of the victim.
+
+## KCD has a working third-person camera
+
+`g_tpview_enable 1` is accepted by the console and is not cheat-marked, with
+`g_tpview_control` and `g_tpview_force_goc` alongside it. First-person at gallop
+makes it very hard to see what an impact actually does, which has cost several
+rides where the only usable evidence was the telemetry. The camera is a
+development CVar, so it needs setting per session like the other console state.
+
+## Re-timing the collision filter changes nothing
+
+**Change tested**: the horse collision filter written three times, immediately
+after `actor:Fall`, at 50 ms and at 200 ms, so that at least one write lands
+after the ragdoll physicalizes.
+
+**Results**: no improvement. Gallop impacts cost 16.89, 20.23 and 20.97,
+against 16.39 to 19.42 with the single write and 20 to 25 with no filter at
+all. The spread across all three configurations is the same.
+
+The physicalization theory is wrong, or at least it is not what limits this.
+Two possibilities remain and they are distinguishable by one test:
+
+1. **The wrong class is being filtered.** `gcc_horse` is the obvious name, but
+   a ridden horse may be classed as `gcc_ai`, as one of the `gcc_npc_` types,
+   or the damage may be charged against the rider's own capsule rather than the
+   horse. Nothing read so far reports an entity's actual collision class, and no
+   getter for it is exposed.
+2. **`SetPhysicParams` does not survive on a ragdoll at all**, in which case the
+   whole route is closed regardless of which class is named.
+
+**Next test**: filter every actor-like class at once, the union of `gcc_horse`,
+`gcc_ai`, `gcc_npc_all`, `gcc_player_all`, `gcc_rigid` and `gcc_vehicle`, which
+is 36412416. Engine-side classes below 1024 are deliberately excluded so the
+body still collides with terrain instead of falling through the world. If the
+damage goes to zero, the mechanism works and only the class was wrong. If it
+does not, physics filtering cannot reach this and the remaining candidate is the
+animated knockdown, which never creates a body at all.
+
+## Physics collision filtering cannot reach the ragdoll
+
+**Test**: `collisionClassIgnore` set to the union of every actor-like class,
+`gcc_horse`, `gcc_ai`, `gcc_npc_all`, `gcc_player_all`, `gcc_rigid` and
+`gcc_vehicle`, which is 36412416, applied at 0, 50 and 200 ms after
+`actor:Fall` and restored after 1500 ms. Engine classes below 1024 were
+excluded so the body still collides with terrain.
+
+**Results**: unchanged. Gallop impacts cost 19.73, 21.23 and 21.44, squarely in
+the 20 to 25 band measured with no filter at all.
+
+Filtering every class the horse could possibly belong to changes nothing, so
+the failure is not the choice of class. `SetPhysicParams` returns success on a
+victim entity, but the collision class written there does not reach the ragdoll
+the engine creates, and the trample resolves regardless.
+
+**This closes the physics filtering route.** Taken with the two results above
+it, every approach that leaves a physics body in the horse's path is now spent:
+
+| Approach | Result |
+| --- | --- |
+| Redirect the impulse sideways | No effect. The impulse does not cause the damage |
+| Zero the impulse entirely | No effect, 20 to 25 either way |
+| Defer the ragdoll 300 ms | 14 to 22, and the impact reads as broken |
+| Filter horse collisions off the body | 16 to 21, three timings tried |
+| Filter every actor class off the body | 20 to 21 |
+
+**What remains** is the approach that never creates a physics body: an animated
+knockdown through the `AnimationControlled` path the walk stagger already uses.
+The existence proof has been in every session's telemetry from the beginning.
+Walk impacts cost exactly zero health, without exception, because the victim
+never leaves the animation system. The work is to author or locate knockdown
+fragments for the trot and gallop tiers, in the same way the stagger fragments
+were added, so those tiers displace the victim through Mannequin rather than
+through physics.
+
+## RPG parameters can be overridden per character, not only globally
+
+`CollisionVelocityDeltaToDmgR` is confirmed in `Libs/Tables/rpg/rpg_param.xml`
+inside `Tables.pak`, as
+`<row rpg_param_key="CollisionVelocityDeltaToDmgR" rpg_param_value="0.25" />`.
+
+That table was treated as global, and overriding it was rejected on the grounds
+that it changes the value for everything in the game including the player's own
+collisions. A second table alongside it changes that reading.
+`Libs/Tables/rpg/perk_rpg_param_override.xml` maps a perk to an RPG parameter
+and a replacement value:
+
+```
+<column name="perk_id" type="uuid" />
+<column name="rpg_param_key" type="character varying" />
+<column name="rpg_param_value" type="real" />
+```
+
+So a parameter's effective value is resolved per character, against the perks
+that character holds, and Warhorse ships the mechanism for doing it. Vanilla
+uses it sparingly: one perk, twenty five keys, and no vanilla perk touches
+`CollisionVelocityDeltaToDmgR`.
+
+If a perk can be attached to a soul at runtime, a victim can carry a perk that
+zeroes their own collision damage for the second the horse is on top of them,
+and the player's collisions are untouched. Two things are unverified: whether
+the parameter is resolved against the damaged character rather than the
+attacker, and whether perks can be added and removed from Lua at all. No
+`AddPerk` or `RemovePerk` appears in the Lua state dump, so the second question
+has to be settled by enumerating the live `soul` methods.
+
+Note also that reading vanilla tables needs a manual decompress.
+`Tables.pak` stores backslash separators in its local file headers while its
+central directory uses forward slashes, and Python's `zipfile` refuses the
+mismatch.
+
+## The damage may not be a defect
+
+Worth recording before more work goes into removing it. The trample damage was
+first investigated because it was believed to cause the lockup. It does not: a
+victim wedges at full health with collision damage zeroed. Meanwhile Phase 3
+lists "apply native blunt damage on high-speed impacts" as a wanted feature and
+marks it already delivered.
+
+Measured, the damage is 3 to 5 at trot and 16 to 25 at gallop against an
+unarmored villager, scaling with the horse's speed at contact and costing
+nothing when the horse has already slowed. That is close to what the design
+asks for. The open question is therefore whether this needs removing at all, or
+only tuning, and the answer decides whether any of the remaining approaches are
+worth building.
+
+## The lockup is vanilla's auto-cure daycycle, and the animation is PretendingIllness
+
+Located in the game's own behavior tree data, in
+`Libs/AI/final/sb_daycycles_cure.xml` inside `Scripts.pak`. The file declares
+five trees: `cureStart`, `cure`, `cureLookHurt`, `cureFastStartCheck` and
+`cureApplyPatch`. `cureLookHurt` is the state, and it is short enough to quote
+whole:
+
+```xml
+<DecoratorBuff BuffId="e3edccf9-fb68-4399-b66d-0a06271a6b81" SoulWUID="this.id">
+  <Parallel successMode="All" failureMode="Any">
+    <LODGuardian LODTerm="OnBoth" StatProp="PropagateChild">
+      <LOD>    <Wait duration="-1" timeType="GameTime" /> </LOD>
+      <Detail> <PlayAnimation animation="PretendingIllness" /> </Detail>
+    </LODGuardian>
+    <Wait duration="-1" timeType="GameTime" />
+  </Parallel>
+</DecoratorBuff>
+```
+
+An NPC in this node plays `PretendingIllness` and waits **forever**. The wait
+has no timeout, so nothing inside the subtree ends it. It ends only when the
+parent withdraws it.
+
+The buff it decorates itself with is `autoCure`, from `Libs/Tables/rpg/buff.xml`:
+
+```xml
+buff_name="autoCure" implementation="Cpp:Constant" duration="-1"
+params="health+0.02/s"
+```
+
+So the node regenerates health at 0.02 per second, or 1.2 per minute of game
+time, while the NPC stands there looking ill.
+
+**The gate is health, and its value is 40.** `Libs/AI/final/sb_daycycles.xml`
+declares `<Variable name="t_autoCureLowHealthLimit" type="_float" values="40.0" />`,
+and `sb_daycycles_cure.xml` gates the cure on `NPCStateGate State="Health"
+Target="this.id" Low="$t_autoCureLowHealthLimit"`.
+
+### Every observation this explains
+
+| Observation | Explanation |
+| --- | --- |
+| Victim stands in a looping hurt animation | `PlayAnimation "PretendingIllness"` under `Wait duration="-1"` |
+| Alive, undamaged further, will not resume its schedule | The daycycle is running this activity instead of the NPC's own |
+| Raising health releases it immediately | Health is the gate the parent re-evaluates |
+| Setting a healthy NPC to 25 did not freeze it | The gate is read when the daycycle re-evaluates, not on a health write |
+| It never recovers on its own | It does, at 1.2 health per game-minute, which reads as never |
+| Combat claims the NPC normally and hands it back | The combat tree preempts the daycycle, then returns to it |
+| `MinVictimHealth = 60` prevented it across 19 impacts | 60 is above the 40 gate |
+| Stuck NPCs measured at 19.6, 26.0, 32.6 and 34.1 | All below 40 |
+| Vanilla never shows it | Vanilla rarely leaves a non-combat NPC under 40 health standing in a street |
+
+### What it is not
+
+It is not an AI failing to resolve an attacker. The proposal that KCD's AI reads
+damage with no valid `shooterId` and falls into an injured loop for that reason
+does not survive the data: nothing in the cure trees examines a shooter, an
+attacker or a hit at all. The trigger is one float compared against health.
+
+It is also not a defect. This is designed vanilla behavior for a wounded NPC
+with no other context, and the mod meets it only because the mod is the one
+thing in the game that leaves ordinary townspeople badly hurt in the open.
+
+### The levers, all of them Warhorse's own
+
+- **Health above 40.** Already proven by `MinVictimHealth`, and the cheapest.
+- **`$b_context['suppressAutoCure']`.** Both `sb_daycycles.xml` and
+  `sb_daycycles_cure.xml` gate the entire cure on `!$b_context['suppressAutoCure']`,
+  and eleven quest files set it, so it is the sanctioned way to exempt a
+  character. `XGenAIModule.SetBrainVariable()` exists in the Lua state and is the
+  candidate for reaching it.
+- **`XGenAIModule.RemoveDaycyclePatch()`.** The cure installs itself through
+  `cureApplyPatch`, and `t_daycycleCureInProgress` is marked `isPersistent="1"`,
+  so a patch that never completes persists. This is the route to releasing an
+  NPC already stuck.
+- **A stronger regen.** The vanilla 0.02/s is what makes the state look
+  permanent.
+
+### The second state is still unexplained
+
+A victim was recorded wedged at **96.4 health in an ordinary standing idle**,
+not in `PretendingIllness`. That is above the 40 gate and in the wrong
+animation, so it is not this. Two distinct states have been recorded under one
+name, and only the low-health one is now understood.
+
+## Low health alone does not start the cure, and the trigger needs a buff
+
+**Test, from the console with no horse involved.** A healthy `rat_man97` at
+100 health was set to 20, well under the 40 gate, and its animation state polled
+every five seconds for a minute.
+
+```
+[IND] target=rat_man97 health=100.0 anim=MotionMovement
+[IND] set health=20 -> now 20.0
+[IND] t+5s  health=20.0 anim=MotionMovement
+[IND] t+15s health=20.0 anim=MoveToIdle
+[IND] t+55s health=20.0 anim=MotionMovement
+```
+
+**No `PretendingIllness`, and no regeneration.** Health held at exactly 20.0 for
+the whole minute, so the `autoCure` buff was never applied either, which is
+independent confirmation that the cure never started. The NPC walked its
+schedule normally. This reproduces the earlier report that a guard set to 25
+health "didn't freeze, he's acting normal", and it corrects the entry above:
+**health below 40 is necessary but not sufficient.**
+
+The full entry condition, read out of `cureStart`, is a gate followed by a
+parallel:
+
+```
+IfGate    !$t_daycycleCureInProgress & !$b_context['suppressAutoCure']
+  BuffTagCheck buffAITagId="4"  then buffAITagId="3"
+  or ProcessMessage buffAdded where tagId in (poison, bleed, sleep)
+  and NPCStateGate State="Health" Low/High="$t_autoCureLowHealthLimit"   (40.0)
+```
+
+So the cure needs **a buff and low health together**. A collision supplies the
+buff, which is what earlier entries were pointing at when they called this "the
+injury buff", and removing that buff afterwards does not help because by then
+the cure activity is already running.
+
+## The context option that suppresses the cure works, and it is vanilla's own
+
+`Scripts/Script/Context.lua` ships a public API over the `b_context` brain
+variable the trees read, and vanilla uses it for exactly this purpose.
+`sa_event_wanderer.xml` calls:
+
+```lua
+Contexts.SetNonpersistentOption(wanderer, 'suppressAutoCure', 'event_wanderer')
+```
+
+and `sa_duel.xml` uses the message form, which expires on its own:
+
+```
+InstantSendMessageToNPC target="this.id" type="context:timedOptionRequest"
+  values="option('suppressAutoCure'),expiration(30),handle('sa_duel')"
+```
+
+**Both were exercised live against an NPC and both were accepted**, and the
+option was read back rather than trusted to a return value:
+
+```
+[CTX] check before ok=true val=false
+[CTX] SetNonpersistentOption ok=true err=nil
+[CTX] check after  ok=true val=true
+[CTX] timedOptionRequest ok=true err=nil
+```
+
+`Contexts.CheckOption` reports the option is set, so the state really changed.
+Whether it prevents the lockup is a separate question and needs a ride.
+
+The message form is the better fit. It carries its own expiration, so a victim
+cannot be left permanently exempt if the mod misses its cleanup, and the mod
+already sends brain messages this way for `hitReaction`.
+
+`XGenAIModule.GetBrainVariable(entity.id, 'b_context')` returns nil, so the
+brain variable is not readable directly by that name from Lua. `Contexts`
+maintains its own table and is the supported route. `SetBrainVariable`,
+`GetBrainVariable` and `RemoveDaycyclePatch` are all present on this build.
+
+## The lockup reproduced on demand, and suppressed on demand
+
+A controlled A/B, run entirely from the console with no horse and no collision.
+Two guards standing in the street. Both were set to 20 health and given the
+`bleeding` buff, `0c903899-fcc9-4cf2-9ee3-1130ac08b0fc`, which carries
+`buff_ai_tag_id="4"`, one of the two tags `cureStart` checks. The only
+difference between them was one line:
+
+```lua
+Contexts.SetNonpersistentOption(B, 'suppressAutoCure', 'hcm')
+```
+
+Result, five seconds later:
+
+```
+[AB] A=villageGuard suppress=false
+[AB] B=rat_guard24   suppress=true
+[AB] A health=20.0 addBuff=true
+[AB] B health=20.0 addBuff=true
+[AB] t+5s  A 20.1 PretendingIllness  |  B 20.0 MotionMovement
+```
+
+**A entered `PretendingIllness`. B carried on walking.**
+
+Three things are settled by that line:
+
+- **The lockup is `cureLookHurt`, and it reproduces on demand.** Bleeding plus
+  health under 40 is the whole trigger. No horse, no ragdoll, no collision, no
+  attacker, and five seconds from a standing start.
+- **`suppressAutoCure` prevents it.** Same health, same buff, same second, and
+  the only difference was the context option.
+- **The `autoCure` buff confirms which subtree is running.** A's health had
+  already moved from 20.0 to 20.1 while B's had not, which is the 0.02 per
+  second regeneration the `DecoratorBuff` on `cureLookHurt` applies. Nothing
+  else in the game was healing A.
+
+That last point matters as evidence, because it is a number moving on a later
+sample rather than a function reporting success, which is the standard this
+project settled on after several ScriptBinds were found to accept calls and do
+nothing.
+
+### What this means for the mod
+
+The mod does not need to avoid ragdolls, avoid damage, or keep victims above a
+health floor to avoid the lockup. It needs to tell the game that a trampled
+villager is not a candidate for the auto-cure daycycle, using the same call
+vanilla uses for a duellist or a scripted wanderer.
+
+The message form is preferable to the direct call because it expires by itself:
+
+```
+XGenAIModule.SendMessageToEntity(npc.id, 'context:timedOptionRequest',
+    "option('suppressAutoCure'),expiration(30),handle('HorseCollisionMod')")
+```
+
+`MinVictimHealth` and `HoldVictimAboveFloor` can then come out. They worked, but
+they bought the fix by preventing a collision from ever being able to kill,
+which was a real change to what the mod does in play.
+
+## The auto-cure exemption holds in play, and trampling can kill again
+
+**Build**: every impact sends the victim
+`context:timedOptionRequest option('suppressAutoCure') expiration(30)`.
+`MinVictimHealth` at 0 and `ClearCollisionInjuries` off, so nothing else was
+protecting the victim.
+
+**User report**: "I hit her maybe 5 times in total. I didn't see any change in
+behavior that wasn't what was expected. No lockup. Just kept getting up and
+returning to walking. I did eventually kill her though and now the guards are
+pissed and trying to kill me."
+
+Five gallop impacts on `rat_bailiff_wife`, an unarmored villager:
+
+| Impact | Speed at contact | Health before | Delta |
+| --- | --- | --- | --- |
+| 1 | 5.08 | 78.08 | +0.0000 |
+| 2 | 10.76 | 78.08 | -18.1326 |
+| 3 | 6.36 | 38.11 | +0.0000 |
+| 4 | 10.66 | 38.11 | -30.9845 |
+| 5 | 10.72 | 7.12 | -7.1229, dead |
+
+**She was at 38.11 health across two impacts, under the 40 gate, and did not
+enter `PretendingIllness`.** That is the condition which produced the lockup on
+demand in the controlled A/B, and the exemption held through it. `SuppressAutoCure`
+logged on all five impacts.
+
+Two things follow beyond the lockup:
+
+- **A collision can kill again.** The last impact took her from 7.12 to 0. The
+  old `MinVictimHealth` floor made that impossible, so removing it restores
+  something the mod is meant to be able to do.
+- **The crime system engages on its own.** Guards turned hostile after the
+  death with no code in the mod for it, which is the Phase 3 behavior arriving
+  without being built.
+
+### The gap this ride did not test
+
+The victim died shortly after falling under 40, so the exemption never had to
+outlast her. The realistic case is different: a rider knocks someone down twice,
+leaves them alive at 30 health, and rides away. Thirty seconds later the
+exemption lapses while they are still under the threshold and still bleeding,
+which is exactly the entry condition again. Whether the cure starts at that
+point is untested and is the next thing to settle.
+
+## The exemption expires cleanly, and the cure has a branch that works
+
+**Test**: `rat_swordsmith_helper` set to 20 health with the `bleeding` buff and
+a 30 second `suppressAutoCure` exemption, then polled for 70 seconds, which is
+40 seconds past the expiry.
+
+```
+[EXP] t+5s  health=20.0 anim=MotionIdle
+[EXP] t+30s health=20.0 anim=MotionIdle
+[EXP] t+70s health=20.0 anim=MotionIdle
+```
+
+Followed by a direct check:
+
+```
+[EXPCHK] rat_swordsmith_helper health=43.6 anim=MotionIdle suppressStillSet=false
+```
+
+Two results. **The timed option really does expire**, so the message form is
+safe to use and cannot strand a victim outside the daycycle. And **no lockup
+followed the expiry**: the NPC never entered `PretendingIllness` at any point.
+
+Health then moved from 20.0 to 43.6. That is far too large a step for the
+`autoCure` regeneration of 0.02 per second, which would have produced about 0.8
+over the same window, so something else restored it. The likely candidate is
+the branch of `cureStart` that actually treats the injury rather than the one
+that stands still: the file declares `cure` and `cureApplyPatch` alongside
+`cureLookHurt`, and `bandage` appears 27 times in it. **This is unconfirmed**,
+and the only firm claims are the two above.
+
+If that reading is right, `cureLookHurt` is the fallback for an NPC that cannot
+treat itself, and whether a victim locks up depends on the victim. The guard in
+the earlier A/B entered `PretendingIllness` within five seconds and stayed there
+for the full ninety, while this NPC recovered on its own. That difference is
+worth settling, because guards are the most likely thing a rider tramples
+repeatedly.
+
+## The message form of the context request can be dropped
+
+An attempt to repeat the expiry test on a guard failed before it started, and
+the failure is worth more than the test would have been:
+
+```
+[GRD] target=villageGuard health=20.0 anim=<unknown> sup=false
+[GRD] t+5s  health=20.0 anim=<unknown> sup=false
+[GRD] t+55s health=20.0 anim=<unknown> sup=false
+```
+
+`Contexts.CheckOption` read **false immediately after** the
+`context:timedOptionRequest` message was sent, so the option was never set. The
+guard was hostile at the time, following a kill earlier in the session, and
+`GetCurrentAnimationState` returned `<unknown>` throughout, which is consistent
+with combat owning the actor.
+
+The direct call does not behave this way. Earlier in the session
+`Contexts.SetNonpersistentOption` was applied to this same `villageGuard` and
+`CheckOption` read back true immediately.
+
+**A brain message is a request, and a busy brain can drop it.** The direct call
+writes the Contexts table itself and does not depend on the brain accepting a
+message. This is the same trap recorded earlier in this diary, where a
+ScriptBind accepted a call and did nothing: the mod logged
+`SuppressAutoCure ... for=30s` on all five impacts of the successful ride, and
+that line only proves the message was sent.
+
+The implementation should therefore use `Contexts.SetNonpersistentOption` with
+its own scheduled `ClearOption`, and verify with `CheckOption` rather than
+trusting either. Non-persistent is the right form for a second reason: it does
+not survive a save, so an exemption the mod fails to clear cannot become
+permanent in a player's game.
+
+A guard in combat is also an invalid subject for any cure test, since combat
+preempts the daycycle. Tests of this kind need a calm area.
+
+## The exemption must be set before the injury, not after
+
+Two runs, same buff, same health, same option, different order.
+
+**Option set after the injury** (`villageGuard`):
+
+```
+[G2] target=villageGuard health=86.9 anim=MotionMovement
+[G2] armed health=20.0 sup=true
+[G2] t+5s health=20.1 anim=PretendingIllness sup=true
+```
+
+**Option set before the injury** (`rat_swordsmith_helper`):
+
+```
+[G3] target=rat_swordsmith_helper sup=true  (option set FIRST)
+[G3] armed  health=20.0 anim=SmithGrab   sup=true
+[G3] t+5s   health=20.0 anim=SmithGrab   sup=true
+[G3] t+10s  health=20.0 anim=SmithHeating sup=true
+```
+
+The second NPC carried on with its job animations and did not regenerate,
+so the cure never started. The first entered `PretendingIllness` **while the
+option read true**.
+
+**The gate is evaluated when the cure starts, and setting the option afterwards
+does not cancel a cure already running.** The `IfGate` in `cureStart` carries
+`RunLogic="KeepRunning"`, so a subtree already entered keeps running regardless
+of the condition that admitted it. This is the same shape as the earlier finding
+that removing the injury buff from a stuck NPC does not release it.
+
+### Why the mod is nonetheless correct
+
+`SuppressAutoCure` is called from `TriggerCollision`, at the moment of impact,
+while collision damage resolves around 500 ms later. The exemption is therefore
+in place before health can cross the threshold, which is the order that works,
+and it is why the ride test passed with a victim held at 38 health.
+
+### What it rules out
+
+The exemption cannot be used to repair an NPC that is already stuck, in a save
+or otherwise. That needs a different lever, and the candidates are raising
+health above 40, which is already known to work, and
+`XGenAIModule.RemoveDaycyclePatch`, which is untested.
+
+## An NPC already in the cure can be released, without healing it
+
+The cure installs itself as a daycycle patch. `cureApplyPatch` sends:
+
+```
+SendMessageToNPC target="this.id" type="daycycle:change"
+  values="add(true), once(true), handle('curePatch'), name('cure'), priority(34)"
+```
+
+so the handle is `curePatch`, and `XGenAIModule.RemoveDaycyclePatch(wuid, handle)`
+is documented to remove it and to report whether it did.
+
+**Removing the patch alone is not enough.** A first attempt removed the patch
+and also reset `t_daycycleCureInProgress` to false. The patch removal reported
+true, and the guard was back in `PretendingIllness` five seconds later: clearing
+that flag reopened the gate while the NPC was still bleeding under 40 health, so
+the cure simply started again.
+
+**Suppress first, then remove.** Applying the ordering rule established above:
+
+```
+[FX2] before health=23.7 anim=PretendingIllness sup=false
+[FX2] step1 suppress set=true
+[FX2] step2 RemoveDaycyclePatch returned=true
+[FX2] t+5s  health=23.7 anim=IdleToMove     sup=true
+[FX2] t+10s health=23.7 anim=MotionMovement sup=true
+[FX2] t+15s health=23.7 anim=MotionMovement sup=true
+```
+
+The guard stood up and walked his patrol again **at 23.7 health**, still
+bleeding, without being healed.
+
+The strongest evidence in that block is the health column. It had been climbing
+by 0.02 every second for the previous three minutes, and it stops dead at 23.7
+and stays there. The `autoCure` buff is attached to `cureLookHurt` by a
+`DecoratorBuff`, so regeneration stopping is proof the subtree itself is gone
+rather than merely out of view, which is what the earlier `MotionIdle` samples
+turned out to be.
+
+### The `LODGuardian` explains an earlier misreading
+
+During the expiry test the same guard left `PretendingIllness` at t+70s and
+showed `MotionIdle` while health kept climbing at the same rate. That is not a
+recovery. `cureLookHurt` wraps its animation in a `LODGuardian`, which plays the
+animation only in the `Detail` branch and substitutes a plain wait in the `LOD`
+branch, so a victim the player is not close to stops performing the animation
+while remaining in the subtree. **Animation state alone is not a reliable test
+for this state; the regeneration is.**
+
+### Both halves are now proven
+
+- **Prevention.** Set the option before health crosses the threshold. The mod
+  does this at impact, and collision damage resolves about 500 ms later.
+- **Repair.** Set the option, then remove the `curePatch` daycycle patch. This
+  releases a victim already stuck, at low health, without healing them, so it
+  does not cost the mod its ability to trample someone to death.
+
+## Entry into the cure is not immediate for every NPC
+
+Attempts to manufacture the stuck state on demand succeed on some NPCs and not
+others. `villageGuard` entered `PretendingIllness` within five seconds of being
+set to 20 health with the `bleeding` buff, twice. `rat_man95` and
+`rat_swordsmith_helper`, given the same treatment, were still walking with
+health flat at exactly 20.00 half a minute later, and the flat health shows the
+`autoCure` buff was never applied, so the cure had not started rather than
+having started invisibly.
+
+The buff and the health threshold are necessary but the daycycle also has to
+re-evaluate, and when that happens depends on what the NPC is doing.
+`sb_daycycles_cure.xml` declares a `cureFastStartCheck` tree and `sb_daycycles.xml`
+carries a persistent `t_fastStart` variable, so there is a fast path and a slow
+one. Which NPCs take which is not established.
+
+Two practical consequences. A guard is a reliable subject for this state and a
+townsperson is not, which is worth knowing before spending a test on one. And
+the mod cannot be judged to have fixed the lockup by watching a single victim
+fail to enter it, since some victims would not have entered it anyway. The
+evidence that matters is the controlled A/B, where two NPCs were treated
+identically in the same second and only the exempt one stayed free.
+
+## The wedge at 96.4 health was an artifact of the modified collision parameter
+
+Recorded so it is not chased again. The one observation that did not fit the
+auto-cure explanation, a victim wedged at 96.4 health in an ordinary standing
+idle rather than in `PretendingIllness`, was made during the session that ran
+with `CollisionVelocityDeltaToDmgR` set to 0 in a loose `rpg_param.xml`.
+
+That table override is a diagnostic that was tried once and rejected, and it is
+not something the mod ships or that a player would ever have. The observation
+therefore describes a game state that no longer exists and cannot recur unless
+the parameter is deliberately overridden again.
+
+It also explains the anomaly on its own terms: with collision damage zeroed the
+victim could not fall under 40 health, so whatever held them was not the cure,
+and there was no reason to expect `PretendingIllness`.
+
+**There is no second lockup state to explain.** The 96.4 reading is retired.
+
+## Which NPCs enter the cure
+
+The entry timing above is worth stating as a practical rule, and it matches an
+earlier session the user recalled, where a named NPC took collision damage
+repeatedly, never locked up, and was eventually killed.
+
+`villageGuard` entered `PretendingIllness` within five seconds, twice, under
+controlled conditions. `rat_man95`, `rat_swordsmith_helper` and
+`rat_bailiff_wife` never entered it under equivalent or worse treatment.
+
+So the state is far more readily produced on guards than on ordinary or named
+townspeople, which is consistent with every report of it in this project: every
+stuck NPC recorded here has been a guard. That is also the worst case for a
+player, since guards are what a rider tramples repeatedly, so the fix is aimed
+at the right target even though the state is not universal.
