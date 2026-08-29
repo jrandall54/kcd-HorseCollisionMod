@@ -1084,6 +1084,25 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 		return
 	end
 
+	-- Releases a victim already held by the cure, which the exemption alone
+	-- cannot do: the gate admitting the subtree is only read on entry, so an
+	-- option set afterwards leaves a running cure running. The cure installs
+	-- itself as a daycycle patch under this handle, and removing it ends the
+	-- activity. The order matters, because removing the patch while the victim
+	-- is still bleeding under the threshold and not yet exempt lets the cure
+	-- start again immediately.
+	--
+	-- On a victim that was never stuck this reports false and costs nothing,
+	-- so it doubles as the repair path for a save carrying stuck NPCs: any
+	-- victim ridden into again is released.
+	pcall(function()
+		local wuid = XGenAIModule.GetMyWUID(npc)
+
+		if wuid then
+			XGenAIModule.RemoveDaycyclePatch(wuid, "curePatch")
+		end
+	end)
+
 	-- Cleared on a timer rather than left to expire, because the direct call
 	-- has no expiry of its own. A later impact reschedules its own clear, and
 	-- clearing an option that is already clear costs nothing.
