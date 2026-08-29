@@ -5825,3 +5825,346 @@ changes falling objects, carts and the player's own collisions, and shipping
 `rpg_param.xml` reintroduces the whole-file conflict surface 3.0.0 removed.
 The damage fix remains a lateral impulse, so the horse and the body stop
 overlapping at all.
+
+## BasicActor's collision damage getters are vestigial
+
+**Hypothesis**: `BasicActor.lua` gates collision damage through four per-entity
+getters, `GetSelfCollisionMult`, `GetForeignCollisionMult`,
+`GetColliderEnergyScale` and `GetCollisionDamageThreshold`, each returning a
+value stored on the entity. If the engine reads them, a victim's collision
+damage can be suppressed per entity at runtime, which would fix the trample
+damage without shipping `rpg_param.xml` and without the whole-file conflict
+surface that override carries.
+
+The properties are authored, not dead defaults. A live read of three NPCs
+returned `collisionDamageThreshold=2` on `rat_man95`, `villageGuard` and
+`rat_guard23`, matching `collisionDamageThreshold = 2` on
+`Scripts/Entities/AI/NPC_x.lua:163`. `Scripts/Entities/actor/BasicActor.lua`
+ships in `Scripts.pak` at 47,737 bytes. All four getters are present as
+functions on every live NPC entity.
+
+**Method**: each getter was replaced on the entity table with a wrapper that
+logs the call and returns a suppressing value, 0 for the three multipliers and
+10000 for the threshold. The hook was verified by direct invocation immediately
+before the ride:
+
+```
+[H3] rat_merchant_shop1 before selfMult=1 fnType=function
+[HOOK] GetSelfCollisionMult on rat_merchant_shop1 a=nil b=nil -> 0
+[H3] rat_merchant_shop1 after  selfMult=0 thresh=10000
+```
+
+**Results**: four impacts on the two verified-hooked entities, one trot and
+three gallop.
+
+| Victim | Tier | Delta |
+| --- | --- | --- |
+| rat_merchant_shop2 | Trot | -4.1089 |
+| rat_merchant_shop2 | Gallop | -26.6725 |
+| rat_merchant_shop1 | Gallop | +0.0000 |
+| rat_merchant_shop1 | Gallop | -21.6846 |
+
+**Not one `[HOOK]` line fired.** Damage landed at its normal magnitude and the
+last impact killed the victim. The engine does not call these getters when it
+resolves collision damage against an actor. The subsystem is vestigial in the
+same way `HitDeathReactions` is, and for the same reason: much of
+`BasicActor.lua` is inherited Crytek code, still carrying Nanosuit, Abrams tank
+and SmartMine references that KCD never uses.
+
+**Two further findings from the same session:**
+
+- **Patching the shared `BasicActor` table does not reach spawned entities.**
+  Global `BasicActor` was patched and a spawned NPC still returned the vanilla
+  value. Entity script tables are copies, which is the same mechanism recorded
+  under additive deployment, where redirecting `NPC_x` had no effect because
+  `NPC = CreateAI(NPC_x)` copies fields.
+- **A radius snapshot is not a reliable way to instrument a victim.** A first
+  pass hooked every NPC within 25 m and the two eventual victims were not among
+  them, which made the first ride worthless. Hook by entity name and verify by
+  direct invocation before treating a ride as valid.
+
+**What this retires**: overriding `BasicActor.lua` to gate collision damage, in
+any form. The file's damage plumbing is not what the engine runs.
+
+## KCD does not route actor damage through Lua `OnHit`
+
+**Hypothesis**: `BasicActor.Server:OnHit(hit)` receives every physical hit, so a
+gatekeeper at the top of it could discard a collision hit before anything
+downstream reads it. `BasicActor.lua` supports the reading: line 616 branches on
+`hit.type ~= "collision"`, and `SinglePlayer:ProcessActorDamage` is reached from
+inside `OnHit`.
+
+**Method**: `Server.OnHit` and `Client.OnHit` were replaced on the entity table
+with a wrapper that logs `hit.type`, `hit.damage` and `hit.shooterId` and then
+calls the original. A synthetic call confirmed the wrapper was reached. The hook
+re-armed on a two second timer against every NPC within 70 m of the player, so
+it followed the rider and covered any target rather than a chosen few. Sixty
+NPCs were instrumented.
+
+**Results**: four impacts, and the victims were checked for instrumentation
+afterwards rather than assumed.
+
+| Victim | Hooked | Tier | Armor weight | Delta |
+| --- | --- | --- | --- | --- |
+| rat_woman44 | no | Trot | 6 | -2.7146 |
+| rat_man19 | yes | Gallop | 8 | -22.7365 |
+| rat_guard24 | yes | Gallop | 46 | +0.0000 |
+| rat_guard_pazdera | yes | Trot | 55 | +0.0000 |
+
+`rat_man19` was verifiably hooked, lost 22.74 health to a gallop impact, and
+produced no wrapper call. The session counter finished at **zero OnHit calls
+against sixty hooked entities**.
+
+Actor damage in KCD does not pass through the Lua `OnHit` entry point. Warhorse
+resolves it natively. There is no Lua interception point on this path, so a
+`BasicActor.lua` override cannot gate collision damage however it is written,
+which matches the finding above that the file's collision multiplier getters are
+never called either.
+
+**Side observation, not pursued.** Both heavily armored victims took exactly
+zero damage while the cloth-clad victim took 22.74 at the same tier. Their
+`armorImpulse` values were 0.42 and 0.38 against 1.00 for the unarmored target.
+A target the impulse barely moves is a target that is not thrown along the
+horse's path, and it takes no trample damage. That is the trample mechanism
+predicting its own signature, and it is direct support for the lateral impulse
+fix: reduce the overlap and the damage goes with it. It also sits awkwardly
+against the earlier Phase 2 reading that armor mitigation "cannot be separated
+from zero", which was measured on damage rather than on impulse.
+
+## A lateral impulse does not reduce collision damage
+
+**Hypothesis**: `Ragdoll` aimed its impulse along the horse's heading, driving
+the victim down the line the horse was about to occupy and maximising the frames
+the two overlap. A sideways component should clear the victim instead, and the
+damage should fall with the overlap.
+
+**Change**: a `Lateral` term, default 40, applied along the perpendicular to the
+horse's heading, signed by which side of the line the victim already stands on.
+
+**Results**: no reduction. Gallop impacts on light targets cost as much as
+before or slightly more, against a pre-change baseline of -22.74 on a cloth-clad
+target.
+
+| Victim | Armor weight | armorImpulse | Tier | Delta |
+| --- | --- | --- | --- | --- |
+| rat_woman34 | 5 | 1.26 | Gallop | -25.8146 |
+| rat_woman34 | 5 | 1.26 | Gallop | -24.1469 |
+| rat_woman34 | 5 | 1.26 | Gallop | -29.2818 |
+| villageGuard | 59 | 0.37 | Trot | +0.0000 |
+
+**The change made the impulse larger, not sideways.** Knockback 50 and Uplift 30
+give a magnitude of 58.3. Adding a perpendicular 40 gives 70.7, a 21 per cent
+increase. Damage rose with it.
+
+**Damage tracks impulse magnitude across the whole session.** Ordering every
+gallop impact by `armorImpulse`, which is the only per-victim multiplier on the
+impulse, the correlation is tight: 0.37 to 0.42 costs nothing, 1.00 costs 22.74,
+and 1.26 costs 24 to 29. Armor weight is the input to that multiplier, so the
+same ordering was previously read as armor mitigating damage. The impulse is the
+better explanation, because the engine charges collision damage on a velocity
+delta and a larger impulse produces a larger one when the body lands.
+
+**What is still open.** An earlier session recorded "impulse zeroed, `Knockback`
+and `Uplift` at 0, damage continues" and concluded `actor:Fall()` alone costs the
+victim health. That test recorded whether damage occurred, not how much. If
+zeroing the impulse takes a gallop impact from 25 down to 3 rather than to 0, the
+ragdoll's own landing accounts for a little of the cost and the impulse accounts
+for most of it, and the conclusion drawn from that table needs revising. The
+magnitude was never measured, so it is being measured now.
+
+## The impulse contributes nothing to collision damage, and neither does armor
+
+**Method**: `Knockback`, `Uplift` and `Lateral` all set to 0 in the running
+game, so victims drop where they stand with no throw at all. Six gallop
+impacts.
+
+| Victim | Armor weight | armorImpulse | Speed at contact | Delta |
+| --- | --- | --- | --- | --- |
+| villageGuard | 50.5 | 0.40 | 10.48 | -25.4294 |
+| rat_man97 | 5 | 1.26 | 10.49 | -24.3547 |
+| rat_armorers_wife | 6 | 1.15 | 10.65 | -20.7616 |
+| rat_armorers_wife | 6 | 1.15 | 10.71 | -23.1778 |
+| rat_woman43 | 6 | 1.15 | 2.62 | +0.0000 |
+| rat_woman12 | 5 | 1.26 | 4.27 | +0.0000 |
+
+**Damage is unchanged with the impulse switched off**, at 20 to 25 against the
+22 to 29 recorded with it on. The impulse accounts for none of it. The earlier
+conclusion that `actor:Fall()` alone costs the victim health stands, and the
+magnitude measurement this test was run to obtain confirms it rather than
+overturning it.
+
+**Armor makes no difference either.** A guard in chain at 50.5 weight took
+25.43, the largest cost of the ride, while unarmored villagers took 20 to 24.
+The apparent armor mitigation recorded earlier was an artifact: `armorImpulse`
+scales the impulse, the impulse moved the victim, and a victim thrown further
+was read as a victim damaged more. With the impulse off the ordering vanishes.
+Phase 2's note that armor mitigation "cannot be separated from zero" was
+correct, and the later reading that armored targets take zero damage was wrong.
+
+**The one predictor is the horse's speed at contact**, and it separates the two
+groups perfectly. Every impact above 10 m/s cost 20 to 25. Both impacts under
+5 m/s cost exactly nothing, despite scoring as Gallop from the peak of the
+speed trail. That is the signature of `CollisionVelocityDeltaToDmgR` and it
+confirms the trample mechanism directly: the cost is the horse striking the
+body, scaled by how fast the horse is still going when it does.
+
+**What this retires**: the lateral impulse, reverted. Aiming the impulse
+differently cannot help when the impulse is not the cause. The remaining
+candidate is to keep the physics body from existing while the horse is on top
+of it, which is the deferred ragdoll.
+
+## Deferring the ragdoll costs the impact and does not fix the damage
+
+**Hypothesis**: an animation-driven actor cannot be struck by the horse and
+costs nothing, so holding the victim upright until the horse has passed, then
+ragdolling, removes the trample without changing anything else.
+`RagdollDelayMs` set to 300, which at 10.5 m/s puts the horse 3.1 m clear
+against a front reach of about 1.3 m.
+
+**Result**: rejected on feel. The user's report: "it doesn't feel or look
+natural and the horse basically sticks inside of them before they fall or I
+clip them as I ride by and it doesn't feel impactful at all".
+
+**And it does not buy much.** Gallop impacts at the 300 ms delay cost 13.9 to
+22.2 where the same impacts cost 20 to 25 undelayed, and only impacts already
+slow at contact reached zero. The delay narrows the window the horse and the
+body share without closing it, because a horse that has just struck someone is
+also decelerating into them. The trade is not feel against damage. It is feel
+against a partial reduction.
+
+Three hundred milliseconds is long enough for the horse to be visibly standing
+inside a victim who has not reacted yet, and the delay breaks the causal link a
+player reads between the strike and the fall. A collision that lands and then
+waits does not register as a collision at all. Shortening the delay trades feel
+back against damage along the same axis, because the damage window is exactly
+the window the horse and the body share.
+
+**What this leaves.** Both cheap fixes are now spent. The impulse does not cause
+the damage and its direction cannot help. Delaying the body costs the impact
+and only partly reduces the damage. The remaining approaches either stop the body existing at all, which is
+the animated knockdown through `AnimationControlled`, or stop the horse and the
+body colliding while both exist.
+
+**The second of those is unexplored and is not a last resort.** KCD's Lua
+exposes CryEngine collision filtering directly through
+`SetPhysicParams(PHYSICPARAM_COLLISION_CLASS, filtering)`, and the vanilla
+scripts use three fields on that table: `collisionClass` and
+`collisionClassUNSET` in `GeomEntity`, `PickableItem`, `Ladder`, `AnimObject`,
+`Bed` and `AlchemyTable`, and `collisionClassIgnore` in `TriggerBase`, which
+sets it to -1 to ignore everything. Named class constants exist as Lua globals:
+`BasicAnimal` declares `collisionClass = gcc_npc_ignored_type` and `Boar_x` and
+`Pig_x` declare `gcc_npc_reported_type`.
+
+If the victim's ragdoll can be told to ignore the horse for the second after it
+is created, the ragdoll stays immediate, the impact keeps its impulse and its
+timing, and the collision that charges the damage never resolves. That is the
+only candidate so far which does not trade feel for damage.
+
+## Filtering horse collisions off the ragdoll, first attempt
+
+**Hypothesis**: the victim's ragdoll can be told to ignore the horse collision
+class for a moment after it is created, so the ragdoll stays immediate and the
+impulse stays untouched while the collision that charges the damage never
+resolves.
+
+**Implementation**: after `actor:Fall`,
+`npc:SetPhysicParams(PHYSICPARAM_COLLISION_CLASS, { collisionClassIgnore = gcc_horse })`,
+restored with `collisionClassIgnoreUNSET` after `HorseIgnoreMs`, default 1500.
+Both field names are confirmed in the decompile, and both calls return cleanly
+against a live NPC. `gcc_horse` is 65536; the full set of class globals is
+`gcc_ai` 131072, `gcc_horse` 65536, `gcc_interactive` 262144, `gcc_ragdoll`
+16384, `gcc_rigid` 32768, `gcc_npc_ignored_type` 2097152,
+`gcc_npc_reported_type` 524288, `gcc_player_capsule` 1024, `gcc_player_body`
+2048, `gcc_vehicle` 4096.
+
+**Results**: a reduction, not a fix. Five gallop impacts cost 16.39, 16.53,
+17.05, 19.15 and 19.42, against a 20 to 25 baseline. Trot fell to 3.7 to 4.9.
+
+The user also reported seeing the horse phase through the victim on the first
+gallop only, and not on any impact after it.
+
+**Diagnosis: the filter is written before the body it is meant to apply to
+exists.** `actor:Fall` does not physicalize the ragdoll within the same tick,
+which the impulse code already accounts for by deferring itself by 50 ms. A
+collision class written immediately after `Fall` lands on the living entity's
+physics and is discarded when the ragdoll replaces it. That explains the
+partial reduction, since the filter takes effect only from whenever it happens
+to survive, and it explains the single visible phase-through: the one impact
+where the ordering happened to work is the one where the horse passed through.
+
+**Change**: the filter is now written three times, immediately, at 50 ms and at
+200 ms, so at least one write lands after physicalization and covers the frames
+where the horse is still on top of the victim.
+
+## KCD has a working third-person camera
+
+`g_tpview_enable 1` is accepted by the console and is not cheat-marked, with
+`g_tpview_control` and `g_tpview_force_goc` alongside it. First-person at gallop
+makes it very hard to see what an impact actually does, which has cost several
+rides where the only usable evidence was the telemetry. The camera is a
+development CVar, so it needs setting per session like the other console state.
+
+## Re-timing the collision filter changes nothing
+
+**Change tested**: the horse collision filter written three times, immediately
+after `actor:Fall`, at 50 ms and at 200 ms, so that at least one write lands
+after the ragdoll physicalizes.
+
+**Results**: no improvement. Gallop impacts cost 16.89, 20.23 and 20.97,
+against 16.39 to 19.42 with the single write and 20 to 25 with no filter at
+all. The spread across all three configurations is the same.
+
+The physicalization theory is wrong, or at least it is not what limits this.
+Two possibilities remain and they are distinguishable by one test:
+
+1. **The wrong class is being filtered.** `gcc_horse` is the obvious name, but
+   a ridden horse may be classed as `gcc_ai`, as one of the `gcc_npc_` types,
+   or the damage may be charged against the rider's own capsule rather than the
+   horse. Nothing read so far reports an entity's actual collision class, and no
+   getter for it is exposed.
+2. **`SetPhysicParams` does not survive on a ragdoll at all**, in which case the
+   whole route is closed regardless of which class is named.
+
+**Next test**: filter every actor-like class at once, the union of `gcc_horse`,
+`gcc_ai`, `gcc_npc_all`, `gcc_player_all`, `gcc_rigid` and `gcc_vehicle`, which
+is 36412416. Engine-side classes below 1024 are deliberately excluded so the
+body still collides with terrain instead of falling through the world. If the
+damage goes to zero, the mechanism works and only the class was wrong. If it
+does not, physics filtering cannot reach this and the remaining candidate is the
+animated knockdown, which never creates a body at all.
+
+## Physics collision filtering cannot reach the ragdoll
+
+**Test**: `collisionClassIgnore` set to the union of every actor-like class,
+`gcc_horse`, `gcc_ai`, `gcc_npc_all`, `gcc_player_all`, `gcc_rigid` and
+`gcc_vehicle`, which is 36412416, applied at 0, 50 and 200 ms after
+`actor:Fall` and restored after 1500 ms. Engine classes below 1024 were
+excluded so the body still collides with terrain.
+
+**Results**: unchanged. Gallop impacts cost 19.73, 21.23 and 21.44, squarely in
+the 20 to 25 band measured with no filter at all.
+
+Filtering every class the horse could possibly belong to changes nothing, so
+the failure is not the choice of class. `SetPhysicParams` returns success on a
+victim entity, but the collision class written there does not reach the ragdoll
+the engine creates, and the trample resolves regardless.
+
+**This closes the physics filtering route.** Taken with the two results above
+it, every approach that leaves a physics body in the horse's path is now spent:
+
+| Approach | Result |
+| --- | --- |
+| Redirect the impulse sideways | No effect. The impulse does not cause the damage |
+| Zero the impulse entirely | No effect, 20 to 25 either way |
+| Defer the ragdoll 300 ms | 14 to 22, and the impact reads as broken |
+| Filter horse collisions off the body | 16 to 21, three timings tried |
+| Filter every actor class off the body | 20 to 21 |
+
+**What remains** is the approach that never creates a physics body: an animated
+knockdown through the `AnimationControlled` path the walk stagger already uses.
+The existence proof has been in every session's telemetry from the beginning.
+Walk impacts cost exactly zero health, without exception, because the victim
+never leaves the animation system. The work is to author or locate knockdown
+fragments for the trot and gallop tiers, in the same way the stagger fragments
+were added, so those tiers displace the victim through Mannequin rather than
+through physics.
