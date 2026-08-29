@@ -153,7 +153,7 @@ HorseCollisionMod.Config = {
 	MaxArmorImpulse          = 1.5,
 	ArmorStaminaExponent     = 0.5,
 	MinArmorStamina          = 0.75,
-	MaxArmorStamina          = 2.0,
+	MaxArmorStamina          = 3.0,
 
 	-- Horse stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
@@ -1251,8 +1251,14 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	local readyAt = self.RecentHits[npcId]
 
 	if readyAt and now < readyAt then
-		self:LogRejection(npc, "recovering",
-				"for=" .. tostring(readyAt - now) .. "ms")
+		-- Logged outside the miss diagnostic. It fires only when a victim
+		-- is hit again while still down, which is a handful of lines rather
+		-- than the thousands that diagnostic writes, and it is the only
+		-- evidence that the wait is doing anything.
+		if self.Config.LogTelemetry then
+			self:Log("Recovering " .. tostring(npc:GetName())
+					.. " for=" .. tostring(readyAt - now) .. "ms")
+		end
 
 		return
 	end

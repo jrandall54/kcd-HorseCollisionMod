@@ -46,7 +46,7 @@ HorseCollisionModSettings = {
 	MaxArmorImpulse          = 1.5,   -- nor is a naked peasant weightless
 	ArmorStaminaExponent     = 0.5,   -- higher means armor tires the horse more
 	MinArmorStamina          = 0.75,
-	MaxArmorStamina          = 2.0,
+	MaxArmorStamina          = 3.0,
 
 	-- Switches.
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
