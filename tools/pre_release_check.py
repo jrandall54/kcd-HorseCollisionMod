@@ -267,6 +267,40 @@ def check_download_size(paths, version):
     return found
 
 
+def check_generated_docs():
+    """The generated API reference against the source it documents.
+
+    docs/api is LDoc output committed to the repository, so it goes stale
+    silently: the source grows new functions and fields and the published
+    reference keeps describing the old surface. Comparing commit times catches
+    that, where comparing file times would fire on every checkout.
+    """
+    source = os.path.join("src", "HorseCollisionMod.lua")
+    generated = os.path.join("docs", "api", "index.html")
+
+    if not os.path.exists(os.path.join(REPO_ROOT, generated)):
+        return []
+
+    def committed_at(path):
+        out = subprocess.run(["git", "log", "-1", "--format=%ct", "--", path],
+                             cwd=REPO_ROOT, capture_output=True,
+                             text=True).stdout.strip()
+
+        return int(out) if out.isdigit() else None
+
+    source_at = committed_at(source)
+    generated_at = committed_at(generated)
+
+    if source_at is None or generated_at is None:
+        return []
+
+    if source_at > generated_at:
+        return [(generated.replace(os.sep, "/"), 0, "stale",
+                 "the source has changed since this was generated; run ldoc .")]
+
+    return []
+
+
 def check_file_description(version):
     """The Files tab entry against the 255 characters the mod page keeps.
 
@@ -322,6 +356,7 @@ def main():
                 + check_claims(paths)
                 + check_links(paths)
                 + check_config_docs()
+                + check_generated_docs()
                 + check_download_size(paths, version))
 
     if not merge_only:
