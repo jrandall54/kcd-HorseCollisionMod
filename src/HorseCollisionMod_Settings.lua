@@ -58,7 +58,7 @@ HorseCollisionModSettings = {
 	-- trampled past the floor, however many times they are ridden into.
 	-- Set it to 0 to restore the behavior 3.0.0 shipped with, lockup
 	-- included.
-	MinVictimHealth          = 60.0,
+	MinVictimHealth          = 0.0,
 
 	-- Injuries. The engine rolls one from the hit a collision becomes, and
 	-- an injury never expires: a player clears one with a bandage, a potion
@@ -68,7 +68,7 @@ HorseCollisionModSettings = {
 	-- Clearing them keeps the damage, the reaction and the crime, and takes
 	-- back only the permanent part. Turning this off restores the behavior
 	-- 3.0.0 shipped with.
-	ClearCollisionInjuries   = true,
+	ClearCollisionInjuries   = false,
 
 	-- Exhaustion. The engine adds it for every collision, and it recovers
 	-- slowly, so a rider who knocks the same guards down repeatedly leaves

@@ -5651,3 +5651,67 @@ all.
 Producing a stuck NPC on demand is the prerequisite, and it could not be done.
 Whether one impact under the floor releases an NPC stuck from before remains
 untested.
+
+## The damage is the ragdoll, and the walk tier proves it
+
+A methodical run from a clean baseline, one variable at a time, finally found
+the cause. It is not downstream of the hit at all. It is the mod's own
+`Ragdoll` call.
+
+### The sequence
+
+With `MinVictimHealth` at 0 and `ClearCollisionInjuries` off, a plain
+`villageGuard` locked up reliably at 18 impacts. That reproduction is what made
+everything after it possible.
+
+| Variable changed | Result |
+| --- | --- |
+| `remove_injuries` applied to a stuck victim, four times | no release |
+| health 52, then 76 | no release |
+| health 88, then 100 | releases |
+| health pulsed to 100 then back down after 700 ms | drops back in |
+| healed, allowed to walk normally, then damage restored | drops back in |
+| `remove_unconsciousness` applied, health untouched | no release |
+| `SendHitReaction` off | **damage continues** |
+| impulse zeroed, `Knockback` and `Uplift` at 0 | **damage continues** |
+| `horse_throwdown_protection` on the victim | **damage continues** |
+
+### What that leaves
+
+The walk tier costs nothing. Every walk impact all session, with the hit
+reaction on or off, left health unchanged:
+
+```
+villageGuard tier=Walk health=63.2079   next impact 63.2079
+villageGuard tier=Walk health=49.6894   next impact 49.6894
+```
+
+Walk calls `PlayStagger`. Trot and gallop call `Ragdoll`. That is the only
+difference between them, and trot damages every time.
+
+**`actor:Fall()` costs the victim health.** Not the impulse, which can be zero
+and still damage. Not the hit reaction, which can be off and still damage. The
+ragdoll itself.
+
+It also explains the vanilla test cleanly. Vanilla never ragdolls a pedestrian,
+so a victim stays animation-driven and a horse cannot touch them. The moment
+this mod ragdolls someone they become a physics object in the path of a horse.
+
+### What this retires
+
+Everything built earlier tonight was treating symptoms of a cause that had not
+been found: the energy limit, the injury cure, and the health floor. None of
+them addresses the ragdoll, and the floor cannot work anyway, since the release
+gate sits between 76 and 88 while a floor that high would cancel damage
+entirely. They should be removed rather than left in.
+
+### The direction that follows
+
+The walk tier is the existence proof. A staggering victim is animated rather
+than physical, takes no damage, and never locks up. Replacing the physics
+ragdoll with an animated knockdown, through the same `AnimationControlled`
+path the mod already uses for `hcm_stagger_*`, would keep the knockdown while
+removing the damage and the lockup together.
+
+That is a design change rather than a patch, and it is where the next branch
+should start.
