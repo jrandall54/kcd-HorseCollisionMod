@@ -427,6 +427,97 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	end)
 end
 
+--- Logs a named entity's health whenever it changes.
+--
+-- Health has moved in every ride with no impact to account for it, and an
+-- impact the footprint rejects writes no line at all, so there is nothing to
+-- correlate the loss against. Watching one target records the moment health
+-- moves, whether or not the mod caused it.
+--
+-- A diagnostic, started from the console rather than from play. It samples
+-- twice a second and writes only on a change, so a quiet watch costs two
+-- lines.
+--
+-- @tparam string name entity name to watch
+-- @tparam number seconds how long to watch, default 90
+function HorseCollisionMod:WatchHealth(name, seconds)
+	local ent = System.GetEntityByName(name)
+
+	if not ent or not ent.soul then
+		self:Log("Watch " .. tostring(name) .. " not found")
+		return
+	end
+
+	-- The same generation guard the detection loop uses. A watch left running
+	-- across a load screen would otherwise hold a stale entity forever.
+	local generation = self.TimerTick
+	local deadline = System.GetCurrTime() + (seconds or 90)
+	local last = nil
+
+	local function tick()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local ok, health = pcall(function()
+			return ent.soul:GetState("health")
+		end)
+
+		if not ok or type(health) ~= "number" then
+			self:Log("Watch " .. name .. " lost")
+			return
+		end
+
+		if last and health ~= last then
+			local z = "?"
+			local away = "?"
+
+			-- Where the rider was standing when the health moved. A loss with
+			-- the horse alongside is a contact the footprint rejected; a loss
+			-- with the horse far off is something else entirely.
+			pcall(function()
+				local q = ent:GetWorldPos()
+				local r = player:GetWorldPos()
+
+				z = string.format("%.2f", q.z)
+				away = string.format("%.1f", math.sqrt(
+						(q.x - r.x) * (q.x - r.x)
+						+ (q.y - r.y) * (q.y - r.y)))
+			end)
+
+			self:Log("Watch " .. name
+					.. " health=" .. string.format("%.4f", health)
+					.. " delta=" .. string.format("%+.4f", health - last)
+					.. " z=" .. z
+					.. " rider=" .. away .. "m"
+					.. " speed=" .. string.format("%.2f", self:RecentPeak(3)))
+		end
+
+		last = health
+
+		if System.GetCurrTime() < deadline then
+			Script.SetTimer(500, tick)
+		else
+			self:Log("Watch " .. name .. " ended health="
+					.. string.format("%.4f", health))
+		end
+	end
+
+	self:Log("Watch " .. name .. " started health="
+			.. string.format("%.4f", ent.soul:GetState("health")))
+	tick()
+end
+
+
+--- When the impact probe samples, in milliseconds after the hit.
+--
+-- 500 catches what the impact cost, since the engine applies damage after the
+-- message is handled. 3000 catches anything continuing. 6000 and 10000 reach
+-- past the get-up, which a ragdoll does not finish before the earlier samples
+-- have already been taken.
+HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
+
+
 --- Samples the victim's health across an impact.
 --
 -- Vanilla converts a collision hit whose rider is the player into a real
@@ -436,9 +527,14 @@ end
 -- readable at the moment of the hit. The health state is sampled again on a
 -- timer instead.
 --
--- Two samples, because they answer different questions. The first shows what
--- the impact itself cost. The second shows whether anything continues, which
--- is what bleeding looks like.
+-- Four samples, because they answer different questions. The first shows what
+-- the impact itself cost. The rest reach past the get-up, because health is
+-- also lost after a ragdoll resolves, in discrete amounts that look like a
+-- fall rather than like bleeding.
+--
+-- Height is sampled alongside health for the same reason. The impulse throws
+-- the target, and a change in z across the recovery separates a fall from
+-- anything the collision itself did.
 --
 -- @tparam table npc victim entity
 -- @tparam string tierName the tier the impact scored
@@ -461,9 +557,24 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
 		name = npc:GetName() or "?"
 	end)
 
+	local function height()
+		local okPos, pos = pcall(function()
+			return npc:GetWorldPos()
+		end)
+
+		if okPos and type(pos) == "table" and type(pos.z) == "number" then
+			return pos.z
+		end
+
+		return nil
+	end
+
+	local baseZ = height()
+
 	self:Log("ImpactCost " .. name .. " tier=" .. tierName
 			.. " strength=" .. tostring(strength)
-			.. " health=" .. string.format("%.4f", before))
+			.. " health=" .. string.format("%.4f", before)
+			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?"))
 
 	local function sample(label)
 		local okAfter, after = pcall(function()
@@ -474,18 +585,29 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
 			return
 		end
 
+		local z = height()
+		local dz = "?"
+
+		if z and baseZ then
+			dz = string.format("%+.2f", z - baseZ)
+		end
+
+		-- The starting health is repeated on every sample. Samples now run
+		-- past the cooldown, so a second impact on the same target can
+		-- interleave its lines with the first one's, and the name alone no
+		-- longer identifies which impact a sample belongs to.
 		self:Log("ImpactCost " .. name .. " " .. label
+				.. " from=" .. string.format("%.4f", before)
 				.. " health=" .. string.format("%.4f", after)
-				.. " delta=" .. string.format("%+.4f", after - before))
+				.. " delta=" .. string.format("%+.4f", after - before)
+				.. " dz=" .. dz)
 	end
 
-	Script.SetTimer(500, function()
-		sample("t+500ms")
-	end)
-
-	Script.SetTimer(3000, function()
-		sample("t+3000ms")
-	end)
+	for _, at in ipairs(self.ImpactProbeSamples) do
+		Script.SetTimer(at, function()
+			sample("t+" .. at .. "ms")
+		end)
+	end
 end
 
 
@@ -958,16 +1080,22 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	end
 
 	if tierName == "Trot" then
-		self:Ragdoll(npc, velocity, speed, 0.6)
+		-- Sampled before the impulse, not after. Ragdoll can cost the
+		-- victim health of its own, and a probe that reads afterwards
+		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury)
+		self:Ragdoll(npc, velocity, speed, 0.6)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainTrot * combatScale)
 		return
 	end
 
 	if tierName == "Gallop" then
-		self:Ragdoll(npc, velocity, speed, 1.0)
+		-- Sampled before the impulse, not after. Ragdoll can cost the
+		-- victim health of its own, and a probe that reads afterwards
+		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury)
+		self:Ragdoll(npc, velocity, speed, 1.0)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt, cfg.StaminaDrainGallop * combatScale)
 		return

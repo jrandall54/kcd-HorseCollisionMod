@@ -4658,3 +4658,214 @@ damage.
 
 Two small health regenerations were also recorded between impacts, +0.04 and
 +0.05, so NPCs recover slowly on their own. Too small to affect any figure here.
+
+## The get-up costs nothing, and the delayed loss is not a fall
+
+**Hypothesis**: health lost between impacts is fall damage from the mod's own
+impulse, applied when the ragdoll resolves and the actor is restored. Sampling
+to 10 seconds should catch it, and the victim's height should show the fall.
+
+**User report**: "I've done the first test with the flat ground but to be
+compeltely honest I have no idea where I could test this. There aren't really
+any stairs with engough space to hold my horse and not run into other people."
+
+Twelve trot impacts on `rat_woman12` on flat ground, sampled at 500, 3000, 6000
+and 10000 ms.
+
+### Nothing happens after 500 ms
+
+No impact changed the victim's health after the first sample. Not one of twelve,
+out to ten seconds. Every figure at 3000, 6000 and 10000 ms equals the figure at
+500 ms exactly.
+
+The height readings also settle. `dz` at 500 ms runs -0.19 to -1.10, the victim
+on the ground, and returns to within about 0.5 of the starting height by 3000 ms.
+**The get-up is finished by three seconds**, which removes the reason for
+believing the earlier samples were closing too early.
+
+So the get-up applies no damage, and the delayed loss is not fall damage applied
+at the end of a ragdoll. The hypothesis in the previous entry is wrong.
+
+### The delayed loss is still there, and it is later than ten seconds
+
+Two of eleven intervals lost health with no impact logged: 5.41 after the sixth
+impact and 5.67 after the tenth. Both are larger than any of the twelve impacts
+that were logged, and both land after the 10000 ms sample.
+
+Across four rides the pattern holds at roughly one interval in five, with a
+magnitude in the range of a trot impact or a little above.
+
+### The next candidate is a contact the mod rejects
+
+The footprint is 0.7 m wide and the mod discards anything outside it, but the
+engine resolves its own collisions regardless, and vanilla parameterizes
+collision damage through `CollisionVelocityDeltaToDmgR` in `rpg_param.xml`.
+A graze while riding away or turning around would then damage the target with no
+`Impact` line written.
+
+That fits the timing, which is arbitrary rather than tied to the recovery, and
+the magnitude, which is in the range of a real collision. It also predicts
+something specific: **health should drop on a pass that produces no log line at
+all.** That needs no stairs and no elevation.
+
+### Moving an actor from the console does work, and fall damage is real
+
+An earlier reading of this test was wrong and is corrected here.
+
+`SetWorldPos` raised the player's horse 12 m. The height read back afterwards
+was identical to the starting height, which was taken as the engine reverting
+the move, in line with the limitation already recorded for `AddImpulse`. It was
+not. The horse had already fallen and landed on the same ground, so the sample
+was taken after the fall rather than instead of it.
+
+What settles it is that the player was mounted at the time and was killed on
+landing, with the game reporting fall height as the cause.
+
+So:
+
+- **Actors can be repositioned from the console**, and a repositioned actor
+  falls. The animation-driven limitation recorded for standing NPCs does not
+  extend to this.
+- **Fall damage is applied**, and 12 m is lethal to the player.
+- **The horse took none of it.** Its health read 100 before the drop and 100
+  after, while its rider died. Fall damage is therefore not uniform across
+  entities, and the horse either resists it or is exempt.
+
+The NPC variant, ragdolling with `actor:Fall` first and raising on a timer,
+never produced its log line, and the level was unloaded partway through the
+measurement. NPC fall damage remains untested rather than disproven, and there
+is no longer any reason to believe the approach cannot work.
+
+## A watch on one target, because the graze test cannot be ridden
+
+**User report**: "I loaded a save because I was checking in on you and when I
+came back I was on the death screen saying I died from fall height lol ths test
+is damn near impossible to actually play out. NPCs don't really just stand there
+for very long espeicaly not enough for me to trot past without hitting them or
+anyone."
+
+The graze test as designed asks for something the game does not allow. NPCs walk
+their schedules, the streets are busy, and a controlled near miss on a chosen
+target cannot be held still long enough to repeat.
+
+The answer is to instrument rather than choreograph.
+`HorseCollisionMod:WatchHealth(name, seconds)` samples one entity twice a
+second and writes a line only when its health changes, so a quiet watch costs two lines and any loss is
+timestamped. Riding normally near the target is then enough: a health drop with
+no `Impact` line beside it is the graze the previous entry predicted, and one
+with an `Impact` line is an ordinary hit.
+
+It takes the same generation guard as the detection loop, so a watch does not
+survive a load screen holding a stale entity.
+
+## The delayed loss was the probe reading health too late
+
+**User report**: "ok I just guessed which one it's not like rat_woman43 has a
+nametag or something lol"
+
+The guess was right. The watch recorded four changes on `rat_woman43` during a
+two-minute ride:
+
+| Event | Health | Change |
+| --- | --- | --- |
+| Watch started | 100.0000 | |
+| Walk impact, `strength=2` | 100.0000 | none |
+| Trot impact | 97.6762 | -2.3238 |
+| Trot impact | 89.7660 | -7.9101 |
+| No impact logged | 69.4161 | **-20.3499** |
+| Gallop impact, starting health already 69.4161 | | |
+
+The 20.35 is larger than any logged impact recorded in this project, and no
+`Impact` line accounts for it. What identifies it is where it sits: the gallop
+impact that follows reads the victim's starting health as 69.4161, so the loss
+had already happened by the time that impact was measured.
+
+### The cause is in the mod, not the engine
+
+`HandleImpact` called `Ragdoll` before `ProbeImpactCost` on both the trot and
+the gallop paths. The probe therefore read the victim's health **after** the
+impulse had been applied.
+
+If the impulse costs the victim health, that cost is invisible to the impact
+that caused it and instead shows up as an unexplained loss in the interval
+before the *next* impact, since it is baked into that impact's starting figure.
+
+That accounts for every property of the mystery:
+
+- The magnitude matches an impact, because it is caused by one.
+- It never appeared between the 500 ms and 10000 ms samples, because it happens
+  at the moment of the next impact rather than during the recovery.
+- It appeared in roughly one interval in five, which is how often the impulse
+  costs the victim anything worth recording.
+- Extending the sampling window could not catch it, which is why the previous
+  two entries could not find it.
+
+The order is now reversed on both paths, so the probe reads before the impulse.
+
+### What this means for the figures already recorded
+
+**Every per-impact cost measured so far understates the impact**, by whatever
+the impulse took. The armor comparison used the same instrument on both sides,
+so its ratio is not invalidated, but the absolute figures in all four rides are
+low.
+
+It also revises the Phase 2 boundary question again. The impulse costing the
+victim health is now the leading reading of the data, which is the same
+conclusion the fall damage hypothesis reached by a route that turned out to be
+wrong: scaling `impulseScale` by armor and mass would scale damage with it.
+
+### The instrument also needs a way to name its target
+
+Watching one entity by name asks the rider to identify an NPC that carries no
+visible name. The watch happened to land on a target that was ridden at anyway.
+Watching every living human near the horse would remove the guess, and is the
+shape to build if a watch is needed again.
+
+## The ordering fix was not the cause either
+
+**Hypothesis**: `ProbeImpactCost` running after `Ragdoll` folded the impulse's
+own damage into the next impact's starting figure. Reversing the order should
+remove the between-impact gaps and raise the per-impact cost by the amount that
+used to go missing.
+
+**User report**: the ride was run as asked, twelve trot impacts on
+`led_wanderer09`.
+
+Both predictions failed.
+
+| | Impacts | Mean | SD | Min | Max | Gaps |
+| --- | --- | --- | --- | --- | --- | --- |
+| Before the fix, `rat_woman12` | 12 | -4.2604 | 1.17 | -1.8493 | -5.8415 | 2 of 11 |
+| After the fix, `led_wanderer09` | 12 | -3.8781 | 0.50 | -2.5422 | -4.5920 | 2 of 11 |
+
+The gaps did not disappear. The rate is identical, and the two losses were 2.13
+and 4.82. The per-impact cost did not rise; it fell slightly.
+
+**So the impulse does not cost the victim health**, and the account given in the
+previous entry is wrong. Sampling before the impulse is still the correct order
+for a measurement, and it stays, but it explains nothing about the gaps.
+
+The one real change is the spread: the standard deviation fell from 1.17 to
+0.50. Two different targets were used, so archetype rather than the reordering
+could account for that, and nothing should be read into it yet.
+
+### Where this leaves the question
+
+Five rides, three explanations offered and all three discarded:
+
+1. Fall damage applied at the get-up. Disproved by sampling to 10 seconds and
+   seeing no change after 500 ms on any impact.
+2. A contact the footprint rejects while the engine still resolves it. Not
+   disproved, but not demonstrated, and the ride designed to test it could not
+   be performed.
+3. The probe reading health after the impulse. Disproved here.
+
+What survives every ride is the rate: close to one interval in five, at a
+magnitude in the range of a trot impact, on every target and both sexes.
+
+Guessing at mechanisms has now cost three rides. The watch is the instrument
+that can answer it directly, because it timestamps the loss instead of
+inferring it from the interval, and it now records the rider's distance and the
+horse's recent peak speed at that moment. A loss with the horse alongside is the
+rejected contact of explanation 2. A loss with the horse thirty metres away is
+none of the three.
