@@ -125,11 +125,13 @@ armor.
       cent. The difference is 0.59 against a standard error of 0.41, so at this sample size it
       cannot be separated from zero. Whatever the engine applies for armor against a collision
       hit, it is small.
-- [ ] Account for health lost between impacts, most likely fall damage from the mod's own
-      impulse. Nine intervals across three targets show a discrete loss of 2.4 to 4.8 with no
-      impact logged, and a guard was seen falling down stairs on two of them. The loss lands
-      after the 3000 ms sample, which is about when the ragdoll resolves and the NPC stands
-      up. Extend the probe past the get-up to confirm.
+- [ ] Account for health lost between impacts. Not the get-up: sampling to 10 seconds on flat
+      ground shows no health change after 500 ms on any of 12 impacts, and the target is back
+      on its feet by 3 seconds. The loss still happens, 5.41 and 5.67 in 2 of 11 intervals,
+      later than 10 seconds after the impact. The leading candidate is now an unlogged contact:
+      the footprint is 0.7 m wide and rejects a graze that the engine still resolves as a
+      collision through `CollisionVelocityDeltaToDmgR`. Testable by riding past a target
+      without producing an `Impact` line and watching health.
 - [ ] Decide where fall damage sits in the Phase 2 scope boundary. If the impulse causes damage
       by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
       and the split between what the engine owns and what the mod owns does not hold as written

@@ -4658,3 +4658,64 @@ damage.
 
 Two small health regenerations were also recorded between impacts, +0.04 and
 +0.05, so NPCs recover slowly on their own. Too small to affect any figure here.
+
+## The get-up costs nothing, and the delayed loss is not a fall
+
+**Hypothesis**: health lost between impacts is fall damage from the mod's own
+impulse, applied when the ragdoll resolves and the actor is restored. Sampling
+to 10 seconds should catch it, and the victim's height should show the fall.
+
+**User report**: "I've done the first test with the flat ground but to be
+compeltely honest I have no idea where I could test this. There aren't really
+any stairs with engough space to hold my horse and not run into other people."
+
+Twelve trot impacts on `rat_woman12` on flat ground, sampled at 500, 3000, 6000
+and 10000 ms.
+
+### Nothing happens after 500 ms
+
+No impact changed the victim's health after the first sample. Not one of twelve,
+out to ten seconds. Every figure at 3000, 6000 and 10000 ms equals the figure at
+500 ms exactly.
+
+The height readings also settle. `dz` at 500 ms runs -0.19 to -1.10, the victim
+on the ground, and returns to within about 0.5 of the starting height by 3000 ms.
+**The get-up is finished by three seconds**, which removes the reason for
+believing the earlier samples were closing too early.
+
+So the get-up applies no damage, and the delayed loss is not fall damage applied
+at the end of a ragdoll. The hypothesis in the previous entry is wrong.
+
+### The delayed loss is still there, and it is later than ten seconds
+
+Two of eleven intervals lost health with no impact logged: 5.41 after the sixth
+impact and 5.67 after the tenth. Both are larger than any of the twelve impacts
+that were logged, and both land after the 10000 ms sample.
+
+Across four rides the pattern holds at roughly one interval in five, with a
+magnitude in the range of a trot impact or a little above.
+
+### The next candidate is a contact the mod rejects
+
+The footprint is 0.7 m wide and the mod discards anything outside it, but the
+engine resolves its own collisions regardless, and vanilla parameterizes
+collision damage through `CollisionVelocityDeltaToDmgR` in `rpg_param.xml`.
+A graze while riding away or turning around would then damage the target with no
+`Impact` line written.
+
+That fits the timing, which is arbitrary rather than tied to the recovery, and
+the magnitude, which is in the range of a real collision. It also predicts
+something specific: **health should drop on a pass that produces no log line at
+all.** That needs no stairs and no elevation.
+
+### Moving an actor from the console does not work
+
+An attempt to test falling directly, by raising an NPC and letting it drop,
+failed on the same limitation already recorded for `AddImpulse`. `SetWorldPos`
+on the player's horse returned it to a height identical to the one it started
+at, and health did not change. Actors are animation-driven and the engine puts
+them back.
+
+Ragdolling the target with `actor:Fall` first and raising it on a short timer
+did not produce its log line either, and the level was unloaded partway through
+the measurement, so that variant is untested rather than disproven.
