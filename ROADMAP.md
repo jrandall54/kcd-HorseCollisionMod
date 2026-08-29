@@ -89,26 +89,30 @@ Overriding `rpg_param.xml` is rejected: one global value read by everything that
 resolves a physical collision, including the player's own, and shipping a
 vanilla table reintroduces the conflict surface 3.0.0 removed.
 
-### 2. Repeatedly ragdolled NPCs wedge, and it is not the damage
+### 2. Repeatedly ragdolled NPCs wedge. Fixed.
 
-An NPC hit enough times stops responding: alive, undamaged, holding whatever
-idle it was in, refusing to resume its schedule. Combat claims it normally and
-hands it back to the wedge afterwards.
+The state is vanilla's auto-cure daycycle. An NPC carrying a bleeding or poison
+buff whose health falls under 40 enters `cureLookHurt`, in
+`Libs/AI/final/sb_daycycles_cure.xml`, which plays the `PretendingIllness`
+animation under a wait with no timeout and regenerates health at 0.02 per
+second. Nothing inside that subtree ends, so a victim left under the threshold
+stands in the street until health climbs back over it.
 
-With collision damage zeroed, a victim still wedged **at 96.4 health**, in an
-ordinary standing idle rather than a wounded pose. So this is independent of
-damage, of health, and of the wounded animation.
+It is designed behavior rather than a defect. The mod meets it because it is the
+one thing in the game that leaves ordinary townspeople badly hurt in the open.
 
-Ruled out by test, not by reading: injury buffs, the Energy stat, the animation
-queue, the mod's Mannequin data, unconsciousness buffs, damage, and health.
+- [x] Exempt a collision victim from the daycycle, using the same context option
+      vanilla uses for duellists and scripted wanderers. Set at impact, which is
+      before collision damage resolves; the gate is only read on entry, so an
+      option set afterwards does not release a running cure.
+- [x] Release a victim already held, by removing the `curePatch` daycycle patch
+      after setting the option. This works at low health and without healing, so
+      a save carrying stuck NPCs repairs itself as the rider rides.
+- [x] Retire `MinVictimHealth`. It prevented the lockup only by making a
+      collision unable to kill.
 
-- [ ] Raise `KnockdownRecoveryMs` well above 6000 and see whether the wedge
-      stops. A victim hit again while still recovering is the most plausible way
-      to wedge the state machine, and it is one setting and one ride.
-- [ ] If that is not it, instrument what the victim's behavior tree is doing.
-      `XGenAIModule.GetBrainVariable(entity, name)` reads a tree's variables and
-      is the only unexplored route; twelve `b_` names returned nil against an
-      entity id, so the addressing needs settling first, WUID against entity id.
+Produced far more readily on guards than on other NPCs, which is also where
+every report of it in this project has come from.
 
 ### Three things to remove before either fix lands
 

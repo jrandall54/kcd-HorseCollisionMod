@@ -6558,3 +6558,162 @@ permanent in a player's game.
 
 A guard in combat is also an invalid subject for any cure test, since combat
 preempts the daycycle. Tests of this kind need a calm area.
+
+## The exemption must be set before the injury, not after
+
+Two runs, same buff, same health, same option, different order.
+
+**Option set after the injury** (`villageGuard`):
+
+```
+[G2] target=villageGuard health=86.9 anim=MotionMovement
+[G2] armed health=20.0 sup=true
+[G2] t+5s health=20.1 anim=PretendingIllness sup=true
+```
+
+**Option set before the injury** (`rat_swordsmith_helper`):
+
+```
+[G3] target=rat_swordsmith_helper sup=true  (option set FIRST)
+[G3] armed  health=20.0 anim=SmithGrab   sup=true
+[G3] t+5s   health=20.0 anim=SmithGrab   sup=true
+[G3] t+10s  health=20.0 anim=SmithHeating sup=true
+```
+
+The second NPC carried on with its job animations and did not regenerate,
+so the cure never started. The first entered `PretendingIllness` **while the
+option read true**.
+
+**The gate is evaluated when the cure starts, and setting the option afterwards
+does not cancel a cure already running.** The `IfGate` in `cureStart` carries
+`RunLogic="KeepRunning"`, so a subtree already entered keeps running regardless
+of the condition that admitted it. This is the same shape as the earlier finding
+that removing the injury buff from a stuck NPC does not release it.
+
+### Why the mod is nonetheless correct
+
+`SuppressAutoCure` is called from `TriggerCollision`, at the moment of impact,
+while collision damage resolves around 500 ms later. The exemption is therefore
+in place before health can cross the threshold, which is the order that works,
+and it is why the ride test passed with a victim held at 38 health.
+
+### What it rules out
+
+The exemption cannot be used to repair an NPC that is already stuck, in a save
+or otherwise. That needs a different lever, and the candidates are raising
+health above 40, which is already known to work, and
+`XGenAIModule.RemoveDaycyclePatch`, which is untested.
+
+## An NPC already in the cure can be released, without healing it
+
+The cure installs itself as a daycycle patch. `cureApplyPatch` sends:
+
+```
+SendMessageToNPC target="this.id" type="daycycle:change"
+  values="add(true), once(true), handle('curePatch'), name('cure'), priority(34)"
+```
+
+so the handle is `curePatch`, and `XGenAIModule.RemoveDaycyclePatch(wuid, handle)`
+is documented to remove it and to report whether it did.
+
+**Removing the patch alone is not enough.** A first attempt removed the patch
+and also reset `t_daycycleCureInProgress` to false. The patch removal reported
+true, and the guard was back in `PretendingIllness` five seconds later: clearing
+that flag reopened the gate while the NPC was still bleeding under 40 health, so
+the cure simply started again.
+
+**Suppress first, then remove.** Applying the ordering rule established above:
+
+```
+[FX2] before health=23.7 anim=PretendingIllness sup=false
+[FX2] step1 suppress set=true
+[FX2] step2 RemoveDaycyclePatch returned=true
+[FX2] t+5s  health=23.7 anim=IdleToMove     sup=true
+[FX2] t+10s health=23.7 anim=MotionMovement sup=true
+[FX2] t+15s health=23.7 anim=MotionMovement sup=true
+```
+
+The guard stood up and walked his patrol again **at 23.7 health**, still
+bleeding, without being healed.
+
+The strongest evidence in that block is the health column. It had been climbing
+by 0.02 every second for the previous three minutes, and it stops dead at 23.7
+and stays there. The `autoCure` buff is attached to `cureLookHurt` by a
+`DecoratorBuff`, so regeneration stopping is proof the subtree itself is gone
+rather than merely out of view, which is what the earlier `MotionIdle` samples
+turned out to be.
+
+### The `LODGuardian` explains an earlier misreading
+
+During the expiry test the same guard left `PretendingIllness` at t+70s and
+showed `MotionIdle` while health kept climbing at the same rate. That is not a
+recovery. `cureLookHurt` wraps its animation in a `LODGuardian`, which plays the
+animation only in the `Detail` branch and substitutes a plain wait in the `LOD`
+branch, so a victim the player is not close to stops performing the animation
+while remaining in the subtree. **Animation state alone is not a reliable test
+for this state; the regeneration is.**
+
+### Both halves are now proven
+
+- **Prevention.** Set the option before health crosses the threshold. The mod
+  does this at impact, and collision damage resolves about 500 ms later.
+- **Repair.** Set the option, then remove the `curePatch` daycycle patch. This
+  releases a victim already stuck, at low health, without healing them, so it
+  does not cost the mod its ability to trample someone to death.
+
+## Entry into the cure is not immediate for every NPC
+
+Attempts to manufacture the stuck state on demand succeed on some NPCs and not
+others. `villageGuard` entered `PretendingIllness` within five seconds of being
+set to 20 health with the `bleeding` buff, twice. `rat_man95` and
+`rat_swordsmith_helper`, given the same treatment, were still walking with
+health flat at exactly 20.00 half a minute later, and the flat health shows the
+`autoCure` buff was never applied, so the cure had not started rather than
+having started invisibly.
+
+The buff and the health threshold are necessary but the daycycle also has to
+re-evaluate, and when that happens depends on what the NPC is doing.
+`sb_daycycles_cure.xml` declares a `cureFastStartCheck` tree and `sb_daycycles.xml`
+carries a persistent `t_fastStart` variable, so there is a fast path and a slow
+one. Which NPCs take which is not established.
+
+Two practical consequences. A guard is a reliable subject for this state and a
+townsperson is not, which is worth knowing before spending a test on one. And
+the mod cannot be judged to have fixed the lockup by watching a single victim
+fail to enter it, since some victims would not have entered it anyway. The
+evidence that matters is the controlled A/B, where two NPCs were treated
+identically in the same second and only the exempt one stayed free.
+
+## The wedge at 96.4 health was an artifact of the modified collision parameter
+
+Recorded so it is not chased again. The one observation that did not fit the
+auto-cure explanation, a victim wedged at 96.4 health in an ordinary standing
+idle rather than in `PretendingIllness`, was made during the session that ran
+with `CollisionVelocityDeltaToDmgR` set to 0 in a loose `rpg_param.xml`.
+
+That table override is a diagnostic that was tried once and rejected, and it is
+not something the mod ships or that a player would ever have. The observation
+therefore describes a game state that no longer exists and cannot recur unless
+the parameter is deliberately overridden again.
+
+It also explains the anomaly on its own terms: with collision damage zeroed the
+victim could not fall under 40 health, so whatever held them was not the cure,
+and there was no reason to expect `PretendingIllness`.
+
+**There is no second lockup state to explain.** The 96.4 reading is retired.
+
+## Which NPCs enter the cure
+
+The entry timing above is worth stating as a practical rule, and it matches an
+earlier session the user recalled, where a named NPC took collision damage
+repeatedly, never locked up, and was eventually killed.
+
+`villageGuard` entered `PretendingIllness` within five seconds, twice, under
+controlled conditions. `rat_man95`, `rat_swordsmith_helper` and
+`rat_bailiff_wife` never entered it under equivalent or worse treatment.
+
+So the state is far more readily produced on guards than on ordinary or named
+townspeople, which is consistent with every report of it in this project: every
+stuck NPC recorded here has been a guard. That is also the worst case for a
+player, since guards are what a rider tramples repeatedly, so the fix is aimed
+at the right target even though the state is not universal.
