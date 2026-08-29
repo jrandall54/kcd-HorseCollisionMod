@@ -164,6 +164,10 @@ HorseCollisionMod.Config = {
 	-- The floor a collision will not take a victim below.
 	MinVictimHealth          = 60.0,
 
+	-- How long a victim is exempted from vanilla's auto-cure daycycle,
+	-- in seconds. Zero leaves them in it.
+	SuppressAutoCureSec      = 30,
+
 	-- Injuries caused by collisions.
 	ClearCollisionInjuries   = true,
 
@@ -1016,6 +1020,80 @@ HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
 -- @tparam string tierName the tier the impact scored
 -- @tparam number strength the `HitReactionStrength` sent with the hit
 -- @tparam[opt] table armor totals from `ArmorOf`, read again when absent
+--- Exempts a collision victim from vanilla's auto-cure daycycle.
+--
+-- An NPC carrying a bleeding or poison buff whose health is under
+-- `t_autoCureLowHealthLimit`, which vanilla sets to 40, enters the
+-- `cureLookHurt` behavior in `Libs/AI/final/sb_daycycles_cure.xml`. That
+-- subtree plays the `PretendingIllness` animation under a wait with no
+-- timeout, and regenerates health at 0.02 per second. Nothing inside it ends,
+-- so a victim left under the threshold stands in the street until health
+-- climbs back over it, which takes a quarter of an hour of game time and
+-- reads as a permanently broken NPC.
+--
+-- Vanilla exempts its own characters from the daycycle through a context
+-- option, used for duellists and for scripted wanderers among others. The
+-- same option is requested here. The timed form is preferred to
+-- `Contexts.SetNonpersistentOption` because it expires by itself, so a victim
+-- cannot be left permanently outside a system the rest of the game depends on
+-- if the mod misses its own cleanup.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:SuppressAutoCure(npc)
+	local HANDLE = "HorseCollisionMod"
+	local seconds = self.Config.SuppressAutoCureSec
+
+	if type(seconds) ~= "number" or seconds <= 0 then
+		return
+	end
+
+	if not npc or not npc.id or type(XGenAIModule) ~= "table" then
+		return
+	end
+
+	if type(Contexts) ~= "table" then
+		return
+	end
+
+	-- The message form, `context:timedOptionRequest`, carries its own
+	-- expiration and reads as the tidier option, but it is a request to the
+	-- brain and a busy brain drops it: sent to a guard in combat, the option
+	-- read back false immediately. The direct call writes the Contexts table
+	-- and does not depend on the brain accepting anything.
+	--
+	-- Non-persistent is deliberate. The option does not survive a save, so an
+	-- exemption this code fails to clear cannot become permanent in a player's
+	-- game.
+	pcall(function()
+		Contexts.SetNonpersistentOption(npc, "suppressAutoCure", HANDLE)
+	end)
+
+	local held = false
+	pcall(function()
+		held = Contexts.CheckOption(npc, "suppressAutoCure")
+	end)
+
+	if self.Config.LogTelemetry then
+		local name = "?"
+		pcall(function() name = npc:GetName() or "?" end)
+		self:Log("SuppressAutoCure " .. name .. " for=" .. tostring(seconds)
+				.. "s set=" .. tostring(held))
+	end
+
+	if not held then
+		return
+	end
+
+	-- Cleared on a timer rather than left to expire, because the direct call
+	-- has no expiry of its own. A later impact reschedules its own clear, and
+	-- clearing an option that is already clear costs nothing.
+	Script.SetTimer(seconds * 1000, function()
+		pcall(function()
+			Contexts.ClearOption(npc, "suppressAutoCure", HANDLE)
+		end)
+	end)
+end
+
 function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	if not self.Config.LogTelemetry or not npc or not npc.soul then
 		return
@@ -1571,9 +1649,13 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- clear.
 	self:ClearInjuries(npc)
 
-	-- The one that actually prevents the lockup. The injury cure above is
-	-- kept because a permanent injury is worth undoing on its own account,
-	-- but it is not what strands a victim.
+	-- What actually prevents the lockup. A victim under 40 health carrying a
+	-- bleeding buff is otherwise taken over by vanilla's auto-cure daycycle,
+	-- which stands them in the street playing `PretendingIllness`.
+	self:SuppressAutoCure(npc)
+
+	-- Superseded by the exemption above, and off by default. It prevented the
+	-- lockup only by making a collision unable to kill.
 	self:HoldVictimAboveFloor(npc)
 
 	-- Walked once per impact. Every use below wants the same totals, and

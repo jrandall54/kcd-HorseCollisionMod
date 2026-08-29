@@ -59,6 +59,7 @@ HorseCollisionModSettings = {
 	-- Set it to 0 to restore the behavior 3.0.0 shipped with, lockup
 	-- included.
 	MinVictimHealth          = 0.0,
+	SuppressAutoCureSec      = 30,   -- exempt victims from the auto-cure daycycle
 
 	-- Injuries. The engine rolls one from the hit a collision becomes, and
 	-- an injury never expires: a player clears one with a bandage, a potion
