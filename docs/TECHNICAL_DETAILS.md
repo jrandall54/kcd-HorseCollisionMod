@@ -99,6 +99,21 @@ local header directly.
   most messages sent under load are lost. There is no return value to check.
 - The behavior tree node `LogToConsole` does not write to `kcd.log`. An
   `ExecuteLua` node calling `System.LogAlways` does.
+- Actor damage does not reach Lua. `BasicActor.Server:OnHit` and
+  `BasicActor.Client:OnHit` can be replaced on a live entity and never fire,
+  including on a victim losing health to a collision. Damage is resolved
+  natively, so no override of `BasicActor.lua` can gate it.
+- The collision damage multipliers on the same file are equally inert.
+  `GetSelfCollisionMult`, `GetForeignCollisionMult`, `GetColliderEnergyScale`
+  and `GetCollisionDamageThreshold` exist on every actor and are never called.
+  Much of `BasicActor.lua` is inherited Crytek code, alongside the vestigial
+  `HitDeathReactions` subsystem, and reads as available while doing nothing.
+- `SetPhysicParams(PHYSICPARAM_COLLISION_CLASS, ...)` returns success on an
+  actor but does not reach the ragdoll the engine creates from it. Filtering
+  every actor-like class off a victim leaves collisions against it unchanged.
+- Entity script tables are copies. `NPC = CreateAI(NPC_x)` copies fields, so
+  patching a shared table such as `BasicActor` changes nothing about entities
+  already spawned.
 
 Most of these failures are silent. A call returns without error, a log line
 never appears, an animation does not play. Confirm that a signal works before
@@ -183,12 +198,18 @@ config table itself is kept scannable, since it is read to change a setting.
 ### Stamina
 
 A full horse stamina pool is 210. At the current values a gallop costs roughly
-three bodies and a trot roughly five before the horse is spent and Henry is
+five bodies and a trot roughly seven before the horse is spent and Henry is
 thrown. Stamina regenerates quickly between impacts, so the number of people
 that can be put down in one run depends on the horse and on how fast the hits
 are strung together.
 
 A walking bump is not hard enough to tire a horse, hence `StaminaDrainWalk = 0`.
+
+The cost is then multiplied by what the target wears, between
+`MinArmorStamina` and `MaxArmorStamina`. A villager in cloth costs less than
+the listed figure and a target in mail costs twice it, so a charge into
+armored men is the expensive one. That multiplier compounds with the combat
+multiplier below.
 
 ### Combat multiplier
 
@@ -213,6 +234,81 @@ either way.
 
 Turning it off compares against vanilla collision handling without uninstalling
 the mod. The knockdown tiers are unaffected.
+
+## Collision damage
+
+The mod contains no damage code. Health lost to a knockdown is the engine's,
+and it comes from one parameter:
+
+```
+Libs/Tables/rpg/rpg_param.xml
+  CollisionVelocityDeltaToDmgR = 0.25
+```
+
+`actor:Fall` turns a victim from an animation-driven actor into a physics body.
+The horse is still moving through that space, so the engine resolves horse
+against body as a collision and charges damage from the velocity delta.
+
+What follows from that, and what does not:
+
+- **The horse's speed at contact is the only predictor.** Impacts above 10 m/s
+  cost 20 to 25 against an unarmored target; impacts under 5 m/s cost nothing,
+  even when the tier scored as a gallop from the peak of the speed trail.
+- **The impulse contributes nothing.** `Knockback`, `Uplift` and any lateral
+  component can all be zero and the cost is unchanged. Aiming the impulse
+  differently therefore cannot reduce it.
+- **Armor contributes nothing either.** A guard in chain takes the same as a
+  villager in cloth. Armor scales the impulse, and a target thrown further
+  reads as a target hurt worse, which is not the same thing.
+- **The walk tier costs nothing at all**, because a stagger never leaves the
+  animation system and no physics body exists to strike.
+
+Overriding the parameter is rejected. It is a single global value read by
+everything that resolves a physical collision, including the player's own, and
+shipping `rpg_param.xml` reintroduces the whole-file conflict surface additive
+deployment removed.
+
+## The auto-cure daycycle
+
+Vanilla takes over any NPC that is hurt and has no other context, and the mod
+is the one thing in the game that leaves ordinary townspeople badly hurt in the
+open.
+
+```
+Libs/AI/final/sb_daycycles_cure.xml   cureStart, cure, cureLookHurt,
+                                      cureFastStartCheck, cureApplyPatch
+Libs/AI/final/sb_daycycles.xml        t_autoCureLowHealthLimit = 40.0
+```
+
+Entry needs two things together: a buff carrying AI tag 3 or 4, which is
+poison or `bleeding`, and health under 40. Either alone does nothing. The
+gate also requires that no cure is already running and that the context
+option `suppressAutoCure` is not set.
+
+`cureLookHurt` is the state that reads as a broken NPC. It plays the
+`PretendingIllness` animation under a wait with no timeout, decorated with the
+`autoCure` buff, which restores health at 0.02 per second. Nothing inside the
+subtree ends it; the parent withdraws it when health rises back over the
+threshold, which takes a quarter of an hour of game time.
+
+Three properties matter for anything built against it:
+
+- **The gate is read on entry only.** The subtree keeps running once admitted,
+  so setting the option afterwards does not release a victim already in it.
+- **Animation state is not a reliable test.** A `LODGuardian` substitutes a
+  plain wait for the animation when the player is not close, so a victim can
+  be held while showing an ordinary idle. The 0.02 per second regeneration is
+  the reliable signal.
+- **Guards reach it far more readily than other NPCs.** Entry also waits on the
+  daycycle re-evaluating, and townspeople given identical treatment often never
+  enter it.
+
+The mod exempts its victims through the same context option vanilla uses for
+duellists and scripted wanderers, set at the moment of impact so that it is in
+place before collision damage resolves, and cleared on a timer. It also removes
+the `curePatch` daycycle patch, which releases a victim already held, at low
+health and without healing them. Removing that patch without setting the option
+first lets the cure restart within seconds.
 
 ## Additive animation deployment
 

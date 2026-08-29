@@ -270,10 +270,11 @@ rather than missing.
 
 - [ ] Riding through a packed group inflicts a morale shock, so lightly armored enemies
       break and flee using native AI.
-- [ ] Bumping someone at walking pace annoys them; trampling triggers the crime system.
-      Construction rather than verification: a gallop impact that knocks a guard down
-      registers no bounty, so a player-attributed `real(true)` hit is not on its own enough
-      for the crime system. Whether a witness or a fatal outcome changes that is untested.
+- [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
+      a guard down registers no bounty, but trampling a villager to death brought the
+      guards down on the rider and carried a jail sentence, with no crime code in the mod.
+      So the threshold is the outcome rather than the hit, and non-lethal trampling being
+      free is the part still open.
 
 The `hitReaction` message the mod already sends is the hook for both, and vanilla
 distinguishes light from normal collisions through the `KOLIZE_S_HRACEM` and

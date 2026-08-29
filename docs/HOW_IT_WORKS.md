@@ -12,11 +12,22 @@ horse's speed at the moment of contact and picks a reaction to match:
 | Speed | Reaction |
 | --- | --- |
 | Walking | The NPC staggers, stays upright, takes no damage |
-| Trot | The NPC is knocked down |
-| Gallop | The NPC is knocked down harder |
+| Trot | The NPC is knocked down, and hurt |
+| Gallop | The NPC is knocked down harder, and hurt badly |
 
-The horse pays for it in stamina, more so during combat, and an exhausted horse
-throws its rider.
+The horse pays for it in stamina, more so during combat and more against an
+armored target, and an exhausted horse throws its rider.
+
+Being ridden down hurts, and enough of it kills. That damage is the game's own
+rather than the mod's: knocking someone down makes them a physical object, and
+the game charges for a horse striking one at speed. A bump costs nothing and a
+full gallop costs a great deal. Because the game attributes a rider's collision
+to the rider, it is a crime like any other, and guards respond to it.
+
+A badly hurt NPC left in the street would otherwise be taken over by the game's
+own behavior for the wounded, which stands them still until they slowly heal.
+The mod exempts anyone it knocks down from that, using the same mechanism the
+game uses for its own characters, so a victim gets up and carries on.
 
 ## The approach
 

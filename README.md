@@ -10,11 +10,17 @@ in vanilla.
 | Speed | NPC | Horse stamina |
 | --- | --- | --- |
 | Walk, 1.8+ m/s | Staggers, stays on their feet, takes no damage | No cost |
-| Trot, 4.5+ m/s | Knocked down | -45 |
-| Gallop, 8.5+ m/s | Knocked down harder | -75 |
+| Trot, 4.5+ m/s | Knocked down, and hurt | -30 |
+| Gallop, 8.5+ m/s | Knocked down harder, and hurt badly | -45 |
 
 - The stagger is the game's own standing hit reaction, picked from the side you hit them on.
-- No crime or bounty. The mod does not fake an attack, so the crime system is never involved.
+- Riding someone down hurts them, and enough of it kills. The damage is the game's
+  own, from the speed the horse is carrying when it strikes, so a bump costs nothing
+  and a full gallop costs a great deal.
+- Because the game treats a rider's collision as the rider's doing, hurting or
+  killing someone this way is a crime like any other, and guards respond to it.
+- Armor decides how far someone is thrown and how much the impact tires your horse.
+  It does not reduce the damage.
 - If a collision empties your horse's stamina, it rears and throws you off.
 - Horses have different stamina pools and it regenerates between impacts, so how many
   people you can put down depends on your horse and how fast you string hits together.
