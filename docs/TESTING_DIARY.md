@@ -5270,3 +5270,66 @@ on a stat this project has not used before.
 The guard remains stuck in a hurt animation, and it is not energy, not the
 animation queue, which logged no overflow at all on a clean save, and not
 anything the mod sets. `health=34.1 stamina=124.1` with no weapon drawn.
+
+## What the stuck guard is not
+
+**User report**: "It kind of reminds me like he's holding his stomach, is he
+hungry (nourishment) or maybe is he's poisoned? or is there some buff attached
+to him?"
+
+Interrogated live, standing next to him. None of those, and the elimination is
+worth more than it looks.
+
+- **Not hunger, poison or bleeding.** `soul:GetState` answers for exactly three
+  names on this build: `health`, `stamina` and `exhaust`. Every other name
+  tried, including `nourishment`, `poison`, `bleeding`, `injury`, `morale` and
+  `consciousness`, returns nil. Those states are not queryable and most likely
+  do not exist here.
+- **Not a buff.** `HasBuffDebug` is absent from `Soul` on this build, and the
+  documented bind list has no getter for buffs at all.
+- **Not injury or low condition.** `health=49.4 stamina=138.6 exhaust=100`, and
+  health was rising between samples, so he is healing normally. Energy is full,
+  which after the correction in the previous entry means rested.
+- **Not the animation queue.** Zero `Animation-queue overflow` lines on the
+  clean save.
+- **Not anything the mod writes.** He entered the state on a save that predates
+  the mod's installation, with the energy limit already disabled.
+
+`actor:StandUp()` is accepted and changes nothing.
+
+### The animation cannot be read from the entity
+
+`entity:GetCurAnimation(slot)` returns nil for every slot while
+`IsAnimationRunning` is true, so the animation is not playing through an entity
+animation slot. It is Mannequin or AI driven, which is consistent with
+everything else this project has found about actor animation, and it means the
+clip cannot be named from Lua.
+
+`ai_DebugAgent`, `ai_DebugDraw` and `ai_DebugBehaviorSelection` were set and
+drew nothing on screen.
+
+### The route that is left
+
+`XGenAIModule.GetBrainVariable(entity, name)` reads a behavior tree's variable
+store, and vanilla uses it from `LuaGate` nodes. Twelve persistent `b_` variable
+names taken from the `sb_switch_*` trees all returned nil against the guard's
+entity id, so either the addressing is wrong, vanilla passing a WUID in one call
+site and an entity id in another, or those variables are not set on him.
+
+Settling that addressing is the next step and it is cheap. What it would give is
+the tree's own view of the NPC, which is the only place left that can name the
+state.
+
+### Runtime archetype data, found incidentally
+
+`soul:GetArchetype()` returns a live table:
+
+```
+NormalBodyWeight=160  BodyBaseArmor=1.3  BaseStamina=110
+UnarmedAttackBase=2.6  InventoryCapacityMultiplier=3  GenderId=1
+```
+
+This is the `soul_archetype.xml` data the roadmap listed as needing extraction,
+available at runtime with no generated table. Phase 2's mass scaling can read
+`NormalBodyWeight` directly, and `BodyBaseArmor` is the engine's own base armor
+for the body underneath whatever is worn.
