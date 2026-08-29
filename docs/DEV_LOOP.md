@@ -30,6 +30,36 @@ success while the game keeps running the packed build.
 Restart the game after either. `-Force` deploys into an install that will
 ignore what it is given.
 
+### The pre-push hook
+
+Enable it once per clone:
+
+```
+git config core.hooksPath .githooks
+```
+
+Git does not carry hook configuration through a clone, so a fresh checkout has
+no hooks until this is set.
+
+Pushing `main` then runs the version and changelog check, the documentation
+style check, and the staleness sweep, and refuses the push if any of them
+reports a problem. Pushing a topic branch runs nothing, because a branch in
+progress is allowed to be inconsistent.
+
+The staleness sweep has two scopes. On a prerelease version it checks the
+repository's own accuracy: version numbers, documented claims, config keys
+against their documentation, and quoted download sizes against the built zip.
+On a release version it also checks the mod page copy and the Files tab entry,
+which are written once per release and would otherwise be reported on every
+ordinary push.
+
+Both scopes can be run by hand:
+
+```
+python tools\pre_release_check.py --merge    repository only
+python tools\pre_release_check.py            repository and mod page
+```
+
 ## Deploying
 
 ```

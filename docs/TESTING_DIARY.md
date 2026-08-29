@@ -6717,3 +6717,36 @@ townspeople, which is consistent with every report of it in this project: every
 stuck NPC recorded here has been a guard. That is also the worst case for a
 player, since guards are what a rider tramples repeatedly, so the fix is aimed
 at the right target even though the state is not universal.
+
+## A polearm guard takes no walk stagger and drops the weapon on a ragdoll
+
+**User observation**, recorded for the animation work rather than acted on now:
+
+> "I noticed a guard with a polearm? or whatever type of special weapon that is
+> and that the walk stagger did not work on him and when he was rag dolled from
+> a trot/gallop, he dropped his weapon and then walked off."
+
+Two separate behaviors on one target, and both are consistent with things
+already known about this mod.
+
+The walk stagger plays through `actor:StartInteractiveActionByName` against the
+mod's `AnimationControlled` FragTags. Those fragments were authored for the
+ordinary human male and female databases, and Mannequin selects a fragment by
+tag against what the actor currently holds. A two-handed polearm puts the actor
+in a weapon state the mod's four fragments do not cover, so the request resolves
+to no fragment and nothing plays, which is the same signature recorded earlier
+for a name that does not resolve. It is not a detection failure: the impact was
+scored, and the same guard reacted to the knockdown tiers.
+
+The dropped weapon is the physics path rather than the animation path, and it is
+already on the roadmap as a known consequence of `actor:Fall`. Recovering a
+dropped item is vanilla's own `panicDrop` behavior in `sb_combat.xml`, which the
+roadmap parked because that tree is 133 KB with no additive route.
+
+**Why this matters for the trot work.** Converting trot from a ragdoll to an
+animated knockdown does not automatically cover this target. Whatever fragments
+the trot tier uses will need to resolve for an actor holding a two-handed
+weapon, or that guard will take no reaction at trot either, which is worse than
+the ragdoll he gets today. A weapon-state axis therefore has to be part of the
+fragment work rather than an afterthought, and the polearm guard is the test
+case for it.

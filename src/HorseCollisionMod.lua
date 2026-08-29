@@ -98,10 +98,20 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field SweepMultiplier how far ahead to sweep, per meter per second
 -- @field MaxSweepExtra cap on the forward sweep, in meters
 -- @field HitCooldownMs minimum gap between reactions on the same victim
+-- @field KnockdownRecoveryMs how long a knocked-down victim is left alone,
+--   which is longer than the walk cooldown because they are still on the ground
 -- @field ImpactSpeedSamples ticks of speed history a collision is scored from
 -- @field MaxImpactSpeed ceiling on the speed a collision is scored at
 -- @field Knockback horizontal ragdoll impulse at full strength
 -- @field Uplift vertical ragdoll impulse at full strength
+-- @field ArmorReferenceWeight armor weight that scales a target by exactly one
+-- @field ArmorImpulseExponent how sharply armor weight reduces the impulse
+-- @field MinArmorImpulse floor on the armor impulse multiplier
+-- @field MaxArmorImpulse ceiling on the armor impulse multiplier, reached by
+--   an unarmored target
+-- @field ArmorStaminaExponent how sharply armor weight raises the stamina cost
+-- @field MinArmorStamina floor on the armor stamina multiplier
+-- @field MaxArmorStamina ceiling on the armor stamina multiplier
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
 -- @field StaminaDrainWalk horse stamina cost per victim at walk
 -- @field StaminaDrainTrot horse stamina cost per victim at trot
@@ -111,6 +121,17 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field SuppressStaggerInCombat skip the stagger animation during a fight
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
+-- @field SuppressAutoCureSec how long a victim is exempted from vanilla's
+--   auto-cure daycycle, in seconds, or 0 to leave them in it
+-- @field MinVictimHealth floor a collision will not take a victim below, or 0
+--   for no floor. Superseded by the auto-cure exemption
+-- @field ClearCollisionInjuries whether injuries caused by a collision are
+--   cleared from the victim
+-- @field LimitCollisionExhaust whether exhaustion added by collisions is capped
+-- @field MaxExhaustPerImpact most exhaustion one impact may add
+-- @field MaxExhaustFromCollisions ceiling on exhaustion reached by collisions
+-- @field ExhaustWatchMs how long a victim's exhaustion is held down after an
+--   impact
 -- @field LogTelemetry write diagnostics to kcd.log
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @table Config

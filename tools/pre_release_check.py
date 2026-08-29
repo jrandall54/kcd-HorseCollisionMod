@@ -45,6 +45,16 @@ def read(path):
                    errors="replace").read()
 
 
+def released_versions():
+    """Versions that were actually released, from the tags, without the v."""
+    out = subprocess.run(["git", "tag", "-l", "v*"],
+                         cwd=REPO_ROOT, capture_output=True, text=True).stdout
+
+    return set(m.group(1) for m in
+               (re.match(r"^v(\d+\.\d+\.\d+)$", t.strip())
+                for t in out.splitlines()) if m)
+
+
 def current_version():
     m = re.search(r"<version>([^<]+)</version>",
                   read(os.path.join("src", "mod.manifest")))
@@ -59,6 +69,7 @@ def check_versions(paths, version):
     history. Everywhere else it dates the document.
     """
     found = []
+    shipped = released_versions()
 
     for path in paths:
         if path in VERSION_EXEMPT or os.path.splitext(path)[1] not in (
@@ -66,7 +77,10 @@ def check_versions(paths, version):
             continue
 
         for i, line in enumerate(read(path).splitlines(), 1):
-            for m in re.finditer(r"\b(\d+\.\d+\.\d+)\b", line):
+            # The trailing boundary excludes a prerelease suffix, so a version
+            # file is not reported for containing "3.1.0" as the first part of
+            # its own "3.1.0-dev.2".
+            for m in re.finditer(r"\b(\d+\.\d+\.\d+)(?![\w.-])", line):
                 other = m.group(1)
 
                 # Semantic Versioning itself, and the game's own version, are
@@ -74,12 +88,17 @@ def check_versions(paths, version):
                 if other in (version, "2.0.0", "1.9.7", "1.1.0", "3.0.3"):
                     continue
 
-                # A patch release ships the behavior of the feature release it
-                # follows, so documentation naming that release is still
-                # describing what is installed. "Since 3.0.0 the mod adds
-                # fragments without replacing a file" stays true in 3.0.1, and
-                # rewriting it to name the patch would make it false.
-                if other.rsplit(".", 1)[0] == version.rsplit(".", 1)[0]:
+                # The version under development, with its prerelease suffix
+                # removed, is the release these documents are being written for.
+                if other == version.split("-", 1)[0]:
+                    continue
+
+                # A version that was actually released is history, and history
+                # is correct. "Shipped in 3.0.0" describes what happened and
+                # stays true forever; rewriting it to name the current build
+                # would make it false. What this looks for is a number naming
+                # no release at all, which is the shape a stale claim takes.
+                if other in shipped:
                     continue
 
                 found.append((path, i, other,
@@ -218,6 +237,7 @@ def check_download_size(paths, version):
         return []
 
     actual = os.path.getsize(zip_path)
+    shipped = released_versions()
     found = []
 
     for path in paths:
@@ -226,6 +246,12 @@ def check_download_size(paths, version):
             continue
 
         for i, line in enumerate(read(path).splitlines(), 1):
+            # A size attributed to a release that happened is a record of that
+            # release, not a claim about this build, on the same reasoning as
+            # the version check above.
+            if any(v in line for v in shipped):
+                continue
+
             for m in re.finditer(r"\b(\d{1,3}(?:,\d{3})+) bytes\b", line):
                 claimed = int(m.group(1).replace(",", ""))
 
@@ -280,6 +306,14 @@ def main():
     paths = tracked_files()
     version = current_version()
 
+    # Two audiences, and conflating them makes the check useless on a branch.
+    # Everything except the mod page asks whether the repository describes
+    # itself accurately, which is true of any merge. The mod page and the
+    # Files tab entry are publishing artifacts, written once per release, and
+    # reporting them as problems on every push trains a reader to skip the
+    # whole report.
+    merge_only = "--merge" in sys.argv
+
     if not version:
         print("[STALE] could not read the version from src/mod.manifest")
         return 1
@@ -288,16 +322,20 @@ def main():
                 + check_claims(paths)
                 + check_links(paths)
                 + check_config_docs()
-                + check_nexus_page(version)
-                + check_download_size(paths, version)
-                + check_file_description(version))
+                + check_download_size(paths, version))
+
+    if not merge_only:
+        problems += (check_nexus_page(version)
+                     + check_file_description(version))
 
     for path, line, found, message in problems:
         where = "%s:%d" % (path, line) if line else path
         print("[STALE] %s  %r  %s" % (where, found, message))
 
     print()
-    print("%d stale reference(s) against version %s" % (len(problems), version))
+    scope = "repository" if merge_only else "repository and mod page"
+    print("%d stale reference(s) against version %s (%s)"
+          % (len(problems), version, scope))
 
     return 1 if problems else 0
 

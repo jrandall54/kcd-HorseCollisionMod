@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+#
+# Refuses a push to main that would publish a repository describing itself
+# inaccurately.
+#
+# The project already had every check this runs. What it did not have was
+# anything that ran them at the moment work lands, so the release checklist in
+# .agent_instructions.md depended on somebody remembering, and a stale claim
+# reached main more than once. This is that checklist, enforced.
+#
+# Scope is deliberate. Pushing a topic branch runs nothing, because a branch in
+# progress is allowed to be inconsistent. Pushing main is the moment the claim
+# becomes public.
+#
+# Two levels, so the report stays worth reading:
+#
+#   Always      the repository's own accuracy. Version numbers agree, the
+#               changelog covers what landed, documented claims match the code,
+#               config keys are documented, sizes match the built zip.
+#
+#   Releases    the above, plus the mod page and the Files tab entry, which are
+#               written once per release and would otherwise be reported as
+#               problems on every ordinary push.
+#
+# Bypass with --no-verify only when the alternative is worse, and say so.
+
+set -u
+
+remote_ref_pushed_to_main() {
+    while read -r _local_ref local_sha remote_ref _remote_sha; do
+        # A branch deletion pushes the zero sha and has nothing to check.
+        if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+            continue
+        fi
+
+        case "$remote_ref" in
+            refs/heads/main) return 0 ;;
+        esac
+    done
+
+    return 1
+}
+
+if ! remote_ref_pushed_to_main; then
+    exit 0
+fi
+
+repo="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$repo" || exit 0
+
+python=python
+command -v python >/dev/null 2>&1 || python=python3
+
+version="$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' src/mod.manifest)"
+release=0
+
+case "$version" in
+    *-*) ;;
+    *) release=1 ;;
+esac
+
+echo "pre-push: checking main at version ${version}"
+
+failed=0
+
+run() {
+    local label="$1"
+    shift
+
+    if ! "$@"; then
+        echo "pre-push: ${label} failed"
+        failed=1
+    fi
+}
+
+run "version and changelog" $python tools/version_check.py
+run "documentation style" $python .claude/lint_docs.py
+
+if [ "$release" = "1" ]; then
+    run "staleness, repository and mod page" $python tools/pre_release_check.py
+else
+    run "staleness, repository" $python tools/pre_release_check.py --merge
+fi
+
+if [ "$failed" != "0" ]; then
+    cat <<'MESSAGE'
+
+pre-push: refusing to push main.
+
+Everything above is a claim the repository makes about itself that is no longer
+true. Fix the claim rather than the check: a number naming no release, a config
+key with no documentation, a size that does not match the built zip. Where the
+check itself is wrong, narrow the rule, because a check that is usually wrong
+teaches everyone to skip the whole report.
+
+MESSAGE
+    exit 1
+fi
+
+echo "pre-push: clean"
+exit 0
