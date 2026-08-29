@@ -4375,3 +4375,91 @@ the Lua. They now compose, Mannequin first.
 
 and a Lua query confirmed the loose settings are the ones in effect:
 `telemetry=true knockback=50 gallop=8.5 settingsGlobal=true`.
+
+## Phase 2 verification: damage lands, nothing bleeds, and one impact cost nothing
+
+**Hypothesis**: vanilla re-sends a player-ridden collision as a real,
+player-attributed `combat:hit` carrying this mod's `hitStrength`, so the current
+build already causes damage, injury and a crime without any new code. The
+impact telemetry added in 3.1.0-dev.2 shows what each impact actually costs.
+
+**User report**: outstanding. The ride was run and the session ended before the
+in-game observations were given, so knockdown behavior, visible bleeding and
+any guard or bounty reaction are not yet recorded. Everything below comes from
+`kcd.log` alone.
+
+Four impacts. `speed` is the peak-window value that selects the tier and scales
+knockback; `sampled` is the instantaneous reading on the detecting tick.
+
+| Victim | Tier | strength | speed | health | t+500ms | t+3000ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| `rat_woman34` | Gallop | 6 | 10.75 | 96.6113 | +0.0000 | +0.0000 |
+| `rat_man95` | Gallop | 6 | 10.75 | 100.0000 | -19.3485 | -19.3485 |
+| `rat_guard18` | Trot | 5 | 6.96 | 100.0000 | -3.2593 | -3.2593 |
+| `rat_guard18` | Gallop | 6 | 10.73 | 96.7407 | -16.9866 | -16.9866 |
+
+Horse stamina drained 45 at trot and 75 at gallop on every impact, matching the
+configured values.
+
+### Damage lands
+
+Three of the four impacts cost health, with no damage code in the mod. Phase 3's
+"apply native blunt damage on high-speed impacts" is verification rather than
+construction, as the behavior tree reading predicted.
+
+The step from `MinorInjury` to `MajorInjury` is not proportional to speed: the
+same guard lost 3.26 at trot and 16.99 at gallop, a fivefold difference across a
+tier boundary the horse crosses often.
+
+### Nothing continues after the hit
+
+Every t+3000ms sample equals its t+500ms sample exactly. Damage resolves inside
+half a second and then stops. At these magnitudes the collision does not start
+bleeding or any other continuing effect, so the injury consequences Phase 3
+assumes do not follow from the hit on their own.
+
+### The armor reading is not yet usable
+
+The armored guard lost 16.99 at gallop against 19.35 for the unarmored man at
+the same strength and within 0.02 m/s of the same speed. That is mitigation of
+about 12 percent, which is far less than a full plate harness against a horse
+should absorb, and it rests on one sample each.
+
+It also cannot be separated from the fourth impact, which is the real finding:
+
+### One gallop impact cost nothing at all
+
+`rat_woman34` was struck at `strength=6` and `speed=10.75`, the same as
+`rat_man95`, and lost no health whatsoever. Not a small amount. Zero, at both
+samples.
+
+An impact that silently costs nothing is indistinguishable from armor working
+very well, so this has to be explained before any number above is trusted. The
+candidates, in order of how well they fit what is already known:
+
+- **The `combat:hit` was never delivered.** Brain messages sent with
+  `XGenAIModule.SendMessageToEntity` are documented in this project as
+  unreliable, and handlers declared `Atomic="true"` drop messages while busy.
+  There is no return value to check, so a dropped message looks exactly like
+  this.
+- **The vanilla branch did not resolve `riderPlayer`.** The conversion to a real
+  hit happens only inside the branch that resolves the horse's `rider` link to
+  the player. A failure there produces a reaction with no damage, which is what
+  the log shows.
+- **A female-specific path.** `wh_female_fragmentids.xml` needed patching for
+  the animation work, so the female side of the data is known to be less
+  complete than the male side. `normal_body_weight` is 120 against 160, which
+  would change damage but could not zero it.
+
+The first two would apply to any target and would appear at random, which makes
+the reliability question prior to the armor question. Sampling one impact per
+target cannot tell a mitigated hit from a dropped one; repeated impacts on the
+same target can.
+
+### What is still unanswered
+
+- Whether a bounty or crime is registered. Nothing appears in `kcd.log` at
+  verbosity 2, and the mod does not log it, so this needs either an in-game
+  observation or a Lua query against the crime system.
+- Whether the victim is knocked down as opposed to merely damaged, which only
+  the in-game observation gives.
