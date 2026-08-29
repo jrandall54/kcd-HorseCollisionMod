@@ -53,7 +53,8 @@ HorseCollisionModSettings = {
 	-- them unable to fight and eventually frozen in place. These bound what
 	-- collisions alone can do; nothing here touches exhaustion from any
 	-- other source.
-	LimitCollisionExhaust    = true,  -- false restores vanilla accumulation
+	LimitCollisionExhaust    = false, -- OFF: the stat is Energy, not
+	                                  -- exhaustion, and 100 means rested
 	MaxExhaustPerImpact      = 8.0,   -- most one collision may add, of 100
 	MaxExhaustFromCollisions = 70.0,  -- collisions never push past this
 	ExhaustWatchMs           = 20000, -- how long a victim is held down

@@ -5223,3 +5223,50 @@ Exhaust rat_woman21 after=112ms was=100.0 rose=100.0 held=70.0
 Nothing goes below the ceiling, so a victim exhausted by a fight still ends up
 tired and a collision is never a favor. What it guarantees is that a guard the
 rider knocks down is always left able to fight, whatever state the save was in.
+
+## The stat is Energy, and higher is better
+
+**User report**: "I'm falling asleep in game, so I'm assuming exhaustion and
+energy are the same thing because I don't see an exhaustion stat I see an energy
+state."
+
+Setting the player's `exhaust` to 0 made the player start falling asleep. The
+stat named `exhaust` in `soul:GetState` is the **Energy** stat the game shows in
+its own UI, and the scale runs the other way from the name: **100 is fully
+rested and 0 is spent.**
+
+Every conclusion drawn from it in the previous four entries is inverted.
+
+- NPCs reading `exhaust=100` were **fully rested**, not exhausted. The reading
+  that looked like a smoking gun was the default state of an untouched NPC.
+- The guards that could not fight were not exhausted at all. Whatever disables
+  them, this was never it, which is what the user suspected before this test.
+- `LimitExhaustion` was **draining** its victims. Holding a victim at 70 took 30
+  points of energy from someone who had none taken by the collision, and the
+  ceiling that was supposed to protect them was making them worse. The clamp
+  logged as `held=70.0` were reductions from full.
+
+The limit is switched off in both the defaults and the settings file. The code
+stays, because the mechanism is sound and the stat is genuinely writable; only
+the premise was wrong.
+
+The player was restored to the 95.5783 recorded before the test, and 55 NPCs
+whose energy the mod had lowered were returned to 100.
+
+### What this cost, and the check that would have caught it
+
+Four entries of reasoning rested on a stat whose direction was never verified.
+The name `exhaust` was taken to mean exhaustion, and every observation was fitted
+to it: a town of NPCs reading 100 looked like accumulated damage rather than
+untouched defaults, and NPCs reading 0 and 100 with nothing between looked like a
+binary stat rather than a rested population and a handful the mod had drained.
+
+The check that settles a stat's direction is to move it on the player and look at
+the screen, which took one command. It should come before any reasoning is built
+on a stat this project has not used before.
+
+### The lockup is still unexplained
+
+The guard remains stuck in a hurt animation, and it is not energy, not the
+animation queue, which logged no overflow at all on a clean save, and not
+anything the mod sets. `health=34.1 stamina=124.1` with no weapon drawn.

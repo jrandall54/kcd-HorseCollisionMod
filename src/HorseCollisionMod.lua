@@ -162,7 +162,7 @@ HorseCollisionMod.Config = {
 	ThrowRiderOnStaminaEmpty = true,
 
 	-- Exhaustion added by collisions.
-	LimitCollisionExhaust    = true,
+	LimitCollisionExhaust    = false,
 	MaxExhaustPerImpact      = 8.0,
 	MaxExhaustFromCollisions = 70.0,
 	ExhaustWatchMs           = 20000,
