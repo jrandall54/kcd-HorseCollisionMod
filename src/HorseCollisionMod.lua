@@ -427,6 +427,15 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	end)
 end
 
+--- When the impact probe samples, in milliseconds after the hit.
+--
+-- 500 catches what the impact cost, since the engine applies damage after the
+-- message is handled. 3000 catches anything continuing. 6000 and 10000 reach
+-- past the get-up, which a ragdoll does not finish before the earlier samples
+-- have already been taken.
+HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
+
+
 --- Samples the victim's health across an impact.
 --
 -- Vanilla converts a collision hit whose rider is the player into a real
@@ -436,9 +445,14 @@ end
 -- readable at the moment of the hit. The health state is sampled again on a
 -- timer instead.
 --
--- Two samples, because they answer different questions. The first shows what
--- the impact itself cost. The second shows whether anything continues, which
--- is what bleeding looks like.
+-- Four samples, because they answer different questions. The first shows what
+-- the impact itself cost. The rest reach past the get-up, because health is
+-- also lost after a ragdoll resolves, in discrete amounts that look like a
+-- fall rather than like bleeding.
+--
+-- Height is sampled alongside health for the same reason. The impulse throws
+-- the target, and a change in z across the recovery separates a fall from
+-- anything the collision itself did.
 --
 -- @tparam table npc victim entity
 -- @tparam string tierName the tier the impact scored
@@ -461,9 +475,24 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
 		name = npc:GetName() or "?"
 	end)
 
+	local function height()
+		local okPos, pos = pcall(function()
+			return npc:GetWorldPos()
+		end)
+
+		if okPos and type(pos) == "table" and type(pos.z) == "number" then
+			return pos.z
+		end
+
+		return nil
+	end
+
+	local baseZ = height()
+
 	self:Log("ImpactCost " .. name .. " tier=" .. tierName
 			.. " strength=" .. tostring(strength)
-			.. " health=" .. string.format("%.4f", before))
+			.. " health=" .. string.format("%.4f", before)
+			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?"))
 
 	local function sample(label)
 		local okAfter, after = pcall(function()
@@ -474,18 +503,29 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
 			return
 		end
 
+		local z = height()
+		local dz = "?"
+
+		if z and baseZ then
+			dz = string.format("%+.2f", z - baseZ)
+		end
+
+		-- The starting health is repeated on every sample. Samples now run
+		-- past the cooldown, so a second impact on the same target can
+		-- interleave its lines with the first one's, and the name alone no
+		-- longer identifies which impact a sample belongs to.
 		self:Log("ImpactCost " .. name .. " " .. label
+				.. " from=" .. string.format("%.4f", before)
 				.. " health=" .. string.format("%.4f", after)
-				.. " delta=" .. string.format("%+.4f", after - before))
+				.. " delta=" .. string.format("%+.4f", after - before)
+				.. " dz=" .. dz)
 	end
 
-	Script.SetTimer(500, function()
-		sample("t+500ms")
-	end)
-
-	Script.SetTimer(3000, function()
-		sample("t+3000ms")
-	end)
+	for _, at in ipairs(self.ImpactProbeSamples) do
+		Script.SetTimer(at, function()
+			sample("t+" .. at .. "ms")
+		end)
+	end
 end
 
 
