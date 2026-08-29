@@ -5775,3 +5775,53 @@ removed.
 
 The energy limit, the injury cure and the health floor all treated symptoms of
 this and none of them touch it. They come out.
+
+## Two bugs, not one: the damage is collision velocity, the lockup is not
+
+With `CollisionVelocityDeltaToDmgR` set to 0 in a loose `rpg_param.xml`, and
+the mod otherwise in its normal configuration:
+
+```
+15 impacts, 15 zero deltas, health 96.3775 throughout
+```
+
+**The damage is proven.** Every trot and gallop impact cost exactly nothing. The
+source is the engine's collision damage, applied when the horse strikes the
+physics body the ragdoll creates, which is what the isolated ragdoll test at
+7.3 m predicted.
+
+**And the victim still locked up, at 96.4 health**, in a normal standing
+animation rather than a wounded one.
+
+That separates the two problems, and it corrects several entries above:
+
+- The lockup is **not caused by the damage**. A victim at full health reaches
+  it just as readily.
+- The wounded pose was never the state, only how a wounded NPC looks while in
+  it. With no damage, the same wedge shows in an ordinary idle.
+- The health gate between 76 and 88 is **not a gate**. Raising health released
+  victims, repeatedly and on demand, but a healthy victim can be stuck, so
+  writing health must jog the AI into re-evaluating rather than clearing a
+  threshold.
+- `MinVictimHealth` could never have fixed the lockup. It should be removed
+  along with the injury cure and the energy limit.
+
+### What the lockup now looks like
+
+An NPC repeatedly ragdolled ends up wedged in whatever idle it holds, alive and
+undamaged, and will not resume its schedule. Combat claims it normally and
+returns it to the wedge afterwards, which was recorded earlier and fits an AI
+state that never resumes rather than anything about health or animation.
+
+The obvious next variable is the interval between impacts.
+`KnockdownRecoveryMs` is 6000, and a victim hit again while still recovering is
+plausibly what wedges the state machine. That is one setting and one ride.
+
+### On shipping the collision parameter
+
+Proven as a diagnostic, rejected as a fix. It is a single global value read by
+everything in the game that resolves a physical collision, so zeroing it
+changes falling objects, carts and the player's own collisions, and shipping
+`rpg_param.xml` reintroduces the whole-file conflict surface 3.0.0 removed.
+The damage fix remains a lateral impulse, so the horse and the body stop
+overlapping at all.
