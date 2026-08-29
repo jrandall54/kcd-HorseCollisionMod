@@ -19,7 +19,9 @@ HorseCollisionModSettings = {
 	HorseFrontReach          = 1.05,  -- meters ahead of the horse
 	HorseHalfWidth           = 0.35,  -- meters to either side
 	HorseRearReach           = 0.20,  -- meters behind
-	HitCooldownMs            = 3000,  -- before the same NPC can react again
+	HitCooldownMs            = 3000,  -- before a staggered NPC can react again
+	KnockdownRecoveryMs      = 6000,  -- before a floored one can, they lie
+	                                  -- there long after a stagger ends
 
 	-- Knockdown force, trot and gallop only.
 	Knockback                = 50.0,  -- horizontal, higher throws further

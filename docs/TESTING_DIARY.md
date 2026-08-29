@@ -5037,3 +5037,49 @@ roughly one line per thirty seconds. It is now part of the environment
 `dev_deploy.ps1` writes, in both the development and shipping sets, since it
 costs nothing in play. The mod's own telemetry carries changing numbers on
 every line, so none of it is suppressed.
+
+## Why five guards could not kill the player
+
+**User report**: "I've been letting 5 guards kick the shit out of me for the
+last few minutes but they haven't been ablet to kill me, whats going on here."
+
+Every NPC within 15 m read `exhaust=100`:
+
+```
+rat_upper_guard12  health=18.9  stamina=90.7   exhaust=100  drawn=true
+villageGuard       health=51.8  stamina=132.6  exhaust=100  drawn=false
+villageGuard       health=80.0  stamina=53.4   exhaust=100  drawn=true
+villageGuard       health=87.5  stamina=12.4   exhaust=100  drawn=true
+rat_woman44        health=0     stamina=0      exhaust=100
+rat_bailiff_wife   health=0     stamina=67.9   exhaust=100
+```
+
+Exhaustion is at its ceiling on every one of them, and it is the same state
+that left a guard frozen in a hurt animation earlier. Being ridden into
+repeatedly drives it there and it does not recover quickly, so a guard can draw
+a weapon and swing without threatening anyone. The player sat at `health=47.5
+exhaust=91.9`, most of the way to the same condition from taking the hits.
+
+This is a consequence of the testing rather than of the mod: a session that
+knocks the same guards down twenty times leaves the town's guards incapable.
+
+### No engine call reports whether an actor is on the ground
+
+Establishing this ruled out the direct approach to the recovery problem:
+
+- `actor` exposes `Fall` and `StandUp` and nothing that reads the state back.
+- `human` exposes `GetItemInHand` and `IsWeaponDrawn` only.
+- `entity:GetAngles()` stays upright through a ragdoll. Two NPCs at `health=0`
+  read pitch and roll of exactly 0.00, identical to a standing guard, so the
+  entity transform says nothing about the body.
+
+The mod applies the impulse itself, so it can time the recovery from that
+instead. `RecentHits` now holds the time a victim becomes eligible again rather
+than the time it was last hit, and the wait is `HitCooldownMs` after a stagger
+against `KnockdownRecoveryMs` after a knockdown. A rejected impact logs
+`recovering` with the time remaining rather than `cooldown`.
+
+The 6000 ms default is above the measured recovery rather than derived from it.
+Height samples put a trot victim prone at 500 ms and standing by 3000 ms, which
+bounds the recovery at 3 seconds for that tier and says nothing about gallop,
+which throws them further.

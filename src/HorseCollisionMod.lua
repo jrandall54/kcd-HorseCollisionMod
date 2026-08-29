@@ -132,6 +132,7 @@ HorseCollisionMod.Config = {
 	SweepMultiplier          = 0.50,
 	MaxSweepExtra            = 0.35,
 	HitCooldownMs            = 3000,
+	KnockdownRecoveryMs      = 6000,
 
 	-- A collision is scored on the peak of the last ImpactSpeedSamples ticks,
 	-- not on the speed read when the victim is noticed. MaxImpactSpeed is the
@@ -209,7 +210,12 @@ HorseCollisionMod.HitReactionStrength = {
 	Fatal = 7
 }
 
---- Time of the last reaction per victim, keyed by entity id.
+--- When each victim may react again, in milliseconds, keyed by entity id.
+--
+-- Holds the time a victim becomes eligible rather than the time it was last
+-- hit, because how long that takes depends on what the last impact did. A
+-- stagger is over quickly; a knockdown leaves them on the ground for several
+-- seconds.
 -- @table RecentHits
 HorseCollisionMod.RecentHits = {}
 
@@ -1231,22 +1237,41 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- The detection sphere is tested ten times a second, so without a
 	-- per-victim cooldown a single pass through a crowd would restart the
 	-- same NPC's reaction every tick and they would never finish staggering.
-	local lastHit = self.RecentHits[npcId]
+	--
+	-- The wait runs until the victim can act again rather than for a fixed
+	-- time after the last impact. Someone knocked down is still on the
+	-- ground long after a stagger would have finished, and an impact landing
+	-- while they are down plays no reaction, because every reaction is a
+	-- standing animation, and usually costs them no health either.
+	--
+	-- Nothing in the engine reports whether an actor is on the ground. The
+	-- entity's angles stay upright through a ragdoll and no ScriptBind
+	-- exposes the state, so the recovery is timed rather than observed, and
+	-- it is timed from the impulse the mod applied itself.
+	local readyAt = self.RecentHits[npcId]
 
-	if lastHit and (now - lastHit) < self.Config.HitCooldownMs then
-		self:LogRejection(npc, "cooldown",
-				"since=" .. tostring(now - lastHit) .. "ms")
+	if readyAt and now < readyAt then
+		self:LogRejection(npc, "recovering",
+				"for=" .. tostring(readyAt - now) .. "ms")
 
 		return
 	end
-
-	self.RecentHits[npcId] = now
 
 	local tierName = self:GetSpeedTier(speed)
 	local strength = self.HitReactionStrength
 	local cfg = self.Config
 	local combatScale = 1.0
 	local isCombat, combatDetail = self:IsCombatCollision(npc)
+
+	-- Only the knockdown tiers put anyone on the ground, so the walk tier
+	-- keeps the shorter wait.
+	local recovery = cfg.HitCooldownMs
+
+	if tierName ~= "Walk" then
+		recovery = cfg.KnockdownRecoveryMs
+	end
+
+	self.RecentHits[npcId] = now + recovery
 
 	-- Walked once per impact. Every use below wants the same totals, and
 	-- enumerating an inventory per use would repeat the work three times.
