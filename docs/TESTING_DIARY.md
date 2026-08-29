@@ -4578,3 +4578,83 @@ If that holds, **the mod is not the only thing damaging a trampled NPC**, and
 every per-impact figure recorded so far understates what being ridden into
 actually costs. It also means the cooldown does not do what its name suggests
 from the victim's point of view.
+
+## Armor barely matters, and the impulse is probably causing its own damage
+
+**Hypothesis**: with the damage half shown to be reliable, ten or more trot
+impacts on an armored target give a mean that can be compared against the
+unarmored mean, and the comparison decides whether Phase 2 needs an armor
+multiplier at all.
+
+**User report**: "First I notice the same single frame glitch on the guard that
+I did on the woman when the NPC is getting up after being ragdolled. On one of
+the trots impacts, the guard did fall off stairs and the very last one he also
+did as well... During the last few tros the guard was displaying a hurt
+animation and will no longer move. In fact I've waiting a few minutes and hes
+still doing the hurt animation in the same place he got up the last time I hit
+him."
+
+Eighteen trot impacts on `villageGuard`, against the twenty-three unarmored
+impacts from the previous entry.
+
+| Target | Impacts | Zero | Mean | SD | Min | Max |
+| --- | --- | --- | --- | --- | --- | --- |
+| Unarmored | 23 | 0 | -4.4931 | 1.64 | -1.9449 | -9.9917 |
+| Armored guard | 18 | 1 | -3.8997 | 0.96 | -1.8464 | -6.0649 |
+
+### The engine's armor mitigation is not measurable here
+
+The armored guard takes 87 per cent of what an unarmored villager takes. The
+difference is 0.59 against a standard error of 0.41, a ratio of 1.43, so it
+cannot be separated from zero at this sample size.
+
+That is not what a full harness against a horse should do. Whatever the engine
+resolves through `smash_def` and `body_base_armor` for a collision-derived hit,
+it is small enough that Phase 2 cannot rely on it as the reason not to model
+armor. The scope boundary at the top of Phase 2 says the engine owns armor
+against damage. That remains true in the sense that the engine does the
+resolving, but it is doing very little with it.
+
+### A second zero-damage impact, on a male target
+
+Impact 8 in the sequence cost the guard nothing at both samples, at
+`sampled=5.32` against the tier boundary at 4.5.
+
+That makes two zeros in forty-five impacts, and the previous entry's conclusion
+that the first was an outlier is wrong. It is a low-rate failure of roughly four
+per cent, and it is not specific to the female path, since this one landed on a
+male guard. Four per cent is small enough not to block the armor work and large
+enough to matter to a player, so it stays open rather than closed.
+
+### Fall damage is the better explanation for the delayed loss
+
+The delayed loss recorded in the previous entry appeared again: 3.88, 2.43 and
+4.26 across the guard's seventeen intervals, alongside 4.47, 2.54, 4.58, 4.66,
+4.75 and 4.82 on the two unarmored targets.
+
+Fall damage from the mod's own impulse fits better than the cooldown explanation
+offered previously:
+
+- The guard was seen falling down stairs on two impacts, which is direct
+  evidence that the impulse produces falls with real height behind them.
+- The magnitudes cluster tightly rather than tracking the wide spread of impact
+  damage, which is what a fall from a roughly constant impulse would give.
+- The loss lands after the 3000 ms sample. A ragdoll takes longer than that to
+  resolve, and the engine plausibly applies accumulated fall damage when the
+  actor is restored at the get-up rather than at the moment of landing.
+- The one-frame animation happens at the get-up as well. Two effects appearing
+  at the same point in the recovery is worth noting, though nothing beyond
+  timing connects them yet.
+
+NPC fall damage is otherwise close to unexercised in vanilla, since NPCs are
+rarely thrown anywhere. That the mod is the thing exercising it would explain
+why this has not been visible before.
+
+**This changes the Phase 2 scope boundary.** If throwing a target damages it,
+then scaling `impulseScale` by armor weight and body mass also scales damage,
+and the clean split of the engine owning armor against damage while the mod owns
+the physical response does not hold. The physical response feeds back into
+damage.
+
+Two small health regenerations were also recorded between impacts, +0.04 and
++0.05, so NPCs recover slowly on their own. Too small to affect any figure here.

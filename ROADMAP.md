@@ -35,11 +35,15 @@ Known gaps carried into later phases:
       momentum, if at all.
 - [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
       physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
-- [ ] A one-frame animation fires as a female NPC stands up from a trot ragdoll. It does not
-      interrupt the recovery, which completes normally. A single frame is the documented
+- [ ] A one-frame animation fires as an NPC stands up from a trot ragdoll. It does not
+      interrupt the recovery, which completes normally. Seen on both a female villager and a
+      male guard, so it is not the female Mannequin data. A single frame is the documented
       signature of `StartInteractiveActionByName` accepting a name that resolves to no
-      fragment, and the female Mannequin data is the half that had to be added rather than
-      extended, so that is where to look first. Cosmetic.
+      fragment. It coincides with the get-up, which is also when delayed health loss appears.
+      Cosmetic.
+- [ ] An NPC beaten to low health can stop responding: a guard at 19.6 health held a hurt
+      animation in place for several minutes without moving. Whether this is vanilla's
+      injured state or an AI state broken by repeated ragdolls is untested.
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
@@ -116,17 +120,20 @@ armor.
       across two unarmored targets cost health, 12 of them on a female target. The single
       zero-damage impact recorded earlier is an outlier rather than a systematic drop, and
       the female path is not implicated.
-- [ ] Compare armored against unarmored damage at the same tier. Unarmored trot averages
-      4.49 over 23 impacts but ranges from 1.94 to 9.99, so the one armored sample at 3.26
-      sits inside the unarmored spread and says nothing. Ten impacts on an armored target
-      are needed before any armor multiplier is chosen.
-- [ ] Account for health lost between impacts. In 6 of 21 intervals the victim lost roughly
-      4.6 more with no impact logged, in discrete steps the size of a trot hit rather than a
-      continuous trickle. `HitCooldownMs` gates the mod's reaction and not the engine's own
-      collision damage, which vanilla parameterizes through `CollisionVelocityDeltaToDmgR`,
-      so a contact inside the cooldown is the first candidate. Until this is understood the
-      mod is not the only thing damaging a trampled NPC, and any per-impact figure understates
-      the total.
+- [x] Compare armored against unarmored damage at the same tier. An armored guard takes 3.90
+      per trot impact over 17 landed impacts against 4.49 over 23 unarmored, which is 87 per
+      cent. The difference is 0.59 against a standard error of 0.41, so at this sample size it
+      cannot be separated from zero. Whatever the engine applies for armor against a collision
+      hit, it is small.
+- [ ] Account for health lost between impacts, most likely fall damage from the mod's own
+      impulse. Nine intervals across three targets show a discrete loss of 2.4 to 4.8 with no
+      impact logged, and a guard was seen falling down stairs on two of them. The loss lands
+      after the 3000 ms sample, which is about when the ragdoll resolves and the NPC stands
+      up. Extend the probe past the get-up to confirm.
+- [ ] Decide where fall damage sits in the Phase 2 scope boundary. If the impulse causes damage
+      by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
+      and the split between what the engine owns and what the mod owns does not hold as written
+      at the top of this phase.
 - [ ] Read an entity's equipped items and their weights, generic over the entity so Phase 3
       barding uses the same call on the horse.
 - [ ] Unarmored targets take proportionally heavier knockback, through `Ragdoll`'s
