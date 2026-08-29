@@ -1010,37 +1010,18 @@ function HorseCollisionMod:ClearInjuries(npc)
 end
 
 
---- When the impact probe samples, in milliseconds after the hit.
+-- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
 -- message is handled. 3000 catches anything continuing. 6000 and 10000 reach
 -- past the get-up, which a ragdoll does not finish before the earlier samples
 -- have already been taken.
+--
+-- Documented as an ordinary comment rather than an LDoc block: LDoc reads an
+-- annotated table as a set of named fields and refuses one holding an array.
 HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
 
 
---- Samples the victim's health across an impact.
---
--- Vanilla converts a collision hit whose rider is the player into a real
--- `combat:hit` attributed to the player, carrying the `hitStrength` sent
--- here. The engine resolves damage and the reputation change from that
--- strength, and applies both after the message is handled, so neither is
--- readable at the moment of the hit. The health state is sampled again on a
--- timer instead.
---
--- Four samples, because they answer different questions. The first shows what
--- the impact itself cost. The rest reach past the get-up, because health is
--- also lost after a ragdoll resolves, in discrete amounts that look like a
--- fall rather than like bleeding.
---
--- Height is sampled alongside health for the same reason. The impulse throws
--- the target, and a change in z across the recovery separates a fall from
--- anything the collision itself did.
---
--- @tparam table npc victim entity
--- @tparam string tierName the tier the impact scored
--- @tparam number strength the `HitReactionStrength` sent with the hit
--- @tparam[opt] table armor totals from `ArmorOf`, read again when absent
 --- Exempts a collision victim from vanilla's auto-cure daycycle.
 --
 -- An NPC carrying a bleeding or poison buff whose health is under
@@ -1054,10 +1035,11 @@ HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
 --
 -- Vanilla exempts its own characters from the daycycle through a context
 -- option, used for duellists and for scripted wanderers among others. The
--- same option is requested here. The timed form is preferred to
--- `Contexts.SetNonpersistentOption` because it expires by itself, so a victim
--- cannot be left permanently outside a system the rest of the game depends on
--- if the mod misses its own cleanup.
+-- same option is set here, and cleared on a timer.
+--
+-- The gate admitting the cure is read only on entry, so the option has to be
+-- in place before health crosses the threshold. It is set at the moment of
+-- impact, and collision damage resolves around half a second later.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:SuppressAutoCure(npc)
@@ -1134,6 +1116,29 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 	end)
 end
 
+
+--- Samples the victim's health across an impact.
+--
+-- Vanilla converts a collision hit whose rider is the player into a real
+-- `combat:hit` attributed to the player, carrying the `hitStrength` sent
+-- here. The engine resolves damage and the reputation change from that
+-- strength, and applies both after the message is handled, so neither is
+-- readable at the moment of the hit. The health state is sampled again on a
+-- timer instead.
+--
+-- Four samples, because they answer different questions. The first shows what
+-- the impact itself cost. The rest reach past the get-up, because health is
+-- also lost after a ragdoll resolves, in discrete amounts that look like a
+-- fall rather than like bleeding.
+--
+-- Height is sampled alongside health for the same reason. The impulse throws
+-- the target, and a change in z across the recovery separates a fall from
+-- anything the collision itself did.
+--
+-- @tparam table npc victim entity
+-- @tparam string tierName the tier the impact scored
+-- @tparam number strength the `HitReactionStrength` sent with the hit
+-- @tparam[opt] table armor totals from `ArmorOf`, read again when absent
 function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	if not self.Config.LogTelemetry or not npc or not npc.soul then
 		return
@@ -2017,7 +2022,12 @@ function HorseCollisionMod:ApplySettings()
 	return applied, rejected
 end
 
---- Entity classes whose animation database this mod redirects.
+-- Entity classes whose animation database this mod redirects.
+--
+-- Documented as an ordinary comment rather than an LDoc block, for the reason
+-- given on ImpactProbeSamples above: LDoc reads an annotated table as a set of
+-- named fields, and one that only maps class names to a character set carries
+-- nothing a per-field line would add.
 --
 -- Each entry maps an entity class table to the character set it belongs to.
 --
@@ -2041,7 +2051,6 @@ end
 -- one's away depending only on mod_order.txt. Mannequin databases cannot be
 -- merged, so that conflict is total and silent in both directions.
 --
--- @table AnimationDatabases
 HorseCollisionMod.AnimationDatabases = {
 	-- The exposed classes. These are what the engine spawns, and what has to
 	-- be redirected for any of this to take effect.
