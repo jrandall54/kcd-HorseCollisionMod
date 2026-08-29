@@ -112,11 +112,21 @@ armor.
       code in the mod. Nothing continues after the hit, so no bleeding follows. No bounty is
       registered. Armor mitigation cannot be read yet, because one gallop impact cost the
       victim nothing at all while still knocking her down.
-- [ ] Establish how often the damage half fails. The impulse is applied by the mod and the
-      damage by the engine, downstream of a `combat:hit` that is not guaranteed to arrive,
-      and a knockdown looks the same either way. Repeated impacts on one target, reading
-      health rather than the reaction. This gates the two impulse items below, since a
-      dropped hit and a well-armored target are indistinguishable in the current data.
+- [x] Establish how often the damage half fails. It does not: 23 of 23 repeated trot impacts
+      across two unarmored targets cost health, 12 of them on a female target. The single
+      zero-damage impact recorded earlier is an outlier rather than a systematic drop, and
+      the female path is not implicated.
+- [ ] Compare armored against unarmored damage at the same tier. Unarmored trot averages
+      4.49 over 23 impacts but ranges from 1.94 to 9.99, so the one armored sample at 3.26
+      sits inside the unarmored spread and says nothing. Ten impacts on an armored target
+      are needed before any armor multiplier is chosen.
+- [ ] Account for health lost between impacts. In 6 of 21 intervals the victim lost roughly
+      4.6 more with no impact logged, in discrete steps the size of a trot hit rather than a
+      continuous trickle. `HitCooldownMs` gates the mod's reaction and not the engine's own
+      collision damage, which vanilla parameterizes through `CollisionVelocityDeltaToDmgR`,
+      so a contact inside the cooldown is the first candidate. Until this is understood the
+      mod is not the only thing damaging a trampled NPC, and any per-impact figure understates
+      the total.
 - [ ] Read an entity's equipped items and their weights, generic over the entity so Phase 3
       barding uses the same call on the horse.
 - [ ] Unarmored targets take proportionally heavier knockback, through `Ragdoll`'s
@@ -145,8 +155,10 @@ rather than missing.
       health drops on impact with no damage code in the mod. The step across the tier
       boundary is steep, roughly fivefold from trot to gallop on the same target.
 - [ ] The injury system does not handle the consequences. Damage resolves within half a
-      second and then stops, so no bleeding or continuing effect follows an impact. Reaching
-      the injury system is separate work from causing the damage.
+      second and then stops: across 27 impacts no health reading at 3 seconds differed from
+      the one at 500 ms. Reaching the injury system is separate work from causing the damage.
+      This is a statement about the window after an impact and not about the total cost of
+      being trampled, which the item above covers.
 - [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
 - [ ] Horse barding increases impact force and reduces momentum loss.
 - [ ] A braced polearm hit head-on acts as a wall: heavy stamina cost, near-certain dismount.

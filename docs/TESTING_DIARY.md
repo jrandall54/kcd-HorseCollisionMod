@@ -4519,3 +4519,62 @@ path runs through a brain message and the animation path through Mannequin, and
 they have no step in common.
 
 Cosmetic, and it does not interrupt the recovery. Parked as a known issue.
+
+## The damage half is reliable, and something else is also causing damage
+
+**Hypothesis**: the zero-damage gallop impact means the `combat:hit` carrying
+the damage is being dropped, which would make every armor reading untrustworthy.
+Repeated impacts on a single target separate a dropped hit from a mitigated one,
+because a knockdown looks identical either way.
+
+**User report**: "I picked two NPCs and hit them at least 10 times or more."
+
+Twenty-three trot impacts, twelve on `rat_woman35` and eleven on
+`rat_refugee_Radan`, both unarmored.
+
+| Target | Impacts | Landed | Zero | Mean | Min | Max |
+| --- | --- | --- | --- | --- | --- | --- |
+| `rat_woman35` | 12 | 12 | 0 | -4.7119 | -2.0293 | -9.9917 |
+| `rat_refugee_Radan` | 11 | 11 | 0 | -4.2544 | -1.9449 | -6.5577 |
+
+### The message is not being dropped
+
+Every impact cost health. Twelve of them landed on a female target, so the
+female path is not implicated either, and the animation twitch recorded in the
+previous entry has no counterpart in the damage path.
+
+The single zero on `rat_woman34` stands as an outlier. One event in twenty-seven
+is not a mechanism, and chasing it further would cost more than it is worth
+until it recurs.
+
+### The variance is what actually blocks the armor question
+
+At a fixed `strength=5` against unarmored targets the cost of an impact ranges
+from 1.94 to 9.99, a fivefold spread. The armored guard's single trot impact
+cost 3.26, which sits comfortably inside that range.
+
+So the armor reading is still not usable, but for a different reason than
+before. It is not that hits are being lost; it is that one sample cannot be
+distinguished from the noise. Ten impacts on an armored target settle it.
+
+### Health is lost between impacts, and the mod does not cause it
+
+In 6 of 21 intervals the victim's health at the next impact was lower than where
+the previous impact left it: 2.54, 4.58, 4.66, 4.75, 4.82 on
+`rat_refugee_Radan`, and 4.47 on `rat_woman35`.
+
+These are discrete steps roughly the size of a trot impact, not a continuous
+trickle, and they appear in some intervals and not others. That rules out
+bleeding, which is consistent with every 3-second sample matching its 500 ms
+sample exactly across all 27 impacts recorded so far.
+
+The first candidate is the mod's own `HitCooldownMs`. It gates the mod's
+reaction to a contact, not the engine's handling of the collision, and vanilla
+parameterizes collision damage on its own through `CollisionVelocityDeltaToDmgR`
+in `rpg_param.xml`. A contact arriving inside the 3-second window would then
+damage the target while producing no log line.
+
+If that holds, **the mod is not the only thing damaging a trampled NPC**, and
+every per-impact figure recorded so far understates what being ridden into
+actually costs. It also means the cooldown does not do what its name suggests
+from the victim's point of view.
