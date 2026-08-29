@@ -41,6 +41,14 @@ Known gaps carried into later phases:
       signature of `StartInteractiveActionByName` accepting a name that resolves to no
       fragment. It coincides with the get-up, which is also when delayed health loss appears.
       Cosmetic.
+- [ ] **Exploit.** Repeated impacts drive a victim's exhaustion to its ceiling and it does not
+      recover quickly. Every NPC near a tested area read `exhaust=100`, including five guards
+      who could swing at the player indefinitely without landing a meaningful hit. A rider who
+      knocks down enough guards can put the controller down and take no real damage, and an
+      NPC pinned at the ceiling can freeze in a hurt animation. Vanilla applies the exhaustion
+      from the real `combat:hit` the mod causes, so the mod is the source even though it never
+      touches the stat. Needs a limit on what one rider can accumulate on one victim rather
+      than a change to the reaction itself.
 - [x] An NPC that stops responding after repeated impacts is exhausted, not broken. A guard
       held in a hurt animation for several minutes read `exhaust=100` against a recovered
       `stamina=121`, so the state is vanilla's and it resolves on its own. Repeated impacts
