@@ -4820,3 +4820,52 @@ Watching one entity by name asks the rider to identify an NPC that carries no
 visible name. The watch happened to land on a target that was ridden at anyway.
 Watching every living human near the horse would remove the guess, and is the
 shape to build if a watch is needed again.
+
+## The ordering fix was not the cause either
+
+**Hypothesis**: `ProbeImpactCost` running after `Ragdoll` folded the impulse's
+own damage into the next impact's starting figure. Reversing the order should
+remove the between-impact gaps and raise the per-impact cost by the amount that
+used to go missing.
+
+**User report**: the ride was run as asked, twelve trot impacts on
+`led_wanderer09`.
+
+Both predictions failed.
+
+| | Impacts | Mean | SD | Min | Max | Gaps |
+| --- | --- | --- | --- | --- | --- | --- |
+| Before the fix, `rat_woman12` | 12 | -4.2604 | 1.17 | -1.8493 | -5.8415 | 2 of 11 |
+| After the fix, `led_wanderer09` | 12 | -3.8781 | 0.50 | -2.5422 | -4.5920 | 2 of 11 |
+
+The gaps did not disappear. The rate is identical, and the two losses were 2.13
+and 4.82. The per-impact cost did not rise; it fell slightly.
+
+**So the impulse does not cost the victim health**, and the account given in the
+previous entry is wrong. Sampling before the impulse is still the correct order
+for a measurement, and it stays, but it explains nothing about the gaps.
+
+The one real change is the spread: the standard deviation fell from 1.17 to
+0.50. Two different targets were used, so archetype rather than the reordering
+could account for that, and nothing should be read into it yet.
+
+### Where this leaves the question
+
+Five rides, three explanations offered and all three discarded:
+
+1. Fall damage applied at the get-up. Disproved by sampling to 10 seconds and
+   seeing no change after 500 ms on any impact.
+2. A contact the footprint rejects while the engine still resolves it. Not
+   disproved, but not demonstrated, and the ride designed to test it could not
+   be performed.
+3. The probe reading health after the impulse. Disproved here.
+
+What survives every ride is the rate: close to one interval in five, at a
+magnitude in the range of a trot impact, on every target and both sexes.
+
+Guessing at mechanisms has now cost three rides. The watch is the instrument
+that can answer it directly, because it timestamps the loss instead of
+inferring it from the interval, and it now records the rider's distance and the
+horse's recent peak speed at that moment. A loss with the horse alongside is the
+rejected contact of explanation 2. A loss with the horse thirty metres away is
+none of the three.

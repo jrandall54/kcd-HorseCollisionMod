@@ -125,12 +125,13 @@ armor.
       cent. The difference is 0.59 against a standard error of 0.41, so at this sample size it
       cannot be separated from zero. Whatever the engine applies for armor against a collision
       hit, it is small.
-- [ ] Confirm that health lost between impacts was a measurement artifact. `ProbeImpactCost`
-      ran after `Ragdoll` on the trot and gallop paths, so the starting figure was read after
-      the impulse had already been applied and any damage the impulse caused fell into the
-      preceding interval rather than into the impact's own delta. The call order is now
-      reversed. A repeat of the flat-ground ride decides it: the gaps should disappear and
-      per-impact costs should rise by roughly the amount that used to go missing.
+- [ ] Account for health lost between impacts. Five rides, three explanations tried and
+      discarded: fall damage at the get-up, a contact the footprint rejects, and a probe that
+      read health after the impulse. Reversing that call order changed neither the rate, still
+      2 of 11 intervals, nor the per-impact cost, which fell slightly rather than rising. The
+      rate holds near one interval in five across every ride. The watch now records the rider's
+      distance and speed at the moment health moves, which distinguishes a contact from
+      anything that happens while the horse is elsewhere.
 - [ ] Decide where fall damage sits in the Phase 2 scope boundary. If the impulse causes damage
       by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
       and the split between what the engine owns and what the mod owns does not hold as written

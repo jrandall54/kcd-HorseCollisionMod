@@ -470,15 +470,27 @@ function HorseCollisionMod:WatchHealth(name, seconds)
 
 		if last and health ~= last then
 			local z = "?"
+			local away = "?"
 
+			-- Where the rider was standing when the health moved. A loss with
+			-- the horse alongside is a contact the footprint rejected; a loss
+			-- with the horse far off is something else entirely.
 			pcall(function()
-				z = string.format("%.2f", ent:GetWorldPos().z)
+				local q = ent:GetWorldPos()
+				local r = player:GetWorldPos()
+
+				z = string.format("%.2f", q.z)
+				away = string.format("%.1f", math.sqrt(
+						(q.x - r.x) * (q.x - r.x)
+						+ (q.y - r.y) * (q.y - r.y)))
 			end)
 
 			self:Log("Watch " .. name
 					.. " health=" .. string.format("%.4f", health)
 					.. " delta=" .. string.format("%+.4f", health - last)
-					.. " z=" .. z)
+					.. " z=" .. z
+					.. " rider=" .. away .. "m"
+					.. " speed=" .. string.format("%.2f", self:RecentPeak(3)))
 		end
 
 		last = health
