@@ -267,6 +267,116 @@ def check_download_size(paths, version):
     return found
 
 
+def readme_layout():
+    """The paths listed in the README's repository layout block.
+
+    The block is indented by directory: a line at the left margin ending in a
+    slash opens a directory, indented lines under it are its members, and a
+    line at the left margin without a slash is a file in the root.
+    """
+    text = read("README.md")
+    m = re.search(r"^## Repository layout\s*\n+```\n(.*?)^```", text,
+                  re.S | re.M)
+
+    if not m:
+        return None
+
+    listed = set()
+    directory = ""
+
+    for line in m.group(1).splitlines():
+        if not line.strip():
+            continue
+
+        name = line.split()[0]
+        indented = line[:1].isspace()
+
+        # A description may wrap, and its continuation is indented like a
+        # member. Only a token that looks like a path is one.
+        if "." not in name and not name.endswith("/"):
+            continue
+
+        if not indented:
+            directory = name if name.endswith("/") else ""
+
+            if not name.endswith("/"):
+                listed.add(name)
+
+            continue
+
+        listed.add(directory + name)
+
+    return listed
+
+
+def check_readme_layout():
+    """The README's repository layout against what the repository holds.
+
+    A layout block is the first thing a reader trusts and the first thing to
+    rot, because adding a file is not a moment anyone thinks about the README.
+    Only src and tools are required to be complete: they are where files are
+    added, and a missing entry there means the description is wrong rather
+    than merely brief.
+    """
+    listed = readme_layout()
+
+    if listed is None:
+        return [("README.md", 0, "layout", "no repository layout block")]
+
+    found = []
+
+    for name in sorted(listed):
+        if name.endswith("/"):
+            continue
+
+        if not os.path.exists(os.path.join(REPO_ROOT, name)):
+            found.append(("README.md", 0, name,
+                          "the layout lists a file that does not exist"))
+
+    tracked = set(tracked_files())
+
+    for path in sorted(tracked):
+        if not path.startswith(("src/", "tools/")):
+            continue
+
+        if os.path.basename(path).startswith("__"):
+            continue
+
+        if path not in listed:
+            found.append(("README.md", 0, path,
+                          "tracked but missing from the layout"))
+
+    return found
+
+
+def check_readme_settings():
+    """Defaults quoted in the README against the file that ships.
+
+    The README documents a subset of the settings deliberately, so a missing
+    row is not a fault. A row quoting a value the mod does not use is, and it
+    is the kind that reaches a player: they set a number from the table,
+    nothing changes the way it says, and the mod looks broken.
+    """
+    settings = read(os.path.join("src", "HorseCollisionMod_Settings.lua"))
+    shipped = dict(re.findall(r"^\t(\w+)\s*=\s*([^,]+),", settings, re.M))
+    found = []
+
+    for key, quoted in re.findall(r"^\|\s*`(\w+)`\s*\|\s*([^|]+?)\s*\|",
+                                  read("README.md"), re.M):
+        if key not in shipped:
+            found.append(("README.md", 0, key,
+                          "the table documents a setting that does not ship"))
+            continue
+
+        actual = shipped[key].strip()
+
+        if quoted != actual:
+            found.append(("README.md", 0, "%s = %s" % (key, quoted),
+                          "the mod ships %s" % actual))
+
+    return found
+
+
 def check_generated_docs():
     """The generated API reference against the source it documents.
 
@@ -356,6 +466,8 @@ def main():
                 + check_claims(paths)
                 + check_links(paths)
                 + check_config_docs()
+                + check_readme_layout()
+                + check_readme_settings()
                 + check_generated_docs()
                 + check_download_size(paths, version))
 

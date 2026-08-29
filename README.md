@@ -42,18 +42,16 @@ zip and going into the pak inside it does not work.
    than Extract:
    - installed by hand: `Mods\HorseCollisionMod\Data\HorseCollisionMod.pak`
    - installed by Vortex: right click the mod, **Open in File Manager**, then
-     `Data\HorseCollisionMod.pak`
+     `Data\HorseCollisionMod.pak`. This is the staging copy, which is the one
+     to edit; Vortex deploys by hard link, and an archive tool replaces a file
+     rather than editing it in place, so editing the deployed copy under
+     `Mods\` separates the two.
 2. Go to `Scripts\Startup\` and open `HorseCollisionMod_Settings.lua`, not
    `HorseCollisionMod.lua`, which is the mod itself.
 3. Change the values you want, keeping the `=` and the comma.
 4. Save and close. When 7-Zip asks whether to update the archive, say yes.
-5. Load a save.
-
-Vortex users: edit the copy in its staging folder, reached by **Open in File
-Manager**, rather than the one under `Mods\`. Vortex deploys by hard link, and
-an archive tool replaces the file rather than editing it in place, so the two
-copies come apart. Editing the staging copy and then running **Deploy Mods**
-keeps them together.
+5. On Vortex, run **Deploy Mods**.
+6. Load a save.
 
 A misspelled or mistyped setting is ignored and named in `kcd.log` rather than
 breaking the mod. Deleting a line restores its default.
@@ -69,8 +67,8 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownMs` | 3000 | Milliseconds before the same NPC can react again. Stops one person reacting repeatedly. |
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
 | `Uplift` | 30.0 | Vertical knockdown force, trot and gallop only. Higher throws them upward rather than along the ground. |
-| `StaminaDrainTrot` | 45.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
-| `StaminaDrainGallop` | 75.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
+| `StaminaDrainTrot` | 30.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
+| `StaminaDrainGallop` | 45.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
 | `StaminaDrainWalk` | 0.0 | Stamina removed per NPC at walking pace. |
 | `CombatStaminaMultiplier` | 2.5 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
@@ -106,23 +104,30 @@ village is finally something the game notices.
 ```
 build.ps1                 the one build entry point
 CHANGELOG.md              what changed in each release
+ROADMAP.md                what is planned, and what each phase established
 config.ld                 LDoc configuration for the API reference
+.luarc.json               Lua language server settings, including engine globals
+.gitattributes            how files are stored, so line endings do not drift
 src/
   HorseCollisionMod.lua            the mod
   HorseCollisionMod_Settings.lua   the values a player edits
   mod.manifest
 tools/
   build_adb.py            generates the animation data from a game install
+  build_item_weights.py   generates the armor weight table from a game install
   dev_deploy.ps1          installs into the game without Vortex
   dev_console.py          talks to the running game over its remote console
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   version_check.py        derives the next version from CHANGELOG.md
+  pre_release_check.py    finds claims the repository makes that are no
+                          longer true
 docs/
   HOW_IT_WORKS.md         plain-language overview of the mod and its layout
   DEV_LOOP.md             the hot-reload development loop
   TECHNICAL_DETAILS.md    engine behavior and the constraints on changing it
   TESTING_DIARY.md        every build tested, what was expected, what happened
+  kcd_api.lua             engine API stubs, so the language server resolves them
   api/                    generated Lua API reference (ldoc .)
 ```
 
