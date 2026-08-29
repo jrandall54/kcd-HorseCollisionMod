@@ -48,6 +48,15 @@ HorseCollisionModSettings = {
 	MinArmorStamina          = 0.75,
 	MaxArmorStamina          = 3.0,
 
+	-- The floor a collision will not take a victim below. A collision puts
+	-- its victim into a wounded state whose exit is gated on health, and an
+	-- NPC never heals, so a victim left below that gate stays wounded for
+	-- good: rooted in place, unable to fight, permanently.
+	--
+	-- Damage still lands, and still accumulates, down to this figure. Set it
+	-- to 0 to restore the behavior 3.0.0 shipped with.
+	MinVictimHealth          = 60.0,
+
 	-- Injuries. The engine rolls one from the hit a collision becomes, and
 	-- an injury never expires: a player clears one with a bandage, a potion
 	-- or sleep, and an NPC has none of those. Left alone, every villager a

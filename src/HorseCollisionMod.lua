@@ -161,6 +161,9 @@ HorseCollisionMod.Config = {
 	StaminaDrainGallop       = 45.0,
 	ThrowRiderOnStaminaEmpty = true,
 
+	-- The floor a collision will not take a victim below.
+	MinVictimHealth          = 60.0,
+
 	-- Injuries caused by collisions.
 	ClearCollisionInjuries   = true,
 
@@ -828,6 +831,70 @@ function HorseCollisionMod:EnforceExhaustLimits()
 	end
 
 	return live
+end
+
+
+--- Keeps a victim above the health a collision leaves them stranded below.
+--
+-- A collision puts its victim into a wounded state, and the exit from that
+-- state is gated on health. Established by test rather than by reading: an
+-- NPC set to 25 health without being hit behaves normally, and a stuck victim
+-- returns to normal the moment health is raised, with no buff involved.
+--
+-- Nothing heals an NPC, so a victim left below the gate never leaves the
+-- state. It is rooted in place and will not fight, which is both an
+-- immersion break and an exploit, since a rider can render a town's guards
+-- harmless.
+--
+-- Vanilla never reaches this state because it never produces a badly wounded
+-- NPC outside combat. In a fight the combat tree owns the situation and has
+-- its own exits.
+--
+-- The floor is applied after the engine has resolved the hit, not before, so
+-- the damage still lands and still accumulates down to the floor.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:HoldVictimAboveFloor(npc)
+	local cfg = self.Config
+
+	if cfg.MinVictimHealth <= 0 or not npc or not npc.soul then
+		return
+	end
+
+	local function lift(label)
+		pcall(function()
+			local health = npc.soul:GetState("health")
+
+			-- A victim already dead is left alone. Reviving a corpse would be
+			-- a stranger bug than the one this fixes.
+			if type(health) ~= "number" or health <= 0 then
+				return
+			end
+
+			if health >= cfg.MinVictimHealth then
+				return
+			end
+
+			npc.soul:SetState("health", cfg.MinVictimHealth)
+
+			if cfg.LogTelemetry then
+				self:Log("Floor " .. tostring(npc:GetName())
+						.. " " .. label
+						.. " was=" .. string.format("%.1f", health)
+						.. " held=" .. string.format("%.1f", cfg.MinVictimHealth))
+			end
+		end)
+	end
+
+	-- After the engine resolves the hit, which the telemetry puts inside
+	-- 500 ms, and again once the late arrivals have landed.
+	Script.SetTimer(1000, function()
+		lift("t+1000ms")
+	end)
+
+	Script.SetTimer(4000, function()
+		lift("t+4000ms")
+	end)
 end
 
 
@@ -1503,6 +1570,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- injure anyone, and clearing costs nothing when there is nothing to
 	-- clear.
 	self:ClearInjuries(npc)
+
+	-- The one that actually prevents the lockup. The injury cure above is
+	-- kept because a permanent injury is worth undoing on its own account,
+	-- but it is not what strands a victim.
+	self:HoldVictimAboveFloor(npc)
 
 	-- Walked once per impact. Every use below wants the same totals, and
 	-- enumerating an inventory per use would repeat the work three times.

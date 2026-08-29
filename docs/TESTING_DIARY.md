@@ -5484,3 +5484,45 @@ function exists, and on this build several of them do nothing observable.
 **Nothing in this project should be recorded as working on the strength of a
 return value.** The only evidence that has held up all session is a change
 someone can see on screen or a number that moves in a later sample.
+
+## It is the wounded state, and health is only the gate out of it
+
+**User report**: a guard set to 25 health without ever being hit "didn't
+freeze, he's acting normal". The same guard, stuck after a collision, returned
+to normal the moment health was raised.
+
+Two tests, one conclusion. **Low health does not cause the state, and raising
+health is what releases it.** A collision puts its victim into a wounded state
+whose exit is gated on health, and because nothing ever heals an NPC, a victim
+left below that gate never leaves.
+
+That reconciles the question the user raised about combat: an NPC beaten to low
+health in a fight does not freeze, because the combat tree owns the situation
+and has its own exits. This mod produces something vanilla never produces, a
+badly wounded NPC standing in the street with no combat context, and nothing
+owns that.
+
+It also means the fix does not need to understand the state at all. Keeping the
+victim above the gate is enough.
+
+### The floor
+
+`HoldVictimAboveFloor` reads the victim's health at 1000 ms and 4000 ms after
+an impact, after the engine has resolved the hit, and lifts it back to
+`MinVictimHealth` if it fell below. Damage still lands and still accumulates
+down to the floor, and a victim already dead is left alone.
+
+`MinVictimHealth` defaults to 60, above the highest health at which a victim
+has been seen stuck, which is 51.8. The exact gate is not known; 60 is a margin
+rather than a measurement, and the setting exists so it can move.
+
+The injury cure stays. A permanent injury is worth undoing on its own account,
+and the two are independent: the cure ran on all 16 impacts of the session that
+produced the stuck guard, and did not prevent it.
+
+### Where this leaves damage
+
+The user's reading is that this becomes moot once damage and crime are properly
+built, since a trampled villager should be hurt and should be a victim the world
+reacts to. That is likely right, and the floor is deliberately a setting rather
+than a rule so it can be lowered as the state acquires an owner.
