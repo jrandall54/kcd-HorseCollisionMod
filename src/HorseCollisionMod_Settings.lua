@@ -19,7 +19,9 @@ HorseCollisionModSettings = {
 	HorseFrontReach          = 1.05,  -- meters ahead of the horse
 	HorseHalfWidth           = 0.35,  -- meters to either side
 	HorseRearReach           = 0.20,  -- meters behind
-	HitCooldownMs            = 3000,  -- before the same NPC can react again
+	HitCooldownMs            = 3000,  -- before a staggered NPC can react again
+	KnockdownRecoveryMs      = 6000,  -- before a floored one can, they lie
+	                                  -- there long after a stagger ends
 
 	-- Knockdown force, trot and gallop only.
 	Knockback                = 50.0,  -- horizontal, higher throws further
@@ -27,10 +29,24 @@ HorseCollisionModSettings = {
 
 	-- Stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 45.0,
-	StaminaDrainGallop       = 75.0,
+	StaminaDrainTrot         = 30.0,
+	StaminaDrainGallop       = 45.0,
 	CombatStaminaMultiplier  = 2.5,   -- 1.0 removes the combat penalty
 	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
+
+	-- How much what a target is wearing changes the impact. Weight is the
+	-- sum of their armor, from the game's own item tables: a villager is
+	-- around 5, a mail-wearing guard around 47.
+	--
+	-- Both multipliers are 1.0 at ArmorReferenceWeight and move from there.
+	-- An exponent of 0 switches that half off and keeps the old behavior.
+	ArmorReferenceWeight     = 8.0,   -- the weight that changes nothing
+	ArmorImpulseExponent     = 0.5,   -- higher means armor plants them harder
+	MinArmorImpulse          = 0.35,  -- a knight is never immovable
+	MaxArmorImpulse          = 1.5,   -- nor is a naked peasant weightless
+	ArmorStaminaExponent     = 0.4,   -- higher means armor tires the horse more
+	MinArmorStamina          = 0.75,
+	MaxArmorStamina          = 3.0,
 
 	-- Switches.
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight

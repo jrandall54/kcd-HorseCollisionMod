@@ -159,7 +159,14 @@ $DevEnvironment = @(
 	@{ Name = "mn_allowEditableDatabasesInPureGame"; Dev = "1"; Play = "0"
 	   Why = "Mannequin refuses to reload its animation databases" },
 	@{ Name = "log_EnableRemoteConsole"; Dev = "1"; Play = "1"
-	   Why = "dev_console.py has no port to connect to" }
+	   Why = "dev_console.py has no port to connect to" },
+	# Warhorse's own backend cannot be reached and retries about twice a
+	# second, which was half of every line written to kcd.log and made the
+	# in-game console unreadable. The delay collapses repeats of an identical
+	# line; the mod's own telemetry carries changing numbers on every line and
+	# is not affected.
+	@{ Name = "log_SpamDelay"; Dev = "30"; Play = "30"
+	   Why = "the PROS backend fills the console and the log with retries" }
 )
 
 function Get-CfgValue {
@@ -299,6 +306,14 @@ function Sync-LooseFiles {
 				From = Join-Path $repoRoot "src\$name"
 				To   = Join-Path $startup $name
 			}
+		}
+
+		# Generated rather than written, so it lives with the other build
+		# products under mod_assets rather than in src.
+		$files += @{
+			Half = "Script"
+			From = Join-Path $repoRoot "mod_assets\Scripts\Startup\HorseCollisionMod_ItemData.lua"
+			To   = Join-Path $startup "HorseCollisionMod_ItemData.lua"
 		}
 	}
 

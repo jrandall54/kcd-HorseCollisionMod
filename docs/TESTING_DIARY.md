@@ -4869,3 +4869,217 @@ inferring it from the interval, and it now records the rider's distance and the
 horse's recent peak speed at that moment. A loss with the horse alongside is the
 rejected contact of explanation 2. A loss with the horse thirty metres away is
 none of the three.
+
+## Reading what an NPC is wearing
+
+**Question**: how to get an entity's equipped items and their weights, which
+every remaining Phase 2 item depends on.
+
+### The API
+
+`inventory:GetInventoryTable()` returns an array of item WUIDs.
+`ItemManager.GetItem(wuid)` returns a table of `amount`, `class`, `entity`,
+`health` and `id`, where `class` is the item class GUID that joins to
+`Libs/Tables/item/`. `ItemManager.GetItemUIName(class)` gives a readable name.
+
+The ScriptBind tables are C++ userdata with metatable indexing, so `pairs()`
+lists nothing on them. Probing candidate names with `type(tbl[name])` works, and
+`references/kcd-documentation/` holds the full generated bind documentation,
+which is the faster source of the two.
+
+### There is no equipped-items accessor, and it does not matter
+
+Neither the live game nor the bind documentation has one. `Actor` and `Human`
+have `EquipInventoryItem`, `EquipItemInSlot` and their unequip counterparts,
+all setters. `Soul` has `GetDerivedStat`, whose valid names are not in
+`statistic.xml` and have not been located.
+
+What removes the problem is what an NPC actually carries. `led_woman6` carries
+eight items: an apple, a quarter loaf, money, two keys, a head wreath, shoes and
+a cotte. Everything except the food, keys and money is what she is wearing. The
+player carries 179 items and is the exception, not the rule.
+
+So for a collision target, **filtering the whole inventory to armor and clothing
+classes is equivalent to reading the equipped set**, and needs no bind that does
+not exist. The player would need the real equipped set, but the player is never
+the victim here.
+
+The traps already recorded still apply: weight is on `pickable_item.xml` joined
+by `item_id` rather than on `armor.xml`, chain outweighs plate per piece, and
+horse tack is filed as armor so saddle, bridle, shoe and spur must be excluded.
+
+### An incidental finding on the stuck guard
+
+While a guard was being ridden at repeatedly the engine logged
+`Animation-queue overflow. More then 16 entries` against
+`objects/characters/humans/skeleton/male.chr` continuously. The guard that
+stopped responding earlier in the session is more likely queued reactions
+accumulating faster than they play than vanilla's injured state.
+
+## The stuck NPC is exhausted, and armor now scales the impulse
+
+**User report**: "currently in game I'm standing right next to one of the NPCs
+in the permo hurt animation where they seem to be stuck in it."
+
+Queried live while the user stood beside it. `villageGuard`, 1.7 m away:
+
+```
+health=26.0386 stamina=121.581 exhaust=100
+weaponDrawn=false  pieces=9 weight=47.0 smashDef=3.93 heaviest=chain
+```
+
+`exhaust=100` is the ceiling. Stamina had already recovered to 121, so the
+guard is not out of stamina; it is exhausted, which is a vanilla state that
+recovers on its own. Repeated impacts drive exhaustion up until the NPC stops
+acting, and the `Animation-queue overflow` the engine logs alongside it is
+queued reactions piling up rather than the cause. Not a defect, and not
+something the mod needs to handle.
+
+The same query corroborates the armor comparison from earlier. That guard
+carries 9 pieces at 47 weight and 3.93 smash_def against a villager's 3 pieces
+at 5 and 0.30. A thirteenfold difference in the game's own blunt defense still
+produced only 13 per cent less damage, which is the clearest statement yet that
+the engine does very little with armor on a collision hit.
+
+### Spurs are the rider's
+
+The first generated table filed spurs as horse tack, following the note in an
+earlier entry. They are worn by a rider, so their weight belongs in a person's
+total. Tack is now saddle, horseshoe and bridle only.
+
+### The scaling
+
+One curve serves both halves, on the ratio between a target's armor weight and
+`ArmorReferenceWeight`. The impulse takes its reciprocal, the horse's stamina
+cost takes it directly, and both are clamped.
+
+| Armor weight | Impulse | Stamina |
+| --- | --- | --- |
+| 0 | 1.50 | 0.75 |
+| 5, a villager | 1.26 | 0.79 |
+| 8, the reference | 1.00 | 1.00 |
+| 20 | 0.63 | 1.58 |
+| 47, a guard in mail | 0.41 | 2.00 |
+| 69 | 0.35 | 2.00 |
+
+The stamina multiplier reaches its ceiling around weight 32, so everything from
+a mail guard upward costs the horse the same. That is a tuning decision rather
+than a limit, and the ceiling exists because the curve has none of its own.
+
+Untested in play. The figures come from the curve, not from riding.
+
+## Ten minutes of free riding, and what repeated impacts do
+
+**User report**: "It's hard to say one way or the other. I did notice a lot of
+dropped animations, especially from the women at one point I tried to walk
+stagger like 5 times in a row and it wouldn't do anything. I did test galloping
+into heavy armored in combat and it did throw me immediately like you had said
+which for now is probably okay and would tune later."
+
+Sixty-two impacts: 9 at walk, 35 at trot, 18 at gallop.
+
+### The armor scaling works, and the stamina half is too strong
+
+The multipliers land where the curve says they should. An armored guard reads
+`armorImpulse=0.37 armorStamina=2.00` at 58 weight, a villager
+`armorImpulse=1.26 armorStamina=0.79` at 5.
+
+The cost is the problem. A single trot into a guard drained the horse from
+207.1 to 117.1, and the largest recorded drain took the whole 210 pool. The
+rider was thrown **nine times in ten minutes**. The stamina multiplier composes
+with the combat multiplier already there, so a gallop into an armored target in
+combat asks for 75 x 2.5 x 2.0, which is more than the pool holds.
+
+### The dropped animations and the missing damage are the same thing
+
+Every one of the nine walk impacts called the stagger and every call returned
+`ok=true`, so the mod attempted all of them and the engine accepted all of them.
+Nothing was dropped by the mod.
+
+What separates this session from the controlled rides is how quickly the same
+NPC is hit again. `HitCooldownMs` is 3000 ms, and a victim spends longer than
+that on the ground: the height samples show them prone at 500 ms and standing by
+3000 ms, which is the earliest they could be upright and is measured from the
+impact rather than from when the ragdoll settles.
+
+An impact that lands on someone still down cannot play a standing stagger,
+because they are not standing, and the numbers agree:
+
+| | Zero damage |
+| --- | --- |
+| Trot | 10 of 35 (29%) |
+| Gallop | 8 of 18 (44%) |
+| Controlled rides, 12 s apart | 2 of 45 (4%) |
+
+Walk was 9 of 9, which is by design rather than a failure: the walk tier sends
+`Tickle`, which is not meant to cost anything.
+
+The rider being thrown is not the cause. Zero-damage impacts sit near a throw at
+much the same rate as damaging ones, 16 of 27 against 21 of 35.
+
+So the earlier four per cent failure rate is a floor measured under ideal
+spacing, and free play is far worse. Whether the fix is a longer cooldown or a
+check that the target is upright is a design question, but the mod currently
+delivers a reaction to people who cannot perform one.
+
+### The console noise
+
+Neither warning the user asked about belongs to the mod.
+
+`Agent '_Sheep21' ... failed to turn towards ... within 8.000000 seconds` is
+vanilla AI pathing, and every instance in the log names a sheep.
+
+`PROS:` is Warhorse's own online backend failing to reach its service and
+retrying about twice a second. It accounted for 965 of 1940 lines in the play
+window, half of everything written. There is no CVar that switches the service
+off, but `log_SpamDelay` collapses repeats of an identical line and takes it to
+roughly one line per thirty seconds. It is now part of the environment
+`dev_deploy.ps1` writes, in both the development and shipping sets, since it
+costs nothing in play. The mod's own telemetry carries changing numbers on
+every line, so none of it is suppressed.
+
+## Why five guards could not kill the player
+
+**User report**: "I've been letting 5 guards kick the shit out of me for the
+last few minutes but they haven't been ablet to kill me, whats going on here."
+
+Every NPC within 15 m read `exhaust=100`:
+
+```
+rat_upper_guard12  health=18.9  stamina=90.7   exhaust=100  drawn=true
+villageGuard       health=51.8  stamina=132.6  exhaust=100  drawn=false
+villageGuard       health=80.0  stamina=53.4   exhaust=100  drawn=true
+villageGuard       health=87.5  stamina=12.4   exhaust=100  drawn=true
+rat_woman44        health=0     stamina=0      exhaust=100
+rat_bailiff_wife   health=0     stamina=67.9   exhaust=100
+```
+
+Exhaustion is at its ceiling on every one of them, and it is the same state
+that left a guard frozen in a hurt animation earlier. Being ridden into
+repeatedly drives it there and it does not recover quickly, so a guard can draw
+a weapon and swing without threatening anyone. The player sat at `health=47.5
+exhaust=91.9`, most of the way to the same condition from taking the hits.
+
+This is a consequence of the testing rather than of the mod: a session that
+knocks the same guards down twenty times leaves the town's guards incapable.
+
+### No engine call reports whether an actor is on the ground
+
+Establishing this ruled out the direct approach to the recovery problem:
+
+- `actor` exposes `Fall` and `StandUp` and nothing that reads the state back.
+- `human` exposes `GetItemInHand` and `IsWeaponDrawn` only.
+- `entity:GetAngles()` stays upright through a ragdoll. Two NPCs at `health=0`
+  read pitch and roll of exactly 0.00, identical to a standing guard, so the
+  entity transform says nothing about the body.
+
+The mod applies the impulse itself, so it can time the recovery from that
+instead. `RecentHits` now holds the time a victim becomes eligible again rather
+than the time it was last hit, and the wait is `HitCooldownMs` after a stagger
+against `KnockdownRecoveryMs` after a knockdown. A rejected impact logs
+`recovering` with the time remaining rather than `cooldown`.
+
+The 6000 ms default is above the measured recovery rather than derived from it.
+Height samples put a trot victim prone at 500 ms and standing by 3000 ms, which
+bounds the recovery at 3 seconds for that tier and says nothing about gallop,
+which throws them further.

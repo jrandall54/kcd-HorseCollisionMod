@@ -41,9 +41,20 @@ Known gaps carried into later phases:
       signature of `StartInteractiveActionByName` accepting a name that resolves to no
       fragment. It coincides with the get-up, which is also when delayed health loss appears.
       Cosmetic.
-- [ ] An NPC beaten to low health can stop responding: a guard at 19.6 health held a hurt
-      animation in place for several minutes without moving. Whether this is vanilla's
-      injured state or an AI state broken by repeated ragdolls is untested.
+- [ ] **Exploit.** Repeated impacts drive a victim's exhaustion to its ceiling and it does not
+      recover quickly. Every NPC near a tested area read `exhaust=100`, including five guards
+      who could swing at the player indefinitely without landing a meaningful hit. A rider who
+      knocks down enough guards can put the controller down and take no real damage, and an
+      NPC pinned at the ceiling can freeze in a hurt animation. Vanilla applies the exhaustion
+      from the real `combat:hit` the mod causes, so the mod is the source even though it never
+      touches the stat. Needs a limit on what one rider can accumulate on one victim rather
+      than a change to the reaction itself.
+- [x] An NPC that stops responding after repeated impacts is exhausted, not broken. A guard
+      held in a hurt animation for several minutes read `exhaust=100` against a recovered
+      `stamina=121`, so the state is vanilla's and it resolves on its own. Repeated impacts
+      drive exhaustion to its ceiling, which is a consequence of testing rather than a defect.
+      The `Animation-queue overflow` the engine logs alongside it is a symptom of queued
+      reactions, not the cause.
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
@@ -136,15 +147,30 @@ armor.
       by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
       and the split between what the engine owns and what the mod owns does not hold as written
       at the top of this phase.
-- [ ] Read an entity's equipped items and their weights, generic over the entity so Phase 3
-      barding uses the same call on the horse.
-- [ ] Unarmored targets take proportionally heavier knockback, through `Ragdoll`'s
-      `impulseScale`.
-- [ ] Heavily armored targets are moved less, by the same multiplier.
+- [ ] Read an entity's carried items and their weights, generic over the entity so Phase 3
+      barding uses the same call on the horse. `inventory:GetInventoryTable()` returns the
+      item WUIDs and `ItemManager.GetItem(wuid)` returns `class`, which joins to the item
+      tables for weight. No bind reports which items are equipped, but an NPC carries only
+      what it wears plus a few trinkets, so filtering the whole inventory to armor classes
+      is equivalent for a target.
+- [x] Unarmored targets take proportionally heavier knockback and armored targets are moved
+      less, through one multiplier on `Ragdoll`'s `impulseScale`. A naked target reaches 1.50
+      and a target in mail 0.41, against 1.00 at `ArmorReferenceWeight`.
 - [ ] Striking a heavy target strips the horse's momentum rather than only its stamina.
-- [ ] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
-      A multiplier on the existing per-tier cost, composing with the Phase 3 Horsemanship
-      multiplier, not a parallel rule set.
+- [x] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
+      A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
+      target in mail, multiplying with the combat multiplier already applied and with the
+      Phase 3 Horsemanship multiplier when it arrives.
+- [ ] Tune the two curves in play. The stamina half is too strong at its defaults: ten
+      minutes of free riding threw the rider nine times, a single trot into a guard drains 90
+      of a 210 pool, and a gallop into an armored target in combat empties it outright. The
+      multiplier also reaches its ceiling at around weight 32, so a guard in mail and a knight
+      in full plate cost the same.
+- [ ] Skip or soften an impact against a target that has not recovered from the last one.
+      `HitCooldownMs` is 3000, which is shorter than the time a victim spends on the ground,
+      so a second impact lands on someone already prone: no reaction plays, because they are
+      not standing, and a third of those impacts cost no health. Controlled rides with twelve
+      seconds between impacts produce neither symptom.
 
 Data located. Armor weight is on `Libs/Tables/item/pickable_item.xml`, joined by `item_id`,
 not on `armor.xml`. Target body mass is `normal_body_weight` on `soul_archetype.xml`: 160
