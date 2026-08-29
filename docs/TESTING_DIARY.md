@@ -5526,3 +5526,36 @@ The user's reading is that this becomes moot once damage and crime are properly
 built, since a trampled villager should be hurt and should be a victim the world
 reacts to. That is likely right, and the floor is deliberately a setting rather
 than a rule so it can be lowered as the state acquires an owner.
+
+## The floor holds
+
+**User report**: "I smashed a guard like 15 times and he didn't seem to get
+stuck."
+
+19 impacts on `rat_guard18`, trot and gallop, 15 floor lifts, no lockup.
+
+```
+Floor rat_guard18 t+1000ms was=21.2 held=60.0
+Floor rat_guard18 t+1000ms was=43.3 held=60.0
+Floor rat_guard18 t+1000ms was=53.5 held=60.0
+```
+
+Damage lands on every impact, visible in the health carried on each impact
+line, between 44 and 57 through the run. Only the stranding is prevented.
+
+That closes the lockup. Four mechanisms were proposed and discarded on the way
+to it, and the one that worked was found by a test rather than by reading: low
+health does not cause the state, and health is only the gate out.
+
+### The trade-off, which is real
+
+A collision can no longer kill. A victim cannot be trampled below the floor
+however many times they are ridden into, so a rider cannot run someone down.
+That is a deliberate exchange for the lockup and it is a setting rather than a
+rule, but it should be understood before release: it is a change to what the
+mod does in play, not only a defect fix.
+
+A future version can separate the two, by letting a hit that would be lethal
+resolve as a death rather than being floored, so that trampling can kill while
+never stranding. That needs the crime work to be meaningful and is not worth
+building before it.

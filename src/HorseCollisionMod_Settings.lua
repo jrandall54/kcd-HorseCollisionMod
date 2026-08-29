@@ -53,8 +53,11 @@ HorseCollisionModSettings = {
 	-- NPC never heals, so a victim left below that gate stays wounded for
 	-- good: rooted in place, unable to fight, permanently.
 	--
-	-- Damage still lands, and still accumulates, down to this figure. Set it
-	-- to 0 to restore the behavior 3.0.0 shipped with.
+	-- Damage still lands, and still accumulates, down to this figure. The
+	-- cost is that a collision can no longer kill: a victim cannot be
+	-- trampled past the floor, however many times they are ridden into.
+	-- Set it to 0 to restore the behavior 3.0.0 shipped with, lockup
+	-- included.
 	MinVictimHealth          = 60.0,
 
 	-- Injuries. The engine rolls one from the hit a collision becomes, and
