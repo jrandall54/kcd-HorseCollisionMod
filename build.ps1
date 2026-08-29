@@ -347,7 +347,44 @@ if (Test-Path $readme) { Copy-Item $readme -Destination "$modDir\" }
 if (-not (Test-Path $releasesDir)) { New-Item -ItemType Directory -Force -Path $releasesDir | Out-Null }
 $outZip = "$releasesDir\HorseCollisionMod_v$Version.zip"
 if (Test-Path $outZip) { Remove-Item -Force $outZip }
-Compress-Archive -Path "$modDir\*" -DestinationPath $outZip -Force
+
+# Same defect as the pak above, and it reached players. Compress-Archive writes
+# Windows separators into the entry names, so the archive carries one entry
+# literally named "Data\HorseCollisionMod.pak" rather than a Data folder holding
+# the pak. File Explorer hides it by treating the backslash as a separator, which
+# is why manual testing never caught it, but the ZIP specification requires
+# forward slashes and every tool that follows it, 7-Zip and Vortex included,
+# extracts a single oddly named file into the mod root. The mod then does not
+# load at all. Build the archive entry by entry, as the pak is built.
+$modRoot = (Resolve-Path $modDir).Path
+$outArchive = [System.IO.Compression.ZipFile]::Open($outZip, "Create")
+try {
+    Get-ChildItem -Path $modRoot -Recurse -File | ForEach-Object {
+        $rel = $_.FullName.Substring($modRoot.Length + 1).Replace("\", "/")
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+            $outArchive, $_.FullName, $rel) | Out-Null
+    }
+}
+finally {
+    $outArchive.Dispose()
+}
+
+# A backslash here ships a broken install, and it did once. The archive is read
+# back and refused rather than trusted, because the failure is invisible in File
+# Explorer and only appears on a player's machine.
+$verify = [System.IO.Compression.ZipFile]::OpenRead($outZip)
+try {
+    $bad = @($verify.Entries | Where-Object { $_.FullName.Contains("\") })
+}
+finally {
+    $verify.Dispose()
+}
+if ($bad.Count -gt 0) {
+    Write-Host "[BUILD ERROR] archive entries use backslash separators:" -ForegroundColor Red
+    $bad | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor Red }
+    Remove-Item -Force $outZip
+    exit 1
+}
 
 # Cleanup
 Remove-Item -Recurse -Force $buildDir
