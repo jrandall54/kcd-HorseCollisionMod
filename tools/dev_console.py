@@ -119,6 +119,7 @@ def is_noise(text):
 # The mod's scripts as the engine's file system names them.
 MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
 SETTINGS_SCRIPT = "Scripts/Startup/HorseCollisionMod_Settings.lua"
+ITEM_DATA_SCRIPT = "Scripts/Startup/HorseCollisionMod_ItemData.lua"
 
 # Reloading the mod's Lua without restarting. `lua_reload_script` is a native
 # console command this build registers, which is a better bet than driving
@@ -131,6 +132,7 @@ RELOAD_COMMANDS = [
     # previous one still live, which reads in game as a setting that does
     # nothing.
     "lua_reload_script " + SETTINGS_SCRIPT,
+    "lua_reload_script " + ITEM_DATA_SCRIPT,
     "lua_reload_script " + MOD_SCRIPT,
     # Re-executing the script is not enough on its own. The mod's detection
     # loop is only started by its UI listener when a loading screen ends,

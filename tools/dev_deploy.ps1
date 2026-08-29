@@ -300,6 +300,14 @@ function Sync-LooseFiles {
 				To   = Join-Path $startup $name
 			}
 		}
+
+		# Generated rather than written, so it lives with the other build
+		# products under mod_assets rather than in src.
+		$files += @{
+			Half = "Script"
+			From = Join-Path $repoRoot "mod_assets\Scripts\Startup\HorseCollisionMod_ItemData.lua"
+			To   = Join-Path $startup "HorseCollisionMod_ItemData.lua"
+		}
 	}
 
 	if ($Anim) {

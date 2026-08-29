@@ -509,6 +509,104 @@ function HorseCollisionMod:WatchHealth(name, seconds)
 end
 
 
+--- What an entity is wearing, summed from its inventory.
+--
+-- Nothing in the ScriptBind surface reports which items are equipped, and
+-- nothing reports an item's weight. Neither gap matters for a collision
+-- target: an NPC carries only what it wears plus a few trinkets, and the
+-- weights are generated into `HorseCollisionMod_ItemData.lua` from the game's
+-- own tables. Filtering an inventory to the classes in that table is therefore
+-- equivalent to reading the equipped set.
+--
+-- The player is the exception, carrying whatever has been picked up, but the
+-- player is never the victim of an impact.
+--
+-- Saddles, bridles, horseshoes and spurs are filed as armor. `tack` selects
+-- between the two: false for what a person is wearing, true for a horse's own
+-- gear, which is what Phase 3 barding needs from the same call.
+--
+-- @tparam table entity any entity with an inventory
+-- @tparam[opt] boolean tack true to sum horse gear instead of worn armor
+-- @treturn table weight, smashDef, pieces, heaviest and heaviestType
+function HorseCollisionMod:ArmorOf(entity, tack)
+	local total = {
+		weight = 0,
+		smashDef = 0,
+		pieces = 0,
+		heaviest = 0,
+		heaviestType = 0,
+	}
+
+	local data = rawget(_G, "HorseCollisionModItemData")
+
+	if not data or not entity or not entity.inventory then
+		return total
+	end
+
+	local ok, items = pcall(function()
+		return entity.inventory:GetInventoryTable()
+	end)
+
+	if not ok or type(items) ~= "table" then
+		return total
+	end
+
+	for _, wuid in pairs(items) do
+		-- Per item rather than around the loop. An entity streaming out
+		-- mid-sum would otherwise discard the pieces already counted.
+		pcall(function()
+			local item = ItemManager.GetItem(wuid)
+
+			if not item or not item.class then
+				return
+			end
+
+			local row = data.Armor[item.class]
+
+			if not row then
+				return
+			end
+
+			local isTack = data.TackTypes[row[3]] == true
+
+			if isTack ~= (tack == true) then
+				return
+			end
+
+			total.weight = total.weight + row[1]
+			total.smashDef = total.smashDef + row[2]
+			total.pieces = total.pieces + 1
+
+			if row[1] > total.heaviest then
+				total.heaviest = row[1]
+				total.heaviestType = row[3]
+			end
+		end)
+	end
+
+	return total
+end
+
+
+--- An armor total as a log fragment.
+--
+-- @tparam table total a table from `ArmorOf`
+-- @treturn string the totals, and the heaviest piece's type by name
+function HorseCollisionMod:DescribeArmor(total)
+	local data = rawget(_G, "HorseCollisionModItemData")
+	local kind = "none"
+
+	if data and data.TypeNames[total.heaviestType] then
+		kind = data.TypeNames[total.heaviestType]
+	end
+
+	return "pieces=" .. tostring(total.pieces)
+			.. " weight=" .. string.format("%.1f", total.weight)
+			.. " smashDef=" .. string.format("%.2f", total.smashDef)
+			.. " heaviest=" .. kind
+end
+
+
 --- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -574,7 +672,8 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength)
 	self:Log("ImpactCost " .. name .. " tier=" .. tierName
 			.. " strength=" .. tostring(strength)
 			.. " health=" .. string.format("%.4f", before)
-			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?"))
+			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?")
+			.. " " .. self:DescribeArmor(self:ArmorOf(npc)))
 
 	local function sample(label)
 		local okAfter, after = pcall(function()

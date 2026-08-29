@@ -9,7 +9,8 @@
 # Packaged mod artifacts
 /releases/
 
-# Animation data generated from a local game install by build_adb.py
+# Animation data and the armor table, generated from a local game install
+# by build_adb.py and build_item_weights.py
 /mod_assets/
 
 *.pak

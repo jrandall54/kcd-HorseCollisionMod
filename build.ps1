@@ -264,6 +264,17 @@ if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\hcm_male_dat
     }
 }
 
+# The armor table is generated the same way and for the same reason: it is
+# derived from the game's tables, so it is not committed either.
+if (-not (Test-Path (Join-Path $assetsDir "Scripts\Startup\HorseCollisionMod_ItemData.lua"))) {
+    Write-Host "Armor table missing - generating..."
+    python (Join-Path $toolsDir "build_item_weights.py")
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[BUILD ERROR] build_item_weights.py failed." -ForegroundColor Red
+        exit 1
+    }
+}
+
 Write-Host "Including data overrides from mod_assets ..."
 Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 
