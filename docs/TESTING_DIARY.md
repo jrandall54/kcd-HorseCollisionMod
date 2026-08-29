@@ -4488,3 +4488,34 @@ here.
   cannot.
 - Whether a crime registers when a collision is witnessed by a third party, or
   when it is fatal.
+
+## A one-frame animation on the female get-up
+
+**User report**: "after the woman get thrown ragdoll from trot, when shes
+getting up I think there a single frame glitch animiation trying to fire. It
+doesn't prevent her from finishing her natually getting up, but I think when the
+impulse is finished and the NPC is snapping back it may be trying to load
+something."
+
+Noticed while running the damage reliability ride, and recorded without
+interrupting it.
+
+A single frame is the exact signature already documented for
+`StartInteractiveActionByName`: a name that matches no `AnimationControlled`
+fragment is accepted silently and aborts after one frame. That does not by
+itself explain this one, because the trot tier calls `Ragdoll` rather than the
+interactive action, so whatever fires here is either the engine's own recovery
+or a reaction message arriving while the ragdoll is still resolving.
+
+The female data is the side that had to be created rather than extended:
+`wh_female_fragmentids.xml` declared no `AnimationControlled` fragment at all,
+and the whole database block is the mod's. That makes it the first place to
+look.
+
+**Not yet connected to anything else.** The same session produced a female NPC
+who took zero damage from a gallop impact. Two anomalies on the female path in
+one session is worth noting and is not evidence they share a cause: the damage
+path runs through a brain message and the animation path through Mannequin, and
+they have no step in common.
+
+Cosmetic, and it does not interrupt the recovery. Parked as a known issue.

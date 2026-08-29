@@ -35,6 +35,11 @@ Known gaps carried into later phases:
       momentum, if at all.
 - [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
       physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
+- [ ] A one-frame animation fires as a female NPC stands up from a trot ragdoll. It does not
+      interrupt the recovery, which completes normally. A single frame is the documented
+      signature of `StartInteractiveActionByName` accepting a name that resolves to no
+      fragment, and the female Mannequin data is the half that had to be added rather than
+      extended, so that is where to look first. Cosmetic.
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
