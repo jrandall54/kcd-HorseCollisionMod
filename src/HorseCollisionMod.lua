@@ -182,7 +182,7 @@ HorseCollisionMod.Config = {
 
 	-- Horse stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 15.0,
+	StaminaDrainTrot         = 18.0,
 	StaminaDrainGallop       = 22.0,
 	ThrowRiderOnStaminaEmpty = true,
 
@@ -209,7 +209,7 @@ HorseCollisionMod.Config = {
 	AutoCureHealthLimit      = 40.0,
 
 	-- Combat.
-	CombatStaminaMultiplier  = 1.5,
+	CombatStaminaMultiplier  = 2.2,
 	SuppressStaggerInCombat  = true,
 
 	-- Switches.

@@ -29,9 +29,9 @@ HorseCollisionModSettings = {
 
 	-- Stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 15.0,
+	StaminaDrainTrot         = 18.0,
 	StaminaDrainGallop       = 22.0,
-	CombatStaminaMultiplier  = 1.5,   -- 1.0 removes the combat penalty
+	CombatStaminaMultiplier  = 2.2,   -- 1.0 removes the combat penalty
 	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
 
 	-- How much what a target is wearing changes the impact. Weight is the
