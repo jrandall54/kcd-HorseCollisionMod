@@ -44,9 +44,13 @@ Setup, once, in the game's system.cfg:
 
 import argparse
 import collections
+import os
 import re
+import shutil
 import socket
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -233,6 +237,46 @@ def unpack(buffer):
     return messages, buffer
 
 
+def check_lua_syntax(code):
+    """Refuses code the game would drop without saying anything.
+
+    The remote console does not report a compile error. A chunk with an
+    unbalanced `end` produces no output and no complaint, which is
+    indistinguishable from a chunk that ran and found nothing, and that
+    ambiguity has cost several rounds of guessing at results that were never
+    produced.
+
+    Returns an error string, or None when the chunk compiles or when no Lua
+    is available to ask.
+    """
+    for candidate in ("luac", "luac5.1", "luajit", "lua"):
+        exe = shutil.which(candidate)
+
+        if exe:
+            break
+    else:
+        return None
+
+    handle, path = tempfile.mkstemp(suffix=".lua")
+
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as f:
+            f.write(code)
+
+        args = [exe, "-bl", path, os.devnull] if "luajit" in exe \
+            else [exe, "-p", path]
+        done = subprocess.run(args, capture_output=True, text=True)
+
+        if done.returncode == 0:
+            return None
+
+        message = (done.stderr or done.stdout).strip()
+
+        return message.replace(path, "<lua>")
+    finally:
+        os.unlink(path)
+
+
 class Console(object):
     """A client that answers the server's requests and prints what it says."""
 
@@ -278,6 +322,7 @@ class Console(object):
         # console; "#" works here regardless. An earlier comment credited
         # sys_DevMode, which is not a CVar in this build at all.
         self.queue("#" + code)
+
 
     def reload_mod(self):
         self.lua('Script.ReloadScript("%s")' % MOD_SCRIPT)
@@ -472,6 +517,15 @@ def main():
             for command in RELOAD_COMMANDS:
                 console.queue(command)
     elif args.lua:
+        problem = check_lua_syntax(args.lua)
+
+        if problem:
+            print("the chunk does not compile, so the game would drop it "
+                  "without a word:")
+            print("  " + problem)
+
+            return 2
+
         console.lua(args.lua)
     elif args.command:
         console.queue(args.command)
