@@ -7876,3 +7876,74 @@ one of those can be installed on a victim by name through a daycycle patch and
 is seen to play, then the daycycle route reaches native animation playback and
 the remaining problem is only authoring a tree that plays this mod's fall
 clips. That is the test worth running before the route is abandoned.
+
+## Taking movement control off the animation stops victims entering geometry
+
+The hypothesis was that a victim passes through a wall because an interactive
+action is root-motion driven, and that
+`actor:SetMovementControlledByAnimation(false)`, applied to the one victim at
+the moment of impact, would put them back on entity-driven movement without
+touching the fragment every option in the database shares.
+
+Because it was not known which side of `StartInteractiveActionByName` the
+engine would honour, the setting names when the call happens rather than
+whether: `fragment` leaves it alone, `before` calls it ahead of the action,
+`after` calls it a tick later on a timer, and `both` does both. The ride was
+run at `both`, so a null result would have ruled out all three at once.
+
+Rides against walls and building corners, with the wall always on the far side
+of the victim so the reaction pushes them into it.
+
+| Tier | Impacts | Result |
+| --- | --- | --- |
+| Walk | 4 to 5 | none entered the wall or any solid geometry |
+| Trot | 3 | slight clipping, no penetration, victims returned to where they stood |
+
+The user's report on the trot rides: "Very slight clipping, but the beggar
+didn't straight up go through a wall like before and more or less returned to
+his original position. the beggar by the church did not end up inside of the
+church wall like he did before which is much better."
+
+**This is the first thing tried on this problem that worked.** The list it
+follows is long: `ColliderMode = Disabled`, `Horizontal = 1`, `Horizontal = 6`,
+removing the movement control layer, `GroundRotation`, the ragdoll settle
+layer, and correcting the fall and get-up pairings. The last of those helped
+the terrain case and none of them touched geometry.
+
+The church wall is worth naming as a landmark, because the same beggar at the
+same wall was put inside it on earlier builds, and is the clearest before and
+after this problem has produced.
+
+Two things are still open. The result was taken at `both`, so it is not yet
+known whether `before` alone, `after` alone, or only the pair is doing the
+work; the answer decides whether the setting can collapse to a boolean. And
+walk is clean while trot still shows slight clipping, which is consistent with
+the residual travel measured on this fragment rather than with a second cause.
+
+## The pull-down family is reachable from Lua, and the mounted probe had a hole
+
+The reading in the entry above, that `Undefined` across all four `Can` calls
+meant they answer only against the interactor's current target, is **wrong**.
+
+On foot and crouched behind a guard at 0.83 m:
+
+```
+[HCMProbe] rat_guard26 mounted=false dist=0.83 ang=-9.3 zang=-2.1 pull=0 knock=4 hunt=0 kill=3
+```
+
+`knock=4` is `SAT_KnockoutEnabled` and `kill=3` is `SAT_KillEnabled`. Polling
+the binds from Lua returns real answers with no interaction prompt on screen
+and nothing selected, so the family is not closed and the earlier reading was
+a false alarm. `CanHorsePullDown` reporting `Undefined` here is correct
+behaviour, since the player is not on a horse.
+
+The mounted samples that produced that reading have a defect. The probe logged
+one line per subject per state, and the state never changed, so a subject first
+seen at the edge of the six metre sphere with every call reading zero was never
+logged again as the horse closed on it. **Nothing closer than 5.15 m was ever
+recorded while mounted**, which is well outside any plausible reach for an
+action performed by leaning out of the saddle. The declared angle limits were
+satisfied in those samples, but distance was not tested at all.
+
+The key now carries a half-metre distance bucket, so a subject logs afresh as
+it closes. Re-running it mounted is what actually tests the gate.
