@@ -133,17 +133,21 @@ one thing in the game that leaves ordinary townspeople badly hurt in the open.
 Produced far more readily on guards than on other NPCs, which is also where
 every report of it in this project has come from.
 
-### Three things to remove before either fix lands
+### Three superseded protections. Removed.
 
-All three treat symptoms of causes since disproven, and all three are committed
-on `fix/collision-exhaustion`:
+Each treated a symptom of a cause since disproven, and the lockup is fixed at
+its source.
 
-- [ ] `MinVictimHealth` and `HoldVictimAboveFloor`. Cannot fix the lockup, which
-      happens at full health.
-- [ ] `ClearInjuries` and the injury buff table. Injuries are not the cause and
-      the cure never released a victim.
-- [ ] `LimitExhaustion`, `EnforceExhaustLimits` and `ExhaustWatch`. Built on an
-      inverted reading of the Energy stat, already disabled by default.
+- [x] `MinVictimHealth` and `HoldVictimAboveFloor`. Prevented the lockup only by
+      making a collision unable to kill.
+- [x] `ClearInjuries` and the injury buff constant. Injuries were never what
+      held a victim.
+- [x] `LimitExhaustion`, `EnforceExhaustLimits` and `ExhaustWatch`. Built on an
+      inverted reading of the Energy stat, and already disabled by default.
+
+313 lines, four methods, two module tables, six settings and a per-tick timer
+hook. A settings file still naming the removed keys keeps working, since an
+unknown setting is ignored and named in `kcd.log`.
 
 ## Development tooling
 
