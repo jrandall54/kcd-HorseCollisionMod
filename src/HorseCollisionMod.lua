@@ -187,11 +187,11 @@ HorseCollisionMod.Config = {
 	-- physics knockdown the mod shipped before.
 	TrotReaction             = "knockdown",
 
-	-- Who drives a victim's movement while a reaction plays. "fragment"
-	-- leaves it to the option's own MovementControlMethod layer. The other
-	-- three call `SetMovementControlledByAnimation(false)` on the victim,
-	-- before the action starts, a tick after it, or both.
-	ReactionMovementControl  = "fragment",
+	-- Takes movement control off the animation once a reaction has started,
+	-- so the victim is moved by the entity rather than by root motion and
+	-- stops being carried through walls. False restores the behavior before
+	-- this, where a stagger beside a building could end inside it.
+	ReleaseAnimationMovement = true,
 
 	-- The health at or above which a victim is no longer a candidate for
 	-- vanilla's auto-cure daycycle. Vanilla's own limit is 40, declared as
@@ -1164,19 +1164,20 @@ end
 --- Stops the animation driving a victim's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
--- fragment's `MovementControlMethod` layer, and it is the only lever found
--- that applies to one victim rather than to every option in the database.
--- Turning it off leaves the actor on entity-driven movement, which is the
--- state vanilla's own hit reactions play in and the reason they respect
--- geometry the mod's reactions pass through.
+-- fragment's `MovementControlMethod` layer, and it is the only lever that
+-- applies to one victim rather than to every option in the database. Turning
+-- it off leaves the actor on entity-driven movement, which is the state
+-- vanilla's own hit reactions play in and the reason they respect geometry an
+-- interactive action passes through.
+--
+-- Called on the tick after the action starts, never before it. An interactive
+-- action applies the fragment's own movement control as it begins, so a call
+-- made ahead of it is overwritten and does nothing at all: victims clipped
+-- into walls exactly as they did without it.
 --
 -- @tparam table npc victim entity
--- @tparam string when `before` or `after`, relative to the action starting,
---   recorded in telemetry because which of the two the engine honours is
---   unknown: an interactive action may reapply the fragment's own value as
---   it starts
 -- @treturn boolean true when the call was accepted without error
-function HorseCollisionMod:ReleaseAnimationMovement(npc, when)
+function HorseCollisionMod:ReleaseVictimMovement(npc)
 	if not npc.actor
 			or type(npc.actor.SetMovementControlledByAnimation) ~= "function" then
 		return false
@@ -1186,9 +1187,10 @@ function HorseCollisionMod:ReleaseAnimationMovement(npc, when)
 		npc.actor:SetMovementControlledByAnimation(false)
 	end)
 
-	self:Log("MovementControl when=" .. when
-			.. " ok=" .. tostring(ok)
-			.. " err=" .. tostring(err))
+	if self.Config.LogTelemetry then
+		self:Log("MovementControl released ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
+	end
 
 	return ok
 end
@@ -1231,12 +1233,6 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		end
 	end)
 
-	local control = self.Config.ReactionMovementControl or "fragment"
-
-	if control == "before" or control == "both" then
-		self:ReleaseAnimationMovement(npc, "before")
-	end
-
 	local ok, err = pcall(function()
 		-- The second argument is the object being interacted with. There is
 		-- no object in a collision, so the victim is passed as its own
@@ -1246,15 +1242,14 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 
 	-- Deferred by a tick for the same reason the ragdoll impulse is: the
 	-- action has to have started before anything it sets can be overridden.
-	if control == "after" or control == "both" then
+	if self.Config.ReleaseAnimationMovement then
 		Script.SetTimer(50, function()
-			self:ReleaseAnimationMovement(npc, "after")
+			self:ReleaseVictimMovement(npc)
 		end)
 	end
 
 	self:Log("Reaction action=" .. action
 			.. " gender=" .. gender
-			.. " control=" .. control
 			.. " ok=" .. tostring(ok)
 			.. " err=" .. tostring(err))
 

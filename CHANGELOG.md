@@ -32,6 +32,21 @@ sections and refuses a release built at any other number.
 
 ### Fixed
 
+- Staggering and falling victims stay out of walls. A reaction played beside a
+  building could carry its victim into the wall, through it, or leave them
+  standing inside it. Movement control is now taken off the animation once the
+  reaction has started, so the victim is moved by the entity rather than by the
+  animation's own root motion. Set `ReleaseAnimationMovement` to `false` to
+  restore the old behaviour.
+
+- Collisions no longer stop working after loading a save. Each victim is held
+  briefly after an impact so a single pass through a crowd cannot restart the
+  same reaction every frame. That wait was timed against a clock the save
+  restores, so loading an earlier save left victims waiting for the length of
+  the rewind, silently: nothing played, however many times they were ridden
+  into. Waits are now discarded on load and any that outlast their own limit
+  are ignored.
+
 - Animals are no longer knocked down. A guard dog could be given a human
   knockdown animation, which cannot play on a dog. The check for whether a
   collision victim is a person accepted anything belonging to a faction, which

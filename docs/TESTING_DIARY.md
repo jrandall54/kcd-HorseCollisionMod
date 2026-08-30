@@ -8030,3 +8030,38 @@ The cooldown fix from the previous entry is confirmed in the same log. The
 deadlines read `for=2896ms` and `for=5920ms` against `HitCooldownMs` of 3000
 and `KnockdownRecoveryMs` of 6000, where the same lines before the fix ran to
 407,408 ms.
+
+## The deferred call alone carries it, and the setting becomes a switch
+
+Ridden at `after` from a freshly loaded save, against the same church wall and
+the same beggar as the two rides before it. Four walk impacts and three trot
+impacts, every one logging `MovementControl when=after ok=true`.
+
+| Setting | Walk | Trot |
+| --- | --- | --- |
+| `fragment` | into the wall | through the wall, ends up inside it |
+| `before` | into the wall | clips in, ejected, ends up in the street |
+| `after` | clean, one head partly in the wall | never clipped, no bounce |
+| `both` | clean | slight clipping, no penetration |
+
+`after` alone reproduces `both`, so the deferred call is doing all of the work
+and the call made ahead of the action contributes nothing. The four modes
+collapse to one boolean, `ReleaseAnimationMovement`, defaulting on.
+
+**Why the order matters.** An interactive action applies its fragment's own
+`MovementControlMethod` layer as it starts, which overwrites a value set before
+the call and leaves one set after it standing. This is the same reason the
+ragdoll impulse is deferred by a tick, and the deferral is 50 ms in both places.
+
+The position question from the previous entry is answered and was not the
+setting. At `after` the victim "more or less returned to original position",
+matching `both`, so the beggar staying in the street at `before` was a
+consequence of being ejected from the wall rather than a separate behaviour.
+Facing is not preserved: one victim came back to the right place pointing a
+different way. That is cosmetic and is not tracked further.
+
+This closes the geometry problem that has been open since the walk stagger
+shipped. Everything tried before it, `ColliderMode`, three `MovementControlMethod`
+variations, removing the movement layer, `GroundRotation`, and the ragdoll
+settle layer, changed nothing about geometry. The terrain problem on sloped
+ground is separate and remains open.
