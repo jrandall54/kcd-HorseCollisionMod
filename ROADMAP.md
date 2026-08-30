@@ -29,6 +29,17 @@ Known gaps carried into later phases:
       behavior tree, which has no additive path, so it reintroduces the whole-file conflict
       surface 3.0.0 removed in exchange for a cosmetic fix. Parked unless an additive
       approach to behavior trees appears.
+- [ ] **Known issue.** A trot knockdown clips into sloped ground. The animation plays in
+      a plane while the ground rises and falls under it, so a victim is partly buried
+      falling uphill and briefly airborne falling downhill. Seven of twelve impacts on a
+      hillside were clean and the rest were cosmetic rather than broken. Everything that
+      could conform the body to terrain has been tried and measured: correcting the
+      get-up pairings fixed the rotation that caused most of it, `GroundRotation` does
+      nothing, the ragdoll settle layer cannot be ordered to run before the victim
+      stands, and the movement control values are modes whose vanilla settings are
+      already correct. Revisiting needs something other than this fragment, most likely
+      driving the ragdoll from Lua once the fall has played. `docs/TESTING_DIARY.md` has
+      the measurements.
 - [ ] The horse and a staggering NPC can still push against each other instead of clearing
       past. Setting the animation's collider mode to `Disabled` did not resolve it, and it
       matches vanilla behavior when riding head-on into someone. Revisit with Phase 2
@@ -63,31 +74,39 @@ Known gaps carried into later phases:
 Two separate defects, found by testing rather than reading, and neither is what
 earlier entries in this file assumed. Both are open.
 
-### 1. Collisions damage the victim, and the mod causes it
+### 1. Collisions damage the victim. Resolved at trot, open at gallop.
 
-The mod ragdolls its victim, which turns them from an animation-driven actor
-into a physics object. The moving horse then collides with that body and the
-engine charges damage from the velocity delta, at
-`CollisionVelocityDeltaToDmgR = 0.25` in `Libs/Tables/rpg/rpg_param.xml`.
+There are two sources and only one was ever a defect.
 
-Proven twice. Ragdolling an NPC 7.3 m away with no horse nearby costs nothing.
-Setting that parameter to 0 in a loose table gives 15 impacts at exactly zero
-damage.
+The mod's own `hitReaction` carries a `hitStrength` per tier, and vanilla turns
+a player-ridden collision into a real `combat:hit` carrying it. That is Phase 3
+blunt damage arriving early, it is wanted, and walk costs nothing only because
+it sends a strength that does nothing.
 
-- [ ] Throw the victim sideways. `Ragdoll` currently aims its impulse along the
-      horse's velocity, driving the victim down the horse's own line of travel
-      and maximising the overlap. A lateral component clears them instead.
-      Cheapest fix, changes nothing else, and the impact telemetry makes a
-      before-and-after unambiguous.
-- [ ] If that is not enough, delay the ragdoll a few hundred milliseconds so the
-      horse has passed before the body becomes physical.
-- [ ] Last resort, an animated knockdown through the `AnimationControlled` path
-      the walk stagger already uses, which never creates a physics body. Walk
-      impacts have cost zero health all session, which is the existence proof.
+The other is the trample. A ragdoll turns the victim into a physics object under
+a moving horse, and the engine charges the velocity delta at
+`CollisionVelocityDeltaToDmgR = 0.25`. The horse's speed at contact is the only
+predictor: above 10 m/s costs 20 to 25 against an unarmored target, under 5 m/s
+costs nothing, and neither the impulse nor armor affects it.
+
+- [x] Throw the victim sideways. No effect. The impulse does not cause the
+      damage, so its direction cannot help.
+- [x] Delay the ragdoll. Cuts the damage by about a fifth and destroys the
+      impact, because a victim who stands upright while the horse is inside them
+      does not read as having been hit.
+- [x] An animated knockdown at trot, through the `AnimationControlled` path the
+      walk stagger uses. No physics body is created, so the trample cannot
+      happen. `TrotReaction` selects it and it is the default.
+- [ ] Gallop still ragdolls, and still takes the trample. That is where the
+      damage is, 20 to 25 an impact against 3 to 5 at trot, and it is untouched.
+      Whether an animated knockdown suits a full gallop is a design question
+      rather than a technical one: a rider at speed should arguably throw a body.
 
 Overriding `rpg_param.xml` is rejected: one global value read by everything that
 resolves a physical collision, including the player's own, and shipping a
-vanilla table reintroduces the conflict surface 3.0.0 removed.
+vanilla table reintroduces the conflict surface 3.0.0 removed. Per-character
+overrides exist through `perk_rpg_param_override.xml`, which resolves RPG
+parameters against the perks a character holds, and are unexplored.
 
 ### 2. Repeatedly ragdolled NPCs wedge. Fixed.
 
