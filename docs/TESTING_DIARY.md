@@ -7135,3 +7135,218 @@ player-ridden collision to the rider as a real `combat:hit`, so a ride through a
 crowd registers an assault per impact and the sentences compound. The mod sends
 one `hitReaction` per impact by design, and the per-impact cooldown governs how
 often that can happen, so the tuning levers already exist.
+
+## Vanilla settles a fallen body with a ragdoll, two seconds in
+
+The mod's knockdown fragment was diffed against the vanilla `HitDeath` option
+that plays the same clip. Vanilla carries one layer the mod's copy does not:
+
+```xml
+<ProcLayer>
+  <Blend ExitTime="2" StartTime="0" Duration="0.2" />
+  <Procedural type="Ragdoll">
+    <ProceduralParams>
+      <Sleep value="0" />
+      <Stiffness value="100" />
+    </ProceduralParams>
+  </Procedural>
+</ProcLayer>
+```
+
+**That is what conforms a fallen body to the ground.** The animation plays for
+two seconds and then the body is handed to a stiff ragdoll, which settles it
+onto whatever terrain is actually there. Without it the clip plays its authored
+pose regardless of the slope underneath, which is exactly the clipping
+reported.
+
+`MovementControlMethod` is otherwise identical to the mod's copy, `Horizontal`
+at 2 and everything else at zero, so nothing else is missing. Vanilla also
+leaves its second clip slot empty, `<Animation name="" />`, because the ragdoll
+is what follows the fall in a death. The mod puts the get-up there instead.
+
+### Why this is not a return to the physics knockdown
+
+The ragdoll the mod removed was created at the moment of impact, underneath a
+horse still travelling through that space, and the engine charged the trample
+that followed. This one is created **two seconds after the animation starts**,
+by which time a horse at trot has covered something like fourteen metres and is
+nowhere near the body.
+
+It is the deferred ragdoll the roadmap proposed and Lua could not deliver. The
+Lua attempt delayed the whole reaction, so the victim stood upright while the
+horse stood inside them, and it was rejected on feel. Timed inside the fragment
+it defers only the physics settle: the fall plays immediately and reads
+correctly, and the body goes physical once, late, purely to find the ground.
+
+**The open question is the get-up.** Vanilla never needs one here because this
+is a death. Whether an actor handed to a ragdoll at two seconds can be returned
+to an animated recovery is not answered by reading, and is the next test.
+
+## The settle layer works, and a stale target nearly buried it
+
+The ragdoll settle layer was added to the knockdown options and the first test
+showed nothing playing at all, on either the knockdown or the walk stagger. The
+stagger failing too was read as the whole database having been rejected, and the
+layer was reverted.
+
+**That diagnosis was wrong.** The stagger still failed after the revert. The
+target was the fault: the test reused an entity captured by an earlier run,
+which happened to be the NPC that had taken twenty-four knockdowns during a
+loop and had logged `Animation-queue overflow. More then 16 entries`. A fresh
+target played the reverted build immediately, and played the settle build
+immediately as well.
+
+The project's own rule covers this and was not followed: log what the victim was
+doing before blaming the fragment. A stale entity reference is the same class of
+error as a victim locked in a scripted job animation, and it produced the same
+symptom, which is a valid call that plays nothing.
+
+**With the layer in place**, on a fresh guard:
+
+```
+[S] t+1.0s anim=AnimationControlled
+[S] t+5.0s anim=AnimationControlled
+[S] t+6.0s anim=BlendRagdoll
+[S] t+8.0s anim=BlendRagdoll
+[S] t+9.0s anim=IdleToMove
+```
+
+The animation plays, the body is handed to the ragdoll to settle, and the actor
+returns to its own locomotion. **The animated recovery and the ragdoll settle
+coexist**, which was the open question and could not be answered by reading.
+Whether the settle actually fixes the clipping on sloped ground is visual and
+needs a ride.
+
+## The settle layer cannot be ordered correctly inside one option
+
+**User report** riding with the settle layer: "clipping is better but still
+definitely there also the rag doll timing isn't quite correct so theres some
+unnatural snapping back adn forth between the stages of animation and the
+transition and rag doll lasts way too long."
+
+The ordering is the fault, and it is structural. What is wanted is fall, then
+settle onto the ground, then get up from a grounded pose. What the fragment
+produces is fall, get up, then settle:
+
+```
+[S] t+1..5s anim=AnimationControlled   fall and get-up
+[S] t+6..8s anim=BlendRagdoll          the settle, after both
+[S] t+9s    anim=IdleToMove
+```
+
+`ExitTime` on the ragdoll `ProcLayer` does not move it. Vanilla uses 2 with two
+anim slots, the second empty, which suggested the value counts clip slots
+rather than seconds; setting it to 1 produced an identical trace. **The layer
+takes over when the animation layer finishes, whatever the value**, so with a
+get-up in that layer the settle can only ever come last. It then holds for
+about three seconds, which is the "lasts way too long".
+
+Reverted to the build without it, which is the one the user judged better.
+
+### What a correct version would need
+
+`actor:StandUp` exists, alongside `RagDollize`, `SetPhysicalizationProfile` and
+`GetPhysicalizationProfile`, so leaving a ragdoll for an animation is possible.
+A correct sequence is therefore available in principle: a fragment holding the
+fall and the settle, as vanilla has, then `StandUp`, then the get-up as a
+second action.
+
+That is three stages joined by Lua rather than two joined by Mannequin, on a
+mod whose last two attempts at Lua-timed animation chaining both failed on
+timing. It should be attempted deliberately, with the physicalization profile
+polled rather than a delay guessed at, or not at all.
+
+**The trade as it stands**: no settle layer gives a clean fall and a good
+recovery with clipping on sloped ground. The settle layer improves the clipping
+and costs the recovery. The first is the better build today.
+
+## Comparing every shared fall clip, and keeping the ones already in use
+
+Eighteen fall clips exist for both character sets: the four
+`relaxed_death_walk_*_01` the mod uses, and fourteen `relaxed_death_idle_*`
+variants that had never been looked at. All were built as named options and
+played one at a time on a standing NPC, in four rounds by direction, judged on
+whether they read as a trot impact.
+
+| Direction | Verdict |
+| --- | --- |
+| Front | `walk_front_01` and `idle_front_04` quickest; the rest slower |
+| Back | `walk_back_01` and `idle_back_01` acceptable; `idle_back_02` and `_03` too dramatic |
+| Left | `walk_left_01` best, `idle_left_01` possible; the rest exaggerated |
+| Right | `walk_right_01` and `idle_right_01` good, `idle_right_03` decent |
+
+**The clips already in use won every direction**, and the reason is in what
+they are: `relaxed_death_walk_*` are falls from motion and `relaxed_death_idle_*`
+are falls from standing, so the walking ones are quicker and less staged. A
+trot victim is mid-stride, which is the case the walking clips were authored
+for.
+
+So the awkwardness reported at trot is **not fixable by choosing a different
+clip**. Nothing quicker exists in the shared palette. What remains is the
+transition, which is the ordering problem the settle layer could not solve.
+
+The fourteen candidates are removed again rather than shipped. Twenty-six
+options where twelve are used is dead weight in a database every redirected
+human resolves through, and restoring them for another comparison is one line.
+
+### A fall for a fatal collision
+
+Worth keeping, from the user, on `relaxed_death_idle_right_02`:
+
+> "3 would be good if it was played on a collision that was also a death hit
+> because it reacts fast get to the ground and then has a dramatic ending but
+> not good just for normal trot."
+
+A collision that kills is a different event from one that knocks down, and the
+clips that read as too theatrical for a knockdown are the ones authored for a
+death. The mod already knows a victim's health at the moment of impact and
+already sends the hit that may kill them, so choosing a death fall when the
+impact is fatal is available and needs no new data. It belongs with the crime
+and damage work rather than here.
+
+## The settle layer fires after the victim has already stood up
+
+Measured properly, with the get-up removed from the fragment so the option was
+fall plus settle exactly as vanilla builds it, and the physicalization profile
+sampled twice a second alongside the animation state:
+
+```
+[P] t+0.5s  anim=AnimationControlled  profile=alive
+[P] t+2.5s  anim=AnimationControlled  profile=alive
+[P] t+3.0s  anim=MotionIdle           profile=alive
+[P] t+4.5s  anim=MotionIdle           profile=alive
+[P] t+5.0s  anim=BlendRagdoll         profile=alive
+[P] t+7.0s  anim=BlendRagdoll         profile=alive
+[P] t+7.5s  anim=MotionIdle           profile=alive
+```
+
+The order is fall, **stand**, ragdoll, stand. The victim regains control two and
+a half seconds before the settle arrives, so the body is upright when the
+ragdoll takes it, drops it again, and hands it back. That is exactly the
+"snapping back and forth between the stages" reported, and it is why the
+clipping only partly improved: the settle is not settling the fall, it is
+settling whatever pose the actor had wandered into afterwards.
+
+**`ExitTime` on that layer does not control this.** Values of 1 and 2 produce
+identical traces, and the gap between the animation ending and the ragdoll
+starting is the same in both.
+
+**And the profile never changes.** It reads `alive` through the entire
+sequence, including while the animation state says `BlendRagdoll`. So the plan
+for a correct three-stage version, polling `GetPhysicalizationProfile` for the
+settle rather than guessing a delay, has nothing to poll. `StandUp`,
+`RagDollize` and `SetPhysicalizationProfile` exist, but the profile is not
+observably driven by this fragment.
+
+**Both approaches to the clipping are therefore closed for now.** The clips
+already in use are the best available, and the settle layer cannot be ordered
+to run while the victim is down. The build is back to the fall and get-up
+sequence, which is the version judged best in play, and the clipping on sloped
+ground stands as a known cosmetic limitation of an animated knockdown.
+
+Anything further would need the ragdoll driven from Lua rather than from the
+fragment: `RagDollize` on the victim once the fall has played, then `StandUp`
+before the get-up. That is a third attempt at Lua-timed animation chaining on a
+mod where two have already failed, and it should only be taken up with a
+measurement that says when the fall has actually finished, which the animation
+state provides and a fixed delay does not.

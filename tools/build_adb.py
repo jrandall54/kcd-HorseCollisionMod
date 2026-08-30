@@ -234,6 +234,7 @@ REACTIONS = [
     ("hcm_knockdown_right",
      ("relaxed_death_walk_right_01", "getup_ground_right"), BOTH),
 
+
     # The recovery half of the knockdown. Without one the fall clip ends and
     # the victim snaps upright, which reads as a break rather than a get-up.
     # Both character sets carry all four.
@@ -290,7 +291,7 @@ COLLIDER_MODE = None
 TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
         <AnimLayer>
 {clips}
-        </AnimLayer>
+        </AnimLayer>{settle}
         <ProcLayer>
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
           <Procedural type="MovementControlMethod">
@@ -306,6 +307,37 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
           </Procedural>
         </ProcLayer>{collider}
       </Fragment>"""
+
+# Hands the body to a stiff ragdoll once the fall has played, which is how
+# vanilla settles a fallen actor onto ground that is not flat. Without it the
+# clip holds its authored pose whatever the slope underneath, and the body
+# clips into the terrain.
+#
+# This is not the physics knockdown the trot tier moved away from. That ragdoll
+# was created at the moment of impact, underneath a horse still travelling
+# through the same space, and the engine charged the trample that followed.
+# This one is created two seconds into the animation, by which time a horse at
+# trot is some fourteen metres away.
+#
+# ExitTime is when the layer takes over, in seconds from the start of the
+# fragment. Stiffness 100 is vanilla's own value and barely deforms the pose;
+# the layer is there to find the ground, not to throw the body.
+SETTLE_LAYER = """
+        <ProcLayer>
+          <Blend ExitTime="%s" StartTime="0" Duration="0.2" />
+          <Procedural type="Ragdoll">
+            <ProceduralParams>
+              <Sleep value="0" />
+              <Stiffness value="%s" />
+            </ProceduralParams>
+          </Procedural>
+        </ProcLayer>"""
+
+# Seconds into the fall before the body is settled, and how rigid it is while
+# settling. None disables the layer, which is the behaviour before this was
+# added and is kept so the two can be compared without a rebuild.
+SETTLE_AT = None
+SETTLE_STIFFNESS = 100
 
 COLLIDER_LAYER = """
         <ProcLayer>
@@ -369,19 +401,26 @@ CLIP = ('          <Blend ExitTime="%s" StartTime="0" Duration="0.2" />\n'
         '          <Animation name="%s" />')
 
 
-def render_option(tags, clips, nl):
+def render_option(tags, clips, nl, settle=False):
     """Renders one Fragment option with the file's own line endings.
 
-    `clips` is one clip name, or several to play in order.
+    `clips` is one clip name, or several to play in order. `settle` adds the
+    ragdoll layer that conforms a fallen body to the ground.
     """
     collider = ""
 
     if COLLIDER_MODE:
         collider = COLLIDER_LAYER % COLLIDER_MODE
 
+    settle_layer = ""
+
+    if settle and SETTLE_AT is not None:
+        settle_layer = SETTLE_LAYER % (SETTLE_AT, SETTLE_STIFFNESS)
+
     body = "\n".join(CLIP % ("0" if i == 0 else "-1", clip)
                       for i, clip in enumerate(as_clips(clips)))
-    option = TEMPLATE.format(tags=tags, clips=body, collider=collider)
+    option = TEMPLATE.format(tags=tags, clips=body, collider=collider,
+                             settle=settle_layer)
 
     return option.replace("\n", nl)
 
@@ -483,7 +522,9 @@ def write_parent(gender, paths, nl):
         raise SystemExit("clips absent from the %s database: %s"
                          % (gender, missing))
 
-    options = nl.join(render_option(tag, clip, nl) for tag, clip in wanted)
+    options = nl.join(
+        render_option(tag, clip, nl, settle=tag.startswith("hcm_knockdown_"))
+        for tag, clip in wanted)
 
     existing = re.search(
         "\n    <AnimationControlled>(.*?)\n    </AnimationControlled>", db, re.S)
