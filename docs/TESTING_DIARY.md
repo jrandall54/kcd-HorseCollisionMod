@@ -7796,3 +7796,83 @@ call returned cleanly and **none rendered**. The original conclusion stands.
 `MinorInjury` at trot and `MajorInjury` at gallop, and has never sent `Fatal`.
 `hitType` is already sent as `Collision`, which `enum_HitReactionType` defines
 as 2.
+
+## The pull-down gate is three angle CVars, and none of them is what blocks it
+
+The three CVars exist and are readable live, decoded from the registration
+block in `references/WHGame_Decompiled.c` and confirmed against the running
+game:
+
+| CVar | Value | Registered description |
+| --- | --- | --- |
+| `wh_cs_HorsePullDownAngle` | 55 | max XY half-angle from the centre of the horse |
+| `wh_cs_HorsePullDownZeroAngle` | 20 | the angle that half-angle is measured about |
+| `wh_cs_HorsePullDownZAngle` | 15 | max Z angle |
+
+So the admissible sector is 20 +/- 55 degrees off the horse's facing, which is
+a wide arc down one side, with the victim within 15 degrees of level. There is
+**no distance CVar for pull-down**, unlike `wh_cs_StealthActionDistance = 2`
+for the stealth actions, so its reach comes from the `inr_pullDown`
+interaction range rather than from a tunable.
+
+A polling probe was installed over the console, sampling every nearby human
+four times a second while riding through Rataje and reporting distance, XY
+angle, Z angle, and all four `Can` calls.
+
+```
+[HCMProbe] rat_woman25 dist=5.34 ang=+7.6 zang=+3.7 pull=0 knock=0 hunt=0 kill=0
+[HCMProbe] rat_woman44 dist=5.41 ang=+6.0 zang=-2.1 pull=0 knock=0 hunt=0 kill=0
+[HCMProbe] rat_woman21 dist=5.15 ang=+8.1 zang=-4.0 pull=0 knock=0 hunt=0 kill=0
+```
+
+Every reading sits inside the declared angle limits on both axes and still
+returns `HPS_Undefined`. The line is logged once per state change, and no
+second line ever appeared for any subject, so the value stayed 0 all the way
+through contact as the horse rode over them.
+
+**The important part is the other three columns.** `CanStealthKnockout`,
+`CanHuntAttack` and `CanStealthKill` return `Undefined` in exactly the same
+conditions. Those are ordinary gameplay features that work when the player is
+sneaking on foot, so a gate that stops all four at once is not a pull-down gate
+at all. The likely reading is that these binds answer against the interactor's
+current target, and report `Undefined` for a victim the interaction system has
+not selected, which is what `BasicAIActions:GetActions` supplies when vanilla
+calls them. If that holds, polling them from Lua can never return anything else
+and the whole family is closed to this mod.
+
+The discriminating test is the same probe with the player on foot and crouched
+behind a subject, where `CanStealthKill` is known to be available in play. A
+non-zero reading there means the gate is being mounted; a zero reading means
+the bind needs interactor context and the family is dead.
+
+## The SmartObject playAnimation route needs a smart object, not a patch
+
+Reading `Libs/AI/final/so_animationOnSpot.xml` in full answers why installing
+`playAnimation` as a daycycle patch did nothing, and it is not the missing
+`sourceId`.
+
+The tree's `PlayAnimation` node is declared
+`SmartObject="__object.id" HelperID="helperId"`, and its `teleport` and
+`exactMove` branches both target `__object.id`. `__object` is the smart object
+the behaviour is running against, so the tree is meaningless without one. Its
+parameters are worse: everything it plays comes from
+`$t_animationOnSpot_params`, which is **forward-declared** rather than owned,
+and is set by an enclosing tree through an `Expression` node. Vanilla's users
+are wrappers like `q_dlc_revelation_trial_johanka`, each of which sets
+`behaviorName`, `animation`, `animationTags` and `movementType` and then
+includes `playAnimation`.
+
+A `daycycle:change` message carries `add`, `once`, `handle`, `name`,
+`priority`, `ignoreDuplicit` and `sourceId`. There is no field in it that can
+set a tree variable, so there is no way to tell an installed `playAnimation`
+which animation to play. Adding `sourceId` to the patch would not have helped.
+
+What the file does establish is that the behaviour-tree `PlayAnimation` node
+exists, is entity-driven rather than root-motion driven, and is the node
+vanilla uses everywhere. `Libs/AI/final/animationUtils.xml` carries several
+self-contained trees built on it that take no `__object` and no external
+parameters, `cheer`, `lookingAround`, `prayStand` and `guard` among them. If
+one of those can be installed on a victim by name through a daycycle patch and
+is seen to play, then the daycycle route reaches native animation playback and
+the remaining problem is only authoring a tree that plays this mod's fall
+clips. That is the test worth running before the route is abandoned.
