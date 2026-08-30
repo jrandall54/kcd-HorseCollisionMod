@@ -939,6 +939,16 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	end
 
 	local baseZ = height()
+
+	-- Where the victim stood when the impact landed. A reaction should leave
+	-- them near it; travelling on while animation-controlled is how a victim
+	-- reaches somewhere the collision never put them.
+	local origin = nil
+
+	pcall(function()
+		origin = npc:GetWorldPos()
+	end)
+
 	local exhaust = -1
 
 	pcall(function()
@@ -963,6 +973,19 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 
 		local z = height()
 		local dz = "?"
+		local travel = "?"
+
+		pcall(function()
+			if origin then
+				local q = npc:GetWorldPos()
+
+				if q then
+					travel = string.format("%.2f",
+							math.sqrt((q.x - origin.x) ^ 2
+									+ (q.y - origin.y) ^ 2))
+				end
+			end
+		end)
 
 		if z and baseZ then
 			dz = string.format("%+.2f", z - baseZ)
@@ -976,7 +999,8 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 				.. " from=" .. string.format("%.4f", before)
 				.. " health=" .. string.format("%.4f", after)
 				.. " delta=" .. string.format("%+.4f", after - before)
-				.. " dz=" .. dz)
+				.. " dz=" .. dz
+				.. " travel=" .. travel)
 	end
 
 	for _, at in ipairs(self.ImpactProbeSamples) do

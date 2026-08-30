@@ -278,20 +278,20 @@ def reactions_for(gender):
     return [(tag, clip) for tag, clip, genders in REACTIONS
             if gender in genders]
 
-# Collider mode held for the duration of the stagger, or None to declare no
-# ColliderMode layer at all.
+# Collider mode held for the duration of the reaction.
 #
-# Build 2.0.0 shipped "Disabled" on the theory that it would stop the horse
-# snagging on a victim who is mid-stagger and cannot step aside. It did not,
-# and it is a departure from vanilla: the clips these options play live on the
-# HitDeath fragment in the stock database, and neither of the two options
-# there declares a ColliderMode layer. Disabling an actor's colliders while a
-# physicalized item is attached to their hand is the leading explanation for
-# NPCs dropping baskets and buckets when they stagger.
+# Vanilla declares `Interactive` on 29 of the 32 options in the
+# `AnimationControlled` fragment, which is the fragment these options live in.
+# It declares nothing on 90 of the 106 in `HitDeath`, which is where the clips
+# themselves come from.
 #
-# None therefore matches vanilla. Set to "Disabled" or "Interactive" only with
-# an in-game result to justify it.
-COLLIDER_MODE = None
+# An earlier value of None was chosen by matching the clip's original fragment
+# rather than the fragment the option sits in. Without a collider layer an
+# interactive action leaves the actor able to pass through geometry, which is
+# why a victim knocked down beside a wagon ends up inside it and is pushed back
+# out on standing, and why vanilla's own hit reactions never do that: they are
+# played through HitDeath, where the actor keeps its ordinary collider.
+COLLIDER_MODE = "Interactive"
 
 # Modeled on the vanilla HitDeath option that plays these same clips
 # (FragTags "so_forward+minor_hit"), rather than on an object interaction.
@@ -303,20 +303,7 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
         <AnimLayer>
 {clips}
         </AnimLayer>{ground}{settle}
-        <ProcLayer>
-          <Blend ExitTime="0" StartTime="0" Duration="0.2" />
-          <Procedural type="MovementControlMethod">
-            <ProceduralParams>
-              <Horizontal value="{horizontal}" />
-              <Vertical value="{vertical}" />
-              <XyMove value="{xymove}" />
-              <ZMove value="{zmove}" />
-              <Rotate value="0" />
-              <Velocity value="0" />
-              <Inertia value="0" />
-            </ProceduralParams>
-          </Procedural>
-        </ProcLayer>{collider}
+{movement}{collider}
       </Fragment>"""
 
 # Hands the body to a stiff ragdoll once the fall has played, which is how
@@ -362,7 +349,16 @@ GROUND_ROTATION = True
 # hit reactions set it. ZMove governs the vertical: at zero the clip plays in
 # a flat plane and a body on a slope is buried going uphill and left in the
 # air going downhill, which is what a fallen victim does on a gradient.
+# Whether the reaction declares a movement control layer at all. Vanilla's own
+# hit reactions mostly do not: 84 of the 106 options in HitDeath declare none,
+# which leaves the actor on default entity-driven movement and therefore
+# collision-aware. The 29 of 32 in AnimationControlled that do declare one are
+# object interactions, where the actor is meant to be driven onto a door or a
+# bed and geometry is not in the way.
+MCM_DECLARE = True
+
 MCM_HORIZONTAL = 2
+MCM_ROTATE = 0
 MCM_VERTICAL = 0
 MCM_XYMOVE = 0
 MCM_ZMOVE = 0
@@ -372,6 +368,22 @@ MCM_ZMOVE = 0
 # added and is kept so the two can be compared without a rebuild.
 SETTLE_AT = None
 SETTLE_STIFFNESS = 100
+
+MOVEMENT_LAYER = """
+        <ProcLayer>
+          <Blend ExitTime="0" StartTime="0" Duration="0.2" />
+          <Procedural type="MovementControlMethod">
+            <ProceduralParams>
+              <Horizontal value="{horizontal}" />
+              <Vertical value="{vertical}" />
+              <XyMove value="{xymove}" />
+              <ZMove value="{zmove}" />
+              <Rotate value="{rotate}" />
+              <Velocity value="0" />
+              <Inertia value="0" />
+            </ProceduralParams>
+          </Procedural>
+        </ProcLayer>"""
 
 COLLIDER_LAYER = """
         <ProcLayer>
@@ -451,6 +463,13 @@ def render_option(tags, clips, nl, settle=False):
     if settle and SETTLE_AT is not None:
         settle_layer = SETTLE_LAYER % (SETTLE_AT, SETTLE_STIFFNESS)
 
+    movement = ""
+
+    if MCM_DECLARE:
+        movement = MOVEMENT_LAYER.format(
+            horizontal=MCM_HORIZONTAL, vertical=MCM_VERTICAL,
+            xymove=MCM_XYMOVE, zmove=MCM_ZMOVE, rotate=MCM_ROTATE)
+
     ground = ""
 
     if settle and GROUND_ROTATION:
@@ -460,8 +479,7 @@ def render_option(tags, clips, nl, settle=False):
                       for i, clip in enumerate(as_clips(clips)))
     option = TEMPLATE.format(tags=tags, clips=body, collider=collider,
                              ground=ground, settle=settle_layer,
-                             horizontal=MCM_HORIZONTAL, vertical=MCM_VERTICAL,
-                             xymove=MCM_XYMOVE, zmove=MCM_ZMOVE)
+                             movement=movement)
 
     return option.replace("\n", nl)
 

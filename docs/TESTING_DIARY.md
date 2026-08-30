@@ -7679,3 +7679,53 @@ above is what an actual teleport measures like.
 plays in a plane, the origin barely moves, and neither `GroundRotation` nor the
 ragdoll settle nor the movement control method changes that. Seven of twelve
 impacts clean on a hillside is where an animated knockdown lands.
+
+## Why the mod's reactions pass through geometry and vanilla's do not
+
+The question was put directly: these are vanilla's own clips, so why does a
+guard staggering beside a wall stay out of it while a mod victim goes through?
+
+**Because the playback path differs, and the mod cannot use vanilla's.** Lua's
+only working entry point is `actor:StartInteractiveActionByName`, which
+resolves against the `AnimationControlled` fragment. An interactive action is
+root-motion driven: the animation moves the body, and root motion is not
+navmesh or collision constrained. Vanilla's hit reactions play through
+`HitDeath`, natively, where the actor keeps entity-driven movement. The
+`hitReaction` and `combat:hit` messages reach a tree that cannot drive the
+body, so that path is closed.
+
+Five approaches were tried against it and measured.
+
+| Approach | Outcome |
+| --- | --- |
+| `ColliderMode = Interactive` | correct, and kept, but not the cause |
+| `Horizontal = 1` | travel drops to 0.00 m and the clipping stops, and the fall loses its direction |
+| `Horizontal = 6`, `Vertical = 6` | does not play at all |
+| No `MovementControlMethod` layer | dropped impacts, glitching, still clips |
+| `GroundRotation`, ragdoll settle | no effect, and cannot be ordered |
+
+Two of those are worth keeping as facts rather than attempts.
+
+**`ColliderMode` was genuinely wrong and is now fixed.** The mod declared none
+while 29 of the 32 vanilla options in `AnimationControlled` declare
+`Interactive`. The builder's own comment explained the faulty reasoning: it
+matched the fragment the clips come from rather than the fragment the options
+live in. It does not stop the clipping, and a victim was still put through a
+wall having travelled 1.59 m, but it was wrong before.
+
+**`Horizontal = 6` is for synchronised pairs.** Vanilla uses it in
+`HorseCombatHitSync` on fragments tagged `throw`, which is a rider throwing
+someone from horseback and reads as an exact match for this case. It requires a
+partner actor and plays nothing without one.
+
+**Removing the movement layer is not the answer either**, despite 84 of
+vanilla's 106 `HitDeath` options declaring none. Without it the animation still
+plays and still travels, which disproves the builder's claim that an
+interactive action needs one, but in play it produced dropped impacts and
+glitching.
+
+The remaining route is the one the roadmap already names: drive the ragdoll
+from Lua once the fall has played, so the body is settled by physics rather
+than by an animation. That is a third attempt at Lua-timed animation chaining
+on a mod where two have failed, and it should be taken up deliberately or not
+at all.
