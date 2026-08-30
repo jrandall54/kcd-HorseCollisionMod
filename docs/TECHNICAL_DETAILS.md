@@ -91,6 +91,11 @@ local header directly.
 - Reading properties on C++ userdata entities outside `pcall` can throw fatal
   errors. Entities stream in and out constantly, so every engine call in this
   mod is wrapped.
+- The stat `soul:GetState("exhaust")` returns is the **Energy** stat the game's
+  own UI shows, and it runs opposite to its name: 100 is fully rested and 0 is
+  spent. An untouched NPC reads 100. Reading it as exhaustion inverts every
+  conclusion drawn from it, and a cap written to hold victims below a ceiling
+  drains them instead of protecting them.
 - `soul:DealDamage(stamina, health, attacker, flag)` takes stamina first.
   Vanilla's debug helper `Quick.lua` names the parameters health-first, which is
   wrong. Use `soul:SetState` when adjusting a specific stat.
