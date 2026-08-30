@@ -29,17 +29,27 @@ Known gaps carried into later phases:
       behavior tree, which has no additive path, so it reintroduces the whole-file conflict
       surface 3.0.0 removed in exchange for a cosmetic fix. Parked unless an additive
       approach to behavior trees appears.
+- [x] Reactions carried their victim into walls and buildings, and sometimes left them
+      standing inside one. An interactive action is root-motion driven, so the animation
+      moves the body and nothing constrains where it ends up.
+      `actor:SetMovementControlledByAnimation(false)`, called on the victim a tick after
+      the action starts, returns them to entity-driven movement, which is the state
+      vanilla's own hit reactions play in. Walk and trot are both clean against a wall.
+      The timing is the whole trick: an interactive action applies its fragment's
+      movement layer as it starts, so the same call made before it is overwritten and
+      changes nothing. Settable as `ReleaseAnimationMovement`.
 - [ ] **Known issue.** A trot knockdown clips into sloped ground. The animation plays in
       a plane while the ground rises and falls under it, so a victim is partly buried
       falling uphill and briefly airborne falling downhill. Seven of twelve impacts on a
-      hillside were clean and the rest were cosmetic rather than broken. Everything that
-      could conform the body to terrain has been tried and measured: correcting the
+      hillside were clean and the rest were cosmetic rather than broken. Correcting the
       get-up pairings fixed the rotation that caused most of it, `GroundRotation` does
       nothing, the ragdoll settle layer cannot be ordered to run before the victim
-      stands, and the movement control values are modes whose vanilla settings are
-      already correct. Revisiting needs something other than this fragment, most likely
-      driving the ragdoll from Lua once the fall has played. `docs/TESTING_DIARY.md` has
-      the measurements.
+      stands, and the movement control values inside the fragment are modes whose
+      vanilla settings are already correct. The runtime movement control call above has
+      not been measured against a slope; it was found and tested after this item was
+      written, and it solved the geometry half of the same problem. That is the next
+      thing to try, ahead of driving the ragdoll from Lua once the fall has played.
+      `docs/TESTING_DIARY.md` has the measurements.
 - [ ] The horse and a staggering NPC can still push against each other instead of clearing
       past. Setting the animation's collider mode to `Disabled` did not resolve it, and it
       matches vanilla behavior when riding head-on into someone. Revisit with Phase 2
