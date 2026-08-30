@@ -7729,3 +7729,70 @@ from Lua once the fall has played, so the body is settled by physics rather
 than by an animation. That is a third attempt at Lua-timed animation chaining
 on a mod where two have failed, and it should be taken up deliberately or not
 at all.
+
+## The animation entry points, enumerated rather than assumed
+
+The module header has said since 1.x that `StartInteractiveActionByName` is the
+only call that drives an NPC's body. That claim was never tested against a full
+enumeration of what the engine exposes, and it is wrong.
+
+**The actor bind carries 98 functions and the human bind 41**, read off a live
+NPC rather than from documentation. Several bear directly on this problem and
+none had been tried.
+
+### `actor:SetMovementControlledByAnimation(enable)`
+
+A runtime, per-victim switch for whether the animation drives the actor's
+movement. This is the same thing `MovementControlMethod` sets inside a fragment,
+except it can be set per victim at the moment of impact rather than baked into
+every option. Confirmed callable and accepted; the animation still plays and
+still travels about a metre afterwards. Whether it prevents a victim passing
+through geometry is untested and is the obvious next experiment, because it is
+the only lever found that can be applied to one victim at a time.
+
+### A family of native full-body actions
+
+```
+CanStealthKill / RequestStealthKill        SAT_KillEnabled = 3
+CanStealthKnockout / RequestKnockOut       SAT_KnockoutEnabled = 4
+CanHorsePullDown / RequestHorsePullDown    HPS_Enabled = 2
+CanHuntAttack / RequestHuntAttack          HAS_Enabled = 2
+RequestMercyKill, RequestGrabCorpse, RequestPutCorpse, RequestItemExchange
+```
+
+Each takes a victim entity id and is called on the attacker.
+`Scripts/Entities/AI/Shared/BasicAIActions.lua` shows vanilla offering them as
+interaction prompts, so **a native mounted takedown exists in the game**:
+`@ui_hud_horse_pulldown`, wired to a behaviour tag `horsePullDown_horse`.
+
+Every `Can` call returned 0, which is `Undefined` rather than `Disabled`, at
+ranges from 4.3 m down to 0.7 m with the player mounted. The `Request` calls
+were accepted and did nothing. So the family is gated on conditions not yet
+identified, and the gate is not distance.
+
+### The SmartObject animation route
+
+`Libs/AI/final/so_animationOnSpot.xml` contains a tree named `playAnimation`,
+registered in `so_behaviour_tag` under that name. Its parameters carry
+`animationOnSpot_movementType`, whose values are `noMove`, `exactMove` and
+`teleport`. That is an explicit vanilla mechanism for playing an animation on an
+NPC with the movement behaviour chosen.
+
+Installing it through a daycycle patch, the mechanism the auto-cure uses, was
+tried and had no effect. Vanilla's own `cureApplyPatch` passes
+`sourceId($__land)`, so the patch anchors to a source the behaviour reads, and a
+patch without one appears to be ignored.
+
+### What is genuinely dead
+
+`human:PlayAnim(fragment, tag)` was retested, since the finding against it
+predates this record. It was called with `HitDeath` and the FragTags of options
+known to exist there, with `AnimationControlled`, and with an empty tag. Every
+call returned cleanly and **none rendered**. The original conclusion stands.
+
+### Unused strength
+
+`enum_HitReactionStrength` runs to `Fatal = 7`. The mod sends `Tickle` at walk,
+`MinorInjury` at trot and `MajorInjury` at gallop, and has never sent `Fatal`.
+`hitType` is already sent as `Collision`, which `enum_HitReactionType` defines
+as 2.
