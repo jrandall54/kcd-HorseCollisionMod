@@ -14,21 +14,32 @@ heading at release. An entry that breaks an existing install is marked
 **BREAKING**. `tools/version_check.py` derives the next version from these
 sections and refuses a release built at any other number.
 
+A version is assigned and tagged when a branch merges, whether or not that
+build is published. Publishing is a separate decision, made against whatever
+version is current at the time.
+
 ## [Unreleased]
 
+## [4.0.0-dev.1] - 2026-08-30
+
+Major because a trot collision no longer does what it did in 3.0.1, and what a
+given speed does is part of this project's public interface. An existing
+settings file still loads, which is a different test.
+
 ### Changed
+
+- **BREAKING** A trot collision now knocks the victim down with an animation
+  rather than a physics ragdoll. They fall, then get up, as one continuous
+  movement, and the horse no longer runs over the body it just made. Set
+  `TrotReaction` to `"ragdoll"` to restore the 3.0.1 behaviour. Gallop is
+  unchanged and still ragdolls, which is what a horse at full speed should do.
 
 - `MinVictimHealth`, `ClearCollisionInjuries` and the `LimitCollisionExhaust` group
   no longer exist. Each was an attempt at the problem where ridden-down NPCs
   stopped responding, and each was aimed at the wrong cause; that problem is
-  now fixed at its source. Nothing needs doing to an existing settings file: a
-  setting the mod does not recognise is ignored and named in `kcd.log`.
-
-- A trot collision now knocks the victim down with an animation rather than a
-  physics ragdoll. They fall, then get up, as one continuous movement, and the
-  horse no longer runs over the body it just made. Set `TrotReaction` to
-  `"ragdoll"` to restore the old behaviour. Gallop is unchanged and still
-  ragdolls, which is what a horse at full speed should do.
+  now fixed at its source. None of them appeared in a released version, so no
+  settings file in use names them; one that does keeps working, since an
+  unrecognised setting is ignored and named in `kcd.log`.
 
 ### Changed
 

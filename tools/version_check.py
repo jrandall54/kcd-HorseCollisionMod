@@ -17,6 +17,7 @@ import sys
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHANGELOG = os.path.join(REPO_ROOT, "CHANGELOG.md")
 MANIFEST = os.path.join(REPO_ROOT, "src", "mod.manifest")
+SCRIPT = os.path.join(REPO_ROOT, "src", "HorseCollisionMod.lua")
 
 # Changes under these paths are visible to a player and must be described in
 # the changelog. Everything else is development tooling, so a hundred commits
@@ -68,13 +69,60 @@ def changelog_releases():
     return blocks
 
 
-def implied_bump(body):
+def config_keys(text):
+    """The `Config` table's key names, from the source of the mod script."""
+    m = re.search(r"HorseCollisionMod\.Config = \{(.*?)^\}", text,
+                  re.M | re.S)
+
+    if not m:
+        return set()
+
+    return set(re.findall(r"^\s*([A-Za-z_]\w*)\s*=", m.group(1), re.M))
+
+
+def dropped_settings(last_tag):
+    """Settings present at the last release and gone now.
+
+    This is the check that was missing. The changelog's own definition of the
+    public interface covers the settings file, and this project's rules make
+    removing or renaming a `Config` key a major change. Reading that off the
+    prose is not reliable: the removals behind an earlier release were written
+    up under `Changed` rather than `Removed`, which left nothing for a
+    heading-based rule to see, and the release went out numbered as a minor.
+
+    Comparing the source against the tag answers it mechanically.
+    """
+    if not last_tag:
+        return set()
+
+    try:
+        out = subprocess.run(
+            ["git", "show", f"{last_tag}:src/HorseCollisionMod.lua"],
+            cwd=REPO_ROOT, capture_output=True, text=True)
+    except OSError:
+        return set()
+
+    if out.returncode != 0:
+        return set()
+
+    current = open(SCRIPT, encoding="utf-8").read()
+
+    return config_keys(out.stdout) - config_keys(current)
+
+
+def implied_bump(body, dropped=None):
     """Which part of the version the entries in one block call for.
 
     Removing something, or an entry marked BREAKING, forces a major. A new
     capability is a minor. Anything else is a patch.
+
+    A setting that existed at the last release and no longer does forces a
+    major too, whatever the prose says about it.
     """
     parts = sections(body)
+
+    if dropped:
+        return "major"
 
     if BREAKING in body or "Removed" in parts:
         return "major"
@@ -141,7 +189,12 @@ def documented_since(blocks, last_version):
             described.append((name, body))
             continue
 
-        m = re.match(r"^(\d+)\.(\d+)\.(\d+)$", name)
+        # A prerelease suffix has to be accepted here. Under this project's
+        # workflow a version is assigned when a branch merges, so the entries
+        # move out of Unreleased and under a heading like `4.0.0-dev.1` long
+        # before anything is published. Matching only a bare `x.y.z` reported
+        # a correctly described release as undescribed.
+        m = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$", name)
 
         if m and tuple(int(g) for g in m.groups()) > last_version:
             described.append((name, body))
@@ -162,6 +215,7 @@ def main():
     tags = released_versions()
     last_tag, last_version = tags[0] if tags else (None, (0, 0, 0))
     blocks = dict(changelog_releases())
+    dropped = dropped_settings(last_tag)
     errors = []
 
     if release:
@@ -181,7 +235,7 @@ def main():
                           "move them under %s" % release)
 
         if release in blocks:
-            bump = implied_bump(blocks[release])
+            bump = implied_bump(blocks[release], dropped)
             expected = next_version(last_version, bump)
             actual = tuple(int(p) for p in release.split("."))
 
@@ -212,7 +266,7 @@ def main():
 
     if described:
         for name, body in described:
-            bump = implied_bump(body)
+            bump = implied_bump(body, dropped)
             print("Documented as:     [%s] %s -> %s"
                   % (name, ", ".join(sorted(sections(body))),
                      ".".join(str(p) for p in next_version(last_version, bump))))

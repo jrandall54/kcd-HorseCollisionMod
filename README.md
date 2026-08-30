@@ -73,11 +73,12 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownMs` | 3000 | Milliseconds before the same NPC can react again. Stops one person reacting repeatedly. |
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
 | `Uplift` | 30.0 | Vertical knockdown force, trot and gallop only. Higher throws them upward rather than along the ground. |
-| `StaminaDrainTrot` | 30.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
-| `StaminaDrainGallop` | 45.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
+| `StaminaDrainTrot` | 18.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
+| `StaminaDrainGallop` | 22.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
 | `StaminaDrainWalk` | 0.0 | Stamina removed per NPC at walking pace. |
-| `CombatStaminaMultiplier` | 2.5 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
+| `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
+| `ReleaseAnimationMovement` | true | Keeps a reacting victim out of walls and out of sloped ground. False restores the behavior before 4.0.0. |
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
