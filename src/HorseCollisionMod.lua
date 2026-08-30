@@ -1123,12 +1123,11 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 	end)
 
 	-- Held for as long as the victim is a candidate for the cure, rather than
-	-- for a fixed time. A fixed window was tried and is wrong: it lapsed while
-	-- a guard was still under the threshold, the cure started the moment it
-	-- did, and he was found in `PretendingIllness` at 40.59 health with the
-	-- option already expired. The window cannot be chosen in advance, because
-	-- what it has to outlast is the victim climbing back over the threshold at
-	-- vanilla's 0.02 health per second.
+	-- for a fixed time. A fixed window cannot be chosen, because what it has
+	-- to outlast is the victim climbing back over the threshold at vanilla's
+	-- 0.02 health per second, which from thirty health is nearly nine minutes.
+	-- A window that lapses while the victim is still below it opens the gate
+	-- and the cure starts immediately.
 	--
 	-- One watcher per victim. A second impact replaces the token, so the
 	-- earlier watcher stops on its next pass rather than running alongside.
