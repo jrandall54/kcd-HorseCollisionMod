@@ -7796,3 +7796,311 @@ call returned cleanly and **none rendered**. The original conclusion stands.
 `MinorInjury` at trot and `MajorInjury` at gallop, and has never sent `Fatal`.
 `hitType` is already sent as `Collision`, which `enum_HitReactionType` defines
 as 2.
+
+## The pull-down gate is three angle CVars, and none of them is what blocks it
+
+The three CVars exist and are readable live, decoded from the registration
+block in `references/WHGame_Decompiled.c` and confirmed against the running
+game:
+
+| CVar | Value | Registered description |
+| --- | --- | --- |
+| `wh_cs_HorsePullDownAngle` | 55 | max XY half-angle from the centre of the horse |
+| `wh_cs_HorsePullDownZeroAngle` | 20 | the angle that half-angle is measured about |
+| `wh_cs_HorsePullDownZAngle` | 15 | max Z angle |
+
+So the admissible sector is 20 +/- 55 degrees off the horse's facing, which is
+a wide arc down one side, with the victim within 15 degrees of level. There is
+**no distance CVar for pull-down**, unlike `wh_cs_StealthActionDistance = 2`
+for the stealth actions, so its reach comes from the `inr_pullDown`
+interaction range rather than from a tunable.
+
+A polling probe was installed over the console, sampling every nearby human
+four times a second while riding through Rataje and reporting distance, XY
+angle, Z angle, and all four `Can` calls.
+
+```
+[HCMProbe] rat_woman25 dist=5.34 ang=+7.6 zang=+3.7 pull=0 knock=0 hunt=0 kill=0
+[HCMProbe] rat_woman44 dist=5.41 ang=+6.0 zang=-2.1 pull=0 knock=0 hunt=0 kill=0
+[HCMProbe] rat_woman21 dist=5.15 ang=+8.1 zang=-4.0 pull=0 knock=0 hunt=0 kill=0
+```
+
+Every reading sits inside the declared angle limits on both axes and still
+returns `HPS_Undefined`. The line is logged once per state change, and no
+second line ever appeared for any subject, so the value stayed 0 all the way
+through contact as the horse rode over them.
+
+**The important part is the other three columns.** `CanStealthKnockout`,
+`CanHuntAttack` and `CanStealthKill` return `Undefined` in exactly the same
+conditions. Those are ordinary gameplay features that work when the player is
+sneaking on foot, so a gate that stops all four at once is not a pull-down gate
+at all. The likely reading is that these binds answer against the interactor's
+current target, and report `Undefined` for a victim the interaction system has
+not selected, which is what `BasicAIActions:GetActions` supplies when vanilla
+calls them. If that holds, polling them from Lua can never return anything else
+and the whole family is closed to this mod.
+
+The discriminating test is the same probe with the player on foot and crouched
+behind a subject, where `CanStealthKill` is known to be available in play. A
+non-zero reading there means the gate is being mounted; a zero reading means
+the bind needs interactor context and the family is dead.
+
+## The SmartObject playAnimation route needs a smart object, not a patch
+
+Reading `Libs/AI/final/so_animationOnSpot.xml` in full answers why installing
+`playAnimation` as a daycycle patch did nothing, and it is not the missing
+`sourceId`.
+
+The tree's `PlayAnimation` node is declared
+`SmartObject="__object.id" HelperID="helperId"`, and its `teleport` and
+`exactMove` branches both target `__object.id`. `__object` is the smart object
+the behaviour is running against, so the tree is meaningless without one. Its
+parameters are worse: everything it plays comes from
+`$t_animationOnSpot_params`, which is **forward-declared** rather than owned,
+and is set by an enclosing tree through an `Expression` node. Vanilla's users
+are wrappers like `q_dlc_revelation_trial_johanka`, each of which sets
+`behaviorName`, `animation`, `animationTags` and `movementType` and then
+includes `playAnimation`.
+
+A `daycycle:change` message carries `add`, `once`, `handle`, `name`,
+`priority`, `ignoreDuplicit` and `sourceId`. There is no field in it that can
+set a tree variable, so there is no way to tell an installed `playAnimation`
+which animation to play. Adding `sourceId` to the patch would not have helped.
+
+What the file does establish is that the behaviour-tree `PlayAnimation` node
+exists, is entity-driven rather than root-motion driven, and is the node
+vanilla uses everywhere. `Libs/AI/final/animationUtils.xml` carries several
+self-contained trees built on it that take no `__object` and no external
+parameters, `cheer`, `lookingAround`, `prayStand` and `guard` among them. If
+one of those can be installed on a victim by name through a daycycle patch and
+is seen to play, then the daycycle route reaches native animation playback and
+the remaining problem is only authoring a tree that plays this mod's fall
+clips. That is the test worth running before the route is abandoned.
+
+## Taking movement control off the animation stops victims entering geometry
+
+The hypothesis was that a victim passes through a wall because an interactive
+action is root-motion driven, and that
+`actor:SetMovementControlledByAnimation(false)`, applied to the one victim at
+the moment of impact, would put them back on entity-driven movement without
+touching the fragment every option in the database shares.
+
+Because it was not known which side of `StartInteractiveActionByName` the
+engine would honour, the setting names when the call happens rather than
+whether: `fragment` leaves it alone, `before` calls it ahead of the action,
+`after` calls it a tick later on a timer, and `both` does both. The ride was
+run at `both`, so a null result would have ruled out all three at once.
+
+Rides against walls and building corners, with the wall always on the far side
+of the victim so the reaction pushes them into it.
+
+| Tier | Impacts | Result |
+| --- | --- | --- |
+| Walk | 4 to 5 | none entered the wall or any solid geometry |
+| Trot | 3 | slight clipping, no penetration, victims returned to where they stood |
+
+The user's report on the trot rides: "Very slight clipping, but the beggar
+didn't straight up go through a wall like before and more or less returned to
+his original position. the beggar by the church did not end up inside of the
+church wall like he did before which is much better."
+
+**This is the first thing tried on this problem that worked.** The list it
+follows is long: `ColliderMode = Disabled`, `Horizontal = 1`, `Horizontal = 6`,
+removing the movement control layer, `GroundRotation`, the ragdoll settle
+layer, and correcting the fall and get-up pairings. The last of those helped
+the terrain case and none of them touched geometry.
+
+The church wall is worth naming as a landmark, because the same beggar at the
+same wall was put inside it on earlier builds, and is the clearest before and
+after this problem has produced.
+
+Two things are still open. The result was taken at `both`, so it is not yet
+known whether `before` alone, `after` alone, or only the pair is doing the
+work; the answer decides whether the setting can collapse to a boolean. And
+walk is clean while trot still shows slight clipping, which is consistent with
+the residual travel measured on this fragment rather than with a second cause.
+
+## The pull-down family is reachable from Lua, and the mounted probe had a hole
+
+The reading in the entry above, that `Undefined` across all four `Can` calls
+meant they answer only against the interactor's current target, is **wrong**.
+
+On foot and crouched behind a guard at 0.83 m:
+
+```
+[HCMProbe] rat_guard26 mounted=false dist=0.83 ang=-9.3 zang=-2.1 pull=0 knock=4 hunt=0 kill=3
+```
+
+`knock=4` is `SAT_KnockoutEnabled` and `kill=3` is `SAT_KillEnabled`. Polling
+the binds from Lua returns real answers with no interaction prompt on screen
+and nothing selected, so the family is not closed and the earlier reading was
+a false alarm. `CanHorsePullDown` reporting `Undefined` here is correct
+behaviour, since the player is not on a horse.
+
+The mounted samples that produced that reading have a defect. The probe logged
+one line per subject per state, and the state never changed, so a subject first
+seen at the edge of the six metre sphere with every call reading zero was never
+logged again as the horse closed on it. **Nothing closer than 5.15 m was ever
+recorded while mounted**, which is well outside any plausible reach for an
+action performed by leaning out of the saddle. The declared angle limits were
+satisfied in those samples, but distance was not tested at all.
+
+The key now carries a half-metre distance bucket, so a subject logs afresh as
+it closes. Re-running it mounted is what actually tests the gate.
+
+## Loading a save locks every previously hit NPC out of reactions
+
+Reported as "it seems none of the animations would fire or I couldn't seem to
+impact them", on a ride that was supposed to be comparing `before` against
+`both`. The setting was not the cause and the ride produced no comparison.
+
+The telemetry showed the detection loop working perfectly and the cooldown gate
+rejecting every impact before it was scored:
+
+```
+[HorseCollisionMod] Recovering rat_refugee_ales for=407408ms
+[HorseCollisionMod] Recovering rat_refugee_vojcek for=258240ms
+[HorseCollisionMod] Recovering rat_refugee_kunes for=251248ms
+```
+
+`KnockdownRecoveryMs` is 6000 and `HitCooldownMs` is 3000, so no deadline this
+code writes can be more than six seconds ahead. Reading `RecentHits` out of the
+running game gave 23 entries whose deadlines spread from 347 seconds behind the
+clock to 239 seconds ahead of it.
+
+There is one writer, `self.RecentHits[npcId] = now + recovery`, so the stamps
+cannot be wrong. **The clock moved under them.**
+
+`System.GetCurrTime` was measured against a real-time `Script.SetTimer`: it
+advanced 5.000 s over a 5.000 s timer, so it does not drift and it is not the
+accelerated world clock. It read 142,746,608 ms, about 39.6 hours, which is
+accumulated time restored from the save rather than time since the level
+loaded. **Loading an earlier save moves it backwards** by however far the save
+was rewound, and every victim hit after that point in the abandoned timeline
+keeps a deadline that is now hundreds of seconds in the future.
+
+The failure is silent and looks exactly like the mod being broken: detection
+runs, the footprint accepts the victim, and nothing happens. It also has a
+second cause with the same signature, since entity ids are reused across a
+load, so a stamp can lock out a victim that was never hit at all.
+
+Two fixes, both shipped.
+
+- The load screen listener clears `RecentHits`. That handles the ordinary case
+  directly, and the listener already fires on every save load because it is
+  where the mod starts its detection loop.
+- The gate discards any deadline further ahead than the longest cooldown that
+  can be written. That covers a discontinuity from anything else, and repairs
+  itself on the next impact rather than needing the load to be observed.
+
+Worth holding on to beyond this mod: **any timestamp kept in Lua across a save
+load is stamped against a clock the save restores**, and Lua state in the
+running game is not restored with it. The two go out of step at every load.
+
+## The movement control call has to come after the action, not before it
+
+Ridden at `before` against the same church wall and the same beggar that gave
+the clean result at `both`. One walk impact and five trot impacts landed, all
+of them logging `MovementControl when=before ok=true`, so the call was made and
+accepted on every one.
+
+The user's report: "Trot saw him first time sort of bounce off the wall of the
+church back towards me, he doesn't return to original position is out in the
+street, then trot impact throws him back towards the church and clips into the
+wall... then the next couple impacts he clips through and is then seemingly
+ejected out of the wall but he never returns to his position."
+
+**That is the old behaviour.** Setting movement control before the action is
+worth nothing, which is consistent with `StartInteractiveActionByName` applying
+the fragment's own `MovementControlMethod` layer as it starts and overwriting
+anything set ahead of it. The call has to land on the running action.
+
+Since `both` worked and `before` did not, the deferred call is carrying the
+result on its own, and `after` alone should reproduce it. Confirming that is
+what collapses the setting from four modes to a switch.
+
+One detail from this ride is not about movement control and should not be read
+as one. The beggar resumed his begging animation wherever he came to rest
+rather than returning to where he had been standing. At `both` he "more or less
+returned to his original position". Whether that tracks the setting or is the
+smart object slot reclaiming him from wherever he ends up needs the `after`
+ride to separate.
+
+The cooldown fix from the previous entry is confirmed in the same log. The
+deadlines read `for=2896ms` and `for=5920ms` against `HitCooldownMs` of 3000
+and `KnockdownRecoveryMs` of 6000, where the same lines before the fix ran to
+407,408 ms.
+
+## The deferred call alone carries it, and the setting becomes a switch
+
+Ridden at `after` from a freshly loaded save, against the same church wall and
+the same beggar as the two rides before it. Four walk impacts and three trot
+impacts, every one logging `MovementControl when=after ok=true`.
+
+| Setting | Walk | Trot |
+| --- | --- | --- |
+| `fragment` | into the wall | through the wall, ends up inside it |
+| `before` | into the wall | clips in, ejected, ends up in the street |
+| `after` | clean, one head partly in the wall | never clipped, no bounce |
+| `both` | clean | slight clipping, no penetration |
+
+`after` alone reproduces `both`, so the deferred call is doing all of the work
+and the call made ahead of the action contributes nothing. The four modes
+collapse to one boolean, `ReleaseAnimationMovement`, defaulting on.
+
+**Why the order matters.** An interactive action applies its fragment's own
+`MovementControlMethod` layer as it starts, which overwrites a value set before
+the call and leaves one set after it standing. This is the same reason the
+ragdoll impulse is deferred by a tick, and the deferral is 50 ms in both places.
+
+The position question from the previous entry is answered and was not the
+setting. At `after` the victim "more or less returned to original position",
+matching `both`, so the beggar staying in the street at `before` was a
+consequence of being ejected from the wall rather than a separate behaviour.
+Facing is not preserved: one victim came back to the right place pointing a
+different way. That is cosmetic and is not tracked further.
+
+This closes the geometry problem that has been open since the walk stagger
+shipped. Everything tried before it, `ColliderMode`, three `MovementControlMethod`
+variations, removing the movement layer, `GroundRotation`, and the ragdoll
+settle layer, changed nothing about geometry. The terrain problem on sloped
+ground is separate and remains open.
+
+## The same call fixes the sloped ground, which was thought to need a ragdoll
+
+The entry above closed the geometry problem and left terrain open, on the
+reasoning that a body buried in a hillside and a body pushed through a wall
+were different faults. They were not. Free play on the shipped build, with no
+further changes:
+
+> "After testing I'm not noticing any floating/clipping through the ground on
+> trot collision animations. Maybe every so slightly, but way better than
+> before and it looks close to something that would be found in vanilla so I
+> think that issue can be set aside. It's not 100% perfect, but it's basically
+> there."
+
+**The hypothesis this overturns was the project's own.** The prior conclusion
+was that terrain conformance had no remaining knob on this fragment, that seven
+of twelve clean impacts on a hillside was where an animated knockdown lands,
+and that revisiting it needed the ragdoll driven from Lua after the fall had
+played. That last was named as a third attempt at Lua-timed animation chaining
+on a mod where two had already failed, and it is now not needed.
+
+Why one call covers both: a root-motion animation moves the body along a path
+authored in a plane, and nothing reconciles that path with the world. A wall is
+the horizontal case and a slope is the vertical one. Returning the actor to
+entity-driven movement puts the engine back in charge of where the body
+actually goes, and the engine already resolves both.
+
+The measurement that read as ruling this out is worth re-reading rather than
+deleting. `Vertical` and `ZMove` at 1 pinned the origin completely and at 2
+flung the body 58 metres, which was correctly read as proof that they are modes
+rather than switches, and correctly concluded that vanilla's values were right.
+The error was generalising from the fragment layer to the runtime call. They
+set the same property and are not the same lever: one is baked into every
+option in the database, the other is applied to one victim on a running action,
+and only the second can be timed to land after the action has claimed control.
+
+Both halves of the problem the animated knockdown shipped with are now closed
+by one line of Lua, so no ragdoll chaining is needed and the trot knockdown
+stays fully animated.

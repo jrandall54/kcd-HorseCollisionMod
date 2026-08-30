@@ -62,24 +62,8 @@ HorseCollisionModSettings = {
 	TrotReaction             = "knockdown", -- "knockdown" or "ragdoll"
 	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
-	-- Injuries. The engine rolls one from the hit a collision becomes, and
-	-- an injury never expires: a player clears one with a bandage, a potion
-	-- or sleep, and an NPC has none of those. Left alone, every villager a
-	-- rider knocks down is crippled for the life of the save.
-	--
-	-- Clearing them keeps the damage, the reaction and the crime, and takes
-	-- back only the permanent part. Turning this off restores the behavior
-	-- 3.0.0 shipped with.
-
-	-- Exhaustion. The engine adds it for every collision, and it recovers
-	-- slowly, so a rider who knocks the same guards down repeatedly leaves
-	-- them unable to fight and eventually frozen in place. These bound what
-	-- collisions alone can do; nothing here touches exhaustion from any
-	-- other source.
-	                                  -- exhaustion, and 100 means rested
-	                                  -- for, since the rise is gradual
-
 	-- Switches.
+	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
