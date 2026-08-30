@@ -16,7 +16,33 @@ sections and refuses a release built at any other number.
 
 ## [Unreleased]
 
+### Changed
+
+- A trot collision now knocks the victim down with an animation rather than a
+  physics ragdoll. They fall, then get up, as one continuous movement, and the
+  horse no longer runs over the body it just made. Set `TrotReaction` to
+  `"ragdoll"` to restore the old behaviour. Gallop is unchanged and still
+  ragdolls, which is what a horse at full speed should do.
+
 ### Fixed
+
+- Animals are no longer knocked down. A guard dog could be given a human
+  knockdown animation, which cannot play on a dog. The check for whether a
+  collision victim is a person accepted anything belonging to a faction, which
+  dogs do; it now names the three human classes. Women reached the mod through
+  that same fallback rather than by name, so this makes their handling
+  deliberate rather than accidental.
+
+- Getting up after a knockdown no longer twists the victim, which was also
+  driving them through sloped ground. The recovery animation has to match the
+  pose the fall ends in, and three of the four were paired wrongly; a get-up
+  authored from the wrong side snapped the body round to reach its own starting
+  pose.
+
+- Knockback no longer varies with how hard the horse braked on contact. The
+  same target could be thrown almost twice as far depending on how much speed
+  the impact happened to scrub, which made the difference between armored and
+  unarmored targets impossible to feel. Armor now decides it, as intended.
 
 - NPCs no longer stand in the street playing a hurt animation after being ridden
   down. A victim knocked under 40 health while bleeding was being taken over by
@@ -24,7 +50,10 @@ sections and refuses a release built at any other number.
   while healing them at a rate too slow to notice. Victims are now exempted from
   it, using the same mechanism the game uses for its own characters, and an NPC
   already stuck is released the next time a rider collides with them, so an
-  existing save repairs itself.
+  existing save repairs itself. The exemption is held until the victim's health
+  has recovered past the point where the game would take them over, rather than
+  for a fixed time, because a fixed window lapsed while victims were still
+  below it.
 
 ### Added
 

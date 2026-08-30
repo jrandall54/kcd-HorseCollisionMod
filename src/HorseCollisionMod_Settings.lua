@@ -60,6 +60,8 @@ HorseCollisionModSettings = {
 	-- included.
 	MinVictimHealth          = 0.0,
 	SuppressAutoCureSec      = 30,   -- exempt victims from the auto-cure daycycle
+	TrotReaction             = "knockdown", -- "knockdown" or "ragdoll"
+	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
 	-- Injuries. The engine rolls one from the hit a collision becomes, and
 	-- an injury never expires: a player clears one with a bandage, a potion

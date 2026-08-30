@@ -210,12 +210,73 @@ GENDERS = {
 # briefly, but nothing referenced them, so they were removed rather than left
 # as dead data. Add them back here when the trot tier moves off the physics
 # ragdoll.
-STAGGERS = [
-    ("hcm_stagger_forward", "hitreaction_idle_medium_torso_stab_front"),
-    ("hcm_stagger_back", "hitreaction_idle_medium_torso_stab_back"),
-    ("hcm_stagger_left", "hitreaction_idle_medium_torso_stab_left"),
-    ("hcm_stagger_right", "hitreaction_idle_medium_torso_stab_right"),
+BOTH = ("male", "female")
+MALE_ONLY = ("male",)
+
+REACTIONS = [
+    # Walk. A standing hit reaction, and the only family both character sets
+    # have had since 2.0.0.
+    ("hcm_stagger_forward", "hitreaction_idle_medium_torso_stab_front", BOTH),
+    ("hcm_stagger_back", "hitreaction_idle_medium_torso_stab_back", BOTH),
+    ("hcm_stagger_left", "hitreaction_idle_medium_torso_stab_left", BOTH),
+    ("hcm_stagger_right", "hitreaction_idle_medium_torso_stab_right", BOTH),
+
+    # Trot, replacing the physics ragdoll. Vanilla plays these on its own
+    # HitDeath fragment under `so_forward+death` with `Tags="walk"`, for a
+    # person collapsing while walking, which is the shape of a knockdown.
+    # Both character sets have all four.
+    # The get-up is paired to the pose the fall ends in, which the shared
+    # direction word does not tell you. Front and back swap; left and right
+    # keep their own. Every pair was found by playing one fall against all
+    # four get-ups on a staged subject, on both character sets, and keeping
+    # the one that did not rotate the root: a get-up authored from the wrong
+    # side snaps the body to reach its own start pose, and at ground level
+    # that drives it through the road.
+    #
+    # The back fall is the weak one. It is clean on a woman and keeps about
+    # ninety degrees on a man, and no get-up does better for him, so the
+    # rotation there is inherent to chaining these two clips rather than a
+    # pairing that can be improved.
+    ("hcm_knockdown_forward",
+     ("relaxed_death_walk_front_01", "getup_ground_back"), BOTH),
+    ("hcm_knockdown_back",
+     ("relaxed_death_walk_back_01", "getup_ground_front"), BOTH),
+    ("hcm_knockdown_left",
+     ("relaxed_death_walk_left_01", "getup_ground_left"), BOTH),
+    ("hcm_knockdown_right",
+     ("relaxed_death_walk_right_01", "getup_ground_right"), BOTH),
+
+    # The recovery half of the knockdown. Without one the fall clip ends and
+    # the victim snaps upright, which reads as a break rather than a get-up.
+    # Both character sets carry all four.
+    ("hcm_getup_forward", "getup_ground_front", BOTH),
+    ("hcm_getup_back", "getup_ground_back", BOTH),
+    ("hcm_getup_left", "getup_ground_left", BOTH),
+    ("hcm_getup_right", "getup_ground_right", BOTH),
+
+    # collision_stand_{front,back,left,right}_heavy are named for exactly this
+    # case and are not here. They exist as assets under
+    # animations/humans/male/hitdeath, but no fragment in the stock database
+    # references them, so they do not appear in its animation list and the
+    # check below rejects them. Reaching them means validating against the
+    # character's animation set rather than against what vanilla already
+    # references. They are male only in any case, so they could never carry a
+    # tier on their own.
 ]
+
+
+def as_clips(clips):
+    """A clip entry as a tuple, whether written as one name or several."""
+    if isinstance(clips, str):
+        return (clips,)
+
+    return tuple(clips)
+
+
+def reactions_for(gender):
+    """The (tag, clip) pairs a character set has the animation for."""
+    return [(tag, clip) for tag, clip, genders in REACTIONS
+            if gender in genders]
 
 # Collider mode held for the duration of the stagger, or None to declare no
 # ColliderMode layer at all.
@@ -240,9 +301,8 @@ COLLIDER_MODE = None
 # triggered hit reaction does not.
 TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
         <AnimLayer>
-          <Blend ExitTime="0" StartTime="0" Duration="0.2" />
-          <Animation name="{clip}" />
-        </AnimLayer>
+{clips}
+        </AnimLayer>{ground}{settle}
         <ProcLayer>
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
           <Procedural type="MovementControlMethod">
@@ -258,6 +318,51 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
           </Procedural>
         </ProcLayer>{collider}
       </Fragment>"""
+
+# Hands the body to a stiff ragdoll once the fall has played, which is how
+# vanilla settles a fallen actor onto ground that is not flat. Without it the
+# clip holds its authored pose whatever the slope underneath, and the body
+# clips into the terrain.
+#
+# This is not the physics knockdown the trot tier moved away from. That ragdoll
+# was created at the moment of impact, underneath a horse still travelling
+# through the same space, and the engine charged the trample that followed.
+# This one is created two seconds into the animation, by which time a horse at
+# trot is some fourteen metres away.
+#
+# ExitTime is when the layer takes over, in seconds from the start of the
+# fragment. Stiffness 100 is vanilla's own value and barely deforms the pose;
+# the layer is there to find the ground, not to throw the body.
+SETTLE_LAYER = """
+        <ProcLayer>
+          <Blend ExitTime="%s" StartTime="0" Duration="0.2" />
+          <Procedural type="Ragdoll">
+            <ProceduralParams>
+              <Sleep value="0" />
+              <Stiffness value="%s" />
+            </ProceduralParams>
+          </Procedural>
+        </ProcLayer>"""
+
+# Rotates the actor to match the ground it is on, copied from the vanilla
+# fragments that place a pose at ground level. Duration 0 at ExitTime 0 means it
+# applies for the whole fragment rather than blending in.
+GROUND_ROTATION_LAYER = """
+        <ProcLayer>
+          <Blend ExitTime="0" StartTime="0" Duration="0" />
+          <Procedural type="GroundRotation">
+            <ProceduralParams />
+          </Procedural>
+        </ProcLayer>"""
+
+# Whether a knockdown carries it. False restores the build before this.
+GROUND_ROTATION = True
+
+# Seconds into the fall before the body is settled, and how rigid it is while
+# settling. None disables the layer, which is the behaviour before this was
+# added and is kept so the two can be compared without a rebuild.
+SETTLE_AT = None
+SETTLE_STIFFNESS = 100
 
 COLLIDER_LAYER = """
         <ProcLayer>
@@ -305,14 +410,47 @@ def newline_of(text):
     return "\n"
 
 
-def render_option(tags, clip, nl):
-    """Renders one Fragment option with the file's own line endings."""
+# One clip and the blend that introduces it. A layer holding several plays
+# them in order, which is how vanilla sequences a jump into its fall, in 568
+# of its own options.
+#
+# ExitTime is 0 on the first clip, meaning start at once, and -1 on every clip
+# after it, meaning begin the transition when the one before has finished. The
+# sequence is therefore timed by the animations themselves.
+#
+# Chaining the same two clips from Lua on a fixed delay does not work. The fall
+# clips differ in length, so one delay is early for some directions and late
+# for others, and a late one arrives after the victim has regained control and
+# drags them back to the ground from wherever they walked to.
+CLIP = ('          <Blend ExitTime="%s" StartTime="0" Duration="0.2" />\n'
+        '          <Animation name="%s" />')
+
+
+def render_option(tags, clips, nl, settle=False):
+    """Renders one Fragment option with the file's own line endings.
+
+    `clips` is one clip name, or several to play in order. `settle` adds the
+    ragdoll layer that conforms a fallen body to the ground.
+    """
     collider = ""
 
     if COLLIDER_MODE:
         collider = COLLIDER_LAYER % COLLIDER_MODE
 
-    option = TEMPLATE.format(tags=tags, clip=clip, collider=collider)
+    settle_layer = ""
+
+    if settle and SETTLE_AT is not None:
+        settle_layer = SETTLE_LAYER % (SETTLE_AT, SETTLE_STIFFNESS)
+
+    ground = ""
+
+    if settle and GROUND_ROTATION:
+        ground = GROUND_ROTATION_LAYER
+
+    body = "\n".join(CLIP % ("0" if i == 0 else "-1", clip)
+                      for i, clip in enumerate(as_clips(clips)))
+    option = TEMPLATE.format(tags=tags, clips=body, collider=collider,
+                             ground=ground, settle=settle_layer)
 
     return option.replace("\n", nl)
 
@@ -344,7 +482,7 @@ def write_shared_tags(nl):
     raw = read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace")
 
     group = ['    <Group name="HcmReaction">']
-    group += ['      <Tag name="%s" />' % tags for tags, _ in STAGGERS]
+    group += ['      <Tag name="%s" />' % tag for tag, _, _ in REACTIONS]
     group += ["    </Group>"]
 
     anchor = nl + "  </Tags>"
@@ -360,7 +498,7 @@ def write_shared_tags(nl):
 
     print("  tags   %s (%d B, %d vanilla + %d added)"
           % (name, os.path.getsize(out(name)),
-             raw.count("<Tag "), len(STAGGERS)))
+             raw.count("<Tag "), len(REACTIONS)))
 
 
 def write_female_declaration(paths, nl):
@@ -406,13 +544,17 @@ def write_parent(gender, paths, nl):
     db = read_pak_entry(PAK, paths["db"]).decode("ascii", "replace")
 
     present = set(re.findall(r'<Animation name="([^"]*)"', db))
-    missing = [clip for _, clip in STAGGERS if clip not in present]
+    wanted = reactions_for(gender)
+    missing = [clip for _, clips in wanted for clip in as_clips(clips)
+               if clip not in present]
 
     if missing:
         raise SystemExit("clips absent from the %s database: %s"
                          % (gender, missing))
 
-    options = nl.join(render_option(tags, clip, nl) for tags, clip in STAGGERS)
+    options = nl.join(
+        render_option(tag, clip, nl, settle=tag.startswith(("hcm_knockdown_", "hcm_pb_")))
+        for tag, clip in wanted)
 
     existing = re.search(
         "\n    <AnimationControlled>(.*?)\n    </AnimationControlled>", db, re.S)
@@ -444,13 +586,14 @@ def write_parent(gender, paths, nl):
         handle.write(parent.encode("ascii"))
 
     print("  %-6s %s (%d B, %d vanilla options + %d added)"
-          % (gender, name, os.path.getsize(out(name)), inherited, len(STAGGERS)))
+          % (gender, name, os.path.getsize(out(name)), inherited, len(wanted)))
 
 def write_additive():
     """Generates the whole layout."""
     nl = newline_of(read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace"))
 
-    print("Additive layout, %d options per character set:" % len(STAGGERS))
+    print("Additive layout, %d options where the character set has the clip:"
+          % len(REACTIONS))
 
     for gender, paths in sorted(GENDERS.items()):
         write_parent(gender, paths, nl)
@@ -458,8 +601,9 @@ def write_additive():
     write_shared_tags(nl)
     write_female_declaration(GENDERS["female"], nl)
 
-    for tags, clip in STAGGERS:
-        print("  + %-22s -> %s" % (tags, clip))
+    for tag, clips, genders in REACTIONS:
+        print("  + %-24s -> %-46s %s"
+              % (tag, " then ".join(as_clips(clips)), "+".join(genders)))
 
     # A stale file here is still an override, and would quietly change which
     # chain entities resolve through.

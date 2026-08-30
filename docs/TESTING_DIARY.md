@@ -6750,3 +6750,838 @@ weapon, or that guard will take no reaction at trot either, which is worse than
 the ragdoll he gets today. A weapon-state axis therefore has to be part of the
 fragment work rather than an afterthought, and the polearm guard is the test
 case for it.
+
+## The animation palette available for a trot knockdown
+
+Read out of the game's own data rather than guessed, in preparation for
+replacing the trot ragdoll with an animated knockdown.
+
+**Where the clips are.** `Animations/Animations.img` inside `Animations-part0.pak`
+holds the catalogue, 139,096 clip paths for humans. The reaction animations are
+in `animations/humans/male/hitdeath/`, 102 clips, and
+`animations/humans/female/hitdeath/`, 60.
+
+**Where the fragments are.** Both the stagger clip the mod already uses and
+vanilla's fall-to-ground clips live in the `HitDeath` fragment of
+`kcd_male_database.adb`, not in `AnimationControlled`. The
+`AnimationControlled` fragment holds 32 fragments and every one of them is an
+object interaction: doors, gates, a cabinet, a wardrobe, an alarm bell. That is
+why the mod copies a clip into a FragTag of its own rather than invoking a
+vanilla one: `actor:StartInteractiveActionByName` reaches
+`AnimationControlled`, and the reactions are not in it. The same copy applies
+to a knockdown.
+
+### Two candidates, and they are not equivalent
+
+**`collision_stand_{front,back,left,right}_heavy`.** Four directional clips,
+named for exactly this case, and **referenced zero times in the vanilla male
+database**. The animation was authored and never wired to a fragment. It is
+male only; the female set has no equivalent.
+
+**`relaxed_death_walk_{front,back,left,right}_01`.** Four directional clips,
+present for **both** male and female, and used by vanilla in `HitDeath` under
+`FragTags="so_forward+death"` with `Tags="walk"`, which is a person collapsing
+to the ground while walking. That is the shape of a knockdown.
+
+The recovery half exists for both genders as
+`getup_ground_{front,back,left,right}` in `behavior/`.
+
+### What that forces
+
+The mod already reaches men and women, and the female database gap has cost
+this project once. A reaction that exists for men only cannot be the trot
+tier's reaction. **`relaxed_death_walk_*_01` is the candidate that can be**,
+with `collision_stand_*_heavy` worth testing separately as a heavier standing
+reaction for men.
+
+Two things are unknown and neither can be read from a filename: whether
+`collision_stand_*_heavy` puts a target on the ground or only rocks them, and
+whether a victim playing a death fall gets up again on their own or stays
+prone. Both are one build and one ride.
+
+### The polearm constraint still applies
+
+Mannequin selects a fragment against what the actor holds, and the walk
+stagger already fails to resolve for a guard carrying a two-handed polearm.
+Whatever the trot tier uses has to resolve for that actor as well, or that
+guard gets no reaction at trot where today he gets a ragdoll, which is worse
+than the state being replaced.
+
+## An animated knockdown resolves and recovers on its own
+
+`hcm_knockdown_{forward,back,left,right}` added to the mod's
+`AnimationControlled` options, mapped to `relaxed_death_walk_*_01`, which both
+character sets carry. Played on a standing NPC from the console, with no horse
+and no ragdoll:
+
+```
+[K] target=rat_man97 before=MotionMovement z=77.35
+[K] hcm_knockdown_forward ok=true err=nil
+[K] t+1.5s anim=AnimationControlled z=77.35
+[K] t+3.0s anim=AnimationControlled z=77.35
+[K] t+4.5s anim=MotionMovement      z=77.41
+[K] t+10.5s anim=MotionMovement     z=76.86
+```
+
+Two results. **The fragment resolves**, which `anim=AnimationControlled` shows
+and which is the same signal the walk stagger gives. And **the victim recovers
+without help**: the interactive action ends after three to four seconds and the
+NPC returns to its own locomotion. A death clip played this way does not leave
+anyone prone, so the trot tier does not need a scheduled `getup_ground_*` to
+follow it.
+
+Since nothing here creates a physics body, this path cannot incur the trample
+damage that the ragdoll does. Whether it reads as a knockdown on screen is a
+separate question and needs eyes rather than telemetry.
+
+### The unreferenced collision clips cannot be reached yet
+
+`collision_stand_{front,back,left,right}_heavy` were tried first and rejected
+by the builder:
+
+```
+clips absent from the male database: ['collision_stand_front_heavy', ...]
+```
+
+The assets exist under `animations/humans/male/hitdeath`, but no fragment in
+the stock database references them, so they never appear in its animation list,
+and `build_adb.py` validates a clip by looking for it there. Reaching them
+means validating against the character's animation set instead. They are male
+only regardless, so they could not carry a tier by themselves.
+
+### Two tooling faults found on the way
+
+`dev_console.py --lua` sent chunks that did not compile and the game dropped
+them without a word, which is indistinguishable from a chunk that ran and found
+nothing. It now compiles the chunk locally first and refuses to send one that
+fails, naming the error. Several rounds of this session were spent reading
+results that were never produced.
+
+`build_adb.py` reported the size of its whole reaction table as the number of
+options written, so a character set that received fewer would still have been
+reported as complete.
+
+## The animated knockdown reads correctly going down and badly coming up
+
+**User observation**, watching `hcm_knockdown_*` played on a merchant at normal
+speed, cycling all four directions:
+
+> "she goes down and thin unnatural snaps back up. the four directions do
+> slightly differ some of them are way too slow and more dramatic type of
+> reactions that I don't think would make sense."
+
+Three findings, and only the first was in question before the test:
+
+- **The victim does go to the ground.** The animation reads as a fall, which
+  the telemetry could not establish: the entity origin does not move during it,
+  so `z` holds at its standing value throughout and says nothing about the
+  pose.
+- **The recovery is wrong.** The interactive action ends and the victim snaps
+  upright rather than getting up. Nothing plays a get-up: the fall clip runs to
+  its end and control returns. `getup_ground_{front,back,left,right}` exists
+  for both character sets and is the obvious next piece.
+- **`relaxed_death_walk_*_01` is not four equivalent clips.** Some directions
+  are slower and more theatrical than a horse impact warrants, which is
+  unsurprising for animations authored as deaths. The direction variants need
+  choosing individually rather than taken as a set.
+
+Slow motion was tried first as a way to see it and was the wrong instrument.
+A reaction cannot be judged for feel at 35 per cent speed, since the thing being
+judged is how it reads at the speed it will be played. Looping it at normal
+speed is what produced usable answers.
+
+## Trot on the animated knockdown: reads decently, three faults
+
+**User report** after riding with `TrotReaction = "knockdown"`:
+
+> "I think it looks decent, but not perfect. The effect of the NPC feeling
+> sticky and the horse kind of feeling muddy while the animation is firing. The
+> snap back needs to be address as it is unnatural."
+
+- **Sticky victim, muddy horse.** The horse and the victim push against each
+  other while the animation runs. This is the same complaint recorded against
+  the walk stagger, where setting the animation's `ColliderMode` to `Disabled`
+  did not resolve it and was reverted for matching vanilla. The knockdown makes
+  it worse in one specific way: the victim is on the ground for three to four
+  seconds rather than staggering for one, so the window in which a horse can
+  snag on them is several times longer.
+- **The snap back up**, already recorded above. The fall clip ends and control
+  returns with no recovery played.
+- The knockdown carries none of the impact's momentum, which is the structural
+  difference from a ragdoll and is not fixable by choosing a different clip.
+
+### An armor observation, and what the code actually does
+
+> "it feels like the guards/more armored NPCs were getting impacted more by
+> trotting than galloping when we still had it wired for fall/rag doll whichs
+> makes me curious if the armor wiring is correct"
+
+Read rather than assumed. `ArmorCurve` is called with `invert=true`, so the
+ratio is `reference / weight`: heavier armor gives a smaller multiplier, and
+armored targets are moved less, which is what the design intends. The tier
+scalars are 0.6 at trot and 1.0 at gallop and they multiply that same figure,
+so for any one target **gallop always applies 1.66 times the trot impulse**.
+A guard at weight 58 scores 0.371, giving 0.22 at trot against 0.37 at gallop.
+
+The arithmetic therefore cannot produce the reported ordering, so if armored
+targets really did move more at trot, the cause is elsewhere: the footprint
+behaving differently at speed, the deferred impulse landing after a fast horse
+has gone, or the visible damage at gallop being read as impact. **None of this
+is measurable today, because the impulse magnitude the mod actually applies is
+computed and never logged.** That is the gap to close before drawing any
+conclusion.
+
+## The fixed exemption window was wrong, and a guard proved it in play
+
+**User report**, standing beside the NPC: "I hit the same guard a fews times
+and he's in the locked up, injured animation loop that I thought we had
+addressed before. Do this animations have damage or did some fluke happen
+here?"
+
+Neither. Measured live on the nearest NPC:
+
+```
+[N] nearest=villageGuard dist=2.7m health=40.59 anim=PretendingIllness suppress=false
+[N] t+4s  health=40.67 anim=PretendingIllness
+[N] t+16s health=40.91 anim=PretendingIllness
+```
+
+Health climbing 0.02 per second is the `autoCure` buff, and
+`suppress=false` is the whole explanation: **the exemption had expired.** The
+impacts logged him at 62.7, then 52.4, then 42.0, and the damage that followed
+the last one took him just under the threshold. Thirty seconds later the
+exemption lapsed, the gate opened, and the cure started.
+
+This is exactly the gap recorded when the message form was first tested and
+never closed. It was described then as the realistic case and it is: a rider
+knocks someone down, leaves them alive under 40, and rides away.
+
+**A fixed window cannot be right at any value.** What it has to outlast is the
+victim climbing back over 40 at 0.02 health per second, which from 30 health is
+just under nine minutes of game time. The exemption is now held until the
+victim is above `AutoCureHealthLimit`, rechecked on the same interval, with one
+watcher per victim and a token so a second impact replaces the first rather
+than running beside it.
+
+**The animated knockdown is not the cause and does still damage.** It creates
+no physics body, so the trample cost is gone, but the mod's `hitReaction`
+message is still converted by vanilla into a real player-attributed
+`combat:hit` carrying `hitStrength`, and that lands. Trot cost about 10 health
+per impact across the three logged here.
+
+The guard was released in place with the mod's own `SuppressAutoCure`, which
+now carries the patch removal:
+
+```
+SuppressAutoCure villageGuard for=30s set=true
+[R] t+4s health=41.39 anim=PretendingIllness
+[R] t+8s health=41.39 anim=MotionMovement
+```
+
+Health stopped moving at 41.39, which is the regeneration ending with the
+subtree rather than the animation merely changing.
+
+## The get-up chains, and clips through uneven ground
+
+**User report**: "the get up animation does chain, but the NPC clips through as
+the ground isn't PERFECTLY flat and the transition isn't smooth."
+
+The fall and the get-up are two separate interactive actions with nothing
+blending them, and neither is aligned to the ground under the victim. On a
+slope the pose at the end of the fall and the pose at the start of the get-up
+do not meet, and the body passes through the terrain between them.
+
+## Where the damage comes from, since the animation is not it
+
+A question worth answering plainly, because the reasoning behind it is right:
+if trot now uses the same mechanism as the walk stagger, and walk costs
+nothing, why does trot cost anything?
+
+**The fragment has never been the source.** Playing an animation on an NPC does
+not hurt them at any tier. There have always been two separate sources, and
+only one of them is gone:
+
+1. **The hit reaction.** `SendHitReaction` posts vanilla's `hitReaction` brain
+   message carrying a `hitStrength`, and vanilla converts a player-ridden
+   collision into a real, player-attributed `combat:hit` carrying that
+   strength, which the engine then resolves against the target. The strength is
+   the whole difference between the tiers: walk sends `Tickle` at 2, trot sends
+   `MinorInjury` at 5, gallop sends `MajorInjury` at 6. **Walk costs nothing
+   because it sends a strength that does nothing, not because it plays an
+   animation.** This is Phase 3's blunt damage, already wired, and it is
+   wanted.
+2. **The trample.** The horse striking the physics body a ragdoll creates,
+   charged by the engine on the velocity delta. **This is the one the animated
+   knockdown removes**, because no physics body is ever created.
+
+Measured on the animated knockdown, trot costs 4.6 to 5.7 per impact with
+`dz=+0.00` on every sample, against 3.7 to 4.9 under the ragdoll. So the trot
+figure barely moved, which is expected: at trot the horse is slow enough that
+the trample component was small to begin with. **The gain from this change is
+at gallop**, where trample was 20 to 25, and gallop is still on the ragdoll.
+
+An earlier note in this session put trot at about 10 per impact. That was read
+from the difference between consecutive impact lines, which spans everything
+that happened in between, rather than from the probe delta. The probe figures
+above are the right ones.
+
+## Chaining the get-up on a timer does not work
+
+**User report**: "almost every single one looks glitchy as the timing between
+the animations is definitely off and the guards clips and even one time got up
+in mid air floating... the animation triggers, then it seems to in one frame
+snap them back into walking, then again snaps them back on the ground for the
+getting up animation."
+
+The description is exact and the cause follows from it. The fall is one
+interactive action and the get-up is a second, fired by a Lua timer at a fixed
+`KnockdownGetupMs`. The fall clips do not all run for the same time, which the
+user had already noticed as some directions being slower, so a single fixed
+delay is early for some and late for others. When it is late the victim has
+already regained control and started walking, and the get-up then drags them
+back to the ground from wherever they had walked to, which is the snap sequence
+reported and also how a get-up ends up playing in mid air.
+
+**A fixed delay cannot be tuned into correctness**, for the same reason the
+auto-cure exemption window could not: it is standing in for a duration the
+system already knows and Lua does not.
+
+The fragment is the place to fix it. A Mannequin `AnimLayer` takes a sequence
+of clips, so the fall and the get-up can be one option that Mannequin times and
+blends itself, with no Lua timing and no gap for the victim to escape through.
+`KnockdownGetupMs` is set to 0 in the meantime, which restores the single fall
+and its abrupt recovery.
+
+## The fall and the get-up as one Mannequin sequence
+
+A Mannequin `AnimLayer` plays several clips in order, and vanilla relies on it:
+568 options in the stock male database hold two or more, sequencing a jump into
+its fall the same way.
+
+```xml
+<AnimLayer>
+  <Blend ExitTime="0" StartTime="0" Duration="0.2" />
+  <Animation name="relaxed_death_walk_front_01" />
+  <Blend ExitTime="-1" StartTime="0" Duration="0.2" />
+  <Animation name="getup_ground_front" />
+</AnimLayer>
+```
+
+`ExitTime="0"` on the first clip starts it at once. `ExitTime="-1"` on the
+second begins the transition when the first has finished, so **the sequence is
+timed by the animations and not by Lua**. That removes the fixed delay
+outright, and with it the gap the victim was escaping through.
+
+Measured on a standing guard, the whole action now holds the actor for about
+5.5 seconds against 3.5 for the fall alone, and leaves through `IdleToMove`
+into ordinary locomotion:
+
+```
+[S] t+1.0s anim=AnimationControlled
+[S] t+5.0s anim=AnimationControlled
+[S] t+6.0s anim=IdleToMove
+[S] t+8.0s anim=MotionMovement
+```
+
+`PlayGetup`, `KnockdownGetupMs` and their setting are removed rather than left
+at zero. The fragment does the work, and a knob whose only remaining function
+is to reintroduce the fault is not worth keeping. The standalone `hcm_getup_*`
+options stay, since they cost nothing and give the recovery a name that can be
+played on its own.
+
+## The knockback varied with how hard the horse braked, not with the target
+
+The user reported twice that armored and unarmored knockback at gallop did not
+feel right. The impulse magnitude was added to the telemetry to make it
+checkable, and it found a fault the armor arithmetic did not have.
+
+`TriggerCollision` is handed the **live** velocity and the **scored** speed, and
+they are deliberately different numbers: the score is the peak of the last few
+ticks, so a collision is rated by the speed the horse carried into it rather
+than by the speed left after contact slowed it. `Ragdoll` then built its
+direction as `velocity.x / speed`, dividing one by the other. That leaves a
+direction shorter than unit whenever the horse has slowed, and an impulse
+weakened by exactly that ratio.
+
+One target, one tier, one armor value, from a single ride:
+
+| Victim | scale | sampled / scored | Predicted | Logged |
+| --- | --- | --- | --- | --- |
+| rat_armorers_wife | 1.15 | 10.14 / 10.14 | 67.0 | 67.3 |
+| rat_armorers_wife | 1.15 | 2.84 / 10.72 | 37.7 | 37.7 |
+
+`sqrt((50 * 1.15 * 0.265)^2 + (30 * 1.15)^2)` is 37.7, so the model accounts
+for the reading exactly. The same woman took 1.8 times the knockback depending
+on how hard the horse happened to brake.
+
+The armor scaling itself was never wrong. Across the same ride, unarmored
+targets scored 1.15 to 1.26 and took 40.9 to 73.4, while guards scored 0.35 to
+0.42 and took 20.3 to 24.3, which is the intended ordering. The noise on top of
+it is what made the ordering hard to feel.
+
+The direction is now normalised against the velocity's own length. The scored
+speed keeps its two jobs, choosing the tier and scaling the impulse, and no
+longer sets the direction's length as well.
+
+## Crime accumulates per collision
+
+**User report** after a gallop kill: "I got arrested and my jail time is REALLY
+high. I get it, every one of those collisions is being counting as a crime and
+it's pilling up, but that might be something we need to tune when we get to the
+crime feature implementation."
+
+Recorded for the crime phase rather than acted on. Vanilla attributes every
+player-ridden collision to the rider as a real `combat:hit`, so a ride through a
+crowd registers an assault per impact and the sentences compound. The mod sends
+one `hitReaction` per impact by design, and the per-impact cooldown governs how
+often that can happen, so the tuning levers already exist.
+
+## Vanilla settles a fallen body with a ragdoll, two seconds in
+
+The mod's knockdown fragment was diffed against the vanilla `HitDeath` option
+that plays the same clip. Vanilla carries one layer the mod's copy does not:
+
+```xml
+<ProcLayer>
+  <Blend ExitTime="2" StartTime="0" Duration="0.2" />
+  <Procedural type="Ragdoll">
+    <ProceduralParams>
+      <Sleep value="0" />
+      <Stiffness value="100" />
+    </ProceduralParams>
+  </Procedural>
+</ProcLayer>
+```
+
+**That is what conforms a fallen body to the ground.** The animation plays for
+two seconds and then the body is handed to a stiff ragdoll, which settles it
+onto whatever terrain is actually there. Without it the clip plays its authored
+pose regardless of the slope underneath, which is exactly the clipping
+reported.
+
+`MovementControlMethod` is otherwise identical to the mod's copy, `Horizontal`
+at 2 and everything else at zero, so nothing else is missing. Vanilla also
+leaves its second clip slot empty, `<Animation name="" />`, because the ragdoll
+is what follows the fall in a death. The mod puts the get-up there instead.
+
+### Why this is not a return to the physics knockdown
+
+The ragdoll the mod removed was created at the moment of impact, underneath a
+horse still travelling through that space, and the engine charged the trample
+that followed. This one is created **two seconds after the animation starts**,
+by which time a horse at trot has covered something like fourteen metres and is
+nowhere near the body.
+
+It is the deferred ragdoll the roadmap proposed and Lua could not deliver. The
+Lua attempt delayed the whole reaction, so the victim stood upright while the
+horse stood inside them, and it was rejected on feel. Timed inside the fragment
+it defers only the physics settle: the fall plays immediately and reads
+correctly, and the body goes physical once, late, purely to find the ground.
+
+**The open question is the get-up.** Vanilla never needs one here because this
+is a death. Whether an actor handed to a ragdoll at two seconds can be returned
+to an animated recovery is not answered by reading, and is the next test.
+
+## The settle layer works, and a stale target nearly buried it
+
+The ragdoll settle layer was added to the knockdown options and the first test
+showed nothing playing at all, on either the knockdown or the walk stagger. The
+stagger failing too was read as the whole database having been rejected, and the
+layer was reverted.
+
+**That diagnosis was wrong.** The stagger still failed after the revert. The
+target was the fault: the test reused an entity captured by an earlier run,
+which happened to be the NPC that had taken twenty-four knockdowns during a
+loop and had logged `Animation-queue overflow. More then 16 entries`. A fresh
+target played the reverted build immediately, and played the settle build
+immediately as well.
+
+The project's own rule covers this and was not followed: log what the victim was
+doing before blaming the fragment. A stale entity reference is the same class of
+error as a victim locked in a scripted job animation, and it produced the same
+symptom, which is a valid call that plays nothing.
+
+**With the layer in place**, on a fresh guard:
+
+```
+[S] t+1.0s anim=AnimationControlled
+[S] t+5.0s anim=AnimationControlled
+[S] t+6.0s anim=BlendRagdoll
+[S] t+8.0s anim=BlendRagdoll
+[S] t+9.0s anim=IdleToMove
+```
+
+The animation plays, the body is handed to the ragdoll to settle, and the actor
+returns to its own locomotion. **The animated recovery and the ragdoll settle
+coexist**, which was the open question and could not be answered by reading.
+Whether the settle actually fixes the clipping on sloped ground is visual and
+needs a ride.
+
+## The settle layer cannot be ordered correctly inside one option
+
+**User report** riding with the settle layer: "clipping is better but still
+definitely there also the rag doll timing isn't quite correct so theres some
+unnatural snapping back adn forth between the stages of animation and the
+transition and rag doll lasts way too long."
+
+The ordering is the fault, and it is structural. What is wanted is fall, then
+settle onto the ground, then get up from a grounded pose. What the fragment
+produces is fall, get up, then settle:
+
+```
+[S] t+1..5s anim=AnimationControlled   fall and get-up
+[S] t+6..8s anim=BlendRagdoll          the settle, after both
+[S] t+9s    anim=IdleToMove
+```
+
+`ExitTime` on the ragdoll `ProcLayer` does not move it. Vanilla uses 2 with two
+anim slots, the second empty, which suggested the value counts clip slots
+rather than seconds; setting it to 1 produced an identical trace. **The layer
+takes over when the animation layer finishes, whatever the value**, so with a
+get-up in that layer the settle can only ever come last. It then holds for
+about three seconds, which is the "lasts way too long".
+
+Reverted to the build without it, which is the one the user judged better.
+
+### What a correct version would need
+
+`actor:StandUp` exists, alongside `RagDollize`, `SetPhysicalizationProfile` and
+`GetPhysicalizationProfile`, so leaving a ragdoll for an animation is possible.
+A correct sequence is therefore available in principle: a fragment holding the
+fall and the settle, as vanilla has, then `StandUp`, then the get-up as a
+second action.
+
+That is three stages joined by Lua rather than two joined by Mannequin, on a
+mod whose last two attempts at Lua-timed animation chaining both failed on
+timing. It should be attempted deliberately, with the physicalization profile
+polled rather than a delay guessed at, or not at all.
+
+**The trade as it stands**: no settle layer gives a clean fall and a good
+recovery with clipping on sloped ground. The settle layer improves the clipping
+and costs the recovery. The first is the better build today.
+
+## Comparing every shared fall clip, and keeping the ones already in use
+
+Eighteen fall clips exist for both character sets: the four
+`relaxed_death_walk_*_01` the mod uses, and fourteen `relaxed_death_idle_*`
+variants that had never been looked at. All were built as named options and
+played one at a time on a standing NPC, in four rounds by direction, judged on
+whether they read as a trot impact.
+
+| Direction | Verdict |
+| --- | --- |
+| Front | `walk_front_01` and `idle_front_04` quickest; the rest slower |
+| Back | `walk_back_01` and `idle_back_01` acceptable; `idle_back_02` and `_03` too dramatic |
+| Left | `walk_left_01` best, `idle_left_01` possible; the rest exaggerated |
+| Right | `walk_right_01` and `idle_right_01` good, `idle_right_03` decent |
+
+**The clips already in use won every direction**, and the reason is in what
+they are: `relaxed_death_walk_*` are falls from motion and `relaxed_death_idle_*`
+are falls from standing, so the walking ones are quicker and less staged. A
+trot victim is mid-stride, which is the case the walking clips were authored
+for.
+
+So the awkwardness reported at trot is **not fixable by choosing a different
+clip**. Nothing quicker exists in the shared palette. What remains is the
+transition, which is the ordering problem the settle layer could not solve.
+
+The fourteen candidates are removed again rather than shipped. Twenty-six
+options where twelve are used is dead weight in a database every redirected
+human resolves through, and restoring them for another comparison is one line.
+
+### A fall for a fatal collision
+
+Worth keeping, from the user, on `relaxed_death_idle_right_02`:
+
+> "3 would be good if it was played on a collision that was also a death hit
+> because it reacts fast get to the ground and then has a dramatic ending but
+> not good just for normal trot."
+
+A collision that kills is a different event from one that knocks down, and the
+clips that read as too theatrical for a knockdown are the ones authored for a
+death. The mod already knows a victim's health at the moment of impact and
+already sends the hit that may kill them, so choosing a death fall when the
+impact is fatal is available and needs no new data. It belongs with the crime
+and damage work rather than here.
+
+## The settle layer fires after the victim has already stood up
+
+Measured properly, with the get-up removed from the fragment so the option was
+fall plus settle exactly as vanilla builds it, and the physicalization profile
+sampled twice a second alongside the animation state:
+
+```
+[P] t+0.5s  anim=AnimationControlled  profile=alive
+[P] t+2.5s  anim=AnimationControlled  profile=alive
+[P] t+3.0s  anim=MotionIdle           profile=alive
+[P] t+4.5s  anim=MotionIdle           profile=alive
+[P] t+5.0s  anim=BlendRagdoll         profile=alive
+[P] t+7.0s  anim=BlendRagdoll         profile=alive
+[P] t+7.5s  anim=MotionIdle           profile=alive
+```
+
+The order is fall, **stand**, ragdoll, stand. The victim regains control two and
+a half seconds before the settle arrives, so the body is upright when the
+ragdoll takes it, drops it again, and hands it back. That is exactly the
+"snapping back and forth between the stages" reported, and it is why the
+clipping only partly improved: the settle is not settling the fall, it is
+settling whatever pose the actor had wandered into afterwards.
+
+**`ExitTime` on that layer does not control this.** Values of 1 and 2 produce
+identical traces, and the gap between the animation ending and the ragdoll
+starting is the same in both.
+
+**And the profile never changes.** It reads `alive` through the entire
+sequence, including while the animation state says `BlendRagdoll`. So the plan
+for a correct three-stage version, polling `GetPhysicalizationProfile` for the
+settle rather than guessing a delay, has nothing to poll. `StandUp`,
+`RagDollize` and `SetPhysicalizationProfile` exist, but the profile is not
+observably driven by this fragment.
+
+**Both approaches to the clipping are therefore closed for now.** The clips
+already in use are the best available, and the settle layer cannot be ordered
+to run while the victim is down. The build is back to the fall and get-up
+sequence, which is the version judged best in play, and the clipping on sloped
+ground stands as a known cosmetic limitation of an animated knockdown.
+
+Anything further would need the ragdoll driven from Lua rather than from the
+fragment: `RagDollize` on the victim once the fall has played, then `StandUp`
+before the get-up. That is a third attempt at Lua-timed animation chaining on a
+mod where two have already failed, and it should only be taken up with a
+measurement that says when the fall has actually finished, which the animation
+state provides and a fixed delay does not.
+
+## The clipping is a pose mismatch between the fall and the get-up
+
+**User observation**, which relocates the problem: "they fall and it looks good
+and then their body usually rotates in a frame and then the get up fires and
+somewhere in that action is where most of the clipping seems to start."
+
+A body that rotates in a single frame is not a terrain problem. It is the root
+orientation being corrected between two clips that disagree about which way the
+body is lying. The fall ends in whatever pose it ends in; the get-up is
+authored from one specific lying pose, and if that is not the pose the body is
+in, the actor is snapped into it. At ground level a snap of that size puts the
+body through the road, which is where the clipping was reported to start.
+
+**The pairing is the suspect.** The mod pairs by name, `relaxed_death_walk_front_01`
+with `getup_ground_front`, on the assumption that "front" means the same thing
+in both. It probably does not. In a fall clip the direction reads as where the
+impact came from; in a get-up it reads as which side the body is lying on.
+Those are opposites: someone struck from the front falls onto their back and
+has to get up from their back.
+
+This also explains why `GroundRotation` changed nothing. It aligns an actor to
+the ground it stands on, and the fault is a root rotation between two clips
+rather than a mismatch with the terrain.
+
+## The get-up has to be paired to the pose, and the names do not tell you which
+
+One fall, `relaxed_death_walk_front_01`, was built against all four get-ups so
+that the only difference between the options was the recovery clip. Fired at an
+NPC the user tagged with a walk stagger, at 3.7 m:
+
+| Get-up | Result |
+| --- | --- |
+| `getup_ground_front` | rotates, clips |
+| `getup_ground_back` | rotates, clips |
+| `getup_ground_left` | **does not rotate, clips far less** |
+| `getup_ground_right` | rotates most, clips most |
+
+So the forward walking fall leaves the body on its **left** side, and the
+correct recovery is `getup_ground_left`. The mod paired it with
+`getup_ground_front` on the assumption that a shared direction word meant a
+shared pose, and it does not: the fall's direction names where the impact came
+from, the get-up's names which side the body is lying on, and the relation
+between them is not identity and not opposition either.
+
+**The clipping was a consequence, not the fault.** A get-up authored from the
+wrong side rotates the root to reach its own start pose, and at ground level
+that rotation drives the body through the road. The worst pairing clipped worst,
+which is the ordering a rotation-driven fault predicts and a terrain-driven one
+does not.
+
+That also explains why `GroundRotation` changed nothing, and why the ragdoll
+settle only partly helped: the settle was correcting some of a bad rotation
+after the fact.
+
+The remaining three pairings have to be found the same way, by playing each
+fall against all four get-ups. There is no naming rule to infer them from.
+
+## The four correct fall and get-up pairings
+
+Each fall was played against all four get-ups, with the fall held constant so
+the recovery clip was the only variable. The subject was teleported three
+metres in front of the player once, allowed to settle, and then given the four
+options in turn.
+
+| Fall | Get-up | Result |
+| --- | --- | --- |
+| `relaxed_death_walk_front_01` | `getup_ground_left` | no rotation, least clipping |
+| `relaxed_death_walk_back_01` | `getup_ground_front` | no rotation |
+| `relaxed_death_walk_left_01` | `getup_ground_left` | slight roll, best available |
+| `relaxed_death_walk_right_01` | `getup_ground_right` | acceptable |
+
+**Three of the four the mod shipped were wrong**, and none of the correct pairs
+follows from the names. Front pairs with left and back pairs with front, which
+is neither identity nor opposition, so there was no rule to infer and the
+mapping had to be measured.
+
+The user's vocabulary made the readings usable: a yaw, described as a clock
+hand moving from six to twelve, against a roll, described as going from back to
+belly. A wrong pairing showed as one or the other, and the worst offenders were
+180 degree yaws.
+
+Two directions have no perfect partner. The left and right falls keep a slight
+roll whichever get-up follows them, so some residual movement is inherent to
+chaining these clips and is not a pairing error.
+
+### On staging a test subject
+
+Reading a single frame of rotation needs the subject in front of the player at
+a known distance, and neither picking the nearest NPC nor asking the user to
+tag one held up: targets walked off, fell through scenery, despawned, or turned
+out to be a namesake two kilometres away, and several rounds were spent on
+subjects nobody could see.
+
+Teleporting one NPC three metres in front of the player, once, then letting it
+settle before firing, is what worked. Repositioning between clips was tried
+first and was worse: it moved the subject mid-animation and left it floating.
+
+The harness now measures where the subject actually landed and refuses to fire
+beyond eight metres, so a bad placement fails loudly instead of costing a round.
+
+The subject also floated at times during these rounds. That is the staging and
+not the mod: `SetWorldPos` places the entity at the player's own height, which
+is not the ground height where it lands, and the body does not always settle
+before the clip is fired. The user judged it not to have affected the
+animations being compared, and no floating has been reported from an actual
+collision, where the victim is standing where it already was. Worth remembering
+before a future session reads it as a defect.
+
+## The pairings hold for both character sets, and play still differs
+
+A trot impact in play showed strong rotation on `hcm_knockdown_back`, the
+pairing round two had judged clean. Every pairing until then had been read on
+one woman, `rat_woman32`, so the character set was the first suspect: the two
+databases are separate and their clips are separately authored.
+
+The back fall was rebuilt against all four get-ups and staged on a man,
+`rat_man97`:
+
+| Get-up | Male | Female |
+| --- | --- | --- |
+| `getup_ground_front` | almost none | no rotation |
+| `getup_ground_back` | strong | rotates |
+| `getup_ground_left` | 180 degrees | rotates |
+| `getup_ground_right` | not very much | rotates |
+
+**The same pairing wins for both**, and the ordering of the losers matches too.
+Gender is not the variable and the mapping needs no per-set split.
+
+So a staged subject and a collision victim behave differently, and the
+difference is not the character set. What a real impact adds is that the victim
+is walking rather than standing idle, that their facing when struck is
+arbitrary rather than whatever the teleport left, and that the mod chooses the
+direction from the impact geometry rather than being told which to play.
+
+Whether the rotation seen in play happens at the start of the fall, which would
+point at the victim being turned to suit the clip's authored facing, or between
+the fall and the get-up, which is the fault already fixed, is not yet
+established and decides which of those to pursue.
+
+## The rotation is in the body's own frame, not the world's
+
+One clip, `relaxed_death_walk_back_01` into `getup_ground_front`, fired four
+times on one man with only his facing changed: toward the player, away, and
+turned ninety degrees each way.
+
+> "slight 90, slight 90, slight 90, slight 90, they all seemed almost identical
+> slightly glitchy almost 90 degree rotation"
+
+**Identical every time.** The get-up resolves against the body rather than a
+world direction, so a victim's orientation when struck does not change which
+pairing is right. That rules out the explanation for why staged tests and play
+disagreed, and it means a fixed mapping can be correct.
+
+It also corrects a reading from the previous round. The same pairing was
+recorded as "almost none" earlier and reads as a slight ninety here. The
+earlier look was the less careful one, taken before the staging held the
+subject still and before the user had settled on a vocabulary for these
+rotations. Readings from the staged pass supersede the ones before it.
+
+## The systematic pairing pass, across both character sets
+
+The first pass was run on whatever NPC was to hand and produced a mapping that
+did not survive scrutiny. This one staged the subject deliberately: teleported
+to a fixed spot four metres in front of the player, placed at terrain height,
+turned to face the player, and held for all four options of a round, so nothing
+varied within a round but the get-up. Sixteen pairings, then the same sixteen
+on the other character set.
+
+| Fall | Get-up | Male | Female |
+| --- | --- | --- | --- |
+| front | back | very slight | slight |
+| back | front | about 90 degrees | very slight |
+| left | left | really good | slight |
+| right | right | pretty dang good | slight |
+
+**Front and back swap, left and right keep their own.** One mapping serves both
+sets, which the earlier partial results had suggested was not the case.
+
+The back fall is the weak entry. It is clean on a woman and holds about ninety
+degrees on a man, and no other get-up does better for him, so that rotation is
+inherent to chaining those two clips rather than a pairing that can be improved.
+
+### What the first pass got wrong, and why
+
+It had front pairing with left. Both sets point at back. The readings behind it
+were taken before the subject was held still, before the user had settled on a
+vocabulary separating a yaw from a roll, and in several cases on a subject that
+walked away, fell through scenery or was a namesake two kilometres off.
+
+Two hypotheses were raised and killed along the way, both worth the time:
+facing, which changed nothing across four orientations of the same clip, and
+per-set mappings, which the matched pass shows are unnecessary.
+
+### Women are a different entity class
+
+Scanning for a female subject reported none within two hundred metres while the
+user could see four. **Women are class `NPC_Female`, not `NPC`.** Thirteen stood
+within sixty metres of a scan that had reported zero.
+
+The mod's own filter accepts a victim on `class == 'NPC'`, `class == 'Player'`,
+or the presence of `Properties.esFaction`, so women reach it only through that
+last fallback and never by class. That works, but it is the kind of accident
+that explains a long history of female-specific faults in this project, and it
+is worth naming the class explicitly.
+
+## The human filter was not one, and a dog proved it
+
+A knockdown was logged against `led_guardDog3` at trot, with `gender=0`:
+
+```
+ImpactCost led_guardDog3 tier=Trot strength=5 health=95.6250 pieces=0 weight=0.0
+Reaction action=hcm_knockdown_back gender=0 ok=true err=nil
+```
+
+A guard dog was handed a human knockdown fragment. It resolves against a dog
+skeleton, which has its own database, so nothing could have played.
+
+The filter accepted anything carrying `Properties.esFaction`, which was written
+to catch quest characters whose class is set to something unexpected. Dogs carry
+it too. The same fallback was also the only route by which **women** passed,
+since they are class `NPC_Female` and the filter named only `NPC` and `Player`.
+
+So one line was wrong in both directions at once: it admitted animals, and it
+admitted half the human population by accident rather than by name. Given the
+run of female-specific faults in this project, reaching women through a fallback
+meant for quest characters is worth calling out as a cause rather than a
+curiosity.
+
+The three human classes are now named: `NPC`, `NPC_Female`, `Player`. Confirmed
+against a live scan, which reported `NPC` at 47, `NPC_Female` at 13, `Dog` at 5,
+`Horse` at 1 and `Player` at 1 within sixty metres.
+
+`ProtectMutt` is unaffected and still guards Henry's dog by name. It was never
+the thing keeping other animals out, because nothing was.
