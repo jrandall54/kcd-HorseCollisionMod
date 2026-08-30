@@ -1977,12 +1977,21 @@ function HorseCollisionMod:SafeUpdate()
 				local isHuman = false
 
 				-- The sphere returns everything nearby: crates, doors, loose
-				-- items. The faction check catches NPCs whose class is set
-				-- to something unexpected, which quest characters often are.
+				-- items, animals. Humans are named by class, and there are
+				-- three: men spawn as NPC, women as NPC_Female, and the rider
+				-- as Player. Naming them is what keeps this a human filter.
+				--
+				-- A faction fallback stood here and was wrong in both
+				-- directions. Dogs carry `esFaction`, so a guard dog was
+				-- given a human knockdown fragment on a dog skeleton, which
+				-- is a fragment that cannot resolve. And women passed only
+				-- through that fallback rather than by class, which is a
+				-- fragile way to reach half the population and sits behind a
+				-- long run of female-specific faults in this mod.
 				pcall(function()
 					isHuman = (ent.class == 'NPC'
-							or ent.class == 'Player'
-							or (ent.Properties and ent.Properties.esFaction))
+							or ent.class == 'NPC_Female'
+							or ent.class == 'Player')
 				end)
 
 				if not isHuman then

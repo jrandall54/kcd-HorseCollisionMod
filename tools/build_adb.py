@@ -225,15 +225,26 @@ REACTIONS = [
     # HitDeath fragment under `so_forward+death` with `Tags="walk"`, for a
     # person collapsing while walking, which is the shape of a knockdown.
     # Both character sets have all four.
+    # The get-up is paired to the pose the fall ends in, which the shared
+    # direction word does not tell you. Front and back swap; left and right
+    # keep their own. Every pair was found by playing one fall against all
+    # four get-ups on a staged subject, on both character sets, and keeping
+    # the one that did not rotate the root: a get-up authored from the wrong
+    # side snaps the body to reach its own start pose, and at ground level
+    # that drives it through the road.
+    #
+    # The back fall is the weak one. It is clean on a woman and keeps about
+    # ninety degrees on a man, and no get-up does better for him, so the
+    # rotation there is inherent to chaining these two clips rather than a
+    # pairing that can be improved.
     ("hcm_knockdown_forward",
-     ("relaxed_death_walk_front_01", "getup_ground_front"), BOTH),
+     ("relaxed_death_walk_front_01", "getup_ground_back"), BOTH),
     ("hcm_knockdown_back",
-     ("relaxed_death_walk_back_01", "getup_ground_back"), BOTH),
+     ("relaxed_death_walk_back_01", "getup_ground_front"), BOTH),
     ("hcm_knockdown_left",
      ("relaxed_death_walk_left_01", "getup_ground_left"), BOTH),
     ("hcm_knockdown_right",
      ("relaxed_death_walk_right_01", "getup_ground_right"), BOTH),
-
 
     # The recovery half of the knockdown. Without one the fall clip ends and
     # the victim snaps upright, which reads as a break rather than a get-up.
@@ -291,7 +302,7 @@ COLLIDER_MODE = None
 TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
         <AnimLayer>
 {clips}
-        </AnimLayer>{settle}
+        </AnimLayer>{ground}{settle}
         <ProcLayer>
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
           <Procedural type="MovementControlMethod">
@@ -332,6 +343,20 @@ SETTLE_LAYER = """
             </ProceduralParams>
           </Procedural>
         </ProcLayer>"""
+
+# Rotates the actor to match the ground it is on, copied from the vanilla
+# fragments that place a pose at ground level. Duration 0 at ExitTime 0 means it
+# applies for the whole fragment rather than blending in.
+GROUND_ROTATION_LAYER = """
+        <ProcLayer>
+          <Blend ExitTime="0" StartTime="0" Duration="0" />
+          <Procedural type="GroundRotation">
+            <ProceduralParams />
+          </Procedural>
+        </ProcLayer>"""
+
+# Whether a knockdown carries it. False restores the build before this.
+GROUND_ROTATION = True
 
 # Seconds into the fall before the body is settled, and how rigid it is while
 # settling. None disables the layer, which is the behaviour before this was
@@ -417,10 +442,15 @@ def render_option(tags, clips, nl, settle=False):
     if settle and SETTLE_AT is not None:
         settle_layer = SETTLE_LAYER % (SETTLE_AT, SETTLE_STIFFNESS)
 
+    ground = ""
+
+    if settle and GROUND_ROTATION:
+        ground = GROUND_ROTATION_LAYER
+
     body = "\n".join(CLIP % ("0" if i == 0 else "-1", clip)
                       for i, clip in enumerate(as_clips(clips)))
     option = TEMPLATE.format(tags=tags, clips=body, collider=collider,
-                             settle=settle_layer)
+                             ground=ground, settle=settle_layer)
 
     return option.replace("\n", nl)
 
@@ -523,7 +553,7 @@ def write_parent(gender, paths, nl):
                          % (gender, missing))
 
     options = nl.join(
-        render_option(tag, clip, nl, settle=tag.startswith("hcm_knockdown_"))
+        render_option(tag, clip, nl, settle=tag.startswith(("hcm_knockdown_", "hcm_pb_")))
         for tag, clip in wanted)
 
     existing = re.search(

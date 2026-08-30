@@ -26,6 +26,19 @@ sections and refuses a release built at any other number.
 
 ### Fixed
 
+- Animals are no longer knocked down. A guard dog could be given a human
+  knockdown animation, which cannot play on a dog. The check for whether a
+  collision victim is a person accepted anything belonging to a faction, which
+  dogs do; it now names the three human classes. Women reached the mod through
+  that same fallback rather than by name, so this makes their handling
+  deliberate rather than accidental.
+
+- Getting up after a knockdown no longer twists the victim, which was also
+  driving them through sloped ground. The recovery animation has to match the
+  pose the fall ends in, and three of the four were paired wrongly; a get-up
+  authored from the wrong side snapped the body round to reach its own starting
+  pose.
+
 - Knockback no longer varies with how hard the horse braked on contact. The
   same target could be thrown almost twice as far depending on how much speed
   the impact happened to scrub, which made the difference between armored and

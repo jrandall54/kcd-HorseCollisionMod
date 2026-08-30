@@ -7350,3 +7350,238 @@ before the get-up. That is a third attempt at Lua-timed animation chaining on a
 mod where two have already failed, and it should only be taken up with a
 measurement that says when the fall has actually finished, which the animation
 state provides and a fixed delay does not.
+
+## The clipping is a pose mismatch between the fall and the get-up
+
+**User observation**, which relocates the problem: "they fall and it looks good
+and then their body usually rotates in a frame and then the get up fires and
+somewhere in that action is where most of the clipping seems to start."
+
+A body that rotates in a single frame is not a terrain problem. It is the root
+orientation being corrected between two clips that disagree about which way the
+body is lying. The fall ends in whatever pose it ends in; the get-up is
+authored from one specific lying pose, and if that is not the pose the body is
+in, the actor is snapped into it. At ground level a snap of that size puts the
+body through the road, which is where the clipping was reported to start.
+
+**The pairing is the suspect.** The mod pairs by name, `relaxed_death_walk_front_01`
+with `getup_ground_front`, on the assumption that "front" means the same thing
+in both. It probably does not. In a fall clip the direction reads as where the
+impact came from; in a get-up it reads as which side the body is lying on.
+Those are opposites: someone struck from the front falls onto their back and
+has to get up from their back.
+
+This also explains why `GroundRotation` changed nothing. It aligns an actor to
+the ground it stands on, and the fault is a root rotation between two clips
+rather than a mismatch with the terrain.
+
+## The get-up has to be paired to the pose, and the names do not tell you which
+
+One fall, `relaxed_death_walk_front_01`, was built against all four get-ups so
+that the only difference between the options was the recovery clip. Fired at an
+NPC the user tagged with a walk stagger, at 3.7 m:
+
+| Get-up | Result |
+| --- | --- |
+| `getup_ground_front` | rotates, clips |
+| `getup_ground_back` | rotates, clips |
+| `getup_ground_left` | **does not rotate, clips far less** |
+| `getup_ground_right` | rotates most, clips most |
+
+So the forward walking fall leaves the body on its **left** side, and the
+correct recovery is `getup_ground_left`. The mod paired it with
+`getup_ground_front` on the assumption that a shared direction word meant a
+shared pose, and it does not: the fall's direction names where the impact came
+from, the get-up's names which side the body is lying on, and the relation
+between them is not identity and not opposition either.
+
+**The clipping was a consequence, not the fault.** A get-up authored from the
+wrong side rotates the root to reach its own start pose, and at ground level
+that rotation drives the body through the road. The worst pairing clipped worst,
+which is the ordering a rotation-driven fault predicts and a terrain-driven one
+does not.
+
+That also explains why `GroundRotation` changed nothing, and why the ragdoll
+settle only partly helped: the settle was correcting some of a bad rotation
+after the fact.
+
+The remaining three pairings have to be found the same way, by playing each
+fall against all four get-ups. There is no naming rule to infer them from.
+
+## The four correct fall and get-up pairings
+
+Each fall was played against all four get-ups, with the fall held constant so
+the recovery clip was the only variable. The subject was teleported three
+metres in front of the player once, allowed to settle, and then given the four
+options in turn.
+
+| Fall | Get-up | Result |
+| --- | --- | --- |
+| `relaxed_death_walk_front_01` | `getup_ground_left` | no rotation, least clipping |
+| `relaxed_death_walk_back_01` | `getup_ground_front` | no rotation |
+| `relaxed_death_walk_left_01` | `getup_ground_left` | slight roll, best available |
+| `relaxed_death_walk_right_01` | `getup_ground_right` | acceptable |
+
+**Three of the four the mod shipped were wrong**, and none of the correct pairs
+follows from the names. Front pairs with left and back pairs with front, which
+is neither identity nor opposition, so there was no rule to infer and the
+mapping had to be measured.
+
+The user's vocabulary made the readings usable: a yaw, described as a clock
+hand moving from six to twelve, against a roll, described as going from back to
+belly. A wrong pairing showed as one or the other, and the worst offenders were
+180 degree yaws.
+
+Two directions have no perfect partner. The left and right falls keep a slight
+roll whichever get-up follows them, so some residual movement is inherent to
+chaining these clips and is not a pairing error.
+
+### On staging a test subject
+
+Reading a single frame of rotation needs the subject in front of the player at
+a known distance, and neither picking the nearest NPC nor asking the user to
+tag one held up: targets walked off, fell through scenery, despawned, or turned
+out to be a namesake two kilometres away, and several rounds were spent on
+subjects nobody could see.
+
+Teleporting one NPC three metres in front of the player, once, then letting it
+settle before firing, is what worked. Repositioning between clips was tried
+first and was worse: it moved the subject mid-animation and left it floating.
+
+The harness now measures where the subject actually landed and refuses to fire
+beyond eight metres, so a bad placement fails loudly instead of costing a round.
+
+The subject also floated at times during these rounds. That is the staging and
+not the mod: `SetWorldPos` places the entity at the player's own height, which
+is not the ground height where it lands, and the body does not always settle
+before the clip is fired. The user judged it not to have affected the
+animations being compared, and no floating has been reported from an actual
+collision, where the victim is standing where it already was. Worth remembering
+before a future session reads it as a defect.
+
+## The pairings hold for both character sets, and play still differs
+
+A trot impact in play showed strong rotation on `hcm_knockdown_back`, the
+pairing round two had judged clean. Every pairing until then had been read on
+one woman, `rat_woman32`, so the character set was the first suspect: the two
+databases are separate and their clips are separately authored.
+
+The back fall was rebuilt against all four get-ups and staged on a man,
+`rat_man97`:
+
+| Get-up | Male | Female |
+| --- | --- | --- |
+| `getup_ground_front` | almost none | no rotation |
+| `getup_ground_back` | strong | rotates |
+| `getup_ground_left` | 180 degrees | rotates |
+| `getup_ground_right` | not very much | rotates |
+
+**The same pairing wins for both**, and the ordering of the losers matches too.
+Gender is not the variable and the mapping needs no per-set split.
+
+So a staged subject and a collision victim behave differently, and the
+difference is not the character set. What a real impact adds is that the victim
+is walking rather than standing idle, that their facing when struck is
+arbitrary rather than whatever the teleport left, and that the mod chooses the
+direction from the impact geometry rather than being told which to play.
+
+Whether the rotation seen in play happens at the start of the fall, which would
+point at the victim being turned to suit the clip's authored facing, or between
+the fall and the get-up, which is the fault already fixed, is not yet
+established and decides which of those to pursue.
+
+## The rotation is in the body's own frame, not the world's
+
+One clip, `relaxed_death_walk_back_01` into `getup_ground_front`, fired four
+times on one man with only his facing changed: toward the player, away, and
+turned ninety degrees each way.
+
+> "slight 90, slight 90, slight 90, slight 90, they all seemed almost identical
+> slightly glitchy almost 90 degree rotation"
+
+**Identical every time.** The get-up resolves against the body rather than a
+world direction, so a victim's orientation when struck does not change which
+pairing is right. That rules out the explanation for why staged tests and play
+disagreed, and it means a fixed mapping can be correct.
+
+It also corrects a reading from the previous round. The same pairing was
+recorded as "almost none" earlier and reads as a slight ninety here. The
+earlier look was the less careful one, taken before the staging held the
+subject still and before the user had settled on a vocabulary for these
+rotations. Readings from the staged pass supersede the ones before it.
+
+## The systematic pairing pass, across both character sets
+
+The first pass was run on whatever NPC was to hand and produced a mapping that
+did not survive scrutiny. This one staged the subject deliberately: teleported
+to a fixed spot four metres in front of the player, placed at terrain height,
+turned to face the player, and held for all four options of a round, so nothing
+varied within a round but the get-up. Sixteen pairings, then the same sixteen
+on the other character set.
+
+| Fall | Get-up | Male | Female |
+| --- | --- | --- | --- |
+| front | back | very slight | slight |
+| back | front | about 90 degrees | very slight |
+| left | left | really good | slight |
+| right | right | pretty dang good | slight |
+
+**Front and back swap, left and right keep their own.** One mapping serves both
+sets, which the earlier partial results had suggested was not the case.
+
+The back fall is the weak entry. It is clean on a woman and holds about ninety
+degrees on a man, and no other get-up does better for him, so that rotation is
+inherent to chaining those two clips rather than a pairing that can be improved.
+
+### What the first pass got wrong, and why
+
+It had front pairing with left. Both sets point at back. The readings behind it
+were taken before the subject was held still, before the user had settled on a
+vocabulary separating a yaw from a roll, and in several cases on a subject that
+walked away, fell through scenery or was a namesake two kilometres off.
+
+Two hypotheses were raised and killed along the way, both worth the time:
+facing, which changed nothing across four orientations of the same clip, and
+per-set mappings, which the matched pass shows are unnecessary.
+
+### Women are a different entity class
+
+Scanning for a female subject reported none within two hundred metres while the
+user could see four. **Women are class `NPC_Female`, not `NPC`.** Thirteen stood
+within sixty metres of a scan that had reported zero.
+
+The mod's own filter accepts a victim on `class == 'NPC'`, `class == 'Player'`,
+or the presence of `Properties.esFaction`, so women reach it only through that
+last fallback and never by class. That works, but it is the kind of accident
+that explains a long history of female-specific faults in this project, and it
+is worth naming the class explicitly.
+
+## The human filter was not one, and a dog proved it
+
+A knockdown was logged against `led_guardDog3` at trot, with `gender=0`:
+
+```
+ImpactCost led_guardDog3 tier=Trot strength=5 health=95.6250 pieces=0 weight=0.0
+Reaction action=hcm_knockdown_back gender=0 ok=true err=nil
+```
+
+A guard dog was handed a human knockdown fragment. It resolves against a dog
+skeleton, which has its own database, so nothing could have played.
+
+The filter accepted anything carrying `Properties.esFaction`, which was written
+to catch quest characters whose class is set to something unexpected. Dogs carry
+it too. The same fallback was also the only route by which **women** passed,
+since they are class `NPC_Female` and the filter named only `NPC` and `Player`.
+
+So one line was wrong in both directions at once: it admitted animals, and it
+admitted half the human population by accident rather than by name. Given the
+run of female-specific faults in this project, reaching women through a fallback
+meant for quest characters is worth calling out as a cause rather than a
+curiosity.
+
+The three human classes are now named: `NPC`, `NPC_Female`, `Player`. Confirmed
+against a live scan, which reported `NPC` at 47, `NPC_Female` at 13, `Dog` at 5,
+`Horse` at 1 and `Player` at 1 within sixty metres.
+
+`ProtectMutt` is unaffected and still guards Henry's dog by name. It was never
+the thing keeping other animals out, because nothing was.
