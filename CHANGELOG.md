@@ -32,12 +32,13 @@ sections and refuses a release built at any other number.
 
 ### Fixed
 
-- Staggering and falling victims stay out of walls. A reaction played beside a
-  building could carry its victim into the wall, through it, or leave them
-  standing inside it. Movement control is now taken off the animation once the
-  reaction has started, so the victim is moved by the entity rather than by the
-  animation's own root motion. Set `ReleaseAnimationMovement` to `false` to
-  restore the old behaviour.
+- Staggering and falling victims stay out of walls and out of the ground. A
+  reaction played beside a building could carry its victim into the wall,
+  through it, or leave them standing inside it, and one played on a hillside
+  buried them falling uphill and left them airborne falling downhill. Movement
+  control is now taken off the animation once the reaction has started, so the
+  victim is moved by the entity rather than by the animation's own root motion.
+  Set `ReleaseAnimationMovement` to `false` to restore the old behaviour.
 
 - Collisions no longer stop working after loading a save. Each victim is held
   briefly after an impact so a single pass through a crowd cannot restart the

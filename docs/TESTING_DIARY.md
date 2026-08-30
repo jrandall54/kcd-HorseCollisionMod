@@ -8065,3 +8065,42 @@ shipped. Everything tried before it, `ColliderMode`, three `MovementControlMetho
 variations, removing the movement layer, `GroundRotation`, and the ragdoll
 settle layer, changed nothing about geometry. The terrain problem on sloped
 ground is separate and remains open.
+
+## The same call fixes the sloped ground, which was thought to need a ragdoll
+
+The entry above closed the geometry problem and left terrain open, on the
+reasoning that a body buried in a hillside and a body pushed through a wall
+were different faults. They were not. Free play on the shipped build, with no
+further changes:
+
+> "After testing I'm not noticing any floating/clipping through the ground on
+> trot collision animations. Maybe every so slightly, but way better than
+> before and it looks close to something that would be found in vanilla so I
+> think that issue can be set aside. It's not 100% perfect, but it's basically
+> there."
+
+**The hypothesis this overturns was the project's own.** The prior conclusion
+was that terrain conformance had no remaining knob on this fragment, that seven
+of twelve clean impacts on a hillside was where an animated knockdown lands,
+and that revisiting it needed the ragdoll driven from Lua after the fall had
+played. That last was named as a third attempt at Lua-timed animation chaining
+on a mod where two had already failed, and it is now not needed.
+
+Why one call covers both: a root-motion animation moves the body along a path
+authored in a plane, and nothing reconciles that path with the world. A wall is
+the horizontal case and a slope is the vertical one. Returning the actor to
+entity-driven movement puts the engine back in charge of where the body
+actually goes, and the engine already resolves both.
+
+The measurement that read as ruling this out is worth re-reading rather than
+deleting. `Vertical` and `ZMove` at 1 pinned the origin completely and at 2
+flung the body 58 metres, which was correctly read as proof that they are modes
+rather than switches, and correctly concluded that vanilla's values were right.
+The error was generalising from the fragment layer to the runtime call. They
+set the same property and are not the same lever: one is baked into every
+option in the database, the other is applied to one victim on a running action,
+and only the second can be timed to land after the action has claimed control.
+
+Both halves of the problem the animated knockdown shipped with are now closed
+by one line of Lua, so no ragdoll chaining is needed and the trot knockdown
+stays fully animated.

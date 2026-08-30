@@ -38,18 +38,16 @@ Known gaps carried into later phases:
       The timing is the whole trick: an interactive action applies its fragment's
       movement layer as it starts, so the same call made before it is overwritten and
       changes nothing. Settable as `ReleaseAnimationMovement`.
-- [ ] **Known issue.** A trot knockdown clips into sloped ground. The animation plays in
-      a plane while the ground rises and falls under it, so a victim is partly buried
-      falling uphill and briefly airborne falling downhill. Seven of twelve impacts on a
-      hillside were clean and the rest were cosmetic rather than broken. Correcting the
-      get-up pairings fixed the rotation that caused most of it, `GroundRotation` does
-      nothing, the ragdoll settle layer cannot be ordered to run before the victim
-      stands, and the movement control values inside the fragment are modes whose
-      vanilla settings are already correct. The runtime movement control call above has
-      not been measured against a slope; it was found and tested after this item was
-      written, and it solved the geometry half of the same problem. That is the next
-      thing to try, ahead of driving the ragdoll from Lua once the fall has played.
-      `docs/TESTING_DIARY.md` has the measurements.
+- [x] A trot knockdown clipped into sloped ground, partly burying a victim falling uphill
+      and leaving one falling downhill briefly airborne. Fixed by the same call as the
+      item above, which was not expected to touch it: a wall and a slope are the
+      horizontal and vertical cases of one fault, an animation moving the body along a
+      path authored in a plane with nothing reconciling that path with the world.
+      Returning the actor to entity-driven movement puts the engine back in charge of
+      where the body goes, and it resolves both. Not perfect, and close enough to
+      vanilla to leave alone. Correcting the get-up pairings had already fixed the
+      rotation behind most of it; `GroundRotation` and the ragdoll settle layer do
+      nothing and are not used.
 - [ ] The horse and a staggering NPC can still push against each other instead of clearing
       past. Setting the animation's collider mode to `Disabled` did not resolve it, and it
       matches vanilla behavior when riding head-on into someone. Revisit with Phase 2
