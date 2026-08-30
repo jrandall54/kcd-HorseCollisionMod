@@ -1527,6 +1527,27 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- it is timed from the impulse the mod applied itself.
 	local readyAt = self.RecentHits[npcId]
 
+	-- A deadline further away than the longest cooldown that can be written
+	-- was not written against this clock. `System.GetCurrTime` is persisted
+	-- in the save, so loading an earlier one moves it backwards by however
+	-- far the save was rewound, and every victim hit before that point is
+	-- then locked out for the length of the rewind. Deadlines up to 239
+	-- seconds ahead were read out of a running game against a configured
+	-- maximum of 6.
+	--
+	-- Discarding the stamp rather than trusting it also covers entity ids
+	-- being reused across a load, which otherwise locks out a victim that
+	-- was never hit at all.
+	if readyAt then
+		local longest = math.max(self.Config.HitCooldownMs,
+				self.Config.KnockdownRecoveryMs)
+
+		if readyAt - now > longest then
+			self.RecentHits[npcId] = nil
+			readyAt = nil
+		end
+	end
+
 	if readyAt and now < readyAt then
 		-- Logged outside the miss diagnostic. It fires only when a victim
 		-- is hit again while still down, which is a handful of lines rather
@@ -2005,6 +2026,12 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		local currentTick = HorseCollisionModGeneration
 
 		self.TimerTick = currentTick
+
+		-- Cooldown deadlines are stamped against a clock the save restores,
+		-- and the entity ids keying them are reused across a load. Neither
+		-- survives the transition, so the table is dropped rather than
+		-- carried into a world it no longer describes.
+		self.RecentHits = {}
 
 		local applied, rejected = self:ApplySettings()
 

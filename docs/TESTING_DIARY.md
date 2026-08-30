@@ -7947,3 +7947,52 @@ satisfied in those samples, but distance was not tested at all.
 
 The key now carries a half-metre distance bucket, so a subject logs afresh as
 it closes. Re-running it mounted is what actually tests the gate.
+
+## Loading a save locks every previously hit NPC out of reactions
+
+Reported as "it seems none of the animations would fire or I couldn't seem to
+impact them", on a ride that was supposed to be comparing `before` against
+`both`. The setting was not the cause and the ride produced no comparison.
+
+The telemetry showed the detection loop working perfectly and the cooldown gate
+rejecting every impact before it was scored:
+
+```
+[HorseCollisionMod] Recovering rat_refugee_ales for=407408ms
+[HorseCollisionMod] Recovering rat_refugee_vojcek for=258240ms
+[HorseCollisionMod] Recovering rat_refugee_kunes for=251248ms
+```
+
+`KnockdownRecoveryMs` is 6000 and `HitCooldownMs` is 3000, so no deadline this
+code writes can be more than six seconds ahead. Reading `RecentHits` out of the
+running game gave 23 entries whose deadlines spread from 347 seconds behind the
+clock to 239 seconds ahead of it.
+
+There is one writer, `self.RecentHits[npcId] = now + recovery`, so the stamps
+cannot be wrong. **The clock moved under them.**
+
+`System.GetCurrTime` was measured against a real-time `Script.SetTimer`: it
+advanced 5.000 s over a 5.000 s timer, so it does not drift and it is not the
+accelerated world clock. It read 142,746,608 ms, about 39.6 hours, which is
+accumulated time restored from the save rather than time since the level
+loaded. **Loading an earlier save moves it backwards** by however far the save
+was rewound, and every victim hit after that point in the abandoned timeline
+keeps a deadline that is now hundreds of seconds in the future.
+
+The failure is silent and looks exactly like the mod being broken: detection
+runs, the footprint accepts the victim, and nothing happens. It also has a
+second cause with the same signature, since entity ids are reused across a
+load, so a stamp can lock out a victim that was never hit at all.
+
+Two fixes, both shipped.
+
+- The load screen listener clears `RecentHits`. That handles the ordinary case
+  directly, and the listener already fires on every save load because it is
+  where the mod starts its detection loop.
+- The gate discards any deadline further ahead than the longest cooldown that
+  can be written. That covers a discontinuity from anything else, and repairs
+  itself on the next impact rather than needing the load to be observed.
+
+Worth holding on to beyond this mod: **any timestamp kept in Lua across a save
+load is stamped against a clock the save restores**, and Lua state in the
+running game is not restored with it. The two go out of step at every load.
