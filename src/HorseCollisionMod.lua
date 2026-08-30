@@ -1418,11 +1418,11 @@ function HorseCollisionMod:GetImpactDir(npc, velocity, speed)
 	return "so_right"
 end
 
---- Plays the walk-speed stagger on a victim.
+--- Plays one of this mod's reactions on a victim.
 --
--- Calls `actor:StartInteractiveActionByName` with one of the `hcm_stagger_*`
--- names this mod adds to the animation database. See the module header for
--- why this is the only call that works.
+-- Calls `actor:StartInteractiveActionByName` with a name this mod adds to the
+-- animation database, chosen by joining `prefix` to the impact direction. See
+-- the module header for why this is the only call that works.
 --
 -- The return value reports whether the call was accepted, which is **not**
 -- the same as the animation playing: an unrecognized name is accepted and
@@ -1431,6 +1431,8 @@ end
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
+-- @tparam string prefix the reaction family, `hcm_stagger_` at walk or
+--   `hcm_knockdown_` at trot, completed with the impact direction
 -- @treturn boolean true when the call was accepted without error
 function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	if not npc.actor or type(npc.actor.StartInteractiveActionByName) ~= "function" then
