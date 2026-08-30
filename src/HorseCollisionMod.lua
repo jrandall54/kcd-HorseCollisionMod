@@ -121,8 +121,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field SuppressStaggerInCombat skip the stagger animation during a fight
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
--- @field SuppressAutoCureSec how long a victim is exempted from vanilla's
---   auto-cure daycycle, in seconds, or 0 to leave them in it
+-- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
+--   in seconds, or 0 to leave victims in the daycycle
+-- @field TrotReaction what a trot impact does, "knockdown" for an animated
+--   fall or "ragdoll" for the physics knockdown
+-- @field AutoCureHealthLimit health at or above which the auto-cure exemption
+--   is dropped, matching vanilla's own limit
 -- @field MinVictimHealth floor a collision will not take a victim below, or 0
 --   for no floor. Superseded by the auto-cure exemption
 -- @field ClearCollisionInjuries whether injuries caused by a collision are
@@ -188,6 +192,18 @@ HorseCollisionMod.Config = {
 	-- How long a victim is exempted from vanilla's auto-cure daycycle,
 	-- in seconds. Zero leaves them in it.
 	SuppressAutoCureSec      = 30,
+
+	-- What a trot impact does. "knockdown" plays an animated fall through
+	-- the same path as the walk stagger and creates no physics body, so it
+	-- cannot incur the trample damage a ragdoll does. "ragdoll" is the
+	-- physics knockdown the mod shipped before.
+	TrotReaction             = "knockdown",
+
+	-- The health at or above which a victim is no longer a candidate for
+	-- vanilla's auto-cure daycycle. Vanilla's own limit is 40, declared as
+	-- `t_autoCureLowHealthLimit` in `Libs/AI/final/sb_daycycles.xml`. The
+	-- exemption is held until the victim is back over this.
+	AutoCureHealthLimit      = 40.0,
 
 	-- Injuries caused by collisions.
 	ClearCollisionInjuries   = true,
@@ -1106,14 +1122,54 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 		end
 	end)
 
-	-- Cleared on a timer rather than left to expire, because the direct call
-	-- has no expiry of its own. A later impact reschedules its own clear, and
-	-- clearing an option that is already clear costs nothing.
-	Script.SetTimer(seconds * 1000, function()
+	-- Held for as long as the victim is a candidate for the cure, rather than
+	-- for a fixed time. A fixed window was tried and is wrong: it lapsed while
+	-- a guard was still under the threshold, the cure started the moment it
+	-- did, and he was found in `PretendingIllness` at 40.59 health with the
+	-- option already expired. The window cannot be chosen in advance, because
+	-- what it has to outlast is the victim climbing back over the threshold at
+	-- vanilla's 0.02 health per second.
+	--
+	-- One watcher per victim. A second impact replaces the token, so the
+	-- earlier watcher stops on its next pass rather than running alongside.
+	local token = (self.CureWatchToken or 0) + 1
+	self.CureWatchToken = token
+	self.CureWatch = self.CureWatch or {}
+
+	local key = tostring(npc.id)
+	self.CureWatch[key] = token
+
+	local function release()
 		pcall(function()
 			Contexts.ClearOption(npc, "suppressAutoCure", HANDLE)
 		end)
-	end)
+	end
+
+	local function watch()
+		if self.CureWatch[key] ~= token then
+			return
+		end
+
+		local health = nil
+
+		pcall(function()
+			health = npc.soul:GetState("health")
+		end)
+
+		-- A victim that is gone, dead, or safely above the threshold has no
+		-- further use for the exemption.
+		if type(health) ~= "number" or health <= 0
+				or health >= self.Config.AutoCureHealthLimit then
+			self.CureWatch[key] = nil
+			release()
+
+			return
+		end
+
+		Script.SetTimer(seconds * 1000, watch)
+	end
+
+	Script.SetTimer(seconds * 1000, watch)
 end
 
 
@@ -1376,7 +1432,7 @@ end
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
 -- @treturn boolean true when the call was accepted without error
-function HorseCollisionMod:PlayStagger(npc, velocity, speed)
+function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	if not npc.actor or type(npc.actor.StartInteractiveActionByName) ~= "function" then
 		return false
 	end
@@ -1384,7 +1440,7 @@ function HorseCollisionMod:PlayStagger(npc, velocity, speed)
 	-- GetImpactDir speaks the engine's "so_" vocabulary; the database entries
 	-- this mod adds are named without that prefix, so strip it.
 	local dir = self:GetImpactDir(npc, velocity, speed)
-	local action = "hcm_stagger_" .. string.gsub(dir, "so_", "")
+	local action = prefix .. string.gsub(dir, "so_", "")
 
 
 	-- Gender is logged because the female animation set has no
@@ -1405,7 +1461,7 @@ function HorseCollisionMod:PlayStagger(npc, velocity, speed)
 		npc.actor:StartInteractiveActionByName(action, npc.id, true, 1)
 	end)
 
-	self:Log("Stagger action=" .. action
+	self:Log("Reaction action=" .. action
 			.. " gender=" .. gender
 			.. " ok=" .. tostring(ok)
 			.. " err=" .. tostring(err))
@@ -1450,9 +1506,22 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 		-- rotates over the impact instead of having their feet swept.
 		hitPos.z = hitPos.z + 1.0
 
-		if speed > 0 and velocity then
-			dir.x = velocity.x / speed
-			dir.y = velocity.y / speed
+		-- Normalised against the velocity's own length, not against the
+		-- scored speed. Those are different numbers: the score is the peak of
+		-- the last few ticks, chosen so a collision is rated by the speed the
+		-- horse carried into it, while the velocity here is what the horse is
+		-- doing now, after the contact has slowed it.
+		--
+		-- Dividing one by the other leaves a direction shorter than unit and
+		-- an impulse weakened by that ratio, so the same target took 67.3 at
+		-- full speed and 37.7 when the horse had dropped to 2.84 against a
+		-- score of 10.72. Knockback then varies with how hard the horse
+		-- happened to brake rather than with the tier and the target.
+		local moving = GetVectorLength(velocity or {x = 0, y = 0, z = 0})
+
+		if moving > 0 then
+			dir.x = velocity.x / moving
+			dir.y = velocity.y / moving
 			dir.z = 0
 		end
 
@@ -1463,6 +1532,16 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 		local impulseMag = math.sqrt((combined.x * combined.x)
 				+ (combined.y * combined.y)
 				+ (combined.z * combined.z))
+
+		-- Logged because the multiplier and the tier scalar are both visible
+		-- in telemetry while the figure they produce was not, which left a
+		-- report of armored targets moving further at trot than at gallop
+		-- with nothing to check it against.
+		if self.Config.LogTelemetry then
+			self:Log("Impulse " .. tostring(npc:GetName())
+					.. " scale=" .. string.format("%.2f", impulseScale)
+					.. " magnitude=" .. string.format("%.1f", impulseMag))
+		end
 
 		if npc.AddImpulse and impulseMag > 0 then
 			local normDir = {
@@ -1728,7 +1807,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		local suppressed = cfg.SuppressStaggerInCombat and combatScale > 1.0
 
 		if cfg.WalkStagger and not suppressed then
-			self:PlayStagger(npc, velocity, speed)
+			self:PlayReaction(npc, velocity, speed, "hcm_stagger_")
 		end
 
 		self:ProbeImpactCost(npc, "Walk", strength.Tickle, armor)
@@ -1743,7 +1822,16 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- victim health of its own, and a probe that reads afterwards
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury, armor)
-		self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
+
+		-- An animated knockdown never makes the victim a physics object, so
+		-- the horse cannot strike them and the engine charges nothing. The
+		-- ragdoll is kept because it is what shipped, and because an
+		-- animation does not carry the impact's momentum.
+		if cfg.TrotReaction == "knockdown" then
+			self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
+		else
+			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
+		end
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
