@@ -179,22 +179,6 @@
 	<td class="summary">The stamina multiplier for a target's armor.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#LimitExhaustion">LimitExhaustion (npc)</a></td>
-	<td class="summary">Bounds the exhaustion a collision adds to its victim.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#EnforceExhaustLimits">EnforceExhaustLimits ()</a></td>
-	<td class="summary">Holds watched victims below what their impact allowed them to reach.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HoldVictimAboveFloor">HoldVictimAboveFloor (npc)</a></td>
-	<td class="summary">Keeps a victim above the health a collision leaves them stranded below.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ClearInjuries">ClearInjuries (npc)</a></td>
-	<td class="summary">Removes the injuries a collision gave its victim.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#SuppressAutoCure">SuppressAutoCure (npc)</a></td>
 	<td class="summary">Exempts a collision victim from vanilla's auto-cure daycycle.</td>
 	</tr>
@@ -274,10 +258,6 @@
 	<td class="summary">Engine enum, transcribed from <code>Libs/AI/TypeDefinitions.xml</code>.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#ExhaustWatch">ExhaustWatch</a></td>
-	<td class="summary">Victims whose exhaustion is being held down, keyed by entity id.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#RecentHits">RecentHits</a></td>
 	<td class="summary">When each victim may react again, in milliseconds, keyed by entity id.</td>
 	</tr>
@@ -290,10 +270,6 @@
 	<td class="summary">Recent horse speeds, newest last, for spotting deceleration on impact.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#InjuryBuffs">InjuryBuffs</a></td>
-	<td class="summary">The injury buffs the engine rolls from a collision.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#AnimationSets">AnimationSets</a></td>
 	<td class="summary">The parent database each character set uses.</td>
 	</tr>
@@ -303,10 +279,6 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionModGeneration">HorseCollisionModGeneration</a></td>
 	<td class="summary">Loop generation counter, deliberately kept outside the table above.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#RemoveInjuriesBuff">RemoveInjuriesBuff</a></td>
-	<td class="summary">The buff that cures injuries, <code>remove_injuries</code> from <code>buff.xml</code>.</td>
 	</tr>
 </table>
 
@@ -776,138 +748,6 @@
            <span class="types"><span class="type">number</span></span>
         a multiplier on the tier's stamina cost
     </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "LimitExhaustion"></a>
-    <strong>LimitExhaustion (npc)</strong>
-    </dt>
-    <dd>
-    Bounds the exhaustion a collision adds to its victim. </p>
-
-<p> The engine raises exhaustion for the real <code>combat:hit</code> a player-ridden
- collision becomes, and it recovers slowly. Repeated impacts drive it to its
- ceiling, where an NPC can swing a weapon without threatening anyone and can
- stop responding altogether. A rider who knocks down enough guards is then
- safe from all of them, which is the exploit this exists to close.</p>
-
-<p> The stat is readable and writable through <code>soul:GetState</code> and
- <code>soul:SetState</code>, so the limit is applied to the stat itself rather than by
- weakening the hit. Damage, the reaction and the crime the hit causes are
- left exactly as they are, which keeps this separate from the systems that
- scale those.</p>
-
-<p> Only the rise this impact caused is removed. Exhaustion the victim earned
- fighting is never given back, because the baseline is read at the moment of
- the impact and the value is only ever clamped down to it.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "EnforceExhaustLimits"></a>
-    <strong>EnforceExhaustLimits ()</strong>
-    </dt>
-    <dd>
-    Holds watched victims below what their impact allowed them to reach. </p>
-
-<p> Runs from the update loop, ahead of the mounted and moving test, because a
- victim keeps accumulating after the rider has stopped.
-
-
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        entries still being watched
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HoldVictimAboveFloor"></a>
-    <strong>HoldVictimAboveFloor (npc)</strong>
-    </dt>
-    <dd>
-    Keeps a victim above the health a collision leaves them stranded below. </p>
-
-<p> A collision puts its victim into a wounded state, and the exit from that
- state is gated on health. Established by test rather than by reading: an
- NPC set to 25 health without being hit behaves normally, and a stuck victim
- returns to normal the moment health is raised, with no buff involved.</p>
-
-<p> Nothing heals an NPC, so a victim left below the gate never leaves the
- state. It is rooted in place and will not fight, which is both an
- immersion break and an exploit, since a rider can render a town's guards
- harmless.</p>
-
-<p> Vanilla never reaches this state because it never produces a badly wounded
- NPC outside combat. In a fight the combat tree owns the situation and has
- its own exits.</p>
-
-<p> The floor is applied after the engine has resolved the hit, not before, so
- the damage still lands and still accumulates down to the floor.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "ClearInjuries"></a>
-    <strong>ClearInjuries (npc)</strong>
-    </dt>
-    <dd>
-    Removes the injuries a collision gave its victim. </p>
-
-<p> Vanilla turns a player-ridden collision into a real <code>combat:hit</code> carrying
- the strength this mod sends, and the engine rolls an injury from it. Nothing
- in the game then removes it from an NPC, so a rider leaves a trail of
- permanently crippled villagers, which is both the exploit and the reason a
- victim can end up holding a wounded pose forever.</p>
-
-<p> Cleared rather than prevented, because the strength that causes the injury
- is the same strength that carries the damage and the crime. Lowering it to
- stop the injury would take those with it.</p>
-
-<p> Only victims of a collision are touched, and only in the seconds after one,
- so an NPC injured by anything else keeps what it earned.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-    </ul>
-
 
 
 
@@ -1667,27 +1507,6 @@
          health at or above which the auto-cure exemption
    is dropped, matching vanilla's own limit
         </li>
-        <li><span class="parameter">MinVictimHealth</span>
-         floor a collision will not take a victim below, or 0
-   for no floor. Superseded by the auto-cure exemption
-        </li>
-        <li><span class="parameter">ClearCollisionInjuries</span>
-         whether injuries caused by a collision are
-   cleared from the victim
-        </li>
-        <li><span class="parameter">LimitCollisionExhaust</span>
-         whether exhaustion added by collisions is capped
-        </li>
-        <li><span class="parameter">MaxExhaustPerImpact</span>
-         most exhaustion one impact may add
-        </li>
-        <li><span class="parameter">MaxExhaustFromCollisions</span>
-         ceiling on exhaustion reached by collisions
-        </li>
-        <li><span class="parameter">ExhaustWatchMs</span>
-         how long a victim's exhaustion is held down after an
-   impact
-        </li>
         <li><span class="parameter">LogTelemetry</span>
          write diagnostics to kcd.log
         </li>
@@ -1807,20 +1626,6 @@
 
 </dd>
     <dt>
-    <a name = "ExhaustWatch"></a>
-    <strong>ExhaustWatch</strong>
-    </dt>
-    <dd>
-    Victims whose exhaustion is being held down, keyed by entity id.
-
-
-
-
-
-
-
-</dd>
-    <dt>
     <a name = "RecentHits"></a>
     <strong>RecentHits</strong>
     </dt>
@@ -1871,60 +1676,6 @@
  deceleration and not so much that an earlier gallop colours a later walk.
 
 
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "InjuryBuffs"></a>
-    <strong>InjuryBuffs</strong>
-    </dt>
-    <dd>
-    The injury buffs the engine rolls from a collision. </p>
-
-<p> Taken from <code>Libs/Tables/rpg/buff.xml</code>, buff class 5. Every one of them
- carries <code>duration=&quot;-1&quot;</code> and <code>is_persistent=&quot;True&quot;</code>, so none expires. A
- player clears an injury with a bandage, a potion or sleep. An NPC has no
- path to any of those, so an injury an NPC receives lasts for the life of the
- save.</p>
-
-<p> The tags among them are what the AI reads, through <code>buff_ai_tag_id</code>, and are
- why an injured NPC holds a wounded pose and will not fight.</p>
-
-<p> Listed for reference. They are not removed one by one: the game cures
- injuries by applying a buff of its own, which is what <a href="index.html#RemoveInjuriesBuff">RemoveInjuriesBuff</a>
- below is.
-
-
-    <h3>Fields:</h3>
-    <ul>
-        <li><span class="parameter">37d59205-3782-446d-b32e-89a9f786725d</span>
-        injured_torso
-        </li>
-        <li><span class="parameter">c48e48e2-ae85-4429-9dd6-4fb94c388001</span>
-        injured_head
-        </li>
-        <li><span class="parameter">34f0885b-7287-4881-907f-f19751a5e831</span>
-        injured<em>left</em>arm
-        </li>
-        <li><span class="parameter">ce3737db-b0a3-459d-8d47-d58695d58be3</span>
-        injured<em>right</em>arm
-        </li>
-        <li><span class="parameter">10fc25ca-c095-44c6-b88b-d54ad58ab0a6</span>
-        injured<em>left</em>leg
-        </li>
-        <li><span class="parameter">738f8a07-c5fd-4687-9408-34ffb0bcd17e</span>
-        injured<em>right</em>leg
-        </li>
-        <li><span class="parameter">3d530e43-375f-4739-a6ee-3bbcf9292601</span>
-        injured_tag
-        </li>
-        <li><span class="parameter">83ef27f9-4ce2-4894-bd42-d2cc61a6f758</span>
-        injured<em>tag</em>persistent
-        </li>
-    </ul>
 
 
 
@@ -2000,30 +1751,6 @@
 
 
 </dd>
-    <dt>
-    <a name = "RemoveInjuriesBuff"></a>
-    <strong>RemoveInjuriesBuff</strong>
-    </dt>
-    <dd>
-    The buff that cures injuries, <code>remove_injuries</code> from <code>buff.xml</code>. </p>
-
-<p> One second of <code>Cpp:BasicTimed</code> whose whole effect is clearing the injury
- class. Vanilla applies it to a duel opponent once the duel ends, in
- <code>sb_duel</code>, which is the game's own idiom for undoing injuries it caused:</p>
-
-<pre><code> entity.soul:AddBuff("46683e3b-e261-412f-b402-99ee17dda62a")
-</code></pre>
-
-<p> Removing each injury by its guid does not work. <code>RemoveAllBuffsByGuid</code>
- accepts the call and reports success without clearing anything.
-
-
-
-
-
-
-
-</dd>
 </dl>
 
 
@@ -2031,7 +1758,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-08-29 20:07:04 </i>
+<i style="float:right;">Last updated 2026-08-29 20:47:50 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

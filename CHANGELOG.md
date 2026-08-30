@@ -16,6 +16,14 @@ sections and refuses a release built at any other number.
 
 ## [Unreleased]
 
+### Removed
+
+- Three settings that no longer do anything useful: `MinVictimHealth`,
+  `ClearCollisionInjuries`, and the `LimitCollisionExhaust` group. Each was an
+  attempt at the problem where ridden-down NPCs stopped responding, and each was
+  aimed at the wrong cause. That problem is now fixed at its source. A settings file still naming them keeps working; unknown
+  settings are ignored and named in `kcd.log`.
+
 ### Changed
 
 - A trot collision now knocks the victim down with an animation rather than a
