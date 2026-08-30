@@ -10,17 +10,20 @@ configuration, or that changes how the mod sits alongside other mods, is a major
 change even when nothing about it looks like an API.
 
 Entries land under `## [Unreleased]` as the work does, and move under a version
-heading at release. An entry that breaks an existing install is marked
-**BREAKING**. `tools/version_check.py` derives the next version from these
-sections and refuses a release built at any other number.
+heading when the branch merges. An entry that breaks an existing install is
+marked **BREAKING**. `tools/version_check.py` derives the next version from
+these sections and refuses a build made at any other number.
 
-A version is assigned and tagged when a branch merges, whether or not that
-build is published. Publishing is a separate decision, made against whatever
-version is current at the time.
+Every merge to `main` takes a version and a tag, whether or not that build is
+published, because `main` is always releasable and a merged version is
+therefore stable. A prerelease suffix belongs to a build still being tested on
+a branch, never to one that has landed. Publishing is a separate decision, made
+against whatever version is current at the time, and it does not change the
+number.
 
 ## [Unreleased]
 
-## [4.0.0-dev.1] - 2026-08-30
+## [4.0.0] - 2026-08-30
 
 Major because a trot collision no longer does what it did in 3.0.1, and what a
 given speed does is part of this project's public interface. An existing
@@ -40,8 +43,6 @@ settings file still loads, which is a different test.
   now fixed at its source. None of them appeared in a released version, so no
   settings file in use names them; one that does keeps working, since an
   unrecognised setting is ignored and named in `kcd.log`.
-
-### Changed
 
 - Collisions cost the horse far less stamina. Riding through ordinary foot
   traffic no longer threatens to throw you: a trot into a villager costs about

@@ -207,7 +207,12 @@ if ($isRelease) {
 
     # Documentation that describes a build the project has moved past is what
     # a reader meets first, and nothing else checks it.
-    python (Join-Path $toolsDir "pre_release_check.py")
+    #
+    # Repository scope only. Every merge to main takes a plain version and
+    # builds at it, and almost none of those are published, so the mod page is
+    # checked by publish_nexus.ps1 where it belongs rather than blocking a
+    # routine build on copy nobody is about to read.
+    python (Join-Path $toolsDir "pre_release_check.py") --merge
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Build failed: stale references to an older build." -ForegroundColor Red

@@ -334,6 +334,21 @@ if (-not $Zip) {
 if (-not (Test-Path $Zip)) {
     throw "No release zip at $Zip. Build it first: .\build.ps1 -Version $Version"
 }
+
+# The mod page and the Files tab entry are checked here rather than in the
+# build, because publishing is the only act that puts them in front of anyone.
+# Every merge to main takes a version and builds, and almost none of those are
+# published, so gating the build on the page copy would block ordinary work on
+# a document nobody is about to read.
+if (-not $DryRun) {
+    python (Join-Path $PSScriptRoot "pre_release_check.py")
+
+    if ($LASTEXITCODE -ne 0) {
+        throw ("The mod page does not describe $Version. Revise " +
+               "nexus_description.txt and the Files tab entry, then run again.")
+    }
+}
+
 $zipItem = Get-Item $Zip
 $zipBytes = $zipItem.Length
 
