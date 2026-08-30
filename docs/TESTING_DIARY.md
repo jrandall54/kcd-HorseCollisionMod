@@ -7996,3 +7996,37 @@ Two fixes, both shipped.
 Worth holding on to beyond this mod: **any timestamp kept in Lua across a save
 load is stamped against a clock the save restores**, and Lua state in the
 running game is not restored with it. The two go out of step at every load.
+
+## The movement control call has to come after the action, not before it
+
+Ridden at `before` against the same church wall and the same beggar that gave
+the clean result at `both`. One walk impact and five trot impacts landed, all
+of them logging `MovementControl when=before ok=true`, so the call was made and
+accepted on every one.
+
+The user's report: "Trot saw him first time sort of bounce off the wall of the
+church back towards me, he doesn't return to original position is out in the
+street, then trot impact throws him back towards the church and clips into the
+wall... then the next couple impacts he clips through and is then seemingly
+ejected out of the wall but he never returns to his position."
+
+**That is the old behaviour.** Setting movement control before the action is
+worth nothing, which is consistent with `StartInteractiveActionByName` applying
+the fragment's own `MovementControlMethod` layer as it starts and overwriting
+anything set ahead of it. The call has to land on the running action.
+
+Since `both` worked and `before` did not, the deferred call is carrying the
+result on its own, and `after` alone should reproduce it. Confirming that is
+what collapses the setting from four modes to a switch.
+
+One detail from this ride is not about movement control and should not be read
+as one. The beggar resumed his begging animation wherever he came to rest
+rather than returning to where he had been standing. At `both` he "more or less
+returned to his original position". Whether that tracks the setting or is the
+smart object slot reclaiming him from wherever he ends up needs the `after`
+ride to separate.
+
+The cooldown fix from the previous entry is confirmed in the same log. The
+deadlines read `for=2896ms` and `for=5920ms` against `HitCooldownMs` of 3000
+and `KnockdownRecoveryMs` of 6000, where the same lines before the fix ran to
+407,408 ms.
