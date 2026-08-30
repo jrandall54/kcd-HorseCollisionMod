@@ -7585,3 +7585,97 @@ against a live scan, which reported `NPC` at 47, `NPC_Female` at 13, `Dog` at 5,
 
 `ProtectMutt` is unaffected and still guards Henry's dog by name. It was never
 the thing keeping other animals out, because nothing was.
+
+## A teleported subject never settles on a slope
+
+Staging by teleport works on flat ground and does not work on a gradient. A
+subject placed with `SetWorldPos` at terrain elevation was polled every 300 ms
+for a stable height and never reached one:
+
+```
+[T] rat_guard22 settled after 12000ms at z=91.59
+```
+
+Twelve seconds is the timeout, not a settle. The body hangs and never comes to
+rest, so the floating the user reported on hillside rounds is the staging
+rather than the animation, and every slope test run this way has been measuring
+that artifact.
+
+**Clipping on slopes can only be judged from natural riding.** The victim is
+then standing where the world put them, with no teleport in the picture. The
+telemetry names which direction fired, so a report of what was seen can still
+be matched to a specific pairing without staging anything.
+
+Teleport staging keeps its place for comparing clips on flat ground, where it
+settles immediately and removes every other variable. It is the wrong
+instrument for terrain.
+
+## Clipping after the pairing fix tracks the slope, not the direction
+
+Twelve trot impacts on a hillside, ridden naturally with no staging, each
+observation matched against the reaction the telemetry recorded.
+
+| Direction | Sex | Observed |
+| --- | --- | --- |
+| right | M | no clip |
+| back | F | no clip |
+| back | F | no clip |
+| forward | M | no clip |
+| left | M | floated, facing downhill |
+| forward | M | clipped on the way down, fell toward uphill |
+| back | M | clipped on standing up, slightly uphill |
+| forward | M | no clip |
+| back | M | floated, facing downhill |
+| right | M | clipped on the way down |
+| back | M | no clip |
+| forward | M | slight clip |
+
+**Seven of twelve were clean**, against a state the user had called
+unacceptable before the pairings were corrected.
+
+**The failures do not track direction.** `forward` appears four times, twice
+clean and twice clipped; `back` five times, three clean and twice not. They
+track the gradient instead: every failure is annotated either as facing
+downhill, where the body floats, or falling toward uphill, where it clips. Both
+female impacts were clean.
+
+So the rotation fault is closed and what remains is terrain conformance: the
+animation plays in a plane while the ground rises or falls under it.
+`MCM_ZMOVE` was already 1 for this ride, so letting the animation drive the
+actor's vertical position is not sufficient on its own. `Vertical` and `XyMove`
+remain at 0 and are the next candidates, one rebuild each now that the movement
+control parameters are settings.
+
+## The movement control values are modes, and vanilla's are already right
+
+`MovementControlMethod` carries `Horizontal` at 2 with `Vertical`, `XyMove` and
+`ZMove` at 0, copied from the vanilla option this mod's fragments are modelled
+on. Those three zeroes looked like a lever for the terrain problem, since a
+body that cannot move vertically cannot follow a slope.
+
+Measured, by sampling the victim's position five times a second through a
+knockdown and reporting the largest single step:
+
+| Vertical, ZMove | Largest step |
+| --- | --- |
+| 0, 0 | 0.21 to 0.30 m |
+| 1, 1 | **0.00 m** |
+| 2, 2 | **58.64 m in one frame** |
+
+**They are modes, not switches.** Setting them to 1 pins the actor's origin
+completely, which is the opposite of following terrain. Setting them to 2, to
+match `Horizontal`, flings the body sixty metres in a single frame.
+
+Vanilla's values are already the correct ones and the mod copied them
+correctly. This is not a lever, and the slight improvement reported while
+`Vertical` was 1 does not survive measurement: the origin moved less, not more.
+
+The reported "slight teleporting" is also answered. With the values at 1 the
+entity origin does not move at all during a knockdown, so nothing about the
+actor was jumping; what was visible was the skeleton, and the 58 metre result
+above is what an actual teleport measures like.
+
+**Terrain conformance has no remaining knob on this fragment.** The animation
+plays in a plane, the origin barely moves, and neither `GroundRotation` nor the
+ragdoll settle nor the movement control method changes that. Seven of twelve
+impacts clean on a hillside is where an animated knockdown lands.

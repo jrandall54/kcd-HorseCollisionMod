@@ -307,10 +307,10 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
           <Blend ExitTime="0" StartTime="0" Duration="0.2" />
           <Procedural type="MovementControlMethod">
             <ProceduralParams>
-              <Horizontal value="2" />
-              <Vertical value="0" />
-              <XyMove value="0" />
-              <ZMove value="0" />
+              <Horizontal value="{horizontal}" />
+              <Vertical value="{vertical}" />
+              <XyMove value="{xymove}" />
+              <ZMove value="{zmove}" />
               <Rotate value="0" />
               <Velocity value="0" />
               <Inertia value="0" />
@@ -357,6 +357,15 @@ GROUND_ROTATION_LAYER = """
 
 # Whether a knockdown carries it. False restores the build before this.
 GROUND_ROTATION = True
+
+# How much of the actor's movement the animation drives, as vanilla's own
+# hit reactions set it. ZMove governs the vertical: at zero the clip plays in
+# a flat plane and a body on a slope is buried going uphill and left in the
+# air going downhill, which is what a fallen victim does on a gradient.
+MCM_HORIZONTAL = 2
+MCM_VERTICAL = 0
+MCM_XYMOVE = 0
+MCM_ZMOVE = 0
 
 # Seconds into the fall before the body is settled, and how rigid it is while
 # settling. None disables the layer, which is the behaviour before this was
@@ -450,7 +459,9 @@ def render_option(tags, clips, nl, settle=False):
     body = "\n".join(CLIP % ("0" if i == 0 else "-1", clip)
                       for i, clip in enumerate(as_clips(clips)))
     option = TEMPLATE.format(tags=tags, clips=body, collider=collider,
-                             ground=ground, settle=settle_layer)
+                             ground=ground, settle=settle_layer,
+                             horizontal=MCM_HORIZONTAL, vertical=MCM_VERTICAL,
+                             xymove=MCM_XYMOVE, zmove=MCM_ZMOVE)
 
     return option.replace("\n", nl)
 
