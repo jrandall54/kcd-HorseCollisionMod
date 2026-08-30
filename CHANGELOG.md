@@ -30,6 +30,17 @@ sections and refuses a release built at any other number.
   `"ragdoll"` to restore the old behaviour. Gallop is unchanged and still
   ragdolls, which is what a horse at full speed should do.
 
+### Changed
+
+- Collisions cost the horse far less stamina. Riding through ordinary foot
+  traffic no longer threatens to throw you: a trot into a villager costs about
+  six per cent of the pool where it cost twelve, and a gallop into an armored
+  target during a fight no longer empties the pool in one impact. Charging
+  armored targets is still expensive, and still much more so than charging
+  peasants. `StaminaDrainTrot`, `StaminaDrainGallop` and
+  `CombatStaminaMultiplier` carry the new defaults; a settings file that names
+  them keeps whatever it sets.
+
 ### Fixed
 
 - Staggering and falling victims stay out of walls and out of the ground. A

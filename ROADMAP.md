@@ -258,11 +258,18 @@ armor.
       A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
       target in mail, multiplying with the combat multiplier already applied and with the
       Phase 3 Horsemanship multiplier when it arrives.
-- [ ] Tune the two curves in play. The stamina half is too strong at its defaults: ten
-      minutes of free riding threw the rider nine times, a single trot into a guard drains 90
-      of a 210 pool, and a gallop into an armored target in combat empties it outright. The
-      multiplier also reaches its ceiling at around weight 32, so a guard in mail and a knight
-      in full plate cost the same.
+- [x] Tune the two curves in play. The stamina half was too strong: ten minutes of free
+      riding threw the rider nine times, and a gallop into an armored target in combat cost
+      108 per cent of a 210 pool, emptying it outright. The base drains are halved, to 15 at
+      trot and 22 at gallop, and the combat multiplier drops from 2.5 to 1.5. A rider can
+      now cross a village on foot traffic all day, 17 trot impacts on villagers to an empty
+      pool, while charging armored targets stays expensive, 7 on a mail guard and 3 on a
+      knight in plate at a gallop in combat.
+
+      The claim that the multiplier saturated around weight 32, so mail and plate cost the
+      same, does not hold: with an exponent of 0.4 against a reference weight of 8 the 3.0
+      ceiling is not reached until weight 125, and mail reads 2.01 against plate at 2.51.
+      No clamp needed changing.
 - [ ] Skip or soften an impact against a target that has not recovered from the last one.
       `HitCooldownMs` is 3000, which is shorter than the time a victim spends on the ground,
       so a second impact lands on someone already prone: no reaction plays, because they are
