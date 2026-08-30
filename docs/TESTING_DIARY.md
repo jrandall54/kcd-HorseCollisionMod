@@ -8104,3 +8104,68 @@ and only the second can be timed to land after the action has claimed control.
 Both halves of the problem the animated knockdown shipped with are now closed
 by one line of Lua, so no ragdoll chaining is needed and the trot knockdown
 stays fully animated.
+
+## The bind enumeration was mostly lost, and is now written down
+
+The entry "The animation entry points, enumerated rather than assumed" claimed
+an enumeration of 98 actor functions and then named about ten of them. The
+list itself was never recorded, so everything not acted on that night was gone.
+
+Re-deriving it live failed and is worth recording as a fact about the
+environment: **the script binds cannot be enumerated with `pairs`.** `actor`,
+`human`, `soul` and `inventory` are userdata dispatching through a metatable,
+and iterating them yields nothing. `ItemManager` and `XGenAIModule` are plain
+tables and enumerate normally, at 9 and 28 functions.
+
+The real source is the script-bind registration in
+`references/kcd-documentation`, one file per bind, with the class, method and
+argument types in the filename. Extracted in full to `docs/ENGINE_BINDS.md`:
+419 functions across the ten classes this mod can reach, 113 of them on
+`Actor`, against the ten previously written down.
+
+### The leads that were sitting in it
+
+Each of these bears on an open roadmap item, and none had been noticed.
+
+- **`actor:GetCurrentAnimationState()`.** The mod states, in the comment on
+  the cooldown gate, that nothing in the engine reports whether an actor is on
+  the ground, and times the recovery blind because of it. This is the call
+  that would answer it, and it would replace `KnockdownRecoveryMs` with an
+  observation.
+- **`actor:StandUp()`.** Chaining a get-up was attempted twice from Lua
+  timers and abandoned both times.
+- **`actor:CameraShake(number, number, number, vector)`.** There is no
+  rider-side feedback on impact at all. Riding into someone at a gallop
+  currently registers only through what the victim does.
+- **`actor:SetSpeedMultiplier(number)`** and
+  **`actor:SetMovementRestriction(boolean, boolean)`.** Per-victim movement
+  effects, which is the shape the momentum work in Phase 2 wants.
+- **`actor:QueueAnimationState(string)`, `ChangeAnimGraph(string, number)`,
+  `SetAnimationInput(string, string)`, `SetVariationInput(string, string)`.**
+  A second animation path, through the animation graph rather than through
+  Mannequin. The module header's claim that the interactive action is the only
+  way to play a clip has never been tested against any of these.
+- **`actor:RagDollize()`** and **`actor:GoLimp()`**, both distinct from the
+  `actor:Fall` the mod uses, and
+  **`actor:SetPhysicalizationProfile(string)`**, which is the switch between
+  alive and ragdoll physics rather than a request to fall.
+- **`actor:AddBlood(string, number)`.** Visible impact feedback on the victim.
+- **`actor:CanKnockOut(id)` and `RequestKnockOut(id)`**, which are separate
+  binds from `CanStealthKnockout` and `RequestStealthKill` and were not in the
+  family previously listed.
+
+### ItemManager carries no weight
+
+Asked directly, because the shipped item table is 50 KB and would be worth
+dropping. `ItemManager` exposes `AddOnEquipBuff`, `CreateItem`, `GetItem`,
+`GetItemName`, `GetItemOwner`, `GetItemUIName`, `IsItemOversized`,
+`RemoveItem` and `SetItemOwner`, and nothing else. An item read back through
+`GetItem` carries `health`, `amount`, `id`, `class` and `entity`, and no
+weight.
+
+So **there is no live weight lookup**, and the join through the shipped table
+is not a shortcut but the only route. What the roadmap describes as unbuilt,
+reading an entity's carried items generically, is already implemented in
+`ArmorOf`: `inventory:GetInventoryTable()` for the WUIDs and
+`ItemManager.GetItem(wuid)` for the class. Only the class-to-weight join needs
+the table.
