@@ -6750,3 +6750,388 @@ weapon, or that guard will take no reaction at trot either, which is worse than
 the ragdoll he gets today. A weapon-state axis therefore has to be part of the
 fragment work rather than an afterthought, and the polearm guard is the test
 case for it.
+
+## The animation palette available for a trot knockdown
+
+Read out of the game's own data rather than guessed, in preparation for
+replacing the trot ragdoll with an animated knockdown.
+
+**Where the clips are.** `Animations/Animations.img` inside `Animations-part0.pak`
+holds the catalogue, 139,096 clip paths for humans. The reaction animations are
+in `animations/humans/male/hitdeath/`, 102 clips, and
+`animations/humans/female/hitdeath/`, 60.
+
+**Where the fragments are.** Both the stagger clip the mod already uses and
+vanilla's fall-to-ground clips live in the `HitDeath` fragment of
+`kcd_male_database.adb`, not in `AnimationControlled`. The
+`AnimationControlled` fragment holds 32 fragments and every one of them is an
+object interaction: doors, gates, a cabinet, a wardrobe, an alarm bell. That is
+why the mod copies a clip into a FragTag of its own rather than invoking a
+vanilla one: `actor:StartInteractiveActionByName` reaches
+`AnimationControlled`, and the reactions are not in it. The same copy applies
+to a knockdown.
+
+### Two candidates, and they are not equivalent
+
+**`collision_stand_{front,back,left,right}_heavy`.** Four directional clips,
+named for exactly this case, and **referenced zero times in the vanilla male
+database**. The animation was authored and never wired to a fragment. It is
+male only; the female set has no equivalent.
+
+**`relaxed_death_walk_{front,back,left,right}_01`.** Four directional clips,
+present for **both** male and female, and used by vanilla in `HitDeath` under
+`FragTags="so_forward+death"` with `Tags="walk"`, which is a person collapsing
+to the ground while walking. That is the shape of a knockdown.
+
+The recovery half exists for both genders as
+`getup_ground_{front,back,left,right}` in `behavior/`.
+
+### What that forces
+
+The mod already reaches men and women, and the female database gap has cost
+this project once. A reaction that exists for men only cannot be the trot
+tier's reaction. **`relaxed_death_walk_*_01` is the candidate that can be**,
+with `collision_stand_*_heavy` worth testing separately as a heavier standing
+reaction for men.
+
+Two things are unknown and neither can be read from a filename: whether
+`collision_stand_*_heavy` puts a target on the ground or only rocks them, and
+whether a victim playing a death fall gets up again on their own or stays
+prone. Both are one build and one ride.
+
+### The polearm constraint still applies
+
+Mannequin selects a fragment against what the actor holds, and the walk
+stagger already fails to resolve for a guard carrying a two-handed polearm.
+Whatever the trot tier uses has to resolve for that actor as well, or that
+guard gets no reaction at trot where today he gets a ragdoll, which is worse
+than the state being replaced.
+
+## An animated knockdown resolves and recovers on its own
+
+`hcm_knockdown_{forward,back,left,right}` added to the mod's
+`AnimationControlled` options, mapped to `relaxed_death_walk_*_01`, which both
+character sets carry. Played on a standing NPC from the console, with no horse
+and no ragdoll:
+
+```
+[K] target=rat_man97 before=MotionMovement z=77.35
+[K] hcm_knockdown_forward ok=true err=nil
+[K] t+1.5s anim=AnimationControlled z=77.35
+[K] t+3.0s anim=AnimationControlled z=77.35
+[K] t+4.5s anim=MotionMovement      z=77.41
+[K] t+10.5s anim=MotionMovement     z=76.86
+```
+
+Two results. **The fragment resolves**, which `anim=AnimationControlled` shows
+and which is the same signal the walk stagger gives. And **the victim recovers
+without help**: the interactive action ends after three to four seconds and the
+NPC returns to its own locomotion. A death clip played this way does not leave
+anyone prone, so the trot tier does not need a scheduled `getup_ground_*` to
+follow it.
+
+Since nothing here creates a physics body, this path cannot incur the trample
+damage that the ragdoll does. Whether it reads as a knockdown on screen is a
+separate question and needs eyes rather than telemetry.
+
+### The unreferenced collision clips cannot be reached yet
+
+`collision_stand_{front,back,left,right}_heavy` were tried first and rejected
+by the builder:
+
+```
+clips absent from the male database: ['collision_stand_front_heavy', ...]
+```
+
+The assets exist under `animations/humans/male/hitdeath`, but no fragment in
+the stock database references them, so they never appear in its animation list,
+and `build_adb.py` validates a clip by looking for it there. Reaching them
+means validating against the character's animation set instead. They are male
+only regardless, so they could not carry a tier by themselves.
+
+### Two tooling faults found on the way
+
+`dev_console.py --lua` sent chunks that did not compile and the game dropped
+them without a word, which is indistinguishable from a chunk that ran and found
+nothing. It now compiles the chunk locally first and refuses to send one that
+fails, naming the error. Several rounds of this session were spent reading
+results that were never produced.
+
+`build_adb.py` reported the size of its whole reaction table as the number of
+options written, so a character set that received fewer would still have been
+reported as complete.
+
+## The animated knockdown reads correctly going down and badly coming up
+
+**User observation**, watching `hcm_knockdown_*` played on a merchant at normal
+speed, cycling all four directions:
+
+> "she goes down and thin unnatural snaps back up. the four directions do
+> slightly differ some of them are way too slow and more dramatic type of
+> reactions that I don't think would make sense."
+
+Three findings, and only the first was in question before the test:
+
+- **The victim does go to the ground.** The animation reads as a fall, which
+  the telemetry could not establish: the entity origin does not move during it,
+  so `z` holds at its standing value throughout and says nothing about the
+  pose.
+- **The recovery is wrong.** The interactive action ends and the victim snaps
+  upright rather than getting up. Nothing plays a get-up: the fall clip runs to
+  its end and control returns. `getup_ground_{front,back,left,right}` exists
+  for both character sets and is the obvious next piece.
+- **`relaxed_death_walk_*_01` is not four equivalent clips.** Some directions
+  are slower and more theatrical than a horse impact warrants, which is
+  unsurprising for animations authored as deaths. The direction variants need
+  choosing individually rather than taken as a set.
+
+Slow motion was tried first as a way to see it and was the wrong instrument.
+A reaction cannot be judged for feel at 35 per cent speed, since the thing being
+judged is how it reads at the speed it will be played. Looping it at normal
+speed is what produced usable answers.
+
+## Trot on the animated knockdown: reads decently, three faults
+
+**User report** after riding with `TrotReaction = "knockdown"`:
+
+> "I think it looks decent, but not perfect. The effect of the NPC feeling
+> sticky and the horse kind of feeling muddy while the animation is firing. The
+> snap back needs to be address as it is unnatural."
+
+- **Sticky victim, muddy horse.** The horse and the victim push against each
+  other while the animation runs. This is the same complaint recorded against
+  the walk stagger, where setting the animation's `ColliderMode` to `Disabled`
+  did not resolve it and was reverted for matching vanilla. The knockdown makes
+  it worse in one specific way: the victim is on the ground for three to four
+  seconds rather than staggering for one, so the window in which a horse can
+  snag on them is several times longer.
+- **The snap back up**, already recorded above. The fall clip ends and control
+  returns with no recovery played.
+- The knockdown carries none of the impact's momentum, which is the structural
+  difference from a ragdoll and is not fixable by choosing a different clip.
+
+### An armor observation, and what the code actually does
+
+> "it feels like the guards/more armored NPCs were getting impacted more by
+> trotting than galloping when we still had it wired for fall/rag doll whichs
+> makes me curious if the armor wiring is correct"
+
+Read rather than assumed. `ArmorCurve` is called with `invert=true`, so the
+ratio is `reference / weight`: heavier armor gives a smaller multiplier, and
+armored targets are moved less, which is what the design intends. The tier
+scalars are 0.6 at trot and 1.0 at gallop and they multiply that same figure,
+so for any one target **gallop always applies 1.66 times the trot impulse**.
+A guard at weight 58 scores 0.371, giving 0.22 at trot against 0.37 at gallop.
+
+The arithmetic therefore cannot produce the reported ordering, so if armored
+targets really did move more at trot, the cause is elsewhere: the footprint
+behaving differently at speed, the deferred impulse landing after a fast horse
+has gone, or the visible damage at gallop being read as impact. **None of this
+is measurable today, because the impulse magnitude the mod actually applies is
+computed and never logged.** That is the gap to close before drawing any
+conclusion.
+
+## The fixed exemption window was wrong, and a guard proved it in play
+
+**User report**, standing beside the NPC: "I hit the same guard a fews times
+and he's in the locked up, injured animation loop that I thought we had
+addressed before. Do this animations have damage or did some fluke happen
+here?"
+
+Neither. Measured live on the nearest NPC:
+
+```
+[N] nearest=villageGuard dist=2.7m health=40.59 anim=PretendingIllness suppress=false
+[N] t+4s  health=40.67 anim=PretendingIllness
+[N] t+16s health=40.91 anim=PretendingIllness
+```
+
+Health climbing 0.02 per second is the `autoCure` buff, and
+`suppress=false` is the whole explanation: **the exemption had expired.** The
+impacts logged him at 62.7, then 52.4, then 42.0, and the damage that followed
+the last one took him just under the threshold. Thirty seconds later the
+exemption lapsed, the gate opened, and the cure started.
+
+This is exactly the gap recorded when the message form was first tested and
+never closed. It was described then as the realistic case and it is: a rider
+knocks someone down, leaves them alive under 40, and rides away.
+
+**A fixed window cannot be right at any value.** What it has to outlast is the
+victim climbing back over 40 at 0.02 health per second, which from 30 health is
+just under nine minutes of game time. The exemption is now held until the
+victim is above `AutoCureHealthLimit`, rechecked on the same interval, with one
+watcher per victim and a token so a second impact replaces the first rather
+than running beside it.
+
+**The animated knockdown is not the cause and does still damage.** It creates
+no physics body, so the trample cost is gone, but the mod's `hitReaction`
+message is still converted by vanilla into a real player-attributed
+`combat:hit` carrying `hitStrength`, and that lands. Trot cost about 10 health
+per impact across the three logged here.
+
+The guard was released in place with the mod's own `SuppressAutoCure`, which
+now carries the patch removal:
+
+```
+SuppressAutoCure villageGuard for=30s set=true
+[R] t+4s health=41.39 anim=PretendingIllness
+[R] t+8s health=41.39 anim=MotionMovement
+```
+
+Health stopped moving at 41.39, which is the regeneration ending with the
+subtree rather than the animation merely changing.
+
+## The get-up chains, and clips through uneven ground
+
+**User report**: "the get up animation does chain, but the NPC clips through as
+the ground isn't PERFECTLY flat and the transition isn't smooth."
+
+The fall and the get-up are two separate interactive actions with nothing
+blending them, and neither is aligned to the ground under the victim. On a
+slope the pose at the end of the fall and the pose at the start of the get-up
+do not meet, and the body passes through the terrain between them.
+
+## Where the damage comes from, since the animation is not it
+
+A question worth answering plainly, because the reasoning behind it is right:
+if trot now uses the same mechanism as the walk stagger, and walk costs
+nothing, why does trot cost anything?
+
+**The fragment has never been the source.** Playing an animation on an NPC does
+not hurt them at any tier. There have always been two separate sources, and
+only one of them is gone:
+
+1. **The hit reaction.** `SendHitReaction` posts vanilla's `hitReaction` brain
+   message carrying a `hitStrength`, and vanilla converts a player-ridden
+   collision into a real, player-attributed `combat:hit` carrying that
+   strength, which the engine then resolves against the target. The strength is
+   the whole difference between the tiers: walk sends `Tickle` at 2, trot sends
+   `MinorInjury` at 5, gallop sends `MajorInjury` at 6. **Walk costs nothing
+   because it sends a strength that does nothing, not because it plays an
+   animation.** This is Phase 3's blunt damage, already wired, and it is
+   wanted.
+2. **The trample.** The horse striking the physics body a ragdoll creates,
+   charged by the engine on the velocity delta. **This is the one the animated
+   knockdown removes**, because no physics body is ever created.
+
+Measured on the animated knockdown, trot costs 4.6 to 5.7 per impact with
+`dz=+0.00` on every sample, against 3.7 to 4.9 under the ragdoll. So the trot
+figure barely moved, which is expected: at trot the horse is slow enough that
+the trample component was small to begin with. **The gain from this change is
+at gallop**, where trample was 20 to 25, and gallop is still on the ragdoll.
+
+An earlier note in this session put trot at about 10 per impact. That was read
+from the difference between consecutive impact lines, which spans everything
+that happened in between, rather than from the probe delta. The probe figures
+above are the right ones.
+
+## Chaining the get-up on a timer does not work
+
+**User report**: "almost every single one looks glitchy as the timing between
+the animations is definitely off and the guards clips and even one time got up
+in mid air floating... the animation triggers, then it seems to in one frame
+snap them back into walking, then again snaps them back on the ground for the
+getting up animation."
+
+The description is exact and the cause follows from it. The fall is one
+interactive action and the get-up is a second, fired by a Lua timer at a fixed
+`KnockdownGetupMs`. The fall clips do not all run for the same time, which the
+user had already noticed as some directions being slower, so a single fixed
+delay is early for some and late for others. When it is late the victim has
+already regained control and started walking, and the get-up then drags them
+back to the ground from wherever they had walked to, which is the snap sequence
+reported and also how a get-up ends up playing in mid air.
+
+**A fixed delay cannot be tuned into correctness**, for the same reason the
+auto-cure exemption window could not: it is standing in for a duration the
+system already knows and Lua does not.
+
+The fragment is the place to fix it. A Mannequin `AnimLayer` takes a sequence
+of clips, so the fall and the get-up can be one option that Mannequin times and
+blends itself, with no Lua timing and no gap for the victim to escape through.
+`KnockdownGetupMs` is set to 0 in the meantime, which restores the single fall
+and its abrupt recovery.
+
+## The fall and the get-up as one Mannequin sequence
+
+A Mannequin `AnimLayer` plays several clips in order, and vanilla relies on it:
+568 options in the stock male database hold two or more, sequencing a jump into
+its fall the same way.
+
+```xml
+<AnimLayer>
+  <Blend ExitTime="0" StartTime="0" Duration="0.2" />
+  <Animation name="relaxed_death_walk_front_01" />
+  <Blend ExitTime="-1" StartTime="0" Duration="0.2" />
+  <Animation name="getup_ground_front" />
+</AnimLayer>
+```
+
+`ExitTime="0"` on the first clip starts it at once. `ExitTime="-1"` on the
+second begins the transition when the first has finished, so **the sequence is
+timed by the animations and not by Lua**. That removes the fixed delay
+outright, and with it the gap the victim was escaping through.
+
+Measured on a standing guard, the whole action now holds the actor for about
+5.5 seconds against 3.5 for the fall alone, and leaves through `IdleToMove`
+into ordinary locomotion:
+
+```
+[S] t+1.0s anim=AnimationControlled
+[S] t+5.0s anim=AnimationControlled
+[S] t+6.0s anim=IdleToMove
+[S] t+8.0s anim=MotionMovement
+```
+
+`PlayGetup`, `KnockdownGetupMs` and their setting are removed rather than left
+at zero. The fragment does the work, and a knob whose only remaining function
+is to reintroduce the fault is not worth keeping. The standalone `hcm_getup_*`
+options stay, since they cost nothing and give the recovery a name that can be
+played on its own.
+
+## The knockback varied with how hard the horse braked, not with the target
+
+The user reported twice that armored and unarmored knockback at gallop did not
+feel right. The impulse magnitude was added to the telemetry to make it
+checkable, and it found a fault the armor arithmetic did not have.
+
+`TriggerCollision` is handed the **live** velocity and the **scored** speed, and
+they are deliberately different numbers: the score is the peak of the last few
+ticks, so a collision is rated by the speed the horse carried into it rather
+than by the speed left after contact slowed it. `Ragdoll` then built its
+direction as `velocity.x / speed`, dividing one by the other. That leaves a
+direction shorter than unit whenever the horse has slowed, and an impulse
+weakened by exactly that ratio.
+
+One target, one tier, one armor value, from a single ride:
+
+| Victim | scale | sampled / scored | Predicted | Logged |
+| --- | --- | --- | --- | --- |
+| rat_armorers_wife | 1.15 | 10.14 / 10.14 | 67.0 | 67.3 |
+| rat_armorers_wife | 1.15 | 2.84 / 10.72 | 37.7 | 37.7 |
+
+`sqrt((50 * 1.15 * 0.265)^2 + (30 * 1.15)^2)` is 37.7, so the model accounts
+for the reading exactly. The same woman took 1.8 times the knockback depending
+on how hard the horse happened to brake.
+
+The armor scaling itself was never wrong. Across the same ride, unarmored
+targets scored 1.15 to 1.26 and took 40.9 to 73.4, while guards scored 0.35 to
+0.42 and took 20.3 to 24.3, which is the intended ordering. The noise on top of
+it is what made the ordering hard to feel.
+
+The direction is now normalised against the velocity's own length. The scored
+speed keeps its two jobs, choosing the tier and scaling the impulse, and no
+longer sets the direction's length as well.
+
+## Crime accumulates per collision
+
+**User report** after a gallop kill: "I got arrested and my jail time is REALLY
+high. I get it, every one of those collisions is being counting as a crime and
+it's pilling up, but that might be something we need to tune when we get to the
+crime feature implementation."
+
+Recorded for the crime phase rather than acted on. Vanilla attributes every
+player-ridden collision to the rider as a real `combat:hit`, so a ride through a
+crowd registers an assault per impact and the sentences compound. The mod sends
+one `hitReaction` per impact by design, and the per-impact cooldown governs how
+often that can happen, so the tuning levers already exist.
