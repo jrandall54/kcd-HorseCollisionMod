@@ -10,25 +10,48 @@ configuration, or that changes how the mod sits alongside other mods, is a major
 change even when nothing about it looks like an API.
 
 Entries land under `## [Unreleased]` as the work does, and move under a version
-heading at release. An entry that breaks an existing install is marked
-**BREAKING**. `tools/version_check.py` derives the next version from these
-sections and refuses a release built at any other number.
+heading when the branch merges. An entry that breaks an existing install is
+marked **BREAKING**. `tools/version_check.py` derives the next version from
+these sections and refuses a build made at any other number.
+
+Every merge to `main` takes a version and a tag, whether or not that build is
+published, because `main` is always releasable and a merged version is
+therefore stable. A prerelease suffix belongs to a build still being tested on
+a branch, never to one that has landed. Publishing is a separate decision, made
+against whatever version is current at the time, and it does not change the
+number.
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-08-30
+
+Major because a trot collision no longer does what it did in 3.0.1, and what a
+given speed does is part of this project's public interface. An existing
+settings file still loads, which is a different test.
+
 ### Changed
+
+- **BREAKING** A trot collision now knocks the victim down with an animation
+  rather than a physics ragdoll. They fall, then get up, as one continuous
+  movement, and the horse no longer runs over the body it just made. Set
+  `TrotReaction` to `"ragdoll"` to restore the 3.0.1 behaviour. Gallop is
+  unchanged and still ragdolls, which is what a horse at full speed should do.
 
 - `MinVictimHealth`, `ClearCollisionInjuries` and the `LimitCollisionExhaust` group
   no longer exist. Each was an attempt at the problem where ridden-down NPCs
   stopped responding, and each was aimed at the wrong cause; that problem is
-  now fixed at its source. Nothing needs doing to an existing settings file: a
-  setting the mod does not recognise is ignored and named in `kcd.log`.
+  now fixed at its source. None of them appeared in a released version, so no
+  settings file in use names them; one that does keeps working, since an
+  unrecognised setting is ignored and named in `kcd.log`.
 
-- A trot collision now knocks the victim down with an animation rather than a
-  physics ragdoll. They fall, then get up, as one continuous movement, and the
-  horse no longer runs over the body it just made. Set `TrotReaction` to
-  `"ragdoll"` to restore the old behaviour. Gallop is unchanged and still
-  ragdolls, which is what a horse at full speed should do.
+- Collisions cost the horse far less stamina. Riding through ordinary foot
+  traffic no longer threatens to throw you: a trot into a villager costs about
+  six per cent of the pool where it cost twelve, and a gallop into an armored
+  target during a fight no longer empties the pool in one impact. Charging
+  armored targets is still expensive, and still much more so than charging
+  peasants. `StaminaDrainTrot`, `StaminaDrainGallop` and
+  `CombatStaminaMultiplier` carry the new defaults; a settings file that names
+  them keeps whatever it sets.
 
 ### Fixed
 

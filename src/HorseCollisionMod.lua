@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 3.1.0-dev.2
+-- @release 4.0.0
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "3.1.0-dev.2"
+HorseCollisionMod.Version = "4.0.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -182,8 +182,8 @@ HorseCollisionMod.Config = {
 
 	-- Horse stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 30.0,
-	StaminaDrainGallop       = 45.0,
+	StaminaDrainTrot         = 18.0,
+	StaminaDrainGallop       = 22.0,
 	ThrowRiderOnStaminaEmpty = true,
 
 	-- How long a victim is exempted from vanilla's auto-cure daycycle,
@@ -209,7 +209,7 @@ HorseCollisionMod.Config = {
 	AutoCureHealthLimit      = 40.0,
 
 	-- Combat.
-	CombatStaminaMultiplier  = 2.5,
+	CombatStaminaMultiplier  = 2.2,
 	SuppressStaggerInCombat  = true,
 
 	-- Switches.

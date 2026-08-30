@@ -8104,3 +8104,105 @@ and only the second can be timed to land after the action has claimed control.
 Both halves of the problem the animated knockdown shipped with are now closed
 by one line of Lua, so no ragdoll chaining is needed and the trot knockdown
 stays fully animated.
+
+## The bind enumeration was mostly lost, and is now written down
+
+The entry "The animation entry points, enumerated rather than assumed" claimed
+an enumeration of 98 actor functions and then named about ten of them. The
+list itself was never recorded, so everything not acted on that night was gone.
+
+Re-deriving it live failed and is worth recording as a fact about the
+environment: **the script binds cannot be enumerated with `pairs`.** `actor`,
+`human`, `soul` and `inventory` are userdata dispatching through a metatable,
+and iterating them yields nothing. `ItemManager` and `XGenAIModule` are plain
+tables and enumerate normally, at 9 and 28 functions.
+
+The real source is the script-bind registration in
+`references/kcd-documentation`, one file per bind, with the class, method and
+argument types in the filename. Extracted in full to `docs/ENGINE_BINDS.md`:
+419 functions across the ten classes this mod can reach, 113 of them on
+`Actor`, against the ten previously written down.
+
+### The leads that were sitting in it
+
+Each of these bears on an open roadmap item, and none had been noticed.
+
+- **`actor:GetCurrentAnimationState()`.** The mod states, in the comment on
+  the cooldown gate, that nothing in the engine reports whether an actor is on
+  the ground, and times the recovery blind because of it. This is the call
+  that would answer it, and it would replace `KnockdownRecoveryMs` with an
+  observation.
+- **`actor:StandUp()`.** Chaining a get-up was attempted twice from Lua
+  timers and abandoned both times.
+- **`actor:CameraShake(number, number, number, vector)`.** There is no
+  rider-side feedback on impact at all. Riding into someone at a gallop
+  currently registers only through what the victim does.
+- **`actor:SetSpeedMultiplier(number)`** and
+  **`actor:SetMovementRestriction(boolean, boolean)`.** Per-victim movement
+  effects, which is the shape the momentum work in Phase 2 wants.
+- **`actor:QueueAnimationState(string)`, `ChangeAnimGraph(string, number)`,
+  `SetAnimationInput(string, string)`, `SetVariationInput(string, string)`.**
+  A second animation path, through the animation graph rather than through
+  Mannequin. The module header's claim that the interactive action is the only
+  way to play a clip has never been tested against any of these.
+- **`actor:RagDollize()`** and **`actor:GoLimp()`**, both distinct from the
+  `actor:Fall` the mod uses, and
+  **`actor:SetPhysicalizationProfile(string)`**, which is the switch between
+  alive and ragdoll physics rather than a request to fall.
+- **`actor:AddBlood(string, number)`.** Visible impact feedback on the victim.
+- **`actor:CanKnockOut(id)` and `RequestKnockOut(id)`**, which are separate
+  binds from `CanStealthKnockout` and `RequestStealthKill` and were not in the
+  family previously listed.
+
+### ItemManager carries no weight
+
+Asked directly, because the shipped item table is 50 KB and would be worth
+dropping. `ItemManager` exposes `AddOnEquipBuff`, `CreateItem`, `GetItem`,
+`GetItemName`, `GetItemOwner`, `GetItemUIName`, `IsItemOversized`,
+`RemoveItem` and `SetItemOwner`, and nothing else. An item read back through
+`GetItem` carries `health`, `amount`, `id`, `class` and `entity`, and no
+weight.
+
+So **there is no live weight lookup**, and the join through the shipped table
+is not a shortcut but the only route. What the roadmap describes as unbuilt,
+reading an entity's carried items generically, is already implemented in
+`ArmorOf`: `inventory:GetInventoryTable()` for the WUIDs and
+`ItemManager.GetItem(wuid)` for the class. Only the class-to-weight join needs
+the table.
+
+## Regeneration between impacts, not the per-impact cost, sets the real limit
+
+The halved values were ridden and reported as: about 20 trot impacts before
+being thrown, gallop about right, trot in combat repeatable "seemingly as much
+as I want", and combat gallop acceptable but ideally capped at one or two.
+
+Measured across 30 logged impacts:
+
+| Tier | Mode | Mean drain | Impacts from a full 210 pool |
+| --- | --- | --- | --- |
+| Gallop | calm | 33.7 | 6.2 |
+| Gallop | combat | 67.1 | 3.1 |
+| Trot | combat | 49.4 | 4.3 |
+
+The first suspicion, that the repeatable combat staggers were walk-tier impacts
+costing nothing, is wrong. Every walk impact in the log carries
+`combatScale=1.0`, so `SuppressStaggerInCombat` is working and none of them
+happened during a fight. They were real trot impacts.
+
+**The pool recovers between impacts, and that is the term that was missing.**
+Consecutive impacts inside a single fight show the horse regaining 14 to 44
+stamina in the gap, against a trot impact on a villager costing 12.4. The cost
+of an impact on an ordinary target is smaller than what the horse gets back
+before the next one, so that case cannot deplete the pool at all and the
+reported figure of 20 is a floor rather than a ceiling.
+
+This is why tuning the base drains alone was never going to land. Against
+armored targets the drain does outrun regeneration and the pool falls, which is
+why gallop read correctly while trot through a village read as free.
+
+The correction raises the combat multiplier from 1.5 to 2.2 and the trot base
+from 15 to 18, leaving gallop at 22 because calm gallop was reported as
+correct. That puts a combat gallop into a mail guard at 2.0 impacts and a
+combat trot at 2.4, which is the cap that was asked for, while a calm trot
+through villagers stays cheap at 14.1 and a calm gallop is unchanged at 4.3
+against a guard.

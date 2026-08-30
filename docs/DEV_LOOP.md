@@ -46,12 +46,18 @@ style check, and the staleness sweep, and refuses the push if any of them
 reports a problem. Pushing a topic branch runs nothing, because a branch in
 progress is allowed to be inconsistent.
 
-The staleness sweep has two scopes. On a prerelease version it checks the
-repository's own accuracy: version numbers, documented claims, config keys
-against their documentation, and quoted download sizes against the built zip.
-On a release version it also checks the mod page copy and the Files tab entry,
-which are written once per release and would otherwise be reported on every
-ordinary push.
+The staleness sweep has two scopes, chosen by what is happening rather than by
+what the version looks like.
+
+`build.ps1` and the pre-push hook check the repository's own accuracy: version
+numbers, documented claims, config keys against their documentation, and quoted
+download sizes against the built zip.
+
+`publish_nexus.ps1` also checks the mod page copy and the Files tab entry.
+Those are written once per release, and publishing is the only act that puts
+them in front of anyone. Every merge to `main` takes a plain version and builds
+at it while almost none are published, so gating a build on the page copy would
+stop ordinary work on a document nobody is about to read.
 
 Both scopes can be run by hand:
 
