@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0-dev.7
+-- @release 4.2.0-dev.8
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0-dev.7"
+HorseCollisionMod.Version = "4.2.0-dev.8"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -378,11 +378,6 @@ HorseCollisionMod.ReplanAfterRebuildMs = 600
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
-
--- TEMPORARY, for one diagnostic ride. How long the animation state is traced
--- after an impact. Zero switches it off. Remove with TraceRecovery before this
--- branch merges.
-HorseCollisionMod.TraceRecoveryForMs = 120000
 
 
 local function GetTimeMs()
@@ -1391,59 +1386,6 @@ function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
 	end)
 end
 
---- Records the animation state through a whole reaction and recovery.
---
--- TEMPORARY, for one diagnostic ride. Remove before this branch merges.
---
--- The handover being tested has three stages and only the first is under this
--- mod's control, so the question is what the engine does with the other two.
--- Sampling the state answers it directly: the clip should show
--- `AnimationControlled`, the handover `BlendRagdoll`, and a recovery that
--- worked ends in an ordinary locomotion state.
---
--- @tparam table npc victim entity
--- @tparam string action the reaction being played
-function HorseCollisionMod:TraceRecovery(npc, action, gender)
-	if not self.Config.LogTelemetry or self.TraceRecoveryForMs <= 0 then
-		return
-	end
-
-	local generation = self.TimerTick
-	local startedAt = GetTimeMs()
-	local last = nil
-
-	local function sample()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local state = "?"
-
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		local elapsed = GetTimeMs() - startedAt
-
-		-- Only transitions are written. A state held for eleven seconds is
-		-- forty-four identical lines otherwise, and the shape of the sequence
-		-- is what matters rather than its sampling rate.
-		if state ~= last then
-			self:Log("RecoveryTrace " .. action
-					.. " gender=" .. tostring(gender)
-					.. " t+" .. string.format("%.0f", elapsed)
-					.. "ms state=" .. state)
-			last = state
-		end
-
-		if elapsed < self.TraceRecoveryForMs then
-			Script.SetTimer(self.ReactionPollMs, sample)
-		end
-	end
-
-	Script.SetTimer(self.ReactionPollMs, sample)
-end
-
 --- Sends a victim back to their activity by way of approaching it again.
 --
 -- A smart object reaches its loop through `Move` to the object followed by
@@ -1641,11 +1583,6 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 			self:ReleaseVictimMovement(npc)
 		end)
 	end
-
-	-- TEMPORARY, for one diagnostic ride. Samples the animation state through
-	-- the whole sequence so the handover from clip to ragdoll to recovery can
-	-- be read rather than inferred. Remove before this branch merges.
-	self:TraceRecovery(npc, action, gender)
 
 	-- The body is handed to physics while the fall is still playing, timed to
 	-- land on the victim reaching the ground rather than on the clip ending.
