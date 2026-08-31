@@ -9181,3 +9181,44 @@ Untried, and each a different shape of the same idea:
 - The animation event system directly, since the parked node waits on
   `LogicalEnd` for a named `AnimationWUID`; if that event can be raised from
   Lua, the node completes and the tree continues normally rather than failing.
+
+## The parked tree reaches merchants too, and that is a regression against main
+
+Tested at 4.2.0-dev.8, the merge candidate.
+
+**User report**: "no clipping, falls look good, no freezes, but this merchant
+next to me was not able to return to his activity and seems stuck when usually
+on every test before this he always was able to snap back in to place. I tested
+the two woman traders across the street and they were both able to return to
+their loops."
+
+`rat_merchant_shop1` and `rat_merchant_shop3` both read `MotionIdle`.
+`rat_merchant_shop2` read `MotionMovement` and was fine.
+
+The LOD flip that freed a beggar was applied to the two idle merchants.
+`rat_merchant_shop1` moved 3.95 m and entered `ADLG_Agree`, so he had been
+parked in the same way. `rat_merchant_shop3` moved 0.48 m and stayed
+`MotionIdle`, which is inconclusive since a merchant standing at his stall is
+legitimately idle.
+
+So the failure is not specific to beggars and innkeepers. It reaches any NPC
+whose smart object tree is parked, and merchants escaped it earlier only because
+their activity involves walking, which re-plans them. When one is left close
+enough to his stall to skip the approach, he parks like a beggar.
+
+### Why this is a regression rather than a pre-existing fault
+
+Both tiers seize the actor with `StartInteractiveActionByName`, so both should
+park the tree equally. They do not, and the difference is what happens next.
+
+Under `knockdown` the interactive action runs to its end and Mannequin releases
+the actor when the fragment completes. Measured at 4.1.0-dev.1, a beggar and an
+innkeeper both re-entered their animations afterwards, turned the wrong way but
+present.
+
+Under `fall` the actor is taken by `actor:Fall` partway through the fragment,
+so the interactive action never completes and never releases. That is the
+plausible cause of the parking, and it is introduced by this branch.
+
+The tier therefore trades a rotation fault that main has for an activity fault
+that main does not.
