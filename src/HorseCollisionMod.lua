@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0-dev.3
+-- @release 4.2.0-dev.4
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0-dev.3"
+HorseCollisionMod.Version = "4.2.0-dev.4"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -343,32 +343,34 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 --
 -- The ceiling is generous because this waits on the game's own recovery rather
 -- than on a clip of known length.
--- When the body is handed to physics during a fall, per direction, in
--- milliseconds from the start of the reaction.
+-- How long each fall clip runs, in milliseconds, by character set and
+-- direction. Measured from the animation state across fifty-six reactions; the
+-- figures inside a group vary by less than fifty milliseconds, so a clip's
+-- length is a property of the clip and not of the victim or the ground.
 --
--- One figure per clip because the clips differ: measured end-to-end, the back
--- fall runs about 1.75 s, forward about 2.45, right about 2.3 and left between
--- 2.0 and 4.2. Ground contact comes before the clip ends, since the clip goes
--- on to settle the body into its final pose after the victim has landed.
+--   male   back 1696-1744   forward 2384-2464   left 4064-4160   right 3008-3104
+--   female back 1856-1936   forward 3312-3376   left 2016        right 2320-2352
 --
--- Early is the safer error. A ragdoll taken slightly before the body has
--- settled continues the fall it was already making, while one taken after the
--- clip has ended arrives to find the victim already standing.
---
--- These are the values to tune. Raise one if its victim is caught in the air
--- and goes limp mid-fall; lower it if the body reaches the ground and pauses
--- before the physics takes over.
-HorseCollisionMod.RagdollAtMs = {
-	forward = 1300,
-	back = 1000,
-	left = 1200,
-	right = 1300
+-- `1` is male and `2` is female, which is what `soul:GetGender` returns.
+HorseCollisionMod.FallClipMs = {
+	["1"] = { forward = 2425, back = 1710, left = 4120, right = 3060 },
+	["2"] = { forward = 3340, back = 1890, left = 2016, right = 2335 }
 }
 
 
--- How long after the rebuild the victim is asked to re-plan. The rebuild
--- resets the behavior and the re-plan chooses what it does next, so they
--- are ordered rather than issued together.
+-- How far into a fall the body is handed to physics, as a fraction of the
+-- clip's length.
+--
+-- A clip does not end when the victim reaches the ground; it goes on to settle
+-- them into a final pose, and the ragdoll belongs at the landing rather than at
+-- the end. Expressing that as a fraction leaves one number to tune instead of
+-- eight, on the reasoning that these clips share an authoring convention and
+-- therefore land at about the same point in their own length.
+--
+-- Raise it if a victim reaches the ground and pauses before the physics takes
+-- over. Lower it if they go limp in the air before landing.
+HorseCollisionMod.RagdollAtFraction = 0.6
+
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 
@@ -1657,13 +1659,27 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- No impulse. The victim is already going down and the ragdoll is here to
 	-- take the body at ground level, not to throw it.
 	if prefix == "hcm_fall_" then
-		local at = self.RagdollAtMs[side] or self.RagdollAtMs.forward
+		local clips = self.FallClipMs[gender] or self.FallClipMs["1"]
+		local length = clips[side] or clips.forward
+		local at = math.floor(length * self.RagdollAtFraction)
 		local generation = self.TimerTick
 
 		Script.SetTimer(at, function()
 			if generation ~= self.TimerTick then
 				return
 			end
+
+			-- Movement control goes back to the animation before the body
+			-- is handed over, so the actor reaches physics in the state it
+			-- would have been in had this mod never touched it.
+			--
+			-- Releasing it is what keeps the fall out of walls, and it was
+			-- never handed back: the actor stayed on entity-driven movement
+			-- for good, which is the condition the original freeze was
+			-- traced to.
+			local handed = pcall(function()
+				npc.actor:SetMovementControlledByAnimation(true)
+			end)
 
 			local dropped = pcall(function()
 				npc.actor:Fall({ x = 0, y = 0, z = 0 }, true)
@@ -1672,12 +1688,19 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 			if self.Config.LogTelemetry then
 				self:Log("VictimFall action=" .. action
 						.. " at=" .. tostring(at)
-						.. "ms ok=" .. tostring(dropped))
+						.. "ms handedBack=" .. tostring(handed)
+						.. " ok=" .. tostring(dropped))
 			end
 
-			self:WhenRagdollResolves(npc, function(state, waitedForBody)
-				self:FinishRecovery(npc, action, state, waitedForBody)
-			end)
+			-- Nothing follows. A gallop victim is ragdolled and left alone,
+			-- and the game returns them to their day on its own: a beggar
+			-- knocked clear by a gallop was observed walking to a begging
+			-- spot and entering the animation unaided.
+			--
+			-- The rebuild and the re-plan exist for the animated get-up,
+			-- where the mod holds the body to the end and has to hand it
+			-- back. Here the game already owns the recovery, and doing both
+			-- to an actor it is recovering is what left beggars standing.
 		end)
 	end
 

@@ -8743,3 +8743,77 @@ that a brain being torn down and remade is the wrong one to ask to choose an
 activity. If that is not enough, a gap between the two `Hide` calls is the next
 variable, and it costs the visible blink that the zero-gap version was chosen to
 avoid.
+
+## The gallop tier works because it does nothing afterwards
+
+Tested at 4.2.0-dev.3, roughly a dozen trot impacts plus one gallop.
+
+**User report**, and the observation the branch turns on: "I hit one with a
+gallop, knocked him way out of position and when he got up he immediately
+starting walking towards another (different than original) begging spot in the
+market and put himself in the beggin annimation. So, how is there a difference
+between how the gallop transitions the NPCs and how we are doing it?"
+
+Also reported: beggars keep barking while stuck standing, though spaced further
+apart than normal, so the brain is running rather than halted; and a beggar who
+was reset by the player leaving and returning came back into the animation but
+at neither the original position nor the original facing.
+
+### Three things the trot tier does that the gallop tier does not
+
+Read from the log, per impact:
+
+| Step | Gallop | Trot fall |
+| --- | --- | --- |
+| `SetMovementControlledByAnimation(false)` | no | yes, and never restored |
+| `entity:Hide(1)` / `Hide(0)` rebuild | no | yes |
+| `daycycle:restartRequest` | no | yes |
+
+A gallop impact emits `actor:Fall` and an impulse and nothing else. The game
+recovers the victim, and the observation above shows it also returns them to
+their day, choosing a replacement begging spot when the original was no longer
+suitable. That is a better outcome than anything this mod has produced by
+hand.
+
+The user's question about the rebuild is the right one: it exists to hand a body
+back after an animated get-up the mod held to the end. Where the game owns the
+recovery there is nothing to hand back, and performing a teardown on an actor
+the engine is in the middle of recovering is a plausible cause of the recovery
+not completing.
+
+**Movement control being released and never restored is the more serious of the
+three.** It is the exact condition the original freeze was traced to: the actor
+left on entity-driven movement while its behavior runs elsewhere. That fits the
+report precisely, since a beggar continuing to bark while standing inert is a
+brain that is running and a body that is not following it.
+
+### The change
+
+For the fall tier only: movement control is handed back immediately before
+`actor:Fall`, so the actor reaches physics in the state it would have been in
+untouched, and neither the rebuild nor the re-plan runs at all. Beyond the
+handover the tier now does exactly what the gallop tier does, which is nothing.
+
+Releasing control during the fall is kept, since that is what stops the clip
+carrying its victim through a wall, and it is only held for the length of the
+fall now rather than forever.
+
+### Clip lengths, measured
+
+Fifty-six reactions, grouped by character set and direction. Within a group the
+spread is under fifty milliseconds, so a clip's length belongs to the clip.
+
+| Direction | Male | Female |
+| --- | --- | --- |
+| back | 1696-1744 | 1856-1936 |
+| forward | 2384-2464 | 3312-3376 |
+| left | 4064-4160 | 2016 |
+| right | 3008-3104 | 2320-2352 |
+
+Left is the pair that differs most between the sets, at 4.1 seconds against 2.0,
+which is why a single timing could not serve both.
+
+The ragdoll now fires at a fraction of the measured length rather than at a
+figure per direction. That leaves one number to tune instead of eight, on the
+reasoning that these clips share an authoring convention and land at about the
+same point in their own length. The starting fraction is 0.6.
