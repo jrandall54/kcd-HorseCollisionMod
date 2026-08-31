@@ -8568,3 +8568,67 @@ fix rather than a property of the animation, and the two are the same problem.
 
 That is a single-variable experiment: measure the drift with the setting on and
 again with it off. Nothing needs correcting to find out, only recording.
+
+
+## The rotation is in the animation data, and one pairing already has none
+
+Two rides at 4.1.0-dev.2, identical but for `ReleaseAnimationMovement`, which is
+the setting that takes a reacting victim off the animation's root motion so they
+stop passing through walls. Sixteen reactions, heading read before the reaction
+and again when it ended, nothing written.
+
+### The setting makes no difference to rotation
+
+| Action | Anti-clipping on | Anti-clipping off |
+| --- | --- | --- |
+| hcm_knockdown_forward | +53, +52 | +53, +53, +53, +53 |
+| hcm_knockdown_left | -176, 0, 0 | -176, -176 |
+| hcm_knockdown_back | +90 | +91 |
+| hcm_knockdown_right | 0 | 0, 0 |
+
+The figures are the same to the degree in both configurations. Taking the body
+off root motion changes where a victim ends up, which is why it fixed the wall
+clipping, and does not change which way they face. The two problems are
+unrelated, and the anti-clipping fix is not paying for itself in rotation.
+
+### Each action has one rotation, and it is a constant
+
+Across sixteen reactions on different people in different places, hit from
+different approaches, in two configurations:
+
+| Action | Rotation |
+| --- | --- |
+| forward | +53 degrees |
+| left | -176 degrees |
+| back | +90 degrees |
+| right | 0 degrees |
+
+`hcm_knockdown_right` imparts no rotation at all, on three reactions across both
+rides. That is the finding that matters. The rotation is not something reactions
+inevitably do; it is something three of the four fall and get-up pairings do and
+the fourth does not.
+
+This is the sixteen-pairing staged pass being visible from the outside. The back
+fall on a male was recorded there as holding about ninety degrees with no better
+get-up available, and the measurement here returns +90 and +91 for exactly that
+action.
+
+### Two anomalous zeros
+
+`hcm_knockdown_left` returned 0 twice in the first ride against -176 everywhere
+else. Those two ended at 6784 and 6752 ms where every other left ended at 7008
+to 7040, so they finished about 250 ms early. An animation that stopped before
+its rotating section would produce both the short duration and the absent
+rotation. Not investigated, and recorded only so a later ride showing the same
+pair of figures is recognized rather than treated as new.
+
+### What this closes and what it opens
+
+Closed: correcting the heading from Lua, which three mechanisms attempted; the
+theory that the drift is caused by the anti-clipping fix; and the theory that a
+stale smart object link strands a victim.
+
+Open, and now well specified: three of the four knockdown pairings carry a fixed
+rotation and one carries none. The work is in the animation data, in the choice
+of get-up paired with each fall, and `hcm_knockdown_right` is a working example
+sitting in the same database.
