@@ -408,6 +408,16 @@ if (-not $DryRun) {
 $zipItem = Get-Item $Zip
 $zipBytes = $zipItem.Length
 
+# The notes for a version are a release artifact like the Files tab entry, and
+# they sit at a predictable path beside it. Finding them without being asked is
+# what stops a release going out with an empty changelog, which is what happened
+# to 4.2.2: the field is optional and nothing looked for it.
+if (-not $Changelog -and -not $ChangelogFile) {
+    $conventionalNotes = Join-Path $repoRoot "releases
+otes-$Version.md"
+    if (Test-Path $conventionalNotes) { $ChangelogFile = $conventionalNotes }
+}
+
 if ($ChangelogFile) {
     if (-not (Test-Path $ChangelogFile)) { throw "No changelog file at $ChangelogFile." }
     $Changelog = Get-Content $ChangelogFile -Raw
@@ -492,6 +502,30 @@ Write-Host "Resolving mod $ModPageId on $GameDomain ..."
 
 $mod = (Invoke-NexusApi GET "/games/$GameDomain/mods/$ModPageId").data
 $modId = $mod.id
+
+# Posting the changelog for a version already on the page, and nothing else.
+# The call is additive and independent of the upload, so a release that went
+# out without one is repaired here rather than re-uploaded.
+if ($ChangelogOnly) {
+    if (-not $Changelog) {
+        throw ("No changelog to post. Write releases
+otes-$Version.md, or " +
+               "pass -Changelog or -ChangelogFile.")
+    }
+
+    Write-Host "Adding the changelog for $Version ..."
+
+    Invoke-NexusApi POST "/mods/$modId/changelogs" @{
+        version   = $Version
+        changelog = $Changelog
+    } | Out-Null
+
+    Write-Host "Done. $($Changelog.Length) characters posted for $Version." -ForegroundColor Green
+    Write-Host "  https://www.nexusmods.com/$GameDomain/mods/$ModPageId`?tab=logs"
+
+    exit 0
+}
+
 
 Write-Host "  mod:      $($mod.name) [$modId]"
 

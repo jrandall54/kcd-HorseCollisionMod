@@ -179,6 +179,22 @@ def check_config_docs():
     return found
 
 
+def check_release_notes(version):
+    """The changelog text a release publishes with.
+
+    The Files tab entry has always been checked; the changelog never was,
+    because the field is optional on the upload. 4.2.2 published with an empty
+    one for exactly that reason.
+    """
+    path = os.path.join("releases", "notes-%s.md" % version)
+
+    if os.path.exists(os.path.join(REPO_ROOT, path)):
+        return []
+
+    return [(path.replace(os.sep, "/"), 0, "missing",
+             "the release would publish with no changelog")]
+
+
 def check_nexus_page(version):
     """The public mod page against the build it describes.
 
@@ -484,6 +500,7 @@ def main():
                 + check_readme_layout()
                 + check_readme_settings()
                 + check_generated_docs()
+                + ([] if merge_only else check_release_notes(version))
                 + check_download_size(paths, version))
 
     if not merge_only:

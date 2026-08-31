@@ -23,6 +23,25 @@ number.
 
 ## [Unreleased]
 
+## [4.2.5] - 2026-08-31
+
+Tooling. The mod is unchanged from 4.2.1.
+
+### Fixed
+
+- A release can no longer publish with an empty changelog. The upload field is
+  optional and nothing looked for it, so 4.2.2 went out with none. Publishing
+  now reads `releases/notes-<version>.md` without being asked, the way it
+  already found the Files tab entry, and the pre-release check refuses a
+  release that has no notes written.
+
+### Added
+
+- `publish_nexus.ps1 -ChangelogOnly` posts the changelog for a version already
+  on the page. The call is additive and independent of the upload, so a release
+  published without one is repaired rather than re-uploaded.
+
+
 ## [4.2.4] - 2026-08-31
 
 Tooling. The mod is unchanged from 4.2.1.
