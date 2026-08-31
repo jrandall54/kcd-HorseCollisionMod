@@ -397,7 +397,7 @@ if (-not $DryRun -and -not $Force) {
 # published, so gating the build on the page copy would block ordinary work on
 # a document nobody is about to read.
 if (-not $DryRun) {
-    python (Join-Path $PSScriptRoot "pre_release_check.py")
+    python (Join-Path $PSScriptRoot "pre_release_check.py") --version $Version
 
     if ($LASTEXITCODE -ne 0) {
         throw ("The mod page does not describe $Version. Revise " +
