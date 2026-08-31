@@ -62,16 +62,8 @@ HorseCollisionModSettings = {
 	TrotReaction             = "knockdown", -- "knockdown" or "ragdoll"
 	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
-	-- How long after a reaction starts the victim is rebuilt, which is what
-	-- lets them carry on instead of standing where they fell. Raise if a
-	-- reaction is cut short; lower if victims stand idle before moving off.
-	RebuildDelayStaggerMs    = 2000,
-	RebuildDelayKnockdownMs  = 5000,
-
 	-- Switches.
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
-	RebuildVictim            = true,  -- lets a victim carry on afterwards
-	                                  -- instead of standing where they fell
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune

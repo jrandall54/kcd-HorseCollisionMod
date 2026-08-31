@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.1.0-dev.1
+-- @release 4.0.1-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.1.0-dev.1"
+HorseCollisionMod.Version = "4.0.1-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -136,12 +136,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   is dropped, matching vanilla's own limit
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
--- @field RebuildVictim turn a victim off and on again once their reaction has
---   finished, so their own behavior reattaches to their body
--- @field RebuildDelayStaggerMs how long after a stagger begins the rebuild
---   happens, in milliseconds
--- @field RebuildDelayKnockdownMs how long after a knockdown begins the rebuild
---   happens, in milliseconds
 -- @field LogTelemetry write diagnostics to kcd.log
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @table Config
@@ -207,17 +201,6 @@ HorseCollisionMod.Config = {
 	-- stops being carried through walls. False restores the behavior before
 	-- this, where a stagger beside a building could end inside it.
 	ReleaseAnimationMovement = true,
-
-	-- Turns a victim off and on again once their reaction has finished, so
-	-- their own behavior reattaches to the body the animation left behind.
-	RebuildVictim            = true,
-
-	-- How long after a reaction begins the rebuild happens. Too early cuts
-	-- the animation short; too late leaves the victim standing idle for the
-	-- difference. Separate per tier because a stagger is over in about a
-	-- second and a knockdown runs several times longer.
-	RebuildDelayStaggerMs    = 2000,
-	RebuildDelayKnockdownMs  = 5000,
 
 	-- The health at or above which a victim is no longer a candidate for
 	-- vanilla's auto-cure daycycle. Vanilla's own limit is 40, declared as
@@ -300,6 +283,20 @@ HorseCollisionMod.RecentRejections = {}
 HorseCollisionMod.SpeedHistory = {}
 
 HorseCollisionMod.SpeedHistorySize = 10
+
+
+-- How long after a reaction begins the victim is rebuilt, per tier.
+--
+-- Timed from the start of the reaction, because nothing here reads whether the
+-- victim is still on the ground, so the figure has to cover the whole fall and
+-- get-up. Too short cuts the animation; every millisecond past the end is time
+-- the victim spends standing idle before their own behavior resumes.
+--
+-- Separate per tier because a stagger is over in about a second while a
+-- knockdown runs several times longer. Not settings: once these are right
+-- there is no reason for a player to hold an opinion about them.
+HorseCollisionMod.RebuildDelayStaggerMs = 2000
+HorseCollisionMod.RebuildDelayKnockdownMs = 5000
 
 local function GetTimeMs()
 	return System.GetCurrTime() * 1000
@@ -1315,21 +1312,29 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- has to clear the whole fall and get-up: rebuilding partway through cuts
 	-- the animation, and every millisecond past the end is time the victim
 	-- spends standing idle before their behavior resumes.
-	if self.Config.RebuildVictim then
-		local delay = self.Config.RebuildDelayKnockdownMs
+	local delay = self.RebuildDelayKnockdownMs
 
-		if prefix == "hcm_stagger_" then
-			delay = self.Config.RebuildDelayStaggerMs
+	if prefix == "hcm_stagger_" then
+		delay = self.RebuildDelayStaggerMs
+	end
+
+	-- The same generation guard the detection loop and the health watch use.
+	-- Entity ids are reused across a save load, so a rebuild booked before one
+	-- and fired after it would hide and show whichever NPC inherited the id,
+	-- having been aimed at a victim from a world that no longer exists.
+	local generation = self.TimerTick
+
+	Script.SetTimer(delay, function()
+		if generation ~= self.TimerTick then
+			return
 		end
 
-		Script.SetTimer(delay, function()
-			self:RebuildVictim(npc)
-		end)
+		self:RebuildVictim(npc)
+	end)
 
-		if self.Config.LogTelemetry then
-			self:Log("VictimRebuild scheduled action=" .. action
-					.. " delay=" .. tostring(delay) .. "ms")
-		end
+	if self.Config.LogTelemetry then
+		self:Log("VictimRebuild scheduled action=" .. action
+				.. " delay=" .. tostring(delay) .. "ms")
 	end
 
 	self:Log("Reaction action=" .. action

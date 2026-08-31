@@ -79,9 +79,6 @@ breaking the mod. Deleting a line restores its default.
 | `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
 | `ReleaseAnimationMovement` | true | Keeps a reacting victim out of walls and out of sloped ground. False restores the behavior before 4.0.0. |
-| `RebuildVictim` | true | Whether a victim is put back under their own control once their reaction ends, instead of standing where they fell. |
-| `RebuildDelayStaggerMs` | 2000 | How long a stagger is given before that happens. Raise if a stagger is cut short. |
-| `RebuildDelayKnockdownMs` | 5000 | The same for a knockdown, which runs several times longer. |
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |

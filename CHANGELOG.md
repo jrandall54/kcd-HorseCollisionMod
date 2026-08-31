@@ -23,7 +23,7 @@ number.
 
 ## [Unreleased]
 
-## [4.1.0-dev.1] - 2026-08-31
+## [4.0.1-dev.1] - 2026-08-31
 
 ### Fixed
 
@@ -34,12 +34,6 @@ number.
   rejoined when something forced the game to rebuild them, which in practice
   meant looking away and back. Affects 4.0.0, and is why victims sometimes
   appeared to teleport.
-
-### Added
-
-- `RebuildVictim`, `RebuildDelayStaggerMs` and `RebuildDelayKnockdownMs`
-  control that recovery and how long each reaction is given before it happens.
-  All have working defaults and nothing needs configuring.
 
 ## [4.0.0] - 2026-08-30
 
