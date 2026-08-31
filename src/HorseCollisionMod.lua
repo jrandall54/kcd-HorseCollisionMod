@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.0.0
+-- @release 4.0.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.0.0"
+HorseCollisionMod.Version = "4.0.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -283,6 +283,40 @@ HorseCollisionMod.RecentRejections = {}
 HorseCollisionMod.SpeedHistory = {}
 
 HorseCollisionMod.SpeedHistorySize = 10
+
+
+-- How long after a reaction begins the victim is rebuilt, per tier.
+--
+-- Timed from the start of the reaction, because nothing here reads whether the
+-- victim is still on the ground, so the figure has to cover the whole fall and
+-- get-up. Too short cuts the animation; every millisecond past the end is time
+-- the victim spends standing idle before their own behavior resumes.
+--
+-- Separate per tier because a stagger is over in about a second while a
+-- knockdown runs several times longer. Not settings: once these are right
+-- there is no reason for a player to hold an opinion about them.
+-- How the end of a reaction is recognized, so the rebuild is triggered by an
+-- observation rather than by a clock guessing at the animation's length.
+--
+-- `actor:GetCurrentAnimationState()` reports `AnimationControlled` for exactly
+-- as long as an interactive action owns the actor, and the value it changes to
+-- afterwards is an ordinary locomotion state. Leaving that value is therefore
+-- the reaction ending, whatever clip played and however long it ran.
+--
+-- A fixed delay cannot do this job. Measured across knockdowns the state was
+-- held for anywhere between 4.3 and 7.0 seconds, and a stagger released it in
+-- 2.3, so any single figure lands inside the range and rebuilds some victims
+-- mid-animation. Rebuilding mid-animation is worse than not rebuilding at all,
+-- because the animation takes the body back afterwards and the freeze the
+-- rebuild exists to prevent happens anyway.
+--
+-- The ceiling covers a victim who dies, unstreams, or holds the state past
+-- anything observed, and the state must have been seen at least once before
+-- leaving it counts, so a poll landing before the action starts cannot be
+-- mistaken for the reaction already being over.
+HorseCollisionMod.ReactionAnimationState = "AnimationControlled"
+HorseCollisionMod.ReactionPollMs = 100
+HorseCollisionMod.ReactionEndCeilingMs = 12000
 
 local function GetTimeMs()
 	return System.GetCurrTime() * 1000
@@ -1204,6 +1238,100 @@ function HorseCollisionMod:ReleaseVictimMovement(npc)
 	return ok
 end
 
+--- Runs something once a victim's reaction animation has finished.
+--
+-- Polls `actor:GetCurrentAnimationState()`, which reports
+-- `AnimationControlled` for as long as an interactive action owns the actor.
+-- Leaving that value is the reaction ending, which makes the wait an
+-- observation instead of a guess at how long a particular clip runs.
+--
+-- The state must have been seen at least once before leaving it counts. A poll
+-- landing in the gap before the action takes hold would otherwise read an
+-- ordinary locomotion state and report a reaction that has not started yet as
+-- already over.
+--
+-- @tparam table npc victim entity
+-- @tparam function fn called with the reason (`state`, `ceiling` or
+--   `unreadable`) and how long the wait took in milliseconds
+function HorseCollisionMod:WhenReactionEnds(npc, fn)
+	-- Entity ids are reused across a save load, so a wait booked before one
+	-- and finishing after it would act on whichever NPC inherited the id,
+	-- having been aimed at a victim from a world that no longer exists. The
+	-- detection loop and the health watch carry the same guard.
+	local generation = self.TimerTick
+	local startedAt = GetTimeMs()
+	local deadline = startedAt + self.ReactionEndCeilingMs
+	local seen = false
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local elapsed = GetTimeMs() - startedAt
+
+		if state == self.ReactionAnimationState then
+			seen = true
+		elseif seen then
+			fn("state", elapsed)
+
+			return
+		end
+
+		if GetTimeMs() >= deadline then
+			fn(seen and "ceiling" or "unreadable", elapsed)
+
+			return
+		end
+
+		Script.SetTimer(self.ReactionPollMs, poll)
+	end
+
+	Script.SetTimer(self.ReactionPollMs, poll)
+end
+
+--- Rebuilds a victim so their own behavior reattaches to their body.
+--
+-- An animated reaction hands the victim's body to the animation, and their
+-- behavior is never told. The reaction ends with the body standing where it
+-- fell while the victim's own idea of where they are carries on elsewhere, and
+-- the two only rejoin the next time the engine rebuilds the actor. A player
+-- triggers that by looking away and back, which drops the NPC to a level of
+-- detail the engine repositions them from; until then the victim stands still
+-- and then appears to teleport.
+--
+-- `entity:Hide(1)` followed immediately by `entity:Hide(0)` forces that
+-- rebuild. Both calls are made together, with no timer between them: the
+-- teardown happens on the call rather than over elapsed time, so the actor is
+-- rebuilt without ever missing a frame of rendering. Separating them by even
+-- twenty milliseconds is visible as a blink and buys nothing.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true when the calls were accepted without error
+function HorseCollisionMod:RebuildVictim(npc)
+	if type(npc.Hide) ~= "function" then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		npc:Hide(1)
+		npc:Hide(0)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("VictimRebuild ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
+
 --- Plays one of this mod's reactions on a victim.
 --
 -- Calls `actor:StartInteractiveActionByName` with a name this mod adds to the
@@ -1256,6 +1384,16 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 			self:ReleaseVictimMovement(npc)
 		end)
 	end
+
+	self:WhenReactionEnds(npc, function(why, waited)
+		self:RebuildVictim(npc)
+
+		if self.Config.LogTelemetry then
+			self:Log("VictimRebuild action=" .. action
+					.. " on=" .. why
+					.. " waited=" .. string.format("%.0f", waited) .. "ms")
+		end
+	end)
 
 	self:Log("Reaction action=" .. action
 			.. " gender=" .. gender
