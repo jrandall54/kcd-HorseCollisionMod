@@ -147,14 +147,24 @@ def main():
         check(not lost, "every vanilla option survives",
               lost or "%d inherited" % len(van_opts))
 
-        wanted = [t for t, _ in build_adb.STAGGERS]
+        # `reactions_for` yields (tag, clips) for this character set, where
+        # clips is one name or several played in order. The table it reads was
+        # called STAGGERS when the mod shipped only the walk tier; it is
+        # REACTIONS now and carries knockdowns, falls and get-ups too, and this
+        # check went unrun for long enough that the rename was not noticed.
+        wanted = [t for t, _ in build_adb.reactions_for(gender)]
         missing = [t for t in wanted if t not in our_opts]
-        check(not missing, "all %d stagger options present" % len(wanted), missing)
+        check(not missing, "all %d reaction options present" % len(wanted),
+              missing)
 
         # Every clip the mod points at must exist in that set's own database.
         clips_present = set(re.findall(r'<Animation name="([^"]*)"', vanilla_db))
-        absent = [c for _, c in build_adb.STAGGERS if c not in clips_present]
-        check(not absent, "every referenced clip exists in the vanilla database", absent)
+        absent = sorted({clip
+                         for _, clips in build_adb.reactions_for(gender)
+                         for clip in build_adb.as_clips(clips)
+                         if clip not in clips_present})
+        check(not absent, "every referenced clip exists in the vanilla database",
+              absent)
 
         # The parent must reference the vanilla database, not carry a copy.
         subs = re.findall(r'<SubADB File="([^"]*)"', parent)
@@ -205,8 +215,14 @@ def main():
     vt = set(re.findall(r'<Tag name="([^"]+)"', van_tags))
     ot = set(re.findall(r'<Tag name="([^"]+)"', our_tags))
     check(not (vt - ot), "every vanilla FragTag survives", sorted(vt - ot) or "%d tags" % len(vt))
-    wanted = set(t for t, _ in build_adb.STAGGERS)
-    check(wanted <= ot, "every stagger FragTag is declared", sorted(wanted - ot))
+    # Every tag the mod declares, across both character sets, since the tag
+    # file is shared and a set that carries an option the file does not declare
+    # resolves to nothing without an error.
+    wanted = set(t for _, entry in
+                 (("male", build_adb.reactions_for("male")),
+                  ("female", build_adb.reactions_for("female")))
+                 for t, _ in entry)
+    check(wanted <= ot, "every reaction FragTag is declared", sorted(wanted - ot))
 
     # ---- 7. pak hygiene ----------------------------------------------------
     heading("Pak packaging")
