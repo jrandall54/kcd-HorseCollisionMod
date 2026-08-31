@@ -718,14 +718,8 @@ Write-Host "  version id $($published.version.id)" -ForegroundColor Green
 # leave changelog text on the page for a version that does not exist, and a
 # repeated call appends rather than replaces.
 #
-# This call does not currently reach Nexus. Measured against 4.2.2 the endpoint
-# answered 413 from nginx, with a Cloudflare challenge injected, for a body of
-# 394 bytes, and 502 intermittently between attempts. A payload that small is
-# not too large for anything, so the request is being refused at the edge
-# rather than by the API. No release on the page carries a changelog, going
-# back to 3.0.0, which fits: this has never worked rather than having broken.
-#
-# Until that is understood, paste the notes into the Changelogs tab by hand.
+# Because it appends, calling this twice for one version leaves two entries on
+# the Changelogs tab and there is no API to remove either.
 if ($Changelog) {
     Write-Host "Adding changelog ..."
 
