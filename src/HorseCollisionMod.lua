@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0-dev.2
+-- @release 4.2.0-dev.3
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0-dev.2"
+HorseCollisionMod.Version = "4.2.0-dev.3"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -364,6 +364,12 @@ HorseCollisionMod.RagdollAtMs = {
 	left = 1200,
 	right = 1300
 }
+
+
+-- How long after the rebuild the victim is asked to re-plan. The rebuild
+-- resets the behavior and the re-plan chooses what it does next, so they
+-- are ordered rather than issued together.
+HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
@@ -1356,13 +1362,30 @@ end
 -- @tparam number waited how long that wait took, in milliseconds
 function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
 	self:RebuildVictim(npc)
-	self:ReplanVictim(npc)
 
 	if self.Config.LogTelemetry then
 		self:Log("VictimRebuild action=" .. action
 				.. " on=" .. why
 				.. " waited=" .. string.format("%.0f", waited) .. "ms")
 	end
+
+	-- After the rebuild rather than alongside it. The rebuild is what resets
+	-- the victim's behavior, and asking a brain to re-plan in the same frame
+	-- it is being torn down and remade is asking the wrong one.
+	--
+	-- Leaving the area and returning restores a beggar or an innkeeper to
+	-- their animation where this sequence does not, and the difference between
+	-- the two is time: the engine's own teardown and rebuild are separated by
+	-- however long the player was away.
+	local generation = self.TimerTick
+
+	Script.SetTimer(self.ReplanAfterRebuildMs, function()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		self:ReplanVictim(npc)
+	end)
 end
 
 --- Records the animation state through a whole reaction and recovery.
@@ -1377,7 +1400,7 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam string action the reaction being played
-function HorseCollisionMod:TraceRecovery(npc, action)
+function HorseCollisionMod:TraceRecovery(npc, action, gender)
 	if not self.Config.LogTelemetry or self.TraceRecoveryForMs <= 0 then
 		return
 	end
@@ -1404,6 +1427,7 @@ function HorseCollisionMod:TraceRecovery(npc, action)
 		-- is what matters rather than its sampling rate.
 		if state ~= last then
 			self:Log("RecoveryTrace " .. action
+					.. " gender=" .. tostring(gender)
 					.. " t+" .. string.format("%.0f", elapsed)
 					.. "ms state=" .. state)
 			last = state
@@ -1579,7 +1603,14 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- GetImpactDir speaks the engine's "so_" vocabulary; the database entries
 	-- this mod adds are named without that prefix, so strip it.
 	local dir = self:GetImpactDir(npc, velocity, speed)
-	local action = prefix .. string.gsub(dir, "so_", "")
+
+	-- The engine's vocabulary is `so_left`; this mod's option names and its
+	-- per-direction tables are keyed on the bare word. Stripping it once and
+	-- using the result everywhere avoids a table lookup silently missing and
+	-- falling back, which is how every direction ended up sharing one
+	-- ragdoll timing while appearing to have four.
+	local side = string.gsub(dir, "so_", "")
+	local action = prefix .. side
 
 
 	-- Gender is logged because the female animation set has no
@@ -1611,7 +1642,7 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- TEMPORARY, for one diagnostic ride. Samples the animation state through
 	-- the whole sequence so the handover from clip to ragdoll to recovery can
 	-- be read rather than inferred. Remove before this branch merges.
-	self:TraceRecovery(npc, action)
+	self:TraceRecovery(npc, action, gender)
 
 	-- The body is handed to physics while the fall is still playing, timed to
 	-- land on the victim reaching the ground rather than on the clip ending.
@@ -1626,7 +1657,7 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- No impulse. The victim is already going down and the ragdoll is here to
 	-- take the body at ground level, not to throw it.
 	if prefix == "hcm_fall_" then
-		local at = self.RagdollAtMs[dir] or self.RagdollAtMs.forward
+		local at = self.RagdollAtMs[side] or self.RagdollAtMs.forward
 		local generation = self.TimerTick
 
 		Script.SetTimer(at, function()

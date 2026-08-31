@@ -8691,3 +8691,55 @@ which adapts to the clip, the character set and the ground underneath without
 any figure being fixed in advance. A per-action ceiling remains as a fallback for
 the case where the height cannot be read at all, and every sample is logged so
 that case is recognized rather than guessed at.
+
+## Every direction shared one ragdoll timing, and the table looked full
+
+Tested at 4.2.0-dev.2, eight to ten trot impacts across both character sets and
+all four directions.
+
+**User report**: "sometimes it fires too early and it looks like a lifeless
+puppet, sometimes it fires right now and looks pretty natural and others its
+late and seem like they kick and go limp after already falling."
+
+### The cause is a table lookup that missed
+
+`GetImpactDir` returns the engine's vocabulary, `so_left`. The option name is
+built by stripping that prefix, but the per-direction timing table was indexed
+with the unstripped value, so every lookup missed and fell through to the
+forward default. The log names it plainly: `hcm_fall_left at=1300ms`, where the
+table holds 1200 for left.
+
+So all four directions and both character sets ran on one figure, which is
+exactly the report: with a single timing against clips that run from 1.75 to 4.2
+seconds, some land early, some land right and some land late.
+
+The user's conclusion that every gender and direction needs its own timing
+stands. What was not true is that four timings had been tried; one had.
+
+Worth generalizing: a Lua table lookup that misses returns nil silently, and a
+fallback written for robustness then hides it. The value used is now logged next
+to the action, which is the only reason this was visible at all.
+
+## The rebuild fires, and does not restore an activity NPC
+
+Thirty recoveries reported `VictimRebuild on=resolved`, so the ragdoll was seen
+to resolve and the entity rebuild ran on every one. Beggars and innkeepers still
+stood inert afterwards while merchants resumed normally.
+
+**User report**: "when I left the area and came back they were back in their
+animations. same behavior confirmed for the innkeeper."
+
+So the teardown the engine performs when a player leaves and returns does
+restore these NPCs, and `entity:Hide(1)` followed immediately by `entity:Hide(0)`
+does not, despite being the call that was found to fix the original freeze.
+
+The difference between the two is time. The engine's own teardown and rebuild
+are separated by however long the player was away; the mod's are separated by
+nothing at all.
+
+The first thing being tried is ordering rather than duration: the re-plan is now
+sent 600 ms after the rebuild instead of in the same frame, on the reasoning
+that a brain being torn down and remade is the wrong one to ask to choose an
+activity. If that is not enough, a gap between the two `Hide` calls is the next
+variable, and it costs the visible blink that the zero-gap version was chosen to
+avoid.
