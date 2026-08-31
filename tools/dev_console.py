@@ -43,6 +43,7 @@ Setup, once, in the game's system.cfg:
 """
 
 import argparse
+import io
 import collections
 import os
 import re
@@ -446,6 +447,11 @@ def main():
     parser.add_argument("command", nargs="?", help="console command to send")
     parser.add_argument("--lua", metavar="CODE",
                         help="evaluate CODE as Lua in the running game")
+    parser.add_argument("--file", metavar="PATH",
+                        help="evaluate the Lua in PATH as one chunk. The remote "
+                             "console takes a whole file as readily as a line, "
+                             "and a probe worth running twice belongs in a file "
+                             "rather than in shell quoting")
     parser.add_argument("--reload", action="store_true",
                         help="reload the mod's Lua script")
     parser.add_argument("--listen", action="store_true",
@@ -516,6 +522,26 @@ def main():
         if args.reload:
             for command in RELOAD_COMMANDS:
                 console.queue(command)
+    elif args.file:
+        try:
+            with io.open(args.file, "r", encoding="utf-8") as handle:
+                body = handle.read()
+        except OSError as err:
+            print("cannot read %s: %s" % (args.file, err))
+
+            return 2
+
+        problem = check_lua_syntax(body)
+
+        if problem:
+            print("%s does not compile, so the game would drop it without a "
+                  "word:" % args.file)
+            print("  " + problem)
+
+            return 2
+
+        print("sending %s, %d lines" % (args.file, body.count(chr(10)) + 1))
+        console.lua(body)
     elif args.lua:
         problem = check_lua_syntax(args.lua)
 

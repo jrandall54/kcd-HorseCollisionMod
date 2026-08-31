@@ -9222,3 +9222,163 @@ plausible cause of the parking, and it is introduced by this branch.
 
 The tier therefore trades a rotation fault that main has for an activity fault
 that main does not.
+
+## Messages have to be typed tables, and ours have all been empty strings
+
+This is the reason a long list of calls has been recorded as accepted and inert,
+and it is not that the brain cannot be reached.
+
+### Two ways to send a message, and only one carries a payload
+
+```lua
+XGenAIModule.SendMessageToEntity(id, name, "")            -- string values
+XGenAIModule.SendMessageToEntityData(id, name, table)     -- typed payload
+```
+
+`Libs/AI/TypeDefinitions.xml` declares what each message carries:
+
+| Message | Required members |
+| --- | --- |
+| `daycycle:restartRequest` | `reason` enum, `speed` enum |
+| `daycycle:interrupt` | `behaviorSource` wuid, `behaviorName` string, `includeXml`, `includeTree`, `daycycleHaltSpeed` enum, `immediateActivityBeingSwitchedIntoHandle` |
+| `daycycle:progress` | `progress` bool, `behavior` string |
+| `haltContext` | `reason` enum, `speed` enum |
+
+Vanilla builds these with `Utils.makeTable`, which is reachable from Lua and used
+in the game's own scripts:
+
+```lua
+local msg = Utils.makeTable('dog:changeRequest',
+        { newMaster = true, master = player.this.id,
+          newMode = true, mode = enum_dogCompanionMode.free })
+XGenAIModule.SendMessageToEntityData(dog.this.id, "dog:changeRequest", msg)
+```
+
+Every message this project has sent used the string form with `""`, so the
+members arrived unset and the receiving node had nothing to match on. The message
+was delivered and discarded, which is indistinguishable from a call that does
+nothing.
+
+### Measured on the same victim
+
+`rat_merchant_shop1`, parked in `MotionIdle` after a trot collision:
+
+| Form | Travel |
+| --- | --- |
+| `SendMessageToEntity(id, 'daycycle:restartRequest', '')` | 0.00 m |
+| `SendMessageToEntityData` with `reason=interrupt, speed=instant` | **3.94 m** |
+
+The typed message re-planned him and he walked back to his stall. The string
+form had been tried repeatedly across this branch and never moved anyone.
+
+The enums are globals: `enum_daycycleHaltReason` is
+`unknown 0, combat 1, death 2, interrupt 3, situation 4`, and
+`enum_daycycleHaltSpeed` is `slow 0, fast 1, instant 2`.
+
+### What this does not explain
+
+`human:StopAnim` takes no payload and is still inert, so it belongs to a
+different category. Registration in the decompiled binary is identical to
+working calls such as `GetHorse` and `IsMounted`, so the difference is in the
+body rather than the binding. The working set is physics, stats and entity
+transforms, none of which the animation system re-asserts every frame; the inert
+set is animation control on an actor a behavior tree owns, which it does.
+
+### Interfaces present at runtime and absent from the bind reference
+
+Taken from a dump of the live Lua state rather than from the registration list:
+`XGenAIModule.MakeTableFromType`, `SendMessageToEntityData`, `SetBrainVariable`,
+`_GetDataVariable` and `_SetDataVariable`. `SetBrainVariable` has never been
+used by this project and is the one genuine write into an NPC's brain that is
+known to exist.
+
+`AbortAllAnimations` is confirmed as `wh::xgenaimodule::BehaviorTree::C_AbortAllAnimations`,
+a tree node class with no Lua entry point, so it is reachable only by a tree
+that runs it.
+
+## Typed messages, run against a parked merchant
+
+The four messages this project had recorded as inert, resent as typed tables
+against `rat_merchant_shop1` parked in `MotionIdle`, one at a time with nine
+seconds between them.
+
+| Message | Travel | State after |
+| --- | --- | --- |
+| `daycycle:restartRequest` | 0.10 m | MotionIdle |
+| **`daycycle:haltContext`** | **3.42 m** | **MotionMovement** |
+| `daycycle:interrupt` | 0.57 m | MotionIdle |
+| **`daycycle:behavior:progress`** | **3.21 m** | **MotionMovement** |
+
+`daycycle:haltContext` moved a victim that `daycycle:restartRequest` had just
+failed to move, which is the useful result: halting the context is what a parked
+tree needs, and restarting the daycycle is not.
+
+`daycycle:interrupt` is the one that had been predicted to work, on the grounds
+that it carries the richest payload and is what vanilla sends to stop a
+behavior. It did not.
+
+### The run has a flaw worth naming
+
+The four were sent to the same victim in sequence, so each was applied to
+whatever the previous one left behind. The victim was walking when
+`daycycle:interrupt` arrived rather than parked, and was walking again after
+`behavior:progress`, so neither of those results is clean.
+
+Only the first two rows are trustworthy: a genuinely parked victim was unmoved
+by `restartRequest` and freed by `haltContext`. The probe now takes a single
+candidate so each can be tried against a freshly parked victim.
+
+### On the earlier merchant result
+
+The same merchant had been moved 3.94 m by a typed `restartRequest` earlier in
+the session, and moved 0.10 m by it here. The difference is that the mod now
+sends a typed `restartRequest` as part of the reaction, so by the time the probe
+ran he had already received one. A message that has already been delivered has
+nothing left to do, which is consistent rather than contradictory.
+
+## The typed replan fixes every activity NPC
+
+Tested at 4.2.1-dev.1, whose only change from 4.2.0 is that `ReplanVictim`
+sends `daycycle:restartRequest` as a typed table rather than as an empty string.
+
+**User report**: "he just got up and started walking ways towards a new place to
+beg... I tried another beggar and she also got up and starting walking away
+towards another begging spot... I hit a woman sitting on a bench and she got up
+and sat back down. Every merchant I hit was able to reset normally. I even went
+and hit the innkeeper and he got up and naturally put himself back into his
+proper leaning position."
+
+Eighteen replans this session, all typed, none falling back to the string form.
+Live states afterwards:
+
+```
+rat_innkeeper1      = Leaning
+rat_refugee_vojcek  = Beggar
+rat_refugee_beranMr = MotionMovement
+rat_merchant_shop1  = MotionIdle
+```
+
+So the parked tree, the unreleased `usedSO` link, the beggar that only a save
+load recovered and the innkeeper that never returned were all one fault: a
+message the game accepted and discarded because its declared members were never
+filled in.
+
+### The distance metric is retired
+
+`travel` ten seconds after impact was used throughout this investigation as the
+test for whether a victim recovered, and it flagged the innkeeper as stuck at
+0.20 m in the same session he was observed leaning correctly. He leans in place
+and never travels; a beggar returning to his own spot does not travel either.
+
+The measure was only ever valid while returning to an activity required walking
+back to it, which was true of a displaced merchant and of nobody else. Animation
+state is the honest test and is what the probes now read.
+
+### A note on how the battery was run
+
+The four typed messages were fired at whatever was parked from an earlier state,
+without the preconditions being stated first, so the run measured a victim that
+had already received a typed replan from the mod. `daycycle:haltContext` moving a
+parked merchant 3.42 m is still a real observation, but it is not evidence that
+`haltContext` is needed: the typed `restartRequest` in the reaction covers every
+case tested since.

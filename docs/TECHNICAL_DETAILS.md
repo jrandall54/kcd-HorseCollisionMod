@@ -68,6 +68,39 @@ An action that resolves to no fragment aborts within a frame and never reports
 `AnimationControlled` at all, so the wait is bounded by a ceiling and the
 rebuild fires regardless when it expires.
 
+### Messages to an NPC carry a declared payload
+
+`XGenAIModule.SendMessageToEntity(id, name, values)` delivers a message to an
+NPC's behavior tree. Most message types declare members in
+`Libs/AI/TypeDefinitions.xml`, and a message whose members are unset is
+accepted and then discarded, since the receiving node has nothing to match on.
+There is no error and no log line: the call returns exactly as it does when it
+works.
+
+`daycycle:restartRequest` declares `reason` and `speed`. Sent with an empty
+payload it does nothing at all, which is what left victims standing after a
+collision with no apparent way to recover them. Sent with both members it
+returns them to their day.
+
+Two forms work. Vanilla's trees use text, `values="reason($enum:...),
+speed($enum:...)"`, and its Lua uses a table:
+
+```lua
+local message = Utils.makeTable('daycycle:restartRequest', {
+    reason = enum_daycycleHaltReason.interrupt,
+    speed  = enum_daycycleHaltSpeed.instant
+})
+XGenAIModule.SendMessageToEntityData(target, 'daycycle:restartRequest', message)
+```
+
+The table form is preferred here because it is checked against the type
+definition rather than parsed out of a string.
+
+**A call that returns without error is not evidence that anything happened.**
+That holds for messages, where the payload may be empty, and separately for
+binds such as `human:StopAnim`, which is accepted and does nothing whatever is
+passed to it. Only observation in game distinguishes the two.
+
 ### Files required to add a FragTag
 
 Three kinds of file, all mandatory. Omitting any one leaves the call succeeding

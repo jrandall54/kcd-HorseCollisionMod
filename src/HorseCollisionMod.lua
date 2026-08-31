@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0
+-- @release 4.2.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0"
+HorseCollisionMod.Version = "4.2.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1418,12 +1418,41 @@ function HorseCollisionMod:ReplanVictim(npc)
 		return false
 	end
 
+	-- Sent with its members filled in.
+	--
+	-- `daycycle:restartRequest` declares `reason` and `speed` in
+	-- `Libs/AI/TypeDefinitions.xml`, and every send this mod made before this
+	-- one passed an empty payload. The message was delivered and discarded with
+	-- nothing for the receiving node to match on, which is indistinguishable
+	-- from a call that does nothing, and it is why a beggar, an innkeeper and a
+	-- merchant could be left standing with no way found to recover them.
+	--
+	-- Measured on one victim parked after a collision: the empty send moved him
+	-- 0.00 m and this one moved him 3.94 m, back to his stall.
+	--
+	-- The fault was the empty payload rather than the string form. Vanilla's own
+	-- trees send this message both ways, as `values="reason(...), speed(...)"`
+	-- and as a table built by `Utils.makeTable`, which is what is used here
+	-- because it is checked against the type definition rather than parsed from
+	-- text.
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
 	local ok, err = pcall(function()
-		XGenAIModule.SendMessageToEntity(npc.id, "daycycle:restartRequest", "")
+		local message = Utils.makeTable("daycycle:restartRequest", {
+			reason = enum_daycycleHaltReason.interrupt,
+			speed = enum_daycycleHaltSpeed.instant
+		})
+
+		XGenAIModule.SendMessageToEntityData(target,
+				"daycycle:restartRequest", message)
 	end)
 
 	if self.Config.LogTelemetry then
-		self:Log("VictimReplan ok=" .. tostring(ok)
+		self:Log("VictimReplan typed=" .. tostring(ok)
 				.. " err=" .. tostring(err))
 	end
 

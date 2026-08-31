@@ -1,41 +1,38 @@
 {
-    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
-
-    "runtime.version": "Lua 5.1",
-
-    "workspace.library": [
-        "docs"
-    ],
-
-    "workspace.ignoreDir": [
-        "references",
-        "vanilla_scripts",
-        "mod_assets",
-        "mod_xmls.disabled",
-        "releases",
-        "archived_dev_session_1",
-        "archived_dev_session_5"
-    ],
-
-    "diagnostics.globals": [
-        "HorseCollisionMod",
-        "System",
-        "Script",
-        "XGenAIModule",
-        "Contexts",
-        "ItemManager",
-        "Framework",
-        "UIAction",
-        "player",
-        "g_localActor"
-    ],
-
-    "diagnostics.disable": [
-        "lowercase-global"
-    ],
-
-    "format.defaultConfig": {
-        "indent_style": "tab",
-        "max_line_length": "90"
-    }
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.1",
+  "workspace.library": [
+    "docs"
+  ],
+  "workspace.ignoreDir": [
+    "references",
+    "vanilla_scripts",
+    "mod_assets",
+    "mod_xmls.disabled",
+    "releases",
+    "archived_dev_session_1",
+    "archived_dev_session_5"
+  ],
+  "diagnostics.globals": [
+    "Contexts",
+    "Framework",
+    "HorseCollisionMod",
+    "ItemManager",
+    "Script",
+    "System",
+    "UIAction",
+    "Utils",
+    "XGenAIModule",
+    "enum_daycycleHaltReason",
+    "enum_daycycleHaltSpeed",
+    "g_localActor",
+    "player"
+  ],
+  "diagnostics.disable": [
+    "lowercase-global"
+  ],
+  "format.defaultConfig": {
+    "indent_style": "tab",
+    "max_line_length": "90"
+  }
 }
