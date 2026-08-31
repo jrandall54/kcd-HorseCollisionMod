@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.1-dev.1
+-- @release 4.2.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.1-dev.1"
+HorseCollisionMod.Version = "4.2.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1418,19 +1418,23 @@ function HorseCollisionMod:ReplanVictim(npc)
 		return false
 	end
 
-	-- Sent as a typed table, not as a string.
+	-- Sent with its members filled in.
 	--
-	-- `SendMessageToEntity` takes its values as text and the members arrive
-	-- unset, so a message declaring any is delivered and then discarded with
-	-- nothing to match on. `daycycle:restartRequest` declares `reason` and
-	-- `speed` in `Libs/AI/TypeDefinitions.xml`, and every send this mod made
-	-- before this one supplied neither.
+	-- `daycycle:restartRequest` declares `reason` and `speed` in
+	-- `Libs/AI/TypeDefinitions.xml`, and every send this mod made before this
+	-- one passed an empty payload. The message was delivered and discarded with
+	-- nothing for the receiving node to match on, which is indistinguishable
+	-- from a call that does nothing, and it is why a beggar, an innkeeper and a
+	-- merchant could be left standing with no way found to recover them.
 	--
-	-- Measured on one victim parked after a collision: the string form moved
-	-- him 0.00 m and the typed form moved him 3.94 m, back to his stall.
+	-- Measured on one victim parked after a collision: the empty send moved him
+	-- 0.00 m and this one moved him 3.94 m, back to his stall.
 	--
-	-- `Utils.makeTable` is the game's own builder for these, used in its
-	-- scripts for `dog:changeRequest` among others.
+	-- The fault was the empty payload rather than the string form. Vanilla's own
+	-- trees send this message both ways, as `values="reason(...), speed(...)"`
+	-- and as a table built by `Utils.makeTable`, which is what is used here
+	-- because it is checked against the type definition rather than parsed from
+	-- text.
 	local target = npc.id
 
 	if npc.this and npc.this.id then
@@ -1446,15 +1450,6 @@ function HorseCollisionMod:ReplanVictim(npc)
 		XGenAIModule.SendMessageToEntityData(target,
 				"daycycle:restartRequest", message)
 	end)
-
-	-- The string form as a fallback, so a build that cannot reach the typed
-	-- path still does what earlier versions did rather than nothing.
-	if not ok then
-		pcall(function()
-			XGenAIModule.SendMessageToEntity(npc.id,
-					"daycycle:restartRequest", "")
-		end)
-	end
 
 	if self.Config.LogTelemetry then
 		self:Log("VictimReplan typed=" .. tostring(ok)

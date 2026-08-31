@@ -23,6 +23,20 @@ number.
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-08-31
+
+### Fixed
+
+- Anyone whose day is anchored to something goes back to it after a trot
+  collision. A beggar returns to begging or walks to another spot, a drinker
+  goes back to leaning on his wall, a merchant returns to his stall and
+  someone knocked off a bench sits back down. Affects 4.2.0, where they stood
+  where they got up until something reloaded them.
+
+  The request that sends a victim back to their day was being sent with an
+  empty payload, so the game accepted it and discarded it.
+
+
 ## [4.2.0] - 2026-08-31
 
 ### Fixed
@@ -38,17 +52,6 @@ number.
 
 - `TrotReaction` accepts `"fall"`, which is the new default. `"knockdown"`
   restores the animated get-up and `"ragdoll"` the physics knockdown.
-
-### Known issues
-
-- An NPC whose day is anchored to something, a beggar at his spot, a drinker
-  leaning on a wall or a merchant left standing at his stall, may not go back
-  to it after a trot collision. They stand where they got up until something
-  reloads them, which in play means walking away and coming back. Anyone who
-  walks as part of their day, which is most people, is unaffected. Set
-  `TrotReaction` to `"knockdown"` to avoid it at the cost of the older
-  get-up, which turned victims as it played.
-
 
 ## [4.1.0] - 2026-08-31
 
