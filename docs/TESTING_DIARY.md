@@ -8206,3 +8206,73 @@ correct. That puts a combat gallop into a mail guard at 2.0 impacts and a
 combat trot at 2.4, which is the cap that was asked for, while a calm trot
 through villagers stays cheap at 14.1 and a calm gallop is unchanged at 4.3
 against a guard.
+
+
+## The rebuild call works; a fixed delay is the wrong trigger for it
+
+Tested at 4.0.1-dev.1, the first build to rebuild a victim after a reaction.
+The rebuild is `entity:Hide(1)` followed immediately by `entity:Hide(0)`, fired
+on a timer measured from the start of the reaction: 5000 ms for a knockdown,
+2000 ms for a stagger.
+
+**User report**: "first npc was woman walking and she took about a second to
+start moving again after getting up, there was a very slight blinking, second
+was woman walking but she is frozen and I'm currently still in game standing
+next to her."
+
+### Four reactions, and the distance each victim covered
+
+`travel` is measured from the impact position and sampled at fixed offsets.
+
+| Victim | Action | Gender | t+3s | t+6s | t+10s |
+| --- | --- | --- | --- | --- | --- |
+| villageGuard | hcm_knockdown_back | male | 0.08 | 6.57 | 10.98 |
+| rat_bailiff_wife | hcm_knockdown_right | female | 0.07 | 0.07 | 2.30 |
+| rat_swordsmiths_wife | hcm_knockdown_forward | female | 0.06 | 0.06 | 0.06 |
+| rat_swordsmiths_wife | hcm_knockdown_forward | female | 0.06 | 0.01 | 0.06 |
+
+Every one of these logged `VictimRebuild ok=true err=nil`. The call being
+accepted says nothing about whether the victim resumed.
+
+### The call is not what failed
+
+The frozen victim was probed live, several minutes after her second impact and
+while still stationary. A `Hide(1)` and `Hide(0)` pair fired by hand at that
+moment moved her **4.17 m in the following five seconds**.
+
+So the same call, on the same victim, in the same session, works when it
+arrives later and does nothing when it arrives at 5000 ms. What separates the
+two is only when it happened relative to the reaction.
+
+### What that means for the trigger
+
+A delay measured from the start of the reaction has to guess the length of the
+fall and the get-up. That length is not constant: it varies by action, and a
+victim hit again while still recovering starts a reaction from a state the
+first one left behind. The victim who never recovered was hit twice, and was
+already frozen from the first impact when the second landed.
+
+Where the delay lands too early the rebuild happens while the animation still
+owns the actor, and the animation takes the body back afterwards, which leaves
+exactly the freeze the rebuild exists to prevent. Where it lands too late the
+victim stands idle for the difference, which is the second-long pause reported
+on the victim who did recover.
+
+The recovering victims bracket the problem rather than contradicting it: the
+male knockdown had covered 6.57 m by t+6s, so 5000 ms was past the end of his
+animation, while the female knockdown had covered 0.07 m at the same offset and
+only reached 2.30 m by t+10s.
+
+### The blink is real
+
+`Hide(1)` and `Hide(0)` issued in the same call, with no timer between them,
+was recorded during earlier work as invisible on screen. Observation at this
+build contradicts that: the recovering victim showed "a very slight blinking".
+The teardown is not free, and hiding the visible NPC is being drawn at least
+once.
+
+### Open question
+
+Whether the reaction's actual end can be read from the engine, so the rebuild
+is triggered by the victim being up rather than by a clock. The alternative is
+a rebuild that verifies its own result and repeats, which treats the symptom.
