@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0-dev.5
+-- @release 4.2.0-dev.6
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0-dev.5"
+HorseCollisionMod.Version = "4.2.0-dev.6"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1711,22 +1711,20 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 			-- the slot rather than to throw them.
 			self:ImpulseVictim(npc, velocity, self.RagdollImpulseScale)
 
-			-- Nothing else follows while the recovery is working, which is
-			-- what the gallop tier does. The rebuild returns only as a
-			-- rescue: on some victims the ragdoll is entered and never
-			-- resolves, and dropping the rebuild dropped the net that used to
-			-- free them.
+			-- The rebuild runs once the ragdoll has resolved, on every
+			-- victim rather than only on one that stalls.
+			--
+			-- Leaving it out was a mistake and the measurement is direct.
+			-- Three victims left standing after a resolved ragdoll were
+			-- tested live: a `daycycle:restartRequest` moved one of them
+			-- 0.00 m and left her in `MotionIdle`, while `entity:Hide(1)`
+			-- followed by `Hide(0)` moved another 4.11 m into
+			-- `MotionMovement`. A victim can leave the ragdoll upright and
+			-- still have no plan, and only the rebuild gives them one.
+			--
+			-- This is the same rebuild the animated get-up needs, for the
+			-- same reason, and it is not specific to how the victim got up.
 			self:WhenRagdollResolves(npc, function(state, waitedForBody)
-				if state == "resolved" then
-					if self.Config.LogTelemetry then
-						self:Log("VictimRecovered action=" .. action
-								.. " waited="
-								.. string.format("%.0f", waitedForBody) .. "ms")
-					end
-
-					return
-				end
-
 				self:FinishRecovery(npc, action, state, waitedForBody)
 			end)
 		end)

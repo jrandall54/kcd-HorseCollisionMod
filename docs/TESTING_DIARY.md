@@ -8883,3 +8883,52 @@ the victim settles where they already were.
   were occupying. This is the gallop's difference, at a fraction of its size.
 - The fraction moves from 0.6 to 0.68, against "if anything, the rag dolls are
   firing ever so slightly too early".
+
+## The rebuild is what gives a recovered victim a plan, and the replan is not
+
+Tested at 4.2.0-dev.5, then measured directly on three victims left standing in
+front of the player.
+
+**User report**: "I only tested the women because I currently have 3 woman stuck
+right in front of me."
+
+### They were not stuck in the ragdoll
+
+Every fall reaction logged `VictimRecovered`, so `BlendRagdoll` was entered and
+left on all of them, at waits between 4.2 and 6.8 seconds. Probed live, the
+three stuck victims read `MotionIdle` and `MotionIdleVAR1`, upright and alive
+with the ragdoll long finished. A fourth victim from the same ride,
+`rat_karolina`, read `MotionMovement` and was walking normally.
+
+So the failure is not a recovery that stalls. It is a victim who completes the
+recovery and then has nothing to do.
+
+### One test each, on two of the three
+
+| Call | Victim | Travel over six seconds | State after |
+| --- | --- | --- | --- |
+| `daycycle:restartRequest` | rat_woman12 | 0.00 m | MotionIdle |
+| `entity:Hide(1)` then `Hide(0)` | rat_woman43 | 4.11 m | MotionMovement |
+
+The third was left untouched as a control and did not move.
+
+The rebuild frees them and the re-plan does nothing at all. That settles a
+question that had been answered by inference twice: the rebuild is not part of
+the animated get-up's cleanup, it is what gives any recovered victim a plan, and
+it is needed whichever way they got up.
+
+Removing it in order to copy the gallop tier was wrong, and the reasoning behind
+it was wrong in an instructive way. The gallop tier does need no rebuild, but
+that is not because the game recovers the victim; it is because a gallop throws
+them far enough that they re-plan on their own. Recovery and re-planning are two
+different things and only one of them was being reasoned about.
+
+### The impulse is not doing what a gallop's does
+
+At a quarter scale the impulse measured 14.5 against a gallop's 24.3, and moved
+victims 0.21, 0.91 and 0.94 m. That is consistent with an earlier finding that
+what throws a body at a gallop is the horse carrying it rather than the impulse,
+and the ragdoll here is created seconds after the horse has gone.
+
+So displacement large enough to force a re-plan is not reachable this way at a
+plausible impulse, and the rebuild reaches the same outcome directly.
