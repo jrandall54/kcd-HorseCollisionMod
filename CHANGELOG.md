@@ -23,6 +23,23 @@ number.
 
 ## [Unreleased]
 
+## [4.2.7] - 2026-08-31
+
+Tooling. The mod is unchanged from 4.2.1.
+
+### Fixed
+
+- 4.2.6 recorded that the changelog endpoint refuses this tool's requests. It
+  does not. The 413 and 502 behind that claim came from a hand-written probe
+  sending different headers and a hand-rolled body, not from the publish path,
+  which posts successfully. The claim is retracted from the changelog and from
+  the tool's own comments.
+
+- The warning that a repeated call appends is stated where it matters. Calling
+  the changelog path twice for one version leaves two entries on the tab and
+  there is no API to remove either.
+
+
 ## [4.2.6] - 2026-08-31
 
 Tooling. The mod is unchanged from 4.2.1.
@@ -37,15 +54,6 @@ Tooling. The mod is unchanged from 4.2.1.
 - A refused changelog no longer looks like a success. The call is reported
   rather than thrown, since the file is published by then and losing that to a
   changelog would be the wrong trade.
-
-### Known
-
-- The changelog endpoint refuses the requests this tool makes. It answers 413 from
-  nginx with a Cloudflare challenge for a 394 byte body, and 502 between
-  attempts, so it is being refused at the edge rather than by the API. No
-  release carries a changelog going back to 3.0.0, so this has never worked.
-  Release notes are pasted into the Changelogs tab by hand.
-
 
 ## [4.2.5] - 2026-08-31
 
