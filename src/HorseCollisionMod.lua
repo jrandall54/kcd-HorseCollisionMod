@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.1.0
+-- @release 5.0.0-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.1.0"
+HorseCollisionMod.Version = "5.0.0-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -130,8 +130,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
 --   in seconds, or 0 to leave victims in the daycycle
--- @field TrotReaction what a trot impact does, "knockdown" for an animated
---   fall or "ragdoll" for the physics knockdown
+-- @field TrotReaction what a trot impact does: "knockdown" for an animated
+--   fall and get-up, "fall" for an animated fall the game recovers from, or
+--   "ragdoll" for the physics knockdown
 -- @field AutoCureHealthLimit health at or above which the auto-cure exemption
 --   is dropped, matching vanilla's own limit
 -- @field ReleaseAnimationMovement take movement control off the animation once
@@ -192,11 +193,21 @@ HorseCollisionMod.Config = {
 	-- in seconds. Zero leaves them in it.
 	SuppressAutoCureSec      = 30,
 
-	-- What a trot impact does. "knockdown" plays an animated fall through
-	-- the same path as the walk stagger and creates no physics body, so it
-	-- cannot incur the trample damage a ragdoll does. "ragdoll" is the
-	-- physics knockdown the mod shipped before.
-	TrotReaction             = "knockdown",
+	-- What a trot impact does.
+	--
+	-- "knockdown" plays an animated fall and an animated get-up through the
+	-- same path as the walk stagger, and creates no physics body, so it
+	-- cannot incur the trample damage a ragdoll does.
+	--
+	-- "fall" plays the same fall and stops there, handing the body to a
+	-- ragdoll once the clip ends so the game recovers the victim the way it
+	-- recovers any fallen actor. The trample the mod moved away from is not a
+	-- risk here, because the ragdoll is created several seconds after the
+	-- impact rather than underneath the horse that caused it.
+	--
+	-- "ragdoll" is the physics knockdown the mod shipped before, created at
+	-- the moment of impact.
+	TrotReaction             = "fall",
 
 	-- Takes movement control off the animation once a reaction has started,
 	-- so the victim is moved by the entity rather than by root motion and
@@ -324,6 +335,22 @@ HorseCollisionMod.SpeedHistorySize = 10
 HorseCollisionMod.ReactionAnimationState = "AnimationControlled"
 HorseCollisionMod.ReactionPollMs = 100
 HorseCollisionMod.ReactionEndCeilingMs = 12000
+
+
+-- How the ragdoll handover is watched, for the tier that hands recovery back
+-- to the game. `GetPhysicalizationProfile` reads `alive` throughout a ragdoll
+-- and cannot be used; the animation state does report `BlendRagdoll`.
+--
+-- The ceiling is generous because this waits on the game's own recovery rather
+-- than on a clip of known length.
+HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
+HorseCollisionMod.RagdollResolveCeilingMs = 15000
+
+
+-- TEMPORARY, for one diagnostic ride. How long the animation state is traced
+-- after an impact. Zero switches it off. Remove with TraceRecovery before this
+-- branch merges.
+HorseCollisionMod.TraceRecoveryForMs = 20000
 
 
 local function GetTimeMs()
@@ -1246,6 +1273,127 @@ function HorseCollisionMod:ReleaseVictimMovement(npc)
 	return ok
 end
 
+--- Runs something once a victim is no longer a settling ragdoll.
+--
+-- `GetPhysicalizationProfile` is not usable for this: measured through a whole
+-- ragdoll sequence it read `alive` from start to finish. The animation state
+-- does report `BlendRagdoll` while the body is being blended back, so that is
+-- what is watched instead.
+--
+-- The state has to be seen before its absence counts, for the same reason the
+-- reaction wait requires it: a poll landing before the ragdoll takes hold
+-- would otherwise report a recovery that has not started as already over.
+--
+-- @tparam table npc victim entity
+-- @tparam function fn called with the reason and the wait in milliseconds
+function HorseCollisionMod:WhenRagdollResolves(npc, fn)
+	local generation = self.TimerTick
+	local startedAt = GetTimeMs()
+	local deadline = startedAt + self.RagdollResolveCeilingMs
+	local seen = false
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local elapsed = GetTimeMs() - startedAt
+
+		if state == self.RagdollAnimationState then
+			seen = true
+		elseif seen then
+			fn("resolved", elapsed)
+
+			return
+		end
+
+		if GetTimeMs() >= deadline then
+			fn(seen and "ceiling" or "neverRagdolled", elapsed)
+
+			return
+		end
+
+		Script.SetTimer(self.ReactionPollMs, poll)
+	end
+
+	Script.SetTimer(self.ReactionPollMs, poll)
+end
+
+--- Rebuilds a victim and sends them back to their activity.
+--
+-- @tparam table npc victim entity
+-- @tparam string action the reaction that played
+-- @tparam string why how the wait before this ended
+-- @tparam number waited how long that wait took, in milliseconds
+function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
+	self:RebuildVictim(npc)
+	self:ReplanVictim(npc)
+
+	if self.Config.LogTelemetry then
+		self:Log("VictimRebuild action=" .. action
+				.. " on=" .. why
+				.. " waited=" .. string.format("%.0f", waited) .. "ms")
+	end
+end
+
+--- Records the animation state through a whole reaction and recovery.
+--
+-- TEMPORARY, for one diagnostic ride. Remove before this branch merges.
+--
+-- The handover being tested has three stages and only the first is under this
+-- mod's control, so the question is what the engine does with the other two.
+-- Sampling the state answers it directly: the clip should show
+-- `AnimationControlled`, the handover `BlendRagdoll`, and a recovery that
+-- worked ends in an ordinary locomotion state.
+--
+-- @tparam table npc victim entity
+-- @tparam string action the reaction being played
+function HorseCollisionMod:TraceRecovery(npc, action)
+	if not self.Config.LogTelemetry or self.TraceRecoveryForMs <= 0 then
+		return
+	end
+
+	local generation = self.TimerTick
+	local startedAt = GetTimeMs()
+	local last = nil
+
+	local function sample()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = "?"
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local elapsed = GetTimeMs() - startedAt
+
+		-- Only transitions are written. A state held for eleven seconds is
+		-- forty-four identical lines otherwise, and the shape of the sequence
+		-- is what matters rather than its sampling rate.
+		if state ~= last then
+			self:Log("RecoveryTrace " .. action
+					.. " t+" .. string.format("%.0f", elapsed)
+					.. "ms state=" .. state)
+			last = state
+		end
+
+		if elapsed < self.TraceRecoveryForMs then
+			Script.SetTimer(self.ReactionPollMs, sample)
+		end
+	end
+
+	Script.SetTimer(self.ReactionPollMs, sample)
+end
+
 --- Sends a victim back to their activity by way of approaching it again.
 --
 -- A smart object reaches its loop through `Move` to the object followed by
@@ -1437,15 +1585,44 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		end)
 	end
 
-	self:WhenReactionEnds(npc, function(why, waited)
-		self:RebuildVictim(npc)
-		self:ReplanVictim(npc)
+	-- TEMPORARY, for one diagnostic ride. Samples the animation state through
+	-- the whole sequence so the handover from clip to ragdoll to recovery can
+	-- be read rather than inferred. Remove before this branch merges.
+	self:TraceRecovery(npc, action)
 
+	self:WhenReactionEnds(npc, function(why, waited)
 		if self.Config.LogTelemetry then
-			self:Log("VictimRebuild action=" .. action
+			self:Log("ReactionEnded action=" .. action
 					.. " on=" .. why
 					.. " waited=" .. string.format("%.0f", waited) .. "ms")
 		end
+
+		-- A fall with no get-up chained to it leaves the victim snapping
+		-- upright when the clip runs out. Handing the body to a ragdoll at
+		-- that moment is what replaces the animated get-up: the game then
+		-- recovers a fallen actor the way it does at gallop, which is a
+		-- recovery that imparts none of the rotation the get-up clips do.
+		--
+		-- No impulse. The victim is already on the ground and the ragdoll is
+		-- here to hold them there until the game picks them up, not to throw
+		-- them.
+		if prefix == "hcm_fall_" then
+			local dropped = pcall(function()
+				npc.actor:Fall({ x = 0, y = 0, z = 0 }, true)
+			end)
+
+			if self.Config.LogTelemetry then
+				self:Log("VictimFall ok=" .. tostring(dropped))
+			end
+
+			self:WhenRagdollResolves(npc, function(state, waitedForBody)
+				self:FinishRecovery(npc, action, state, waitedForBody)
+			end)
+
+			return
+		end
+
+		self:FinishRecovery(npc, action, why, waited)
 	end)
 
 	self:Log("Reaction action=" .. action
@@ -1824,6 +2001,8 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- animation does not carry the impact's momentum.
 		if cfg.TrotReaction == "knockdown" then
 			self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
+		elseif cfg.TrotReaction == "fall" then
+			self:PlayReaction(npc, velocity, speed, "hcm_fall_")
 		else
 			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
 		end
