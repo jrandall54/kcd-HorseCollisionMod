@@ -9222,3 +9222,76 @@ plausible cause of the parking, and it is introduced by this branch.
 
 The tier therefore trades a rotation fault that main has for an activity fault
 that main does not.
+
+## Messages have to be typed tables, and ours have all been empty strings
+
+This is the reason a long list of calls has been recorded as accepted and inert,
+and it is not that the brain cannot be reached.
+
+### Two ways to send a message, and only one carries a payload
+
+```lua
+XGenAIModule.SendMessageToEntity(id, name, "")            -- string values
+XGenAIModule.SendMessageToEntityData(id, name, table)     -- typed payload
+```
+
+`Libs/AI/TypeDefinitions.xml` declares what each message carries:
+
+| Message | Required members |
+| --- | --- |
+| `daycycle:restartRequest` | `reason` enum, `speed` enum |
+| `daycycle:interrupt` | `behaviorSource` wuid, `behaviorName` string, `includeXml`, `includeTree`, `daycycleHaltSpeed` enum, `immediateActivityBeingSwitchedIntoHandle` |
+| `daycycle:progress` | `progress` bool, `behavior` string |
+| `haltContext` | `reason` enum, `speed` enum |
+
+Vanilla builds these with `Utils.makeTable`, which is reachable from Lua and used
+in the game's own scripts:
+
+```lua
+local msg = Utils.makeTable('dog:changeRequest',
+        { newMaster = true, master = player.this.id,
+          newMode = true, mode = enum_dogCompanionMode.free })
+XGenAIModule.SendMessageToEntityData(dog.this.id, "dog:changeRequest", msg)
+```
+
+Every message this project has sent used the string form with `""`, so the
+members arrived unset and the receiving node had nothing to match on. The message
+was delivered and discarded, which is indistinguishable from a call that does
+nothing.
+
+### Measured on the same victim
+
+`rat_merchant_shop1`, parked in `MotionIdle` after a trot collision:
+
+| Form | Travel |
+| --- | --- |
+| `SendMessageToEntity(id, 'daycycle:restartRequest', '')` | 0.00 m |
+| `SendMessageToEntityData` with `reason=interrupt, speed=instant` | **3.94 m** |
+
+The typed message re-planned him and he walked back to his stall. The string
+form had been tried repeatedly across this branch and never moved anyone.
+
+The enums are globals: `enum_daycycleHaltReason` is
+`unknown 0, combat 1, death 2, interrupt 3, situation 4`, and
+`enum_daycycleHaltSpeed` is `slow 0, fast 1, instant 2`.
+
+### What this does not explain
+
+`human:StopAnim` takes no payload and is still inert, so it belongs to a
+different category. Registration in the decompiled binary is identical to
+working calls such as `GetHorse` and `IsMounted`, so the difference is in the
+body rather than the binding. The working set is physics, stats and entity
+transforms, none of which the animation system re-asserts every frame; the inert
+set is animation control on an actor a behavior tree owns, which it does.
+
+### Interfaces present at runtime and absent from the bind reference
+
+Taken from a dump of the live Lua state rather than from the registration list:
+`XGenAIModule.MakeTableFromType`, `SendMessageToEntityData`, `SetBrainVariable`,
+`_GetDataVariable` and `_SetDataVariable`. `SetBrainVariable` has never been
+used by this project and is the one genuine write into an NPC's brain that is
+known to exist.
+
+`AbortAllAnimations` is confirmed as `wh::xgenaimodule::BehaviorTree::C_AbortAllAnimations`,
+a tree node class with no Lua entry point, so it is reachable only by a tree
+that runs it.
