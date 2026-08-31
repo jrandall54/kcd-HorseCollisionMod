@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.0.0
+-- @release 4.1.0-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.0.0"
+HorseCollisionMod.Version = "4.1.0-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -136,6 +136,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   is dropped, matching vanilla's own limit
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
+-- @field RebuildVictim turn a victim off and on again once their reaction has
+--   finished, so their own behavior reattaches to their body
+-- @field RebuildDelayStaggerMs how long after a stagger begins the rebuild
+--   happens, in milliseconds
+-- @field RebuildDelayKnockdownMs how long after a knockdown begins the rebuild
+--   happens, in milliseconds
 -- @field LogTelemetry write diagnostics to kcd.log
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @table Config
@@ -201,6 +207,17 @@ HorseCollisionMod.Config = {
 	-- stops being carried through walls. False restores the behavior before
 	-- this, where a stagger beside a building could end inside it.
 	ReleaseAnimationMovement = true,
+
+	-- Turns a victim off and on again once their reaction has finished, so
+	-- their own behavior reattaches to the body the animation left behind.
+	RebuildVictim            = true,
+
+	-- How long after a reaction begins the rebuild happens. Too early cuts
+	-- the animation short; too late leaves the victim standing idle for the
+	-- difference. Separate per tier because a stagger is over in about a
+	-- second and a knockdown runs several times longer.
+	RebuildDelayStaggerMs    = 2000,
+	RebuildDelayKnockdownMs  = 5000,
 
 	-- The health at or above which a victim is no longer a candidate for
 	-- vanilla's auto-cure daycycle. Vanilla's own limit is 40, declared as
@@ -1204,6 +1221,42 @@ function HorseCollisionMod:ReleaseVictimMovement(npc)
 	return ok
 end
 
+--- Rebuilds a victim so their own behavior reattaches to their body.
+--
+-- An animated reaction hands the victim's body to the animation, and their
+-- behavior is never told. The reaction ends with the body standing where it
+-- fell while the victim's own idea of where they are carries on elsewhere, and
+-- the two only rejoin the next time the engine rebuilds the actor. A player
+-- triggers that by looking away and back, which drops the NPC to a level of
+-- detail the engine repositions them from; until then the victim stands still
+-- and then appears to teleport.
+--
+-- `entity:Hide(1)` followed immediately by `entity:Hide(0)` forces that
+-- rebuild. Both calls are made together, with no timer between them: the
+-- teardown happens on the call rather than over elapsed time, so the actor is
+-- rebuilt without ever missing a frame of rendering. Separating them by even
+-- twenty milliseconds is visible as a blink and buys nothing.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true when the calls were accepted without error
+function HorseCollisionMod:RebuildVictim(npc)
+	if type(npc.Hide) ~= "function" then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		npc:Hide(1)
+		npc:Hide(0)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("VictimRebuild ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
+
 --- Plays one of this mod's reactions on a victim.
 --
 -- Calls `actor:StartInteractiveActionByName` with a name this mod adds to the
@@ -1255,6 +1308,28 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		Script.SetTimer(50, function()
 			self:ReleaseVictimMovement(npc)
 		end)
+	end
+
+	-- Timed from the start of the reaction rather than from its end, because
+	-- nothing here reads whether the victim is still on the ground. The delay
+	-- has to clear the whole fall and get-up: rebuilding partway through cuts
+	-- the animation, and every millisecond past the end is time the victim
+	-- spends standing idle before their behavior resumes.
+	if self.Config.RebuildVictim then
+		local delay = self.Config.RebuildDelayKnockdownMs
+
+		if prefix == "hcm_stagger_" then
+			delay = self.Config.RebuildDelayStaggerMs
+		end
+
+		Script.SetTimer(delay, function()
+			self:RebuildVictim(npc)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("VictimRebuild scheduled action=" .. action
+					.. " delay=" .. tostring(delay) .. "ms")
+		end
 	end
 
 	self:Log("Reaction action=" .. action

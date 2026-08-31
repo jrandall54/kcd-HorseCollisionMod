@@ -23,6 +23,24 @@ number.
 
 ## [Unreleased]
 
+## [4.1.0-dev.1] - 2026-08-31
+
+### Fixed
+
+- NPCs no longer freeze where they fell and then jump somewhere else. An
+  animated reaction hands a victim's body to the animation and their own
+  behavior is never told, so the reaction ended with the body standing still
+  while their thoughts carried on somewhere across the street. The two only
+  rejoined when something forced the game to rebuild them, which in practice
+  meant looking away and back. Affects 4.0.0, and is why victims sometimes
+  appeared to teleport.
+
+### Added
+
+- `RebuildVictim`, `RebuildDelayStaggerMs` and `RebuildDelayKnockdownMs`
+  control that recovery and how long each reaction is given before it happens.
+  All have working defaults and nothing needs configuring.
+
 ## [4.0.0] - 2026-08-30
 
 Major because a trot collision no longer does what it did in 3.0.1, and what a
