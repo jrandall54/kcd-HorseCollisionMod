@@ -23,6 +23,33 @@ number.
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-08-31
+
+### Fixed
+
+- A trot victim is recovered by the game rather than by an animated get-up.
+  The get-up clips turn the body as they play, by a fixed amount per direction,
+  and that rotation is what left an innkeeper leaning into his wall from the
+  wrong side. The fall is unchanged; what follows it is now the same recovery
+  a gallop victim gets. `TrotReaction` gains a third value, `"fall"`, which is
+  the new default; `"knockdown"` restores the animated get-up.
+
+### Added
+
+- `TrotReaction` accepts `"fall"`, which is the new default. `"knockdown"`
+  restores the animated get-up and `"ragdoll"` the physics knockdown.
+
+### Known issues
+
+- An NPC whose day is anchored to something, a beggar at his spot, a drinker
+  leaning on a wall or a merchant left standing at his stall, may not go back
+  to it after a trot collision. They stand where they got up until something
+  reloads them, which in play means walking away and coming back. Anyone who
+  walks as part of their day, which is most people, is unaffected. Set
+  `TrotReaction` to `"knockdown"` to avoid it at the cost of the older
+  get-up, which turned victims as it played.
+
+
 ## [4.1.0] - 2026-08-31
 
 ### Fixed

@@ -122,7 +122,7 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.1.0</li>
+        <li><strong>Release</strong>: 4.2.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -210,6 +210,14 @@
 	<td class="summary">Stops the animation driving a victim's own movement.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#WhenRagdollResolves">WhenRagdollResolves (npc, fn)</a></td>
+	<td class="summary">Runs something once a victim is no longer a settling ragdoll.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#FinishRecovery">FinishRecovery (npc, action, why, waited)</a></td>
+	<td class="summary">Rebuilds a victim and sends them back to their activity.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#ReplanVictim">ReplanVictim (npc)</a></td>
 	<td class="summary">Sends a victim back to their activity by way of approaching it again.</td>
 	</tr>
@@ -228,6 +236,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#Ragdoll">Ragdoll (npc, velocity, speed, impulseScale)</a></td>
 	<td class="summary">Knocks a victim down with a physics ragdoll.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#ImpulseVictim">ImpulseVictim (npc, velocity, impulseScale)</a></td>
+	<td class="summary">Pushes a victim who is already a physics body.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#IsCombatCollision">IsCombatCollision (npc)</a></td>
@@ -1046,6 +1058,73 @@
 
 </dd>
     <dt>
+    <a name = "WhenRagdollResolves"></a>
+    <strong>WhenRagdollResolves (npc, fn)</strong>
+    </dt>
+    <dd>
+    Runs something once a victim is no longer a settling ragdoll. </p>
+
+<p> <code>GetPhysicalizationProfile</code> is not usable for this: measured through a whole
+ ragdoll sequence it read <code>alive</code> from start to finish. The animation state
+ does report <code>BlendRagdoll</code> while the body is being blended back, so that is
+ what is watched instead.</p>
+
+<p> The state has to be seen before its absence counts, for the same reason the
+ reaction wait requires it: a poll landing before the ragdoll takes hold
+ would otherwise report a recovery that has not started as already over.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">fn</span>
+            <span class="types"><span class="type">function</span></span>
+         called with the reason and the wait in milliseconds
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "FinishRecovery"></a>
+    <strong>FinishRecovery (npc, action, why, waited)</strong>
+    </dt>
+    <dd>
+    Rebuilds a victim and sends them back to their activity.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">action</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the reaction that played
+        </li>
+        <li><span class="parameter">why</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         how the wait before this ended
+        </li>
+        <li><span class="parameter">waited</span>
+            <span class="types"><span class="type">number</span></span>
+         how long that wait took, in milliseconds
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "ReplanVictim"></a>
     <strong>ReplanVictim (npc)</strong>
     </dt>
@@ -1246,6 +1325,39 @@
         <li><span class="parameter">speed</span>
             <span class="types"><span class="type">number</span></span>
          horse speed in meters per second
+        </li>
+        <li><span class="parameter">impulseScale</span>
+            <span class="types"><span class="type">number</span></span>
+         multiplier on the configured impulse, 0 to 1
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "ImpulseVictim"></a>
+    <strong>ImpulseVictim (npc, velocity, impulseScale)</strong>
+    </dt>
+    <dd>
+    Pushes a victim who is already a physics body. </p>
+
+<p> Separated from <a href="index.html#Ragdoll">Ragdoll</a> because the fall tier ragdolls the victim itself,
+ partway through an animation rather than at the moment of impact, and needs
+ the push without the rest.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">velocity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse velocity vector
         </li>
         <li><span class="parameter">impulseScale</span>
             <span class="types"><span class="type">number</span></span>
@@ -1689,8 +1801,9 @@
    in seconds, or 0 to leave victims in the daycycle
         </li>
         <li><span class="parameter">TrotReaction</span>
-         what a trot impact does, "knockdown" for an animated
-   fall or "ragdoll" for the physics knockdown
+         what a trot impact does: "knockdown" for an animated
+   fall and get-up, "fall" for an animated fall the game recovers from, or
+   "ragdoll" for the physics knockdown
         </li>
         <li><span class="parameter">AutoCureHealthLimit</span>
          health at or above which the auto-cure exemption
@@ -1955,7 +2068,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-08-31 11:14:15 </i>
+<i style="float:right;">Last updated 2026-08-31 14:06:44 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

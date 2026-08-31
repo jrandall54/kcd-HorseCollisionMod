@@ -246,6 +246,29 @@ REACTIONS = [
     ("hcm_knockdown_right",
      ("relaxed_death_walk_right_01", "getup_ground_right"), BOTH),
 
+    # The same four falls with no get-up chained to them, for the tier that
+    # hands recovery back to the game instead of animating it.
+    #
+    # Measured, the rotation a knockdown leaves behind is a constant per
+    # action: +53 forward, +90 back, -176 left and zero right. Right is paired
+    # the same way left is and imparts nothing, so the rotation lives in the
+    # get-up rather than in the fall or in the chaining. Dropping the get-up
+    # drops the rotation with it, and the falls are kept untouched because a
+    # comparison of all eighteen shared fall clips found these four to be the
+    # best available.
+    #
+    # Recovery is not chained here, by the fragment or otherwise. The ragdoll
+    # settle layer cannot do it: measured on this exact shape, a fall with no
+    # get-up and the settle layer present, the actor left the animation before
+    # three seconds, stood up, and was only taken by the ragdoll two seconds
+    # after that. The layer arrives too late to catch a fall however its
+    # ExitTime is set, so it is left disabled and recovery is driven from Lua
+    # against the animation state instead.
+    ("hcm_fall_forward", "relaxed_death_walk_front_01", BOTH),
+    ("hcm_fall_back", "relaxed_death_walk_back_01", BOTH),
+    ("hcm_fall_left", "relaxed_death_walk_left_01", BOTH),
+    ("hcm_fall_right", "relaxed_death_walk_right_01", BOTH),
+
     # The recovery half of the knockdown. Without one the fall clip ends and
     # the victim snaps upright, which reads as a break rather than a get-up.
     # Both character sets carry all four.
@@ -582,7 +605,8 @@ def write_parent(gender, paths, nl):
                          % (gender, missing))
 
     options = nl.join(
-        render_option(tag, clip, nl, settle=tag.startswith(("hcm_knockdown_", "hcm_pb_")))
+        render_option(tag, clip, nl,
+                      settle=tag.startswith(("hcm_knockdown_", "hcm_pb_")))
         for tag, clip in wanted)
 
     existing = re.search(

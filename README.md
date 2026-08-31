@@ -78,6 +78,7 @@ breaking the mod. Deleting a line restores its default.
 | `StaminaDrainWalk` | 0.0 | Stamina removed per NPC at walking pace. |
 | `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
+| `TrotReaction` | "fall" | What a trot impact does. `"fall"` plays an animated fall the game recovers from, `"knockdown"` adds an animated get-up, `"ragdoll"` is the physics knockdown. |
 | `ReleaseAnimationMovement` | true | Keeps a reacting victim out of walls and out of sloped ground. False restores the behavior before 4.0.0. |
 | `ReplanAfterReaction` | true | Whether a victim walks back to whatever they were using, which is what puts them straight with it again. |
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |

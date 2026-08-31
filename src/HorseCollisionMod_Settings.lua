@@ -59,7 +59,9 @@ HorseCollisionModSettings = {
 	-- Set it to 0 to restore the behavior 3.0.0 shipped with, lockup
 	-- included.
 	SuppressAutoCureSec      = 30,   -- exempt victims from the auto-cure daycycle
-	TrotReaction             = "knockdown", -- "knockdown" or "ragdoll"
+	TrotReaction             = "fall",
+	         -- "fall" is an animated fall the game recovers from,
+	         -- "knockdown" adds an animated get-up, "ragdoll" is physics
 	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
 	-- Switches.

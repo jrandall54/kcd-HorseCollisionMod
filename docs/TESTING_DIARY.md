@@ -8632,3 +8632,593 @@ Open, and now well specified: three of the four knockdown pairings carry a fixed
 rotation and one carries none. The work is in the animation data, in the choice
 of get-up paired with each fall, and `hcm_knockdown_right` is a working example
 sitting in the same database.
+
+
+## Handing recovery to the game works, and lands the ragdoll too late
+
+Tested at 4.2.0-dev.1 after a full game restart, which the new fall-only
+fragments require. Five trot impacts.
+
+**User report**: "There is a gap between when the animation ends and the the
+visible rag doll starts, but everyone gets up much more naturally once it takes
+over and looks much better. Also beggars and innkeepers do not return to begging
+and lean animations after impact and they just stand in place after, but the
+merchants seem to not have a problem getting back into their pacing schedules
+around their attached booths."
+
+### The recovery itself is better
+
+Dropping the get-up clip removes the rotation it imparted, and the game's own
+recovery reads as more natural than the animated one it replaces. That is the
+approach confirmed: the fall is worth keeping and the get-up was not.
+
+### Firing at the end of the clip is the wrong moment
+
+The ragdoll is currently triggered when the animation state leaves
+`AnimationControlled`, which is the end of the whole fall clip. A fall clip does
+not end when the victim reaches the ground; it ends after they have reached it
+and settled into the clip's final pose, and the difference is the visible gap.
+
+The correct moment is ground contact, which is earlier and differs per clip.
+Handing a body to physics while it is already prone is invisible; handing it
+over after a pause is not.
+
+### A regression on activity NPCs that do not walk
+
+Beggars and innkeepers no longer return to their begging and leaning animations
+at all, where under the animated get-up they returned but faced the wrong way.
+Merchants are unaffected and resume their rounds.
+
+The split is the same one found earlier: a merchant walks back to his booth and
+a beggar does not walk anywhere. The difference now is that the ones who do not
+walk fail to re-enter their animation rather than entering it turned. Something
+about the state a ragdoll recovery leaves an actor in prevents the smart object
+from taking them back, where the animated get-up did not.
+
+This is a cost of the change and it has to be answered before the tier ships as
+a default.
+
+### The proposal being taken up
+
+From the user: "the rag doll should fire the moment the NPC finally hits the
+ground which would be different for every animation since they have different
+lengths and times till NPC hits the ground."
+
+Rather than four hand-tuned constants, ground contact is observable the same way
+the end of a reaction turned out to be. The victim's height is sampled while the
+fall plays and the ragdoll is handed the body once that height stops falling,
+which adapts to the clip, the character set and the ground underneath without
+any figure being fixed in advance. A per-action ceiling remains as a fallback for
+the case where the height cannot be read at all, and every sample is logged so
+that case is recognized rather than guessed at.
+
+## Every direction shared one ragdoll timing, and the table looked full
+
+Tested at 4.2.0-dev.2, eight to ten trot impacts across both character sets and
+all four directions.
+
+**User report**: "sometimes it fires too early and it looks like a lifeless
+puppet, sometimes it fires right now and looks pretty natural and others its
+late and seem like they kick and go limp after already falling."
+
+### The cause is a table lookup that missed
+
+`GetImpactDir` returns the engine's vocabulary, `so_left`. The option name is
+built by stripping that prefix, but the per-direction timing table was indexed
+with the unstripped value, so every lookup missed and fell through to the
+forward default. The log names it plainly: `hcm_fall_left at=1300ms`, where the
+table holds 1200 for left.
+
+So all four directions and both character sets ran on one figure, which is
+exactly the report: with a single timing against clips that run from 1.75 to 4.2
+seconds, some land early, some land right and some land late.
+
+The user's conclusion that every gender and direction needs its own timing
+stands. What was not true is that four timings had been tried; one had.
+
+Worth generalizing: a Lua table lookup that misses returns nil silently, and a
+fallback written for robustness then hides it. The value used is now logged next
+to the action, which is the only reason this was visible at all.
+
+## The rebuild fires, and does not restore an activity NPC
+
+Thirty recoveries reported `VictimRebuild on=resolved`, so the ragdoll was seen
+to resolve and the entity rebuild ran on every one. Beggars and innkeepers still
+stood inert afterwards while merchants resumed normally.
+
+**User report**: "when I left the area and came back they were back in their
+animations. same behavior confirmed for the innkeeper."
+
+So the teardown the engine performs when a player leaves and returns does
+restore these NPCs, and `entity:Hide(1)` followed immediately by `entity:Hide(0)`
+does not, despite being the call that was found to fix the original freeze.
+
+The difference between the two is time. The engine's own teardown and rebuild
+are separated by however long the player was away; the mod's are separated by
+nothing at all.
+
+The first thing being tried is ordering rather than duration: the re-plan is now
+sent 600 ms after the rebuild instead of in the same frame, on the reasoning
+that a brain being torn down and remade is the wrong one to ask to choose an
+activity. If that is not enough, a gap between the two `Hide` calls is the next
+variable, and it costs the visible blink that the zero-gap version was chosen to
+avoid.
+
+## The gallop tier works because it does nothing afterwards
+
+Tested at 4.2.0-dev.3, roughly a dozen trot impacts plus one gallop.
+
+**User report**, and the observation the branch turns on: "I hit one with a
+gallop, knocked him way out of position and when he got up he immediately
+starting walking towards another (different than original) begging spot in the
+market and put himself in the beggin annimation. So, how is there a difference
+between how the gallop transitions the NPCs and how we are doing it?"
+
+Also reported: beggars keep barking while stuck standing, though spaced further
+apart than normal, so the brain is running rather than halted; and a beggar who
+was reset by the player leaving and returning came back into the animation but
+at neither the original position nor the original facing.
+
+### Three things the trot tier does that the gallop tier does not
+
+Read from the log, per impact:
+
+| Step | Gallop | Trot fall |
+| --- | --- | --- |
+| `SetMovementControlledByAnimation(false)` | no | yes, and never restored |
+| `entity:Hide(1)` / `Hide(0)` rebuild | no | yes |
+| `daycycle:restartRequest` | no | yes |
+
+A gallop impact emits `actor:Fall` and an impulse and nothing else. The game
+recovers the victim, and the observation above shows it also returns them to
+their day, choosing a replacement begging spot when the original was no longer
+suitable. That is a better outcome than anything this mod has produced by
+hand.
+
+The user's question about the rebuild is the right one: it exists to hand a body
+back after an animated get-up the mod held to the end. Where the game owns the
+recovery there is nothing to hand back, and performing a teardown on an actor
+the engine is in the middle of recovering is a plausible cause of the recovery
+not completing.
+
+**Movement control being released and never restored is the more serious of the
+three.** It is the exact condition the original freeze was traced to: the actor
+left on entity-driven movement while its behavior runs elsewhere. That fits the
+report precisely, since a beggar continuing to bark while standing inert is a
+brain that is running and a body that is not following it.
+
+### The change
+
+For the fall tier only: movement control is handed back immediately before
+`actor:Fall`, so the actor reaches physics in the state it would have been in
+untouched, and neither the rebuild nor the re-plan runs at all. Beyond the
+handover the tier now does exactly what the gallop tier does, which is nothing.
+
+Releasing control during the fall is kept, since that is what stops the clip
+carrying its victim through a wall, and it is only held for the length of the
+fall now rather than forever.
+
+### Clip lengths, measured
+
+Fifty-six reactions, grouped by character set and direction. Within a group the
+spread is under fifty milliseconds, so a clip's length belongs to the clip.
+
+| Direction | Male | Female |
+| --- | --- | --- |
+| back | 1696-1744 | 1856-1936 |
+| forward | 2384-2464 | 3312-3376 |
+| left | 4064-4160 | 2016 |
+| right | 3008-3104 | 2320-2352 |
+
+Left is the pair that differs most between the sets, at 4.1 seconds against 2.0,
+which is why a single timing could not serve both.
+
+The ragdoll now fires at a fraction of the measured length rather than at a
+figure per direction. That leaves one number to tune instead of eight, on the
+reasoning that these clips share an authoring convention and land at about the
+same point in their own length. The starting fraction is 0.6.
+
+## The ragdoll always fires; on some victims it never resolves
+
+Tested at 4.2.0-dev.4. Twenty-two reactions across both character sets.
+
+**User report**: "on some of the woman the freeze occured and my gut tells me you
+forgot to get rid of the get up animation we had before because on those ones
+that freeze, I don't think I see the rag doll even firing at all."
+
+### The ragdoll fires on every one
+
+Every `hcm_fall_*` reaction logged a matching `VictimFall`, at the timing its
+character set and direction call for, and every trace reached `BlendRagdoll`.
+The only reaction with no ragdoll was a walk stagger, which is correct.
+
+So the freeze is not a reaction falling back to the old two-clip setup. It is
+the opposite: the ragdoll arrives and **does not resolve**. Two traces end at
+`BlendRagdoll` with the twenty second window run out, meaning the victim was
+still a settling body when observation stopped.
+
+Distance covered ten seconds after impact names the victims:
+
+| Victim | Travel per impact |
+| --- | --- |
+| rat_woman34 | 1.08, 0.80, 0.24, 0.19, 0.24, 0.84 |
+| rat_woman35 | 0.32 |
+| rat_guard24 | 0.00 |
+| rat_refugee_vojcek | 0.43, 4.20 |
+| rat_refugee_beranMr | 0.44, 2.83 |
+
+`rat_woman34` is the repeat case and matches the report of one type of woman.
+
+**The cause is the safety net being removed rather than the ragdoll being
+wrong.** Copying the gallop tier meant dropping the rebuild, and the rebuild was
+also what eventually freed a victim whose recovery stalled. A gallop victim has
+no such net either, but a gallop victim is thrown clear, and being thrown clear
+turns out to be what makes the difference.
+
+### Displacement is what returns an NPC to their day
+
+Three observations now say the same thing.
+
+- A merchant walks back to his booth and re-acquires it correctly.
+- A beggar hit at a trot is not displaced and stays standing indefinitely.
+- **User report**: "the beggars on trot seemed stuck at standing, and then I
+  galloped into them a few times and they seemed to snap out of it and reorient
+  themselves somewhere else."
+
+The user's note that a freed beggar chooses a different spot rather than the
+original is the useful part: the NPC is not resuming an interrupted activity, it
+is planning a new one, and planning is what a victim still standing on their own
+slot never does.
+
+A gallop differs from a trot fall in exactly one relevant way, which is that it
+carries an impulse. The trot fall hands the body to physics with none at all, so
+the victim settles where they already were.
+
+### The three changes under test
+
+- A bounded safety net returns, firing only when the ragdoll fails to resolve
+  within the ceiling. In the ordinary case the tier still does nothing, which is
+  what the gallop tier does.
+- The ragdoll carries a small impulse, so a victim is moved off the slot they
+  were occupying. This is the gallop's difference, at a fraction of its size.
+- The fraction moves from 0.6 to 0.68, against "if anything, the rag dolls are
+  firing ever so slightly too early".
+
+## The rebuild is what gives a recovered victim a plan, and the replan is not
+
+Tested at 4.2.0-dev.5, then measured directly on three victims left standing in
+front of the player.
+
+**User report**: "I only tested the women because I currently have 3 woman stuck
+right in front of me."
+
+### They were not stuck in the ragdoll
+
+Every fall reaction logged `VictimRecovered`, so `BlendRagdoll` was entered and
+left on all of them, at waits between 4.2 and 6.8 seconds. Probed live, the
+three stuck victims read `MotionIdle` and `MotionIdleVAR1`, upright and alive
+with the ragdoll long finished. A fourth victim from the same ride,
+`rat_karolina`, read `MotionMovement` and was walking normally.
+
+So the failure is not a recovery that stalls. It is a victim who completes the
+recovery and then has nothing to do.
+
+### One test each, on two of the three
+
+| Call | Victim | Travel over six seconds | State after |
+| --- | --- | --- | --- |
+| `daycycle:restartRequest` | rat_woman12 | 0.00 m | MotionIdle |
+| `entity:Hide(1)` then `Hide(0)` | rat_woman43 | 4.11 m | MotionMovement |
+
+The third was left untouched as a control and did not move.
+
+The rebuild frees them and the re-plan does nothing at all. That settles a
+question that had been answered by inference twice: the rebuild is not part of
+the animated get-up's cleanup, it is what gives any recovered victim a plan, and
+it is needed whichever way they got up.
+
+Removing it in order to copy the gallop tier was wrong, and the reasoning behind
+it was wrong in an instructive way. The gallop tier does need no rebuild, but
+that is not because the game recovers the victim; it is because a gallop throws
+them far enough that they re-plan on their own. Recovery and re-planning are two
+different things and only one of them was being reasoned about.
+
+### The impulse is not doing what a gallop's does
+
+At a quarter scale the impulse measured 14.5 against a gallop's 24.3, and moved
+victims 0.21, 0.91 and 0.94 m. That is consistent with an earlier finding that
+what throws a body at a gallop is the horse carrying it rather than the impulse,
+and the ragdoll here is created seconds after the horse has gone.
+
+So displacement large enough to force a re-plan is not reachable this way at a
+plausible impulse, and the rebuild reaches the same outcome directly.
+
+## Five interventions on a stuck beggar, all inert
+
+A beggar left standing after a trot fall was held in that state and tested
+directly, one call at a time, measuring travel and animation state afterwards.
+Untouched beggars nearby read `Beggar` throughout, so the state was specific to
+the victim rather than to the time of day.
+
+| Intervention | Travel | State after |
+| --- | --- | --- |
+| `entity:Hide(1)` then `Hide(0)`, same call | 0.00 m | MotionIdle |
+| The same pair with a 400 ms gap | 0.00 m | MotionIdle |
+| `actor:Fall`, no impulse | 0.66 m | MotionIdle |
+| `actor:Fall` with an impulse of 70 | 1.71 m | MotionIdle |
+| `SetWorldPos` 4.5 m away, then `daycycle:restartRequest` | 4.47 m | MotionIdle |
+
+None returned him to begging.
+
+The last row matters most because it is vanilla's own teleport recovery, the
+pairing used in `hasteInstruction_teleportBase.lua`, and because it removes
+displacement as the explanation. He was moved four and a half meters clear of
+his spot and re-planned, and still did nothing.
+
+The impulse row confirms the earlier finding from another direction: 70 of
+impulse moved a free body 1.71 m, so what throws a victim at a gallop is the
+horse carrying them and not the impulse. Displacement of the size a gallop
+produces is not reachable from a ragdoll created after the horse has gone.
+
+### A stuck beggar and a stuck villager are not the same failure
+
+Both read `MotionIdle`, upright, with the ragdoll long resolved. The difference
+is what frees them: hiding and showing a stuck villager moved her 4.11 m into
+`MotionMovement`, and the identical call on the beggar moved him nothing at all.
+
+So the rebuild does not restore an activity. It restores an NPC who had no
+activity to return to.
+
+### What is left
+
+Two things free a beggar and neither is understood: the player leaving the area
+and returning, and a fresh gallop impact.
+
+A gallop may not be curing anything. It hits a beggar who is still in `Beggar`
+rather than one already stuck, and it may simply be a path that never creates
+the problem. Under that reading the question is not what a gallop does
+afterwards but what the trot fall does that a gallop does not.
+
+Three differences were identified between the two paths. The impulse is now
+removed, and movement control is handed back before the ragdoll. **One remains
+untested: the trot fall releases movement control for the length of the fall
+and a gallop never touches it at all.**
+
+## The movement control release is not what breaks an activity NPC
+
+Tested at 4.2.0-dev.7 with `ReleaseAnimationMovement` off, which is the last
+structural difference between the trot fall path and the gallop path.
+
+**User report**: "Beggar goes through the wall and stands up and stays there and
+doesn't return. nothing else to report."
+
+Going through the wall is the setting being off and is expected. Not returning
+is the answer: taking the release away does not restore the beggar, so it was
+never the cause. The setting is back on.
+
+That exhausts the differences between the two paths. The impulse was removed,
+movement control is handed back before the ragdoll, and the release itself is now
+ruled out.
+
+### A correction to the previous entry
+
+A beggar observed back in `Beggar` without intervention had not recovered on his
+own; the user had reloaded a save. Nothing about a stuck beggar improves with
+time. The recovery trace, extended to two minutes, holds `MotionIdle` and
+`MotionIdleVARdefault` past a hundred seconds.
+
+### The context tables, compared
+
+`Contexts.GetDataTable` reads what options an entity carries. Between a stuck
+beggar and a healthy one the only difference was:
+
+```
+stuck     suppressAutoCure: HorseCollisionMod=false
+healthy   suppressAutoCure:
+```
+
+`false` means the option is not active, and `Contexts.ClearOption` refused it for
+exactly that reason: "doesn't have the 'suppressAutoCure' option active with
+handle 'HorseCollisionMod'". So this is a residual key rather than a live option,
+and clearing it moved the victim 0.00 m. Not the cause, and recorded so the same
+difference is not chased again.
+
+### Everything that does not free a stuck activity NPC
+
+Measured on beggars held in the stuck state, each tried on its own:
+
+`entity:Hide(1)`/`Hide(0)` together, the same pair with a 400 ms gap,
+`actor:Fall` with no impulse, `actor:Fall` with an impulse of 70, `SetWorldPos`
+4.5 m away followed by `daycycle:restartRequest`, `Contexts.ClearOption`, and
+turning off the movement control release for the whole reaction.
+
+Every one left the victim in `MotionIdle` having travelled at most the distance
+the call itself moved them. Only a save load restores them.
+
+### Where that leaves the tier
+
+The fall tier is better than the animated get-up for ordinary NPCs and worse for
+activity NPCs. Under the animated get-up a beggar and an innkeeper returned to
+their animations, facing the wrong way; under the fall tier they do not return at
+all. That is a regression against what `main` ships, and the tier cannot take the
+default while it stands.
+
+## A stuck beggar is a behavior tree waiting for an animation that was destroyed
+
+This is what makes an activity NPC's `MotionIdle` different from a villager's,
+and it was found by reading `so_beggarworkplace.xml` rather than by testing.
+
+### The shape of the beggar's tree
+
+```
+FuseBox
+  Child: LuaWrapper(SetNonpersistentOption suppressDudeProxBark_greet, 'begging')
+    Sequence
+      AddLink usedSO -> the workplace
+      InstantSendMessageToNPC daycycle:behavior:progress
+      IfCondition tag == '' -> RandomGate -> beggarLaying or beggarKneeling
+      LODGuardian
+        Detail
+          Sequence
+            PlayAnimation 'Beggar'
+            ...
+            PlayAnimation 'BeggarOut'
+            AnimationEventWait Id='animation' Event='LogicalEnd'
+  OnFail
+    Sequence
+      RemoveLink usedSO
+      SuppressFailure
+```
+
+Two things follow.
+
+**The link is released only on failure.** `RemoveLink usedSO` sits in the
+FuseBox's `OnFail` branch, so it runs when the child fails and at no other time.
+
+**The child cannot fail; it waits.** The sequence ends in `AnimationEventWait`
+for a `LogicalEnd` event. An interactive action seizes the body and the animation
+that would have raised that event no longer exists, so the node neither succeeds
+nor fails. The tree parks there permanently.
+
+That is the whole difference. A villager's `sa_` activity is issuing movement and
+re-evaluating; a beggar's `so_` tree is blocked on an event that will never come.
+It also matches the independent finding recorded earlier for
+`sb_switch_hitreactions`, whose handler stalls the same way on an animation that
+never completes.
+
+### Why everything tried so far failed
+
+Nothing that was tried touches a parked tree node. Brain variables are identical
+between a stuck and a healthy beggar because the block is in tree execution
+rather than in brain state; the context tables match for the same reason;
+`daycycle:restartRequest`, `daycycle:interrupt` and `daycycle:change` are
+messages the parked node is not listening for; and `entity:Hide` rebuilds the
+entity while the tree state survives. A save load works because the tree is
+instantiated afresh.
+
+### The LODGuardian is the way out, and it is verified
+
+`LODGuardian` plays the animation in its `Detail` branch and substitutes a plain
+wait in the `LOD` branch. Moving an NPC into the LOD branch therefore abandons
+the Detail sequence and the parked `AnimationEventWait` with it. That is exactly
+what the player leaving the area does.
+
+Tested on a beggar held in the stuck state, by narrowing the AI level of detail
+distances so he fell outside `Detail`, then restoring them four seconds later:
+
+```
+[L] forced LOD distances low
+[L] restored LOD distances
+[L] kunes after LOD flip travel=0.00 state=BeggarVAR
+```
+
+He returned to begging without moving, having been inert through seven earlier
+interventions. The mechanism is confirmed.
+
+### What a fix has to be
+
+`WH_AI_LOD_DistanceMin` and `WH_AI_LOD_DistanceMax` are global, so flipping them
+degrades every NPC in the world for the duration and cannot ship. Two directions
+follow from the same understanding:
+
+- **Per-entity.** `WH_AI_LOD_Override` exists and its argument form is not yet
+  known. If the level of detail can be forced on one actor, the flip becomes
+  local and the fix is a few lines.
+- **Prevent rather than repair.** The tree parks because the animation it waits
+  on is destroyed without failing. Anything that makes that node fail instead
+  reaches `OnFail`, which releases the link and lets the tree recover on its own,
+  which is what vanilla intends.
+
+## Vanilla's own abort is a tree node, and Lua has no equivalent
+
+Following the parked-node finding, the question became what makes the parked
+`AnimationEventWait` fail, since failing is what reaches the `OnFail` branch that
+releases the smart object and lets the tree recover.
+
+**Vanilla's answer is `AbortAllAnimations Target="this.id"`.** It appears in
+twelve trees, and in `sb_combat.xml` it is gated on exactly the flag the beggars
+carry:
+
+```
+IfCondition condition="$b_interruptAnimationsInCombat"
+  AbortAllAnimations Target="this.id"
+Expression "$b_interruptAnimationsInCombat = true"
+```
+
+Probed, every beggar reads `b_interruptAnimationsInCombat = true` while a
+sitting villager reads `false`. So the game already knows these animations must
+be aborted rather than interrupted, and it does so when combat starts.
+
+`AbortAllAnimations` is a behavior tree node. It has no Lua bind, and the bind
+list carries nothing else of that shape.
+
+### Two candidates tested and neither works
+
+**`human:StopAnim`** was recorded earlier as inert, but only ever on a victim
+stuck for minutes, which left the result open to being an artifact of the moment
+it was tried. Repeated properly on a healthy beggar mid-animation, it returns
+`ok=true` and the actor is still `Beggar` twelve seconds later. The call is
+accepted and does nothing, which is what the bind reference already says of it.
+
+**`daycycle:behavior:progress` with `progress(false)`** is the counterpart of the
+message the tree sends on entering, so it was the most plausible way to tell the
+daycycle the behavior had ended. Sent to a stuck beggar it is accepted and
+changes nothing: `MotionIdle` before, `MotionIdle` ten seconds later.
+
+### Where this leaves the fix
+
+The mechanism is fully understood and the repair is not reachable through any
+Lua bind found so far. What has been established is narrow and useful: the fix
+must make the animation abort, not stop, not interrupt, and not be seized; and
+the game has a node that does exactly that, reserved for combat.
+
+Untried, and each a different shape of the same idea:
+
+- Reaching `AbortAllAnimations` indirectly, by finding what else in the game
+  raises it outside combat. Eleven trees other than `sb_combat` use it.
+- Making the victim briefly satisfy whatever condition the combat subbrain
+  enters on, so vanilla aborts the animation itself.
+- The animation event system directly, since the parked node waits on
+  `LogicalEnd` for a named `AnimationWUID`; if that event can be raised from
+  Lua, the node completes and the tree continues normally rather than failing.
+
+## The parked tree reaches merchants too, and that is a regression against main
+
+Tested at 4.2.0-dev.8, the merge candidate.
+
+**User report**: "no clipping, falls look good, no freezes, but this merchant
+next to me was not able to return to his activity and seems stuck when usually
+on every test before this he always was able to snap back in to place. I tested
+the two woman traders across the street and they were both able to return to
+their loops."
+
+`rat_merchant_shop1` and `rat_merchant_shop3` both read `MotionIdle`.
+`rat_merchant_shop2` read `MotionMovement` and was fine.
+
+The LOD flip that freed a beggar was applied to the two idle merchants.
+`rat_merchant_shop1` moved 3.95 m and entered `ADLG_Agree`, so he had been
+parked in the same way. `rat_merchant_shop3` moved 0.48 m and stayed
+`MotionIdle`, which is inconclusive since a merchant standing at his stall is
+legitimately idle.
+
+So the failure is not specific to beggars and innkeepers. It reaches any NPC
+whose smart object tree is parked, and merchants escaped it earlier only because
+their activity involves walking, which re-plans them. When one is left close
+enough to his stall to skip the approach, he parks like a beggar.
+
+### Why this is a regression rather than a pre-existing fault
+
+Both tiers seize the actor with `StartInteractiveActionByName`, so both should
+park the tree equally. They do not, and the difference is what happens next.
+
+Under `knockdown` the interactive action runs to its end and Mannequin releases
+the actor when the fragment completes. Measured at 4.1.0-dev.1, a beggar and an
+innkeeper both re-entered their animations afterwards, turned the wrong way but
+present.
+
+Under `fall` the actor is taken by `actor:Fall` partway through the fragment,
+so the interactive action never completes and never releases. That is the
+plausible cause of the parking, and it is introduced by this branch.
+
+The tier therefore trades a rotation fault that main has for an activity fault
+that main does not.

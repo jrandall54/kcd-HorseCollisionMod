@@ -52,10 +52,13 @@ like part of the game.
 for everything near the player's horse, works out which of those are actually
 underneath or in front of it, and decides what should happen to them.
 
-**A reaction, per speed tier.** Knockdowns are physics: the NPC is given an
-impulse and the game's ragdoll takes over. The walking-pace stagger is not
-physics at all; it plays one of the game's own standing hit-reaction
-animations, so the NPC keeps their feet and their dignity.
+**A reaction, per speed tier.** The walking-pace stagger plays one of the game's
+own standing hit-reaction animations, so the NPC keeps their feet and their
+dignity. A trot plays an animated fall and then hands the body to the game's
+physics partway through, so the victim lands as the animation intended and is
+picked up afterwards the way the game picks up anyone who has fallen. A gallop
+is physics from the moment of impact: the NPC is given an impulse and the
+ragdoll takes over.
 
 **Animation data.** The stagger is the part that needs new data, and it is the
 reason this mod ships anything besides a script.
