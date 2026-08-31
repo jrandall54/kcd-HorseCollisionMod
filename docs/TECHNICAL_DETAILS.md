@@ -37,6 +37,37 @@ body, plays a whole animation, and hands control back cleanly.
 silently and aborts after a single frame, which reads in game as a one-frame
 twitch.
 
+### Returning the victim to their own control
+
+An interactive action takes the body and does not tell the actor's behavior it
+happened. When the animation finishes, the body stands where the reaction left
+it while the victim's own idea of where they are continues elsewhere. The two
+rejoin only when the engine rebuilds the actor, which in ordinary play happens
+when the player looks away and back and the NPC drops to a level of detail the
+engine repositions them from. Until that happens the victim is motionless, and
+the rebuild then reads as a teleport.
+
+`entity:Hide(1)` followed by `entity:Hide(0)` forces the rebuild. Both calls
+are issued together: the teardown happens on the call rather than over elapsed
+time, so no interval is needed between them.
+
+The rebuild must land after the animation has finished. An actor still owned by
+an interactive action is given back to it, and the freeze happens anyway.
+
+`actor:GetCurrentAnimationState()` reports `AnimationControlled` for as long as
+that ownership lasts, and an ordinary locomotion state afterwards, so leaving
+that value is the reaction ending. Polling for it is the only workable trigger:
+the same action holds the state for different lengths on different victims,
+knockdowns spanning 4.3 to 7.2 seconds and staggers around 2.3, so no fixed
+delay sits past every animation and inside none.
+
+The poll interval is what a player perceives as a delay before the victim
+resumes, since the rebuild fires on the first poll after the animation ends.
+
+An action that resolves to no fragment aborts within a frame and never reports
+`AnimationControlled` at all, so the wait is bounded by a ceiling and the
+rebuild fires regardless when it expires.
+
 ### Files required to add a FragTag
 
 Three kinds of file, all mandatory. Omitting any one leaves the call succeeding

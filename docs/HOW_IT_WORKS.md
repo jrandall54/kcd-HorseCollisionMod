@@ -60,6 +60,13 @@ animations, so the NPC keeps their feet and their dignity.
 **Animation data.** The stagger is the part that needs new data, and it is the
 reason this mod ships anything besides a script.
 
+**Handing the victim back.** Playing an animation on someone takes their body
+away from them, and the game does not tell them so. Left alone they stand where
+they fell, thinking they are somewhere else, until something makes the game
+rebuild them, which is why a victim could stand motionless and then appear to
+jump across the street. The mod watches for the animation finishing and rebuilds
+them itself, so they get up and carry on.
+
 ## Why the stagger needs new data
 
 The game will play a chosen animation on an NPC on request, but only through a

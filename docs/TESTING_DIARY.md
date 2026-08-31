@@ -8419,3 +8419,18 @@ which is the known behavior of a reaction whose name resolves to no fragment.
 The cost is a victim waiting out the ceiling before being rebuilt, and the
 telemetry names the case whenever it happens, so its frequency is measurable
 rather than assumed.
+
+## The pause closes at a hundred millisecond poll
+
+Tested at 4.0.1-dev.4, four trot knockdowns and two walk staggers.
+
+**User report**: "pause is gone, no freezes."
+
+Halving the polling interval from 250 ms to 100 ms removed the remaining pause
+entirely, which confirms the diagnosis that the pause was the interval rather
+than anything about the rebuild. No victim froze, so the observed trigger holds
+at the faster rate.
+
+This is the freeze fix complete, and the first fix reimplemented on the clean
+4.0.0 base. What remains unresolved is the blink, which is its own defect and
+its own branch.
