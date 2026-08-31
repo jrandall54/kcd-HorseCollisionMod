@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0-dev.6
+-- @release 4.2.0-dev.7
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0-dev.6"
+HorseCollisionMod.Version = "4.2.0-dev.7"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -371,12 +371,6 @@ HorseCollisionMod.FallClipMs = {
 -- over. Lower it if they go limp in the air before landing.
 HorseCollisionMod.RagdollAtFraction = 0.68
 
-
--- How much of the configured knockdown impulse the fall tier's ragdoll carries,
--- against a gallop's full one. Enough to take a victim off the slot they were
--- standing on, which is what makes them plan a new activity rather than resume
--- none, and not enough to throw them the distance a gallop does.
-HorseCollisionMod.RagdollImpulseScale = 0.25
 
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
@@ -1698,18 +1692,6 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 						.. "ms handedBack=" .. tostring(handed)
 						.. " ok=" .. tostring(dropped))
 			end
-
-			-- A small impulse, where a gallop carries a full one and this
-			-- tier previously carried none.
-			--
-			-- Being moved is what returns an NPC to their day. A merchant
-			-- walks back to his booth and re-acquires it; a beggar left
-			-- standing on his own slot plans nothing and stays there; the
-			-- same beggar hit at a gallop gets up and walks to a different
-			-- begging spot unaided. The victim who is still where they were
-			-- has nothing to re-plan, so the impulse is here to take them off
-			-- the slot rather than to throw them.
-			self:ImpulseVictim(npc, velocity, self.RagdollImpulseScale)
 
 			-- The rebuild runs once the ragdoll has resolved, on every
 			-- victim rather than only on one that stalls.

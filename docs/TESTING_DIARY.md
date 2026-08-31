@@ -8932,3 +8932,54 @@ and the ragdoll here is created seconds after the horse has gone.
 
 So displacement large enough to force a re-plan is not reachable this way at a
 plausible impulse, and the rebuild reaches the same outcome directly.
+
+## Five interventions on a stuck beggar, all inert
+
+A beggar left standing after a trot fall was held in that state and tested
+directly, one call at a time, measuring travel and animation state afterwards.
+Untouched beggars nearby read `Beggar` throughout, so the state was specific to
+the victim rather than to the time of day.
+
+| Intervention | Travel | State after |
+| --- | --- | --- |
+| `entity:Hide(1)` then `Hide(0)`, same call | 0.00 m | MotionIdle |
+| The same pair with a 400 ms gap | 0.00 m | MotionIdle |
+| `actor:Fall`, no impulse | 0.66 m | MotionIdle |
+| `actor:Fall` with an impulse of 70 | 1.71 m | MotionIdle |
+| `SetWorldPos` 4.5 m away, then `daycycle:restartRequest` | 4.47 m | MotionIdle |
+
+None returned him to begging.
+
+The last row matters most because it is vanilla's own teleport recovery, the
+pairing used in `hasteInstruction_teleportBase.lua`, and because it removes
+displacement as the explanation. He was moved four and a half meters clear of
+his spot and re-planned, and still did nothing.
+
+The impulse row confirms the earlier finding from another direction: 70 of
+impulse moved a free body 1.71 m, so what throws a victim at a gallop is the
+horse carrying them and not the impulse. Displacement of the size a gallop
+produces is not reachable from a ragdoll created after the horse has gone.
+
+### A stuck beggar and a stuck villager are not the same failure
+
+Both read `MotionIdle`, upright, with the ragdoll long resolved. The difference
+is what frees them: hiding and showing a stuck villager moved her 4.11 m into
+`MotionMovement`, and the identical call on the beggar moved him nothing at all.
+
+So the rebuild does not restore an activity. It restores an NPC who had no
+activity to return to.
+
+### What is left
+
+Two things free a beggar and neither is understood: the player leaving the area
+and returning, and a fresh gallop impact.
+
+A gallop may not be curing anything. It hits a beggar who is still in `Beggar`
+rather than one already stuck, and it may simply be a path that never creates
+the problem. Under that reading the question is not what a gallop does
+afterwards but what the trot fall does that a gallop does not.
+
+Three differences were identified between the two paths. The impulse is now
+removed, and movement control is handed back before the ragdoll. **One remains
+untested: the trot fall releases movement control for the length of the fall
+and a gallop never touches it at all.**
