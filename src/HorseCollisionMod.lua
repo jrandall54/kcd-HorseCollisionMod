@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0
+-- @release 4.2.1-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0"
+HorseCollisionMod.Version = "4.2.1-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1418,12 +1418,46 @@ function HorseCollisionMod:ReplanVictim(npc)
 		return false
 	end
 
+	-- Sent as a typed table, not as a string.
+	--
+	-- `SendMessageToEntity` takes its values as text and the members arrive
+	-- unset, so a message declaring any is delivered and then discarded with
+	-- nothing to match on. `daycycle:restartRequest` declares `reason` and
+	-- `speed` in `Libs/AI/TypeDefinitions.xml`, and every send this mod made
+	-- before this one supplied neither.
+	--
+	-- Measured on one victim parked after a collision: the string form moved
+	-- him 0.00 m and the typed form moved him 3.94 m, back to his stall.
+	--
+	-- `Utils.makeTable` is the game's own builder for these, used in its
+	-- scripts for `dog:changeRequest` among others.
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
 	local ok, err = pcall(function()
-		XGenAIModule.SendMessageToEntity(npc.id, "daycycle:restartRequest", "")
+		local message = Utils.makeTable("daycycle:restartRequest", {
+			reason = enum_daycycleHaltReason.interrupt,
+			speed = enum_daycycleHaltSpeed.instant
+		})
+
+		XGenAIModule.SendMessageToEntityData(target,
+				"daycycle:restartRequest", message)
 	end)
 
+	-- The string form as a fallback, so a build that cannot reach the typed
+	-- path still does what earlier versions did rather than nothing.
+	if not ok then
+		pcall(function()
+			XGenAIModule.SendMessageToEntity(npc.id,
+					"daycycle:restartRequest", "")
+		end)
+	end
+
 	if self.Config.LogTelemetry then
-		self:Log("VictimReplan ok=" .. tostring(ok)
+		self:Log("VictimReplan typed=" .. tostring(ok)
 				.. " err=" .. tostring(err))
 	end
 
