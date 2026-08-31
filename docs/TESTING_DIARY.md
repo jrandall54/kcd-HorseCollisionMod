@@ -8352,3 +8352,70 @@ Telemetry is now one line per reaction, `VictimRebuild action= on= waited=`,
 where `on` is `state`, `ceiling` or `unreadable` and `waited` is how long the
 reaction actually ran. Those figures are the evidence for whether the trigger
 is firing where this predicts.
+
+
+## The observed trigger holds, and the freeze is fixed
+
+Tested at 4.0.1-dev.3, five trot knockdowns and two walk staggers, men and
+women.
+
+**User report**: "no freezes, pause is very short but still present. The blink
+seemed to be noticable a few time maybe."
+
+### Every reaction fired on the observation
+
+| Action | Waited |
+| --- | --- |
+| hcm_knockdown_back | 7248 ms |
+| hcm_knockdown_forward | 5248 ms |
+| hcm_knockdown_left | 6752 ms |
+| hcm_knockdown_back | 4528 ms |
+| hcm_knockdown_left | 6768 ms |
+| hcm_stagger_back | 2496 ms |
+| hcm_stagger_left | 2000 ms |
+
+All seven reported `on=state`. The ceiling was never reached, so the animation
+state was readable and changed on every victim, and no rebuild was fired blind.
+
+The figures land where the sampled ride predicted: knockdowns between 4.5 and
+7.2 seconds, staggers at 2.0 and 2.5. `hcm_knockdown_back` again varies by most
+of three seconds between two victims, at 7248 and 4528 ms, which is the
+variation no fixed delay could have covered.
+
+Against the previous build this is the difference between four of six victims
+frozen and none of seven.
+
+### The residual pause is the polling interval
+
+Each `waited` figure sits about 250 ms above the animation's measured end: the
+sampled `hcm_knockdown_back` released `AnimationControlled` at 6992 ms and the
+trigger reported 7248 ms. That gap is one poll, which is what the player sees as
+the short remaining pause.
+
+`ReactionPollMs` drops from 250 to 100, which bounds the pause at a tenth of a
+second. The detection loop already runs at that rate, so the cost is known.
+
+### The blink is unresolved and belongs to its own branch
+
+Hiding and showing the entity in a single call was recorded during earlier work
+as invisible on screen. Two rides have now contradicted that, first as "a very
+slight blinking" and now as noticeable on some victims.
+
+It is a separate defect from the freeze, with a separate cause, and the freeze
+fix is complete without it. What has not been tried is firing something other
+than `Hide` at this moment. The eleven calls previously found inert were all
+tested on victims that had been stuck for minutes; none was tried at the
+transition out of `AnimationControlled`, which is a different state and was not
+observable when those tests were run.
+
+### One reaction reached the ceiling
+
+A `hcm_stagger_right` reported `on=unreadable waited=12160ms`, meaning
+`AnimationControlled` was never observed at all across the full twelve seconds.
+The fallback did its job and the rebuild fired anyway.
+
+An action that is accepted and then aborts within a frame produces exactly this,
+which is the known behavior of a reaction whose name resolves to no fragment.
+The cost is a victim waiting out the ceiling before being rebuilt, and the
+telemetry names the case whenever it happens, so its frequency is measurable
+rather than assumed.
