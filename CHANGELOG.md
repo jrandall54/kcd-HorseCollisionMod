@@ -23,6 +23,18 @@ number.
 
 ## [Unreleased]
 
+## [4.2.3] - 2026-08-31
+
+Tooling. The mod is unchanged from 4.2.1.
+
+### Fixed
+
+- The check that proves a release overrides no vanilla file could not run. It
+  read a table renamed when the mod grew past the walk tier, so it raised an
+  error instead of checking anything, and had done since. It now verifies every
+  reaction option and every clip both character sets reference.
+
+
 ## [4.2.2] - 2026-08-31
 
 Tooling and the mod page. The mod is unchanged from 4.2.1 and there is no
