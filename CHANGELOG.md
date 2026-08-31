@@ -23,6 +23,19 @@ number.
 
 ## [Unreleased]
 
+## [4.2.4] - 2026-08-31
+
+Tooling. The mod is unchanged from 4.2.1.
+
+### Fixed
+
+- Publishing checks the version being published rather than the one the
+  manifest happens to sit on. A release that has been played from its own pak
+  is the one that goes out, and `main` may have moved on to tooling since, so
+  the check reported the mod page as stale for a version nobody was publishing
+  and refused to publish one that was correctly described.
+
+
 ## [4.2.3] - 2026-08-31
 
 Tooling. The mod is unchanged from 4.2.1.

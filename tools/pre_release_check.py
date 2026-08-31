@@ -454,6 +454,17 @@ def main():
     paths = tracked_files()
     version = current_version()
 
+    # Publishing does not always ship the version the manifest is sitting on.
+    # A release that has been played from its own pak is the one that goes out,
+    # and `main` may have moved on to tooling work since. Checking the manifest
+    # in that case reports the mod page as stale for a version nobody is
+    # publishing, and blocks the publish of one that is correctly described.
+    if "--version" in sys.argv:
+        index = sys.argv.index("--version")
+
+        if index + 1 < len(sys.argv):
+            version = sys.argv[index + 1]
+
     # Two audiences, and conflating them makes the check useless on a branch.
     # Everything except the mod page asks whether the repository describes
     # itself accurately, which is true of any merge. The mod page and the
