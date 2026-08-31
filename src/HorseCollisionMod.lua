@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.1.0-dev.1
+-- @release 4.1.0-dev.2
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.1.0-dev.1"
+HorseCollisionMod.Version = "4.1.0-dev.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1246,6 +1246,71 @@ function HorseCollisionMod:ReleaseVictimMovement(npc)
 	return ok
 end
 
+--- Records how far a reaction turned its victim.
+--
+-- TEMPORARY, for one pair of diagnostic rides. Remove before this branch
+-- merges.
+--
+-- Measurement only. This reads a heading twice and writes a log line; it never
+-- sets an angle. Three earlier mechanisms tried to correct this value from Lua
+-- and all three were removed, because at a smart object the angle belongs to
+-- the object and is written when the victim approaches it.
+--
+-- What is being separated is whether the rotation belongs to the animation or
+-- to the mod. `ReleaseAnimationMovement` takes the body off the animation's
+-- root motion so it stops passing through walls; whether that also changes what
+-- the clip does to the victim's heading has never been measured. Running this
+-- with the setting on and again with it off answers that, and the answer
+-- decides whether the drift is a property of the clip or the price of the
+-- anti-clipping fix.
+--
+-- @tparam table npc victim entity
+-- @tparam string action the reaction being played
+function HorseCollisionMod:MeasureReactionTurn(npc, action)
+	if not self.Config.LogTelemetry then
+		return
+	end
+
+	local function heading()
+		local z = nil
+
+		pcall(function()
+			z = npc:GetAngles().z
+		end)
+
+		return type(z) == "number" and z or nil
+	end
+
+	local before = heading()
+
+	if not before then
+		return
+	end
+
+	local generation = self.TimerTick
+
+	self:WhenReactionEnds(npc, function(why, waited)
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local after = heading()
+
+		if not after then
+			return
+		end
+
+		local turn = math.pi * 2
+		local drift = ((after - before + math.pi) % turn) - math.pi
+
+		self:Log("ReactionTurn " .. action
+				.. " released=" .. tostring(self.Config.ReleaseAnimationMovement)
+				.. " drift=" .. string.format("%+.0f", math.deg(drift))
+				.. "deg on=" .. why
+				.. " waited=" .. string.format("%.0f", waited) .. "ms")
+	end)
+end
+
 --- Sends a victim back to their activity by way of approaching it again.
 --
 -- A smart object reaches its loop through `Move` to the object followed by
@@ -1436,6 +1501,9 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 			self:ReleaseVictimMovement(npc)
 		end)
 	end
+
+	-- TEMPORARY. Measurement only, removed before this branch merges.
+	self:MeasureReactionTurn(npc, action)
 
 	self:WhenReactionEnds(npc, function(why, waited)
 		self:RebuildVictim(npc)
