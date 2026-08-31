@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.0.1-dev.1
+-- @release 4.0.1-dev.2
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.0.1-dev.1"
+HorseCollisionMod.Version = "4.0.1-dev.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -295,8 +295,18 @@ HorseCollisionMod.SpeedHistorySize = 10
 -- Separate per tier because a stagger is over in about a second while a
 -- knockdown runs several times longer. Not settings: once these are right
 -- there is no reason for a player to hold an opinion about them.
-HorseCollisionMod.RebuildDelayStaggerMs = 2000
-HorseCollisionMod.RebuildDelayKnockdownMs = 5000
+HorseCollisionMod.RebuildDelayStaggerMs = 12000
+HorseCollisionMod.RebuildDelayKnockdownMs = 12000
+
+
+-- TEMPORARY, for one diagnostic ride. How often a running reaction is sampled
+-- and for how long, so the animation state and the distance covered can be
+-- read against the same clock. Set the sampling window to 0 to switch it off.
+--
+-- The rebuild delays above are held past this window on purpose: a rebuild
+-- landing mid-sample would change the thing being measured.
+HorseCollisionMod.ReactionSampleMs = 250
+HorseCollisionMod.ReactionSampleForMs = 11000
 
 local function GetTimeMs()
 	return System.GetCurrTime() * 1000
@@ -1312,6 +1322,55 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- has to clear the whole fall and get-up: rebuilding partway through cuts
 	-- the animation, and every millisecond past the end is time the victim
 	-- spends standing idle before their behavior resumes.
+	-- TEMPORARY, for one diagnostic ride. Samples what the engine reports
+	-- while a reaction runs, so the rebuild can be triggered by the reaction
+	-- ending rather than by a clock guessing at its length. Remove with
+	-- ReactionSampleMs and ReactionSampleForMs before this branch merges.
+	if self.Config.LogTelemetry and self.ReactionSampleForMs > 0 then
+		local sampleGeneration = self.TimerTick
+		local startedAt = GetTimeMs()
+		local from = nil
+
+		pcall(function()
+			from = npc:GetWorldPos()
+		end)
+
+		local function sample()
+			if sampleGeneration ~= self.TimerTick then
+				return
+			end
+
+			local state = "?"
+			local moved = -1
+
+			pcall(function()
+				state = tostring(npc.actor:GetCurrentAnimationState())
+			end)
+
+			pcall(function()
+				local p = npc:GetWorldPos()
+
+				moved = math.sqrt(((p.x - from.x) * (p.x - from.x))
+						+ ((p.y - from.y) * (p.y - from.y)))
+			end)
+
+			local elapsed = GetTimeMs() - startedAt
+
+			self:Log("ReactionSample " .. action
+					.. " t+" .. string.format("%.0f", elapsed)
+					.. "ms state=" .. state
+					.. " moved=" .. string.format("%.2f", moved))
+
+			if elapsed < self.ReactionSampleForMs then
+				Script.SetTimer(self.ReactionSampleMs, sample)
+			end
+		end
+
+		if from then
+			Script.SetTimer(self.ReactionSampleMs, sample)
+		end
+	end
+
 	local delay = self.RebuildDelayKnockdownMs
 
 	if prefix == "hcm_stagger_" then
