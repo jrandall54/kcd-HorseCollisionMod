@@ -62,7 +62,7 @@ settings file still loads, which is a different test.
 - **BREAKING** A trot collision now knocks the victim down with an animation
   rather than a physics ragdoll. They fall, then get up, as one continuous
   movement, and the horse no longer runs over the body it just made. Set
-  `TrotReaction` to `"ragdoll"` to restore the 3.0.1 behaviour. Gallop is
+  `TrotReaction` to `"ragdoll"` to restore the 3.0.1 behavior. Gallop is
   unchanged and still ragdolls, which is what a horse at full speed should do.
 
 - `MinVictimHealth`, `ClearCollisionInjuries` and the `LimitCollisionExhaust` group
@@ -70,7 +70,7 @@ settings file still loads, which is a different test.
   stopped responding, and each was aimed at the wrong cause; that problem is
   now fixed at its source. None of them appeared in a released version, so no
   settings file in use names them; one that does keeps working, since an
-  unrecognised setting is ignored and named in `kcd.log`.
+  unrecognized setting is ignored and named in `kcd.log`.
 
 - Collisions cost the horse far less stamina. Riding through ordinary foot
   traffic no longer threatens to throw you: a trot into a villager costs about
@@ -89,7 +89,7 @@ settings file still loads, which is a different test.
   buried them falling uphill and left them airborne falling downhill. Movement
   control is now taken off the animation once the reaction has started, so the
   victim is moved by the entity rather than by the animation's own root motion.
-  Set `ReleaseAnimationMovement` to `false` to restore the old behaviour.
+  Set `ReleaseAnimationMovement` to `false` to restore the old behavior.
 
 - Collisions no longer stop working after loading a save. Each victim is held
   briefly after an impact so a single pass through a crowd cannot restart the
@@ -119,7 +119,7 @@ settings file still loads, which is a different test.
 
 - NPCs no longer stand in the street playing a hurt animation after being ridden
   down. A victim knocked under 40 health while bleeding was being taken over by
-  the game's own auto-cure behaviour, which holds them in place indefinitely
+  the game's own auto-cure behavior, which holds them in place indefinitely
   while healing them at a rate too slow to notice. Victims are now exempted from
   it, using the same mechanism the game uses for its own characters, and an NPC
   already stuck is released the next time a rider collides with them, so an

@@ -2,7 +2,7 @@
 
 Every Lua function the game exposes on the objects this mod touches, extracted from the engine's own script-bind registration.
 
-This is a catalogue of what exists, not of what works. A name here has not been called unless it is marked, and several documented binds accept a call and then do nothing: `human:PlayAnim` is the standing example, and the whole `Can`/`Request` family answers `Undefined` under conditions that are not yet identified. Signatures come from the registration, so an argument count can differ from what the engine accepts in practice; `actor:Fall` is registered with one argument and takes two.
+This is a catalog of what exists, not of what works. A name here has not been called unless it is marked, and several documented binds accept a call and then do nothing: `human:PlayAnim` is the standing example, and the whole `Can`/`Request` family answers `Undefined` under conditions that are not yet identified. Signatures come from the registration, so an argument count can differ from what the engine accepts in practice; `actor:Fall` is registered with one argument and takes two.
 
 Entries this mod calls are marked with a dagger. See `docs/kcd_api.lua` for annotated definitions of those, and `docs/TESTING_DIARY.md` for what was learned about the ones that misbehave.
 
@@ -356,7 +356,7 @@ Reached through `RPGModule`. Global. RPG parameters and derived values.
 
 ## XGenAIModule
 
-Reached through `XGenAIModule`. Global. WUIDs, brain variables, daycycle patches and messages to an NPC's behaviour tree.
+Reached through `XGenAIModule`. Global. WUIDs, brain variables, daycycle patches and messages to an NPC's behavior tree.
 
 34 functions.
 

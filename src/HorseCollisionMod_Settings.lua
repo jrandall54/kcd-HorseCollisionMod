@@ -4,7 +4,7 @@
 -- in the mod needs touching, and anything left out or misspelled falls back to
 -- the default rather than breaking.
 --
--- Speeds are meters per second. Distances are meters from the horse's centre.
+-- Speeds are meters per second. Distances are meters from the horse's center.
 --
 -- @script HorseCollisionMod_Settings
 

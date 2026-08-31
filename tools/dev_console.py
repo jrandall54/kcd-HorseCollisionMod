@@ -54,7 +54,7 @@ import tempfile
 import threading
 import time
 
-# CryEngine marks up console text with "$" followed by a colour digit. Left in,
+# CryEngine marks up console text with "$" followed by a color digit. Left in,
 # a log line reads "$3MemInfo = $60 $5[]$4".
 COLOUR_CODES = re.compile(r"\$[0-9]")
 

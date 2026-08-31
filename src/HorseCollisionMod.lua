@@ -286,7 +286,7 @@ HorseCollisionMod.RecentRejections = {}
 -- `SpeedWalk`, because that test returns before any entity is examined.
 --
 -- Kept deliberately short. Half a second of history is enough to see a
--- deceleration and not so much that an earlier gallop colours a later walk.
+-- deceleration and not so much that an earlier gallop colors a later walk.
 HorseCollisionMod.SpeedHistory = {}
 
 HorseCollisionMod.SpeedHistorySize = 10
@@ -998,7 +998,7 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	local baseZ = height()
 
 	-- Where the victim stood when the impact landed. A reaction should leave
-	-- them near it; travelling on while animation-controlled is how a victim
+	-- them near it; traveling on while animation-controlled is how a victim
 	-- reaches somewhere the collision never put them.
 	local origin = nil
 
@@ -1493,7 +1493,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 		-- rotates over the impact instead of having their feet swept.
 		hitPos.z = hitPos.z + 1.0
 
-		-- Normalised against the velocity's own length, not against the
+		-- Normalized against the velocity's own length, not against the
 		-- scored speed. Those are different numbers: the score is the peak of
 		-- the last few ticks, chosen so a collision is rated by the speed the
 		-- horse carried into it, while the velocity here is what the horse is

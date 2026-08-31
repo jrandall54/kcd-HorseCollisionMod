@@ -312,10 +312,10 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
 # clips into the terrain.
 #
 # This is not the physics knockdown the trot tier moved away from. That ragdoll
-# was created at the moment of impact, underneath a horse still travelling
+# was created at the moment of impact, underneath a horse still traveling
 # through the same space, and the engine charged the trample that followed.
 # This one is created two seconds into the animation, by which time a horse at
-# trot is some fourteen metres away.
+# trot is some fourteen meters away.
 #
 # ExitTime is when the layer takes over, in seconds from the start of the
 # fragment. Stiffness 100 is vanilla's own value and barely deforms the pose;
@@ -364,7 +364,7 @@ MCM_XYMOVE = 0
 MCM_ZMOVE = 0
 
 # Seconds into the fall before the body is settled, and how rigid it is while
-# settling. None disables the layer, which is the behaviour before this was
+# settling. None disables the layer, which is the behavior before this was
 # added and is kept so the two can be compared without a rebuild.
 SETTLE_AT = None
 SETTLE_STIFFNESS = 100
