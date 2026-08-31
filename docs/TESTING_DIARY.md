@@ -9128,3 +9128,56 @@ follow from the same understanding:
   on is destroyed without failing. Anything that makes that node fail instead
   reaches `OnFail`, which releases the link and lets the tree recover on its own,
   which is what vanilla intends.
+
+## Vanilla's own abort is a tree node, and Lua has no equivalent
+
+Following the parked-node finding, the question became what makes the parked
+`AnimationEventWait` fail, since failing is what reaches the `OnFail` branch that
+releases the smart object and lets the tree recover.
+
+**Vanilla's answer is `AbortAllAnimations Target="this.id"`.** It appears in
+twelve trees, and in `sb_combat.xml` it is gated on exactly the flag the beggars
+carry:
+
+```
+IfCondition condition="$b_interruptAnimationsInCombat"
+  AbortAllAnimations Target="this.id"
+Expression "$b_interruptAnimationsInCombat = true"
+```
+
+Probed, every beggar reads `b_interruptAnimationsInCombat = true` while a
+sitting villager reads `false`. So the game already knows these animations must
+be aborted rather than interrupted, and it does so when combat starts.
+
+`AbortAllAnimations` is a behavior tree node. It has no Lua bind, and the bind
+list carries nothing else of that shape.
+
+### Two candidates tested and neither works
+
+**`human:StopAnim`** was recorded earlier as inert, but only ever on a victim
+stuck for minutes, which left the result open to being an artifact of the moment
+it was tried. Repeated properly on a healthy beggar mid-animation, it returns
+`ok=true` and the actor is still `Beggar` twelve seconds later. The call is
+accepted and does nothing, which is what the bind reference already says of it.
+
+**`daycycle:behavior:progress` with `progress(false)`** is the counterpart of the
+message the tree sends on entering, so it was the most plausible way to tell the
+daycycle the behavior had ended. Sent to a stuck beggar it is accepted and
+changes nothing: `MotionIdle` before, `MotionIdle` ten seconds later.
+
+### Where this leaves the fix
+
+The mechanism is fully understood and the repair is not reachable through any
+Lua bind found so far. What has been established is narrow and useful: the fix
+must make the animation abort, not stop, not interrupt, and not be seized; and
+the game has a node that does exactly that, reserved for combat.
+
+Untried, and each a different shape of the same idea:
+
+- Reaching `AbortAllAnimations` indirectly, by finding what else in the game
+  raises it outside combat. Eleven trees other than `sb_combat` use it.
+- Making the victim briefly satisfy whatever condition the combat subbrain
+  enters on, so vanilla aborts the animation itself.
+- The animation event system directly, since the parked node waits on
+  `LogicalEnd` for a named `AnimationWUID`; if that event can be raised from
+  Lua, the node completes and the tree continues normally rather than failing.
