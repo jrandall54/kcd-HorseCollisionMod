@@ -23,6 +23,30 @@ number.
 
 ## [Unreleased]
 
+## [4.2.6] - 2026-08-31
+
+Tooling. The mod is unchanged from 4.2.1.
+
+### Fixed
+
+- `-ChangelogOnly` works. The switch was referenced but never declared, so it
+  was rejected as an unknown parameter, and the path it guards looked for the
+  notes file at a path containing a newline. Both passed a syntax check: an
+  undeclared variable and a multi-line string are valid PowerShell.
+
+- A refused changelog no longer looks like a success. The call is reported
+  rather than thrown, since the file is published by then and losing that to a
+  changelog would be the wrong trade.
+
+### Known
+
+- The changelog endpoint refuses the requests this tool makes. It answers 413 from
+  nginx with a Cloudflare challenge for a 394 byte body, and 502 between
+  attempts, so it is being refused at the edge rather than by the API. No
+  release carries a changelog going back to 3.0.0, so this has never worked.
+  Release notes are pasted into the Changelogs tab by hand.
+
+
 ## [4.2.5] - 2026-08-31
 
 Tooling. The mod is unchanged from 4.2.1.

@@ -137,7 +137,13 @@ param (
     # answered from a non-interactive shell, and reaching for -Force to get
     # past it turns off the checks as well, which is the opposite of what a
     # publish wants. Authorization and verification are separate things.
-    [switch]$AssumeYes
+    [switch]$AssumeYes,
+
+    # Posts the changelog for a version already on the page, and exits. The
+    # changelog call is additive and independent of the upload, so a release
+    # published without one is repaired rather than re-uploaded. 4.2.2 went out
+    # with none, because the field is optional and nothing looked for it.
+    [switch]$ChangelogOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -413,8 +419,7 @@ $zipBytes = $zipItem.Length
 # what stops a release going out with an empty changelog, which is what happened
 # to 4.2.2: the field is optional and nothing looked for it.
 if (-not $Changelog -and -not $ChangelogFile) {
-    $conventionalNotes = Join-Path $repoRoot "releases
-otes-$Version.md"
+    $conventionalNotes = Join-Path $repoRoot (Join-Path "releases" "notes-$Version.md")
     if (Test-Path $conventionalNotes) { $ChangelogFile = $conventionalNotes }
 }
 
@@ -712,12 +717,32 @@ Write-Host "  version id $($published.version.id)" -ForegroundColor Green
 # Last, and separately, because it is additive: a failed publish should not
 # leave changelog text on the page for a version that does not exist, and a
 # repeated call appends rather than replaces.
+#
+# This call does not currently reach Nexus. Measured against 4.2.2 the endpoint
+# answered 413 from nginx, with a Cloudflare challenge injected, for a body of
+# 394 bytes, and 502 intermittently between attempts. A payload that small is
+# not too large for anything, so the request is being refused at the edge
+# rather than by the API. No release on the page carries a changelog, going
+# back to 3.0.0, which fits: this has never worked rather than having broken.
+#
+# Until that is understood, paste the notes into the Changelogs tab by hand.
 if ($Changelog) {
     Write-Host "Adding changelog ..."
-    Invoke-NexusApi POST "/mods/$modId/changelogs" @{
-        version   = $Version
-        changelog = $Changelog
-    } | Out-Null
+
+    # Reported rather than thrown. The file is published by this point, and
+    # losing that to a changelog would be the wrong trade.
+    try {
+        Invoke-NexusApi POST "/mods/$modId/changelogs" @{
+            version   = $Version
+            changelog = $Changelog
+        } | Out-Null
+
+        Write-Host "  changelog posted" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "  the changelog call was refused: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "  paste releases\notes-$Version.md into the Changelogs tab by hand" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""
