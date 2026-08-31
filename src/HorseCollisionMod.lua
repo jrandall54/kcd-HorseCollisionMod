@@ -382,7 +382,7 @@ HorseCollisionMod.RagdollResolveCeilingMs = 15000
 -- TEMPORARY, for one diagnostic ride. How long the animation state is traced
 -- after an impact. Zero switches it off. Remove with TraceRecovery before this
 -- branch merges.
-HorseCollisionMod.TraceRecoveryForMs = 20000
+HorseCollisionMod.TraceRecoveryForMs = 120000
 
 
 local function GetTimeMs()

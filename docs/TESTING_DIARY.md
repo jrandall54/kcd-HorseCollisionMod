@@ -8983,3 +8983,62 @@ Three differences were identified between the two paths. The impulse is now
 removed, and movement control is handed back before the ragdoll. **One remains
 untested: the trot fall releases movement control for the length of the fall
 and a gallop never touches it at all.**
+
+## The movement control release is not what breaks an activity NPC
+
+Tested at 4.2.0-dev.7 with `ReleaseAnimationMovement` off, which is the last
+structural difference between the trot fall path and the gallop path.
+
+**User report**: "Beggar goes through the wall and stands up and stays there and
+doesn't return. nothing else to report."
+
+Going through the wall is the setting being off and is expected. Not returning
+is the answer: taking the release away does not restore the beggar, so it was
+never the cause. The setting is back on.
+
+That exhausts the differences between the two paths. The impulse was removed,
+movement control is handed back before the ragdoll, and the release itself is now
+ruled out.
+
+### A correction to the previous entry
+
+A beggar observed back in `Beggar` without intervention had not recovered on his
+own; the user had reloaded a save. Nothing about a stuck beggar improves with
+time. The recovery trace, extended to two minutes, holds `MotionIdle` and
+`MotionIdleVARdefault` past a hundred seconds.
+
+### The context tables, compared
+
+`Contexts.GetDataTable` reads what options an entity carries. Between a stuck
+beggar and a healthy one the only difference was:
+
+```
+stuck     suppressAutoCure: HorseCollisionMod=false
+healthy   suppressAutoCure:
+```
+
+`false` means the option is not active, and `Contexts.ClearOption` refused it for
+exactly that reason: "doesn't have the 'suppressAutoCure' option active with
+handle 'HorseCollisionMod'". So this is a residual key rather than a live option,
+and clearing it moved the victim 0.00 m. Not the cause, and recorded so the same
+difference is not chased again.
+
+### Everything that does not free a stuck activity NPC
+
+Measured on beggars held in the stuck state, each tried on its own:
+
+`entity:Hide(1)`/`Hide(0)` together, the same pair with a 400 ms gap,
+`actor:Fall` with no impulse, `actor:Fall` with an impulse of 70, `SetWorldPos`
+4.5 m away followed by `daycycle:restartRequest`, `Contexts.ClearOption`, and
+turning off the movement control release for the whole reaction.
+
+Every one left the victim in `MotionIdle` having travelled at most the distance
+the call itself moved them. Only a save load restores them.
+
+### Where that leaves the tier
+
+The fall tier is better than the animated get-up for ordinary NPCs and worse for
+activity NPCs. Under the animated get-up a beggar and an innkeeper returned to
+their animations, facing the wrong way; under the fall tier they do not return at
+all. That is a regression against what `main` ships, and the tier cannot take the
+default while it stands.
