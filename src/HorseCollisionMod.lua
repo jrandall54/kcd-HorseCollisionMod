@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.0-dev.4
+-- @release 4.2.0-dev.5
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.0-dev.4"
+HorseCollisionMod.Version = "4.2.0-dev.5"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -369,7 +369,14 @@ HorseCollisionMod.FallClipMs = {
 --
 -- Raise it if a victim reaches the ground and pauses before the physics takes
 -- over. Lower it if they go limp in the air before landing.
-HorseCollisionMod.RagdollAtFraction = 0.6
+HorseCollisionMod.RagdollAtFraction = 0.68
+
+
+-- How much of the configured knockdown impulse the fall tier's ragdoll carries,
+-- against a gallop's full one. Enough to take a victim off the slot they were
+-- standing on, which is what makes them plan a new activity rather than resume
+-- none, and not enough to throw them the distance a gallop does.
+HorseCollisionMod.RagdollImpulseScale = 0.25
 
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
@@ -1692,15 +1699,36 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 						.. " ok=" .. tostring(dropped))
 			end
 
-			-- Nothing follows. A gallop victim is ragdolled and left alone,
-			-- and the game returns them to their day on its own: a beggar
-			-- knocked clear by a gallop was observed walking to a begging
-			-- spot and entering the animation unaided.
+			-- A small impulse, where a gallop carries a full one and this
+			-- tier previously carried none.
 			--
-			-- The rebuild and the re-plan exist for the animated get-up,
-			-- where the mod holds the body to the end and has to hand it
-			-- back. Here the game already owns the recovery, and doing both
-			-- to an actor it is recovering is what left beggars standing.
+			-- Being moved is what returns an NPC to their day. A merchant
+			-- walks back to his booth and re-acquires it; a beggar left
+			-- standing on his own slot plans nothing and stays there; the
+			-- same beggar hit at a gallop gets up and walks to a different
+			-- begging spot unaided. The victim who is still where they were
+			-- has nothing to re-plan, so the impulse is here to take them off
+			-- the slot rather than to throw them.
+			self:ImpulseVictim(npc, velocity, self.RagdollImpulseScale)
+
+			-- Nothing else follows while the recovery is working, which is
+			-- what the gallop tier does. The rebuild returns only as a
+			-- rescue: on some victims the ragdoll is entered and never
+			-- resolves, and dropping the rebuild dropped the net that used to
+			-- free them.
+			self:WhenRagdollResolves(npc, function(state, waitedForBody)
+				if state == "resolved" then
+					if self.Config.LogTelemetry then
+						self:Log("VictimRecovered action=" .. action
+								.. " waited="
+								.. string.format("%.0f", waitedForBody) .. "ms")
+					end
+
+					return
+				end
+
+				self:FinishRecovery(npc, action, state, waitedForBody)
+			end)
 		end)
 	end
 
@@ -1742,6 +1770,20 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 		end
 	end)
 
+	self:ImpulseVictim(npc, velocity, impulseScale)
+end
+
+
+--- Pushes a victim who is already a physics body.
+--
+-- Separated from `Ragdoll` because the fall tier ragdolls the victim itself,
+-- partway through an animation rather than at the moment of impact, and needs
+-- the push without the rest.
+--
+-- @tparam table npc victim entity
+-- @tparam table velocity horse velocity vector
+-- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale)
 	local k_back = self.Config.Knockback * impulseScale
 	local k_up = self.Config.Uplift * impulseScale
 

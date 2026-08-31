@@ -8817,3 +8817,69 @@ The ragdoll now fires at a fraction of the measured length rather than at a
 figure per direction. That leaves one number to tune instead of eight, on the
 reasoning that these clips share an authoring convention and land at about the
 same point in their own length. The starting fraction is 0.6.
+
+## The ragdoll always fires; on some victims it never resolves
+
+Tested at 4.2.0-dev.4. Twenty-two reactions across both character sets.
+
+**User report**: "on some of the woman the freeze occured and my gut tells me you
+forgot to get rid of the get up animation we had before because on those ones
+that freeze, I don't think I see the rag doll even firing at all."
+
+### The ragdoll fires on every one
+
+Every `hcm_fall_*` reaction logged a matching `VictimFall`, at the timing its
+character set and direction call for, and every trace reached `BlendRagdoll`.
+The only reaction with no ragdoll was a walk stagger, which is correct.
+
+So the freeze is not a reaction falling back to the old two-clip setup. It is
+the opposite: the ragdoll arrives and **does not resolve**. Two traces end at
+`BlendRagdoll` with the twenty second window run out, meaning the victim was
+still a settling body when observation stopped.
+
+Distance covered ten seconds after impact names the victims:
+
+| Victim | Travel per impact |
+| --- | --- |
+| rat_woman34 | 1.08, 0.80, 0.24, 0.19, 0.24, 0.84 |
+| rat_woman35 | 0.32 |
+| rat_guard24 | 0.00 |
+| rat_refugee_vojcek | 0.43, 4.20 |
+| rat_refugee_beranMr | 0.44, 2.83 |
+
+`rat_woman34` is the repeat case and matches the report of one type of woman.
+
+**The cause is the safety net being removed rather than the ragdoll being
+wrong.** Copying the gallop tier meant dropping the rebuild, and the rebuild was
+also what eventually freed a victim whose recovery stalled. A gallop victim has
+no such net either, but a gallop victim is thrown clear, and being thrown clear
+turns out to be what makes the difference.
+
+### Displacement is what returns an NPC to their day
+
+Three observations now say the same thing.
+
+- A merchant walks back to his booth and re-acquires it correctly.
+- A beggar hit at a trot is not displaced and stays standing indefinitely.
+- **User report**: "the beggars on trot seemed stuck at standing, and then I
+  galloped into them a few times and they seemed to snap out of it and reorient
+  themselves somewhere else."
+
+The user's note that a freed beggar chooses a different spot rather than the
+original is the useful part: the NPC is not resuming an interrupted activity, it
+is planning a new one, and planning is what a victim still standing on their own
+slot never does.
+
+A gallop differs from a trot fall in exactly one relevant way, which is that it
+carries an impulse. The trot fall hands the body to physics with none at all, so
+the victim settles where they already were.
+
+### The three changes under test
+
+- A bounded safety net returns, firing only when the ragdoll fails to resolve
+  within the ceiling. In the ordinary case the tier still does nothing, which is
+  what the gallop tier does.
+- The ragdoll carries a small impulse, so a victim is moved off the slot they
+  were occupying. This is the gallop's difference, at a fraction of its size.
+- The fraction moves from 0.6 to 0.68, against "if anything, the rag dolls are
+  firing ever so slightly too early".
