@@ -8506,3 +8506,65 @@ The untested lever is making the victim re-approach rather than resume in place.
 `daycycle:restartRequest` is what vanilla sends for this, and
 `sb_switch_hitreactions.xml` sends it after the game's own hit reactions, which
 is the closest vanilla precedent to this mod.
+
+
+## The replan fixes the merchant and cannot reach the innkeeper
+
+Tested at 4.1.0-dev.1, two impacts each on the Rattay innkeeper, a beggar and a
+merchant. `daycycle:restartRequest` reported `ok=true` on all six.
+
+**User report**: the innkeeper "always returns to his lean in the direction he
+is facing after his getting up animation which was 180 degrees on the first
+impact and 90 degrees to his right on the second. same idea with the beggar but
+it was first impact 45 degrees to his left, second impact ended with him 90
+degrees to his left from original direction, merchant seemed to get right up and
+walk back into his position, second impact he got up again, and then shortly
+after walked back behind his booth to his other normal position."
+
+### The prediction held exactly
+
+The merchant is fixed, on both impacts, including the first. Previously only his
+second impact produced a correct return, and the difference then was that the
+second had thrown him clear of the booth. With the replan he approaches every
+time, and the approach is what puts him straight.
+
+The innkeeper and the beggar are unchanged. Both re-attach to their object at
+whatever angle the get-up left them at: 180 and 90 degrees for the innkeeper, 45
+and 90 for the beggar. Neither walks anywhere, so neither is aligned.
+
+This is the mechanism working as understood rather than failing. Alignment
+happens during the approach, and a victim already inside their object's
+tolerance has no approach to make. Restarting the daycycle asks them to re-plan;
+re-planning correctly concludes that they are already where they should be.
+
+So the fix is real and it is partial by construction. It covers every victim who
+is displaced and no victim who is not, and displacement is a property of the
+impact rather than of the victim.
+
+### The angle is inherited from the get-up, not chosen by the object
+
+Worth stating plainly, because it narrows what is left: the object does not pick
+a wrong angle. It accepts the one the victim is holding. Every reported figure
+is the rotation the fall and get-up chain imparted, which earlier measurement
+established belongs to the clip rather than to the victim, the same action
+producing the same drift on different people in different places.
+
+### The question that is now open
+
+Raised by the user: whether the rotation is caused by the mechanism that keeps a
+reacting victim out of walls.
+
+`ReleaseAnimationMovement` calls `actor:SetMovementControlledByAnimation(false)`
+one tick after the action starts. That takes the body off the animation's root
+motion and puts it on entity-driven movement, which is the state vanilla's own
+hit reactions play in and the reason they respect geometry that an interactive
+action passes through. Reverting it was previously observed to bring wall
+clipping back, so its effect on translation is established.
+
+Its effect on rotation is not. If suppressing the animation's translation leaves
+its rotation still being written, or causes the entity to be turned to follow the
+clip it can no longer travel along, then the drift is a cost of the anti-clipping
+fix rather than a property of the animation, and the two are the same problem.
+
+That is a single-variable experiment: measure the drift with the setting on and
+again with it off. Nothing needs correcting to find out, only recording.
