@@ -23,16 +23,21 @@ number.
 
 ## [Unreleased]
 
-## [5.0.0-dev.1] - 2026-08-31
+## [4.2.0-dev.2] - 2026-08-31
 
-### Changed
+### Fixed
 
-- **BREAKING** A trot victim is recovered by the game rather than by an animated get-up.
+- A trot victim is recovered by the game rather than by an animated get-up.
   The get-up clips turn the body as they play, by a fixed amount per direction,
   and that rotation is what left an innkeeper leaning into his wall from the
   wrong side. The fall is unchanged; what follows it is now the same recovery
   a gallop victim gets. `TrotReaction` gains a third value, `"fall"`, which is
   the new default; `"knockdown"` restores the animated get-up.
+
+### Added
+
+- `TrotReaction` accepts `"fall"`, which is the new default. `"knockdown"`
+  restores the animated get-up and `"ragdoll"` the physics knockdown.
 
 
 ## [4.1.0] - 2026-08-31

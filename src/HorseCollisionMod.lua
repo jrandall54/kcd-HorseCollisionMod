@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.0.0-dev.1
+-- @release 4.2.0-dev.2
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.0.0-dev.1"
+HorseCollisionMod.Version = "4.2.0-dev.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -343,6 +343,29 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 --
 -- The ceiling is generous because this waits on the game's own recovery rather
 -- than on a clip of known length.
+-- When the body is handed to physics during a fall, per direction, in
+-- milliseconds from the start of the reaction.
+--
+-- One figure per clip because the clips differ: measured end-to-end, the back
+-- fall runs about 1.75 s, forward about 2.45, right about 2.3 and left between
+-- 2.0 and 4.2. Ground contact comes before the clip ends, since the clip goes
+-- on to settle the body into its final pose after the victim has landed.
+--
+-- Early is the safer error. A ragdoll taken slightly before the body has
+-- settled continues the fall it was already making, while one taken after the
+-- clip has ended arrives to find the victim already standing.
+--
+-- These are the values to tune. Raise one if its victim is caught in the air
+-- and goes limp mid-fall; lower it if the body reaches the ground and pauses
+-- before the physics takes over.
+HorseCollisionMod.RagdollAtMs = {
+	forward = 1300,
+	back = 1000,
+	left = 1200,
+	right = 1300
+}
+
+
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
@@ -1590,6 +1613,43 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- be read rather than inferred. Remove before this branch merges.
 	self:TraceRecovery(npc, action)
 
+	-- The body is handed to physics while the fall is still playing, timed to
+	-- land on the victim reaching the ground rather than on the clip ending.
+	--
+	-- Waiting for the clip to end is too late by more than a second, and the
+	-- cost is not only the visible pause. Measured, a victim whose clip runs
+	-- out stands up and re-enters their activity first: a beggar reaches
+	-- `Beggar` and an innkeeper reaches `Leaning` before the ragdoll arrives
+	-- and evicts them from it, and the smart object does not take them back a
+	-- second time. Firing during the fall means there is nothing to evict.
+	--
+	-- No impulse. The victim is already going down and the ragdoll is here to
+	-- take the body at ground level, not to throw it.
+	if prefix == "hcm_fall_" then
+		local at = self.RagdollAtMs[dir] or self.RagdollAtMs.forward
+		local generation = self.TimerTick
+
+		Script.SetTimer(at, function()
+			if generation ~= self.TimerTick then
+				return
+			end
+
+			local dropped = pcall(function()
+				npc.actor:Fall({ x = 0, y = 0, z = 0 }, true)
+			end)
+
+			if self.Config.LogTelemetry then
+				self:Log("VictimFall action=" .. action
+						.. " at=" .. tostring(at)
+						.. "ms ok=" .. tostring(dropped))
+			end
+
+			self:WhenRagdollResolves(npc, function(state, waitedForBody)
+				self:FinishRecovery(npc, action, state, waitedForBody)
+			end)
+		end)
+	end
+
 	self:WhenReactionEnds(npc, function(why, waited)
 		if self.Config.LogTelemetry then
 			self:Log("ReactionEnded action=" .. action
@@ -1597,32 +1657,9 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 					.. " waited=" .. string.format("%.0f", waited) .. "ms")
 		end
 
-		-- A fall with no get-up chained to it leaves the victim snapping
-		-- upright when the clip runs out. Handing the body to a ragdoll at
-		-- that moment is what replaces the animated get-up: the game then
-		-- recovers a fallen actor the way it does at gallop, which is a
-		-- recovery that imparts none of the rotation the get-up clips do.
-		--
-		-- No impulse. The victim is already on the ground and the ragdoll is
-		-- here to hold them there until the game picks them up, not to throw
-		-- them.
-		if prefix == "hcm_fall_" then
-			local dropped = pcall(function()
-				npc.actor:Fall({ x = 0, y = 0, z = 0 }, true)
-			end)
-
-			if self.Config.LogTelemetry then
-				self:Log("VictimFall ok=" .. tostring(dropped))
-			end
-
-			self:WhenRagdollResolves(npc, function(state, waitedForBody)
-				self:FinishRecovery(npc, action, state, waitedForBody)
-			end)
-
-			return
+		if prefix ~= "hcm_fall_" then
+			self:FinishRecovery(npc, action, why, waited)
 		end
-
-		self:FinishRecovery(npc, action, why, waited)
 	end)
 
 	self:Log("Reaction action=" .. action

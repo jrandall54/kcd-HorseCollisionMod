@@ -8632,3 +8632,62 @@ Open, and now well specified: three of the four knockdown pairings carry a fixed
 rotation and one carries none. The work is in the animation data, in the choice
 of get-up paired with each fall, and `hcm_knockdown_right` is a working example
 sitting in the same database.
+
+
+## Handing recovery to the game works, and lands the ragdoll too late
+
+Tested at 4.2.0-dev.1 after a full game restart, which the new fall-only
+fragments require. Five trot impacts.
+
+**User report**: "There is a gap between when the animation ends and the the
+visible rag doll starts, but everyone gets up much more naturally once it takes
+over and looks much better. Also beggars and innkeepers do not return to begging
+and lean animations after impact and they just stand in place after, but the
+merchants seem to not have a problem getting back into their pacing schedules
+around their attached booths."
+
+### The recovery itself is better
+
+Dropping the get-up clip removes the rotation it imparted, and the game's own
+recovery reads as more natural than the animated one it replaces. That is the
+approach confirmed: the fall is worth keeping and the get-up was not.
+
+### Firing at the end of the clip is the wrong moment
+
+The ragdoll is currently triggered when the animation state leaves
+`AnimationControlled`, which is the end of the whole fall clip. A fall clip does
+not end when the victim reaches the ground; it ends after they have reached it
+and settled into the clip's final pose, and the difference is the visible gap.
+
+The correct moment is ground contact, which is earlier and differs per clip.
+Handing a body to physics while it is already prone is invisible; handing it
+over after a pause is not.
+
+### A regression on activity NPCs that do not walk
+
+Beggars and innkeepers no longer return to their begging and leaning animations
+at all, where under the animated get-up they returned but faced the wrong way.
+Merchants are unaffected and resume their rounds.
+
+The split is the same one found earlier: a merchant walks back to his booth and
+a beggar does not walk anywhere. The difference now is that the ones who do not
+walk fail to re-enter their animation rather than entering it turned. Something
+about the state a ragdoll recovery leaves an actor in prevents the smart object
+from taking them back, where the animated get-up did not.
+
+This is a cost of the change and it has to be answered before the tier ships as
+a default.
+
+### The proposal being taken up
+
+From the user: "the rag doll should fire the moment the NPC finally hits the
+ground which would be different for every animation since they have different
+lengths and times till NPC hits the ground."
+
+Rather than four hand-tuned constants, ground contact is observable the same way
+the end of a reaction turned out to be. The victim's height is sampled while the
+fall plays and the ragdoll is handed the body once that height stops falling,
+which adapts to the clip, the character set and the ground underneath without
+any figure being fixed in advance. A per-action ceiling remains as a fallback for
+the case where the height cannot be read at all, and every sample is logged so
+that case is recognized rather than guessed at.
