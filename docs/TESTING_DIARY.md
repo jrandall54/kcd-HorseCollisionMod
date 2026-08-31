@@ -9042,3 +9042,89 @@ activity NPCs. Under the animated get-up a beggar and an innkeeper returned to
 their animations, facing the wrong way; under the fall tier they do not return at
 all. That is a regression against what `main` ships, and the tier cannot take the
 default while it stands.
+
+## A stuck beggar is a behavior tree waiting for an animation that was destroyed
+
+This is what makes an activity NPC's `MotionIdle` different from a villager's,
+and it was found by reading `so_beggarworkplace.xml` rather than by testing.
+
+### The shape of the beggar's tree
+
+```
+FuseBox
+  Child: LuaWrapper(SetNonpersistentOption suppressDudeProxBark_greet, 'begging')
+    Sequence
+      AddLink usedSO -> the workplace
+      InstantSendMessageToNPC daycycle:behavior:progress
+      IfCondition tag == '' -> RandomGate -> beggarLaying or beggarKneeling
+      LODGuardian
+        Detail
+          Sequence
+            PlayAnimation 'Beggar'
+            ...
+            PlayAnimation 'BeggarOut'
+            AnimationEventWait Id='animation' Event='LogicalEnd'
+  OnFail
+    Sequence
+      RemoveLink usedSO
+      SuppressFailure
+```
+
+Two things follow.
+
+**The link is released only on failure.** `RemoveLink usedSO` sits in the
+FuseBox's `OnFail` branch, so it runs when the child fails and at no other time.
+
+**The child cannot fail; it waits.** The sequence ends in `AnimationEventWait`
+for a `LogicalEnd` event. An interactive action seizes the body and the animation
+that would have raised that event no longer exists, so the node neither succeeds
+nor fails. The tree parks there permanently.
+
+That is the whole difference. A villager's `sa_` activity is issuing movement and
+re-evaluating; a beggar's `so_` tree is blocked on an event that will never come.
+It also matches the independent finding recorded earlier for
+`sb_switch_hitreactions`, whose handler stalls the same way on an animation that
+never completes.
+
+### Why everything tried so far failed
+
+Nothing that was tried touches a parked tree node. Brain variables are identical
+between a stuck and a healthy beggar because the block is in tree execution
+rather than in brain state; the context tables match for the same reason;
+`daycycle:restartRequest`, `daycycle:interrupt` and `daycycle:change` are
+messages the parked node is not listening for; and `entity:Hide` rebuilds the
+entity while the tree state survives. A save load works because the tree is
+instantiated afresh.
+
+### The LODGuardian is the way out, and it is verified
+
+`LODGuardian` plays the animation in its `Detail` branch and substitutes a plain
+wait in the `LOD` branch. Moving an NPC into the LOD branch therefore abandons
+the Detail sequence and the parked `AnimationEventWait` with it. That is exactly
+what the player leaving the area does.
+
+Tested on a beggar held in the stuck state, by narrowing the AI level of detail
+distances so he fell outside `Detail`, then restoring them four seconds later:
+
+```
+[L] forced LOD distances low
+[L] restored LOD distances
+[L] kunes after LOD flip travel=0.00 state=BeggarVAR
+```
+
+He returned to begging without moving, having been inert through seven earlier
+interventions. The mechanism is confirmed.
+
+### What a fix has to be
+
+`WH_AI_LOD_DistanceMin` and `WH_AI_LOD_DistanceMax` are global, so flipping them
+degrades every NPC in the world for the duration and cannot ship. Two directions
+follow from the same understanding:
+
+- **Per-entity.** `WH_AI_LOD_Override` exists and its argument form is not yet
+  known. If the level of detail can be forced on one actor, the flip becomes
+  local and the fix is a few lines.
+- **Prevent rather than repair.** The tree parks because the animation it waits
+  on is destroyed without failing. Anything that makes that node fail instead
+  reaches `OnFail`, which releases the link and lets the tree recover on its own,
+  which is what vanilla intends.
