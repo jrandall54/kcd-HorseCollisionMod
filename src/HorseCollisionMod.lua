@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.0.1
+-- @release 4.0.2-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.0.1"
+HorseCollisionMod.Version = "4.0.2-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -317,6 +317,12 @@ HorseCollisionMod.SpeedHistorySize = 10
 HorseCollisionMod.ReactionAnimationState = "AnimationControlled"
 HorseCollisionMod.ReactionPollMs = 100
 HorseCollisionMod.ReactionEndCeilingMs = 12000
+
+
+-- TEMPORARY, for one diagnostic ride. How long after the rebuild the victim's
+-- links are read again, long enough for the engine to have finished rebuilding
+-- the actor. Remove with ProbeSmartObject before this branch merges.
+HorseCollisionMod.ProbeSettleMs = 1500
 
 local function GetTimeMs()
 	return System.GetCurrTime() * 1000
@@ -1238,6 +1244,71 @@ function HorseCollisionMod:ReleaseVictimMovement(npc)
 	return ok
 end
 
+--- Reports what a victim is linked to, and what the engine says owns them.
+--
+-- TEMPORARY, for one diagnostic ride. Remove before this branch merges.
+--
+-- Vanilla's smart object trees follow one lifecycle: reserve a slot, walk to
+-- the object, align to it with `ExactMove directionType="AlignWithEntity"`,
+-- add a link tagged `usedSO`, announce progress to the daycycle, play the
+-- loop, then release. An interactive action seizes the body partway through
+-- and none of the release runs, so the question this answers is what state is
+-- left behind and whether it clears on its own.
+--
+-- Read-only on purpose. Nothing here sends a message or clears a link,
+-- because a probe that repairs what it is measuring proves nothing.
+--
+-- @tparam table npc victim entity
+-- @tparam string when a label for the moment being sampled
+function HorseCollisionMod:ProbeSmartObject(npc, when)
+	if not self.Config.LogTelemetry then
+		return
+	end
+
+	local who = "?"
+	local count = -1
+	local used = "none"
+	local targets = {}
+
+	pcall(function()
+		who = tostring(npc:GetName())
+	end)
+
+	pcall(function()
+		count = npc:CountLinks()
+	end)
+
+	pcall(function()
+		local target = npc:GetLinkTarget("usedSO", 0)
+
+		if target then
+			used = tostring(target:GetName())
+		end
+	end)
+
+	if type(count) == "number" and count > 0 then
+		for i = 0, count - 1 do
+			local name = "?"
+
+			pcall(function()
+				local link = npc:GetLink(i)
+
+				if link then
+					name = tostring(link:GetName())
+				end
+			end)
+
+			targets[#targets + 1] = name
+		end
+	end
+
+	self:Log("SmartObject " .. when
+			.. " victim=" .. who
+			.. " links=" .. tostring(count)
+			.. " usedSO=" .. used
+			.. " targets=[" .. table.concat(targets, ",") .. "]")
+end
+
 --- Runs something once a victim's reaction animation has finished.
 --
 -- Polls `actor:GetCurrentAnimationState()`, which reports
@@ -1385,7 +1456,13 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		end)
 	end
 
+	-- TEMPORARY. Three samples, chosen so each one answers a different
+	-- question: what owned the victim before the reaction, what survived the
+	-- reaction, and whether the rebuild changes any of it.
+	self:ProbeSmartObject(npc, "before")
+
 	self:WhenReactionEnds(npc, function(why, waited)
+		self:ProbeSmartObject(npc, "afterReaction")
 		self:RebuildVictim(npc)
 
 		if self.Config.LogTelemetry then
@@ -1393,6 +1470,16 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 					.. " on=" .. why
 					.. " waited=" .. string.format("%.0f", waited) .. "ms")
 		end
+
+		local generation = self.TimerTick
+
+		Script.SetTimer(self.ProbeSettleMs, function()
+			if generation ~= self.TimerTick then
+				return
+			end
+
+			self:ProbeSmartObject(npc, "afterRebuild")
+		end)
 	end)
 
 	self:Log("Reaction action=" .. action
