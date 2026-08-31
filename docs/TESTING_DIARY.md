@@ -8434,3 +8434,201 @@ at the faster rate.
 This is the freeze fix complete, and the first fix reimplemented on the clean
 4.0.0 base. What remains unresolved is the blink, which is its own defect and
 its own branch.
+
+
+## Entity links are not how a smart object holds an NPC
+
+Probed at 4.0.2-dev.1, reading every entity link on a victim before the
+reaction, after it, and after the rebuild. Eight reactions across an innkeeper,
+a merchant, a beggar and two guards.
+
+### The link list never changed
+
+| Victim | Links, identical at all three samples |
+| --- | --- |
+| rat_innkeeper1 | rat_home14, rat_pub2, rat_home13 |
+| rat_merchant_shop3 | rat_home7, sa_rat_shop3 |
+| rat_refugee_vojcek | refugeeCamp, rat_watercarrier_jobs |
+| rat_guard8 | sa_rat_garrison, rat_home8 |
+| rat_guard4 | sa_rat_garrison, rat_home12 |
+
+`usedSO` resolved to nothing on every victim at every sample, including on
+victims observed returning to a smart object animation afterwards.
+
+So the `usedSO` link the behavior trees write is not in the entity link system
+that `entity:GetLink` and `entity:GetLinkTarget` read, and nothing in that
+system records a smart object being used or lost. The hypothesis that a stale
+link is what strands a victim is wrong.
+
+What entity links do hold is persistent assignment: a home, a workplace, a
+garrison, a job list. `sa_rat_shop3` and `sa_rat_garrison` are smart activities,
+so the link names the role an NPC is assigned to rather than the object they are
+touching at any moment.
+
+### The victims do re-acquire their smart object
+
+**User report**: the innkeeper "does return to his lean animation which because
+of his distance to the wall showed some slight clipping, like hes attaching from
+the wrong angle". The beggar "also doesn't end up facing the direction he
+started in but also returns to begging animation".
+
+This is the finding that matters, and it is the opposite of what a stale link
+would predict. Nothing is stranded. The smart object takes the victim back, and
+takes them back at whatever angle they happen to be standing at, which is why
+the innkeeper leans into the wall instead of against it.
+
+### The merchant shows what a correct re-acquisition looks like
+
+**User report**: the merchant "seemed to just stay in place on the first impact,
+but the second he got up and went back around to the front of his booth which I
+think is what he does normally on a loop when he's attached to his booth".
+
+Both outcomes came from the same code, so the difference is where he was left
+standing. A smart object tree reaches its loop through `Move` to the object and
+then `ExactMove directionType="AlignWithEntity"`, and the alignment is part of
+the approach. A victim left inside the object's tolerance resumes the loop
+without approaching, so the alignment never runs and their angle is whatever the
+fall gave them. A victim left outside it walks back, and the approach aligns
+them correctly on the way in.
+
+That accounts for every observation in one mechanism: the innkeeper and the
+beggar were near enough to skip the approach, the merchant on his second impact
+was not.
+
+### What this says about the facing work
+
+The rotation chased across three earlier mechanisms was a symptom. The angle was
+never the victim's to keep; at a smart object it belongs to the object and is
+written by the approach. Correcting it from Lua was fighting for control of a
+value the engine sets as a side effect of an NPC walking to their work.
+
+The untested lever is making the victim re-approach rather than resume in place.
+`daycycle:restartRequest` is what vanilla sends for this, and
+`sb_switch_hitreactions.xml` sends it after the game's own hit reactions, which
+is the closest vanilla precedent to this mod.
+
+
+## The replan fixes the merchant and cannot reach the innkeeper
+
+Tested at 4.1.0-dev.1, two impacts each on the Rattay innkeeper, a beggar and a
+merchant. `daycycle:restartRequest` reported `ok=true` on all six.
+
+**User report**: the innkeeper "always returns to his lean in the direction he
+is facing after his getting up animation which was 180 degrees on the first
+impact and 90 degrees to his right on the second. same idea with the beggar but
+it was first impact 45 degrees to his left, second impact ended with him 90
+degrees to his left from original direction, merchant seemed to get right up and
+walk back into his position, second impact he got up again, and then shortly
+after walked back behind his booth to his other normal position."
+
+### The prediction held exactly
+
+The merchant is fixed, on both impacts, including the first. Previously only his
+second impact produced a correct return, and the difference then was that the
+second had thrown him clear of the booth. With the replan he approaches every
+time, and the approach is what puts him straight.
+
+The innkeeper and the beggar are unchanged. Both re-attach to their object at
+whatever angle the get-up left them at: 180 and 90 degrees for the innkeeper, 45
+and 90 for the beggar. Neither walks anywhere, so neither is aligned.
+
+This is the mechanism working as understood rather than failing. Alignment
+happens during the approach, and a victim already inside their object's
+tolerance has no approach to make. Restarting the daycycle asks them to re-plan;
+re-planning correctly concludes that they are already where they should be.
+
+So the fix is real and it is partial by construction. It covers every victim who
+is displaced and no victim who is not, and displacement is a property of the
+impact rather than of the victim.
+
+### The angle is inherited from the get-up, not chosen by the object
+
+Worth stating plainly, because it narrows what is left: the object does not pick
+a wrong angle. It accepts the one the victim is holding. Every reported figure
+is the rotation the fall and get-up chain imparted, which earlier measurement
+established belongs to the clip rather than to the victim, the same action
+producing the same drift on different people in different places.
+
+### The question that is now open
+
+Raised by the user: whether the rotation is caused by the mechanism that keeps a
+reacting victim out of walls.
+
+`ReleaseAnimationMovement` calls `actor:SetMovementControlledByAnimation(false)`
+one tick after the action starts. That takes the body off the animation's root
+motion and puts it on entity-driven movement, which is the state vanilla's own
+hit reactions play in and the reason they respect geometry that an interactive
+action passes through. Reverting it was previously observed to bring wall
+clipping back, so its effect on translation is established.
+
+Its effect on rotation is not. If suppressing the animation's translation leaves
+its rotation still being written, or causes the entity to be turned to follow the
+clip it can no longer travel along, then the drift is a cost of the anti-clipping
+fix rather than a property of the animation, and the two are the same problem.
+
+That is a single-variable experiment: measure the drift with the setting on and
+again with it off. Nothing needs correcting to find out, only recording.
+
+
+## The rotation is in the animation data, and one pairing already has none
+
+Two rides at 4.1.0-dev.2, identical but for `ReleaseAnimationMovement`, which is
+the setting that takes a reacting victim off the animation's root motion so they
+stop passing through walls. Sixteen reactions, heading read before the reaction
+and again when it ended, nothing written.
+
+### The setting makes no difference to rotation
+
+| Action | Anti-clipping on | Anti-clipping off |
+| --- | --- | --- |
+| hcm_knockdown_forward | +53, +52 | +53, +53, +53, +53 |
+| hcm_knockdown_left | -176, 0, 0 | -176, -176 |
+| hcm_knockdown_back | +90 | +91 |
+| hcm_knockdown_right | 0 | 0, 0 |
+
+The figures are the same to the degree in both configurations. Taking the body
+off root motion changes where a victim ends up, which is why it fixed the wall
+clipping, and does not change which way they face. The two problems are
+unrelated, and the anti-clipping fix is not paying for itself in rotation.
+
+### Each action has one rotation, and it is a constant
+
+Across sixteen reactions on different people in different places, hit from
+different approaches, in two configurations:
+
+| Action | Rotation |
+| --- | --- |
+| forward | +53 degrees |
+| left | -176 degrees |
+| back | +90 degrees |
+| right | 0 degrees |
+
+`hcm_knockdown_right` imparts no rotation at all, on three reactions across both
+rides. That is the finding that matters. The rotation is not something reactions
+inevitably do; it is something three of the four fall and get-up pairings do and
+the fourth does not.
+
+This is the sixteen-pairing staged pass being visible from the outside. The back
+fall on a male was recorded there as holding about ninety degrees with no better
+get-up available, and the measurement here returns +90 and +91 for exactly that
+action.
+
+### Two anomalous zeros
+
+`hcm_knockdown_left` returned 0 twice in the first ride against -176 everywhere
+else. Those two ended at 6784 and 6752 ms where every other left ended at 7008
+to 7040, so they finished about 250 ms early. An animation that stopped before
+its rotating section would produce both the short duration and the absent
+rotation. Not investigated, and recorded only so a later ride showing the same
+pair of figures is recognized rather than treated as new.
+
+### What this closes and what it opens
+
+Closed: correcting the heading from Lua, which three mechanisms attempted; the
+theory that the drift is caused by the anti-clipping fix; and the theory that a
+stale smart object link strands a victim.
+
+Open, and now well specified: three of the four knockdown pairings carry a fixed
+rotation and one carries none. The work is in the animation data, in the choice
+of get-up paired with each fall, and `hcm_knockdown_right` is a working example
+sitting in the same database.

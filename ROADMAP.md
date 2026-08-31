@@ -208,6 +208,22 @@ redirecting the same class still collide. `docs/HOW_IT_WORKS.md` and
 Detection itself is sound: the human filter, the dead check, the below-walk gate
 and both axes of the footprint were each cleared against logged sessions.
 
+### Parked
+
+- [ ] A polearm guard's get-up plays wrong. The body turns fully sideways while
+      straightening and passes through the floor before settling. Observed twice
+      on the same guard, and not seen on villagers, women or unarmed guards, so
+      a held polearm occupying an animation scope is the first thing to check.
+      Unrelated to how a victim rejoins their activity, and parked rather than
+      folded into that work.
+
+- [ ] A victim blinks when rebuilt. Hiding and showing the entity in a single
+      call was recorded as invisible during earlier work and is not: it is
+      slight but visible, and noticeable on some victims. The untried lead is
+      that the eleven calls previously found inert were all tested on victims
+      stuck for minutes, never at the moment a reaction ends, which is a
+      different state and was not observable when those tests were run.
+
 ## Phase 2: Mass, armor and momentum
 
 Scale the physical response to what the target is made of.

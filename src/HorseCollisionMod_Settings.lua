@@ -64,6 +64,8 @@ HorseCollisionModSettings = {
 
 	-- Switches.
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
+	ReplanAfterReaction      = true,  -- sends them back to their stall or
+	                                  -- whatever they were leaning on
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
