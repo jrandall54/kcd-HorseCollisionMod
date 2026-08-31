@@ -208,7 +208,11 @@ def check_nexus_page(version):
 
         return found
 
-    listed = set(re.findall(r"^(\w+)\s", block.group(1), re.M))
+    # Settings are indented inside the block and its section headings are not,
+    # so an unindented word is "Force" or "Behavior" rather than a key. Matching
+    # from column zero collected every heading and no setting, which reported
+    # the page as missing all twenty-nine keys it actually documents.
+    listed = set(re.findall(r"^[ 	]{2,}(\w+)\s{2,}", block.group(1), re.M))
     shipped = set(re.findall(
         r"^	(\w+)\s*=",
         read(os.path.join("src", "HorseCollisionMod_Settings.lua")), re.M))
