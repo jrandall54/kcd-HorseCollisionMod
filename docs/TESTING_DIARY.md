@@ -8276,3 +8276,79 @@ once.
 Whether the reaction's actual end can be read from the engine, so the rebuild
 is triggered by the victim being up rather than by a clock. The alternative is
 a rebuild that verifies its own result and repeats, which treats the symptom.
+
+
+## `AnimationControlled` is the reaction, and reading it replaces the delay
+
+Instrumented ride at 4.0.1-dev.2, sampling `actor:GetCurrentAnimationState()`
+and distance covered every 250 ms for 11 seconds after each impact. The rebuild
+delays were held at 12000 ms so nothing interfered with the measurement. Six
+runs produced samples: five knockdowns and one stagger.
+
+### The states an actor passes through
+
+262 samples returned six values:
+
+| State | Samples |
+| --- | --- |
+| AnimationControlled | 115 |
+| MotionIdle | 89 |
+| MotionMovement | 39 |
+| IdleToMove | 8 |
+| MoveToIdle | 6 |
+| MotionIdleVARdefault | 5 |
+
+`AnimationControlled` is present from the first sample at t+256 ms and holds
+continuously until the reaction ends. Everything else is ordinary locomotion.
+Nothing else in the set distinguishes a victim mid-reaction.
+
+### How long it is held
+
+| Action | Held until | Moved by then | Recovered on their own |
+| --- | --- | --- | --- |
+| hcm_knockdown_back | 6992 ms | 0.06 m | no |
+| hcm_knockdown_forward | 5040 ms | 0.09 m | no |
+| hcm_knockdown_right | 6032 ms | 0.00 m | yes |
+| hcm_knockdown_back | 4288 ms | 0.07 m | no |
+| hcm_knockdown_back | 4272 ms | 0.08 m | no |
+| hcm_stagger_right | 2256 ms | 0.06 m | yes |
+
+Knockdowns spread from 4272 to 6992 ms, a range of 2.7 seconds, and the same
+action varies within it: `hcm_knockdown_back` was held for 6992 ms on one victim
+and 4272 ms on another. The stagger released at 2256 ms.
+
+### Why any fixed delay was going to fail
+
+The 5000 ms the previous build used falls inside the knockdown range. Victims
+whose animation ended before it were rebuilt correctly and stood for the
+remainder; victims whose animation was still running were rebuilt mid-clip, and
+the animation took the body back afterwards, which produced exactly the freeze
+the rebuild exists to prevent. Both outcomes came from one number, which is why
+the same build looked like it worked on some victims and not others.
+
+The stagger delay of 2000 ms was under 2256 ms, so every stagger was being
+rebuilt mid-clip.
+
+### The freeze does not resolve itself
+
+Four of the six victims covered less than a tenth of a meter for the full
+eleven seconds, having left `AnimationControlled` and settled into `MotionIdle`
+seconds earlier. The animation ending is not the victim resuming. Something has
+to reattach them, which is what the rebuild is for.
+
+### What replaced the delay
+
+`WhenReactionEnds` polls the animation state every 250 ms and fires when the
+value leaves `AnimationControlled`, bounded at 12000 ms. The state must have
+been observed at least once before leaving it counts, so a poll landing in the
+gap before the action takes hold cannot report a reaction that has not started
+as already finished.
+
+Both per-tier delay constants are removed. The distinction they encoded was an
+attempt to approximate clip length, and an observation covers stagger and
+knockdown without needing to know which is playing.
+
+Telemetry is now one line per reaction, `VictimRebuild action= on= waited=`,
+where `on` is `state`, `ceiling` or `unreadable` and `waited` is how long the
+reaction actually ran. Those figures are the evidence for whether the trigger
+is firing where this predicts.
