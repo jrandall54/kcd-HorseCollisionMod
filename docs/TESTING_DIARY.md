@@ -9335,3 +9335,50 @@ the session, and moved 0.10 m by it here. The difference is that the mod now
 sends a typed `restartRequest` as part of the reaction, so by the time the probe
 ran he had already received one. A message that has already been delivered has
 nothing left to do, which is consistent rather than contradictory.
+
+## The typed replan fixes every activity NPC
+
+Tested at 4.2.1-dev.1, whose only change from 4.2.0 is that `ReplanVictim`
+sends `daycycle:restartRequest` as a typed table rather than as an empty string.
+
+**User report**: "he just got up and started walking ways towards a new place to
+beg... I tried another beggar and she also got up and starting walking away
+towards another begging spot... I hit a woman sitting on a bench and she got up
+and sat back down. Every merchant I hit was able to reset normally. I even went
+and hit the innkeeper and he got up and naturally put himself back into his
+proper leaning position."
+
+Eighteen replans this session, all typed, none falling back to the string form.
+Live states afterwards:
+
+```
+rat_innkeeper1      = Leaning
+rat_refugee_vojcek  = Beggar
+rat_refugee_beranMr = MotionMovement
+rat_merchant_shop1  = MotionIdle
+```
+
+So the parked tree, the unreleased `usedSO` link, the beggar that only a save
+load recovered and the innkeeper that never returned were all one fault: a
+message the game accepted and discarded because its declared members were never
+filled in.
+
+### The distance metric is retired
+
+`travel` ten seconds after impact was used throughout this investigation as the
+test for whether a victim recovered, and it flagged the innkeeper as stuck at
+0.20 m in the same session he was observed leaning correctly. He leans in place
+and never travels; a beggar returning to his own spot does not travel either.
+
+The measure was only ever valid while returning to an activity required walking
+back to it, which was true of a displaced merchant and of nobody else. Animation
+state is the honest test and is what the probes now read.
+
+### A note on how the battery was run
+
+The four typed messages were fired at whatever was parked from an earlier state,
+without the preconditions being stated first, so the run measured a victim that
+had already received a typed replan from the mod. `daycycle:haltContext` moving a
+parked merchant 3.42 m is still a real observation, but it is not evidence that
+`haltContext` is needed: the typed `restartRequest` in the reaction covers every
+case tested since.
