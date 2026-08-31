@@ -9295,3 +9295,43 @@ known to exist.
 `AbortAllAnimations` is confirmed as `wh::xgenaimodule::BehaviorTree::C_AbortAllAnimations`,
 a tree node class with no Lua entry point, so it is reachable only by a tree
 that runs it.
+
+## Typed messages, run against a parked merchant
+
+The four messages this project had recorded as inert, resent as typed tables
+against `rat_merchant_shop1` parked in `MotionIdle`, one at a time with nine
+seconds between them.
+
+| Message | Travel | State after |
+| --- | --- | --- |
+| `daycycle:restartRequest` | 0.10 m | MotionIdle |
+| **`daycycle:haltContext`** | **3.42 m** | **MotionMovement** |
+| `daycycle:interrupt` | 0.57 m | MotionIdle |
+| **`daycycle:behavior:progress`** | **3.21 m** | **MotionMovement** |
+
+`daycycle:haltContext` moved a victim that `daycycle:restartRequest` had just
+failed to move, which is the useful result: halting the context is what a parked
+tree needs, and restarting the daycycle is not.
+
+`daycycle:interrupt` is the one that had been predicted to work, on the grounds
+that it carries the richest payload and is what vanilla sends to stop a
+behavior. It did not.
+
+### The run has a flaw worth naming
+
+The four were sent to the same victim in sequence, so each was applied to
+whatever the previous one left behind. The victim was walking when
+`daycycle:interrupt` arrived rather than parked, and was walking again after
+`behavior:progress`, so neither of those results is clean.
+
+Only the first two rows are trustworthy: a genuinely parked victim was unmoved
+by `restartRequest` and freed by `haltContext`. The probe now takes a single
+candidate so each can be tried against a freshly parked victim.
+
+### On the earlier merchant result
+
+The same merchant had been moved 3.94 m by a typed `restartRequest` earlier in
+the session, and moved 0.10 m by it here. The difference is that the mod now
+sends a typed `restartRequest` as part of the reaction, so by the time the probe
+ran he had already received one. A message that has already been delivered has
+nothing left to do, which is consistent rather than contradictory.

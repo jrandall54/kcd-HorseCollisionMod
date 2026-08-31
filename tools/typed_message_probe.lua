@@ -108,6 +108,10 @@ function HCMProbe.Try(entity, name, index, waitMs)
 		return
 	end
 
+	-- Stop after one when a specific candidate was asked for, so the result
+	-- belongs to that message and not to the three before it.
+	local single = HCMProbe.Only ~= nil
+
 	local before = entity:GetWorldPos()
 	local wuid = nil
 
@@ -139,6 +143,12 @@ function HCMProbe.Try(entity, name, index, waitMs)
 				.. string.format("%.2f", HCMProbe.Travel(before, after))
 				.. " state=" .. HCMProbe.State(entity))
 
+		if single then
+			System.LogAlways("[PROBE] finished")
+
+			return
+		end
+
 		HCMProbe.Try(entity, name, index + 1, waitMs)
 	end)
 end
@@ -163,7 +173,16 @@ function HCMProbe.Run()
 	System.LogAlways("[PROBE] target " .. name
 			.. " state=" .. HCMProbe.State(entity))
 
-	HCMProbe.Try(entity, name, 1, 9000)
+	-- One candidate per run, against a freshly parked victim.
+	--
+	-- Sending all four in sequence measures each against whatever the previous
+	-- one left behind: the first run had the victim walking by the time the
+	-- third arrived, so only the first two rows of it meant anything.
+	HCMProbe.Try(entity, name, HCMProbe.Only or 1, 9000)
 end
+
+-- Set HCMProbe.Only before loading this to choose the candidate:
+-- 1 restartRequest, 2 haltContext, 3 interrupt, 4 behavior:progress.
+HCMProbe.Only = HCMProbe.Only or 1
 
 HCMProbe.Run()
