@@ -13,6 +13,9 @@
 #   .\tools\dev_deploy.ps1 -GameRoot "D:\..."   use an install somewhere else
 #   .\tools\dev_deploy.ps1 -SetDevEnvironment    switch system.cfg to development values
 #   .\tools\dev_deploy.ps1 -SetPlayEnvironment   switch it back to shipping values
+#   .\tools\dev_deploy.ps1 -PrepareShippingTest  park every loose file and switch to
+#                                               shipping values, to test a release zip
+#   .\tools\dev_deploy.ps1 -RestoreDevEnvironment   put it all back
 #
 # The game folder is found automatically: -GameRoot, then the KCD_PATH
 # environment variable, then the usual Steam and GOG install locations.
@@ -33,6 +36,8 @@ param (
 	[switch]$AnimOnly,
 	[switch]$SetDevEnvironment,
 	[switch]$SetPlayEnvironment,
+	[switch]$PrepareShippingTest,
+	[switch]$RestoreDevEnvironment,
 	[switch]$Force
 )
 
@@ -139,6 +144,10 @@ $exe = Join-Path $gameRoot "Bin\Win64\KingdomCome.exe"
 # the old one has to be removed by hand. One stable folder makes deployment a
 # straight overwrite.
 $devMod = "HorseCollisionMod_dev"
+
+# Where -PrepareShippingTest moves everything the development loop installed, so
+# a release zip can be tested with nothing loose left to mask a broken pak.
+$parkedDir = "hcm_dev_parked"
 
 # ---------------------------------------------------------------------------
 # Which configuration the install is in
@@ -260,6 +269,100 @@ if ($SetPlayEnvironment) {
 	exit 0
 }
 
+# Puts the install in the state a player is in, so a packaged build can be
+# tested the way it will actually be loaded. The development loop deploys loose
+# files and runs at sys_PakPriority 0, and a pak with wrong entry names or
+# reference paths overrides nothing and logs nothing, so a broken release looks
+# identical to a working one until every loose file is gone.
+#
+# Everything is moved rather than deleted, and -RestoreDevEnvironment puts it
+# all back.
+if ($PrepareShippingTest) {
+	$park = Join-Path $gameRoot $parkedDir
+	New-Item -ItemType Directory -Force $park | Out-Null
+
+	# Where each item came from, so the restore does not have to infer it.
+	$manifest = Join-Path $park "parked.txt"
+	Set-Content $manifest "" -Encoding utf8
+
+	$moved = 0
+
+	foreach ($rel in @("Data\Scripts\Startup\HorseCollisionMod.lua",
+			"Data\Scripts\Startup\HorseCollisionMod_Settings.lua",
+			"Data\Animations\Mannequin\ADB\hcm_female_database.adb",
+			"Data\Animations\Mannequin\ADB\hcm_male_database.adb",
+			"Data\Animations\Mannequin\ADB\kcd_animationControlledTags.xml",
+			"Data\Animations\Mannequin\ADB\wh_female_fragmentids.xml")) {
+		$p = Join-Path $gameRoot $rel
+
+		if (Test-Path $p) {
+			$leaf = Split-Path $rel -Leaf
+			Move-Item $p (Join-Path $park $leaf) -Force
+			Add-Content $manifest "$leaf|$rel" -Encoding utf8
+			Write-Host "[DEPLOY] parked $rel"
+			$moved++
+		}
+	}
+
+	$dev = Join-Path $modsDir $devMod
+
+	if (Test-Path $dev) {
+		Move-Item $dev (Join-Path $park $devMod) -Force
+		Add-Content $manifest "$devMod|Mods\$devMod" -Encoding utf8
+		Write-Host "[DEPLOY] parked Mods\$devMod"
+		$moved++
+	}
+
+	Set-CfgValues -Root $gameRoot -Which "Play"
+
+	Write-Host "[DEPLOY] $moved item(s) parked in $parkedDir."
+	Write-Host "[DEPLOY] install the release zip through Vortex, then launch"
+	Write-Host "         the game normally. No -devmode."
+	Write-Host "[DEPLOY] undo with: .\tools\dev_deploy.ps1 -RestoreDevEnvironment"
+	exit 0
+}
+
+if ($RestoreDevEnvironment) {
+	$park = Join-Path $gameRoot $parkedDir
+
+	if (-not (Test-Path $park)) {
+		Write-Host "[DEPLOY] nothing parked in $parkedDir." -ForegroundColor Yellow
+		Set-CfgValues -Root $gameRoot -Which "Dev"
+		exit 0
+	}
+
+	# Restored to where each item actually came from, read back from the
+	# manifest written when it was parked. Inferring the destination from the
+	# file name puts anything unexpected in Scripts\Startup, and a script that
+	# lands there is executed at startup rather than sitting inert.
+	$manifest = Join-Path $park "parked.txt"
+
+	if (-not (Test-Path $manifest)) {
+		Write-Host "[DEPLOY] $parkedDir has no manifest; restore by hand." -ForegroundColor Red
+		Write-Host "         Items are in $park"
+		exit 1
+	}
+
+	foreach ($line in Get-Content $manifest) {
+		if (-not $line.Trim()) { continue }
+
+		$name, $rel = $line -split "\|", 2
+		$src = Join-Path $park $name
+
+		if (-not (Test-Path $src)) { continue }
+
+		$dest = Join-Path $gameRoot $rel
+		New-Item -ItemType Directory -Force (Split-Path $dest -Parent) | Out-Null
+		Move-Item $src $dest -Force
+		Write-Host "[DEPLOY] restored $rel"
+	}
+
+	Remove-Item $park -Recurse -Force -ErrorAction SilentlyContinue
+	Set-CfgValues -Root $gameRoot -Which "Dev"
+	Write-Host "[DEPLOY] development environment restored. Restart the game."
+	exit 0
+}
+
 # Every deploy path runs this, including -ScriptOnly and -AnimOnly, which are
 # the ones most likely to be aimed at an install left in shipping values.
 if (-not $Force) {
@@ -306,14 +409,6 @@ function Sync-LooseFiles {
 				From = Join-Path $repoRoot "src\$name"
 				To   = Join-Path $startup $name
 			}
-		}
-
-		# Generated rather than written, so it lives with the other build
-		# products under mod_assets rather than in src.
-		$files += @{
-			Half = "Script"
-			From = Join-Path $repoRoot "mod_assets\Scripts\Startup\HorseCollisionMod_ItemData.lua"
-			To   = Join-Path $startup "HorseCollisionMod_ItemData.lua"
 		}
 	}
 

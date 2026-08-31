@@ -23,6 +23,24 @@ number.
 
 ## [Unreleased]
 
+## [4.2.2] - 2026-08-31
+
+Tooling and the mod page. The mod is unchanged from 4.2.1 and there is no
+reason to reinstall for this on its own.
+
+### Fixed
+
+- A release can no longer be published without having been played from its own
+  pak. The development loop reads loose files at a pak priority a player does
+  not use, where a pak with wrong entry names overrides nothing and logs
+  nothing, so a broken release is indistinguishable from a working one. The
+  guard existed and was lost; it is restored.
+
+- The mod page check read section headings as settings and none of the settings
+  themselves, so it reported the page as missing all twenty-nine keys it
+  documents while missing the one key it genuinely lacked.
+
+
 ## [4.2.1] - 2026-08-31
 
 ### Fixed

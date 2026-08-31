@@ -131,7 +131,13 @@ param (
     [switch]$DryRun,
 
     # Skips the confirmation prompt and the manifest and pre-release checks.
-    [switch]$Force
+    [switch]$Force,
+
+    # Skips the confirmation prompt and nothing else. The prompt cannot be
+    # answered from a non-interactive shell, and reaching for -Force to get
+    # past it turns off the checks as well, which is the opposite of what a
+    # publish wants. Authorization and verification are separate things.
+    [switch]$AssumeYes
 )
 
 $ErrorActionPreference = "Stop"
@@ -335,6 +341,56 @@ if (-not (Test-Path $Zip)) {
     throw "No release zip at $Zip. Build it first: .\build.ps1 -Version $Version"
 }
 
+# A release has to have been played from its pak before it goes out. The
+# development loop deploys loose files and runs at sys_PakPriority 0, where the
+# engine prefers them over any pak, so a pak with wrong entry names or wrong
+# reference paths overrides nothing, logs nothing, and looks exactly like a
+# working one. Version 4.0.0 was published without this check.
+#
+# An install still holding loose mod files, or still set to development pak
+# priority, is proof that whatever was last played was not the packaged build.
+if (-not $DryRun -and -not $Force) {
+    $gameRoot = $env:KCD_PATH
+
+    if (-not $gameRoot -or -not (Test-Path $gameRoot)) {
+        $gameRoot = "C:\Games\Kingdom Come - Deliverance"
+    }
+
+    if (Test-Path $gameRoot) {
+        $loose = @(
+            "Data\Scripts\Startup\HorseCollisionMod.lua",
+            "Data\Animations\Mannequin\ADB\hcm_male_database.adb"
+        ) | Where-Object { Test-Path (Join-Path $gameRoot $_) }
+
+        $cfg = Join-Path $gameRoot "system.cfg"
+        $devPriority = $false
+
+        if (Test-Path $cfg) {
+            $pattern = "^\s*sys_PakPriority\s*=\s*0"
+            $devPriority = [bool](Select-String -Path $cfg -Pattern $pattern -Quiet)
+        }
+
+        if ($loose.Count -gt 0 -or $devPriority) {
+            Write-Host ""
+            Write-Host "The game install is still set up for development, so the" -ForegroundColor Red
+            Write-Host "packaged build has not been played the way a player runs it." -ForegroundColor Red
+
+            foreach ($f in $loose) {
+                Write-Host "  loose file still installed: $f" -ForegroundColor Red
+            }
+
+            if ($devPriority) {
+                Write-Host "  sys_PakPriority = 0, so paks are not read first" -ForegroundColor Red
+            }
+
+            throw ("Test the release first: .\tools\dev_deploy.ps1 " +
+                   "-PrepareShippingTest, install the zip through Vortex, " +
+                   "launch without -devmode, and ride into someone at each " +
+                   "speed tier.")
+        }
+    }
+}
+
 # The mod page and the Files tab entry are checked here rather than in the
 # build, because publishing is the only act that puts them in front of anyone.
 # Every merge to main takes a version and builds, and almost none of those are
@@ -504,10 +560,10 @@ if ($DryRun) {
     exit 0
 }
 
-if (-not $Force) {
+if (-not $Force -and -not $AssumeYes) {
     $answer = Read-Host "This publishes to the live mod page. Type the version to confirm"
     if ($answer -ne $Version) {
-        Write-Host "Cancelled." -ForegroundColor Yellow
+        Write-Host "Canceled." -ForegroundColor Yellow
         exit 1
     }
 }
