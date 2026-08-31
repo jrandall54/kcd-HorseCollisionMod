@@ -23,6 +23,22 @@ number.
 
 ## [Unreleased]
 
+## [4.1.0-dev.1] - 2026-08-31
+
+### Fixed
+
+- Victims go back to what they were doing properly, instead of resuming it from
+  wherever they fell. Anyone whose day is anchored to something, a merchant at a
+  stall or a drinker leaning on a wall, would otherwise carry on at whatever
+  angle the fall left them at, which showed as an innkeeper leaning into his
+  wall from the wrong side. They now walk back to it, which is what sets their
+  position and their facing.
+
+### Added
+
+- `ReplanAfterReaction` controls that, and is on by default.
+
+
 ## [4.0.1] - 2026-08-31
 
 ### Fixed

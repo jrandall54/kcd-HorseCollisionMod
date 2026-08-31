@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.0.2-dev.1
+-- @release 4.1.0-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.0.2-dev.1"
+HorseCollisionMod.Version = "4.1.0-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -136,6 +136,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   is dropped, matching vanilla's own limit
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
+-- @field ReplanAfterReaction ask a victim to re-plan their activity once the
+--   reaction is over, so they approach and re-align to whatever they were using
 -- @field LogTelemetry write diagnostics to kcd.log
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @table Config
@@ -201,6 +203,11 @@ HorseCollisionMod.Config = {
 	-- stops being carried through walls. False restores the behavior before
 	-- this, where a stagger beside a building could end inside it.
 	ReleaseAnimationMovement = true,
+
+	-- Sends a victim back to their activity once their reaction is over, so
+	-- they walk to whatever they were using and are aligned to it on the way
+	-- in rather than resuming it from wherever they fell.
+	ReplanAfterReaction      = true,
 
 	-- The health at or above which a victim is no longer a candidate for
 	-- vanilla's auto-cure daycycle. Vanilla's own limit is 40, declared as
@@ -318,11 +325,6 @@ HorseCollisionMod.ReactionAnimationState = "AnimationControlled"
 HorseCollisionMod.ReactionPollMs = 100
 HorseCollisionMod.ReactionEndCeilingMs = 12000
 
-
--- TEMPORARY, for one diagnostic ride. How long after the rebuild the victim's
--- links are read again, long enough for the engine to have finished rebuilding
--- the actor. Remove with ProbeSmartObject before this branch merges.
-HorseCollisionMod.ProbeSettleMs = 1500
 
 local function GetTimeMs()
 	return System.GetCurrTime() * 1000
@@ -1244,69 +1246,48 @@ function HorseCollisionMod:ReleaseVictimMovement(npc)
 	return ok
 end
 
---- Reports what a victim is linked to, and what the engine says owns them.
+--- Sends a victim back to their activity by way of approaching it again.
 --
--- TEMPORARY, for one diagnostic ride. Remove before this branch merges.
+-- A smart object reaches its loop through `Move` to the object followed by
+-- `ExactMove directionType="AlignWithEntity"`, so the angle an NPC holds while
+-- leaning on a wall or standing at a stall is the object's, written by the
+-- approach rather than owned by the NPC.
 --
--- Vanilla's smart object trees follow one lifecycle: reserve a slot, walk to
--- the object, align to it with `ExactMove directionType="AlignWithEntity"`,
--- add a link tagged `usedSO`, announce progress to the daycycle, play the
--- loop, then release. An interactive action seizes the body partway through
--- and none of the release runs, so the question this answers is what state is
--- left behind and whether it clears on its own.
+-- A reaction leaves the victim near enough to that object to resume the loop
+-- without approaching it. The alignment never runs, and the loop plays at
+-- whatever angle the fall left them at, which reads in game as an innkeeper
+-- leaning into a wall from the wrong side. A victim thrown clear of the object
+-- walks back instead and is aligned correctly on the way in, which is the same
+-- code producing the correct result for the only reason that matters: the
+-- approach happened.
 --
--- Read-only on purpose. Nothing here sends a message or clears a link,
--- because a probe that repairs what it is measuring proves nothing.
+-- Restarting the daycycle is what makes the approach happen. Vanilla sends the
+-- same message from `Libs/AI/final/sb_switch_hitreactions.xml` after its own
+-- hit reactions, and from `Scripts/Haste/hasteInstruction_teleportBase.lua`
+-- after teleporting an NPC, both being cases where a body has been moved
+-- without its behavior being told.
+--
+-- Entity links are not involved. Probing a victim before a reaction, after it
+-- and after the rebuild showed an unchanged list of persistent assignments, a
+-- home and a workplace, with no `usedSO` link visible at any point.
 --
 -- @tparam table npc victim entity
--- @tparam string when a label for the moment being sampled
-function HorseCollisionMod:ProbeSmartObject(npc, when)
-	if not self.Config.LogTelemetry then
-		return
+-- @treturn boolean true when the message was accepted without error
+function HorseCollisionMod:ReplanVictim(npc)
+	if not self.Config.ReplanAfterReaction then
+		return false
 	end
 
-	local who = "?"
-	local count = -1
-	local used = "none"
-	local targets = {}
-
-	pcall(function()
-		who = tostring(npc:GetName())
+	local ok, err = pcall(function()
+		XGenAIModule.SendMessageToEntity(npc.id, "daycycle:restartRequest", "")
 	end)
 
-	pcall(function()
-		count = npc:CountLinks()
-	end)
-
-	pcall(function()
-		local target = npc:GetLinkTarget("usedSO", 0)
-
-		if target then
-			used = tostring(target:GetName())
-		end
-	end)
-
-	if type(count) == "number" and count > 0 then
-		for i = 0, count - 1 do
-			local name = "?"
-
-			pcall(function()
-				local link = npc:GetLink(i)
-
-				if link then
-					name = tostring(link:GetName())
-				end
-			end)
-
-			targets[#targets + 1] = name
-		end
+	if self.Config.LogTelemetry then
+		self:Log("VictimReplan ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
 	end
 
-	self:Log("SmartObject " .. when
-			.. " victim=" .. who
-			.. " links=" .. tostring(count)
-			.. " usedSO=" .. used
-			.. " targets=[" .. table.concat(targets, ",") .. "]")
+	return ok
 end
 
 --- Runs something once a victim's reaction animation has finished.
@@ -1456,30 +1437,15 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		end)
 	end
 
-	-- TEMPORARY. Three samples, chosen so each one answers a different
-	-- question: what owned the victim before the reaction, what survived the
-	-- reaction, and whether the rebuild changes any of it.
-	self:ProbeSmartObject(npc, "before")
-
 	self:WhenReactionEnds(npc, function(why, waited)
-		self:ProbeSmartObject(npc, "afterReaction")
 		self:RebuildVictim(npc)
+		self:ReplanVictim(npc)
 
 		if self.Config.LogTelemetry then
 			self:Log("VictimRebuild action=" .. action
 					.. " on=" .. why
 					.. " waited=" .. string.format("%.0f", waited) .. "ms")
 		end
-
-		local generation = self.TimerTick
-
-		Script.SetTimer(self.ProbeSettleMs, function()
-			if generation ~= self.TimerTick then
-				return
-			end
-
-			self:ProbeSmartObject(npc, "afterRebuild")
-		end)
 	end)
 
 	self:Log("Reaction action=" .. action

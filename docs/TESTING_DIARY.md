@@ -8434,3 +8434,75 @@ at the faster rate.
 This is the freeze fix complete, and the first fix reimplemented on the clean
 4.0.0 base. What remains unresolved is the blink, which is its own defect and
 its own branch.
+
+
+## Entity links are not how a smart object holds an NPC
+
+Probed at 4.0.2-dev.1, reading every entity link on a victim before the
+reaction, after it, and after the rebuild. Eight reactions across an innkeeper,
+a merchant, a beggar and two guards.
+
+### The link list never changed
+
+| Victim | Links, identical at all three samples |
+| --- | --- |
+| rat_innkeeper1 | rat_home14, rat_pub2, rat_home13 |
+| rat_merchant_shop3 | rat_home7, sa_rat_shop3 |
+| rat_refugee_vojcek | refugeeCamp, rat_watercarrier_jobs |
+| rat_guard8 | sa_rat_garrison, rat_home8 |
+| rat_guard4 | sa_rat_garrison, rat_home12 |
+
+`usedSO` resolved to nothing on every victim at every sample, including on
+victims observed returning to a smart object animation afterwards.
+
+So the `usedSO` link the behavior trees write is not in the entity link system
+that `entity:GetLink` and `entity:GetLinkTarget` read, and nothing in that
+system records a smart object being used or lost. The hypothesis that a stale
+link is what strands a victim is wrong.
+
+What entity links do hold is persistent assignment: a home, a workplace, a
+garrison, a job list. `sa_rat_shop3` and `sa_rat_garrison` are smart activities,
+so the link names the role an NPC is assigned to rather than the object they are
+touching at any moment.
+
+### The victims do re-acquire their smart object
+
+**User report**: the innkeeper "does return to his lean animation which because
+of his distance to the wall showed some slight clipping, like hes attaching from
+the wrong angle". The beggar "also doesn't end up facing the direction he
+started in but also returns to begging animation".
+
+This is the finding that matters, and it is the opposite of what a stale link
+would predict. Nothing is stranded. The smart object takes the victim back, and
+takes them back at whatever angle they happen to be standing at, which is why
+the innkeeper leans into the wall instead of against it.
+
+### The merchant shows what a correct re-acquisition looks like
+
+**User report**: the merchant "seemed to just stay in place on the first impact,
+but the second he got up and went back around to the front of his booth which I
+think is what he does normally on a loop when he's attached to his booth".
+
+Both outcomes came from the same code, so the difference is where he was left
+standing. A smart object tree reaches its loop through `Move` to the object and
+then `ExactMove directionType="AlignWithEntity"`, and the alignment is part of
+the approach. A victim left inside the object's tolerance resumes the loop
+without approaching, so the alignment never runs and their angle is whatever the
+fall gave them. A victim left outside it walks back, and the approach aligns
+them correctly on the way in.
+
+That accounts for every observation in one mechanism: the innkeeper and the
+beggar were near enough to skip the approach, the merchant on his second impact
+was not.
+
+### What this says about the facing work
+
+The rotation chased across three earlier mechanisms was a symptom. The angle was
+never the victim's to keep; at a smart object it belongs to the object and is
+written by the approach. Correcting it from Lua was fighting for control of a
+value the engine sets as a side effect of an NPC walking to their work.
+
+The untested lever is making the victim re-approach rather than resume in place.
+`daycycle:restartRequest` is what vanilla sends for this, and
+`sb_switch_hitreactions.xml` sends it after the game's own hit reactions, which
+is the closest vanilla precedent to this mod.
