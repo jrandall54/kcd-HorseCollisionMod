@@ -10161,3 +10161,56 @@ both part files through the `Script.ReloadScript` calls at the foot of it, and
 the mod came back reporting `Load screen ended. v4.3.2 initializing physics
 timer loop 4`. The development loop needs no knowledge of how many part files
 there are.
+
+## Logging, speed history and the tier, and two locals that had to change shape
+
+`Log`, `LogRejection`, `TrackSpeed`, `RecentPeak`, `SpeedTrail`, `ImpactSpeed`
+and `GetSpeedTier` moved to `Scripts/HorseCollisionMod/Log.lua`, 171 lines. The
+entry point is 2,198 lines, down from 2,558 before the split began.
+
+### A file-local cannot cross a part file boundary
+
+`GetTimeMs` and `GetVectorLength` were declared `local function` in the entry
+point and called from nine places spread across the file. A `local` is visible
+only inside the chunk that declares it, and each part file is a separate chunk,
+so moving them as locals would have left every later slice calling a global
+that resolves to nil.
+
+They are now `HorseCollisionMod:TimeMs` and `HorseCollisionMod:VectorLength`.
+Every call site is inside a method and reaches them through `self`, including
+three inside nested closures, where `self` is captured as an upvalue.
+
+This is why the slice is placed third rather than later. The constraint applies
+to any file-local shared across the seams, and finding it while the rest of the
+mod is still in one file made it one edit instead of several.
+
+### One trot impact after the reload
+
+```
+Impact tier=Trot speed=6.93 sampled=6.92 armorImpulse=1.26 armorStamina=0.83
+ImpactCost rat_pickpocket_woman1 tier=Trot strength=5 weight=5.0
+Reaction action=hcm_fall_forward gender=2 ok=true err=nil
+Horse stamina 210.0 -> 195.1
+VictimRebuild action=hcm_fall_forward on=resolved waited=9184ms
+```
+
+That single line exercises the whole moved block: `VectorLength` on the horse's
+velocity, `TrackSpeed` and `ImpactSpeed` against the history, `GetSpeedTier` to
+choose the tier, and `Log` to report it. The recovery completed and no field
+resolved to nil.
+
+### The deployed pak is not what the loose files are
+
+Worth knowing before any shipping test. The engine enumerates
+`Scripts/Startup/` from every source it has, so the loose script and the copy
+inside `Mods\HorseCollisionMod_dev\Data\HorseCollisionMod.pak` are both
+executed, and each registers its own load-screen listener. Three banners
+appeared on one load screen, at three different versions, because a hot reload
+registers another listener without removing the previous one.
+
+At `sys_PakPriority = 0` the loose files win the path lookup, so the part files
+resolve to the current ones and the measurements above are of the current code.
+The deployed pak, however, is whatever the last full deploy built - here
+v4.3.1, which predates the split and contains no part files at all. A shipping
+test run against a stale pak would exercise the monolithic build and report
+nothing wrong.
