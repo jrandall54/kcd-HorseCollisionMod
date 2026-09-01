@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.12-dev.1
+-- @release 4.2.12-dev.2
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.12-dev.1"
+HorseCollisionMod.Version = "4.2.12-dev.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -378,6 +378,14 @@ HorseCollisionMod.ReplanAfterRebuildMs = 600
 -- Whether a real, player-attributed combat hit is sent alongside the physical
 -- one. Off because it is how the game decides a crime happened.
 HorseCollisionMod.SendCombatHitEnabled = false
+
+
+-- Overrides for the combat hit, used while measuring what the game charges.
+-- `CombatHitType` takes a `HitReactionType`; nil uses Melee, which is what
+-- vanilla's own branch rewrites a ridden collision into. `CombatHitStrength`
+-- takes a `HitReactionStrength`; nil uses the tier's own.
+HorseCollisionMod.CombatHitType = nil
+HorseCollisionMod.CombatHitStrength = nil
 
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
@@ -1624,11 +1632,18 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 		return false
 	end
 
+	-- Both overridable, so a single impact can be run at a chosen setting
+	-- without a rebuild. The charge the game brings is the thing being
+	-- measured, and it can only be read by surrendering to a guard, which
+	-- means one impact per save load.
+	local hitType = self.CombatHitType or self.HitReactionType.Melee
+	local sent = self.CombatHitStrength or strength
+
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("combat:hit", {
 			attacker = playerWuid,
-			strength = strength,
-			hitType = self.HitReactionType.Melee,
+			strength = sent,
+			hitType = hitType,
 			real = true
 		})
 
@@ -1637,7 +1652,8 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 
 	if self.Config.LogTelemetry then
 		self:Log("CombatHit ok=" .. tostring(ok)
-				.. " strength=" .. tostring(strength)
+				.. " hitType=" .. tostring(hitType)
+				.. " strength=" .. tostring(sent)
 				.. " err=" .. tostring(err))
 	end
 

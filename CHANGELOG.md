@@ -23,7 +23,7 @@ number.
 
 ## [Unreleased]
 
-## [4.2.12-dev.1] - 2026-08-31
+## [4.2.12-dev.2] - 2026-08-31
 
 Diagnostics, off by default. The mod behaves as 4.2.11 does unless enabled.
 
