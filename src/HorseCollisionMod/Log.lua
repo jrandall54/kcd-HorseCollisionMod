@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Log
 -- @author jrandall54
--- @release 4.3.3
+-- @release 4.3.4
 
 --- The engine clock in milliseconds.
 --
