@@ -287,8 +287,21 @@ if ($PrepareShippingTest) {
 
 	$moved = 0
 
+	# Every loose Lua part the entry point pulls in has to be parked too. One
+	# left behind is worse than leaving them all: the pak's entry point would
+	# load, find a stale part next to it, and the shipping test would pass on
+	# a file set no player has.
+	$looseParts = @()
+	$partsSrc = Join-Path $repoRoot "src\HorseCollisionMod"
+
+	if (Test-Path $partsSrc) {
+		$looseParts = @(Get-ChildItem -Path $partsSrc -Filter *.lua -File |
+			Sort-Object Name |
+			ForEach-Object { "Data\Scripts\HorseCollisionMod\$($_.Name)" })
+	}
+
 	foreach ($rel in @("Data\Scripts\Startup\HorseCollisionMod.lua",
-			"Data\Scripts\Startup\HorseCollisionMod_Settings.lua",
+			"Data\Scripts\Startup\HorseCollisionMod_Settings.lua") + $looseParts + @(
 			"Data\Animations\Mannequin\ADB\hcm_female_database.adb",
 			"Data\Animations\Mannequin\ADB\hcm_male_database.adb",
 			"Data\Animations\Mannequin\ADB\kcd_animationControlledTags.xml",
@@ -408,6 +421,26 @@ function Sync-LooseFiles {
 				Half = "Script"
 				From = Join-Path $repoRoot "src\$name"
 				To   = Join-Path $startup $name
+			}
+		}
+
+		# The part files the entry point pulls in with Script.ReloadScript.
+		# They sit beside Scripts\Startup rather than in it, because that
+		# folder is enumerated and executed by the engine. Walked rather than
+		# named, so a later slice needs no change here. A missing part does not
+		# fail loudly: the entry point loads, the methods it expected are nil,
+		# and the mod silently does less.
+		$partsSrc = Join-Path $repoRoot "src\HorseCollisionMod"
+
+		if (Test-Path $partsSrc) {
+			$partsDest = Join-Path $Root "Data\Scripts\HorseCollisionMod"
+
+			foreach ($part in (Get-ChildItem -Path $partsSrc -Filter *.lua -File | Sort-Object Name)) {
+				$files += @{
+					Half = "Script"
+					From = $part.FullName
+					To   = Join-Path $partsDest $part.Name
+				}
 			}
 		}
 	}

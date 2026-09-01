@@ -9,7 +9,9 @@ The claims, in order:
  1. The only vanilla names claimed are the two small declaration files, and
     what is claimed stays small enough for another author to merge by hand.
     No animation database is claimed.
- 2. The release ships exactly the intended file set, no more.
+ 2. The release ships exactly the intended file set, no more, and every Lua
+    part file in src/ both ships and is named by a Script.ReloadScript call
+    in the entry point.
  3. Nothing is lost from the fragment the mod takes authority over: every
     vanilla FragTag and every vanilla option survives.
  4. The mod's own options are present and point at clips the game contains.
@@ -120,6 +122,44 @@ def main():
                                    sorted(got - expected) or "none"))
     check("Scripts/Startup/HorseCollisionMod.lua" in shipped,
           "the mod script ships")
+
+    # The entry point is only the entry point. It pulls the rest of the mod in
+    # with Script.ReloadScript, and a part that is missing from the pak, or
+    # present but never named, does not crash: the methods it defines stay nil
+    # and the mod silently does less. Both halves are checked, and against the
+    # source tree rather than a list written here, so that moving another
+    # section into a part file cannot leave this passing vacuously.
+    entry = pak.read("Scripts/Startup/HorseCollisionMod.lua").decode(
+        "ascii", "replace")
+    named = set(re.findall(
+        r'Script\.ReloadScript\s*\(\s*"([^"]+)"\s*\)', entry))
+
+    parts_dir = os.path.join(REPO_ROOT, "src", "HorseCollisionMod")
+    expected_parts = set(
+        "Scripts/HorseCollisionMod/" + f
+        for f in sorted(os.listdir(parts_dir))
+        if f.endswith(".lua")) if os.path.isdir(parts_dir) else set()
+
+    check(bool(expected_parts),
+          "there is at least one part file to check, so this is not vacuous",
+          "%d found in src/HorseCollisionMod/" % len(expected_parts))
+
+    missing = sorted(p for p in expected_parts if p not in shipped)
+    check(not missing, "every part file in src/ ships in the pak", missing)
+
+    unnamed = sorted(expected_parts - named)
+    check(not unnamed,
+          "the entry point names every part it ships with ReloadScript",
+          unnamed)
+
+    dangling = sorted(named - set(shipped))
+    check(not dangling,
+          "every path the entry point loads exists in the pak", dangling)
+
+    stray = sorted(n for n in shipped
+                   if n.startswith("Scripts/HorseCollisionMod/")
+                   and n not in expected_parts)
+    check(not stray, "the pak carries no part file src/ does not have", stray)
 
     # ---- 3, 4, 5. per character set ---------------------------------------
     for gender, paths in sorted(build_adb.GENDERS.items()):

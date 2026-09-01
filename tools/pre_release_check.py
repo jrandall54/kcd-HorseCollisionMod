@@ -337,6 +337,10 @@ def check_readme_layout():
     Only src and tools are required to be complete: they are where files are
     added, and a missing entry there means the description is wrong rather
     than merely brief.
+
+    A listed directory covers what is inside it. The mod's Lua is split across
+    a directory of part files that grows one file at a time, and a layout block
+    that named every one would say less than a line describing the directory.
     """
     listed = readme_layout()
 
@@ -344,14 +348,13 @@ def check_readme_layout():
         return [("README.md", 0, "layout", "no repository layout block")]
 
     found = []
+    directories = sorted(n for n in listed if n.endswith("/"))
 
     for name in sorted(listed):
-        if name.endswith("/"):
-            continue
-
         if not os.path.exists(os.path.join(REPO_ROOT, name)):
             found.append(("README.md", 0, name,
-                          "the layout lists a file that does not exist"))
+                          "the layout lists a %s that does not exist"
+                          % ("directory" if name.endswith("/") else "file")))
 
     tracked = set(tracked_files())
 
@@ -362,9 +365,11 @@ def check_readme_layout():
         if os.path.basename(path).startswith("__"):
             continue
 
-        if path not in listed:
-            found.append(("README.md", 0, path,
-                          "tracked but missing from the layout"))
+        if path in listed or any(path.startswith(d) for d in directories):
+            continue
+
+        found.append(("README.md", 0, path,
+                      "tracked but missing from the layout"))
 
     return found
 
@@ -404,11 +409,23 @@ def check_generated_docs():
     silently: the source grows new functions and fields and the published
     reference keeps describing the old surface. Comparing commit times catches
     that, where comparing file times would fire on every checkout.
-    """
-    source = os.path.join("src", "HorseCollisionMod.lua")
-    generated = os.path.join("docs", "api", "index.html")
 
-    if not os.path.exists(os.path.join(REPO_ROOT, generated)):
+    Every Lua file under src/ is compared against every generated page, rather
+    than the entry point against the index. The mod is split across part files
+    and LDoc writes one page per module, so a check on a single pair either
+    misses a part file that changed or misses a page that was not rewritten.
+    """
+    def tracked(prefix, suffix):
+        out = subprocess.run(["git", "ls-files", "--", prefix],
+                             cwd=REPO_ROOT, capture_output=True,
+                             text=True).stdout.split()
+
+        return [p for p in out if p.endswith(suffix)]
+
+    sources = tracked("src", ".lua")
+    generated = tracked("docs/api", ".html")
+
+    if not sources or not generated:
         return []
 
     def committed_at(path):
@@ -418,15 +435,19 @@ def check_generated_docs():
 
         return int(out) if out.isdigit() else None
 
-    source_at = committed_at(source)
-    generated_at = committed_at(generated)
+    source_times = [(p, committed_at(p)) for p in sources]
+    generated_times = [(p, committed_at(p)) for p in generated]
 
-    if source_at is None or generated_at is None:
+    if any(t is None for _, t in source_times + generated_times):
         return []
 
+    newest_source, source_at = max(source_times, key=lambda pair: pair[1])
+    oldest_page, generated_at = min(generated_times, key=lambda pair: pair[1])
+
     if source_at > generated_at:
-        return [(generated.replace(os.sep, "/"), 0, "stale",
-                 "the source has changed since this was generated; run ldoc .")]
+        return [(oldest_page, 0, "stale",
+                 "%s has changed since this was generated; run ldoc ."
+                 % newest_source)]
 
     return []
 

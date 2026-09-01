@@ -255,37 +255,6 @@ HorseCollisionMod.Config = {
 }
 
 
---- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
---
--- The values are deliberately non-sequential; they mirror a C++ enum. The
--- full set is kept rather than just the value used, so the contract stays
--- verifiable against the engine.
---
--- @table HitReactionType
-HorseCollisionMod.HitReactionType = {
-	Melee = 1,
-	Collision = 2,
-	Fall = 7,
-	Bullet = 10,
-	MeleeStealth = 16
-}
-
---- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
---
--- Ascending severity. `Tickle` and `Unpleasant` cost the victim no health.
---
--- @table HitReactionStrength
-HorseCollisionMod.HitReactionStrength = {
-	Zero = 0,
-	Healing = 1,
-	Tickle = 2,
-	Unpleasant = 3,
-	Exhausting = 4,
-	MinorInjury = 5,
-	MajorInjury = 6,
-	Fatal = 7
-}
-
 --- When each victim may react again, in milliseconds, keyed by entity id.
 --
 -- Holds the time a victim becomes eligible rather than the time it was last
@@ -2544,6 +2513,26 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		end)
 	end
 end
+
+-- The rest of the mod, named explicitly and in the order it is wanted.
+--
+-- `Script.ReloadScript` is how the base game composes its own Lua: it is the
+-- first line of nearly every vanilla entity script and is what
+-- `Scripts/common.lua` uses to pull in its utility files. It is synchronous
+-- and resolves the path through the merged pak filesystem, so a part file is
+-- fully defined by the time the next line runs.
+--
+-- The parts live outside `Scripts/Startup/` on purpose. The engine enumerates
+-- that folder and executes what it finds, in no guaranteed order, which would
+-- both run a part before this table exists and run it a second time. Only the
+-- entry point is enumerated; everything else is named here.
+--
+-- Loaded at the foot of the file rather than the head so that every part can
+-- rely on the whole entry point being defined, and so the bootstrap below,
+-- which calls into the mod, runs after the parts are in place. Each part adds
+-- to the table above and carries no top-level statements, so the reload the
+-- dev console fires cascades through them harmlessly.
+Script.ReloadScript("Scripts/HorseCollisionMod/Enums.lua")
 
 -- Runs at file scope rather than from the load screen, because
 -- AnimDatabase3P is read when an actor spawns and the load screen ends
