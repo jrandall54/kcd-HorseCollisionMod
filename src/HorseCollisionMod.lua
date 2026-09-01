@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.11-dev.2
+-- @release 4.2.11-dev.4
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.11-dev.2"
+HorseCollisionMod.Version = "4.2.11-dev.4"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -382,6 +382,17 @@ HorseCollisionMod.ReplanAfterRebuildMs = 600
 HorseCollisionMod.HitReactionTyped = true
 
 
+-- Who a collision names as its attacker. "horse" is what vanilla does for a
+-- trample and leaves the game to follow the horse's rider link to the player;
+-- "player" names the rider directly and skips that step.
+HorseCollisionMod.HitReactionAttacker = "horse"
+
+
+-- Whether the hit is sent before the reaction seizes the victim's body, or
+-- after it as the mod has always done.
+HorseCollisionMod.HitReactionFirst = false
+
+
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
@@ -570,9 +581,11 @@ end
 -- message arriving.
 --
 -- @tparam table npc victim entity
--- @tparam userdata horseWuid WUID of the horse, sent as the attacker
+-- @tparam userdata horseWuid WUID of the horse
+-- @tparam[opt] table playerEnt the rider, named as the attacker when
+--   `HitReactionAttacker` is "player"
 -- @tparam number strength a `HitReactionStrength` value
-function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
+function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength, playerEnt)
 	if not self.Config.SendHitReaction then
 		return
 	end
@@ -581,6 +594,31 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 
 	if npc.this and npc.this.id then
 		target = npc.this.id
+	end
+
+	-- Who the hit is attributed to.
+	--
+	-- Naming the horse is what vanilla does for a trample, and it costs a
+	-- resolution step: `sb_switch_hitreactions.xml` follows the horse's
+	-- `rider` link and only re-sends the event as `combat:hit` once that
+	-- reaches the player. Naming the rider skips the link entirely.
+	--
+	-- Switchable so the two can be compared:
+	--   HorseCollisionMod.HitReactionAttacker = "player"
+	local attacker = horseWuid
+	local named = "horse"
+
+	if self.HitReactionAttacker == "player" and playerEnt then
+		local playerWuid = nil
+
+		pcall(function()
+			playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+		end)
+
+		if playerWuid then
+			attacker = playerWuid
+			named = "player"
+		end
 	end
 
 	-- Sent as a typed table, with the attacker as a WUID rather than as text.
@@ -613,7 +651,7 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	if self.HitReactionTyped then
 		ok, err = pcall(function()
 			local message = Utils.makeTable("hitReaction", {
-				attacker = horseWuid,
+				attacker = attacker,
 				hitStrength = strength,
 				hitType = self.HitReactionType.Collision
 			})
@@ -626,8 +664,8 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 					.. "), hitType(" .. tostring(self.HitReactionType.Collision)
 					.. ")"
 
-			if horseWuid and Framework and Framework.WUIDToMsg then
-				values = "attacker(" .. Framework.WUIDToMsg(horseWuid) .. "), "
+			if attacker and Framework and Framework.WUIDToMsg then
+				values = "attacker(" .. Framework.WUIDToMsg(attacker) .. "), "
 						.. values
 			end
 
@@ -639,7 +677,7 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 		self:Log("HitReaction form=" .. (self.HitReactionTyped and "typed" or "string")
 				.. " ok=" .. tostring(ok)
 				.. " strength=" .. tostring(strength)
-				.. " attacker=" .. tostring(horseWuid ~= nil)
+				.. " attacker=" .. named
 				.. " err=" .. tostring(err))
 	end
 end
@@ -2119,7 +2157,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		end
 
 		self:ProbeImpactCost(npc, "Walk", strength.Tickle, armor)
-		self:SendHitReaction(npc, horseWuid, strength.Tickle)
+		self:SendHitReaction(npc, horseWuid, strength.Tickle, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainWalk * combatScale * armorStamina)
 		return
@@ -2135,6 +2173,20 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- the horse cannot strike them and the engine charges nothing. The
 		-- ragdoll is kept because it is what shipped, and because an
 		-- animation does not carry the impact's momentum.
+		-- The hit can be sent before the reaction or after it.
+		--
+		-- After is what shipped, and it delivers the message to a victim whose
+		-- body has just been seized by an interactive action. A handler
+		-- declared Atomic drops messages while busy, which would drop the hit
+		-- on some victims and not others without depending on what the message
+		-- carries. Changing the contents across three measured phases moved the
+		-- rate not at all, which is what points here.
+		--
+		-- Switchable:  HorseCollisionMod.HitReactionFirst = true
+		if self.HitReactionFirst then
+			self:SendHitReaction(npc, horseWuid, strength.MinorInjury, playerEnt)
+		end
+
 		if cfg.TrotReaction == "knockdown" then
 			self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
 		elseif cfg.TrotReaction == "fall" then
@@ -2142,7 +2194,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		else
 			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
 		end
-		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
+
+		if not self.HitReactionFirst then
+			self:SendHitReaction(npc, horseWuid, strength.MinorInjury, playerEnt)
+		end
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
 		return
@@ -2154,7 +2209,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
 		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse)
-		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
+		self:SendHitReaction(npc, horseWuid, strength.MajorInjury, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina)
 		return

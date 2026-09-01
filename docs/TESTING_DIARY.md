@@ -9509,3 +9509,55 @@ ride, `rat_refugee_Radan` and `rat_refugee_tonda_rumpal`, took damage normally.
 
 Worth stating that the zero rate is not new and was not introduced here. It sits
 at the same level under the form that shipped in 4.2.1.
+
+## Neither the encoding nor the attacker changes the zeros
+
+Three phases at 4.2.11-dev.2 and dev.3, one save, no reload between them, the
+form and the attacker switched from the console so the horse, the entity ids and
+the cooldowns stay constant. Trot only.
+
+| Phase | Form | Attacker | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- | --- |
+| A | string | horse | 11 | 2 (18%) | 4.85 |
+| B | typed | horse | 14 | 2 (14%) | 5.09 |
+| C | typed | player | 10 | 2 (20%) | 5.04 |
+
+Thirty-five impacts, six with no damage, and the rate does not move.
+
+**Naming the rider directly makes no difference either.** That was worth
+testing: naming the horse leaves the game to follow the horse's `rider` link
+before it re-sends the event as `combat:hit`, and an intermittently
+unresolvable link would have produced exactly this pattern. It does not.
+
+### The zeros are real, not a sampling window
+
+Impact cost is sampled at four offsets. Every victim reading zero at t+3000
+reads zero at t+500, t+6000 and t+10000 as well:
+
+```
+rat_refugee_vojcek     +0.00  +0.00  +0.00  +0.00
+rat_merchant_shop1     +0.00  +0.00  +0.00  +0.00
+rat_innkeeper1         +0.00  +0.00  +0.00  +0.00
+rat_swordsmiths_wife   +0.00  +0.00  +0.00  +0.00
+rat_man13              +0.00  +0.00  +0.00  +0.00
+rat_refugee_maruna     +0.00  +0.00  +0.00  +0.00
+```
+
+Nothing arrives late. The hit does not land at all.
+
+### What is left, and it is about ordering rather than content
+
+`TriggerCollision` starts the reaction and then sends the hit:
+
+```lua
+self:PlayReaction(npc, velocity, speed, "hcm_fall_")
+self:SendHitReaction(npc, horseWuid, strength.MinorInjury, playerEnt)
+```
+
+`PlayReaction` seizes the actor through `StartInteractiveActionByName`. The hit
+message therefore arrives at a victim whose body has just been taken, and an
+earlier entry recorded that handlers declared `Atomic="true"` drop messages
+while busy. A handler occupied by the reaction would drop the hit for some
+victims and not others, which is the shape of what is measured, and it is
+independent of what the message contains, which is why three phases of changing
+the contents moved nothing.
