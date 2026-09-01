@@ -23,6 +23,17 @@ number.
 
 ## [Unreleased]
 
+## [4.2.11-dev.1] - 2026-08-31
+
+### Fixed
+
+- A collision names its attacker in a form the game can resolve. The hit event
+  carried the horse as text rather than as an identifier, and the attacker is
+  what the game follows to decide whether a collision is the player's doing.
+  Victims have been recorded taking no damage at all from a knockdown that
+  visibly landed.
+
+
 ## [4.2.10] - 2026-08-31
 
 Documentation. The mod is unchanged from 4.2.1.

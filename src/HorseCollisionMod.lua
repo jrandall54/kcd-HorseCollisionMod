@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.10
+-- @release 4.2.11-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.10"
+HorseCollisionMod.Version = "4.2.11-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -570,21 +570,46 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 		return
 	end
 
-	pcall(function()
-		-- Brain messages carry their arguments as a "key(value), key(value)"
-		-- string rather than a table.
-		local values = "hitStrength(" .. tostring(strength)
-				.. "), hitType(" .. tostring(self.HitReactionType.Collision) .. ")"
+	local target = npc.id
 
-		-- The horse is named as the attacker, not Henry. That matches what
-		-- the engine does for a trample, and the victim's brain resolves the
-		-- rider from the horse itself when assigning blame.
-		if horseWuid and Framework and Framework.WUIDToMsg then
-			values = "attacker(" .. Framework.WUIDToMsg(horseWuid) .. "), " .. values
-		end
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
 
-		XGenAIModule.SendMessageToEntity(npc.id, "hitReaction", values)
+	-- Sent as a typed table, with the attacker as a WUID rather than as text.
+	--
+	-- `hitReaction` declares `attacker` as `common:wuid` in
+	-- `Libs/AI/TypeDefinitions.xml`. The string form carried it through
+	-- `Framework.WUIDToMsg`, which renders a sixty-four bit identifier into
+	-- the message text for a tree to parse back. `Utils.makeTable` takes the
+	-- WUID itself and is checked against the declaration.
+	--
+	-- This matters because the attacker is what vanilla resolves to decide
+	-- whether a collision is the player's doing. `sb_switch_hitreactions.xml`
+	-- follows the horse's `rider` link and, when it reaches the player,
+	-- re-sends the event as `combat:hit`, which is what applies damage and
+	-- attributes the crime. An attacker that does not resolve leaves the
+	-- reaction playing and the consequences absent, which matches victims
+	-- recorded taking no damage at all from a confirmed knockdown.
+	--
+	-- The horse is named rather than Henry, which is what the engine does for
+	-- a trample; the rider is resolved from the horse.
+	local ok, err = pcall(function()
+		local message = Utils.makeTable("hitReaction", {
+			attacker = horseWuid,
+			hitStrength = strength,
+			hitType = self.HitReactionType.Collision
+		})
+
+		XGenAIModule.SendMessageToEntityData(target, "hitReaction", message)
 	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("HitReaction typed=" .. tostring(ok)
+				.. " strength=" .. tostring(strength)
+				.. " attacker=" .. tostring(horseWuid ~= nil)
+				.. " err=" .. tostring(err))
+	end
 end
 
 --- Logs a named entity's health whenever it changes.
