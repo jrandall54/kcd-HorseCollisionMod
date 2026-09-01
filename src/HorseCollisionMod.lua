@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.11
+-- @release 4.2.12-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.11"
+HorseCollisionMod.Version = "4.2.12-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -373,6 +373,11 @@ HorseCollisionMod.RagdollAtFraction = 0.68
 
 
 HorseCollisionMod.ReplanAfterRebuildMs = 600
+
+
+-- Whether a real, player-attributed combat hit is sent alongside the physical
+-- one. Off because it is how the game decides a crime happened.
+HorseCollisionMod.SendCombatHitEnabled = false
 
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
@@ -1567,6 +1572,78 @@ function HorseCollisionMod:RebuildVictim(npc)
 	return ok
 end
 
+--- Sends the victim a real combat hit, attributed to the player.
+--
+-- `hitReaction` is a physical event, consumed by `sb_switch_hitreactions.xml`,
+-- which is a passive observer that cannot drive a body. `combat:hit` feeds the
+-- combat subbrain, which owns it. That difference is why this is worth trying
+-- at all, and why the mod's reaction animations have always had to be played
+-- by seizing the actor instead.
+--
+-- The shape is vanilla's own, from the branch in that switch tree that turns a
+-- player-ridden collision into a real hit:
+--
+--     attacker($__player), strength($hitReaction.hitStrength),
+--     hitType($enum:HitReactionType.Melee), real(true)
+--
+-- A collision is rewritten as `Melee` there rather than kept as `Collision`,
+-- the player is named rather than the horse, and `real` marks it as a genuine
+-- strike rather than a near miss.
+--
+-- This was tried once before, twelve times, as a `key(value)` string, and
+-- produced no reaction and no hostility. It has never been sent as a typed
+-- table. That is the only thing being changed here, and it is worth one test
+-- because the same change on `daycycle:restartRequest` was the difference
+-- between a message being acted on and being discarded.
+--
+-- Off by default. A real hit attributed to the player is how the game decides
+-- a crime happened, so this can make a village turn on the rider.
+--
+-- @tparam table npc victim entity
+-- @tparam table playerEnt the player entity
+-- @tparam number strength a `HitReactionStrength` value
+-- @treturn boolean true when the call was accepted
+function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
+	if not self.SendCombatHitEnabled or not playerEnt then
+		return false
+	end
+
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local playerWuid = nil
+
+	pcall(function()
+		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+	end)
+
+	if not playerWuid then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		local message = Utils.makeTable("combat:hit", {
+			attacker = playerWuid,
+			strength = strength,
+			hitType = self.HitReactionType.Melee,
+			real = true
+		})
+
+		XGenAIModule.SendMessageToEntityData(target, "combat:hit", message)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("CombatHit ok=" .. tostring(ok)
+				.. " strength=" .. tostring(strength)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
+
 --- Plays one of this mod's reactions on a victim.
 --
 -- Calls `actor:StartInteractiveActionByName` with a name this mod adds to the
@@ -2100,6 +2177,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
 		end
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
+		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
 		return

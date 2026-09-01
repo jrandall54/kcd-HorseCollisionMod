@@ -23,6 +23,16 @@ number.
 
 ## [Unreleased]
 
+## [4.2.12-dev.1] - 2026-08-31
+
+Diagnostics, off by default. The mod behaves as 4.2.11 does unless enabled.
+
+### Changed
+
+- A real, player-attributed combat hit can be sent alongside the physical one,
+  which is what the game reads when deciding a crime happened. Off by default.
+
+
 ## [4.2.11] - 2026-08-31
 
 Diagnostics. The mod behaves exactly as 4.2.10 does.
