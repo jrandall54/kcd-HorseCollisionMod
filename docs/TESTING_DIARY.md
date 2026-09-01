@@ -10954,3 +10954,47 @@ ms to rise if male and 5,100 ms if female. Neither figure responds to
 `ExitTime`, `Sleep`, `Stiffness`, `g_ragdollPollTime` or `ca_DeathBlendTime`,
 and the gallop tier reaches both through `actor:Fall` without touching any data
 this mod ships.
+
+## What drives the wait before a victim stands, and why it cannot be reached
+
+The wait is a terminator on the `BlendRagdoll` fragment's `blendIn` option: an
+empty Procedural at an ExitTime, which replaces the Ragdoll procedural and ends
+the hold.
+
+```
+<Blend ExitTime="2" StartTime="0" Duration="0" />
+<Procedural type="" />
+```
+
+`kcd_male_database.adb` carries one at 2 seconds across its 10 options.
+`wh_female_database.adb`, with 5 options, carries none at all. That is the
+whole of the gender difference: a man's hold is told to stop and a woman's is
+not, which is why `BlendRagdoll` measures 2,570 ms against 5,100 ms.
+
+### The override was built and is not read
+
+`build_adb.py` was extended to take authority over `BlendRagdoll` the same way
+it does over `AnimationControlled`, carrying all 10 male and all 5 female
+vanilla options with no clip lost, rewriting the male terminator and adding one
+to the female option. The generated file deployed correctly and contained the
+new value.
+
+It changes nothing. At a hold of 0.5 seconds the figures were unmoved, and at a
+deliberately absurd 8 seconds they were unmoved again, which rules out a clamp
+and shows the fragment is never consulted.
+
+`BlendRagdoll` resolves through `ActionController`, and this mod redirects only
+`AnimDatabase3P`. That is deliberate and recorded in `TECHNICAL_DETAILS.md`:
+redirecting `ActionController` requires copies of the controller def and the
+fragment id file, which puts the mod in the resolution path of every human
+animation rather than one fragment, and broke unrelated animations when it was
+tried. `verify_additive.py` asserts against it.
+
+### Where that leaves the wait
+
+Identified, understood, and gated behind a change the project has already
+rejected on stronger grounds than this symptom. Everything reachable was
+measured and moves it by nothing: `ExitTime` on the mod's own fall fragment,
+`Sleep`, `Stiffness`, `g_ragdollPollTime`, `ca_DeathBlendTime`, and the
+physicalization profile, which reads `alive` throughout and so leaves
+`actor:StandUp` and `SetPhysicalizationProfile` with nothing to act on.
