@@ -9382,3 +9382,59 @@ had already received a typed replan from the mod. `daycycle:haltContext` moving 
 parked merchant 3.42 m is still a real observation, but it is not evidence that
 `haltContext` is needed: the typed `restartRequest` in the reaction covers every
 case tested since.
+
+## The attacker resolves when it is sent as a WUID rather than as text
+
+Tested at 4.2.11-dev.1. `hitReaction` declares `attacker` as `common:wuid`, and
+the message had been carrying it through `Framework.WUIDToMsg`, which renders a
+sixty-four bit identifier into the message text for a tree to parse back. It is
+now built with `Utils.makeTable` and sent with `SendMessageToEntityData`.
+
+Twenty-three sends, every one `typed=true attacker=true`, no errors.
+
+### Damage, before and after, from one session's log
+
+The build was hot-reloaded partway through, so both forms appear in the same
+log against the same save.
+
+| | Tier | Impacts | No damage | Mean loss |
+| --- | --- | --- | --- | --- |
+| Before | Gallop | 3 | **3 (100%)** | 0.00 |
+| After | Trot | 18 | 1 (5.6%) | 5.94 |
+| After | Gallop | 2 | 0 | 26.61 |
+
+### The repetition test is the part that carries weight
+
+A single impact cannot distinguish a mitigated hit from a dropped message, which
+is why an earlier session could not settle this. Repeated impacts on one victim
+can, and every repeat landed:
+
+```
+rat_woman34   -7.00  -11.63  -6.23
+rat_man95     -5.34   -5.25  -4.80
+rat_woman44   -6.64   -3.63  -5.34  -5.41
+rat_ruch      -6.26   -6.66
+```
+
+Trot losses cluster between 3.6 and 7.4 with one at 11.6, which is the shape of
+a hit resolving every time rather than intermittently.
+
+### What this does not establish
+
+The sample is small and unbalanced. There is no trot baseline in this log,
+because the reload happened before any trot impact under the old form, so the
+comparison rests on three gallops. Three of three failing and none of two
+failing is suggestive and is not a measurement.
+
+One trot impact still did nothing, on `rat_shop_guard_butcher`. Armor does not
+reduce damage in this mod, so a guard is not expected to differ, and one case is
+not a pattern.
+
+### The open question this reopens
+
+If the attacker now resolves, the branch inside `sb_switch_hitreactions.xml`
+that follows the horse's `rider` link to the player, and re-sends the event as
+`combat:hit`, is reachable. That branch is what applies damage and attributes
+crime, and `combat:hit` feeds the combat sub-brain, which owns the body. The
+conclusion that a reaction animation is unreachable from a mod was drawn when
+that path was assumed dead.
