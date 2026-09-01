@@ -1,0 +1,300 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><strong>HorseCollisionMod.Armor</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Armor</code></h1>
+<p>Armor: what a collision victim is wearing, and what it changes.</p>
+<p> Weight is read from the entity's inventory and turned into two multipliers,
+ one for the impulse an impact carries and one for the stamina it costs the
+ horse. Both run through a single curve so the two settings that shape them
+ behave the same way.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>. The curve reads <code>Config</code>, so
+ the settings it depends on live in the entry point and exist before this
+ file runs.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.3.3</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ArmorOf">HorseCollisionMod:ArmorOf (entity[, tack])</a></td>
+	<td class="summary">What an entity is wearing, summed from its inventory.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:DescribeArmor">HorseCollisionMod:DescribeArmor (total)</a></td>
+	<td class="summary">An armor total as a log fragment.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ArmorCurve">HorseCollisionMod:ArmorCurve (weight, reference, exponent, invert, low, high)</a></td>
+	<td class="summary">How much a target's armor changes the impact it takes.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ArmorImpulseScale">HorseCollisionMod:ArmorImpulseScale (armor)</a></td>
+	<td class="summary">The impulse multiplier for a target's armor.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ArmorStaminaScale">HorseCollisionMod:ArmorStaminaScale (armor)</a></td>
+	<td class="summary">The stamina multiplier for a target's armor.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:ArmorOf"></a>
+    <strong>HorseCollisionMod:ArmorOf (entity[, tack])</strong>
+    </dt>
+    <dd>
+    What an entity is wearing, summed from its inventory. </p>
+
+<p> Nothing in the ScriptBind surface reports which items are equipped, and
+ nothing reports an item's weight. Neither gap matters for a collision
+ target: an NPC carries only what it wears plus a few trinkets, and the
+ weights are generated into <code>HorseCollisionMod_ItemData.lua</code> from the game's
+ own tables. Filtering an inventory to the classes in that table is therefore
+ equivalent to reading the equipped set.</p>
+
+<p> The player is the exception, carrying whatever has been picked up, but the
+ player is never the victim of an impact.</p>
+
+<p> Saddles, bridles, horseshoes and spurs are filed as armor. <code>tack</code> selects
+ between the two: false for what a person is wearing, true for a horse's own
+ gear, which is what Phase 3 barding needs from the same call.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         any entity with an inventory
+        </li>
+        <li><span class="parameter">tack</span>
+            <span class="types"><span class="type">boolean</span></span>
+         true to sum horse gear instead of worn armor
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        weight, smashDef, pieces, heaviest and heaviestType
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:DescribeArmor"></a>
+    <strong>HorseCollisionMod:DescribeArmor (total)</strong>
+    </dt>
+    <dd>
+    An armor total as a log fragment.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">total</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a table from <a href="../modules/HorseCollisionMod.Armor.html#HorseCollisionMod:ArmorOf">ArmorOf</a>
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the totals, and the heaviest piece's type by name
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ArmorCurve"></a>
+    <strong>HorseCollisionMod:ArmorCurve (weight, reference, exponent, invert, low, high)</strong>
+    </dt>
+    <dd>
+    How much a target's armor changes the impact it takes. </p>
+
+<p> One curve serves both halves. <code>weight</code> is the target's armor weight and
+ <code>reference</code> the weight that changes nothing, so the ratio between them is
+ the whole signal; <code>exponent</code> sets how sharply it bites and 0 switches the
+ scaling off entirely.</p>
+
+<p> Armor makes a target harder to throw and more tiring to hit, so the impulse
+ takes the reciprocal of the ratio and the stamina cost takes it directly.
+ Both are clamped, because the curve has no natural floor or ceiling and an
+ unclamped extreme reads in game as a target that cannot be moved at all, or
+ one that flies out of sight.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">weight</span>
+            <span class="types"><span class="type">number</span></span>
+         the target's armor weight
+        </li>
+        <li><span class="parameter">reference</span>
+            <span class="types"><span class="type">number</span></span>
+         the weight that produces 1.0
+        </li>
+        <li><span class="parameter">exponent</span>
+            <span class="types"><span class="type">number</span></span>
+         how strongly weight matters, 0 to disable
+        </li>
+        <li><span class="parameter">invert</span>
+            <span class="types"><span class="type">boolean</span></span>
+         true for the impulse, false for the stamina cost
+        </li>
+        <li><span class="parameter">low</span>
+            <span class="types"><span class="type">number</span></span>
+         the smallest multiplier allowed
+        </li>
+        <li><span class="parameter">high</span>
+            <span class="types"><span class="type">number</span></span>
+         the largest
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        the multiplier
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ArmorImpulseScale"></a>
+    <strong>HorseCollisionMod:ArmorImpulseScale (armor)</strong>
+    </dt>
+    <dd>
+    The impulse multiplier for a target's armor.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a table from <a href="../modules/HorseCollisionMod.Armor.html#HorseCollisionMod:ArmorOf">ArmorOf</a>
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        a multiplier on the tier's impulse scale
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ArmorStaminaScale"></a>
+    <strong>HorseCollisionMod:ArmorStaminaScale (armor)</strong>
+    </dt>
+    <dd>
+    The stamina multiplier for a target's armor. </p>
+
+<p> Composes with the combat multiplier already applied, and is the same shape
+ the Phase 3 Horsemanship multiplier will take, so the three multiply rather
+ than each becoming its own rule.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a table from <a href="../modules/HorseCollisionMod.Armor.html#HorseCollisionMod:ArmorOf">ArmorOf</a>
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        a multiplier on the tier's stamina cost
+    </ol>
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-01 12:18:41 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

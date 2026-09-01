@@ -23,6 +23,16 @@ number.
 
 ## [Unreleased]
 
+## [4.3.3] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The armor lookup and the curves that turn armor weight into an impulse
+  and a stamina multiplier moved out of the entry point into
+  `Scripts/HorseCollisionMod/Armor.lua`.
+
 ## [4.3.2] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.

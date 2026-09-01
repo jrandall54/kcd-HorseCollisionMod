@@ -22,7 +22,8 @@ description = "Speed-tiered horse collision reactions for Kingdom Come: Delivera
 -- reference reads in the order the mod loads, which `sort = false` preserves.
 file = {
 	"src/HorseCollisionMod.lua",
-	"src/HorseCollisionMod/Enums.lua"
+	"src/HorseCollisionMod/Enums.lua",
+	"src/HorseCollisionMod/Armor.lua"
 }
 dir = "docs/api"
 
