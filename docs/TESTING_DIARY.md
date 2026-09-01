@@ -9597,3 +9597,47 @@ exactly what a flat rate across four configurations looks like.
 
 The test is to switch the message off entirely and see whether damage still
 lands at the same rate.
+
+## Switching the hit message off removes the zeros
+
+Phase E at 4.2.11-dev.4, `SendHitReaction` disabled entirely. Same save, same
+session, no reload.
+
+| Phase | Configuration | Sends | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- | --- |
+| A | string, horse, after | 11 | 11 | 2 (18%) | 4.85 |
+| B | typed, horse, after | 14 | 14 | 2 (14%) | 5.09 |
+| C | typed, player, after | 12 | 10 | 2 (20%) | 5.04 |
+| D | typed, horse, before | 19 | 18 | 3 (17%) | 4.85 |
+| **E** | **no message at all** | **0** | **13** | **0 (0%)** | **6.30** |
+
+Thirteen impacts, none of them free, and the highest mean loss recorded.
+
+### The message is not the damage, and may be what prevents it
+
+The assumption behind four phases was that `hitReaction` is what produces the
+damage, so its contents and its timing were varied to find why it sometimes did
+not. Removing it produced more damage, more reliably.
+
+That fits the user's account of the earliest builds, which had no such message:
+"we were able to produce a hit on people based on collision, which back then was
+purely through fall/ragdoll or just the insphere, that made the guards instantly
+want to kill me". The damage and the crime came from the collision, and they did
+so before this mod ever sent a message.
+
+### Held to what it proves
+
+Zero of thirteen against eleven of fifty-three. If the underlying rate were the
+seventeen per cent the other phases show, a run of thirteen with none has roughly
+a one in eleven chance, so this is suggestive rather than settled on its own. The
+mean rising from about 4.9 to 6.3 is a second signal in the same direction, and
+the four configurations on the other side agree with each other.
+
+A confirming phase with the message back on, under otherwise identical
+conditions, is what would settle it.
+
+### The open question this raises
+
+`hitReaction` is in the roadmap as a Phase 1 deliverable, for one reason: to keep
+the vanilla collision bark. If the barks continue without it, the message costs
+damage and buys nothing. If they stop, there is a real trade to weigh.
