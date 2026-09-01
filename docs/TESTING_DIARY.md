@@ -9833,3 +9833,57 @@ that the game believes Henry struck them by hand, which is why the guard talks
 about beating and brawling rather than about riding anyone down. Whether that
 trade is worth taking, and whether a fatal collision already produces murder on
 its own, are the open questions.
+
+## The crime matrix for a typed combat hit
+
+Nine runs at 4.2.12-dev.2, one impact each, reloading between them and reading
+the charge by surrendering to a guard. Every run corroborated against the log,
+which records the `hitType` and `strength` actually sent.
+
+| hitType | strength | Charged | Guard's words |
+| --- | --- | --- | --- |
+| Melee (1) | Tickle (2) | yes | "no one gets away with beating people up around here" |
+| Melee (1) | MinorInjury (5) | yes | "beating people right under my nose?" |
+| Melee (1) | MajorInjury (6) | yes | "you're brawling!" |
+| Melee (1) | Fatal (7) | yes | "I saw you beating folk" |
+| Collision (2) | MinorInjury (5) | **no** | nothing, over five impacts |
+| Collision (2) | MajorInjury (6) | **no** | nothing |
+| Fall (7) | MinorInjury (5) | **no** | nothing |
+| Bullet (10) | MinorInjury (5) | yes | "nobody gets away with shooting people here" |
+| MeleeStealth (16) | MinorInjury (5) | yes | "forgotten that brawl, have you?" |
+
+### What the message actually controls
+
+**`hitType` decides whether there is a crime, and what it is called.** Melee and
+MeleeStealth are prosecuted as a brawl, Bullet as a shooting. Collision and Fall
+are invisible to the crime system entirely, at any strength.
+
+**`strength` changes nothing about the crime.** Tickle, documented as costing no
+health at all, is charged exactly as Fatal is. So the crime does not come from
+harm; it comes from the hit existing.
+
+**`combat:hit` does no damage.** `Fatal` is documented as killing a fully
+healthy target and the victim did not die. Damage comes from the collision
+itself, which the earlier phases established when removing the mod's hit message
+left damage unchanged.
+
+So this message is an attribution channel and nothing else.
+
+### What that means for severity
+
+Severity cannot be scaled through this message. The ladder the game gives is
+assault for any hit and murder when the victim actually dies, which the user has
+confirmed happens on its own at a gallop.
+
+The fine is scaled by the victim's social class rather than by the hit:
+`nobleman` 12.5, `bailiff` 5, `officer`, `soldier` and `watchman` 2.5,
+`circator` 2, the craft trades 1.5, and everyone else 1. The eighty gold
+recorded earlier against a remembered sixty is therefore not evidence that
+strength scales anything, since the two victims were different people.
+
+### Still untried
+
+The second `hit` type, `attacker, kind, real`, where `kind` is a
+`combatAttackKind` of `none`, `missile`, `stealthAction`, `unarmed`, `melee` or
+`dogBite`. And `crimeReport`, which carries a `crime:string` and is the game's
+own channel for naming a crime rather than implying one.
