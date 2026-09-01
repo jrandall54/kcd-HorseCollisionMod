@@ -720,6 +720,15 @@ Write-Host "  version id $($published.version.id)" -ForegroundColor Green
 #
 # Because it appends, calling this twice for one version leaves two entries on
 # the Changelogs tab and there is no API to remove either.
+#
+# The public pages lag behind. A changelog posted for 4.2.2 was visible under
+# the author's own management and documentation view straight away and still
+# absent from the mod page and its logs tab well afterwards, which went on
+# listing 4.0.0 as the newest entry. So a successful post is not something to
+# confirm by reloading the public page, and its absence there is not evidence
+# the call failed. That was concluded twice from the page alone, once as an
+# endpoint refusing requests and once as no release ever having carried a
+# changelog, and both were wrong.
 if ($Changelog) {
     Write-Host "Adding changelog ..."
 

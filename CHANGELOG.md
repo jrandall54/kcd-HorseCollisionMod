@@ -23,6 +23,17 @@ number.
 
 ## [Unreleased]
 
+## [4.2.9] - 2026-08-31
+
+Tooling. The mod is unchanged from 4.2.1.
+
+### Fixed
+
+- The note about the public pages lagging is beside the call it describes.
+  4.2.8 recorded it in this file only, which is not where anyone reading the
+  publish path would look for it.
+
+
 ## [4.2.8] - 2026-08-31
 
 Tooling. The mod is unchanged from 4.2.1.
