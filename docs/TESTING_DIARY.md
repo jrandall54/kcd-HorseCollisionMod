@@ -9788,3 +9788,48 @@ one, and `HitReactionType.Collision` is the obvious alternative to measure.
 
 Making every trot collision a crime is a large change to how the mod plays, and
 it is off by default until that is decided.
+
+## What the game charges for a ridden collision, measured
+
+Four runs at 4.2.12-dev.2, one impact each, reloading between them so the charge
+could be read by surrendering to a guard. `combat:hit` sent as a typed table
+with the player as attacker and `real` true; only `hitType` and `strength` vary.
+
+| Run | hitType | strength | Result |
+| --- | --- | --- | --- |
+| 1 | Melee | MinorInjury (5) | "beating people right under my nose?" charged, fine |
+| 2 | Melee | MajorInjury (6) | "you're brawling!" charged, 80 gold |
+| 3 | **Collision** | MinorInjury (5) | **no crime at all, across five impacts** |
+| 4 | **Collision** | MajorInjury (6) | **no crime at all** |
+
+### The crime system does not see a collision
+
+`HitReactionType.Collision` produces no crime whatever the strength. Only
+`Melee` does. That is why the vanilla branch in `sb_switch_hitreactions.xml`
+rewrites a player-ridden collision into `Melee` before re-sending it as
+`combat:hit`: the crime system has no concept of being ridden down, so the game
+launders it into the one hit type it does prosecute.
+
+So a collision can be made a crime, and only by describing it as something it is
+not.
+
+### Severity moves with strength, within one label
+
+Both `Melee` runs produced the same kind of charge and a different fine, 80 gold
+at `MajorInjury` against a smaller figure at `MinorInjury`. The crime label
+appears to stay assault-shaped while the penalty scales, which is most of what
+was wanted from severity scaling and needs no new message.
+
+`Crime.lua` in `Scripts.pak` defines the labels and their reaction profiles:
+`assault` has civilians auto-reacting within 2 m and able to react within 8;
+`murder` within 3 and 12. Both are named strings, and `crimeReport` carries a
+`crime:string` member, so naming a crime directly is a channel that exists and
+has not been tried.
+
+### Where that leaves the design
+
+Making a trot collision a crime works today, by sending `Melee`. The cost is
+that the game believes Henry struck them by hand, which is why the guard talks
+about beating and brawling rather than about riding anyone down. Whether that
+trade is worth taking, and whether a fatal collision already produces murder on
+its own, are the open questions.
