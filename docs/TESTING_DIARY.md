@@ -10599,3 +10599,54 @@ only by that SHA and only until the object is pruned.
 
 The file it was written against was the 2,558-line single script, which no
 longer exists, so the commit is a specification rather than a patch to apply.
+
+## The shipped armor table is gone, and the weights did not move
+
+`ItemIndex` in `Armor.lua` builds the class-to-weight join from `Database` at
+runtime, replacing the 50 KB table that was generated from the game's paks at
+build time and shipped with the mod.
+
+Rebuilt onto the part file rather than cherry-picked from `093ae77`, which was
+written against the single-file mod that no longer exists. The new code is in
+`Armor.lua`, which owns armor; nothing was added to the entry point.
+
+### It builds
+
+```
+ItemIndex built ok=true armorPieces=796 err=nil
+```
+
+796 is the same count the orphaned implementation measured, so the join reaches
+the same set of rows.
+
+### The weights are unchanged, on the same NPCs
+
+Six impacts across walk, trot and gallop. Three of the victims had been ridden
+down earlier the same day, with the shipped table still in place:
+
+| Victim | With the shipped table | From `Database` |
+|---|---|---|
+| `rat_pickpocket_woman1` | `pieces=3 weight=5.0 smashDef=0.30 heaviest=default cloth` | identical |
+| `rat_karolina` | `pieces=1 weight=2.0 smashDef=0.10 heaviest=default cloth` | identical |
+| `rat_woman12` | `armorImpulse=1.26 armorStamina=0.83` | identical |
+
+`rat_guard23` read `pieces=8 weight=31.0 smashDef=3.22`, giving
+`armorStamina=1.72`, so the armored path scales as before. No Lua error and no
+`Database is unavailable` line.
+
+Matching a named victim's figures before and after is the measurement worth
+having. A count of 796 proves the tables were read; identical output on the
+same NPC proves the join is the same one.
+
+### What it costs
+
+The built zip falls from 71,925 to 52,561 bytes, 27 percent. Removed with it:
+`build_item_weights.py`, its build step, the shipped Startup script, its entry
+in the dev console's reload chain, and its line in the README layout.
+
+### Why the table existed
+
+An earlier entry concluded there was no live weight lookup, on the evidence
+that `ItemManager` reports a class and no weight. That evidence is correct and
+the conclusion did not follow: `ItemManager` is not the only bind that reads
+the game's tables. `Database` is, and it was never asked.

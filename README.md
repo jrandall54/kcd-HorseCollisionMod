@@ -127,7 +127,6 @@ src/
   mod.manifest
 tools/
   build_adb.py            generates the animation data from a game install
-  build_item_weights.py   generates the armor weight table from a game install
   dev_deploy.ps1          installs into the game without Vortex
   dev_console.py          talks to the running game over its remote console
   typed_message_probe.lua a Lua probe run in the game through dev_console.py

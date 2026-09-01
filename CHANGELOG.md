@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The armor weights are read from the game's own item tables at runtime instead of from a 50 KB table generated at build time and shipped with the mod. The weights are unchanged; the download is 27 percent smaller.
+
 ## [4.4.0] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently, but the

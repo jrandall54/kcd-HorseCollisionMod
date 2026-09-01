@@ -12,16 +12,136 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 4.4.0
+-- @release 4.4.1
+
+-- The `armor_type_id` values worn by a horse rather than a person.
+--
+-- A sum over a person has to exclude them and a sum over a horse has to be
+-- only them, because a saddle sits in the horse's inventory and a rider's
+-- armor does not.
+HorseCollisionMod.TackTypes = {
+	[10] = true,
+	[11] = true,
+	[12] = true
+}
+
+-- `armor_type_id` as a readable name, for telemetry only. Nothing branches on
+-- these; they exist so a log line names the heaviest piece.
+HorseCollisionMod.ArmorTypeNames = {
+	[1] = "default cloth",
+	[2] = "light leather",
+	[3] = "heavy leather",
+	[4] = "chain",
+	[5] = "plate",
+	[6] = "decorated",
+	[7] = "cloth",
+	[8] = "spur",
+	[9] = "shoe",
+	[10] = "horse saddle",
+	[11] = "horse shoe",
+	[12] = "horse bridle"
+}
+
+--- Every armor class the game defines, with its weight and protection.
+--
+-- `Database` exposes the tables the game ships. `pickable_item` carries every
+-- item's weight, and `armor` carries `smash_def` and `armor_type_id` for the
+-- subset that is armor. They join on `item_id`, which is the class an item
+-- reports through `ItemManager.GetItem`.
+--
+-- Membership of `armor` is what makes a carried item count. `pickable_item`
+-- holds food, tools and coin as well, and summing all of it would weigh a
+-- target by their shopping rather than their protection.
+--
+-- This replaces a 50 KB table generated from the game's paks at build time and
+-- shipped with the mod. The join is the same one that generator performed, done
+-- against the live tables instead, so nothing about the resulting weights
+-- changed and the download no longer carries them.
+--
+-- Built once and cached. The tables do not change while the game runs, and the
+-- join walks a few thousand rows.
+--
+-- @treturn table `Armor`, keyed by class, holding weight, smashDef and type.
+--   Empty when the tables cannot be read, which leaves every target unarmored
+--   rather than failing the impact.
+function HorseCollisionMod:ItemIndex()
+	if self.ItemIndexCache then
+		return self.ItemIndexCache
+	end
+
+	local db = rawget(_G, "Database")
+
+	if type(db) ~= "table" then
+		self:Log("Database is unavailable, so armor scaling is off")
+		self.ItemIndexCache = { Armor = {} }
+
+		return self.ItemIndexCache
+	end
+
+	local index = { Armor = {} }
+
+	local ok, err = pcall(function()
+		-- Column order is not promised, so each table's columns are resolved
+		-- by name rather than assumed to sit at a fixed index.
+		local function columns(name)
+			local info = db.GetTableInfo(name)
+			local map = {}
+
+			for c = 0, info.ColumnCount - 1 do
+				map[db.GetColumnInfo(name, c).Name] = c
+			end
+
+			return map
+		end
+
+		local pc = columns("pickable_item")
+		local ids = db.GetTableColumnData("pickable_item", pc["item_id"])
+		local weights = db.GetTableColumnData("pickable_item", pc["weight"])
+		local weight = {}
+
+		for i = 1, #ids do
+			weight[tostring(ids[i])] = weights[i]
+		end
+
+		local ac = columns("armor")
+		local aids = db.GetTableColumnData("armor", ac["item_id"])
+		local smash = db.GetTableColumnData("armor", ac["smash_def"])
+		local kinds = db.GetTableColumnData("armor", ac["armor_type_id"])
+
+		for i = 1, #aids do
+			local class = tostring(aids[i])
+
+			index.Armor[class] = {
+				weight[class] or 0,
+				smash[i] or 0,
+				kinds[i]
+			}
+		end
+	end)
+
+	local count = 0
+
+	for _ in pairs(index.Armor) do
+		count = count + 1
+	end
+
+	self:Log("ItemIndex built ok=" .. tostring(ok)
+			.. " armorPieces=" .. tostring(count)
+			.. " err=" .. tostring(err))
+
+	self.ItemIndexCache = index
+
+	return index
+end
 
 --- What an entity is wearing, summed from its inventory.
 --
 -- Nothing in the ScriptBind surface reports which items are equipped, and
--- nothing reports an item's weight. Neither gap matters for a collision
--- target: an NPC carries only what it wears plus a few trinkets, and the
--- weights are generated into `HorseCollisionMod_ItemData.lua` from the game's
--- own tables. Filtering an inventory to the classes in that table is therefore
--- equivalent to reading the equipped set.
+-- nothing reports an item's weight directly. Neither gap matters for a
+-- collision target: an NPC carries only what it wears plus a few trinkets, and
+-- `ItemIndex` above supplies the class-to-weight join from the game's own
+-- tables. Filtering an inventory to the classes the `armor` table contains is
+-- therefore equivalent to reading the equipped set.
 --
 -- The player is the exception, carrying whatever has been picked up, but the
 -- player is never the victim of an impact.
@@ -42,9 +162,9 @@ function HorseCollisionMod:ArmorOf(entity, tack)
 		heaviestType = 0,
 	}
 
-	local data = rawget(_G, "HorseCollisionModItemData")
+	local data = self:ItemIndex()
 
-	if not data or not entity or not entity.inventory then
+	if not entity or not entity.inventory then
 		return total
 	end
 
@@ -72,7 +192,7 @@ function HorseCollisionMod:ArmorOf(entity, tack)
 				return
 			end
 
-			local isTack = data.TackTypes[row[3]] == true
+			local isTack = self.TackTypes[row[3]] == true
 
 			if isTack ~= (tack == true) then
 				return
@@ -98,12 +218,7 @@ end
 -- @tparam table total a table from `ArmorOf`
 -- @treturn string the totals, and the heaviest piece's type by name
 function HorseCollisionMod:DescribeArmor(total)
-	local data = rawget(_G, "HorseCollisionModItemData")
-	local kind = "none"
-
-	if data and data.TypeNames[total.heaviestType] then
-		kind = data.TypeNames[total.heaviestType]
-	end
+	local kind = self.ArmorTypeNames[total.heaviestType] or "none"
 
 	return "pieces=" .. tostring(total.pieces)
 			.. " weight=" .. string.format("%.1f", total.weight)
