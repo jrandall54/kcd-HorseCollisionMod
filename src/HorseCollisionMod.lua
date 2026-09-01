@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.11-dev.5
+-- @release 4.2.11
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.11-dev.5"
+HorseCollisionMod.Version = "4.2.11"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -375,24 +375,6 @@ HorseCollisionMod.RagdollAtFraction = 0.68
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 
--- Which form the hit event is sent in. Typed carries the attacker as a WUID,
--- which is what the type declares; the string form renders it into the
--- message text. Kept switchable so the two can be compared in one session
--- rather than across a reload.
-HorseCollisionMod.HitReactionTyped = true
-
-
--- Who a collision names as its attacker. "horse" is what vanilla does for a
--- trample and leaves the game to follow the horse's rider link to the player;
--- "player" names the rider directly and skips that step.
-HorseCollisionMod.HitReactionAttacker = "horse"
-
-
--- Whether the hit is sent before the reaction seizes the victim's body, or
--- after it as the mod has always done.
-HorseCollisionMod.HitReactionFirst = false
-
-
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
@@ -581,105 +563,28 @@ end
 -- message arriving.
 --
 -- @tparam table npc victim entity
--- @tparam userdata horseWuid WUID of the horse
--- @tparam[opt] table playerEnt the rider, named as the attacker when
---   `HitReactionAttacker` is "player"
+-- @tparam userdata horseWuid WUID of the horse, sent as the attacker
 -- @tparam number strength a `HitReactionStrength` value
-function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength, playerEnt)
+function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	if not self.Config.SendHitReaction then
 		return
 	end
 
-	local target = npc.id
+	pcall(function()
+		-- Brain messages carry their arguments as a "key(value), key(value)"
+		-- string rather than a table.
+		local values = "hitStrength(" .. tostring(strength)
+				.. "), hitType(" .. tostring(self.HitReactionType.Collision) .. ")"
 
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
-
-	-- Who the hit is attributed to.
-	--
-	-- Naming the horse is what vanilla does for a trample, and it costs a
-	-- resolution step: `sb_switch_hitreactions.xml` follows the horse's
-	-- `rider` link and only re-sends the event as `combat:hit` once that
-	-- reaches the player. Naming the rider skips the link entirely.
-	--
-	-- Switchable so the two can be compared:
-	--   HorseCollisionMod.HitReactionAttacker = "player"
-	local attacker = horseWuid
-	local named = "horse"
-
-	if self.HitReactionAttacker == "player" and playerEnt then
-		local playerWuid = nil
-
-		pcall(function()
-			playerWuid = XGenAIModule.GetMyWUID(playerEnt)
-		end)
-
-		if playerWuid then
-			attacker = playerWuid
-			named = "player"
+		-- The horse is named as the attacker, not Henry. That matches what
+		-- the engine does for a trample, and the victim's brain resolves the
+		-- rider from the horse itself when assigning blame.
+		if horseWuid and Framework and Framework.WUIDToMsg then
+			values = "attacker(" .. Framework.WUIDToMsg(horseWuid) .. "), " .. values
 		end
-	end
 
-	-- Sent as a typed table, with the attacker as a WUID rather than as text.
-	--
-	-- `hitReaction` declares `attacker` as `common:wuid` in
-	-- `Libs/AI/TypeDefinitions.xml`. The string form carried it through
-	-- `Framework.WUIDToMsg`, which renders a sixty-four bit identifier into
-	-- the message text for a tree to parse back. `Utils.makeTable` takes the
-	-- WUID itself and is checked against the declaration.
-	--
-	-- This matters because the attacker is what vanilla resolves to decide
-	-- whether a collision is the player's doing. `sb_switch_hitreactions.xml`
-	-- follows the horse's `rider` link and, when it reaches the player,
-	-- re-sends the event as `combat:hit`, which is what applies damage and
-	-- attributes the crime. An attacker that does not resolve leaves the
-	-- reaction playing and the consequences absent, which matches victims
-	-- recorded taking no damage at all from a confirmed knockdown.
-	--
-	-- The horse is named rather than Henry, which is what the engine does for
-	-- a trample; the rider is resolved from the horse.
-	-- The old string form is kept behind a switch so the two can be measured
-	-- against each other in one session, on one save, without reloading. A
-	-- reload changes entity ids and clears cooldowns, and comparing across one
-	-- is how the previous attempt at this ended up resting on three impacts.
-	--
-	-- Flip it live from the console:
-	--   HorseCollisionMod.HitReactionTyped = false
-	local ok, err
-
-	if self.HitReactionTyped then
-		ok, err = pcall(function()
-			local message = Utils.makeTable("hitReaction", {
-				attacker = attacker,
-				hitStrength = strength,
-				hitType = self.HitReactionType.Collision
-			})
-
-			XGenAIModule.SendMessageToEntityData(target, "hitReaction", message)
-		end)
-	else
-		ok, err = pcall(function()
-			local values = "hitStrength(" .. tostring(strength)
-					.. "), hitType(" .. tostring(self.HitReactionType.Collision)
-					.. ")"
-
-			if attacker and Framework and Framework.WUIDToMsg then
-				values = "attacker(" .. Framework.WUIDToMsg(attacker) .. "), "
-						.. values
-			end
-
-			XGenAIModule.SendMessageToEntity(npc.id, "hitReaction", values)
-		end)
-	end
-
-	if self.Config.LogTelemetry then
-		self:Log("HitReaction form=" .. (self.HitReactionTyped and "typed" or "string")
-				.. " ok=" .. tostring(ok)
-				.. " strength=" .. tostring(strength)
-				.. " attacker=" .. named
-				.. " err=" .. tostring(err))
-	end
+		XGenAIModule.SendMessageToEntity(npc.id, "hitReaction", values)
+	end)
 end
 
 --- Logs a named entity's health whenever it changes.
@@ -1163,12 +1068,11 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 
 	-- What the victim was doing when the horse reached them.
 	--
-	-- A reaction is a standing animation, so an impact landing on someone
-	-- already on the ground plays nothing and usually costs them no health,
-	-- which the cooldown gate exists to avoid and does not always catch. That
-	-- has never been recorded, so an impact that cost nothing has been
-	-- indistinguishable from one that failed, and six phases of investigation
-	-- were spent on the difference.
+	-- Every reaction is a standing animation, so an impact landing on someone
+	-- already down plays nothing and usually costs them no health. Without
+	-- this, an impact that cost nothing by design reads exactly like one that
+	-- failed, and a long investigation turned on being unable to tell them
+	-- apart.
 	local state = "?"
 
 	pcall(function()
@@ -2172,7 +2076,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		end
 
 		self:ProbeImpactCost(npc, "Walk", strength.Tickle, armor)
-		self:SendHitReaction(npc, horseWuid, strength.Tickle, playerEnt)
+		self:SendHitReaction(npc, horseWuid, strength.Tickle)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainWalk * combatScale * armorStamina)
 		return
@@ -2188,20 +2092,6 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- the horse cannot strike them and the engine charges nothing. The
 		-- ragdoll is kept because it is what shipped, and because an
 		-- animation does not carry the impact's momentum.
-		-- The hit can be sent before the reaction or after it.
-		--
-		-- After is what shipped, and it delivers the message to a victim whose
-		-- body has just been seized by an interactive action. A handler
-		-- declared Atomic drops messages while busy, which would drop the hit
-		-- on some victims and not others without depending on what the message
-		-- carries. Changing the contents across three measured phases moved the
-		-- rate not at all, which is what points here.
-		--
-		-- Switchable:  HorseCollisionMod.HitReactionFirst = true
-		if self.HitReactionFirst then
-			self:SendHitReaction(npc, horseWuid, strength.MinorInjury, playerEnt)
-		end
-
 		if cfg.TrotReaction == "knockdown" then
 			self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
 		elseif cfg.TrotReaction == "fall" then
@@ -2209,10 +2099,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		else
 			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
 		end
-
-		if not self.HitReactionFirst then
-			self:SendHitReaction(npc, horseWuid, strength.MinorInjury, playerEnt)
-		end
+		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
 		return
@@ -2224,7 +2111,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
 		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse)
-		self:SendHitReaction(npc, horseWuid, strength.MajorInjury, playerEnt)
+		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina)
 		return

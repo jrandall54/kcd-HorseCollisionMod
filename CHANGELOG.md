@@ -23,16 +23,17 @@ number.
 
 ## [Unreleased]
 
-## [4.2.11-dev.5] - 2026-08-31
+## [4.2.11] - 2026-08-31
 
-### Fixed
+Diagnostics. The mod behaves exactly as 4.2.10 does.
 
-- A collision names its attacker in a form the game can resolve. The hit event
-  carried the horse as text rather than as an identifier, and the attacker is
-  what the game follows to decide whether a collision is the player's doing.
-  Victims have been recorded taking no damage at all from a knockdown that
-  visibly landed.
+### Changed
 
+- Impact telemetry records what the victim was doing when the horse reached
+  them. Every reaction is a standing animation, so an impact on someone
+  already down plays nothing and usually costs no health; without this, an
+  impact that cost nothing by design was indistinguishable in the log from one
+  that failed.
 
 ## [4.2.10] - 2026-08-31
 
