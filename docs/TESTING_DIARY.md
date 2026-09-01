@@ -10521,3 +10521,38 @@ it: one trot impact drew 88.1 stamina at 2.2 combat and 2.22 armor, against
 
 One `neverRagdolled` appeared at 15008 ms. That case predates the split, the
 ceiling exists for it, and the victim recovered.
+
+## 4.4.0 tested as a player installs it
+
+The zip installed through Vortex into a shipping-configured game, launched
+without `-devmode`, with `sys_PakPriority = 2`,
+`mn_allowEditableDatabasesInPureGame = 0`, and every loose file parked. All
+three tiers behaved.
+
+This is the test the whole split was gated on. The development loop runs on
+loose files, which the engine finds by enumeration and by a priority that
+favors them; a pak resolves the ten part files by exact path instead, and that
+lookup is the one thing loose-file testing cannot exercise. A wrong path there
+fails silently: the entry point loads, its `Script.ReloadScript` calls find
+nothing, every method the parts define stays nil, and the mod does nothing
+while logging no error.
+
+`Script.ReloadScript` therefore works in a shipping build, which was the open
+risk when the split was planned, and the answer is no longer inferred from
+vanilla using the call at load time.
+
+### What the parked set has to include
+
+The shipping test is only valid if nothing loose remains. Two files were nearly
+missed.
+
+The ten part files were added to the parking list in the same branch that
+created the first one, so they parked correctly. `HorseCollisionMod_ItemData.lua`
+was not on the list at all and was found by checking the game folder rather
+than by trusting the tool. Left in place it would have overridden the pak's
+copy of the armor weight table, and the armor readings in a shipping test would
+have come from a loose file.
+
+The general shape: a parking list written by hand goes stale the moment the
+shipped file set changes, and the failure is silent in the direction that
+matters, because a stale loose file makes the test pass rather than fail.
