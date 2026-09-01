@@ -131,6 +131,8 @@ tools/
   dev_deploy.ps1          installs into the game without Vortex
   dev_console.py          talks to the running game over its remote console
   typed_message_probe.lua a Lua probe run in the game through dev_console.py
+  probe_stuck_actor.lua   reports nearby actors' animation state, to tell a
+                          mod-driven animation apart from a vanilla one
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   version_check.py        derives the next version from CHANGELOG.md
