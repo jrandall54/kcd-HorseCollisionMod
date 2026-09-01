@@ -10303,3 +10303,36 @@ shipped default, so crime responses are being exercised again alongside this.
 `BlendRagdoll` was not observed inside the ceiling and the rebuild ran anyway.
 That case predates the split and the ceiling exists for it. The victim
 recovered.
+
+## The three reaction paths, separated by tier
+
+`SendHitReaction`, `PlayReaction`, `Ragdoll` and `ImpulseVictim` moved to
+`Scripts/HorseCollisionMod/Reaction.lua`, 235 lines. The entry point is 1,452
+lines, down from 2,558 before the split began.
+
+These were two non-contiguous regions in the old file, `SendHitReaction` above
+the recovery code and the other three below it. They are one concern, being the
+three ways a collision reaches the victim's body, and the file now reads in
+ascending force: brain message, animation, physics.
+
+### The two tiers wrote different lines
+
+| Tier | Victim | What the log recorded | Damage |
+|---|---|---|---|
+| Trot | `rat_pickpocket_woman1`, 5.0 kg cloth | `Reaction action=hcm_fall_forward ok=true`, then `MovementControl released ok=true` | -6.03 |
+| Gallop | `rat_guard24`, 46.0 kg chain | no `Reaction` line at all; `Impulse scale=0.42 magnitude=24.3` | -26.63 |
+
+That difference is the result worth recording. A part file that loaded but
+resolved to something wrong could still produce a reaction of some kind, and
+one tier alone would not distinguish the animation path from the physics path.
+Two tiers writing two different signatures does.
+
+The trot recovery reported `on=resolved` and all four impact-cost samples fired
+on both victims. No field resolved to nil.
+
+### The gallop impulse carries the armor multiplier
+
+`armorImpulse=0.42` on the guard reached physics as `Impulse scale=0.42`, so
+the multiplier is applied on this path. Whether it changes anything a player
+can see is the separate question recorded in `ROADMAP.md` under Phase 2, and is
+untouched by this slice.

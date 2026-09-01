@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.3.7] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The brain message, the reaction animation and the physics ragdoll moved out of the entry point into `Scripts/HorseCollisionMod/Reaction.lua`.
+
 ## [4.3.6] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.
