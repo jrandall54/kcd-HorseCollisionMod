@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.4.2] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- A victim knocked down at a trot no longer snaps into a different activity about half a second after standing up. Carried items are no longer dropped and NPCs no longer change direction in a single frame. Beggars and innkeepers, who cannot recover on their own, are still returned to what they were doing, and now immediately rather than after a delay.
+
 ## [4.4.1] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.

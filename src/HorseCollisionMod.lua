@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.4.1
+-- @release 4.4.2
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.4.1"
+HorseCollisionMod.Version = "4.4.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -264,6 +264,19 @@ HorseCollisionMod.Config = {
 -- @table RecentHits
 HorseCollisionMod.RecentHits = {}
 
+--- What each victim was doing when it was hit, keyed by entity id.
+--
+-- Read back once the victim is on their feet, to tell one that has resumed
+-- its activity from one left standing with nothing to do. A beggar and an
+-- innkeeper cannot recover their own loop and need the replan; almost
+-- everyone else recovers on their own and is only interrupted by it.
+--
+-- Cleared with the rest of the per-victim state on a load screen.
+HorseCollisionMod.VictimActivity = {}
+
+
+
+
 --- Last time each entity was reported as a miss, keyed by entity id.
 HorseCollisionMod.RecentRejections = {}
 
@@ -320,7 +333,18 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 -- How long after the rebuild the victim is asked to re-plan. The rebuild
 -- resets the behavior and the re-plan chooses what it does next, so they are
 -- ordered rather than issued together.
-HorseCollisionMod.ReplanAfterRebuildMs = 600
+
+--- How abruptly the replan is allowed to interrupt what the victim is doing.
+--
+-- `daycycleHaltSpeed` in the engine's type definitions: 0 slow, 1 fast,
+-- 2 instant.
+--
+-- Vanilla reserves `instant` for teleports and cutscenes, where the screen is
+-- faded or the character is being relocated outright, and a transition with no
+-- wind-down is the point. Every vanilla call site that uses it is one of those.
+-- Sent to an NPC standing in the street it reads as a one-frame snap, and the
+-- activity it tears down takes any prop the NPC was holding with it.
+HorseCollisionMod.ReplanHaltSpeed = 1
 
 
 -- How the ragdoll handover is watched, for the tier that hands recovery back
@@ -502,6 +526,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- survives the transition, so the table is dropped rather than
 		-- carried into a world it no longer describes.
 		self.RecentHits = {}
+		self.VictimActivity = {}
 
 		local applied, rejected = self:ApplySettings()
 

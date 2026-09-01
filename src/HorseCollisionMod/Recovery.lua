@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.4.1
+-- @release 4.4.2
 
 --- Stops the animation driving a victim's own movement.
 --
@@ -125,23 +125,66 @@ function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
 				.. " waited=" .. string.format("%.0f", waited) .. "ms")
 	end
 
-	-- After the rebuild rather than alongside it. The rebuild is what resets
-	-- the victim's behavior, and asking a brain to re-plan in the same frame
-	-- it is being torn down and remade is asking the wrong one.
-	--
-	-- Leaving the area and returning restores a beggar or an innkeeper to
-	-- their animation where this sequence does not, and the difference between
-	-- the two is time: the engine's own teardown and rebuild are separated by
-	-- however long the player was away.
-	local generation = self.TimerTick
+	-- Watching starts here rather than after a delay. The delay that used to
+	-- sit in front of this existed so a replan did not land in the frame the
+	-- brain was being remade in; watching carries no such constraint, and the
+	-- wait it imposed was paid by every victim including the ones that needed
+	-- nothing.
+	self:ReplanIfStranded(npc)
+end
 
-	Script.SetTimer(self.ReplanAfterRebuildMs, function()
-		if generation ~= self.TimerTick then
-			return
-		end
+--- Replans a victim only when the game has not recovered them itself.
+--
+-- The replan restarts the victim's daycycle, which is the only way a beggar or
+-- an innkeeper regains their loop: they are bound to a smart object they
+-- cannot re-approach on their own, and without it they stand where they got
+-- up. Everyone else recovers unaided, and for them the restart interrupts
+-- correct behavior visibly. A woman carrying a bucket drops it, because
+-- restarting the daycycle tears down the activity holding the prop.
+--
+-- The two cases are told apart by one reading. A stranded victim sits in
+-- `MotionIdle`; a recovered one is already in `MotionMovement`, `IdleToMove`
+-- or a turn. Measured across nine recoveries, that held without exception.
+--
+-- Taken immediately rather than after a wait. Nothing about the reading
+-- improves by being taken later, and everything a victim needs is owed to them
+-- the moment they are on their feet: the wait was only ever the cost of a
+-- weaker signal.
+--
+-- A victim whose own activity is standing still is not stranded, so a state
+-- matching what they were hit in counts as recovered whatever it is.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:ReplanIfStranded(npc)
+	if not self.Config.ReplanAfterReaction then
+		return
+	end
 
-		self:ReplanVictim(npc)
+	local id = tostring(npc.id)
+	local was = self.VictimActivity[id]
+	local state = nil
+
+	pcall(function()
+		state = tostring(npc.actor:GetCurrentAnimationState())
 	end)
+
+	self.VictimActivity[id] = nil
+
+	local idle = state ~= nil and string.find(state, "^MotionIdle") ~= nil
+	local resumed = (was ~= nil and state == was) or not idle
+
+	if self.Config.LogTelemetry then
+		self:Log("Stranded " .. tostring(npc:GetName())
+				.. " was=" .. tostring(was)
+				.. " now=" .. tostring(state)
+				.. " resumed=" .. tostring(resumed))
+	end
+
+	if resumed then
+		return
+	end
+
+	self:ReplanVictim(npc)
 end
 
 --- Sends a victim back to their activity by way of approaching it again.
@@ -202,7 +245,7 @@ function HorseCollisionMod:ReplanVictim(npc)
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("daycycle:restartRequest", {
 			reason = enum_daycycleHaltReason.interrupt,
-			speed = enum_daycycleHaltSpeed.instant
+			speed = self.ReplanHaltSpeed
 		})
 
 		XGenAIModule.SendMessageToEntityData(target,
