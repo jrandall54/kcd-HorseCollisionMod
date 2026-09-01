@@ -437,6 +437,32 @@ if ($bad.Count -gt 0) {
 # Cleanup
 Remove-Item -Recurse -Force $buildDir
 
+# Superseded builds move into releases\archive.
+#
+# Every build of every branch lands here, and a session of small slices leaves
+# dozens. That is not merely untidy: publish_nexus.ps1 and pre_release_check.py
+# resolve a zip by name, and the one thing worse than a full directory is
+# picking the wrong file out of it.
+#
+# Nothing is deleted, and nothing is lost by moving: a prerelease is superseded
+# the moment anything newer exists, and a released zip is reproducible by
+# checking out its tag and building it again. Only the build just made stays at
+# the top level, which is where the publishing tools look for it.
+$archiveDir = Join-Path $releasesDir "archive"
+
+$stale = @(Get-ChildItem -Path $releasesDir -Filter "HorseCollisionMod_v*.zip" -File |
+    Where-Object { $_.Name -ne "HorseCollisionMod_v$Version.zip" })
+
+if ($stale.Count -gt 0) {
+    New-Item -ItemType Directory -Force -Path $archiveDir | Out-Null
+
+    foreach ($old in $stale) {
+        Move-Item $old.FullName (Join-Path $archiveDir $old.Name) -Force
+    }
+
+    Write-Host "Archived $($stale.Count) superseded build(s) to releases\archive."
+}
+
 Write-Host "Successfully built $outZip"
 
 
