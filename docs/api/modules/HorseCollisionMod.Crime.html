@@ -1,0 +1,166 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><strong>HorseCollisionMod.Crime</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Crime</code></h1>
+<p>Crime: making the game charge the player for riding someone down.</p>
+<p> Vanilla does not treat a mounted collision as an offence at all. What makes
+ it one is a real combat hit attributed to the player, which is delivered as
+ <code>combat:hit</code> rather than <code>hitReaction</code>: the latter is consumed by a passive
+ observer that cannot drive a body or raise a crime, while the former feeds
+ the combat subbrain that owns both.</p>
+
+<p> <code>CollisionIsCrime</code> gates the whole thing, and the payload shape is vanilla's
+ own, taken from the branch that turns a player-ridden collision into a real
+ hit. The strength sent is the same <code>HitReactionStrength</code> the tier chose, so
+ a harder impact is charged as a worse offence without this file deciding
+ anything about severity.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.3.9</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:SendCombatHit">HorseCollisionMod:SendCombatHit (npc, playerEnt, strength)</a></td>
+	<td class="summary">Sends the victim a real combat hit, attributed to the player.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:SendCombatHit"></a>
+    <strong>HorseCollisionMod:SendCombatHit (npc, playerEnt, strength)</strong>
+    </dt>
+    <dd>
+    Sends the victim a real combat hit, attributed to the player. </p>
+
+<p> <code>hitReaction</code> is a physical event, consumed by <code>sb_switch_hitreactions.xml</code>,
+ which is a passive observer that cannot drive a body. <code>combat:hit</code> feeds the
+ combat subbrain, which owns it. That difference is why this is worth trying
+ at all, and why the mod's reaction animations have always had to be played
+ by seizing the actor instead.</p>
+
+<p> The shape is vanilla's own, from the branch in that switch tree that turns a
+ player-ridden collision into a real hit:</p>
+
+<pre><code> attacker($__player), strength($hitReaction.hitStrength),
+ hitType($enum:HitReactionType.Melee), real(true)
+</code></pre>
+
+<p> A collision is rewritten as <code>Melee</code> there rather than kept as <code>Collision</code>,
+ the player is named rather than the horse, and <code>real</code> marks it as a genuine
+ strike rather than a near miss.</p>
+
+<p> The payload has to be a typed table. As a <code>key(value)</code> string this message
+ is accepted and discarded, producing no reaction and no hostility, which is
+ the same fault that made <code>daycycle:restartRequest</code> look inert.</p>
+
+<p> <code>CollisionIsCrime</code> governs it. A real hit attributed to the player is how the
+ game decides a crime happened, so this is what turns a village against the
+ rider.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+        <li><span class="parameter">strength</span>
+            <span class="types"><span class="type">number</span></span>
+         a <code>HitReactionStrength</code> value
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the call was accepted
+    </ol>
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-01 13:34:44 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

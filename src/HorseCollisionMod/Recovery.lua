@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.3.8
+-- @release 4.3.9
 
 --- Stops the animation driving a victim's own movement.
 --

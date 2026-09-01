@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Detection
 -- @author jrandall54
--- @release 4.3.8
+-- @release 4.3.9
 
 --- Tests whether a victim is actually under the horse.
 --

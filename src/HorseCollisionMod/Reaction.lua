@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.3.8
+-- @release 4.3.9
 
 --- Posts the native `hitReaction` message to the victim's brain.
 --

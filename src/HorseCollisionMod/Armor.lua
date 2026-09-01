@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 4.3.8
+-- @release 4.3.9
 
 --- What an entity is wearing, summed from its inventory.
 --

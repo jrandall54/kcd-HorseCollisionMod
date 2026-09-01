@@ -10402,3 +10402,33 @@ observation that has simply not been looked for before.
 
 It is not breaking, and it is not from the split: the recovery code moved
 verbatim and the same lines appear in the impacts recorded before it moved.
+
+## The crime hit, from its own part file
+
+`SendCombatHit` moved to `Scripts/HorseCollisionMod/Crime.lua`, 86 lines. The
+entry point is 1,081 lines, down from 2,558 before the split began.
+
+One method rather than a subsystem, but its own concern: it is the only place
+the mod tells the game to charge the player, and the only consumer of
+`CollisionIsCrime`. `IsCombatCollision` stays in the entry point despite the
+name, because it decides how hard an impact is rather than whether it is an
+offence, and it is read by the rider and stamina code.
+
+One trot impact with a witness present, `CollisionIsCrime` restored to `true`:
+
+```
+Impact tier=Trot speed=6.92 armorImpulse=1.26 armorStamina=0.83
+Reaction action=hcm_fall_right gender=2 ok=true err=nil
+CombatHit ok=true strength=5 err=nil
+VictimRebuild action=hcm_fall_right on=resolved waited=8480ms
+```
+
+A guard pursued the player. The strength sent is 5, the same
+`HitReactionStrength.MinorInjury` the trot tier chose, so the value crossed
+two part-file boundaries to get there: read from `Enums.lua`, chosen in the
+entry point, sent from `Crime.lua`.
+
+The witness matters to the test. `SendCombatHit` returning `ok=true` only
+proves the message was accepted, not that the crime system did anything with
+it, and an impact with nobody watching would have logged the same line either
+way.

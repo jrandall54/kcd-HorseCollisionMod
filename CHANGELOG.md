@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.3.9] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The combat hit that makes riding someone down a crime moved out of the entry point into `Scripts/HorseCollisionMod/Crime.lua`.
+
 ## [4.3.8] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.
