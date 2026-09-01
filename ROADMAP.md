@@ -259,9 +259,17 @@ armor.
       tables for weight. No bind reports which items are equipped, but an NPC carries only
       what it wears plus a few trinkets, so filtering the whole inventory to armor classes
       is equivalent for a target.
-- [x] Unarmored targets take proportionally heavier knockback and armored targets are moved
+- [ ] Unarmored targets take proportionally heavier knockback and armored targets are moved
       less, through one multiplier on `Ragdoll`'s `impulseScale`. A naked target reaches 1.50
-      and a target in mail 0.41, against 1.00 at `ArmorReferenceWeight`.
+      and a target in mail 0.41, against 1.00 at `ArmorReferenceWeight`. Reopened: the
+      multiplier is computed and logged on every impact but no longer governs what a player
+      sees. `TrotReaction` has defaulted to `"fall"` since 4.2.0, and the trot branch reaches
+      `Ragdoll` only under the `"ragdoll"` setting, so at trot the figure is applied to
+      nothing. Gallop still passes it, and armored and unarmored targets are reported moving
+      alike there too, which points at the horse carrying a victim it stays in contact with
+      rather than at the impulse being wrong. Measure the two separately before changing
+      either: an armor multiplier tuned against a distance the horse is dictating will be
+      tuned to the wrong thing.
 - [ ] Striking a heavy target strips the horse's momentum rather than only its stamina.
 - [x] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
       A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a

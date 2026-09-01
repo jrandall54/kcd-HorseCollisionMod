@@ -19,8 +19,8 @@ in vanilla.
   and a full gallop costs a great deal.
 - Because the game treats a rider's collision as the rider's doing, hurting or
   killing someone this way is a crime like any other, and guards respond to it.
-- Armor decides how far someone is thrown and how much the impact tires your horse.
-  It does not reduce the damage.
+- Armor decides how much the impact tires your horse. It does not reduce the damage,
+  and it does not currently change how far someone is carried.
 - If a collision empties your horse's stamina, it rears and throws you off.
 - Horses have different stamina pools and it regenerates between impacts, so how many
   people you can put down depends on your horse and how fast you string hits together.
