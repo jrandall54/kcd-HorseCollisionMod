@@ -403,10 +403,10 @@ SETTLE_SLEEP = 0
 #   <Procedural type="Ragdoll">
 #     <Sleep value="1" /> <Stiffness value="500" />
 #
-# An earlier attempt at this layer used Sleep 0 and Stiffness 100 and was
-# abandoned after the ragdoll was measured arriving two seconds after the
-# victim had already stood up. Sleep decides whether the body settles or stays
-# live, so those are not small differences.
+# Sleep has to be 1. At 0 the body stays live rather than settling, and the
+# ragdoll is measured arriving two seconds after the victim has already stood
+# up, which is not a handover at all. Stiffness 100 is too soft to hold a body
+# through it; 500 is what vanilla uses for the same purpose.
 FALL_SETTLE_STIFFNESS = 500
 FALL_SETTLE_SLEEP = 1
 
