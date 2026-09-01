@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.11-dev.1
+-- @release 4.2.11-dev.2
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.11-dev.1"
+HorseCollisionMod.Version = "4.2.11-dev.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -375,6 +375,13 @@ HorseCollisionMod.RagdollAtFraction = 0.68
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 
+-- Which form the hit event is sent in. Typed carries the attacker as a WUID,
+-- which is what the type declares; the string form renders it into the
+-- message text. Kept switchable so the two can be compared in one session
+-- rather than across a reload.
+HorseCollisionMod.HitReactionTyped = true
+
+
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
@@ -594,18 +601,43 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	--
 	-- The horse is named rather than Henry, which is what the engine does for
 	-- a trample; the rider is resolved from the horse.
-	local ok, err = pcall(function()
-		local message = Utils.makeTable("hitReaction", {
-			attacker = horseWuid,
-			hitStrength = strength,
-			hitType = self.HitReactionType.Collision
-		})
+	-- The old string form is kept behind a switch so the two can be measured
+	-- against each other in one session, on one save, without reloading. A
+	-- reload changes entity ids and clears cooldowns, and comparing across one
+	-- is how the previous attempt at this ended up resting on three impacts.
+	--
+	-- Flip it live from the console:
+	--   HorseCollisionMod.HitReactionTyped = false
+	local ok, err
 
-		XGenAIModule.SendMessageToEntityData(target, "hitReaction", message)
-	end)
+	if self.HitReactionTyped then
+		ok, err = pcall(function()
+			local message = Utils.makeTable("hitReaction", {
+				attacker = horseWuid,
+				hitStrength = strength,
+				hitType = self.HitReactionType.Collision
+			})
+
+			XGenAIModule.SendMessageToEntityData(target, "hitReaction", message)
+		end)
+	else
+		ok, err = pcall(function()
+			local values = "hitStrength(" .. tostring(strength)
+					.. "), hitType(" .. tostring(self.HitReactionType.Collision)
+					.. ")"
+
+			if horseWuid and Framework and Framework.WUIDToMsg then
+				values = "attacker(" .. Framework.WUIDToMsg(horseWuid) .. "), "
+						.. values
+			end
+
+			XGenAIModule.SendMessageToEntity(npc.id, "hitReaction", values)
+		end)
+	end
 
 	if self.Config.LogTelemetry then
-		self:Log("HitReaction typed=" .. tostring(ok)
+		self:Log("HitReaction form=" .. (self.HitReactionTyped and "typed" or "string")
+				.. " ok=" .. tostring(ok)
 				.. " strength=" .. tostring(strength)
 				.. " attacker=" .. tostring(horseWuid ~= nil)
 				.. " err=" .. tostring(err))

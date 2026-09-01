@@ -9438,3 +9438,23 @@ that follows the horse's `rider` link to the player, and re-sends the event as
 crime, and `combat:hit` feeds the combat sub-brain, which owns the body. The
 conclusion that a reaction animation is unreachable from a mod was drawn when
 that path was assumed dead.
+
+## A testing hazard: the first sprint after a save load gallops
+
+**User report**: "there is this bug that I don't think is our mods doing and is
+just vanilla where after you reload a save, the first time you press the run
+button while on the horse it automatically gets to gallop speed even though you
+didn't hold forward or double press."
+
+Not caused by this mod, and it does not need fixing here, but it corrupts a ride
+that is meant to be at a single tier: the first impact after a load can arrive
+at gallop when the rider meant to trot. It cost the opening impact of a
+controlled comparison.
+
+Two protections, both cheap:
+
+- **Filter by the tier the log records** rather than by what the ride intended.
+  Every impact writes its tier, so an accidental gallop is excluded by the
+  analysis instead of by the rider's memory.
+- **Write a marker into the log** at the start of a measured phase, and count
+  only what follows it. A phase that has to be restarted then costs nothing.
