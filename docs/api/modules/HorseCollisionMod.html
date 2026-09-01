@@ -51,6 +51,7 @@
   <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
   <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
 </div>
@@ -134,25 +135,13 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.3.10</li>
+        <li><strong>Release</strong>: 4.4.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
 
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
-	<tr>
-	<td class="name" nowrap><a href="#TriggerCollision">TriggerCollision (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</a></td>
-	<td class="summary">Applies the appropriate reaction for one collision.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#SafeUpdate">SafeUpdate ()</a></td>
-	<td class="summary">One tick of collision detection.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#UpdateTimer">UpdateTimer (assignedTick)</a></td>
-	<td class="summary">Reschedules itself every 100 ms and runs one detection tick.</td>
-	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#ApplySettings">ApplySettings ()</a></td>
 	<td class="summary">Applies HorseCollisionMod_Settings.lua over the defaults above.</td>
@@ -205,109 +194,15 @@
 
     <dl class="function">
     <dt>
-    <a name = "TriggerCollision"></a>
-    <strong>TriggerCollision (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</strong>
-    </dt>
-    <dd>
-    Applies the appropriate reaction for one collision. </p>
-
-<p> Enforces the per-victim cooldown, then dispatches on gait.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">velocity</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         horse velocity vector
-        </li>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         speed to score the impact at, in meters per second
-        </li>
-        <li><span class="parameter">horseEnt</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the player's horse entity
-        </li>
-        <li><span class="parameter">playerEnt</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the player entity
-        </li>
-        <li><span class="parameter">horseWuid</span>
-            <span class="types"><span class="type">userdata</span></span>
-         WUID of the horse
-        </li>
-        <li><span class="parameter">sampledSpeed</span>
-            <span class="types"><span class="type">number</span></span>
-         speed read on this tick, recorded in the log so
-   the correction for collision deceleration stays visible
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "SafeUpdate"></a>
-    <strong>SafeUpdate ()</strong>
-    </dt>
-    <dd>
-    One tick of collision detection. </p>
-
-<p> Bails out early unless the player is mounted and moving at least at
- walking pace, then tests every entity within <code>HitRadius</code> of the horse.</p>
-
-<p> Every engine call is wrapped in <a href="https://www.lua.org/manual/5.1/manual.html#pdf-pcall">pcall</a>, because entities can be unstreamed
- or partially initialized at any moment and an uncaught error would kill the
- timer loop for the rest of the session.
-
-
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "UpdateTimer"></a>
-    <strong>UpdateTimer (assignedTick)</strong>
-    </dt>
-    <dd>
-    Reschedules itself every 100 ms and runs one detection tick. </p>
-
-<p> The tick number guards against duplicate loops. Each load screen starts a
- new loop, and any loop whose number no longer matches the current one stops
- on its next iteration, so reloading a save leaves no stale timers running.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">assignedTick</span>
-            <span class="types"><span class="type">number</span></span>
-         the loop generation this timer belongs to
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
     <a name = "ApplySettings"></a>
     <strong>ApplySettings ()</strong>
     </dt>
     <dd>
     Applies HorseCollisionMod_Settings.lua over the defaults above. </p>
 
-<p> Settings live in their own file so that changing one does not mean finding a
- table partway down a thousand-line script. That file ships alongside this one
- in <code>Scripts/Startup/</code> and defines a single global.</p>
+<p> Settings live in their own file so that changing one does not mean opening
+ the mod's source at all. That file ships alongside this one in
+ <code>Scripts/Startup/</code> and defines a single global.</p>
 
 <p> Startup scripts are loaded in name order, so the settings file runs after
  this one and its global does not exist at the time this file is executed.
@@ -689,7 +584,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-01 13:39:34 </i>
+<i style="float:right;">Last updated 2026-09-01 13:47:13 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

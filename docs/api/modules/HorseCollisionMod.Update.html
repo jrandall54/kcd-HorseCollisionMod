@@ -1,0 +1,217 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><strong>HorseCollisionMod.Update</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Update</code></h1>
+<p>Update: the loop that finds collisions, and what it does with one.</p>
+<p> The detection loop runs ten times a second while the player is mounted. It
+ reads the horse's velocity, sweeps a footprint forward proportional to
+ speed, and for every human inside it decides a tier and dispatches the
+ reaction. Everything else in this mod is called from here.</p>
+
+<p> <a href="../modules/HorseCollisionMod.Update.html#HorseCollisionMod:UpdateTimer">UpdateTimer</a> is what keeps it running, and it carries the generation guard.
+ Re-executing the entry point builds a fresh <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table, and
+ without that guard every reload would leave another loop sweeping for
+ collisions ten times a second, all of them writing to the same cooldown
+ table.</p>
+
+<p> <a href="../modules/HorseCollisionMod.Update.html#HorseCollisionMod:SafeUpdate">SafeUpdate</a> is wrapped in <a href="https://www.lua.org/manual/5.1/manual.html#pdf-pcall">pcall</a> by its caller for a reason worth keeping:
+ an error thrown inside a timer callback kills the loop silently, and the mod
+ would simply stop working with nothing in the log to say so.</p>
+
+<p> This file was moved last, because it calls into every other part and a
+ mistake here would have been indistinguishable from a mistake in whichever
+ part it called.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.4.0</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:TriggerCollision">HorseCollisionMod:TriggerCollision (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</a></td>
+	<td class="summary">Applies the appropriate reaction for one collision.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:SafeUpdate">HorseCollisionMod:SafeUpdate ()</a></td>
+	<td class="summary">One tick of collision detection.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:UpdateTimer">HorseCollisionMod:UpdateTimer (assignedTick)</a></td>
+	<td class="summary">Reschedules itself every 100 ms and runs one detection tick.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:TriggerCollision"></a>
+    <strong>HorseCollisionMod:TriggerCollision (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</strong>
+    </dt>
+    <dd>
+    Applies the appropriate reaction for one collision. </p>
+
+<p> Enforces the per-victim cooldown, then dispatches on gait.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">velocity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse velocity vector
+        </li>
+        <li><span class="parameter">speed</span>
+            <span class="types"><span class="type">number</span></span>
+         speed to score the impact at, in meters per second
+        </li>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+        <li><span class="parameter">horseWuid</span>
+            <span class="types"><span class="type">userdata</span></span>
+         WUID of the horse
+        </li>
+        <li><span class="parameter">sampledSpeed</span>
+            <span class="types"><span class="type">number</span></span>
+         speed read on this tick, recorded in the log so
+   the correction for collision deceleration stays visible
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:SafeUpdate"></a>
+    <strong>HorseCollisionMod:SafeUpdate ()</strong>
+    </dt>
+    <dd>
+    One tick of collision detection. </p>
+
+<p> Bails out early unless the player is mounted and moving at least at
+ walking pace, then tests every entity within <code>HitRadius</code> of the horse.</p>
+
+<p> Every engine call is wrapped in <a href="https://www.lua.org/manual/5.1/manual.html#pdf-pcall">pcall</a>, because entities can be unstreamed
+ or partially initialized at any moment and an uncaught error would kill the
+ timer loop for the rest of the session.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:UpdateTimer"></a>
+    <strong>HorseCollisionMod:UpdateTimer (assignedTick)</strong>
+    </dt>
+    <dd>
+    Reschedules itself every 100 ms and runs one detection tick. </p>
+
+<p> The tick number guards against duplicate loops. Each load screen starts a
+ new loop, and any loop whose number no longer matches the current one stops
+ on its next iteration, so reloading a save leaves no stale timers running.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">assignedTick</span>
+            <span class="types"><span class="type">number</span></span>
+         the loop generation this timer belongs to
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-01 13:47:13 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

@@ -43,8 +43,8 @@ like part of the game.
   where impacts were landing.
 - Stamina limits how much is possible in one run, and costs more in combat, so
   charging into a fight is a decision rather than a default.
-- Nothing is hardcoded. Every threshold, force and cost is a value at the top of
-  one file.
+- Nothing is hardcoded. Every threshold, force and cost is a value in one
+  settings table, and players edit a separate file rather than the mod source.
 
 ## The three parts
 
