@@ -50,10 +50,9 @@ for _, ent in pairs(System.GetEntities() or {}) do
 					and HorseCollisionMod.RecentHits
 					and HorseCollisionMod.RecentHits[tostring(ent.id)]
 
-			-- Printed exactly as the mod records it. `GetState("health")`
-			-- already returns the 0 to 100 scale the ImpactCost lines carry,
-			-- and an earlier version of this probe multiplied it by a hundred
-			-- and reported every healthy NPC as 10000.
+			-- Printed on the scale the mod records. `GetState("health")`
+			-- already returns 0 to 100, the same scale the `ImpactCost` lines
+			-- carry, so it is formatted rather than converted.
 			local health = "?"
 			pcall(function()
 				health = string.format("%.1f", ent.soul:GetState("health"))
