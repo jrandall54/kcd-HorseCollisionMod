@@ -125,98 +125,66 @@ function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
 				.. " waited=" .. string.format("%.0f", waited) .. "ms")
 	end
 
-	-- After the rebuild rather than alongside it. The rebuild is what resets
-	-- the victim's behavior, and asking a brain to re-plan in the same frame
-	-- it is being torn down and remade is asking the wrong one.
-	--
-	-- Leaving the area and returning restores a beggar or an innkeeper to
-	-- their animation where this sequence does not, and the difference between
-	-- the two is time: the engine's own teardown and rebuild are separated by
-	-- however long the player was away.
-	local generation = self.TimerTick
-
-	self:WatchHeading(npc, action)
-
-	Script.SetTimer(self.ReplanAfterRebuildMs, function()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		self:ReplanVictim(npc)
-	end)
+	-- Watching starts here rather than after a delay. The delay that used to
+	-- sit in front of this existed so a replan did not land in the frame the
+	-- brain was being remade in; watching carries no such constraint, and the
+	-- wait it imposed was paid by every victim including the ones that needed
+	-- nothing.
+	self:ReplanIfStranded(npc)
 end
 
---- Measures how far a victim turns after standing up.
+--- Replans a victim only when the game has not recovered them itself.
 --
--- A victim seen to stand, start moving, pause and then set off in a different
--- direction is a report about something the log cannot show: `VictimReplan`
--- records that the message was sent, not what the victim did with it. This
--- turns the observation into a number, so a heading change can be compared
--- between a build that replans and one that does not.
+-- The replan restarts the victim's daycycle, which is the only way a beggar or
+-- an innkeeper regains their loop: they are bound to a smart object they
+-- cannot re-approach on their own, and without it they stand where they got
+-- up. Everyone else recovers unaided, and for them the restart interrupts
+-- correct behavior visibly. A woman carrying a bucket drops it, because
+-- restarting the daycycle tears down the activity holding the prop.
 --
--- Sampled either side of the replan window rather than across it. The first
--- reading is taken as the rebuild finishes, before `ReplanAfterRebuildMs` has
--- elapsed, and the second far enough after for a new plan to have moved the
--- body.
+-- The two cases are told apart by one reading. A stranded victim sits in
+-- `MotionIdle`; a recovered one is already in `MotionMovement`, `IdleToMove`
+-- or a turn. Measured across nine recoveries, that held without exception.
 --
--- Diagnostic, and off unless `LogTelemetry` is set.
+-- Taken immediately rather than after a wait. Nothing about the reading
+-- improves by being taken later, and everything a victim needs is owed to them
+-- the moment they are on their feet: the wait was only ever the cost of a
+-- weaker signal.
+--
+-- A victim whose own activity is standing still is not stranded, so a state
+-- matching what they were hit in counts as recovered whatever it is.
 --
 -- @tparam table npc victim entity
--- @tparam string action the reaction that was played, for the log line
-function HorseCollisionMod:WatchHeading(npc, action)
-	if not self.Config.LogTelemetry then
+function HorseCollisionMod:ReplanIfStranded(npc)
+	if not self.Config.ReplanAfterReaction then
 		return
 	end
 
-	local function reading()
-		local ok, dir, pos = pcall(function()
-			return npc:GetDirectionVector(1), npc:GetWorldPos()
-		end)
+	local id = tostring(npc.id)
+	local was = self.VictimActivity[id]
+	local state = nil
 
-		if not ok or not dir or not pos then
-			return nil
-		end
-
-		return { x = dir.x, y = dir.y, px = pos.x, py = pos.y }
-	end
-
-	local before = reading()
-
-	if not before then
-		return
-	end
-
-	local at = self.ReplanAfterRebuildMs + 1400
-
-	Script.SetTimer(at, function()
-		local after = reading()
-
-		if not after then
-			return
-		end
-
-		-- The angle between two unit heading vectors, from their dot product.
-		-- Clamped because floating point drift can push it just outside the
-		-- domain of acos and return nan for two identical headings.
-		local dot = (before.x * after.x) + (before.y * after.y)
-
-		if dot > 1 then
-			dot = 1
-		elseif dot < -1 then
-			dot = -1
-		end
-
-		local turned = math.deg(math.acos(dot))
-		local moved = math.sqrt(((after.px - before.px) ^ 2)
-				+ ((after.py - before.py) ^ 2))
-
-		self:Log("Heading " .. tostring(npc:GetName())
-				.. " action=" .. tostring(action)
-				.. " replan=" .. tostring(self.Config.ReplanAfterReaction)
-				.. " turned=" .. string.format("%.0f", turned) .. "deg"
-				.. " moved=" .. string.format("%.2f", moved) .. "m"
-				.. " over=" .. tostring(at) .. "ms")
+	pcall(function()
+		state = tostring(npc.actor:GetCurrentAnimationState())
 	end)
+
+	self.VictimActivity[id] = nil
+
+	local idle = state ~= nil and string.find(state, "^MotionIdle") ~= nil
+	local resumed = (was ~= nil and state == was) or not idle
+
+	if self.Config.LogTelemetry then
+		self:Log("Stranded " .. tostring(npc:GetName())
+				.. " was=" .. tostring(was)
+				.. " now=" .. tostring(state)
+				.. " resumed=" .. tostring(resumed))
+	end
+
+	if resumed then
+		return
+	end
+
+	self:ReplanVictim(npc)
 end
 
 --- Sends a victim back to their activity by way of approaching it again.

@@ -102,6 +102,15 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		end
 	end)
 
+	-- Recorded before the action seizes the body, because that is the last
+	-- moment the victim's own activity is still readable. `ReplanIfStranded`
+	-- compares against it to tell a victim who has resumed from one left
+	-- standing.
+	pcall(function()
+		self.VictimActivity[tostring(npc.id)] =
+				tostring(npc.actor:GetCurrentAnimationState())
+	end)
+
 	local ok, err = pcall(function()
 		-- The second argument is the object being interacted with. There is
 		-- no object in a collision, so the victim is passed as its own
@@ -171,24 +180,6 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 
 	self:ImpulseVictim(npc, velocity, impulseScale)
 
-	-- Measured here as the control for the same reading taken on the fall
-	-- path. This tier never seizes the actor, so it never rebuilds and never
-	-- replans, and the engine recovers the victim on its own. How far a victim
-	-- turns after that is therefore how far the game turns them with the mod
-	-- doing nothing, which is the figure the fall path has to be compared
-	-- against before anything is blamed for the difference.
-	--
-	-- Sampled from when the body settles rather than from the impact, so both
-	-- tiers are measured from the same moment in their own sequence.
-	local generation = self.TimerTick
-
-	self:WhenRagdollResolves(npc, function(state)
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		self:WatchHeading(npc, "ragdoll:" .. tostring(state))
-	end)
 end
 
 

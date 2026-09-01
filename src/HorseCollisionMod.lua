@@ -264,6 +264,19 @@ HorseCollisionMod.Config = {
 -- @table RecentHits
 HorseCollisionMod.RecentHits = {}
 
+--- What each victim was doing when it was hit, keyed by entity id.
+--
+-- Read back once the victim is on their feet, to tell one that has resumed
+-- its activity from one left standing with nothing to do. A beggar and an
+-- innkeeper cannot recover their own loop and need the replan; almost
+-- everyone else recovers on their own and is only interrupted by it.
+--
+-- Cleared with the rest of the per-victim state on a load screen.
+HorseCollisionMod.VictimActivity = {}
+
+
+
+
 --- Last time each entity was reported as a miss, keyed by entity id.
 HorseCollisionMod.RecentRejections = {}
 
@@ -320,7 +333,6 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 -- How long after the rebuild the victim is asked to re-plan. The rebuild
 -- resets the behavior and the re-plan chooses what it does next, so they are
 -- ordered rather than issued together.
-HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 --- How abruptly the replan is allowed to interrupt what the victim is doing.
 --
@@ -514,6 +526,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- survives the transition, so the table is dropped rather than
 		-- carried into a world it no longer describes.
 		self.RecentHits = {}
+		self.VictimActivity = {}
 
 		local applied, rejected = self:ApplySettings()
 

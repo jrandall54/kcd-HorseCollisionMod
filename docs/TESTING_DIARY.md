@@ -10712,3 +10712,78 @@ With the replan off, `rat_refugee_tonka` recorded `turned=0deg moved=0.00m`, a
 beggar who did not move at all in two seconds. That is the case the replan was
 added for in 4.2.1, where a beggar, an innkeeper and a merchant were left
 standing. One sample, and not pursued here.
+
+## The replan fires at whoever needs it, and nobody else
+
+A victim was reported standing up, beginning to resume, and then snapping into
+something else about half a second later, dropping a carried bucket or changing
+direction in a single frame.
+
+### What it was
+
+`ReplanVictim`, sent to every trot victim 600 ms after the rebuild. It restarts
+the victim's daycycle, which tears down the activity they are in; a prop held
+by that activity goes with it, which is the bucket.
+
+Two earlier answers about it were wrong and are recorded as wrong. The first
+blamed the crime response for masking it, which the release dates disprove. The
+second cleared the replan outright on a measurement of heading angle, which was
+the wrong quantity: an NPC who ragdolls, stands up facing anywhere and walks off
+scores a large angle with no snap at all, which is why gallop, a tier that never
+replans, produced the largest angles in the set.
+
+### Why it is still needed
+
+Switching it off fixed the snap and stranded two kinds of victim:
+
+| Victim | Without the replan |
+| --- | --- |
+| Woman carrying a bucket | recovers, keeps the bucket |
+| Merchant | recovers |
+| Beggar | stands where they got up |
+| Innkeeper | stands where they got up |
+
+A beggar and an innkeeper are bound to a smart object they cannot re-approach
+on their own. The replan is the only thing that returns them to it. It was
+added in 4.2.1 for exactly those cases, and 4.3.1 handing the fall to the
+engine did not make it unnecessary, only unnecessary for everyone else.
+
+### The signal that separates them
+
+The victim's animation state, read once the rebuild lands:
+
+```
+Stranded rat_refugee_vojcek  was=BeggarVAR      now=MotionIdle      resumed=false
+Stranded rat_innkeeper1      was=Leaning        now=MotionIdle      resumed=false
+Stranded rat_woman24         was=MotionMovement now=MotionMovement  resumed=true
+Stranded rat_merchant_shop3  was=MotionMovement now=MotionMovement  resumed=true
+```
+
+A stranded victim sits in `MotionIdle`. A recovered one is already in
+`MotionMovement`, `IdleToMove` or a turn. Across sixteen recoveries this held
+without exception. A victim whose own activity is standing still is covered by
+the state matching what they were hit in.
+
+### The reading is taken immediately
+
+Three intermediate versions each cost time that turned out to be unnecessary,
+and the last of them was removed on the player's argument rather than on a
+measurement:
+
+| Version | Delay before a stranded victim is helped |
+| --- | --- |
+| Fire at everyone | 600 ms, and wrong |
+| Fixed check after the rebuild | 1,800 ms |
+| Poll to a ceiling | up to 1,200 ms |
+| Read the state once, immediately | none |
+
+Waiting was only ever the cost of a weaker signal. Distance moved was carried
+alongside the state for one version and was redundant the moment the state rule
+existed: every case it caught, the state caught first, and it misjudged a
+merchant who resumed by turning on the spot.
+
+### Also corrected
+
+The replan sent `daycycleHaltSpeed.instant`. Vanilla uses that value only for
+teleports and cutscenes, where a transition with no wind-down is the point. It
+is `fast` now. This was not the fault, and changing it alone fixed nothing.
