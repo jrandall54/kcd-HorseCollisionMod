@@ -287,34 +287,69 @@ if ($PrepareShippingTest) {
 
 	$moved = 0
 
-	# Every loose Lua part the entry point pulls in has to be parked too. One
-	# left behind is worse than leaving them all: the pak's entry point would
-	# load, find a stale part next to it, and the shipping test would pass on
-	# a file set no player has.
-	$looseParts = @()
-	$partsSrc = Join-Path $repoRoot "src\HorseCollisionMod"
+	# What gets parked is discovered in the game folder, not listed here.
+	#
+	# A list of names only covers what this script currently deploys, and the
+	# set of files the mod ships changes: the ten part files were added when
+	# the Lua was split, and HorseCollisionMod_ItemData.lua was deployed by an
+	# earlier version of this script and left behind by every list written
+	# since. A single survivor invalidates the whole test, and it does so by
+	# making it pass: at sys_PakPriority 2 the engine ignores loose files, but
+	# the moment the priority is wrong the stale file is read instead of the
+	# pak's copy, and nothing says so.
+	#
+	# So this matches on where the mod puts things rather than on what it is
+	# expected to have put there. Two vanilla file names are listed explicitly
+	# because the mod claims them and they carry no hcm_ prefix.
+	$patterns = @(
+		@{ Dir = "Data\Scripts\Startup"; Filter = "HorseCollisionMod*" },
+		@{ Dir = "Data\Scripts\HorseCollisionMod"; Filter = "*" },
+		@{ Dir = "Data\Animations\Mannequin\ADB"; Filter = "hcm_*" },
+		@{ Dir = "Data\Animations\Mannequin\ADB"
+		   Names = @("kcd_animationControlledTags.xml", "wh_female_fragmentids.xml") }
+	)
 
-	if (Test-Path $partsSrc) {
-		$looseParts = @(Get-ChildItem -Path $partsSrc -Filter *.lua -File |
-			Sort-Object Name |
-			ForEach-Object { "Data\Scripts\HorseCollisionMod\$($_.Name)" })
+	$found = @()
+
+	foreach ($rule in $patterns) {
+		$dir = Join-Path $gameRoot $rule.Dir
+
+		if (-not (Test-Path $dir)) { continue }
+
+		if ($rule.Names) {
+			foreach ($n in $rule.Names) {
+				$p = Join-Path $dir $n
+				if (Test-Path $p) { $found += "$($rule.Dir)\$n" }
+			}
+
+			continue
+		}
+
+		foreach ($f in (Get-ChildItem -Path $dir -Filter $rule.Filter -File | Sort-Object Name)) {
+			$found += "$($rule.Dir)\$($f.Name)"
+		}
 	}
 
-	foreach ($rel in @("Data\Scripts\Startup\HorseCollisionMod.lua",
-			"Data\Scripts\Startup\HorseCollisionMod_Settings.lua") + $looseParts + @(
-			"Data\Animations\Mannequin\ADB\hcm_female_database.adb",
-			"Data\Animations\Mannequin\ADB\hcm_male_database.adb",
-			"Data\Animations\Mannequin\ADB\kcd_animationControlledTags.xml",
-			"Data\Animations\Mannequin\ADB\wh_female_fragmentids.xml")) {
-		$p = Join-Path $gameRoot $rel
+	# Two directories can hold the same leaf name, and the manifest keys on the
+	# leaf, so a collision would restore one file over the other.
+	$used = @{}
 
-		if (Test-Path $p) {
-			$leaf = Split-Path $rel -Leaf
-			Move-Item $p (Join-Path $park $leaf) -Force
-			Add-Content $manifest "$leaf|$rel" -Encoding utf8
-			Write-Host "[DEPLOY] parked $rel"
-			$moved++
+	foreach ($rel in ($found | Select-Object -Unique)) {
+		$p = Join-Path $gameRoot $rel
+		$leaf = Split-Path $rel -Leaf
+		$name = $leaf
+		$n = 1
+
+		while ($used.ContainsKey($name)) {
+			$n++
+			$name = "$n-$leaf"
 		}
+
+		$used[$name] = $rel
+		Move-Item $p (Join-Path $park $name) -Force
+		Add-Content $manifest "$name|$rel" -Encoding utf8
+		Write-Host "[DEPLOY] parked $rel"
+		$moved++
 	}
 
 	$dev = Join-Path $modsDir $devMod
