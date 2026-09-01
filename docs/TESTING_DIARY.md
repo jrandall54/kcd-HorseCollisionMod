@@ -9887,3 +9887,37 @@ The second `hit` type, `attacker, kind, real`, where `kind` is a
 `combatAttackKind` of `none`, `missile`, `stealthAction`, `unarmed`, `melee` or
 `dogBite`. And `crimeReport`, which carries a `crime:string` and is the game's
 own channel for naming a crime rather than implying one.
+
+## The undeclared hit types do nothing, and there is no explosion
+
+`HitReactionType` is declared in `TypeDefinitions.xml` with the comment "These
+correspond to the C++ enum => weird values", and its five values leave gaps at
+3 to 6, 8, 9 and 11 to 15. Those gaps are real C++ values the XML does not
+expose, so each was sent as a `combat:hit` against a live victim.
+
+**All eleven produced nothing.** No witness, no crime, no reaction. Combined
+with the earlier runs, the complete picture is:
+
+| Value | Declared as | Crime |
+| --- | --- | --- |
+| 1 | Melee | yes, a brawl |
+| 2 | Collision | no |
+| 3, 4, 5, 6 | undeclared | no |
+| 7 | Fall | no |
+| 8, 9 | undeclared | no |
+| 10 | Bullet | yes, a shooting |
+| 11 to 15 | undeclared | no |
+| 16 | MeleeStealth | yes, a brawl |
+
+Only the three the crime system knows about are prosecuted, and there is nothing
+hiding in the gaps.
+
+### On explosion
+
+There is no explosion among KCD's hit reaction types. The word does appear in
+the game's data, in `Scripts/Entities/Items/HitTypes.xml`, whose own comment
+says it "is loaded as a non-native fallback" and which lists `ExplosiveGrenade`,
+`Rocket`, `Tank125`, `MGBullet` and `PistolBullet`. Those are CryEngine and
+Crysis assets shipped unused, alongside `VTOLExplosion` and `HumanTurret`
+elsewhere. A build that sent an explosion damage type was reaching into that
+registry rather than into KCD's combat system.
