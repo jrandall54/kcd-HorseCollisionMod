@@ -10008,3 +10008,58 @@ parameters, and the layer is doing in Mannequin what this mod now does from Lua
 with a timer and `actor:Fall`.
 
 Whether the earlier failure was the parameters or the ordering is untested.
+
+## The fragment performs the ragdoll handover, and the timer goes
+
+Tested at 4.3.1-dev.1. Each `hcm_fall_*` option carries a Ragdoll ProcLayer at
+its own ExitTime, with `Sleep` 1 and `Stiffness` 500 taken from the `HitDeath`
+option that drops a rider off a horse. Exit times are the measured clip lengths
+at 0.68, per character set and direction, which is what the Lua timer used.
+
+Fourteen impacts, every one `by=fragment`, and twelve recoveries all
+`on=resolved`. No ceiling, no case where the layer failed to fire.
+
+**User report**: "it's hard to tell the difference between what we had and what
+it is now. I can see the ragdolls for sure and maybe on some of the animations
+it looks a little weird, but some of them are completely smooth the entire way
+through so it might just be a tuning issue."
+
+Which is the expected outcome: the exit times are the same numbers the timer
+used, so nothing about the timing changed. What changed is where they live.
+
+### The earlier abandonment was a parameter, not the approach
+
+The settle layer was tried before and dropped after the ragdoll was measured
+arriving two seconds after the victim had already stood up. That attempt used
+`Sleep` 0 and `Stiffness` 100, recorded at the time as vanilla's own value.
+Vanilla's value in the fragment that performs this exact handover is `Sleep` 1
+and `Stiffness` 500. `Sleep` decides whether the body settles or stays live.
+
+### What it removes
+
+Ninety lines: the handover branch, the per-gender clip length table, and the
+fraction. Also the `actor:Fall` call for this tier, its timer, its generation
+guard, and the movement control hand-back that had to happen immediately
+before it.
+
+The clip length table was the liability worth removing. It held figures this
+project measured out of the running game across fifty-six reactions, correct
+for four clips on one build, and silently wrong if a clip were ever swapped.
+The fragment cannot drift that way, because the timing sits beside the clip it
+belongs to.
+
+What remains is the wait for the ragdoll to resolve, which the rebuild has to
+follow: a victim can leave the ragdoll upright and still have no plan.
+
+### After the removal
+
+Five impacts on the trimmed build, with the ninety lines gone: four recoveries
+`resolved` and one `neverRagdolled`, where `BlendRagdoll` was not observed inside
+the ceiling and the rebuild ran anyway. No errors.
+
+That case is not new and not caused by this. It appeared at two in forty-three
+under the Lua handover, and the ceiling exists for it.
+
+`VictimFall` no longer appears in the log, correctly: the mod does not perform
+the handover any more, so it has nothing to report about it. `VictimRebuild`
+still records how each recovery ended.
