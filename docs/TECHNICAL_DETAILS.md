@@ -181,6 +181,24 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 because they have to exist before any part is loaded and because
 `ApplySettings` writes to them.
 
+### The layout is enforced by the build
+
+New behavior goes in the part file that owns the concern, or in a new part
+file. `build.ps1` refuses a build that breaks that, because the split would
+otherwise be undone a method at a time, each one defensible on its own:
+
+| Rule | What it prevents |
+|---|---|
+| The entry point defines only `ApplySettings`, `RedirectAnimationDatabases` and `uiActionListener` | behavior accumulating back in the entry point |
+| Only the entry point writes `HorseCollisionMod = {}` | a part file discarding every method loaded before it |
+| Every part file carries an LDoc `@module` header | a file silently absent from the reference |
+| Every part file is named by a `Script.ReloadScript` line | a file that exists, never loads, and logs nothing |
+| Every part file is listed in `config.ld` | a file missing from the reference |
+| Every path the entry point loads exists in `src` | a load that resolves to nothing |
+
+Adding a name to that first list is meant to feel like a decision, because it
+is one.
+
 `Script.ReloadScript` is the base game's own mechanism, not a development
 facility. It is the first line of nearly every vanilla entity script and is how
 `Scripts/common.lua` assembles its utilities, so it works in a shipping build.
