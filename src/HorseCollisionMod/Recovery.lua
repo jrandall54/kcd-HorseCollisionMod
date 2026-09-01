@@ -170,6 +170,15 @@ function HorseCollisionMod:TraceRecovery(npc, action)
 			state = tostring(npc.actor:GetCurrentAnimationState())
 		end)
 
+		-- Paired with the animation state, because the two answer different
+		-- questions. The animation state says what is playing; the
+		-- physicalization profile says who owns the body. `alive` is the
+		-- engine's, `ragdoll` is physics, and `sleep` is a settled body that
+		-- vanilla's own commented-out code pairs with `actor:StandUp`.
+		pcall(function()
+			state = state .. "/" .. tostring(npc.actor:GetPhysicalizationProfile())
+		end)
+
 		local now = self:TimeMs()
 
 		if state ~= current then
