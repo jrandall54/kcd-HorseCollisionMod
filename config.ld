@@ -23,6 +23,7 @@ description = "Speed-tiered horse collision reactions for Kingdom Come: Delivera
 file = {
 	"src/HorseCollisionMod.lua",
 	"src/HorseCollisionMod/Enums.lua",
+	"src/HorseCollisionMod/Log.lua",
 	"src/HorseCollisionMod/Armor.lua"
 }
 dir = "docs/api"
