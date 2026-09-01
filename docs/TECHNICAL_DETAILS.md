@@ -143,6 +143,40 @@ opening successfully and reports no error.
 `build.ps1` writes the pak entry by entry through `System.IO.Compression`, and
 prints each entry name so the separators are visible.
 
+## How the mod's Lua is composed
+
+The mod is more than one file. `Scripts/Startup/HorseCollisionMod.lua` is the
+entry point and creates the table; the rest lives in
+`Scripts/HorseCollisionMod/` and is pulled in at the foot of the entry point:
+
+```lua
+Script.ReloadScript("Scripts/HorseCollisionMod/Enums.lua")
+```
+
+`Script.ReloadScript` is the base game's own mechanism, not a development
+facility. It is the first line of nearly every vanilla entity script and is how
+`Scripts/common.lua` assembles its utilities, so it works in a shipping build.
+It is synchronous and resolves the path through the merged pak filesystem, so
+each part is fully defined before the next line runs.
+
+The parts sit beside `Scripts/Startup/`, never inside it. The engine enumerates
+that folder and executes what it finds, which would run a part before the table
+exists and then run it again when the entry point named it. Naming them
+explicitly removes the ordering question.
+
+Two consequences follow from the section above. The parts are looked up by
+path, so they do not inherit the accidental protection that keeps enumerated
+Startup Lua working in a backslash pak; a part file that fails to load is the
+first thing to suspect there. And a part that does not load raises no error on
+its own - the methods it defines stay nil, and the mod silently does less -
+which is why `verify_additive.py` checks that every part ships and that the
+entry point names it.
+
+Each part adds to the table and carries no top-level statements beyond its
+function definitions, so re-running the entry point cascades a reload through
+all of them. The development loop reloads only
+`Scripts/Startup/HorseCollisionMod.lua`.
+
 The game's own paks store forward slashes in the central directory and
 backslashes in the local file headers. Python's `zipfile` treats that as
 corruption and refuses to read them, so `build_adb.py` inflates entries from the

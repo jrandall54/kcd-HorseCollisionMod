@@ -122,6 +122,11 @@ def is_noise(text):
     return any(pattern.search(stripped) for pattern in NOISE)
 
 # The mod's scripts as the engine's file system names them.
+#
+# Only the three Startup scripts are named. The rest of the mod lives in
+# Scripts/HorseCollisionMod/ and is pulled in by Script.ReloadScript calls at
+# the foot of the entry point, so reloading MOD_SCRIPT cascades through every
+# part file and nothing here has to know what they are.
 MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
 SETTINGS_SCRIPT = "Scripts/Startup/HorseCollisionMod_Settings.lua"
 ITEM_DATA_SCRIPT = "Scripts/Startup/HorseCollisionMod_ItemData.lua"

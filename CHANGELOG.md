@@ -23,6 +23,18 @@ number.
 
 ## [Unreleased]
 
+## [4.3.2] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The mod's Lua is no longer one file. The entry point in
+  `Scripts/Startup/` creates the table and names the parts it wants; the
+  parts live in `Scripts/HorseCollisionMod/` and are pulled in with
+  `Script.ReloadScript`, the same mechanism the base game uses to compose
+  its own scripts. The engine enums are the first section moved.
+
 ## [4.3.1] - 2026-08-31
 
 Internal. Nothing about a collision looks or behaves differently.

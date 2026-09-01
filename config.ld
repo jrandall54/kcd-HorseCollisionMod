@@ -1,8 +1,8 @@
 -- LDoc configuration. Run `ldoc .` from the repository root.
 --
 -- LDoc is the standard documentation generator for Lua, and the doc comments
--- in src/HorseCollisionMod.lua are written for it. It is not needed to build
--- the mod, only to regenerate docs/api/.
+-- in src/ are written for it. It is not needed to build the mod, only to
+-- regenerate docs/api/.
 --
 -- Installing it needs a C compiler, because LDoc depends on penlight which
 -- depends on luafilesystem, which is a C module. On Windows without one:
@@ -17,7 +17,13 @@ project = "HorseCollisionMod"
 title = "HorseCollisionMod API reference"
 description = "Speed-tiered horse collision reactions for Kingdom Come: Deliverance."
 
-file = "src/HorseCollisionMod.lua"
+-- The entry point first, then the part files it pulls in with
+-- Script.ReloadScript. Listed rather than pointed at the directory so the
+-- reference reads in the order the mod loads, which `sort = false` preserves.
+file = {
+	"src/HorseCollisionMod.lua",
+	"src/HorseCollisionMod/Enums.lua"
+}
 dir = "docs/api"
 
 -- The doc comments use Markdown for emphasis, lists and fenced code.
@@ -27,9 +33,9 @@ format = "markdown"
 -- mechanism before the functions that use it.
 sort = false
 
--- The mod is one module rather than a package, so a module index adds a click
--- without adding information.
-one = true
+-- Once there is more than one module a package index carries information: it
+-- is the list of the parts the mod is built from.
+one = false
 
 -- Everything in the file is part of the documented surface. Nothing is marked
 -- @local, and the internals are worth reading.

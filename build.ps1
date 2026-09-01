@@ -1,4 +1,4 @@
-param (
+﻿param (
     [string]$Version = "dev"
 )
 
@@ -13,6 +13,23 @@ $toolsDir = Join-Path $repoRoot "tools"
 $assetsDir = Join-Path $repoRoot "mod_assets"
 $modScript = Join-Path $srcDir "HorseCollisionMod.lua"
 $settingsScript = Join-Path $srcDir "HorseCollisionMod_Settings.lua"
+
+# The entry point names its parts with Script.ReloadScript and they ship
+# alongside it under Scripts/HorseCollisionMod/. The directory is walked rather
+# than listed file by file, so moving another section into its own part file
+# needs no change here. Sorted so the build log and the pak read the same way
+# on every machine.
+$partsSrcDir = Join-Path $srcDir "HorseCollisionMod"
+$partScripts = @()
+if (Test-Path $partsSrcDir) {
+    $partScripts = @(Get-ChildItem -Path $partsSrcDir -Filter *.lua -File |
+        Sort-Object Name | ForEach-Object { $_.FullName })
+}
+
+# Every Lua file the mod ships. The style, scope and syntax checks below all
+# run over this set, so a part file is held to the same standard as the entry
+# point instead of being packaged unchecked.
+$luaScripts = @($modScript, $settingsScript) + $partScripts
 
 $buildDir = Join-Path $repoRoot "build_temp"
 $pakDir = "$buildDir\pak\Scripts\Startup"
@@ -30,7 +47,7 @@ $errors = 0
 $maxLineLength = 90
 $luaLineCount = 0
 
-foreach ($luaFile in @($modScript, $settingsScript)) {
+foreach ($luaFile in $luaScripts) {
 $shortName = Split-Path -Leaf $luaFile
 $lines = Get-Content $luaFile
 $luaLineCount += $lines.Count
@@ -88,7 +105,7 @@ if ($errors -gt 0) {
 # parse below accepts it, and the mod loads and then errors on every tick.
 $scopeErrors = @()
 
-foreach ($luaFile in @($modScript, $settingsScript)) {
+foreach ($luaFile in $luaScripts) {
     $text = Get-Content $luaFile
     $shortName = Split-Path -Leaf $luaFile
 
@@ -145,7 +162,7 @@ if ($controlChars.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Code Style Check Passed ($luaLineCount lines, 2 files)."
+Write-Host "Code Style Check Passed ($luaLineCount lines, $($luaScripts.Count) files)."
 
 # Release gate. A release version is anything without a prerelease suffix, so
 # -dev and -diag builds skip every check below and stay free to carry
@@ -174,16 +191,17 @@ if ($isRelease) {
     }
 
     # The LDoc header carries the version too, and it is the one that goes
-    # stale unnoticed because nothing reads it back.
-    $releaseTag = $null
+    # stale unnoticed because nothing reads it back. Checked in every part
+    # file that declares one, not just the entry point, since a part header is
+    # read even less often than the entry point's.
+    foreach ($script in (@($modScript) + $partScripts)) {
+        $raw = Get-Content $script -Raw
+        if ($raw -notmatch '@release\s+([^\s]+)') { continue }
 
-    if ((Get-Content $modScript -Raw) -match '@release\s+([^\s]+)') {
-        $releaseTag = $Matches[1]
-    }
-
-    if ($releaseTag -ne $Version) {
-        Write-Host "Build failed: the @release tag is $releaseTag, building $Version." -ForegroundColor Red
-        exit 1
+        if ($Matches[1] -ne $Version) {
+            Write-Host "Build failed: the @release tag in $(Split-Path -Leaf $script) is $($Matches[1]), building $Version." -ForegroundColor Red
+            exit 1
+        }
     }
 
     # A diagnostic left on writes thousands of lines to a player's kcd.log.
@@ -234,7 +252,7 @@ $luajit = Get-Command luajit -ErrorAction SilentlyContinue
 if ($luajit) {
     # Lua treats a backslash in a quoted string as an escape, so the path
     # handed to loadfile is converted to forward slashes.
-    foreach ($script in @($modScript, $settingsScript)) {
+    foreach ($script in $luaScripts) {
         $luaPath = $script.Replace([char]92, [char]47)
         & $luajit.Source -e "assert(loadfile('$luaPath'))"
         if ($LASTEXITCODE -ne 0) {
@@ -251,6 +269,20 @@ else {
 # 1. Structure the PAK contents
 Copy-Item $modScript -Destination "$pakDir\"
 Copy-Item $settingsScript -Destination "$pakDir\"
+
+# The parts go beside Scripts/Startup/, not inside it. The engine enumerates
+# Startup and executes what it finds, in no guaranteed order and without the
+# entry point's knowledge; a part file there would run before the mod's table
+# exists and then run again when the entry point named it. Here they are only
+# ever reached by the Script.ReloadScript calls at the foot of the entry point.
+if ($partScripts.Count -gt 0) {
+    $pakPartsDir = "$buildDir\pak\Scripts\HorseCollisionMod"
+    New-Item -ItemType Directory -Force -Path $pakPartsDir | Out-Null
+
+    foreach ($part in $partScripts) {
+        Copy-Item $part -Destination "$pakPartsDir\"
+    }
+}
 
 # Data overrides live under mod_assets/ mirroring the game's own layout and
 # are copied in wholesale. They are derived from the game's paks, so they are

@@ -72,6 +72,14 @@ Script = {}
 ---@param callback fun()
 function Script.SetTimer(milliseconds, callback) end
 
+--- Executes another Lua file, synchronously, resolving the path through the
+--- merged pak filesystem. This is how the base game composes its own scripts:
+--- it is the first line of nearly every vanilla entity script and is what
+--- `Scripts/common.lua` uses to pull in its utility files. Re-running a file
+--- redefines what it declares, which is why a mod can hot-reload with it.
+---@param path string forward-slash path inside Data, e.g. "Scripts/x.lua"
+function Script.ReloadScript(path) end
+
 --------------------------------------------------------------------------
 -- XGenAIModule - Warhorse's AI and entity layer
 --------------------------------------------------------------------------

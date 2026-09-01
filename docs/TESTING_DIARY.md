@@ -10063,3 +10063,57 @@ under the Lua handover, and the ceiling exists for it.
 `VictimFall` no longer appears in the log, correctly: the mod does not perform
 the handover any more, so it has nothing to report about it. `VictimRebuild`
 still records how each recovery ended.
+
+## A part file inside the mod's own pak loads
+
+The mod's Lua was one file of 2,558 lines. The first section is out of it:
+`HitReactionType` and `HitReactionStrength` now live in
+`Scripts/HorseCollisionMod/Enums.lua`, which the entry point pulls in with
+`Script.ReloadScript` at the foot of the file.
+
+Thirty lines were moved rather than a whole subsystem, because the question
+being answered was whether the mechanism works at all, and a failure here costs
+one revert instead of a tangle.
+
+### What the log shows
+
+Two trot impacts on a save loaded from the deployed build:
+
+```
+Impact tier=Trot speed=6.95 sampled=6.92 armorImpulse=1.26 armorStamina=0.83
+Impact tier=Trot speed=6.95 sampled=6.95 armorImpulse=0.38 armorStamina=2.16
+ImpactCost rat_guard_pazdera tier=Trot state=MoveToIdle strength=5 ...
+Reaction action=hcm_fall_forward gender=1 ok=true err=nil
+CombatHit ok=true strength=5 err=nil
+```
+
+`strength=5` is `HitReactionStrength.MinorInjury` and the combat hit carries
+`HitReactionType.Melee`. Both values were read out of the part file. No Lua
+error appeared, and no field resolved to nil.
+
+The victim reacted normally, which is the outcome that matters: nothing
+player-facing changed, so an impact indistinguishable from 4.3.1 is the result.
+
+### The failure this had to be able to catch
+
+A part file that does not load raises no error of its own. The entry point
+still loads, the methods it expected are nil, and the mod silently does less.
+Eyeballing the game cannot tell that apart from a quiet build.
+
+`verify_additive.py` now checks three things against the packaged pak: that
+every Lua file in `src/HorseCollisionMod/` ships, that the entry point names
+each one in a `Script.ReloadScript` call, and that no path it loads is missing.
+The checks were confirmed by tampering with a copy of the release - stripping
+the part out of the pak fails two of them, deleting the `ReloadScript` line
+fails the third - because this tool has passed vacuously before.
+
+### Load order, and why the parts sit outside Scripts/Startup
+
+The engine enumerates `Scripts/Startup/` and executes what it finds. A part
+file there would run in no guaranteed order, possibly before the table exists,
+and then run a second time when the entry point named it. Only the entry point
+is enumerated; everything else is named explicitly.
+
+One consequence is worth carrying forward: a part file is looked up by path, so
+it does not inherit the accidental protection that keeps enumerated Startup Lua
+working in a pak built with backslash entry names.

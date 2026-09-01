@@ -119,8 +119,11 @@ config.ld                 LDoc configuration for the API reference
 .luarc.json               Lua language server settings, including engine globals
 .gitattributes            how files are stored, so line endings do not drift
 src/
-  HorseCollisionMod.lua            the mod
+  HorseCollisionMod.lua            the entry point: the table, the settings it
+                                   reads, and the parts it loads
   HorseCollisionMod_Settings.lua   the values a player edits
+  HorseCollisionMod/               the rest of the mod, one file per concern,
+                                   pulled in by the entry point
   mod.manifest
 tools/
   build_adb.py            generates the animation data from a game install
