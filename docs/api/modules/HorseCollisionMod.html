@@ -43,6 +43,7 @@
 <ul class="nowrap">
   <li><strong>HorseCollisionMod</strong></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
 </ul>
 
@@ -127,41 +128,13 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.3.3</li>
+        <li><strong>Release</strong>: 4.3.4</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
 
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
-	<tr>
-	<td class="name" nowrap><a href="#TrackSpeed">TrackSpeed (speed)</a></td>
-	<td class="summary">Records one speed sample.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#RecentPeak">RecentPeak (count)</a></td>
-	<td class="summary">The peak of the last <code>count</code> speed samples.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#SpeedTrail">SpeedTrail (count)</a></td>
-	<td class="summary">The recent speed samples, oldest first, as a compact string.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ImpactSpeed">ImpactSpeed ()</a></td>
-	<td class="summary">The speed a collision should be scored at.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#LogRejection">LogRejection (npc, reason, detail)</a></td>
-	<td class="summary">Logs why a candidate was passed over, at most once per second per entity.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#Log">Log (message)</a></td>
-	<td class="summary">Current time in milliseconds.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#GetSpeedTier">GetSpeedTier (speed)</a></td>
-	<td class="summary">Resolves a speed to its gait name.</td>
-	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#SendHitReaction">SendHitReaction (npc, horseWuid, strength)</a></td>
 	<td class="summary">Posts the native <code>hitReaction</code> message to the victim's brain.</td>
@@ -305,210 +278,6 @@
     <h2 class="section-header "><a name="Functions"></a>Functions</h2>
 
     <dl class="function">
-    <dt>
-    <a name = "TrackSpeed"></a>
-    <strong>TrackSpeed (speed)</strong>
-    </dt>
-    <dd>
-    Records one speed sample.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         the current sample, in meters per second
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "RecentPeak"></a>
-    <strong>RecentPeak (count)</strong>
-    </dt>
-    <dd>
-    The peak of the last <code>count</code> speed samples.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">count</span>
-            <span class="types"><span class="type">number</span></span>
-         how many of the most recent samples to consider
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        the highest speed among them, in meters per second
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "SpeedTrail"></a>
-    <strong>SpeedTrail (count)</strong>
-    </dt>
-    <dd>
-    The recent speed samples, oldest first, as a compact string. </p>
-
-<p> Printed on every impact while diagnosing. The width of the deceleration on
- contact is what sets <code>ImpactSpeedSamples</code>, and it is only visible in the
- samples either side of the collision.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">count</span>
-            <span class="types"><span class="type">number</span></span>
-         how many of the most recent samples to include
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-        the samples, space separated, to two decimal places
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "ImpactSpeed"></a>
-    <strong>ImpactSpeed ()</strong>
-    </dt>
-    <dd>
-    The speed a collision should be scored at. </p>
-
-<p> A horse loses speed the moment it hits someone. Detection samples velocity
- once per tick, so the speed read on the tick that notices a victim has
- already been reduced by the collision it is meant to describe, and a gallop
- impact can be scored as a walk. The peak of the last few samples brackets
- the moment of contact instead.</p>
-
-<p> The window is deliberately short. Taken over a whole second it would charge
- gallop to a rider who galloped up and then slowed deliberately to nudge
- someone.</p>
-
-<p> Capped because the physics system reports occasional speeds above anything a
- horse holds, and this value scales knockback force as well as selecting the
- tier.
-
-
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        the speed to score the impact at, in meters per second
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "LogRejection"></a>
-    <strong>LogRejection (npc, reason, detail)</strong>
-    </dt>
-    <dd>
-    Logs why a candidate was passed over, at most once per second per entity. </p>
-
-<p> Every rejection in the detection loop is silent, so an impact that produces
- no reaction is indistinguishable from one that was never detected. This
- names the reason.</p>
-
-<p> Rate limited because the loop runs about twenty times a second and the
- detection sphere returns everything nearby, including crates and doors.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the entity that was rejected
-        </li>
-        <li><span class="parameter">reason</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         short label for which test rejected it
-        </li>
-        <li><span class="parameter">detail</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the measurement behind that decision
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "Log"></a>
-    <strong>Log (message)</strong>
-    </dt>
-    <dd>
-    Current time in milliseconds.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">message</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         text to log
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        milliseconds since the game session started
- Writes a prefixed line to kcd.log when telemetry is enabled.
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "GetSpeedTier"></a>
-    <strong>GetSpeedTier (speed)</strong>
-    </dt>
-    <dd>
-    Resolves a speed to its gait name.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         speed in meters per second
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-        one of "Gallop", "Trot", "Walk" or "Idle"
-    </ol>
-
-
-
-
-</dd>
     <dt>
     <a name = "SendHitReaction"></a>
     <strong>SendHitReaction (npc, horseWuid, strength)</strong>
@@ -1819,7 +1588,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-01 12:18:41 </i>
+<i style="float:right;">Last updated 2026-09-01 12:26:18 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

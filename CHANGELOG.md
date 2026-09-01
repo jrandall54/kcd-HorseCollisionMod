@@ -23,6 +23,17 @@ number.
 
 ## [Unreleased]
 
+## [4.3.4] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- Logging, the speed history and the speed tier moved out of the entry
+  point into `Scripts/HorseCollisionMod/Log.lua`. The engine clock and
+  vector length became methods on the mod's table, since the file-locals
+  they replaced could not be reached from another file.
+
 ## [4.3.3] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.

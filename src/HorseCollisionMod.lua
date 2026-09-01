@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.3.3
+-- @release 4.3.4
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.3.3"
+HorseCollisionMod.Version = "4.3.4"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -333,177 +333,6 @@ HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
 
-local function GetTimeMs()
-	return System.GetCurrTime() * 1000
-end
-
---- Magnitude of a CryEngine vector.
--- @tparam ?table v vector with x, y and z components, or nil
--- @treturn number length, or 0 when v is nil
-local function GetVectorLength(v)
-	if not v then
-		return 0
-	end
-
-	return math.sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z))
-end
-
---- Records one speed sample.
---
--- @tparam number speed the current sample, in meters per second
-function HorseCollisionMod:TrackSpeed(speed)
-	local history = self.SpeedHistory
-
-	history[#history + 1] = speed
-
-	while #history > self.SpeedHistorySize do
-		table.remove(history, 1)
-	end
-end
-
---- The peak of the last `count` speed samples.
---
--- @tparam number count how many of the most recent samples to consider
--- @treturn number the highest speed among them, in meters per second
-function HorseCollisionMod:RecentPeak(count)
-	local history = self.SpeedHistory
-	local first = #history - count + 1
-	local peak = 0
-
-	if first < 1 then
-		first = 1
-	end
-
-	for i = first, #history do
-		if history[i] > peak then
-			peak = history[i]
-		end
-	end
-
-	return peak
-end
-
---- The recent speed samples, oldest first, as a compact string.
---
--- Printed on every impact while diagnosing. The width of the deceleration on
--- contact is what sets `ImpactSpeedSamples`, and it is only visible in the
--- samples either side of the collision.
---
--- @tparam number count how many of the most recent samples to include
--- @treturn string the samples, space separated, to two decimal places
-function HorseCollisionMod:SpeedTrail(count)
-	local history = self.SpeedHistory
-	local first = #history - count + 1
-	local parts = {}
-
-	if first < 1 then
-		first = 1
-	end
-
-	for i = first, #history do
-		parts[#parts + 1] = string.format("%.2f", history[i])
-	end
-
-	return table.concat(parts, " ")
-end
-
---- The speed a collision should be scored at.
---
--- A horse loses speed the moment it hits someone. Detection samples velocity
--- once per tick, so the speed read on the tick that notices a victim has
--- already been reduced by the collision it is meant to describe, and a gallop
--- impact can be scored as a walk. The peak of the last few samples brackets
--- the moment of contact instead.
---
--- The window is deliberately short. Taken over a whole second it would charge
--- gallop to a rider who galloped up and then slowed deliberately to nudge
--- someone.
---
--- Capped because the physics system reports occasional speeds above anything a
--- horse holds, and this value scales knockback force as well as selecting the
--- tier.
---
--- @treturn number the speed to score the impact at, in meters per second
-function HorseCollisionMod:ImpactSpeed()
-	local peak = self:RecentPeak(self.Config.ImpactSpeedSamples)
-
-	if peak > self.Config.MaxImpactSpeed then
-		return self.Config.MaxImpactSpeed
-	end
-
-	return peak
-end
-
---- Logs why a candidate was passed over, at most once per second per entity.
---
--- Every rejection in the detection loop is silent, so an impact that produces
--- no reaction is indistinguishable from one that was never detected. This
--- names the reason.
---
--- Rate limited because the loop runs about twenty times a second and the
--- detection sphere returns everything nearby, including crates and doors.
---
--- @tparam table npc the entity that was rejected
--- @tparam string reason short label for which test rejected it
--- @tparam string detail the measurement behind that decision
-function HorseCollisionMod:LogRejection(npc, reason, detail)
-	if not self.Config.DiagnoseMisses then
-		return
-	end
-
-	local id = tostring(npc and npc.id or "?")
-	local now = GetTimeMs()
-	local last = self.RecentRejections[id]
-
-	if last and (now - last) < 1000 then
-		return
-	end
-
-	self.RecentRejections[id] = now
-
-	local name = "?"
-
-	pcall(function()
-		name = npc:GetName() or "?"
-	end)
-
-	self:Log("Miss " .. reason .. " name=" .. tostring(name)
-			.. " " .. tostring(detail))
-end
-
-
---- Current time in milliseconds.
--- @treturn number milliseconds since the game session started
---- Writes a prefixed line to kcd.log when telemetry is enabled.
--- @tparam string message text to log
-function HorseCollisionMod:Log(message)
-	if not self.Config.LogTelemetry then
-		return
-	end
-
-	System.LogAlways("[HorseCollisionMod] " .. tostring(message))
-end
-
---- Resolves a speed to its gait name.
--- @tparam number speed speed in meters per second
--- @treturn string one of "Gallop", "Trot", "Walk" or "Idle"
-function HorseCollisionMod:GetSpeedTier(speed)
-	local cfg = self.Config
-
-	if speed >= cfg.SpeedGallop then
-		return "Gallop"
-	end
-
-	if speed >= cfg.SpeedTrot then
-		return "Trot"
-	end
-
-	if speed >= cfg.SpeedWalk then
-		return "Walk"
-	end
-
-	return "Idle"
-end
 
 --- Posts the native `hitReaction` message to the victim's brain.
 --
@@ -1102,7 +931,7 @@ end
 -- @tparam function fn called with the reason and the wait in milliseconds
 function HorseCollisionMod:WhenRagdollResolves(npc, fn)
 	local generation = self.TimerTick
-	local startedAt = GetTimeMs()
+	local startedAt = self:TimeMs()
 	local deadline = startedAt + self.RagdollResolveCeilingMs
 	local seen = false
 
@@ -1117,7 +946,7 @@ function HorseCollisionMod:WhenRagdollResolves(npc, fn)
 			state = tostring(npc.actor:GetCurrentAnimationState())
 		end)
 
-		local elapsed = GetTimeMs() - startedAt
+		local elapsed = self:TimeMs() - startedAt
 
 		if state == self.RagdollAnimationState then
 			seen = true
@@ -1127,7 +956,7 @@ function HorseCollisionMod:WhenRagdollResolves(npc, fn)
 			return
 		end
 
-		if GetTimeMs() >= deadline then
+		if self:TimeMs() >= deadline then
 			fn(seen and "ceiling" or "neverRagdolled", elapsed)
 
 			return
@@ -1267,7 +1096,7 @@ function HorseCollisionMod:WhenReactionEnds(npc, fn)
 	-- having been aimed at a victim from a world that no longer exists. The
 	-- detection loop and the health watch carry the same guard.
 	local generation = self.TimerTick
-	local startedAt = GetTimeMs()
+	local startedAt = self:TimeMs()
 	local deadline = startedAt + self.ReactionEndCeilingMs
 	local seen = false
 
@@ -1282,7 +1111,7 @@ function HorseCollisionMod:WhenReactionEnds(npc, fn)
 			state = tostring(npc.actor:GetCurrentAnimationState())
 		end)
 
-		local elapsed = GetTimeMs() - startedAt
+		local elapsed = self:TimeMs() - startedAt
 
 		if state == self.ReactionAnimationState then
 			seen = true
@@ -1292,7 +1121,7 @@ function HorseCollisionMod:WhenReactionEnds(npc, fn)
 			return
 		end
 
-		if GetTimeMs() >= deadline then
+		if self:TimeMs() >= deadline then
 			fn(seen and "ceiling" or "unreadable", elapsed)
 
 			return
@@ -1582,7 +1411,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale)
 		-- full speed and 37.7 when the horse had dropped to 2.84 against a
 		-- score of 10.72. Knockback then varies with how hard the horse
 		-- happened to brake rather than with the tier and the target.
-		local moving = GetVectorLength(velocity or {x = 0, y = 0, z = 0})
+		local moving = self:VectorLength(velocity or {x = 0, y = 0, z = 0})
 
 		if moving > 0 then
 			dir.x = velocity.x / moving
@@ -1782,7 +1611,7 @@ end
 function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, playerEnt,
 		horseWuid, sampledSpeed)
 	local npcId = tostring(npc.id)
-	local now = GetTimeMs()
+	local now = self:TimeMs()
 
 	-- The detection sphere is tested ten times a second, so without a
 	-- per-victim cooldown a single pass through a crowd would restart the
@@ -1986,7 +1815,7 @@ function HorseCollisionMod:SafeUpdate()
 		end
 	end)
 
-	local speed = GetVectorLength(velocity)
+	local speed = self:VectorLength(velocity)
 	self:TrackSpeed(speed)
 
 	local impactSpeed = self:ImpactSpeed()
@@ -2353,6 +2182,7 @@ end
 -- to the table above and carries no top-level statements, so the reload the
 -- dev console fires cascades through them harmlessly.
 Script.ReloadScript("Scripts/HorseCollisionMod/Enums.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Log.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Armor.lua")
 
 -- Runs at file scope rather than from the load screen, because
