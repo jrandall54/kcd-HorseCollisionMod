@@ -1,8 +1,8 @@
 --- Reaction: making a victim visibly respond to being ridden into.
 --
 -- The three ways a collision reaches the victim's body, in ascending force.
--- `SendHitReaction` posts the native brain message, which is what makes the
--- vanilla bark, perception and crime handling fire but drives no animation.
+-- `SendHitReaction` posts the native brain message, which feeds the victim's
+-- perception but drives no animation and does not cause the vanilla bark.
 -- `PlayReaction` runs one of this mod's own clips through
 -- `actor:StartInteractiveActionByName`, the only call that moves an actor's
 -- body from Lua. `Ragdoll` and `ImpulseVictim` hand the body to physics
@@ -20,9 +20,12 @@
 
 --- Posts the native `hitReaction` message to the victim's brain.
 --
--- This is what makes the vanilla collision bark, perception and crime
--- handling fire, so the reaction still feels like part of the game rather
--- than something bolted on. It does **not** drive animation.
+-- It feeds the victim's perception, so the reaction registers as something
+-- the game knows happened rather than as an animation played over the top.
+-- It does **not** drive animation.
+--
+-- It does not produce the collision bark either. Vanilla barks on a mounted
+-- collision on its own, and does so with this message switched off.
 --
 -- Delivery is best effort. The receiving handler is declared `Atomic="true"`
 -- and drops messages when busy, so nothing here may depend on a given

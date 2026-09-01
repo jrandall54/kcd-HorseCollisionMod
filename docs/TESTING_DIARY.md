@@ -10650,3 +10650,65 @@ An earlier entry concluded there was no live weight lookup, on the evidence
 that `ItemManager` reports a class and no weight. That evidence is correct and
 the conclusion did not follow: `ItemManager` is not the only bind that reads
 the game's tables. `Database` is, and it was never asked.
+
+## The replan does not turn the victim
+
+A victim was reported standing up, starting to move, pausing, then setting off
+in a different direction. `ReplanVictim` sends `daycycle:restartRequest` with
+`reason(interrupt)` 600 ms after the rebuild, which fits that description
+exactly, and `Config.ReplanAfterReaction` switches it off. So it was measured
+rather than argued.
+
+### Heading, measured either side of the replan window
+
+`WatchHeading` in `Recovery.lua` samples the victim's direction vector as the
+rebuild finishes and again 2,000 ms later, and logs the angle between them.
+Reporting by eye had produced "I think I saw it before but now it's gone?",
+which is not a measurement, and the numbers show why: the effect is
+intermittent, so a handful of impacts watched by eye can support either answer.
+
+| Turn | Replan on | Replan off |
+| --- | --- | --- |
+| | 11 | 9 |
+| | 4 | 83 |
+| | 78 | 102 |
+| | 143 | 0 |
+| | 29 | 74 |
+| Mean | 53 | 54 |
+| Over 70 degrees | 2 of 5 | 3 of 5 |
+
+No `VictimReplan` line appears in the second set, so the switch took effect
+rather than being set and ignored.
+
+**The replan is not the cause.** Victims turn just as far without it, and the
+turning is the game's own behavior tree choosing a destination for an NPC whose
+activity was interrupted.
+
+### Two other explanations ruled out the same way
+
+The same session cleared two more of the mod's own actions, each by switching
+it off rather than by reading the source:
+
+- **`SendHitReaction`**, the native brain message, was suspected of causing a
+  victim and then several bystanders to flee. The same innkeeper was ridden
+  down with the message off and on: `travel=0.00` both times, no flight either
+  way.
+- **The flight itself** was seen once, on `rat_pickpocket_woman1`, and did not
+  reproduce across the seven impacts that followed under identical settings. No
+  cause is established and none is proposed.
+
+### The bark does not come from the mod
+
+Observed while `SendHitReaction` was off: the vanilla collision bark fired
+anyway. The comment on that function claims the message is what makes the bark,
+perception and crime handling fire. The bark half of that claim is wrong, and
+the module header's own description of vanilla behavior already said so, since
+it records that riding into an NPC in vanilla produces an audio bark and
+nothing else.
+
+### One observation worth a second look later
+
+With the replan off, `rat_refugee_tonka` recorded `turned=0deg moved=0.00m`, a
+beggar who did not move at all in two seconds. That is the case the replan was
+added for in 4.2.1, where a beggar, an innkeeper and a merchant were left
+standing. One sample, and not pursued here.

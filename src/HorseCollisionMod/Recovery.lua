@@ -135,12 +135,87 @@ function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
 	-- however long the player was away.
 	local generation = self.TimerTick
 
+	self:WatchHeading(npc, action)
+
 	Script.SetTimer(self.ReplanAfterRebuildMs, function()
 		if generation ~= self.TimerTick then
 			return
 		end
 
 		self:ReplanVictim(npc)
+	end)
+end
+
+--- Measures how far a victim turns after standing up.
+--
+-- A victim seen to stand, start moving, pause and then set off in a different
+-- direction is a report about something the log cannot show: `VictimReplan`
+-- records that the message was sent, not what the victim did with it. This
+-- turns the observation into a number, so a heading change can be compared
+-- between a build that replans and one that does not.
+--
+-- Sampled either side of the replan window rather than across it. The first
+-- reading is taken as the rebuild finishes, before `ReplanAfterRebuildMs` has
+-- elapsed, and the second far enough after for a new plan to have moved the
+-- body.
+--
+-- Diagnostic, and off unless `LogTelemetry` is set.
+--
+-- @tparam table npc victim entity
+-- @tparam string action the reaction that was played, for the log line
+function HorseCollisionMod:WatchHeading(npc, action)
+	if not self.Config.LogTelemetry then
+		return
+	end
+
+	local function reading()
+		local ok, dir, pos = pcall(function()
+			return npc:GetDirectionVector(1), npc:GetWorldPos()
+		end)
+
+		if not ok or not dir or not pos then
+			return nil
+		end
+
+		return { x = dir.x, y = dir.y, px = pos.x, py = pos.y }
+	end
+
+	local before = reading()
+
+	if not before then
+		return
+	end
+
+	local at = self.ReplanAfterRebuildMs + 1400
+
+	Script.SetTimer(at, function()
+		local after = reading()
+
+		if not after then
+			return
+		end
+
+		-- The angle between two unit heading vectors, from their dot product.
+		-- Clamped because floating point drift can push it just outside the
+		-- domain of acos and return nan for two identical headings.
+		local dot = (before.x * after.x) + (before.y * after.y)
+
+		if dot > 1 then
+			dot = 1
+		elseif dot < -1 then
+			dot = -1
+		end
+
+		local turned = math.deg(math.acos(dot))
+		local moved = math.sqrt(((after.px - before.px) ^ 2)
+				+ ((after.py - before.py) ^ 2))
+
+		self:Log("Heading " .. tostring(npc:GetName())
+				.. " action=" .. tostring(action)
+				.. " replan=" .. tostring(self.Config.ReplanAfterReaction)
+				.. " turned=" .. string.format("%.0f", turned) .. "deg"
+				.. " moved=" .. string.format("%.2f", moved) .. "m"
+				.. " over=" .. tostring(at) .. "ms")
 	end)
 end
 
