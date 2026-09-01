@@ -10214,3 +10214,43 @@ The deployed pak, however, is whatever the last full deploy built - here
 v4.3.1, which predates the split and contains no part files at all. A shipping
 test run against a stale pak would exercise the monolithic build and report
 nothing wrong.
+
+## Footprint detection and impact direction, across eight impacts
+
+`IsInHorseFootprint`, `FootprintDetail` and `GetImpactDir` moved to
+`Scripts/HorseCollisionMod/Detection.lua`, 144 lines. The entry point is 2,055
+lines, down from 2,558 before the split began. The block used no file-local of
+the entry point, so nothing changed shape.
+
+### What the ride covered
+
+Eight impacts after the reload, without a single Lua error:
+
+| Tier | Victims | Directions chosen |
+|---|---|---|
+| Trot | 7 | `hcm_fall_forward`, `hcm_fall_back`, `hcm_fall_left` |
+| Gallop | 1 | ragdoll path, `Impulse scale=1.26 magnitude=73.7` |
+
+Every reaction returned `ok=true err=nil`, every recovery that ran to
+completion reported `on=resolved`, and armor was read across the whole range
+present in the world: 2.0 kg of cloth on `rat_karolina` through 55.0 kg of
+chain on `rat_guard_pazdera`.
+
+### Direction is the signal that matters here
+
+A footprint test that failed outright would produce no impacts at all, which is
+easy to see. The failure worth catching is a subtler one: a direction lookup
+returning a single constant would still produce reactions, and every victim
+would fall the same way.
+
+Three distinct directions appeared across the eight, chosen against the horse's
+approach rather than fixed, which is what rules that out. `GetImpactDir`
+resolves the cross product through `VectorLength`, now a method in `Log.lua`,
+so this also exercises the previous slice's change from a second part file.
+
+### The footprint sweep widens with speed
+
+Visible in the limits printed on each test: `limits=1.40/0.35/2.35` at impact
+speed and `1.11/0.35/2.35` through the slower recovery polls. The forward
+limit tracks the sweep term while the lateral and vertical limits stay fixed,
+which is the intended shape and is unchanged by the move.
