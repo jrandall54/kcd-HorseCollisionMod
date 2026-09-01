@@ -10117,3 +10117,47 @@ is enumerated; everything else is named explicitly.
 One consequence is worth carrying forward: a part file is looked up by path, so
 it does not inherit the accidental protection that keeps enumerated Startup Lua
 working in a pak built with backslash entry names.
+
+## The armor part file, measured against horse stamina
+
+`ArmorOf`, `DescribeArmor`, `ArmorCurve`, `ArmorImpulseScale` and
+`ArmorStaminaScale` moved to `Scripts/HorseCollisionMod/Armor.lua`, 180 lines
+out of the entry point, which is now 2,368 lines.
+
+The block referenced no file-local of the entry point and every caller reaches
+it through `self`, so no call site changed. The build needed no change either:
+it walks `src/HorseCollisionMod/` rather than naming files.
+
+### Two trot impacts, same horse, same starting stamina
+
+| Victim | Armor read | `armorStamina` | Horse stamina |
+|---|---|---|---|
+| `rat_pickpocket_woman1` | 5.0 kg, 3 pieces, default cloth | 0.83 | 210.0 -> 195.1 |
+| `rat_guard_pazdera` | 55.0 kg, 11 pieces, chain | 2.16 | 210.0 -> 171.1 |
+
+Trot speeds were 6.97 and 6.96, and both started from a full 210.0, so the
+stamina drawn is comparable directly: 14.9 against 38.9, a ratio of 2.61. The
+multipliers stand in a ratio of 2.60.
+
+The armor weight therefore reaches the horse's stamina cost intact through the
+part file. No Lua error followed the reload.
+
+### The stamina signal is the one that works
+
+Throw distance would have measured nothing. `armorImpulse` is computed on every
+impact and has one consumer, which at trot is a branch the shipped settings do
+not take, so at trot the impulse multiplier is applied to nothing at all. That
+is recorded in `ROADMAP.md` under Phase 2 and is unaffected by this slice.
+
+Stamina has no such gap: `ArmorStaminaScale` feeds the drain on every impact at
+trot and gallop, and the log carries both the multiplier and the resulting
+figures.
+
+### The reload path exercised the cascade
+
+This slice was deployed into an already-running game rather than a fresh
+launch. Reloading `Scripts/Startup/HorseCollisionMod.lua` alone re-executed
+both part files through the `Script.ReloadScript` calls at the foot of it, and
+the mod came back reporting `Load screen ended. v4.3.2 initializing physics
+timer loop 4`. The development loop needs no knowledge of how many part files
+there are.
