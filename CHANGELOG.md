@@ -23,6 +23,12 @@ number.
 
 ## [Unreleased]
 
+### Changed
+
+- The `TraceRecovery` diagnostic also reports which system owns a
+  victim's body at each step, not only what animation is playing.
+  Off by default, as before.
+
 ## [4.4.3] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.

@@ -10905,3 +10905,52 @@ the body goes limp rather than how long it stays down.
 The remaining time belongs to the engine. A trot victim is limp for roughly a
 second and then takes 2,570 ms to rise if male and 5,100 ms if female, and the
 gallop path reaches the same figures without touching any data this mod ships.
+
+## The limp period is fixed, measured from the handover, and is the engine's
+
+Corrects the framing in the two entries above, both of which timed this from
+the wrong point.
+
+Measured from when physics takes the body rather than from when the clip ends,
+across eighteen trot impacts: **1,457 ms on average, and the same for both
+character sets.** Female victims are indistinguishable from male here. What
+differs by gender is only `BlendRagdoll`, the stand-up animation itself, which
+runs twice as long for women.
+
+Timed from the end of the clip instead it appears as a variable gap of nought
+to 1.4 seconds, and that variability is an artifact: it is whatever part of the
+fixed period falls after the animation stops.
+
+### The gap in the trace is not the gap a player sees
+
+A victim whose clip was still nominally playing showed no `MotionIdle` between
+`AnimationControlled` and `BlendRagdoll`, which was written up here as the clip
+covering the limp period, and a per-direction handover table was derived to
+reproduce it.
+
+That was wrong, for a reason this diary already recorded. Once the ragdoll
+fires the animation no longer drives the body, so a clip still nominally
+playing is not visible and covers nothing. The player sees a limp body from the
+handover onward in every case. `ExitTime` moves when that begins and never how
+long it lasts, which two earlier experiments had already established.
+
+### Everything the profile trace rules out
+
+`GetPhysicalizationProfile` reads `alive` for the whole recovery: during the
+fall clip, during the limp period, and during the stand-up. The actor is never
+in the `ragdoll` or `sleep` profile, so `SetPhysicalizationProfile("alive")`
+and `actor:StandUp` have nothing to act on. The ragdoll here is a Mannequin
+ProcLayer effect rather than a physicalization switch.
+
+The other candidate was the interactive action this mod starts and never ends.
+No stop bind for one exists on the actor: the surface has
+`StartInteractiveActionByName` and nothing to match it, and `OnEndInteractive`
+is a callback on `human` rather than a call.
+
+### Where that leaves it
+
+A trot victim is limp for a fixed 1,457 ms from the handover, then takes 2,570
+ms to rise if male and 5,100 ms if female. Neither figure responds to
+`ExitTime`, `Sleep`, `Stiffness`, `g_ragdollPollTime` or `ca_DeathBlendTime`,
+and the gallop tier reaches both through `actor:Fall` without touching any data
+this mod ships.
