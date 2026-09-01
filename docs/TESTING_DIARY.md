@@ -10432,3 +10432,40 @@ The witness matters to the test. `SendCombatHit` returning `ok=true` only
 proves the message was accepted, not that the crime system did anything with
 it, and an impact with nobody watching would have logged the same line either
 way.
+
+## The stamina budget and the throw, drained to empty
+
+`IsCombatCollision`, `ThrowRider` and `DrainHorseStamina` moved to
+`Scripts/HorseCollisionMod/Rider.lua`, 141 lines. The entry point is 941 lines,
+under a thousand for the first time, from 2,558 before the split began.
+
+`IsCombatCollision` is filed here rather than with `Crime.lua` despite the
+name. It decides how hard an impact counts, not whether it is an offence, and
+the stamina multiplier is its only consumer.
+
+### Five gallop impacts without stopping
+
+| # | `armorStamina` | Horse stamina | Cost |
+|---|---|---|---|
+| 1 | 0.83 | 180.4 -> 162.2 | 18.2 |
+| 2 | 0.83 | 153.7 -> 135.5 | 18.2 |
+| 3 | 0.83 | 119.0 -> 100.7 | 18.3 |
+| 4 | 2.22 | 70.7 -> 21.8 | 48.9 |
+| 5 | 1.67 | 0.0 -> 0.0 | already empty |
+
+`ThrowRider via horse.horse ok=true` followed, and the player was dismounted.
+
+The fourth impact is the useful one. An armored victim cost 48.9 against 18.2
+for the unarmored, a ratio of 2.69, where the multipliers stand at 2.67. The
+armor weight is read in `Armor.lua`, turned into a multiplier there, and spent
+in `Rider.lua`, so this measures a value crossing a part file boundary rather
+than either file alone.
+
+Stamina also falls between impacts, which is the gallop itself costing the
+horse and is vanilla behaviour, not the mod's drain.
+
+### What this ride did not cover
+
+`combatScale` read 1.0 on all five, so only the non-combat branch of
+`IsCombatCollision` was exercised. The combat multiplier path is untested by
+this slice and would need an impact taken during a fight.
