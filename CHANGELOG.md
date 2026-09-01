@@ -23,6 +23,16 @@ number.
 
 ## [Unreleased]
 
+## [4.3.1] - 2026-08-31
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- A trot victim is handed to physics by the animation itself rather than by a
+  timer in the mod. The timing now sits beside the clip it belongs to, so the
+  mod no longer has to know how long any of the game's animations run for.
+
 ## [4.3.0] - 2026-08-31
 
 ### Added

@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.3.0
+-- @release 4.3.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.3.0"
+HorseCollisionMod.Version = "4.3.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -348,48 +348,18 @@ HorseCollisionMod.ReactionPollMs = 100
 HorseCollisionMod.ReactionEndCeilingMs = 12000
 
 
+-- How long after the rebuild the victim is asked to re-plan. The rebuild
+-- resets the behavior and the re-plan chooses what it does next, so they are
+-- ordered rather than issued together.
+HorseCollisionMod.ReplanAfterRebuildMs = 600
+
+
 -- How the ragdoll handover is watched, for the tier that hands recovery back
 -- to the game. `GetPhysicalizationProfile` reads `alive` throughout a ragdoll
 -- and cannot be used; the animation state does report `BlendRagdoll`.
 --
 -- The ceiling is generous because this waits on the game's own recovery rather
 -- than on a clip of known length.
--- How long each fall clip runs, in milliseconds, by character set and
--- direction. Measured from the animation state across fifty-six reactions; the
--- figures inside a group vary by less than fifty milliseconds, so a clip's
--- length is a property of the clip and not of the victim or the ground.
---
---   male   back 1696-1744   forward 2384-2464   left 4064-4160   right 3008-3104
---   female back 1856-1936   forward 3312-3376   left 2016        right 2320-2352
---
--- `1` is male and `2` is female, which is what `soul:GetGender` returns.
-HorseCollisionMod.FallClipMs = {
-	["1"] = { forward = 2425, back = 1710, left = 4120, right = 3060 },
-	["2"] = { forward = 3340, back = 1890, left = 2016, right = 2335 }
-}
-
-
--- How far into a fall the body is handed to physics, as a fraction of the
--- clip's length.
---
--- A clip does not end when the victim reaches the ground; it goes on to settle
--- them into a final pose, and the ragdoll belongs at the landing rather than at
--- the end. Expressing that as a fraction leaves one number to tune instead of
--- eight, on the reasoning that these clips share an authoring convention and
--- therefore land at about the same point in their own length.
---
--- Raise it if a victim reaches the ground and pauses before the physics takes
--- over. Lower it if they go limp in the air before landing.
-HorseCollisionMod.RagdollAtFraction = 0.68
-
-
-HorseCollisionMod.ReplanAfterRebuildMs = 600
-
-
-
-
-
-
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
@@ -1727,82 +1697,31 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		end)
 	end
 
-	-- The body is handed to physics while the fall is still playing, timed to
-	-- land on the victim reaching the ground rather than on the clip ending.
+	-- The fragment hands the body to physics itself, partway through the fall.
 	--
-	-- Waiting for the clip to end is too late by more than a second, and the
-	-- cost is not only the visible pause. Measured, a victim whose clip runs
-	-- out stands up and re-enters their activity first: a beggar reaches
-	-- `Beggar` and an innkeeper reaches `Leaning` before the ragdoll arrives
-	-- and evicts them from it, and the smart object does not take them back a
-	-- second time. Firing during the fall means there is nothing to evict.
+	-- Each `hcm_fall_*` option carries a Ragdoll ProcLayer at its own ExitTime,
+	-- with `Sleep` 1 and `Stiffness` 500 taken from the `HitDeath` option that
+	-- drops a rider off a horse. Mannequin owns the timing, so this mod does not
+	-- have to know how long any clip runs for.
 	--
-	-- No impulse. The victim is already going down and the ragdoll is here to
-	-- take the body at ground level, not to throw it.
+	-- The handover belongs during the fall rather than after it. A victim whose
+	-- clip runs out stands up and re-enters their activity first, and a ragdoll
+	-- arriving then evicts them from it, which the smart object does not undo.
+	--
+	-- What remains here is the wait for that ragdoll to resolve, because the
+	-- rebuild that follows has to land after it. A victim can leave the ragdoll
+	-- upright and still have no plan, and only the rebuild gives them one.
 	if prefix == "hcm_fall_" then
-		local clips = self.FallClipMs[gender] or self.FallClipMs["1"]
-		local length = clips[side] or clips.forward
-		local at = math.floor(length * self.RagdollAtFraction)
 		local generation = self.TimerTick
 
-		Script.SetTimer(at, function()
+		self:WhenRagdollResolves(npc, function(state, waitedForBody)
 			if generation ~= self.TimerTick then
 				return
 			end
 
-			-- Movement control goes back to the animation before the body
-			-- is handed over, so the actor reaches physics in the state it
-			-- would have been in had this mod never touched it.
-			--
-			-- Releasing it is what keeps the fall out of walls, and it was
-			-- never handed back: the actor stayed on entity-driven movement
-			-- for good, which is the condition the original freeze was
-			-- traced to.
-			local handed = pcall(function()
-				npc.actor:SetMovementControlledByAnimation(true)
-			end)
-
-			local dropped = pcall(function()
-				npc.actor:Fall({ x = 0, y = 0, z = 0 }, true)
-			end)
-
-			if self.Config.LogTelemetry then
-				self:Log("VictimFall action=" .. action
-						.. " at=" .. tostring(at)
-						.. "ms handedBack=" .. tostring(handed)
-						.. " ok=" .. tostring(dropped))
-			end
-
-			-- The rebuild runs once the ragdoll has resolved, on every
-			-- victim rather than only on one that stalls.
-			--
-			-- Leaving it out was a mistake and the measurement is direct.
-			-- Three victims left standing after a resolved ragdoll were
-			-- tested live: a `daycycle:restartRequest` moved one of them
-			-- 0.00 m and left her in `MotionIdle`, while `entity:Hide(1)`
-			-- followed by `Hide(0)` moved another 4.11 m into
-			-- `MotionMovement`. A victim can leave the ragdoll upright and
-			-- still have no plan, and only the rebuild gives them one.
-			--
-			-- This is the same rebuild the animated get-up needs, for the
-			-- same reason, and it is not specific to how the victim got up.
-			self:WhenRagdollResolves(npc, function(state, waitedForBody)
-				self:FinishRecovery(npc, action, state, waitedForBody)
-			end)
+			self:FinishRecovery(npc, action, state, waitedForBody)
 		end)
 	end
-
-	self:WhenReactionEnds(npc, function(why, waited)
-		if self.Config.LogTelemetry then
-			self:Log("ReactionEnded action=" .. action
-					.. " on=" .. why
-					.. " waited=" .. string.format("%.0f", waited) .. "ms")
-		end
-
-		if prefix ~= "hcm_fall_" then
-			self:FinishRecovery(npc, action, why, waited)
-		end
-	end)
 
 	self:Log("Reaction action=" .. action
 			.. " gender=" .. gender
