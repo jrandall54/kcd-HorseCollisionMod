@@ -23,15 +23,19 @@ number.
 
 ## [Unreleased]
 
-## [4.2.12-dev.2] - 2026-08-31
+## [4.3.0] - 2026-08-31
 
-Diagnostics, off by default. The mod behaves as 4.2.11 does unless enabled.
+### Added
 
-### Changed
+- Riding someone down is a crime. A witness calls for help, guards respond, and
+  surrendering gets you fined; killing someone is charged as murder, which the
+  game already did on its own. It applies at trot and gallop, where the impact
+  hurts, and never at a walk. `CollisionIsCrime` turns it off.
 
-- A real, player-attributed combat hit can be sent alongside the physical one,
-  which is what the game reads when deciding a crime happened. Off by default.
-
+  The game charges it as a brawl. Its crime system has no concept of being
+  ridden down, and vanilla makes the same substitution for a player-ridden
+  collision, so this is the game's own compromise rather than a choice made
+  here.
 
 ## [4.2.11] - 2026-08-31
 

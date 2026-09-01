@@ -65,6 +65,8 @@ HorseCollisionModSettings = {
 	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
 	-- Switches.
+	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
+	                                  -- and gallop; never at a walk
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
 	ReplanAfterReaction      = true,  -- sends them back to their stall or
 	                                  -- whatever they were leaning on

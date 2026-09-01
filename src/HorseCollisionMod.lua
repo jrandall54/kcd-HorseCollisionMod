@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.12-dev.2
+-- @release 4.3.0
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.12-dev.2"
+HorseCollisionMod.Version = "4.3.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -135,6 +135,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   "ragdoll" for the physics knockdown
 -- @field AutoCureHealthLimit health at or above which the auto-cure exemption
 --   is dropped, matching vanilla's own limit
+-- @field CollisionIsCrime whether riding someone down is reported to the
+--   game as a crime, at trot and gallop
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
 -- @field ReplanAfterReaction ask a victim to re-plan their activity once the
@@ -208,6 +210,15 @@ HorseCollisionMod.Config = {
 	-- "ragdoll" is the physics knockdown the mod shipped before, created at
 	-- the moment of impact.
 	TrotReaction             = "fall",
+
+	-- Whether riding someone down is a crime.
+	--
+	-- Sent at trot and gallop, where the collision hurts them, and never at a
+	-- walk: a stagger costs no health and being arrested for brushing past
+	-- someone is not the intent. The game charges it as a brawl, which is what
+	-- vanilla does with a ridden collision too, and prosecutes murder on its
+	-- own when a victim dies.
+	CollisionIsCrime         = true,
 
 	-- Takes movement control off the animation once a reaction has started,
 	-- so the victim is moved by the entity rather than by root motion and
@@ -375,22 +386,12 @@ HorseCollisionMod.RagdollAtFraction = 0.68
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 
--- Whether a real, player-attributed combat hit is sent alongside the physical
--- one. Off because it is how the game decides a crime happened.
-HorseCollisionMod.SendCombatHitEnabled = false
 
 
--- Overrides for the combat hit, used while measuring what the game charges.
--- `CombatHitType` takes a `HitReactionType`; nil uses Melee, which is what
--- vanilla's own branch rewrites a ridden collision into. `CombatHitStrength`
--- takes a `HitReactionStrength`; nil uses the tier's own.
-HorseCollisionMod.CombatHitType = nil
-HorseCollisionMod.CombatHitStrength = nil
 
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
-
 
 
 local function GetTimeMs()
@@ -1612,7 +1613,7 @@ end
 -- @tparam number strength a `HitReactionStrength` value
 -- @treturn boolean true when the call was accepted
 function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
-	if not self.SendCombatHitEnabled or not playerEnt then
+	if not self.Config.CollisionIsCrime or not playerEnt then
 		return false
 	end
 
@@ -1636,14 +1637,22 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 	-- without a rebuild. The charge the game brings is the thing being
 	-- measured, and it can only be read by surrendering to a guard, which
 	-- means one impact per save load.
-	local hitType = self.CombatHitType or self.HitReactionType.Melee
-	local sent = self.CombatHitStrength or strength
-
+	-- Melee, not Collision, and that is not a mistake. Measured across nine
+	-- runs, the crime system prosecutes `Melee`, `MeleeStealth` and `Bullet`
+	-- and is blind to `Collision` and `Fall` at every strength. Vanilla makes
+	-- the same substitution in `sb_switch_hitreactions.xml`, rewriting a
+	-- player-ridden collision into `Melee` before re-sending it, because the
+	-- crime system has no concept of being ridden down.
+	--
+	-- `strength` is passed through and changes nothing about the charge: a
+	-- `Tickle`, which costs no health, is prosecuted exactly as a `Fatal` is.
+	-- The fine scales with the victim's social class instead, and murder
+	-- arrives on its own when a victim actually dies.
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("combat:hit", {
 			attacker = playerWuid,
-			strength = sent,
-			hitType = hitType,
+			strength = strength,
+			hitType = self.HitReactionType.Melee,
 			real = true
 		})
 
@@ -1652,8 +1661,7 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 
 	if self.Config.LogTelemetry then
 		self:Log("CombatHit ok=" .. tostring(ok)
-				.. " hitType=" .. tostring(hitType)
-				.. " strength=" .. tostring(sent)
+				.. " strength=" .. tostring(strength)
 				.. " err=" .. tostring(err))
 	end
 
@@ -2206,6 +2214,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
 		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
+		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina)
 		return
