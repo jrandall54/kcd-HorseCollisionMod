@@ -10378,16 +10378,27 @@ victim on their feet and they move under whatever plan they still hold.
 restarts the schedule at once and sends them where the schedule wants them
 rather than where they had started walking.
 
-The behaviour is not new and is not from the split. It is the typed-payload
-fix from 4.2.1, the one that got beggars, innkeepers and merchants returning to
-their stalls instead of standing still, and `VictimReplan typed=true` appears
-in every recorded impact since.
+That is what the code does. It does not explain why it is being seen now.
 
-What was new is the opportunity to see it. Every previous observation was made
-with `CollisionIsCrime` on, where the victim's behaviour after standing up was
-the crime response rather than their schedule. Turning the crime off does not
-change the recovery; it stops something louder from covering it.
+The mechanism is old: the typed payload landed in 4.2.1 and `VictimReplan
+typed=true` appears on every impact recorded since. The player reports having
+watched thousands of impacts and never seen a victim pause and change
+direction after standing up.
 
-Whether the pause and the direction change should read more smoothly is a
-tuning question about 4.2.1 behaviour, and is recorded rather than acted on
-here.
+An explanation was offered here and is wrong, so it is recorded as wrong rather
+than deleted: that the crime response had always masked it. `CollisionIsCrime`
+was added in 4.3.0, one day before this entry. Every version before that ran
+with no crime system at all, which is the same condition this test created, so
+there was a long stretch in which the behaviour would have been just as visible
+as it is now.
+
+So the observation stands unexplained. What is established is only that the
+replan fires, that it fired on all four impacts, and that the recovery
+completes. Why its effect appears newly visible is not answered, and the
+candidates worth separating are whether anything about the send changed since
+4.2.1, whether the 600 ms gap is being reached differently now that the fall
+hands off through the fragment rather than a timer, and whether this is an
+observation that has simply not been looked for before.
+
+It is not breaking, and it is not from the split: the recovery code moved
+verbatim and the same lines appear in the impacts recorded before it moved.
