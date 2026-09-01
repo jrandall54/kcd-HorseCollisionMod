@@ -37,6 +37,13 @@ $modDir = "$buildDir\HorseCollisionMod"
 $dataDir = "$modDir\Data"
 $releasesDir = Join-Path $repoRoot "releases"
 
+# The version the repository is currently on, regardless of what is being
+# built. A prerelease build carries a different -Version, and the release
+# checks below read the manifest again for their own comparison; this copy
+# exists so the archive step at the end knows which released zip to leave in
+# place.
+$manifestCurrent = ([xml](Get-Content (Join-Path $srcDir "mod.manifest"))).kcd_mod.info.version
+
 # Clean previous temp build
 if (Test-Path $buildDir) { Remove-Item -Recurse -Force $buildDir }
 New-Item -ItemType Directory -Force -Path $pakDir | Out-Null
@@ -444,14 +451,23 @@ Remove-Item -Recurse -Force $buildDir
 # resolve a zip by name, and the one thing worse than a full directory is
 # picking the wrong file out of it.
 #
-# Nothing is deleted, and nothing is lost by moving: a prerelease is superseded
-# the moment anything newer exists, and a released zip is reproducible by
-# checking out its tag and building it again. Only the build just made stays at
-# the top level, which is where the publishing tools look for it.
+# Nothing is deleted, only moved, which matters more than it first appears: a
+# tagged release cannot be rebuilt. Asked for its own version number this
+# script refuses twice, once because the manifest has moved on and once because
+# version_check.py sees that version already tagged and demands the next one.
+# The zip in this directory is therefore the only copy of what was released,
+# and archiving is the whole safety net rather than a convenience.
+#
+# So two names stay at the top level. The build just made, and the version the
+# manifest currently names, so that a prerelease built while testing does not
+# push the release it is testing out of reach of the publishing tools.
 $archiveDir = Join-Path $releasesDir "archive"
 
+$keep = @("HorseCollisionMod_v$Version.zip",
+          "HorseCollisionMod_v$manifestCurrent.zip")
+
 $stale = @(Get-ChildItem -Path $releasesDir -Filter "HorseCollisionMod_v*.zip" -File |
-    Where-Object { $_.Name -ne "HorseCollisionMod_v$Version.zip" })
+    Where-Object { $keep -notcontains $_.Name })
 
 if ($stale.Count -gt 0) {
     New-Item -ItemType Directory -Force -Path $archiveDir | Out-Null
