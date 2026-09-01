@@ -9458,3 +9458,54 @@ Two protections, both cheap:
   analysis instead of by the rider's memory.
 - **Write a marker into the log** at the start of a measured phase, and count
   only what follows it. A phase that has to be restarted then costs nothing.
+
+## The attacker encoding makes no difference, and that kills the premise
+
+A controlled comparison at 4.2.11-dev.2. One save, one session, no reload
+between phases: the form is switched from the console, so entity ids, cooldowns
+and the horse are held constant. Trot only, since the gallop trample adds engine
+damage unrelated to the message. Phase B used victims Phase A had not touched.
+
+| Phase | Form | Trot impacts | No damage | Mean loss |
+| --- | --- | --- | --- | --- |
+| A | string | 11 | 2 (18%) | 4.85 |
+| B | typed | 13 | 2 (15%) | 5.26 |
+
+Eighteen per cent against fifteen, on samples of eleven and thirteen, is noise.
+The typed form is not better and not worse.
+
+### What that settles
+
+**`Framework.WUIDToMsg` resolves.** Trot damage exists only because vanilla
+follows the horse's `rider` link to the player and re-sends the event as
+`combat:hit`; that branch cannot run without an attacker it can resolve. Damage
+landed on eleven of thirteen impacts under the string form, so the attacker was
+resolving all along.
+
+The theory behind this branch was that the WUID was being mangled into text and
+failing to resolve, and that this explained victims taking no damage. It is
+wrong. It was built on an archived note reading "the vanilla branch did not
+resolve riderPlayer", which was one candidate among several in that entry and
+was never the finding.
+
+**It also removes the premise for retrying `combat:hit`.** That plan rested on
+the same encoding argument. Reopening it now needs a different reason, and there
+is not one yet.
+
+### What is still unexplained
+
+Roughly one impact in six does no damage, in both forms. Four cases here:
+
+```
+A   rat_refugee_vojcek        beggar, activity anchored
+A   rat_merchant_shop1        merchant, activity anchored
+B   rat_innkeeper1            innkeeper, activity anchored
+B   rat_swordsmiths_wife      second impact on the same victim
+```
+
+Three of the four are NPCs whose day is anchored to a smart object, which is
+suggestive and is not a result at four cases: other anchored victims in the same
+ride, `rat_refugee_Radan` and `rat_refugee_tonda_rumpal`, took damage normally.
+
+Worth stating that the zero rate is not new and was not introduced here. It sits
+at the same level under the form that shipped in 4.2.1.
