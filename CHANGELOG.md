@@ -23,6 +23,18 @@ number.
 
 ## [Unreleased]
 
+## [4.2.11] - 2026-08-31
+
+Diagnostics. The mod behaves exactly as 4.2.10 does.
+
+### Changed
+
+- Impact telemetry records what the victim was doing when the horse reached
+  them. Every reaction is a standing animation, so an impact on someone
+  already down plays nothing and usually costs no health; without this, an
+  impact that cost nothing by design was indistinguishable in the log from one
+  that failed.
+
 ## [4.2.10] - 2026-08-31
 
 Documentation. The mod is unchanged from 4.2.1.

@@ -9382,3 +9382,361 @@ had already received a typed replan from the mod. `daycycle:haltContext` moving 
 parked merchant 3.42 m is still a real observation, but it is not evidence that
 `haltContext` is needed: the typed `restartRequest` in the reaction covers every
 case tested since.
+
+## The attacker resolves when it is sent as a WUID rather than as text
+
+Tested at 4.2.11-dev.1. `hitReaction` declares `attacker` as `common:wuid`, and
+the message had been carrying it through `Framework.WUIDToMsg`, which renders a
+sixty-four bit identifier into the message text for a tree to parse back. It is
+now built with `Utils.makeTable` and sent with `SendMessageToEntityData`.
+
+Twenty-three sends, every one `typed=true attacker=true`, no errors.
+
+### Damage, before and after, from one session's log
+
+The build was hot-reloaded partway through, so both forms appear in the same
+log against the same save.
+
+| | Tier | Impacts | No damage | Mean loss |
+| --- | --- | --- | --- | --- |
+| Before | Gallop | 3 | **3 (100%)** | 0.00 |
+| After | Trot | 18 | 1 (5.6%) | 5.94 |
+| After | Gallop | 2 | 0 | 26.61 |
+
+### The repetition test is the part that carries weight
+
+A single impact cannot distinguish a mitigated hit from a dropped message, which
+is why an earlier session could not settle this. Repeated impacts on one victim
+can, and every repeat landed:
+
+```
+rat_woman34   -7.00  -11.63  -6.23
+rat_man95     -5.34   -5.25  -4.80
+rat_woman44   -6.64   -3.63  -5.34  -5.41
+rat_ruch      -6.26   -6.66
+```
+
+Trot losses cluster between 3.6 and 7.4 with one at 11.6, which is the shape of
+a hit resolving every time rather than intermittently.
+
+### What this does not establish
+
+The sample is small and unbalanced. There is no trot baseline in this log,
+because the reload happened before any trot impact under the old form, so the
+comparison rests on three gallops. Three of three failing and none of two
+failing is suggestive and is not a measurement.
+
+One trot impact still did nothing, on `rat_shop_guard_butcher`. Armor does not
+reduce damage in this mod, so a guard is not expected to differ, and one case is
+not a pattern.
+
+### The open question this reopens
+
+If the attacker now resolves, the branch inside `sb_switch_hitreactions.xml`
+that follows the horse's `rider` link to the player, and re-sends the event as
+`combat:hit`, is reachable. That branch is what applies damage and attributes
+crime, and `combat:hit` feeds the combat sub-brain, which owns the body. The
+conclusion that a reaction animation is unreachable from a mod was drawn when
+that path was assumed dead.
+
+## A testing hazard: the first sprint after a save load gallops
+
+**User report**: "there is this bug that I don't think is our mods doing and is
+just vanilla where after you reload a save, the first time you press the run
+button while on the horse it automatically gets to gallop speed even though you
+didn't hold forward or double press."
+
+Not caused by this mod, and it does not need fixing here, but it corrupts a ride
+that is meant to be at a single tier: the first impact after a load can arrive
+at gallop when the rider meant to trot. It cost the opening impact of a
+controlled comparison.
+
+Two protections, both cheap:
+
+- **Filter by the tier the log records** rather than by what the ride intended.
+  Every impact writes its tier, so an accidental gallop is excluded by the
+  analysis instead of by the rider's memory.
+- **Write a marker into the log** at the start of a measured phase, and count
+  only what follows it. A phase that has to be restarted then costs nothing.
+
+## The attacker encoding makes no difference, and that kills the premise
+
+A controlled comparison at 4.2.11-dev.2. One save, one session, no reload
+between phases: the form is switched from the console, so entity ids, cooldowns
+and the horse are held constant. Trot only, since the gallop trample adds engine
+damage unrelated to the message. Phase B used victims Phase A had not touched.
+
+| Phase | Form | Trot impacts | No damage | Mean loss |
+| --- | --- | --- | --- | --- |
+| A | string | 11 | 2 (18%) | 4.85 |
+| B | typed | 13 | 2 (15%) | 5.26 |
+
+Eighteen per cent against fifteen, on samples of eleven and thirteen, is noise.
+The typed form is not better and not worse.
+
+### What that settles
+
+**`Framework.WUIDToMsg` resolves.** Trot damage exists only because vanilla
+follows the horse's `rider` link to the player and re-sends the event as
+`combat:hit`; that branch cannot run without an attacker it can resolve. Damage
+landed on eleven of thirteen impacts under the string form, so the attacker was
+resolving all along.
+
+The theory behind this branch was that the WUID was being mangled into text and
+failing to resolve, and that this explained victims taking no damage. It is
+wrong. It was built on an archived note reading "the vanilla branch did not
+resolve riderPlayer", which was one candidate among several in that entry and
+was never the finding.
+
+**It also removes the premise for retrying `combat:hit`.** That plan rested on
+the same encoding argument. Reopening it now needs a different reason, and there
+is not one yet.
+
+### What is still unexplained
+
+Roughly one impact in six does no damage, in both forms. Four cases here:
+
+```
+A   rat_refugee_vojcek        beggar, activity anchored
+A   rat_merchant_shop1        merchant, activity anchored
+B   rat_innkeeper1            innkeeper, activity anchored
+B   rat_swordsmiths_wife      second impact on the same victim
+```
+
+Three of the four are NPCs whose day is anchored to a smart object, which is
+suggestive and is not a result at four cases: other anchored victims in the same
+ride, `rat_refugee_Radan` and `rat_refugee_tonda_rumpal`, took damage normally.
+
+Worth stating that the zero rate is not new and was not introduced here. It sits
+at the same level under the form that shipped in 4.2.1.
+
+## Neither the encoding nor the attacker changes the zeros
+
+Three phases at 4.2.11-dev.2 and dev.3, one save, no reload between them, the
+form and the attacker switched from the console so the horse, the entity ids and
+the cooldowns stay constant. Trot only.
+
+| Phase | Form | Attacker | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- | --- |
+| A | string | horse | 11 | 2 (18%) | 4.85 |
+| B | typed | horse | 14 | 2 (14%) | 5.09 |
+| C | typed | player | 10 | 2 (20%) | 5.04 |
+
+Thirty-five impacts, six with no damage, and the rate does not move.
+
+**Naming the rider directly makes no difference either.** That was worth
+testing: naming the horse leaves the game to follow the horse's `rider` link
+before it re-sends the event as `combat:hit`, and an intermittently
+unresolvable link would have produced exactly this pattern. It does not.
+
+### The zeros are real, not a sampling window
+
+Impact cost is sampled at four offsets. Every victim reading zero at t+3000
+reads zero at t+500, t+6000 and t+10000 as well:
+
+```
+rat_refugee_vojcek     +0.00  +0.00  +0.00  +0.00
+rat_merchant_shop1     +0.00  +0.00  +0.00  +0.00
+rat_innkeeper1         +0.00  +0.00  +0.00  +0.00
+rat_swordsmiths_wife   +0.00  +0.00  +0.00  +0.00
+rat_man13              +0.00  +0.00  +0.00  +0.00
+rat_refugee_maruna     +0.00  +0.00  +0.00  +0.00
+```
+
+Nothing arrives late. The hit does not land at all.
+
+### What is left, and it is about ordering rather than content
+
+`TriggerCollision` starts the reaction and then sends the hit:
+
+```lua
+self:PlayReaction(npc, velocity, speed, "hcm_fall_")
+self:SendHitReaction(npc, horseWuid, strength.MinorInjury, playerEnt)
+```
+
+`PlayReaction` seizes the actor through `StartInteractiveActionByName`. The hit
+message therefore arrives at a victim whose body has just been taken, and an
+earlier entry recorded that handlers declared `Atomic="true"` drop messages
+while busy. A handler occupied by the reaction would drop the hit for some
+victims and not others, which is the shape of what is measured, and it is
+independent of what the message contains, which is why three phases of changing
+the contents moved nothing.
+
+## Ordering does not change it either, and the message may not be the source
+
+Phase D at 4.2.11-dev.4, the hit sent before the reaction seizes the body
+rather than after it. Same save, same session, no reload.
+
+| Phase | Form | Attacker | Sent | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | string | horse | after | 11 | 2 (18%) | 4.85 |
+| B | typed | horse | after | 14 | 2 (14%) | 5.09 |
+| C | typed | player | after | 10 | 2 (20%) | 5.04 |
+| D | typed | horse | **before** | 18 | 3 (17%) | 4.85 |
+
+Fifty-three trot impacts across four configurations. The rate does not move,
+and neither does the mean.
+
+### The variable that has never been tested is whether the message matters at all
+
+**User recollection**, and it reframes the whole question: "way back in the
+v1.00-1.20 or somewhere in the early days of development we were able to produce
+a hit on people based on collision, which back then was purely through
+fall/ragdoll or just the insphere, that made the guards instantly want to kill
+me."
+
+Those builds had no `hitReaction` message. The reaction was a physics ragdoll
+and the damage and the crime came from the collision itself, which is the
+engine charging a velocity delta against a physics body.
+
+Four phases have varied what the message contains and when it is sent, on the
+assumption that the message is what produces the damage. That assumption has
+never been checked. If trot damage comes from somewhere else, every one of those
+phases was measuring noise around a figure the message does not set, which is
+exactly what a flat rate across four configurations looks like.
+
+The test is to switch the message off entirely and see whether damage still
+lands at the same rate.
+
+## Switching the hit message off removes the zeros
+
+Phase E at 4.2.11-dev.4, `SendHitReaction` disabled entirely. Same save, same
+session, no reload.
+
+| Phase | Configuration | Sends | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- | --- |
+| A | string, horse, after | 11 | 11 | 2 (18%) | 4.85 |
+| B | typed, horse, after | 14 | 14 | 2 (14%) | 5.09 |
+| C | typed, player, after | 12 | 10 | 2 (20%) | 5.04 |
+| D | typed, horse, before | 19 | 18 | 3 (17%) | 4.85 |
+| **E** | **no message at all** | **0** | **13** | **0 (0%)** | **6.30** |
+
+Thirteen impacts, none of them free, and the highest mean loss recorded.
+
+### The message is not the damage, and may be what prevents it
+
+The assumption behind four phases was that `hitReaction` is what produces the
+damage, so its contents and its timing were varied to find why it sometimes did
+not. Removing it produced more damage, more reliably.
+
+That fits the user's account of the earliest builds, which had no such message:
+"we were able to produce a hit on people based on collision, which back then was
+purely through fall/ragdoll or just the insphere, that made the guards instantly
+want to kill me". The damage and the crime came from the collision, and they did
+so before this mod ever sent a message.
+
+### Held to what it proves
+
+Zero of thirteen against eleven of fifty-three. If the underlying rate were the
+seventeen per cent the other phases show, a run of thirteen with none has roughly
+a one in eleven chance, so this is suggestive rather than settled on its own. The
+mean rising from about 4.9 to 6.3 is a second signal in the same direction, and
+the four configurations on the other side agree with each other.
+
+A confirming phase with the message back on, under otherwise identical
+conditions, is what would settle it.
+
+### The open question this raises
+
+`hitReaction` is in the roadmap as a Phase 1 deliverable, for one reason: to keep
+the vanilla collision bark. If the barks continue without it, the message costs
+damage and buys nothing. If they stop, there is a real trade to weigh.
+
+## Six phases, and the zero-damage impacts remain unexplained
+
+Phase F put the message back on under Phase B's exact configuration, as an
+A/B/A. It did not reproduce.
+
+| Phase | Message | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- |
+| B | on, typed, horse, after | 14 | 2 (14%) | 5.09 |
+| D | on, typed, horse, before | 18 | 3 (17%) | 4.85 |
+| E | **off entirely** | 13 | 0 (0%) | 6.30 |
+| F | **on again**, as B | 15 | 0 (0%) | 6.21 |
+
+Pooled, the message being on gives five zeros in forty-seven and off gives none
+in thirteen, which looks like an effect until F is read: the message was on and
+the zeros still did not appear. **Phase E was a false positive and was nearly
+written up as a finding.**
+
+The zeros stopped after Phase D and no variable under test explains it.
+
+### Everything ruled out, on eighty-one trot impacts
+
+- **Message contents.** String against typed: 18% against 14%.
+- **Attacker identity.** Horse against rider: 14% against 20%. Naming the rider
+  skips the `rider` link resolution entirely and changes nothing.
+- **Ordering.** Sent before the reaction seizes the body against after: 17%
+  against 14%.
+- **The message existing at all.** Off against on, within the later phases:
+  0% against 0%.
+- **Impact speed.** Zeros averaged 6.76 m/s and hits 6.84 m/s, over the same
+  range. Not glancing blows.
+- **Repeat impacts.** Three of ten zeros were repeats, against thirty-nine of
+  seventy-one that dealt damage. Zeros skew towards first hits, not away.
+- **Sampling.** Every zero reads zero at t+500, t+3000, t+6000 and t+10000.
+
+### What is actually known
+
+The rate is about one impact in eight overall, it predates this branch, and
+nothing here made it better or worse. The vanilla collision bark fires with the
+message and without it, which removes the one documented reason for sending it,
+but not on evidence strong enough to act on given how this investigation went.
+
+### The lesson, which is the useful part
+
+Four phases were spent varying the contents and timing of a message on the
+assumption that it was the damage source, and that assumption was never checked
+until the user recalled that the earliest builds produced damage and crime with
+no message at all. The check took one ride and overturned four.
+
+Then Phase E's clean run was very nearly recorded as a discovery, on thirteen
+impacts, before the confirming phase showed the effect was not there. A run of
+thirteen with no zeros has about a one in eleven chance at the observed rate,
+which is exactly the kind of number that reads as a result and is not one.
+
+## Riding over the fallen is caught by the gate, and the zeros are not that
+
+Phase G at 4.2.11-dev.5, recording the victim's animation state at the moment of
+impact, ridden the way the player normally rides rather than at clean standing
+targets.
+
+**User note**, and the reason for the phase: "are you taking into account the
+fact that I run over the NPCs while they are on the ground like 90% of the
+time?"
+
+Fourteen trot impacts reached the damage telemetry. Two cost nothing, and both
+were on victims who were upright:
+
+```
+rat_woman10          MotionMovement   +0.00
+rat_refugee_beranMr  BeggarVAR        +0.00
+```
+
+Against twelve that did cost, on `MotionMovement`, `Beggar`, `IdleToMove` and
+`MotionIdle`. Every state that appears in the zero column also appears in the
+column that took damage, and `rat_woman10` reads `MotionMovement` for both a
+zero and a normal loss in the same ride.
+
+### The gate is doing its job
+
+In the same session the cooldown gate turned away **174** impacts, and only
+**two** impacts on a victim mid-reaction reached the telemetry at all. So
+riding over the fallen is being filtered before any of this is measured, which
+is what it is for.
+
+That is worth knowing on its own: the impacts a player spends most of their time
+making are invisible to the damage telemetry by design, so any reading of
+"damage per impact" from this log describes clean standing hits and nothing
+else.
+
+### Where the zeros stand after seven phases
+
+Roughly one impact in eight on a standing victim costs nothing, and none of
+these explains it: the message's contents, its attacker, its ordering, its
+existence, the impact speed, whether the victim had been hit before, the
+sampling window, or the victim's state at impact.
+
+It predates this branch and nothing here moved it. It is now well bounded, which
+is the only progress: it happens to upright victims, at ordinary trot speeds, on
+first and repeat impacts alike, with and without the hit message.
