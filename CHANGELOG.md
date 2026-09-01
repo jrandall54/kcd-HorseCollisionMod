@@ -23,6 +23,17 @@ number.
 
 ## [Unreleased]
 
+## [4.2.10] - 2026-08-31
+
+Documentation. The mod is unchanged from 4.2.1.
+
+### Changed
+
+- The rebuild blink is no longer a parked issue. It belonged to the animated
+  get-up, where the rebuild landed on a standing victim; the trot tier hands
+  the body to physics during the fall and the blink went with it.
+
+
 ## [4.2.9] - 2026-08-31
 
 Tooling. The mod is unchanged from 4.2.1.
