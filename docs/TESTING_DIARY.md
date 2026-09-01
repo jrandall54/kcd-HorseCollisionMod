@@ -10556,3 +10556,46 @@ have come from a loose file.
 The general shape: a parking list written by hand goes stale the moment the
 shipped file set changes, and the failure is silent in the direction that
 matters, because a stale loose file makes the test pass rather than fail.
+
+## The live item table lookup exists, and is reachable only by SHA
+
+Recorded because it was found once, built once, verified once, and then lost.
+
+An earlier entry in this diary concludes that `ItemManager` reports an item's
+class and no weight, and that "there is no live weight lookup, and the join
+through the shipped table is not a shortcut but the only route". The first half
+is correct and the conclusion is not. `ItemManager` is not the route. The
+`Database` bind is.
+
+### What it does
+
+`Database` exposes the tables the game ships, read through
+`Database.GetTableColumnData(table, column)`:
+
+| Table | Columns used | For |
+|---|---|---|
+| `pickable_item` | `item_id`, `weight` | every item's weight |
+| `armor` | `item_id`, `smash_def`, `armor_type_id` | the subset that is armor |
+
+The class an item reports through `ItemManager.GetItem` joins straight to
+`pickable_item.item_id`. Membership of `armor` is what makes a carried item
+count as worn, which is the same filter the shipped table provided by
+containing only armor classes.
+
+It degrades rather than failing: when `Database` is unavailable the log says so
+and every target reads as unarmored.
+
+### What it was measured at
+
+Confirmed against a live inventory, 18 items matched and none missed, and the
+index built 796 armor pieces in game. Removing the generator, its build step
+and the shipped file took the download from 56,470 to 37,573 bytes.
+
+### Why it is not in the mod
+
+It was committed as `093ae77`, and `main` was later hard reset to 4.0.0. The
+commit is not an ancestor of `main` and is on no branch, so it is reachable
+only by that SHA and only until the object is pruned.
+
+The file it was written against was the 2,558-line single script, which no
+longer exists, so the commit is a specification rather than a patch to apply.

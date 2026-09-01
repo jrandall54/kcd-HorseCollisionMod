@@ -210,6 +210,22 @@ and both axes of the footprint were each cleared against logged sessions.
 
 ### Parked
 
+- [ ] Drop the shipped armor weight table and read the game's tables directly.
+      The `Database` bind exposes them: `pickable_item` carries `item_id` and
+      `weight`, `armor` carries `item_id`, `smash_def` and `armor_type_id`, and
+      the class an item reports joins straight to `pickable_item.item_id`.
+      Membership of `armor` is what decides worn rather than carried. This was
+      built once and verified in game against a live inventory, 18 items matched
+      with none missed and 796 armor pieces indexed, and it removed
+      `build_item_weights.py`, its build step and the shipped file, cutting the
+      download by about a third. The figures are in the testing diary, which
+      records them as a measurement of that build rather than a claim about the
+      current one. It was then orphaned when `main` was
+      reset to 4.0.0 and is not in any branch; the implementation is in commit
+      `093ae77`, reachable only by SHA. Rebuild it forward onto
+      `HorseCollisionMod/Armor.lua` rather than cherry-picking, since the file
+      layout it was written against no longer exists.
+
 - [ ] A polearm guard's get-up plays wrong. The body turns fully sideways while
       straightening and passes through the floor before settling. Observed twice
       on the same guard, and not seen on villagers, women or unarmed guards, so
