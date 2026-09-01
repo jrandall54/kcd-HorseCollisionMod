@@ -138,6 +138,99 @@ if ($scopeErrors.Count -gt 0) {
     Write-Host "Build failed: a local helper is used above where it is declared." -ForegroundColor Red
     exit 1
 }
+
+# The part file layout, enforced rather than remembered.
+#
+# The mod's Lua was one 2,558-line file and was split across ten part files by
+# concern. Nothing stops the next change putting a new method back in the entry
+# point, and that is how the split would be undone: not in one commit anybody
+# would question, but a method at a time, each one defensible on its own.
+#
+# The entry point owns the table, Config, the state tables, the timing
+# constants, the settings merge, the animation database redirect, the load
+# screen listener and the bootstrap. Behavior belongs in a part file. This list
+# is deliberately short and deliberately awkward to extend: adding a name here
+# should feel like a decision, because it is one.
+$entryPointMethods = @(
+    "ApplySettings",
+    "RedirectAnimationDatabases",
+    "uiActionListener"
+)
+
+$layoutErrors = @()
+$entryText = Get-Content $modScript
+
+for ($i = 0; $i -lt $entryText.Count; $i++) {
+    if ($entryText[$i] -notmatch '^function HorseCollisionMod:(\w+)') { continue }
+
+    $method = $Matches[1]
+
+    if ($entryPointMethods -notcontains $method) {
+        $layoutErrors += "HorseCollisionMod.lua line $($i + 1): $method belongs in a part file under src\HorseCollisionMod\, not in the entry point"
+    }
+}
+
+# Only the entry point creates the table. A part file that rebuilt it would
+# discard every method loaded before it, and the order they load in is the only
+# thing that would decide what survived.
+foreach ($part in $partScripts) {
+    $shortName = Split-Path -Leaf $part
+    $text = Get-Content $part
+    $hasModule = $false
+
+    for ($i = 0; $i -lt $text.Count; $i++) {
+        if ($text[$i] -match '^\s*HorseCollisionMod\s*=\s*\{') {
+            $layoutErrors += "${shortName} line $($i + 1): only the entry point may create the HorseCollisionMod table"
+        }
+
+        if ($text[$i] -match '^--\s*@module\s') { $hasModule = $true }
+    }
+
+    # Without one, ldoc drops the file from the reference silently.
+    if (-not $hasModule) {
+        $layoutErrors += "${shortName}: no LDoc @module header, so it is missing from docs\api"
+    }
+}
+
+# A part file that exists but is never loaded is the quietest failure the mod
+# has. The entry point loads, the methods it expected are nil, and the log says
+# nothing. verify_additive.py checks this against a packaged release, which is
+# too late to be useful while writing one.
+$namedByEntry = @([regex]::Matches((Get-Content $modScript -Raw),
+    'Script\.ReloadScript\s*\(\s*"Scripts/HorseCollisionMod/([^"]+)"\s*\)') |
+    ForEach-Object { $_.Groups[1].Value })
+
+# Missing from config.ld is quieter still: the file works, and only its
+# documentation disappears.
+$ldocText = if (Test-Path (Join-Path $repoRoot "config.ld")) {
+    Get-Content (Join-Path $repoRoot "config.ld") -Raw
+} else { "" }
+
+foreach ($part in $partScripts) {
+    $leaf = Split-Path -Leaf $part
+
+    if ($namedByEntry -notcontains $leaf) {
+        $layoutErrors += "${leaf}: no Script.ReloadScript line in the entry point, so it never loads"
+    }
+
+    if ($ldocText -notmatch [regex]::Escape("src/HorseCollisionMod/$leaf")) {
+        $layoutErrors += "${leaf}: not listed in config.ld, so it is missing from the reference"
+    }
+}
+
+foreach ($named in $namedByEntry) {
+    if (-not (Test-Path (Join-Path $partsSrcDir $named))) {
+        $layoutErrors += "HorseCollisionMod.lua: loads Scripts/HorseCollisionMod/$named, which does not exist in src"
+    }
+}
+
+if ($layoutErrors.Count -gt 0) {
+    foreach ($e in $layoutErrors) {
+        Write-Host "[LAYOUT] $e" -ForegroundColor Red
+    }
+    Write-Host "Build failed: the part file layout was not respected." -ForegroundColor Red
+    exit 1
+}
 # Stray control characters in any tracked text file.
 #
 # A scripted edit that writes a path like ".\build.ps1" through a tool that
