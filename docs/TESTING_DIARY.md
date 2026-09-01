@@ -10469,3 +10469,55 @@ horse and is vanilla behaviour, not the mod's drain.
 `combatScale` read 1.0 on all five, so only the non-combat branch of
 `IsCombatCollision` was exercised. The combat multiplier path is untested by
 this slice and would need an impact taken during a fight.
+
+## The detection loop, and the split finished
+
+`TriggerCollision`, `SafeUpdate` and `UpdateTimer` moved to
+`Scripts/HorseCollisionMod/Update.lua`, 373 lines. The entry point is 569
+lines, from 2,558 when the split began.
+
+Moved last on purpose. It calls into every other part, so a fault here would
+have been indistinguishable from a fault in whichever part it called, and all
+nine of those had already been proven in the running game.
+
+### Fourteen impacts across all three tiers
+
+| Tier | Count | Reaction | `CombatHit` | Horse stamina |
+|---|---|---|---|---|
+| Walk | 3 | `hcm_stagger_left`, `_right`, `_forward` | none | none |
+| Trot | 5 | `hcm_fall_forward`, `_back`, `_right` | `strength=5` | 15 to 88 |
+| Gallop | 6 | `Impulse` magnitude 24.3 to 73.8 | `strength=6` | 37 to 80 |
+
+Every reaction returned `ok=true err=nil`. No Lua error and no
+`CRITICAL ERROR IN UPDATE TIMER` line appeared.
+
+The walk tier is the result worth having. It had not been ridden once since the
+split began, and it is the only tier whose correctness is partly an absence:
+no crime is raised and no stamina is drawn, which is the shipped design and
+would have been invisible in a test that only counted reactions.
+
+### The combat multiplier, left untested by the previous slice
+
+`combatScale=2.2` appears on nine of the fourteen, so the combat branch of
+`IsCombatCollision` ran. The rider slice recorded that gap and this ride closes
+it: one trot impact drew 88.1 stamina at 2.2 combat and 2.22 armor, against
+14.9 for the same tier unarmored and out of combat.
+
+### The layout as it now stands
+
+| File | Lines | What it holds |
+|---|---|---|
+| `HorseCollisionMod.lua` | 569 | the table, `Config`, state, timing, `ApplySettings`, the redirect, the bootstrap |
+| `Update.lua` | 400 | the detection loop and dispatching one collision |
+| `Health.lua` | 383 | what an impact cost, and the auto-cure suppression |
+| `Recovery.lua` | 312 | the waits, the rebuild and the replan |
+| `Reaction.lua` | 255 | brain message, reaction clip, physics ragdoll |
+| `Log.lua` | 199 | logging, clock, vector length, speed history and tier |
+| `Armor.lua` | 196 | what a victim wears, and both curves |
+| `Rider.lua` | 160 | horse stamina, combat multiplier, dismount |
+| `Detection.lua` | 159 | footprint test and impact direction |
+| `Crime.lua` | 106 | the combat hit that makes it an offence |
+| `Enums.lua` | 41 | the two engine enums |
+
+One `neverRagdolled` appeared at 15008 ms. That case predates the split, the
+ceiling exists for it, and the victim recovered.
