@@ -9951,3 +9951,60 @@ player-ridden collision into `Melee` for exactly this reason.
 
 Severity is not ours to set. The label follows the hit type, the fine follows
 the victim's social class, and murder arrives on its own when the victim dies.
+
+## The engine's own hit reactions, and the API that is not there
+
+`Libs/Tables/animation/hit_reaction.xml` holds 287 rows mapping an actor class,
+a reaction type and a set of tags to a Mannequin fragment. The vocabulary is the
+one this mod already computes:
+
+```
+so_forward+minor_hit   so_back+major_hit   death
+sitting+so_left+minor_hit   lying+death   horse+so_forward+major_hit
+```
+
+Every row resolves to `HitDeath` or `HitDeathTorso`. Reaction types come from
+`hit_reaction_type.xml`: `AnimatedMinor` 5 tagged `minor_hit`, `AnimatedMajor` 6
+tagged `major_hit`, `AnimatedDeath` 7 tagged `death`, `AnimatedWeak` 8 tagged
+`weak_hit`, alongside `Ragdollize` 0 and three physical types.
+
+### The script bind is documented and absent
+
+Warhorse's own `CScriptBindHitDeathReactions` documentation describes exactly
+what this mod has always needed, including `StartReactionAnim`, which "pauses
+the animation graph while playing it and resumes automatically when the
+animation ends", and `OnHit`, which notifies the hit death reactions system.
+
+Probed on a live NPC, none of `OnHit`, `StartReactionAnim`, `ExecuteHitReaction`,
+`ExecuteDeathReaction`, `IsValidReaction`, `EndCurrentReaction`,
+`EndReactionAnim` or `StartInteractiveAction` exists on the entity, the actor or
+the human. The documentation describes a build that is not this one.
+
+### What is reachable is the fragment itself
+
+`HitDeath` sits in the vanilla database with the same structure as
+`AnimationControlled`, which this mod already extends:
+
+```xml
+<HitDeath>
+  <Fragment BlendOutDuration="0.2" Tags="horse" FragTags="so_forward+major_hit">
+    <AnimLayer><Animation name="horserider_fall_right" /></AnimLayer>
+    <ProcLayer>
+      <Blend ExitTime="1.1" StartTime="0" Duration="0.2" />
+      <Procedural type="Ragdoll">
+        <Sleep value="1" /> <Stiffness value="500" />
+```
+
+### A correction to an earlier conclusion
+
+The ragdoll settle layer was tried in the fall fragment and abandoned, on a
+measurement showing it arriving two seconds after the victim had already stood
+up. That attempt used `Sleep` 0 and `Stiffness` 100, recorded at the time as
+"vanilla's own value".
+
+Vanilla's own value, in the fragment that does exactly this handover, is
+`Sleep` 1 and `Stiffness` 500, at `ExitTime` 1.1. Those are materially different
+parameters, and the layer is doing in Mannequin what this mod now does from Lua
+with a timer and `actor:Fall`.
+
+Whether the earlier failure was the parameters or the ordering is untested.
