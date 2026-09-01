@@ -10336,3 +10336,58 @@ on both victims. No field resolved to nil.
 the multiplier is applied on this path. Whether it changes anything a player
 can see is the separate question recorded in `ROADMAP.md` under Phase 2, and is
 untouched by this slice.
+
+## Victim recovery, watched without the crime response
+
+`ReleaseVictimMovement`, `WhenRagdollResolves`, `FinishRecovery`,
+`ReplanVictim`, `WhenReactionEnds` and `RebuildVictim` moved to
+`Scripts/HorseCollisionMod/Recovery.lua`, 287 lines. The entry point is 1,166
+lines, under half the 2,558 it started at.
+
+`CollisionIsCrime` was set `false` at the console for this test and restored to
+`true` afterwards. A guard response makes a recovery impossible to watch: the
+victim is reacting to the crime rather than recovering, and the player is being
+arrested rather than observing.
+
+### Four trot impacts
+
+Every one resolved:
+
+| Victim | Reaction | Rebuild | Replan |
+|---|---|---|---|
+| `rat_armorers_wife` | `hcm_fall_forward` | `on=resolved waited=9360ms` | `typed=true` |
+| `rat_konyas_wife` | `hcm_fall_back` | `on=resolved waited=7824ms` | `typed=true` |
+| `rat_woman44` | `hcm_fall_forward` | `on=resolved waited=8928ms` | `typed=true` |
+| `rat_guard_pazdera` | `hcm_fall_back` | `on=resolved waited=5408ms` | `typed=true` |
+
+No `CombatHit` line appears on any of them, which confirms the crime setting
+took effect rather than being sent and ignored. No Lua error, and no field
+resolved to nil.
+
+### What the replan looks like from the saddle
+
+Observed for the first time, because it has always been hidden until now:
+
+> "they get up normally, start to return, pause for a sec natural looking, and
+> then seem to change direction and resume"
+
+That is the two-stage recovery working as designed. `RebuildVictim` puts the
+victim on their feet and they move under whatever plan they still hold.
+`ReplanAfterRebuildMs` later, 600 ms, `ReplanVictim` sends
+`daycycle:restartRequest` with `reason(interrupt), speed(instant)`, which
+restarts the schedule at once and sends them where the schedule wants them
+rather than where they had started walking.
+
+The behaviour is not new and is not from the split. It is the typed-payload
+fix from 4.2.1, the one that got beggars, innkeepers and merchants returning to
+their stalls instead of standing still, and `VictimReplan typed=true` appears
+in every recorded impact since.
+
+What was new is the opportunity to see it. Every previous observation was made
+with `CollisionIsCrime` on, where the victim's behaviour after standing up was
+the crime response rather than their schedule. Turning the crime off does not
+change the recovery; it stops something louder from covering it.
+
+Whether the pause and the direction change should read more smoothly is a
+tuning question about 4.2.1 behaviour, and is recorded rather than acted on
+here.
