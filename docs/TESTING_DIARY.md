@@ -9561,3 +9561,39 @@ while busy. A handler occupied by the reaction would drop the hit for some
 victims and not others, which is the shape of what is measured, and it is
 independent of what the message contains, which is why three phases of changing
 the contents moved nothing.
+
+## Ordering does not change it either, and the message may not be the source
+
+Phase D at 4.2.11-dev.4, the hit sent before the reaction seizes the body
+rather than after it. Same save, same session, no reload.
+
+| Phase | Form | Attacker | Sent | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- | --- | --- |
+| A | string | horse | after | 11 | 2 (18%) | 4.85 |
+| B | typed | horse | after | 14 | 2 (14%) | 5.09 |
+| C | typed | player | after | 10 | 2 (20%) | 5.04 |
+| D | typed | horse | **before** | 18 | 3 (17%) | 4.85 |
+
+Fifty-three trot impacts across four configurations. The rate does not move,
+and neither does the mean.
+
+### The variable that has never been tested is whether the message matters at all
+
+**User recollection**, and it reframes the whole question: "way back in the
+v1.00-1.20 or somewhere in the early days of development we were able to produce
+a hit on people based on collision, which back then was purely through
+fall/ragdoll or just the insphere, that made the guards instantly want to kill
+me."
+
+Those builds had no `hitReaction` message. The reaction was a physics ragdoll
+and the damage and the crime came from the collision itself, which is the
+engine charging a velocity delta against a physics body.
+
+Four phases have varied what the message contains and when it is sent, on the
+assumption that the message is what produces the damage. That assumption has
+never been checked. If trot damage comes from somewhere else, every one of those
+phases was measuring noise around a figure the message does not set, which is
+exactly what a flat rate across four configurations looks like.
+
+The test is to switch the message off entirely and see whether damage still
+lands at the same rate.
