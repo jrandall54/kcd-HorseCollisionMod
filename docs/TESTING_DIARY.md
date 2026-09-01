@@ -9740,3 +9740,271 @@ sampling window, or the victim's state at impact.
 It predates this branch and nothing here moved it. It is now well bounded, which
 is the only progress: it happens to upright victims, at ordinary trot speeds, on
 first and repeat impacts alike, with and without the hit message.
+
+## A typed combat hit registers as a crime, where the string form never did
+
+Phase I at 4.2.12-dev.1, `combat:hit` sent as a typed table built with
+`Utils.makeTable`, in vanilla's own shape: the player named as attacker, the
+collision rewritten as `Melee`, `real` set true.
+
+**User report**: "on the first hit it was a recognized crime with a witness
+calling for help. I hit another woman and then I surrendered to the guard. He
+said I was brawling, I paid the fine."
+
+Two impacts, both `CombatHit ok=true`, both costing the victim the usual amount:
+`-5.80` and `-5.95`. The damage is unchanged. What is new is that the game
+recognized the act, produced a witness, and charged the player for it.
+
+### This overturns a documented conclusion
+
+`docs/TECHNICAL_DETAILS.md` lists the `combat:hit` brain message as delivered
+and handled by a tree that cannot drive the body, alongside `hitReaction`. That
+came from an earlier session which sent it twelve times as a `key(value)`
+string and observed no reaction and no hostility, and recorded plainly that
+"`ok=true` proves nothing".
+
+The message was correct. The payload was not carried. Sent as a typed table the
+same message reaches the combat subbrain and is acted on, which is the third
+time this project has found an accepted message doing nothing because its
+declared members never arrived.
+
+### What it delivers, and what it does not
+
+It delivers a roadmap item that has been open since Phase 3 was written: riding
+someone down in a village is something the game notices.
+
+It does not appear to drive an animation. The user reported no reaction beyond
+the mod's own fall, so the hope that reaching the body-owning subbrain would
+produce an engine-authored hit reaction is not supported by this test, though
+two impacts cannot rule it out.
+
+### Open, and worth a moment's thought before shipping
+
+The charge was **brawling**. `hitType` is sent as `Melee`, because that is what
+vanilla's own branch rewrites a player-ridden collision into, so the game is
+being told Henry struck them by hand. Whether a collision should be charged as
+brawling, as assault, or not at all is a design question rather than a technical
+one, and `HitReactionType.Collision` is the obvious alternative to measure.
+
+Making every trot collision a crime is a large change to how the mod plays, and
+it is off by default until that is decided.
+
+## What the game charges for a ridden collision, measured
+
+Four runs at 4.2.12-dev.2, one impact each, reloading between them so the charge
+could be read by surrendering to a guard. `combat:hit` sent as a typed table
+with the player as attacker and `real` true; only `hitType` and `strength` vary.
+
+| Run | hitType | strength | Result |
+| --- | --- | --- | --- |
+| 1 | Melee | MinorInjury (5) | "beating people right under my nose?" charged, fine |
+| 2 | Melee | MajorInjury (6) | "you're brawling!" charged, 80 gold |
+| 3 | **Collision** | MinorInjury (5) | **no crime at all, across five impacts** |
+| 4 | **Collision** | MajorInjury (6) | **no crime at all** |
+
+### The crime system does not see a collision
+
+`HitReactionType.Collision` produces no crime whatever the strength. Only
+`Melee` does. That is why the vanilla branch in `sb_switch_hitreactions.xml`
+rewrites a player-ridden collision into `Melee` before re-sending it as
+`combat:hit`: the crime system has no concept of being ridden down, so the game
+launders it into the one hit type it does prosecute.
+
+So a collision can be made a crime, and only by describing it as something it is
+not.
+
+### Severity moves with strength, within one label
+
+Both `Melee` runs produced the same kind of charge and a different fine, 80 gold
+at `MajorInjury` against a smaller figure at `MinorInjury`. The crime label
+appears to stay assault-shaped while the penalty scales, which is most of what
+was wanted from severity scaling and needs no new message.
+
+`Crime.lua` in `Scripts.pak` defines the labels and their reaction profiles:
+`assault` has civilians auto-reacting within 2 m and able to react within 8;
+`murder` within 3 and 12. Both are named strings, and `crimeReport` carries a
+`crime:string` member, so naming a crime directly is a channel that exists and
+has not been tried.
+
+### Where that leaves the design
+
+Making a trot collision a crime works today, by sending `Melee`. The cost is
+that the game believes Henry struck them by hand, which is why the guard talks
+about beating and brawling rather than about riding anyone down. Whether that
+trade is worth taking, and whether a fatal collision already produces murder on
+its own, are the open questions.
+
+## The crime matrix for a typed combat hit
+
+Nine runs at 4.2.12-dev.2, one impact each, reloading between them and reading
+the charge by surrendering to a guard. Every run corroborated against the log,
+which records the `hitType` and `strength` actually sent.
+
+| hitType | strength | Charged | Guard's words |
+| --- | --- | --- | --- |
+| Melee (1) | Tickle (2) | yes | "no one gets away with beating people up around here" |
+| Melee (1) | MinorInjury (5) | yes | "beating people right under my nose?" |
+| Melee (1) | MajorInjury (6) | yes | "you're brawling!" |
+| Melee (1) | Fatal (7) | yes | "I saw you beating folk" |
+| Collision (2) | MinorInjury (5) | **no** | nothing, over five impacts |
+| Collision (2) | MajorInjury (6) | **no** | nothing |
+| Fall (7) | MinorInjury (5) | **no** | nothing |
+| Bullet (10) | MinorInjury (5) | yes | "nobody gets away with shooting people here" |
+| MeleeStealth (16) | MinorInjury (5) | yes | "forgotten that brawl, have you?" |
+
+### What the message actually controls
+
+**`hitType` decides whether there is a crime, and what it is called.** Melee and
+MeleeStealth are prosecuted as a brawl, Bullet as a shooting. Collision and Fall
+are invisible to the crime system entirely, at any strength.
+
+**`strength` changes nothing about the crime.** Tickle, documented as costing no
+health at all, is charged exactly as Fatal is. So the crime does not come from
+harm; it comes from the hit existing.
+
+**`combat:hit` does no damage.** `Fatal` is documented as killing a fully
+healthy target and the victim did not die. Damage comes from the collision
+itself, which the earlier phases established when removing the mod's hit message
+left damage unchanged.
+
+So this message is an attribution channel and nothing else.
+
+### What that means for severity
+
+Severity cannot be scaled through this message. The ladder the game gives is
+assault for any hit and murder when the victim actually dies, which the user has
+confirmed happens on its own at a gallop.
+
+The fine is scaled by the victim's social class rather than by the hit:
+`nobleman` 12.5, `bailiff` 5, `officer`, `soldier` and `watchman` 2.5,
+`circator` 2, the craft trades 1.5, and everyone else 1. The eighty gold
+recorded earlier against a remembered sixty is therefore not evidence that
+strength scales anything, since the two victims were different people.
+
+### Still untried
+
+The second `hit` type, `attacker, kind, real`, where `kind` is a
+`combatAttackKind` of `none`, `missile`, `stealthAction`, `unarmed`, `melee` or
+`dogBite`. And `crimeReport`, which carries a `crime:string` and is the game's
+own channel for naming a crime rather than implying one.
+
+## The undeclared hit types do nothing, and there is no explosion
+
+`HitReactionType` is declared in `TypeDefinitions.xml` with the comment "These
+correspond to the C++ enum => weird values", and its five values leave gaps at
+3 to 6, 8, 9 and 11 to 15. Those gaps are real C++ values the XML does not
+expose, so each was sent as a `combat:hit` against a live victim.
+
+**All eleven produced nothing.** No witness, no crime, no reaction. Combined
+with the earlier runs, the complete picture is:
+
+| Value | Declared as | Crime |
+| --- | --- | --- |
+| 1 | Melee | yes, a brawl |
+| 2 | Collision | no |
+| 3, 4, 5, 6 | undeclared | no |
+| 7 | Fall | no |
+| 8, 9 | undeclared | no |
+| 10 | Bullet | yes, a shooting |
+| 11 to 15 | undeclared | no |
+| 16 | MeleeStealth | yes, a brawl |
+
+Only the three the crime system knows about are prosecuted, and there is nothing
+hiding in the gaps.
+
+### On explosion
+
+There is no explosion among KCD's hit reaction types. The word does appear in
+the game's data, in `Scripts/Entities/Items/HitTypes.xml`, whose own comment
+says it "is loaded as a non-native fallback" and which lists `ExplosiveGrenade`,
+`Rocket`, `Tank125`, `MGBullet` and `PistolBullet`. Those are CryEngine and
+Crysis assets shipped unused, alongside `VTOLExplosion` and `HumanTurret`
+elsewhere. A build that sent an explosion damage type was reaching into that
+registry rather than into KCD's combat system.
+
+## Naming a crime directly does nothing
+
+`pm:crimeReport` carries `sender`, `criminal`, `crime` as a string, and
+`investigationInProgress`, and was the last candidate for charging a collision
+as something other than a brawl. Sent as a typed table naming `murder` with the
+player as criminal, and accepted by five NPCs, it produced no reaction of any
+kind.
+
+That fits what the trees do with it. In `sa_crimeDistrict.xml` the message is
+routing: it resolves a destination and decides whether the report goes to a
+soldier or a circator. It carries a crime the system already knows about to an
+authority; it does not create one.
+
+Worth recording separately: the type is `pm:crimeReport`, not `crimeReport`.
+Types in `TypeDefinitions.xml` are namespaced by nesting, so the enclosing
+`<Type>` supplies the prefix, and `Utils.makeTable` rejects an unqualified name
+outright with "requires name of a existing MBT type". That rejection is the
+validation the string form never offered, and it is a reason to prefer the
+typed path even where both work.
+
+### The crime question is closed
+
+`combat:hit` with `hitType` of `Melee` is the only way to make a ridden
+collision a crime, and the game will call it a brawl. That is the same
+compromise vanilla makes in `sb_switch_hitreactions.xml`, which rewrites a
+player-ridden collision into `Melee` for exactly this reason.
+
+Severity is not ours to set. The label follows the hit type, the fine follows
+the victim's social class, and murder arrives on its own when the victim dies.
+
+## The engine's own hit reactions, and the API that is not there
+
+`Libs/Tables/animation/hit_reaction.xml` holds 287 rows mapping an actor class,
+a reaction type and a set of tags to a Mannequin fragment. The vocabulary is the
+one this mod already computes:
+
+```
+so_forward+minor_hit   so_back+major_hit   death
+sitting+so_left+minor_hit   lying+death   horse+so_forward+major_hit
+```
+
+Every row resolves to `HitDeath` or `HitDeathTorso`. Reaction types come from
+`hit_reaction_type.xml`: `AnimatedMinor` 5 tagged `minor_hit`, `AnimatedMajor` 6
+tagged `major_hit`, `AnimatedDeath` 7 tagged `death`, `AnimatedWeak` 8 tagged
+`weak_hit`, alongside `Ragdollize` 0 and three physical types.
+
+### The script bind is documented and absent
+
+Warhorse's own `CScriptBindHitDeathReactions` documentation describes exactly
+what this mod has always needed, including `StartReactionAnim`, which "pauses
+the animation graph while playing it and resumes automatically when the
+animation ends", and `OnHit`, which notifies the hit death reactions system.
+
+Probed on a live NPC, none of `OnHit`, `StartReactionAnim`, `ExecuteHitReaction`,
+`ExecuteDeathReaction`, `IsValidReaction`, `EndCurrentReaction`,
+`EndReactionAnim` or `StartInteractiveAction` exists on the entity, the actor or
+the human. The documentation describes a build that is not this one.
+
+### What is reachable is the fragment itself
+
+`HitDeath` sits in the vanilla database with the same structure as
+`AnimationControlled`, which this mod already extends:
+
+```xml
+<HitDeath>
+  <Fragment BlendOutDuration="0.2" Tags="horse" FragTags="so_forward+major_hit">
+    <AnimLayer><Animation name="horserider_fall_right" /></AnimLayer>
+    <ProcLayer>
+      <Blend ExitTime="1.1" StartTime="0" Duration="0.2" />
+      <Procedural type="Ragdoll">
+        <Sleep value="1" /> <Stiffness value="500" />
+```
+
+### A correction to an earlier conclusion
+
+The ragdoll settle layer was tried in the fall fragment and abandoned, on a
+measurement showing it arriving two seconds after the victim had already stood
+up. That attempt used `Sleep` 0 and `Stiffness` 100, recorded at the time as
+"vanilla's own value".
+
+Vanilla's own value, in the fragment that does exactly this handover, is
+`Sleep` 1 and `Stiffness` 500, at `ExitTime` 1.1. Those are materially different
+parameters, and the layer is doing in Mannequin what this mod now does from Lua
+with a timer and `actor:Fall`.
+
+Whether the earlier failure was the parameters or the ordering is untested.

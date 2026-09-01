@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.11
+-- @release 4.3.0
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.11"
+HorseCollisionMod.Version = "4.3.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -135,6 +135,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   "ragdoll" for the physics knockdown
 -- @field AutoCureHealthLimit health at or above which the auto-cure exemption
 --   is dropped, matching vanilla's own limit
+-- @field CollisionIsCrime whether riding someone down is reported to the
+--   game as a crime, at trot and gallop
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
 -- @field ReplanAfterReaction ask a victim to re-plan their activity once the
@@ -208,6 +210,15 @@ HorseCollisionMod.Config = {
 	-- "ragdoll" is the physics knockdown the mod shipped before, created at
 	-- the moment of impact.
 	TrotReaction             = "fall",
+
+	-- Whether riding someone down is a crime.
+	--
+	-- Sent at trot and gallop, where the collision hurts them, and never at a
+	-- walk: a stagger costs no health and being arrested for brushing past
+	-- someone is not the intent. The game charges it as a brawl, which is what
+	-- vanilla does with a ridden collision too, and prosecutes murder on its
+	-- own when a victim dies.
+	CollisionIsCrime         = true,
 
 	-- Takes movement control off the animation once a reaction has started,
 	-- so the victim is moved by the entity rather than by root motion and
@@ -375,9 +386,12 @@ HorseCollisionMod.RagdollAtFraction = 0.68
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 
+
+
+
+
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
-
 
 
 local function GetTimeMs()
@@ -1567,6 +1581,93 @@ function HorseCollisionMod:RebuildVictim(npc)
 	return ok
 end
 
+--- Sends the victim a real combat hit, attributed to the player.
+--
+-- `hitReaction` is a physical event, consumed by `sb_switch_hitreactions.xml`,
+-- which is a passive observer that cannot drive a body. `combat:hit` feeds the
+-- combat subbrain, which owns it. That difference is why this is worth trying
+-- at all, and why the mod's reaction animations have always had to be played
+-- by seizing the actor instead.
+--
+-- The shape is vanilla's own, from the branch in that switch tree that turns a
+-- player-ridden collision into a real hit:
+--
+--     attacker($__player), strength($hitReaction.hitStrength),
+--     hitType($enum:HitReactionType.Melee), real(true)
+--
+-- A collision is rewritten as `Melee` there rather than kept as `Collision`,
+-- the player is named rather than the horse, and `real` marks it as a genuine
+-- strike rather than a near miss.
+--
+-- This was tried once before, twelve times, as a `key(value)` string, and
+-- produced no reaction and no hostility. It has never been sent as a typed
+-- table. That is the only thing being changed here, and it is worth one test
+-- because the same change on `daycycle:restartRequest` was the difference
+-- between a message being acted on and being discarded.
+--
+-- Off by default. A real hit attributed to the player is how the game decides
+-- a crime happened, so this can make a village turn on the rider.
+--
+-- @tparam table npc victim entity
+-- @tparam table playerEnt the player entity
+-- @tparam number strength a `HitReactionStrength` value
+-- @treturn boolean true when the call was accepted
+function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
+	if not self.Config.CollisionIsCrime or not playerEnt then
+		return false
+	end
+
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local playerWuid = nil
+
+	pcall(function()
+		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+	end)
+
+	if not playerWuid then
+		return false
+	end
+
+	-- Both overridable, so a single impact can be run at a chosen setting
+	-- without a rebuild. The charge the game brings is the thing being
+	-- measured, and it can only be read by surrendering to a guard, which
+	-- means one impact per save load.
+	-- Melee, not Collision, and that is not a mistake. Measured across nine
+	-- runs, the crime system prosecutes `Melee`, `MeleeStealth` and `Bullet`
+	-- and is blind to `Collision` and `Fall` at every strength. Vanilla makes
+	-- the same substitution in `sb_switch_hitreactions.xml`, rewriting a
+	-- player-ridden collision into `Melee` before re-sending it, because the
+	-- crime system has no concept of being ridden down.
+	--
+	-- `strength` is passed through and changes nothing about the charge: a
+	-- `Tickle`, which costs no health, is prosecuted exactly as a `Fatal` is.
+	-- The fine scales with the victim's social class instead, and murder
+	-- arrives on its own when a victim actually dies.
+	local ok, err = pcall(function()
+		local message = Utils.makeTable("combat:hit", {
+			attacker = playerWuid,
+			strength = strength,
+			hitType = self.HitReactionType.Melee,
+			real = true
+		})
+
+		XGenAIModule.SendMessageToEntityData(target, "combat:hit", message)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("CombatHit ok=" .. tostring(ok)
+				.. " strength=" .. tostring(strength)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
+
 --- Plays one of this mod's reactions on a victim.
 --
 -- Calls `actor:StartInteractiveActionByName` with a name this mod adds to the
@@ -2100,6 +2201,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
 		end
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
+		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
 		return
@@ -2112,6 +2214,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
 		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
+		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina)
 		return

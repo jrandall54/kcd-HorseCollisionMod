@@ -13,8 +13,8 @@ cannot address a skeleton directly, and none of these produce a reaction:
 | `human:PlayAnim(fragment, tag)` | Call is accepted, nothing renders |
 | `entity:AddImpulse` on a standing NPC | Ignored; actors are animation-driven, not physics-driven |
 | `soul:DealDamage` with the player as attacker | Changes stat numbers only |
-| `hitReaction` brain message | Delivered, handled by a tree that cannot drive the body |
-| `combat:hit` brain message | Same |
+| `hitReaction` brain message | Delivered, handled by a tree that cannot drive the body. Removing it entirely changes neither damage nor the collision bark |
+| `combat:hit` brain message | Reaches the combat subbrain and is acted on, but drives no animation. Sent as a typed table it registers a crime; sent as a string it does nothing at all |
 | A `PlayAnimation` node in `sb_switch_hitreactions.xml` | Node runs, animation fails |
 
 Trees named `sb_switch_*` are passive observers running alongside whatever the
