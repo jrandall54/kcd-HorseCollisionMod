@@ -137,6 +137,8 @@ docs/
   HOW_IT_WORKS.md         plain-language overview of the mod and its layout
   DEV_LOOP.md             the hot-reload development loop
   TECHNICAL_DETAILS.md    engine behavior and the constraints on changing it
+  ENGINE_BINDS.md         every Lua function the game exposes on the objects
+                          this mod touches, from the engine's own registration
   TESTING_DIARY.md        every build tested, what was expected, what happened
   kcd_api.lua             engine API stubs, so the language server resolves them
   api/                    generated Lua API reference (ldoc .)
