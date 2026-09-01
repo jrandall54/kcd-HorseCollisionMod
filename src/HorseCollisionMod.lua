@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.3.9
+-- @release 4.3.10
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.3.9"
+HorseCollisionMod.Version = "4.3.10"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --

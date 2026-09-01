@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.3.10] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The horse stamina cost and the dismount when the horse is spent moved out of the entry point into `Scripts/HorseCollisionMod/Rider.lua`.
+
 ## [4.3.9] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.
