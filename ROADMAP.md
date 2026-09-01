@@ -226,6 +226,17 @@ and both axes of the footprint were each cleared against logged sessions.
       `HorseCollisionMod/Armor.lua` rather than cherry-picking, since the file
       layout it was written against no longer exists.
 
+- [ ] Close the gap between a trot fall clip ending and the engine beginning
+      the get-up. Roughly a second in `MotionIdle` with nothing happening and
+      nothing asked for, and the only part of the lie-down this mod can
+      shorten. The rest of it is `BlendRagdoll`, which is the engine's get-up
+      blend: 2,570 ms for men and 5,100 ms for women, the same on the gallop
+      path where no data of this mod's is involved, and unmoved by `ExitTime`,
+      `Sleep`, `g_ragdollPollTime` or `ca_DeathBlendTime`. Tuning
+      `FALL_SETTLE_AT` per direction, which this list previously proposed, is
+      not the fix: it decides when the body goes limp, not how long it stays
+      down, and the lie-down is the same length at every direction.
+
 - [ ] A polearm guard's get-up plays wrong. The body turns fully sideways while
       straightening and passes through the floor before settling. Observed twice
       on the same guard, and not seen on villagers, women or unarmed guards, so

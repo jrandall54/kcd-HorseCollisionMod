@@ -10787,3 +10787,71 @@ merchant who resumed by turning on the spot.
 The replan sent `daycycleHaltSpeed.instant`. Vanilla uses that value only for
 teleports and cutscenes, where a transition with no wind-down is the point. It
 is `fast` now. This was not the fault, and changing it alone fixed nothing.
+
+## The long lie-down after a trot fall is the engine's, and women get twice it
+
+The reported symptom: the fall animation plays well, the ragdoll takes the
+body, and then the victim lies there too long before standing. Most noticeable
+on women; guards look close to seamless.
+
+### Where a recovery spends its time
+
+`TraceRecovery` times every animation state a victim passes through and logs
+the sequence, because a single duration covering the whole recovery cannot say
+which phase is long. Three phases, measured across ten trot impacts:
+
+| Phase | Male | Female | Controlled by |
+|---|---|---|---|
+| Limp for the rest of the fall clip | ~550 ms | ~650 ms | `FALL_SETTLE_AT` |
+| A gap in `MotionIdle` | ~1000 ms | ~900 ms | unexplained |
+| `BlendRagdoll` | 2570 ms | 5100 ms | the engine |
+
+`BlendRagdoll` is not the ragdoll. Physics takes the body at the fragment's
+`ExitTime`, inside the `AnimationControlled` window; `BlendRagdoll` is the
+engine blending the body back to animation afterwards, which is the get-up.
+An earlier reading of this trace had that backwards.
+
+### It is vanilla, proven on a path with none of the mod's data in it
+
+Female `BlendRagdoll` is 5100 ms against male 2570 ms, a ratio of 1.98 with
+almost no variance in either group. A clean factor of two is not physics
+settling.
+
+The gallop tier hands the body over with `actor:Fall` and touches no fragment
+of this mod's, no `ExitTime`, no `Sleep` and no `Stiffness`. Traced there:
+
+| Victim | `BlendRagdoll` |
+|---|---|
+| `rat_woman43` | 4832 ms |
+| `rat_woman34` | 5056 ms |
+| `rat_woman12` | 5040 ms |
+| `rat_man97` | 2496 ms |
+| `rat_refugee_tonda_rumpal` | 2864 ms |
+
+The same split, within noise of the fall path. **Female actors take twice as
+long to stand up from a ragdoll in this game, whatever knocked them down.** No
+parameter this mod controls changes it, and that rules out `Stiffness` without
+testing it, since the gallop path never reads it.
+
+### What was tried and did nothing
+
+| Change | Effect on `BlendRagdoll` |
+|---|---|
+| Female handover 0.68 to 0.50 of clip | -30 ms |
+| `Sleep` 1 to 0 | -29 ms female, -127 ms male |
+| `g_ragdollPollTime` 0.5 to 0.05 | none |
+| `ca_DeathBlendTime` | already 0 |
+
+`ExitTime` is honored: forced to 0.30 for every direction, victims collapse a
+third of a second into the fall. It decides when the body goes limp and not how
+long it then stays down.
+
+### What is left, and is ours
+
+The `MotionIdle` gap. Roughly a second between the fall clip ending and the
+engine beginning the get-up, in which nothing is happening and nothing has been
+asked for. That, and the limp remainder of the clip, are the only parts of the
+sequence this mod can shorten.
+
+The one change kept from all of this is the female handover at 0.50, which the
+player reports makes the falls themselves look better.
