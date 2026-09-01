@@ -9921,3 +9921,33 @@ says it "is loaded as a non-native fallback" and which lists `ExplosiveGrenade`,
 Crysis assets shipped unused, alongside `VTOLExplosion` and `HumanTurret`
 elsewhere. A build that sent an explosion damage type was reaching into that
 registry rather than into KCD's combat system.
+
+## Naming a crime directly does nothing
+
+`pm:crimeReport` carries `sender`, `criminal`, `crime` as a string, and
+`investigationInProgress`, and was the last candidate for charging a collision
+as something other than a brawl. Sent as a typed table naming `murder` with the
+player as criminal, and accepted by five NPCs, it produced no reaction of any
+kind.
+
+That fits what the trees do with it. In `sa_crimeDistrict.xml` the message is
+routing: it resolves a destination and decides whether the report goes to a
+soldier or a circator. It carries a crime the system already knows about to an
+authority; it does not create one.
+
+Worth recording separately: the type is `pm:crimeReport`, not `crimeReport`.
+Types in `TypeDefinitions.xml` are namespaced by nesting, so the enclosing
+`<Type>` supplies the prefix, and `Utils.makeTable` rejects an unqualified name
+outright with "requires name of a existing MBT type". That rejection is the
+validation the string form never offered, and it is a reason to prefer the
+typed path even where both work.
+
+### The crime question is closed
+
+`combat:hit` with `hitType` of `Melee` is the only way to make a ridden
+collision a crime, and the game will call it a brawl. That is the same
+compromise vanilla makes in `sb_switch_hitreactions.xml`, which rewrites a
+player-ridden collision into `Melee` for exactly this reason.
+
+Severity is not ours to set. The label follows the hit type, the fine follows
+the victim's social class, and murder arrives on its own when the victim dies.
