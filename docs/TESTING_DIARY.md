@@ -10336,3 +10336,69 @@ on both victims. No field resolved to nil.
 the multiplier is applied on this path. Whether it changes anything a player
 can see is the separate question recorded in `ROADMAP.md` under Phase 2, and is
 untouched by this slice.
+
+## Victim recovery, watched without the crime response
+
+`ReleaseVictimMovement`, `WhenRagdollResolves`, `FinishRecovery`,
+`ReplanVictim`, `WhenReactionEnds` and `RebuildVictim` moved to
+`Scripts/HorseCollisionMod/Recovery.lua`, 287 lines. The entry point is 1,166
+lines, under half the 2,558 it started at.
+
+`CollisionIsCrime` was set `false` at the console for this test and restored to
+`true` afterwards. A guard response makes a recovery impossible to watch: the
+victim is reacting to the crime rather than recovering, and the player is being
+arrested rather than observing.
+
+### Four trot impacts
+
+Every one resolved:
+
+| Victim | Reaction | Rebuild | Replan |
+|---|---|---|---|
+| `rat_armorers_wife` | `hcm_fall_forward` | `on=resolved waited=9360ms` | `typed=true` |
+| `rat_konyas_wife` | `hcm_fall_back` | `on=resolved waited=7824ms` | `typed=true` |
+| `rat_woman44` | `hcm_fall_forward` | `on=resolved waited=8928ms` | `typed=true` |
+| `rat_guard_pazdera` | `hcm_fall_back` | `on=resolved waited=5408ms` | `typed=true` |
+
+No `CombatHit` line appears on any of them, which confirms the crime setting
+took effect rather than being sent and ignored. No Lua error, and no field
+resolved to nil.
+
+### What the replan looks like from the saddle
+
+Observed for the first time, because it has always been hidden until now:
+
+> "they get up normally, start to return, pause for a sec natural looking, and
+> then seem to change direction and resume"
+
+That is the two-stage recovery working as designed. `RebuildVictim` puts the
+victim on their feet and they move under whatever plan they still hold.
+`ReplanAfterRebuildMs` later, 600 ms, `ReplanVictim` sends
+`daycycle:restartRequest` with `reason(interrupt), speed(instant)`, which
+restarts the schedule at once and sends them where the schedule wants them
+rather than where they had started walking.
+
+That is what the code does. It does not explain why it is being seen now.
+
+The mechanism is old: the typed payload landed in 4.2.1 and `VictimReplan
+typed=true` appears on every impact recorded since. The player reports having
+watched thousands of impacts and never seen a victim pause and change
+direction after standing up.
+
+An explanation was offered here and is wrong, so it is recorded as wrong rather
+than deleted: that the crime response had always masked it. `CollisionIsCrime`
+was added in 4.3.0, one day before this entry. Every version before that ran
+with no crime system at all, which is the same condition this test created, so
+there was a long stretch in which the behaviour would have been just as visible
+as it is now.
+
+So the observation stands unexplained. What is established is only that the
+replan fires, that it fired on all four impacts, and that the recovery
+completes. Why its effect appears newly visible is not answered, and the
+candidates worth separating are whether anything about the send changed since
+4.2.1, whether the 600 ms gap is being reached differently now that the fall
+hands off through the fragment rather than a timer, and whether this is an
+observation that has simply not been looked for before.
+
+It is not breaking, and it is not from the split: the recovery code moved
+verbatim and the same lines appear in the impacts recorded before it moved.

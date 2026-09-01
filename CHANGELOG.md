@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.3.8] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- Victim recovery, the ragdoll and reaction waits and the replan moved out of the entry point into `Scripts/HorseCollisionMod/Recovery.lua`.
+
 ## [4.3.7] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.
