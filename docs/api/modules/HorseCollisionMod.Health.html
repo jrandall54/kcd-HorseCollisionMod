@@ -1,0 +1,230 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><strong>HorseCollisionMod.Health</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Health</code></h1>
+<p>Health: what an impact cost, and keeping the game from undoing it.</p>
+<p> Nothing in the ScriptBind surface reports damage, so what a collision cost
+ is established by reading health before and after and sampling it again as
+ the victim recovers. <a href="../modules/HorseCollisionMod.Health.html#HorseCollisionMod:WatchHealth">WatchHealth</a> is the console-driven version of the same
+ idea, used when health moves with no impact to account for it.</p>
+
+<p> <a href="../modules/HorseCollisionMod.Health.html#HorseCollisionMod:SuppressAutoCure">SuppressAutoCure</a> is here because it protects the measurement: vanilla's
+ daycycle clears a victim's buffs and restores health on its own schedule,
+ which would erase the loss before the later samples are taken.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.3.5</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:WatchHealth">HorseCollisionMod:WatchHealth (name, seconds)</a></td>
+	<td class="summary">Logs a named entity's health whenever it changes.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:SuppressAutoCure">HorseCollisionMod:SuppressAutoCure (npc)</a></td>
+	<td class="summary">Exempts a collision victim from vanilla's auto-cure daycycle.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ProbeImpactCost">HorseCollisionMod:ProbeImpactCost (npc, tierName, strength[, armor])</a></td>
+	<td class="summary">Samples the victim's health across an impact.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:WatchHealth"></a>
+    <strong>HorseCollisionMod:WatchHealth (name, seconds)</strong>
+    </dt>
+    <dd>
+    Logs a named entity's health whenever it changes. </p>
+
+<p> Health has moved in every ride with no impact to account for it, and an
+ impact the footprint rejects writes no line at all, so there is nothing to
+ correlate the loss against. Watching one target records the moment health
+ moves, whether or not the mod caused it.</p>
+
+<p> A diagnostic, started from the console rather than from play. It samples
+ twice a second and writes only on a change, so a quiet watch costs two
+ lines.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">name</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         entity name to watch
+        </li>
+        <li><span class="parameter">seconds</span>
+            <span class="types"><span class="type">number</span></span>
+         how long to watch, default 90
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:SuppressAutoCure"></a>
+    <strong>HorseCollisionMod:SuppressAutoCure (npc)</strong>
+    </dt>
+    <dd>
+    Exempts a collision victim from vanilla's auto-cure daycycle. </p>
+
+<p> An NPC carrying a bleeding or poison buff whose health is under
+ <code>t_autoCureLowHealthLimit</code>, which vanilla sets to 40, enters the
+ <code>cureLookHurt</code> behavior in <code>Libs/AI/final/sb_daycycles_cure.xml</code>. That
+ subtree plays the <code>PretendingIllness</code> animation under a wait with no
+ timeout, and regenerates health at 0.02 per second. Nothing inside it ends,
+ so a victim left under the threshold stands in the street until health
+ climbs back over it, which takes a quarter of an hour of game time and
+ reads as a permanently broken NPC.</p>
+
+<p> Vanilla exempts its own characters from the daycycle through a context
+ option, used for duellists and for scripted wanderers among others. The
+ same option is set here, and cleared on a timer.</p>
+
+<p> The gate admitting the cure is read only on entry, so the option has to be
+ in place before health crosses the threshold. It is set at the moment of
+ impact, and collision damage resolves around half a second later.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ProbeImpactCost"></a>
+    <strong>HorseCollisionMod:ProbeImpactCost (npc, tierName, strength[, armor])</strong>
+    </dt>
+    <dd>
+    Samples the victim's health across an impact. </p>
+
+<p> Vanilla converts a collision hit whose rider is the player into a real
+ <code>combat:hit</code> attributed to the player, carrying the <code>hitStrength</code> sent
+ here. The engine resolves damage and the reputation change from that
+ strength, and applies both after the message is handled, so neither is
+ readable at the moment of the hit. The health state is sampled again on a
+ timer instead.</p>
+
+<p> Four samples, because they answer different questions. The first shows what
+ the impact itself cost. The rest reach past the get-up, because health is
+ also lost after a ragdoll resolves, in discrete amounts that look like a
+ fall rather than like bleeding.</p>
+
+<p> Height is sampled alongside health for the same reason. The impulse throws
+ the target, and a change in z across the recovery separates a fall from
+ anything the collision itself did.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the tier the impact scored
+        </li>
+        <li><span class="parameter">strength</span>
+            <span class="types"><span class="type">number</span></span>
+         the <code>HitReactionStrength</code> sent with the hit
+        </li>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         totals from <code>ArmorOf</code>, read again when absent
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-01 12:58:28 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

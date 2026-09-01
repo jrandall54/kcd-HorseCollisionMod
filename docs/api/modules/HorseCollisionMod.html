@@ -46,6 +46,7 @@
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
 </ul>
 
 </div>
@@ -139,18 +140,6 @@
 	<tr>
 	<td class="name" nowrap><a href="#SendHitReaction">SendHitReaction (npc, horseWuid, strength)</a></td>
 	<td class="summary">Posts the native <code>hitReaction</code> message to the victim's brain.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#WatchHealth">WatchHealth (name, seconds)</a></td>
-	<td class="summary">Logs a named entity's health whenever it changes.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#SuppressAutoCure">SuppressAutoCure (npc)</a></td>
-	<td class="summary">Exempts a collision victim from vanilla's auto-cure daycycle.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ProbeImpactCost">ProbeImpactCost (npc, tierName, strength[, armor])</a></td>
-	<td class="summary">Samples the victim's health across an impact.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#ReleaseVictimMovement">ReleaseVictimMovement (npc)</a></td>
@@ -296,128 +285,6 @@
         <li><span class="parameter">strength</span>
             <span class="types"><span class="type">number</span></span>
          a <code>HitReactionStrength</code> value
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "WatchHealth"></a>
-    <strong>WatchHealth (name, seconds)</strong>
-    </dt>
-    <dd>
-    Logs a named entity's health whenever it changes. </p>
-
-<p> Health has moved in every ride with no impact to account for it, and an
- impact the footprint rejects writes no line at all, so there is nothing to
- correlate the loss against. Watching one target records the moment health
- moves, whether or not the mod caused it.</p>
-
-<p> A diagnostic, started from the console rather than from play. It samples
- twice a second and writes only on a change, so a quiet watch costs two
- lines.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">name</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         entity name to watch
-        </li>
-        <li><span class="parameter">seconds</span>
-            <span class="types"><span class="type">number</span></span>
-         how long to watch, default 90
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "SuppressAutoCure"></a>
-    <strong>SuppressAutoCure (npc)</strong>
-    </dt>
-    <dd>
-    Exempts a collision victim from vanilla's auto-cure daycycle. </p>
-
-<p> An NPC carrying a bleeding or poison buff whose health is under
- <code>t_autoCureLowHealthLimit</code>, which vanilla sets to 40, enters the
- <code>cureLookHurt</code> behavior in <code>Libs/AI/final/sb_daycycles_cure.xml</code>. That
- subtree plays the <code>PretendingIllness</code> animation under a wait with no
- timeout, and regenerates health at 0.02 per second. Nothing inside it ends,
- so a victim left under the threshold stands in the street until health
- climbs back over it, which takes a quarter of an hour of game time and
- reads as a permanently broken NPC.</p>
-
-<p> Vanilla exempts its own characters from the daycycle through a context
- option, used for duellists and for scripted wanderers among others. The
- same option is set here, and cleared on a timer.</p>
-
-<p> The gate admitting the cure is read only on entry, so the option has to be
- in place before health crosses the threshold. It is set at the moment of
- impact, and collision damage resolves around half a second later.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "ProbeImpactCost"></a>
-    <strong>ProbeImpactCost (npc, tierName, strength[, armor])</strong>
-    </dt>
-    <dd>
-    Samples the victim's health across an impact. </p>
-
-<p> Vanilla converts a collision hit whose rider is the player into a real
- <code>combat:hit</code> attributed to the player, carrying the <code>hitStrength</code> sent
- here. The engine resolves damage and the reputation change from that
- strength, and applies both after the message is handled, so neither is
- readable at the moment of the hit. The health state is sampled again on a
- timer instead.</p>
-
-<p> Four samples, because they answer different questions. The first shows what
- the impact itself cost. The rest reach past the get-up, because health is
- also lost after a ragdoll resolves, in discrete amounts that look like a
- fall rather than like bleeding.</p>
-
-<p> Height is sampled alongside health for the same reason. The impulse throws
- the target, and a change in z across the recovery separates a fall from
- anything the collision itself did.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">tierName</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the tier the impact scored
-        </li>
-        <li><span class="parameter">strength</span>
-            <span class="types"><span class="type">number</span></span>
-         the <code>HitReactionStrength</code> sent with the hit
-        </li>
-        <li><span class="parameter">armor</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         totals from <code>ArmorOf</code>, read again when absent
-         (<em>optional</em>)
         </li>
     </ul>
 
@@ -1435,7 +1302,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-01 12:53:07 </i>
+<i style="float:right;">Last updated 2026-09-01 12:58:28 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

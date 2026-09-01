@@ -25,7 +25,8 @@ file = {
 	"src/HorseCollisionMod/Enums.lua",
 	"src/HorseCollisionMod/Log.lua",
 	"src/HorseCollisionMod/Armor.lua",
-	"src/HorseCollisionMod/Detection.lua"
+	"src/HorseCollisionMod/Detection.lua",
+	"src/HorseCollisionMod/Health.lua"
 }
 dir = "docs/api"
 
