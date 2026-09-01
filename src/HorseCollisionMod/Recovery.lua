@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.4.2
+-- @release 4.4.3
 
 --- Stops the animation driving a victim's own movement.
 --
@@ -131,6 +131,70 @@ function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
 	-- wait it imposed was paid by every victim including the ones that needed
 	-- nothing.
 	self:ReplanIfStranded(npc)
+end
+
+--- Records every animation state a victim passes through while recovering.
+--
+-- The recovery is not one phase. A victim is animation-driven while the fall
+-- clip plays, limp while physics holds the body, and animation-driven again
+-- while the game stands them up. A single duration covering all of it cannot
+-- say which phase is long, and the complaint is about one of them: the pause
+-- between the ragdoll taking hold and the victim beginning to rise.
+--
+-- So each distinct state is timed and the sequence is logged as one line. Any
+-- state occupying seconds is where the time is going, and it is named.
+--
+-- Diagnostic, and off unless `TraceRecovery` is set, because it polls at the
+-- reaction poll rate for the length of a recovery.
+--
+-- @tparam table npc victim entity
+-- @tparam string action the reaction that played
+function HorseCollisionMod:TraceRecovery(npc, action)
+	if not self.Config.TraceRecovery then
+		return
+	end
+
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local seen = {}
+	local current, since = nil, startedAt
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local now = self:TimeMs()
+
+		if state ~= current then
+			if current ~= nil then
+				seen[#seen + 1] = current .. "=" .. string.format("%.0f", now - since) .. "ms"
+			end
+
+			current, since = state, now
+		end
+
+		if now - startedAt < self.RagdollResolveCeilingMs then
+			Script.SetTimer(self.ReactionPollMs, poll)
+
+			return
+		end
+
+		seen[#seen + 1] = tostring(current)
+				.. "=" .. string.format("%.0f", now - since) .. "ms"
+
+		self:Log("RecoveryTrace " .. tostring(npc:GetName())
+				.. " action=" .. tostring(action)
+				.. " " .. table.concat(seen, " "))
+	end
+
+	poll()
 end
 
 --- Replans a victim only when the game has not recovered them itself.

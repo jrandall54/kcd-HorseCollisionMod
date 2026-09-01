@@ -413,19 +413,27 @@ FALL_SETTLE_SLEEP = 1
 # When each fall option hands over, in seconds, by character set and direction.
 #
 # A clip does not end when the victim reaches the ground; it goes on to settle
-# them into a final pose. These are the measured clip lengths taken at 0.68,
-# which is the fraction the Lua handover was tuned to before this moved into
-# the fragment. Measured lengths, in milliseconds:
+# them into a final pose. Measured clip lengths, in milliseconds:
 #
 #   male    back 1710  forward 2425  left 4120  right 3060
 #   female  back 1890  forward 3340  left 2016  right 2335
 #
-# Expressing them here rather than in Lua is the point of the change: Mannequin
-# owns the timing, and the mod stops running a timer against a clip whose length
-# it has to know.
+# Expressing them here rather than in Lua is the point: Mannequin owns the
+# timing, and the mod stops running a timer against a clip whose length it has
+# to know.
+#
+# Male hands over at 0.68 of its clip, female at 0.50. The fractions differ
+# because the falls do. Female clips reach the ground sooner relative to their
+# length, and at 0.68 physics took over well after the body had settled, which
+# read as the animation finishing and then the victim going limp a second time.
+#
+# The value is honored: forced to 0.30 for every direction, victims collapse a
+# third of a second into the fall and the reactions are, in the player's words,
+# borderline pure ragdoll. It does not, however, change how long the victim
+# then lies there. That is `BlendRagdoll`, and it is the engine's.
 FALL_SETTLE_AT = {
     "male": {"forward": 1.65, "back": 1.16, "left": 2.80, "right": 2.08},
-    "female": {"forward": 2.27, "back": 1.29, "left": 1.37, "right": 1.59}
+    "female": {"forward": 1.67, "back": 0.95, "left": 1.01, "right": 1.17}
 }
 
 MOVEMENT_LAYER = """

@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.4.2
+-- @release 4.4.3
 
 --- Posts the native `hitReaction` message to the victim's brain.
 --
@@ -141,6 +141,8 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- rebuild that follows has to land after it. A victim can leave the ragdoll
 	-- upright and still have no plan, and only the rebuild gives them one.
 	if prefix == "hcm_fall_" then
+		self:TraceRecovery(npc, action)
+
 		local generation = self.TimerTick
 
 		self:WhenRagdollResolves(npc, function(state, waitedForBody)
@@ -179,6 +181,11 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 	end)
 
 	self:ImpulseVictim(npc, velocity, impulseScale)
+
+	-- Traced as the control for the fall path. This tier hands the body to
+	-- physics through actor:Fall with no fragment of this mod's involved, so
+	-- how long the engine then holds it is the engine's own figure.
+	self:TraceRecovery(npc, "engine-ragdoll")
 
 end
 

@@ -23,6 +23,15 @@ number.
 
 ## [Unreleased]
 
+## [4.4.3] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- A woman knocked down at a trot is handed to physics earlier in her fall, which makes the fall itself read better. Men are unchanged.
+- A new `TraceRecovery` setting, off by default, times every animation state a recovering victim passes through and writes the sequence to the log.
+
 ## [4.4.2] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.

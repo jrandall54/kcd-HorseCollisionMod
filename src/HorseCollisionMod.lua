@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.4.2
+-- @release 4.4.3
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.4.2"
+HorseCollisionMod.Version = "4.4.3"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -142,6 +142,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ReplanAfterReaction ask a victim to re-plan their activity once the
 --   reaction is over, so they approach and re-align to whatever they were using
 -- @field LogTelemetry write diagnostics to kcd.log
+-- @field TraceRecovery time each animation state during a recovery
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @table Config
 HorseCollisionMod.Config = {
@@ -251,7 +252,13 @@ HorseCollisionMod.Config = {
 	-- detection loop rejects silently, so a missed impact and an impact that
 	-- never happened look identical. Off by default: it is noisy and only
 	-- useful while investigating.
-	DiagnoseMisses           = false
+	DiagnoseMisses           = false,
+
+	-- Times every animation state a recovering victim passes through and
+	-- logs the sequence. Answers where a recovery spends its seconds, which
+	-- a single duration cannot. Off by default: one line per impact and a
+	-- poll running for the length of each recovery.
+	TraceRecovery            = false
 }
 
 
