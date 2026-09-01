@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.3.5] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The footprint test and the impact direction lookup moved out of the entry point into `Scripts/HorseCollisionMod/Detection.lua`.
+
 ## [4.3.4] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.

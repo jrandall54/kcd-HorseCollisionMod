@@ -1,0 +1,247 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><strong>HorseCollisionMod.Detection</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Detection</code></h1>
+<p>Detection: whether an impact happened, and which way it pushed.</p>
+<p> The footprint test decides whether a nearby NPC is actually under the horse
+ rather than merely close to it, and the direction lookup turns the horse's
+ velocity into the side the victim is struck from, which is what selects the
+ reaction clip.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>. The footprint limits are read
+ from <code>Config</code>, so they live in the entry point and exist before this file
+ runs.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.3.5</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsInHorseFootprint">HorseCollisionMod:IsInHorseFootprint (npc, horsePos, horseForward, speed)</a></td>
+	<td class="summary">Tests whether a victim is actually under the horse.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:FootprintDetail">HorseCollisionMod:FootprintDetail (npc, horsePos, horseForward, speed)</a></td>
+	<td class="summary">Measurements for a candidate the footprint test rejected.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:GetImpactDir">HorseCollisionMod:GetImpactDir (npc, velocity, speed)</a></td>
+	<td class="summary">Works out which side of the victim the impact lands on.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:IsInHorseFootprint"></a>
+    <strong>HorseCollisionMod:IsInHorseFootprint (npc, horsePos, horseForward, speed)</strong>
+    </dt>
+    <dd>
+    Tests whether a victim is actually under the horse. </p>
+
+<p> The sphere search is a broad-phase cull and nothing more. A horse is about
+ two meters long and under a meter wide, so a sphere around its origin also
+ catches people walking alongside or trailing behind it, which is what makes
+ collisions feel like they reach too far.</p>
+
+<p> This narrows the sphere to an oriented box: the victim must be within the
+ horse's width laterally, between its rear and front reach along its facing,
+ and at a comparable height. The front reach is extended by the distance the
+ horse travels in one tick so that fast victims are not missed between
+ frames.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">horsePos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         world position of the horse
+        </li>
+        <li><span class="parameter">horseForward</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse facing, unit vector
+        </li>
+        <li><span class="parameter">speed</span>
+            <span class="types"><span class="type">number</span></span>
+         horse speed in meters per second
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the victim is inside the footprint
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:FootprintDetail"></a>
+    <strong>HorseCollisionMod:FootprintDetail (npc, horsePos, horseForward, speed)</strong>
+    </dt>
+    <dd>
+    Measurements for a candidate the footprint test rejected. </p>
+
+<p> Same geometry as the test itself rather than a second copy of it, so the
+ numbers reported are the numbers the decision was made on.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+
+
+
+        </li>
+        <li><span class="parameter">horsePos</span>
+
+
+
+        </li>
+        <li><span class="parameter">horseForward</span>
+
+
+
+        </li>
+        <li><span class="parameter">speed</span>
+
+
+
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the distances and the limits they were checked against
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:GetImpactDir"></a>
+    <strong>HorseCollisionMod:GetImpactDir (npc, velocity, speed)</strong>
+    </dt>
+    <dd>
+    Works out which side of the victim the impact lands on. </p>
+
+<p> The stagger clips are authored relative to the NPC's facing, so the impact
+ has to be expressed in the victim's own frame. Using the horse's frame
+ instead makes NPCs stagger into the horse rather than away from it.</p>
+
+<p> The impact is derived from the horse's <strong>direction of travel</strong>, not its
+ position. Position is ambiguous at the moment of contact, when the horse
+ is effectively on top of the victim and a centimeter either way flips the
+ answer. Travel direction is stable, and it is what actually decides which
+ side of the body is struck: a horse moving north hits the south face of
+ whoever is in front of it.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">velocity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse velocity vector
+        </li>
+        <li><span class="parameter">speed</span>
+            <span class="types"><span class="type">number</span></span>
+         horse speed in meters per second
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        one of "so<em>forward", "so</em>back", "so<em>left", "so</em>right"
+    </ol>
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-01 12:53:07 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>
