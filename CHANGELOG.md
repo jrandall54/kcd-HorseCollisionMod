@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.3.6] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- Health probing, the impact-cost samples and the auto-cure suppression moved out of the entry point into `Scripts/HorseCollisionMod/Health.lua`.
+
 ## [4.3.5] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.

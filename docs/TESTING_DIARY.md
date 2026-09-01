@@ -10254,3 +10254,52 @@ Visible in the limits printed on each test: `limits=1.40/0.35/2.35` at impact
 speed and `1.11/0.35/2.35` through the slower recovery polls. The forward
 limit tracks the sweep term while the lateral and vertical limits stay fixed,
 which is the intended shape and is unchanged by the move.
+
+## Health probing, with the full sample series intact
+
+`WatchHealth`, `SuppressAutoCure`, `ProbeImpactCost` and `ImpactProbeSamples`
+moved to `Scripts/HorseCollisionMod/Health.lua`, 368 lines. The entry point is
+1,688 lines, down from 2,558 before the split began.
+
+`SuppressAutoCure` is filed with the probe rather than the reaction because its
+purpose is protecting the measurement: vanilla's daycycle would restore health
+before the later samples are taken.
+
+### Two trot impacts, four samples each
+
+`villageGuard`, 59.0 kg of chain, `armorStamina=2.22`:
+
+```
+ImpactCost t+500ms   from=96.3775 health=93.6406 delta=-2.7369
+ImpactCost t+3000ms  from=96.3775 health=93.6406 delta=-2.7369
+ImpactCost t+6000ms  from=96.3775 health=93.6406 delta=-2.7369
+ImpactCost t+10000ms from=96.3775 health=93.6406 delta=-2.7369
+```
+
+`rat_refugee_tonda_rumpal`, 6.0 kg of cloth:
+
+```
+ImpactCost t+500ms   delta=-4.3907
+ImpactCost t+3000ms  delta=-6.0535
+ImpactCost t+6000ms  delta=-6.0535
+ImpactCost t+10000ms delta=-6.0535
+```
+
+All four scheduled samples fired on both, `SuppressAutoCure` reported
+`for=30s set=true` on both, and no field resolved to nil. The second victim
+shows the case the 3000 ms sample exists for: a further 1.67 of health left
+after the first reading and before the second, which a single sample at 500 ms
+would have missed entirely.
+
+### The crime response is back on
+
+The guard got up and attempted an arrest. `CollisionIsCrime` was left `false`
+at the console during 4.3.1 animation testing; a save reload has restored the
+shipped default, so crime responses are being exercised again alongside this.
+
+### One neverRagdolled, which is not new
+
+`VictimRebuild action=hcm_fall_left on=neverRagdolled waited=15072ms`, meaning
+`BlendRagdoll` was not observed inside the ceiling and the rebuild ran anyway.
+That case predates the split and the ceiling exists for it. The victim
+recovered.
