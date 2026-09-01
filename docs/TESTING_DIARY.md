@@ -9694,3 +9694,49 @@ Then Phase E's clean run was very nearly recorded as a discovery, on thirteen
 impacts, before the confirming phase showed the effect was not there. A run of
 thirteen with no zeros has about a one in eleven chance at the observed rate,
 which is exactly the kind of number that reads as a result and is not one.
+
+## Riding over the fallen is caught by the gate, and the zeros are not that
+
+Phase G at 4.2.11-dev.5, recording the victim's animation state at the moment of
+impact, ridden the way the player normally rides rather than at clean standing
+targets.
+
+**User note**, and the reason for the phase: "are you taking into account the
+fact that I run over the NPCs while they are on the ground like 90% of the
+time?"
+
+Fourteen trot impacts reached the damage telemetry. Two cost nothing, and both
+were on victims who were upright:
+
+```
+rat_woman10          MotionMovement   +0.00
+rat_refugee_beranMr  BeggarVAR        +0.00
+```
+
+Against twelve that did cost, on `MotionMovement`, `Beggar`, `IdleToMove` and
+`MotionIdle`. Every state that appears in the zero column also appears in the
+column that took damage, and `rat_woman10` reads `MotionMovement` for both a
+zero and a normal loss in the same ride.
+
+### The gate is doing its job
+
+In the same session the cooldown gate turned away **174** impacts, and only
+**two** impacts on a victim mid-reaction reached the telemetry at all. So
+riding over the fallen is being filtered before any of this is measured, which
+is what it is for.
+
+That is worth knowing on its own: the impacts a player spends most of their time
+making are invisible to the damage telemetry by design, so any reading of
+"damage per impact" from this log describes clean standing hits and nothing
+else.
+
+### Where the zeros stand after seven phases
+
+Roughly one impact in eight on a standing victim costs nothing, and none of
+these explains it: the message's contents, its attacker, its ordering, its
+existence, the impact speed, whether the victim had been hit before, the
+sampling window, or the victim's state at impact.
+
+It predates this branch and nothing here moved it. It is now well bounded, which
+is the only progress: it happens to upright victims, at ordinary trot speeds, on
+first and repeat impacts alike, with and without the hit message.

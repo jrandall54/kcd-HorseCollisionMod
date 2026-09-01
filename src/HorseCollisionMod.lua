@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.2.11-dev.4
+-- @release 4.2.11-dev.5
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.2.11-dev.4"
+HorseCollisionMod.Version = "4.2.11-dev.5"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1161,7 +1161,22 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 		exhaust = npc.soul:GetState("exhaust") or -1
 	end)
 
+	-- What the victim was doing when the horse reached them.
+	--
+	-- A reaction is a standing animation, so an impact landing on someone
+	-- already on the ground plays nothing and usually costs them no health,
+	-- which the cooldown gate exists to avoid and does not always catch. That
+	-- has never been recorded, so an impact that cost nothing has been
+	-- indistinguishable from one that failed, and six phases of investigation
+	-- were spent on the difference.
+	local state = "?"
+
+	pcall(function()
+		state = tostring(npc.actor:GetCurrentAnimationState())
+	end)
+
 	self:Log("ImpactCost " .. name .. " tier=" .. tierName
+			.. " state=" .. state
 			.. " strength=" .. tostring(strength)
 			.. " health=" .. string.format("%.4f", before)
 			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?")
