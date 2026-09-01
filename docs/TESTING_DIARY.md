@@ -9740,3 +9740,51 @@ sampling window, or the victim's state at impact.
 It predates this branch and nothing here moved it. It is now well bounded, which
 is the only progress: it happens to upright victims, at ordinary trot speeds, on
 first and repeat impacts alike, with and without the hit message.
+
+## A typed combat hit registers as a crime, where the string form never did
+
+Phase I at 4.2.12-dev.1, `combat:hit` sent as a typed table built with
+`Utils.makeTable`, in vanilla's own shape: the player named as attacker, the
+collision rewritten as `Melee`, `real` set true.
+
+**User report**: "on the first hit it was a recognized crime with a witness
+calling for help. I hit another woman and then I surrendered to the guard. He
+said I was brawling, I paid the fine."
+
+Two impacts, both `CombatHit ok=true`, both costing the victim the usual amount:
+`-5.80` and `-5.95`. The damage is unchanged. What is new is that the game
+recognized the act, produced a witness, and charged the player for it.
+
+### This overturns a documented conclusion
+
+`docs/TECHNICAL_DETAILS.md` lists the `combat:hit` brain message as delivered
+and handled by a tree that cannot drive the body, alongside `hitReaction`. That
+came from an earlier session which sent it twelve times as a `key(value)`
+string and observed no reaction and no hostility, and recorded plainly that
+"`ok=true` proves nothing".
+
+The message was correct. The payload was not carried. Sent as a typed table the
+same message reaches the combat subbrain and is acted on, which is the third
+time this project has found an accepted message doing nothing because its
+declared members never arrived.
+
+### What it delivers, and what it does not
+
+It delivers a roadmap item that has been open since Phase 3 was written: riding
+someone down in a village is something the game notices.
+
+It does not appear to drive an animation. The user reported no reaction beyond
+the mod's own fall, so the hope that reaching the body-owning subbrain would
+produce an engine-authored hit reaction is not supported by this test, though
+two impacts cannot rule it out.
+
+### Open, and worth a moment's thought before shipping
+
+The charge was **brawling**. `hitType` is sent as `Melee`, because that is what
+vanilla's own branch rewrites a player-ridden collision into, so the game is
+being told Henry struck them by hand. Whether a collision should be charged as
+brawling, as assault, or not at all is a design question rather than a technical
+one, and `HitReactionType.Collision` is the obvious alternative to measure.
+
+Making every trot collision a crime is a large change to how the mod plays, and
+it is off by default until that is decided.
