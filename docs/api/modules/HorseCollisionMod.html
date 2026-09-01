@@ -47,6 +47,7 @@
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
   <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
 </ul>
 
 </div>
@@ -138,10 +139,6 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#SendHitReaction">SendHitReaction (npc, horseWuid, strength)</a></td>
-	<td class="summary">Posts the native <code>hitReaction</code> message to the victim's brain.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#ReleaseVictimMovement">ReleaseVictimMovement (npc)</a></td>
 	<td class="summary">Stops the animation driving a victim's own movement.</td>
 	</tr>
@@ -168,18 +165,6 @@
 	<tr>
 	<td class="name" nowrap><a href="#SendCombatHit">SendCombatHit (npc, playerEnt, strength)</a></td>
 	<td class="summary">Sends the victim a real combat hit, attributed to the player.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#PlayReaction">PlayReaction (npc, velocity, speed, prefix)</a></td>
-	<td class="summary">Plays one of this mod's reactions on a victim.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#Ragdoll">Ragdoll (npc, velocity, speed, impulseScale)</a></td>
-	<td class="summary">Knocks a victim down with a physics ragdoll.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ImpulseVictim">ImpulseVictim (npc, velocity, impulseScale)</a></td>
-	<td class="summary">Pushes a victim who is already a physics body.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#IsCombatCollision">IsCombatCollision (npc)</a></td>
@@ -256,43 +241,6 @@
     <h2 class="section-header "><a name="Functions"></a>Functions</h2>
 
     <dl class="function">
-    <dt>
-    <a name = "SendHitReaction"></a>
-    <strong>SendHitReaction (npc, horseWuid, strength)</strong>
-    </dt>
-    <dd>
-    Posts the native <code>hitReaction</code> message to the victim's brain. </p>
-
-<p> This is what makes the vanilla collision bark, perception and crime
- handling fire, so the reaction still feels like part of the game rather
- than something bolted on. It does <strong>not</strong> drive animation.</p>
-
-<p> Delivery is best effort. The receiving handler is declared <code>Atomic=&quot;true&quot;</code>
- and drops messages when busy, so nothing here may depend on a given
- message arriving.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">horseWuid</span>
-            <span class="types"><span class="type">userdata</span></span>
-         WUID of the horse, sent as the attacker
-        </li>
-        <li><span class="parameter">strength</span>
-            <span class="types"><span class="type">number</span></span>
-         a <code>HitReactionStrength</code> value
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
     <dt>
     <a name = "ReleaseVictimMovement"></a>
     <strong>ReleaseVictimMovement (npc)</strong>
@@ -581,125 +529,6 @@
            <span class="types"><span class="type">boolean</span></span>
         true when the call was accepted
     </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "PlayReaction"></a>
-    <strong>PlayReaction (npc, velocity, speed, prefix)</strong>
-    </dt>
-    <dd>
-    Plays one of this mod's reactions on a victim. </p>
-
-<p> Calls <code>actor:StartInteractiveActionByName</code> with a name this mod adds to the
- animation database, chosen by joining <code>prefix</code> to the impact direction. See
- the module header for why this is the only call that works.</p>
-
-<p> The return value reports whether the call was accepted, which is <strong>not</strong>
- the same as the animation playing: an unrecognized name is accepted and
- then aborts within a frame. Only in-game observation confirms playback.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">velocity</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         horse velocity vector
-        </li>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         horse speed in meters per second
-        </li>
-        <li><span class="parameter">prefix</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the reaction family, <code>hcm_stagger_</code> at walk or
-   <code>hcm_knockdown_</code> at trot, completed with the impact direction
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when the call was accepted without error
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "Ragdoll"></a>
-    <strong>Ragdoll (npc, velocity, speed, impulseScale)</strong>
-    </dt>
-    <dd>
-    Knocks a victim down with a physics ragdoll. </p>
-
-<p> Used at trot and gallop. <code>actor:Fall</code> switches the victim to a ragdoll,
- after which an impulse can be applied. Impulses are ignored on an upright,
- animation-driven actor, so the order matters and the impulse is deferred
- by a tick.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">velocity</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         horse velocity vector
-        </li>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         horse speed in meters per second
-        </li>
-        <li><span class="parameter">impulseScale</span>
-            <span class="types"><span class="type">number</span></span>
-         multiplier on the configured impulse, 0 to 1
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "ImpulseVictim"></a>
-    <strong>ImpulseVictim (npc, velocity, impulseScale)</strong>
-    </dt>
-    <dd>
-    Pushes a victim who is already a physics body. </p>
-
-<p> Separated from <a href="../modules/HorseCollisionMod.html#Ragdoll">Ragdoll</a> because the fall tier ragdolls the victim itself,
- partway through an animation rather than at the moment of impact, and needs
- the push without the rest.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">velocity</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         horse velocity vector
-        </li>
-        <li><span class="parameter">impulseScale</span>
-            <span class="types"><span class="type">number</span></span>
-         multiplier on the configured impulse, 0 to 1
-        </li>
-    </ul>
-
 
 
 
@@ -1302,7 +1131,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-01 13:05:34 </i>
+<i style="float:right;">Last updated 2026-09-01 13:07:01 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
