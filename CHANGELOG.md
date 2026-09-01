@@ -23,6 +23,17 @@ number.
 
 ## [Unreleased]
 
+## [4.2.8] - 2026-08-31
+
+Tooling. The mod is unchanged from 4.2.1.
+
+### Fixed
+
+- Records that a posted changelog reaches the author's own management view
+  immediately and the public pages later. Its absence from the mod page is not
+  evidence the call failed, which is what an investigation concluded twice.
+
+
 ## [4.2.7] - 2026-08-31
 
 Tooling. The mod is unchanged from 4.2.1.
