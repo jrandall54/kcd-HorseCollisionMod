@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.4.0
+-- @release 4.4.1
 
 --- Whether this collision should count as a combat one.
 --
