@@ -1599,14 +1599,13 @@ end
 -- the player is named rather than the horse, and `real` marks it as a genuine
 -- strike rather than a near miss.
 --
--- This was tried once before, twelve times, as a `key(value)` string, and
--- produced no reaction and no hostility. It has never been sent as a typed
--- table. That is the only thing being changed here, and it is worth one test
--- because the same change on `daycycle:restartRequest` was the difference
--- between a message being acted on and being discarded.
+-- The payload has to be a typed table. As a `key(value)` string this message
+-- is accepted and discarded, producing no reaction and no hostility, which is
+-- the same fault that made `daycycle:restartRequest` look inert.
 --
--- Off by default. A real hit attributed to the player is how the game decides
--- a crime happened, so this can make a village turn on the rider.
+-- `CollisionIsCrime` governs it. A real hit attributed to the player is how the
+-- game decides a crime happened, so this is what turns a village against the
+-- rider.
 --
 -- @tparam table npc victim entity
 -- @tparam table playerEnt the player entity
