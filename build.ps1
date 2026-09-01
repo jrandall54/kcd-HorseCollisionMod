@@ -308,15 +308,15 @@ if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\hcm_male_dat
     }
 }
 
-# The armor table is generated the same way and for the same reason: it is
-# derived from the game's tables, so it is not committed either.
-if (-not (Test-Path (Join-Path $assetsDir "Scripts\Startup\HorseCollisionMod_ItemData.lua"))) {
-    Write-Host "Armor table missing - generating..."
-    python (Join-Path $toolsDir "build_item_weights.py")
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[BUILD ERROR] build_item_weights.py failed." -ForegroundColor Red
-        exit 1
-    }
+# A stale armor table from before the mod read the game's tables directly. It
+# is a Startup script, so leaving one in mod_assets would ship it and define a
+# global nothing reads. Removed rather than ignored, because mod_assets is
+# generated and not committed, so a working copy can still be carrying one.
+$staleItemData = Join-Path $assetsDir "Scripts\Startup\HorseCollisionMod_ItemData.lua"
+
+if (Test-Path $staleItemData) {
+    Remove-Item -Force $staleItemData
+    Write-Host "Removed the superseded armor table from mod_assets."
 }
 
 Write-Host "Including data overrides from mod_assets ..."
