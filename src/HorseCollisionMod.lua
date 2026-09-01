@@ -322,6 +322,18 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 -- ordered rather than issued together.
 HorseCollisionMod.ReplanAfterRebuildMs = 600
 
+--- How abruptly the replan is allowed to interrupt what the victim is doing.
+--
+-- `daycycleHaltSpeed` in the engine's type definitions: 0 slow, 1 fast,
+-- 2 instant.
+--
+-- Vanilla reserves `instant` for teleports and cutscenes, where the screen is
+-- faded or the character is being relocated outright, and a transition with no
+-- wind-down is the point. Every vanilla call site that uses it is one of those.
+-- Sent to an NPC standing in the street it reads as a one-frame snap, and the
+-- activity it tears down takes any prop the NPC was holding with it.
+HorseCollisionMod.ReplanHaltSpeed = 1
+
 
 -- How the ragdoll handover is watched, for the tier that hands recovery back
 -- to the game. `GetPhysicalizationProfile` reads `alive` throughout a ragdoll

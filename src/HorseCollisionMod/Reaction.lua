@@ -170,6 +170,25 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 	end)
 
 	self:ImpulseVictim(npc, velocity, impulseScale)
+
+	-- Measured here as the control for the same reading taken on the fall
+	-- path. This tier never seizes the actor, so it never rebuilds and never
+	-- replans, and the engine recovers the victim on its own. How far a victim
+	-- turns after that is therefore how far the game turns them with the mod
+	-- doing nothing, which is the figure the fall path has to be compared
+	-- against before anything is blamed for the difference.
+	--
+	-- Sampled from when the body settles rather than from the impact, so both
+	-- tiers are measured from the same moment in their own sequence.
+	local generation = self.TimerTick
+
+	self:WhenRagdollResolves(npc, function(state)
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		self:WatchHeading(npc, "ragdoll:" .. tostring(state))
+	end)
 end
 
 

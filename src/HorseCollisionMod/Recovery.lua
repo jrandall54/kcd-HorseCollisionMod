@@ -277,7 +277,7 @@ function HorseCollisionMod:ReplanVictim(npc)
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("daycycle:restartRequest", {
 			reason = enum_daycycleHaltReason.interrupt,
-			speed = enum_daycycleHaltSpeed.instant
+			speed = self.ReplanHaltSpeed
 		})
 
 		XGenAIModule.SendMessageToEntityData(target,
