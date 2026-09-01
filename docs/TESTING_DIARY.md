@@ -9641,3 +9641,56 @@ conditions, is what would settle it.
 `hitReaction` is in the roadmap as a Phase 1 deliverable, for one reason: to keep
 the vanilla collision bark. If the barks continue without it, the message costs
 damage and buys nothing. If they stop, there is a real trade to weigh.
+
+## Six phases, and the zero-damage impacts remain unexplained
+
+Phase F put the message back on under Phase B's exact configuration, as an
+A/B/A. It did not reproduce.
+
+| Phase | Message | Trot | No damage | Mean |
+| --- | --- | --- | --- | --- |
+| B | on, typed, horse, after | 14 | 2 (14%) | 5.09 |
+| D | on, typed, horse, before | 18 | 3 (17%) | 4.85 |
+| E | **off entirely** | 13 | 0 (0%) | 6.30 |
+| F | **on again**, as B | 15 | 0 (0%) | 6.21 |
+
+Pooled, the message being on gives five zeros in forty-seven and off gives none
+in thirteen, which looks like an effect until F is read: the message was on and
+the zeros still did not appear. **Phase E was a false positive and was nearly
+written up as a finding.**
+
+The zeros stopped after Phase D and no variable under test explains it.
+
+### Everything ruled out, on eighty-one trot impacts
+
+- **Message contents.** String against typed: 18% against 14%.
+- **Attacker identity.** Horse against rider: 14% against 20%. Naming the rider
+  skips the `rider` link resolution entirely and changes nothing.
+- **Ordering.** Sent before the reaction seizes the body against after: 17%
+  against 14%.
+- **The message existing at all.** Off against on, within the later phases:
+  0% against 0%.
+- **Impact speed.** Zeros averaged 6.76 m/s and hits 6.84 m/s, over the same
+  range. Not glancing blows.
+- **Repeat impacts.** Three of ten zeros were repeats, against thirty-nine of
+  seventy-one that dealt damage. Zeros skew towards first hits, not away.
+- **Sampling.** Every zero reads zero at t+500, t+3000, t+6000 and t+10000.
+
+### What is actually known
+
+The rate is about one impact in eight overall, it predates this branch, and
+nothing here made it better or worse. The vanilla collision bark fires with the
+message and without it, which removes the one documented reason for sending it,
+but not on evidence strong enough to act on given how this investigation went.
+
+### The lesson, which is the useful part
+
+Four phases were spent varying the contents and timing of a message on the
+assumption that it was the damage source, and that assumption was never checked
+until the user recalled that the earliest builds produced damage and crime with
+no message at all. The check took one ride and overturned four.
+
+Then Phase E's clean run was very nearly recorded as a discovery, on thirteen
+impacts, before the confirming phase showed the effect was not there. A run of
+thirteen with no zeros has about a one in eleven chance at the observed rate,
+which is exactly the kind of number that reads as a result and is not one.
