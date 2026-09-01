@@ -42,7 +42,7 @@ set of files the mod installs has changed.
   `Scripts/HorseCollisionMod/Update.lua`, completing the split begun in
   4.3.2. The entry point is 569 lines, from 2,558, and holds the settings
   table, the state it keeps between ticks and the startup sequence; the
-  behaviour lives in the ten part files.
+  behavior lives in the ten part files.
 
 ## [4.3.10] - 2026-09-01
 

@@ -10389,7 +10389,7 @@ An explanation was offered here and is wrong, so it is recorded as wrong rather
 than deleted: that the crime response had always masked it. `CollisionIsCrime`
 was added in 4.3.0, one day before this entry. Every version before that ran
 with no crime system at all, which is the same condition this test created, so
-there was a long stretch in which the behaviour would have been just as visible
+there was a long stretch in which the behavior would have been just as visible
 as it is now.
 
 So the observation stands unexplained. What is established is only that the
@@ -10462,7 +10462,7 @@ in `Rider.lua`, so this measures a value crossing a part file boundary rather
 than either file alone.
 
 Stamina also falls between impacts, which is the gallop itself costing the
-horse and is vanilla behaviour, not the mod's drain.
+horse and is vanilla behavior, not the mod's drain.
 
 ### What this ride did not cover
 
