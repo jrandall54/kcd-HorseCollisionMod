@@ -23,6 +23,27 @@ number.
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently, but the
+set of files the mod installs has changed.
+
+### Added
+
+- Ten script files under `Scripts/HorseCollisionMod/`, which the mod now
+  installs alongside the two in `Scripts/Startup/`. They are loaded by the
+  entry point rather than by the engine, so they must be installed
+  together; a pak carrying only the Startup scripts no longer contains a
+  working mod.
+
+### Changed
+
+- The detection loop moved out of the entry point into
+  `Scripts/HorseCollisionMod/Update.lua`, completing the split begun in
+  4.3.2. The entry point is 569 lines, from 2,558, and holds the settings
+  table, the state it keeps between ticks and the startup sequence; the
+  behaviour lives in the ten part files.
+
 ## [4.3.10] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.
