@@ -348,7 +348,7 @@ SETTLE_LAYER = """
           <Blend ExitTime="%s" StartTime="0" Duration="0.2" />
           <Procedural type="Ragdoll">
             <ProceduralParams>
-              <Sleep value="0" />
+              <Sleep value="%s" />
               <Stiffness value="%s" />
             </ProceduralParams>
           </Procedural>
@@ -387,10 +387,46 @@ MCM_XYMOVE = 0
 MCM_ZMOVE = 0
 
 # Seconds into the fall before the body is settled, and how rigid it is while
-# settling. None disables the layer, which is the behavior before this was
-# added and is kept so the two can be compared without a rebuild.
+# settling. None disables the layer for the knockdown options, which is the
+# behavior these shipped with.
 SETTLE_AT = None
 SETTLE_STIFFNESS = 100
+SETTLE_SLEEP = 0
+
+# The settle layer for the fall tier, whose whole purpose is to hand the body
+# to physics partway through the clip.
+#
+# These are vanilla's own values, read from the `HitDeath` fragment option that
+# performs this exact handover for a rider knocked off a horse:
+#
+#   <Blend ExitTime="1.1" StartTime="0" Duration="0.2" />
+#   <Procedural type="Ragdoll">
+#     <Sleep value="1" /> <Stiffness value="500" />
+#
+# An earlier attempt at this layer used Sleep 0 and Stiffness 100 and was
+# abandoned after the ragdoll was measured arriving two seconds after the
+# victim had already stood up. Sleep decides whether the body settles or stays
+# live, so those are not small differences.
+FALL_SETTLE_STIFFNESS = 500
+FALL_SETTLE_SLEEP = 1
+
+# When each fall option hands over, in seconds, by character set and direction.
+#
+# A clip does not end when the victim reaches the ground; it goes on to settle
+# them into a final pose. These are the measured clip lengths taken at 0.68,
+# which is the fraction the Lua handover was tuned to before this moved into
+# the fragment. Measured lengths, in milliseconds:
+#
+#   male    back 1710  forward 2425  left 4120  right 3060
+#   female  back 1890  forward 3340  left 2016  right 2335
+#
+# Expressing them here rather than in Lua is the point of the change: Mannequin
+# owns the timing, and the mod stops running a timer against a clip whose length
+# it has to know.
+FALL_SETTLE_AT = {
+    "male": {"forward": 1.65, "back": 1.16, "left": 2.80, "right": 2.08},
+    "female": {"forward": 2.27, "back": 1.29, "left": 1.37, "right": 1.59}
+}
 
 MOVEMENT_LAYER = """
         <ProcLayer>
@@ -470,11 +506,35 @@ CLIP = ('          <Blend ExitTime="%s" StartTime="0" Duration="0.2" />\n'
         '          <Animation name="%s" />')
 
 
-def render_option(tags, clips, nl, settle=False):
+def settle_for(tag, gender):
+    """The ragdoll layer an option carries, as (exitTime, sleep, stiffness).
+
+    Returns None when the option carries none.
+
+    The fall tier is the case this exists for. Its whole purpose is to hand the
+    body to physics partway through the clip, which is what the knockdown tier
+    did from Lua with a timer against a clip length it had to be told.
+    """
+    if tag.startswith("hcm_fall_"):
+        side = tag[len("hcm_fall_"):]
+        at = FALL_SETTLE_AT.get(gender, {}).get(side)
+
+        if at is None:
+            return None
+
+        return (at, FALL_SETTLE_SLEEP, FALL_SETTLE_STIFFNESS)
+
+    if tag.startswith(("hcm_knockdown_", "hcm_pb_")) and SETTLE_AT is not None:
+        return (SETTLE_AT, SETTLE_SLEEP, SETTLE_STIFFNESS)
+
+    return None
+
+
+def render_option(tags, clips, nl, settle=None, ground=False):
     """Renders one Fragment option with the file's own line endings.
 
-    `clips` is one clip name, or several to play in order. `settle` adds the
-    ragdoll layer that conforms a fallen body to the ground.
+    `clips` is one clip name, or several to play in order. `settle` is the
+    ragdoll layer's (exitTime, sleep, stiffness), or None for no layer.
     """
     collider = ""
 
@@ -483,8 +543,8 @@ def render_option(tags, clips, nl, settle=False):
 
     settle_layer = ""
 
-    if settle and SETTLE_AT is not None:
-        settle_layer = SETTLE_LAYER % (SETTLE_AT, SETTLE_STIFFNESS)
+    if settle is not None:
+        settle_layer = SETTLE_LAYER % settle
 
     movement = ""
 
@@ -493,15 +553,15 @@ def render_option(tags, clips, nl, settle=False):
             horizontal=MCM_HORIZONTAL, vertical=MCM_VERTICAL,
             xymove=MCM_XYMOVE, zmove=MCM_ZMOVE, rotate=MCM_ROTATE)
 
-    ground = ""
+    ground_layer = ""
 
-    if settle and GROUND_ROTATION:
-        ground = GROUND_ROTATION_LAYER
+    if ground and GROUND_ROTATION:
+        ground_layer = GROUND_ROTATION_LAYER
 
     body = "\n".join(CLIP % ("0" if i == 0 else "-1", clip)
                       for i, clip in enumerate(as_clips(clips)))
     option = TEMPLATE.format(tags=tags, clips=body, collider=collider,
-                             ground=ground, settle=settle_layer,
+                             ground=ground_layer, settle=settle_layer,
                              movement=movement)
 
     return option.replace("\n", nl)
@@ -606,7 +666,9 @@ def write_parent(gender, paths, nl):
 
     options = nl.join(
         render_option(tag, clip, nl,
-                      settle=tag.startswith(("hcm_knockdown_", "hcm_pb_")))
+                      settle=settle_for(tag, gender),
+                      ground=tag.startswith(("hcm_knockdown_", "hcm_fall_",
+                                             "hcm_pb_")))
         for tag, clip in wanted)
 
     existing = re.search(

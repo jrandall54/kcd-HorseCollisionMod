@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.3.1-dev.1] - 2026-08-31
+
+### Changed
+
+- The fall hands the body to physics from the animation itself rather than
+  from a timer in the mod.
+
+
 ## [4.3.0] - 2026-08-31
 
 ### Added

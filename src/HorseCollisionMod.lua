@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.3.0
+-- @release 4.3.1-dev.1
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.3.0"
+HorseCollisionMod.Version = "4.3.1-dev.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -388,6 +388,12 @@ HorseCollisionMod.ReplanAfterRebuildMs = 600
 
 
 
+
+
+-- Whether the fall fragment hands the body to physics itself, through a
+-- Ragdoll ProcLayer at its own ExitTime, rather than this mod doing it from a
+-- timer. The fragment route needs no clip length table and no fraction.
+HorseCollisionMod.FragmentDrivesRagdoll = true
 
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
@@ -1739,7 +1745,31 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	--
 	-- No impulse. The victim is already going down and the ragdoll is here to
 	-- take the body at ground level, not to throw it.
-	if prefix == "hcm_fall_" then
+	--
+	-- The fragment can perform this handover itself. Each `hcm_fall_*` option
+	-- carries a Ragdoll ProcLayer at its own ExitTime, with vanilla's Sleep and
+	-- Stiffness taken from the `HitDeath` option that drops a rider off a
+	-- horse. Where that works, Mannequin owns the timing and none of the
+	-- machinery below is needed: no clip length table, no fraction, no timer,
+	-- and no poll waiting for the ragdoll to resolve.
+	--
+	-- Kept switchable while the two are compared:
+	--   HorseCollisionMod.FragmentDrivesRagdoll = false
+	if prefix == "hcm_fall_" and self.FragmentDrivesRagdoll then
+		local generation = self.TimerTick
+
+		if self.Config.LogTelemetry then
+			self:Log("VictimFall action=" .. action .. " by=fragment")
+		end
+
+		self:WhenRagdollResolves(npc, function(state, waitedForBody)
+			if generation ~= self.TimerTick then
+				return
+			end
+
+			self:FinishRecovery(npc, action, state, waitedForBody)
+		end)
+	elseif prefix == "hcm_fall_" then
 		local clips = self.FallClipMs[gender] or self.FallClipMs["1"]
 		local length = clips[side] or clips.forward
 		local at = math.floor(length * self.RagdollAtFraction)
