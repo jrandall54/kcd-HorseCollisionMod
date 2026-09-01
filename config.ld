@@ -29,7 +29,8 @@ file = {
 	"src/HorseCollisionMod/Health.lua",
 	"src/HorseCollisionMod/Reaction.lua",
 	"src/HorseCollisionMod/Recovery.lua",
-	"src/HorseCollisionMod/Crime.lua"
+	"src/HorseCollisionMod/Crime.lua",
+	"src/HorseCollisionMod/Rider.lua"
 }
 dir = "docs/api"
 

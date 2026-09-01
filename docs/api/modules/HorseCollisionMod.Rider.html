@@ -1,0 +1,226 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><strong>HorseCollisionMod.Rider</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Rider</code></h1>
+<p>Rider: what a collision costs the player and the horse.</p>
+<p> The anti-bulldozing budget. Riding through a crowd has to end with Henry on
+ the ground rather than being a free way to scatter a dozen people, so every
+ impact at trot or gallop draws horse stamina, and a spent horse throws its
+ rider.</p>
+
+<p> <a href="../modules/HorseCollisionMod.Rider.html#HorseCollisionMod:IsCombatCollision">IsCombatCollision</a> lives here despite its name. It decides how hard an
+ impact counts, not whether it is an offence, and the stamina multiplier is
+ its only consumer: charging into a fight costs the horse more than riding
+ through a market. Whether a collision is a crime is <code>Crime.lua</code>.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>. Every threshold and
+ multiplier is read from <code>Config</code> at call time.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.3.9</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsCombatCollision">HorseCollisionMod:IsCombatCollision (npc)</a></td>
+	<td class="summary">Whether this collision should count as a combat one.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ThrowRider">HorseCollisionMod:ThrowRider (horseEnt, playerEnt)</a></td>
+	<td class="summary">Throws the rider from the horse.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:DrainHorseStamina">HorseCollisionMod:DrainHorseStamina (horseEnt, playerEnt, staminaDrain)</a></td>
+	<td class="summary">Charges the horse for an impact and dismounts Henry when it is spent.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:IsCombatCollision"></a>
+    <strong>HorseCollisionMod:IsCombatCollision (npc)</strong>
+    </dt>
+    <dd>
+    Whether this collision should count as a combat one. </p>
+
+<p> Two independent signals, because neither alone is reliable:</p>
+
+<ul>
+    <li><code>player.soul:IsInCombatDanger()</code> is what vanilla scripts use, but it
+    reflects immediate danger rather than "a fight is happening", and reads
+    false for long stretches of an ongoing fight. Mounted and moving, the
+    player may not be in danger at the instant of each impact.</li>
+    <li>The victim having a weapon drawn. Townsfolk do not walk around armed, so
+    this catches the case the first signal misses: charging someone who is
+    actively fighting.</li>
+</ul>
+
+<p> Both raw values are logged so a disagreement between them is visible
+ rather than being hidden behind a single boolean.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><span class="type">boolean</span></span>
+        true when combat rules should apply</li>
+        <li>
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        diagnostic describing both signals</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ThrowRider"></a>
+    <strong>HorseCollisionMod:ThrowRider (horseEnt, playerEnt)</strong>
+    </dt>
+    <dd>
+    Throws the rider from the horse. </p>
+
+<p> Prefers the horse's own <code>RearAndThrowDown</code>, which plays the animation of
+ the animal rearing and unseating its rider. Falls back to ragdolling the
+ player, which is what earlier builds did and which reads as the player
+ collapsing rather than being thrown.</p>
+
+<p> <code>RearAndThrowDown</code> is undocumented. It sits on the horse entity's <code>horse</code>
+ extension, alongside <code>HasRider</code> and <code>IsMountable</code>.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:DrainHorseStamina"></a>
+    <strong>HorseCollisionMod:DrainHorseStamina (horseEnt, playerEnt, staminaDrain)</strong>
+    </dt>
+    <dd>
+    Charges the horse for an impact and dismounts Henry when it is spent. </p>
+
+<p> Stamina is written with <code>soul:SetState</code>, never <code>soul:DealDamage</code>. That
+ call takes <code>(stamina, health, attacker, ...)</code>  -  stamina first  -  even though
+ vanilla's own debug helper names the parameters health-first, so using it
+ here silently injures the horse instead.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+        <li><span class="parameter">staminaDrain</span>
+            <span class="types"><span class="type">number</span></span>
+         points of stamina to remove
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-01 13:35:39 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>
