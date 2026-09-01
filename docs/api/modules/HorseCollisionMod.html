@@ -43,6 +43,7 @@
 <ul class="nowrap">
   <li><strong>HorseCollisionMod</strong></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
 </ul>
 
 </div>
@@ -168,26 +169,6 @@
 	<tr>
 	<td class="name" nowrap><a href="#WatchHealth">WatchHealth (name, seconds)</a></td>
 	<td class="summary">Logs a named entity's health whenever it changes.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ArmorOf">ArmorOf (entity[, tack])</a></td>
-	<td class="summary">What an entity is wearing, summed from its inventory.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#DescribeArmor">DescribeArmor (total)</a></td>
-	<td class="summary">An armor total as a log fragment.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ArmorCurve">ArmorCurve (weight, reference, exponent, invert, low, high)</a></td>
-	<td class="summary">How much a target's armor changes the impact it takes.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ArmorImpulseScale">ArmorImpulseScale (armor)</a></td>
-	<td class="summary">The impulse multiplier for a target's armor.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#ArmorStaminaScale">ArmorStaminaScale (armor)</a></td>
-	<td class="summary">The stamina multiplier for a target's armor.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#SuppressAutoCure">SuppressAutoCure (npc)</a></td>
@@ -600,195 +581,6 @@
 
 </dd>
     <dt>
-    <a name = "ArmorOf"></a>
-    <strong>ArmorOf (entity[, tack])</strong>
-    </dt>
-    <dd>
-    What an entity is wearing, summed from its inventory. </p>
-
-<p> Nothing in the ScriptBind surface reports which items are equipped, and
- nothing reports an item's weight. Neither gap matters for a collision
- target: an NPC carries only what it wears plus a few trinkets, and the
- weights are generated into <code>HorseCollisionMod_ItemData.lua</code> from the game's
- own tables. Filtering an inventory to the classes in that table is therefore
- equivalent to reading the equipped set.</p>
-
-<p> The player is the exception, carrying whatever has been picked up, but the
- player is never the victim of an impact.</p>
-
-<p> Saddles, bridles, horseshoes and spurs are filed as armor. <code>tack</code> selects
- between the two: false for what a person is wearing, true for a horse's own
- gear, which is what Phase 3 barding needs from the same call.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">entity</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         any entity with an inventory
-        </li>
-        <li><span class="parameter">tack</span>
-            <span class="types"><span class="type">boolean</span></span>
-         true to sum horse gear instead of worn armor
-         (<em>optional</em>)
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-        weight, smashDef, pieces, heaviest and heaviestType
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "DescribeArmor"></a>
-    <strong>DescribeArmor (total)</strong>
-    </dt>
-    <dd>
-    An armor total as a log fragment.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">total</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         a table from <a href="../modules/HorseCollisionMod.html#ArmorOf">ArmorOf</a>
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-        the totals, and the heaviest piece's type by name
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "ArmorCurve"></a>
-    <strong>ArmorCurve (weight, reference, exponent, invert, low, high)</strong>
-    </dt>
-    <dd>
-    How much a target's armor changes the impact it takes. </p>
-
-<p> One curve serves both halves. <code>weight</code> is the target's armor weight and
- <code>reference</code> the weight that changes nothing, so the ratio between them is
- the whole signal; <code>exponent</code> sets how sharply it bites and 0 switches the
- scaling off entirely.</p>
-
-<p> Armor makes a target harder to throw and more tiring to hit, so the impulse
- takes the reciprocal of the ratio and the stamina cost takes it directly.
- Both are clamped, because the curve has no natural floor or ceiling and an
- unclamped extreme reads in game as a target that cannot be moved at all, or
- one that flies out of sight.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">weight</span>
-            <span class="types"><span class="type">number</span></span>
-         the target's armor weight
-        </li>
-        <li><span class="parameter">reference</span>
-            <span class="types"><span class="type">number</span></span>
-         the weight that produces 1.0
-        </li>
-        <li><span class="parameter">exponent</span>
-            <span class="types"><span class="type">number</span></span>
-         how strongly weight matters, 0 to disable
-        </li>
-        <li><span class="parameter">invert</span>
-            <span class="types"><span class="type">boolean</span></span>
-         true for the impulse, false for the stamina cost
-        </li>
-        <li><span class="parameter">low</span>
-            <span class="types"><span class="type">number</span></span>
-         the smallest multiplier allowed
-        </li>
-        <li><span class="parameter">high</span>
-            <span class="types"><span class="type">number</span></span>
-         the largest
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        the multiplier
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "ArmorImpulseScale"></a>
-    <strong>ArmorImpulseScale (armor)</strong>
-    </dt>
-    <dd>
-    The impulse multiplier for a target's armor.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">armor</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         a table from <a href="../modules/HorseCollisionMod.html#ArmorOf">ArmorOf</a>
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        a multiplier on the tier's impulse scale
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "ArmorStaminaScale"></a>
-    <strong>ArmorStaminaScale (armor)</strong>
-    </dt>
-    <dd>
-    The stamina multiplier for a target's armor. </p>
-
-<p> Composes with the combat multiplier already applied, and is the same shape
- the Phase 3 Horsemanship multiplier will take, so the three multiply rather
- than each becoming its own rule.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">armor</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         a table from <a href="../modules/HorseCollisionMod.html#ArmorOf">ArmorOf</a>
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        a multiplier on the tier's stamina cost
-    </ol>
-
-
-
-
-</dd>
-    <dt>
     <a name = "SuppressAutoCure"></a>
     <strong>SuppressAutoCure (npc)</strong>
     </dt>
@@ -866,7 +658,7 @@
         </li>
         <li><span class="parameter">armor</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         totals from <a href="../modules/HorseCollisionMod.html#ArmorOf">ArmorOf</a>, read again when absent
+         totals from <code>ArmorOf</code>, read again when absent
          (<em>optional</em>)
         </li>
     </ul>
@@ -2027,7 +1819,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-01 12:12:17 </i>
+<i style="float:right;">Last updated 2026-09-01 12:13:38 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
