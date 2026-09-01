@@ -10855,3 +10855,53 @@ sequence this mod can shorten.
 
 The one change kept from all of this is the female handover at 0.50, which the
 player reports makes the falls themselves look better.
+
+## Stiffness does not move the lie-down either, and the parameters are exhausted
+
+`Stiffness` was the last ragdoll parameter untested against the phase a victim
+spends limp on the ground. It does not move it.
+
+| `Stiffness` | Mean gap | Range | n |
+|---|---|---|---|
+| 500 | 902 ms | 112 to 1408 | 10 |
+| 100 | 757 ms | 400 to 1120 | 9 |
+
+The means differ by less than the spread of either set, so this is noise rather
+than a saving. `Stiffness` is back at vanilla's 500, since nothing justifies
+deviating from it.
+
+It does not govern how fast a victim rises either: `BlendRagdoll` measured
+2560, 2688, 2512 and 2528 ms for men at `Stiffness` 100, against 2570 ms at
+500.
+
+### What the phases actually are
+
+Corrected from the previous entry, which had `MotionIdle` down as dead air.
+Traced on the gallop path, where the body is thrown and visibly tumbles:
+
+```
+rat_woman43  MotionIdle=1888ms BlendRagdoll=4832ms
+rat_man97    MotionIdle=2272ms BlendRagdoll=2496ms
+rat_guard18  MotionIdle=2496ms BlendRagdoll=2672ms
+```
+
+`MotionIdle` is the ragdoll being a ragdoll, and it is longer at gallop because
+the body travels further before coming to rest. `BlendRagdoll` is only the
+stand-up blend at the end.
+
+### Every dial, and what it does
+
+| Dial | The limp phase | The stand-up |
+|---|---|---|
+| `ExitTime` | moves when it begins | nothing |
+| `Sleep` 1 to 0 | nothing | nothing |
+| `Stiffness` 500 to 100 | noise | nothing |
+| `g_ragdollPollTime` 0.5 to 0.05 | nothing | nothing |
+| `ca_DeathBlendTime` | already 0 | already 0 |
+
+`ExitTime` is the only one that does anything, and what it does is decide when
+the body goes limp rather than how long it stays down.
+
+The remaining time belongs to the engine. A trot victim is limp for roughly a
+second and then takes 2,570 ms to rise if male and 5,100 ms if female, and the
+gallop path reaches the same figures without touching any data this mod ships.
