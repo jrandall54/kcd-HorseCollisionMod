@@ -145,13 +145,41 @@ prints each entry name so the separators are visible.
 
 ## How the mod's Lua is composed
 
-The mod is more than one file. `Scripts/Startup/HorseCollisionMod.lua` is the
-entry point and creates the table; the rest lives in
-`Scripts/HorseCollisionMod/` and is pulled in at the foot of the entry point:
+`Scripts/Startup/HorseCollisionMod.lua` is the entry point. It creates the
+table, holds `Config`, the state tables and the timing constants, and applies
+the settings file; the behavior lives in ten part files under
+`Scripts/HorseCollisionMod/`, named at the foot of the entry point in the order
+they are wanted:
 
 ```lua
 Script.ReloadScript("Scripts/HorseCollisionMod/Enums.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Log.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Armor.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 ```
+
+| File | What it holds |
+|---|---|
+| `Enums.lua` | the two engine enums, transcribed from `TypeDefinitions.xml` |
+| `Log.lua` | logging, the engine clock, vector length, speed history and tier |
+| `Armor.lua` | what a victim is wearing, and both curves derived from it |
+| `Detection.lua` | the horse footprint test and the impact direction |
+| `Health.lua` | what an impact cost, and the auto-cure suppression |
+| `Reaction.lua` | the brain message, the reaction clip, the physics ragdoll |
+| `Recovery.lua` | the waits, the rebuild and the replan that follow |
+| `Crime.lua` | the combat hit that makes riding someone down an offence |
+| `Rider.lua` | horse stamina, the combat multiplier and the dismount |
+| `Update.lua` | the detection loop, and dispatching one collision |
+
+`Config`, the state tables and the timing constants stay in the entry point,
+because they have to exist before any part is loaded and because
+`ApplySettings` writes to them.
 
 `Script.ReloadScript` is the base game's own mechanism, not a development
 facility. It is the first line of nearly every vanilla entity script and is how

@@ -100,6 +100,7 @@ Loose files go under `<game>\Data`, mirroring the pak layout:
 ```
 Data\Scripts\Startup\HorseCollisionMod.lua
 Data\Scripts\Startup\HorseCollisionMod_Settings.lua
+Data\Scripts\HorseCollisionMod\*.lua
 Data\Animations\Mannequin\ADB\*.adb
 ```
 
