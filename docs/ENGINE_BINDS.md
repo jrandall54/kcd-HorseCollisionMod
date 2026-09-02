@@ -813,11 +813,11 @@ A combat action type group in the binary carries, among forty-six entries:
 `riderGuardJump`, `riderGuardJumpStart`, `riderGuardJumpEnd`,
 **`riderGuardRear`**, `horsePullDownAttackSuccess`, `horsePullDownHitSuccess`.
 
-These are behaviour and animation identifiers rather than Lua entry points, so
+These are behavior and animation identifiers rather than Lua entry points, so
 they are not callable as they stand. What they establish is that the AI has
-combat behaviour written specifically for fighting a mounted target and for
+combat behavior written specifically for fighting a mounted target and for
 mounted guards, including a rear. The roadmap item about striking a heavy
-target rearing the horse has a named behaviour behind it.
+target rearing the horse has a named behavior behind it.
 
 ## The verified surface, enumerated from the running game
 

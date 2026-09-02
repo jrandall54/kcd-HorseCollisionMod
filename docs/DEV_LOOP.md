@@ -174,10 +174,9 @@ successful reload ends with:
 
 ## Tests that need game time
 
-Passing in-game time used to be the most expensive thing a test could ask
-for. The in-game wait dialog caps at 24 hours, runs at about four real
-minutes a day, and in hardcore it also demands food and a bed, so a question
-needing several days was abandoned rather than answered.
+The in-game wait dialog caps at 24 hours, runs at about four real minutes a
+day, and in hardcore it also demands food and a bed. None of that is
+necessary.
 
 It is not necessary. `Calendar` is a Lua global and world time is directly
 settable:
