@@ -12297,3 +12297,39 @@ Not yet run.
 value marks the rider as an enemy. That is an argument against permanence, not
 proof of it, since whatever drives the flee is evidently not stored in any of
 the three.
+
+---
+
+## Beating a man to a yield zeroes his relationship, and only his
+
+Thirty humans within 40 m had their `soul:GetRelationship(playerWuid)` read
+before a provoked brawl and again after it. The rider provoked one man, beat
+him until he yielded, and touched nobody else.
+
+| NPC | before | after |
+|---|---|---|
+| `rat_man19` | 0.5378 | **-0.0000** |
+| the other 23 read both times | unchanged | unchanged |
+
+The common baseline is **0.5378**, shared by nearly every townsman, merchant
+and shop guard. Soldiers sit at 0.4052 and beggars at about 0.72. An earlier
+reading of 0.5378 on a brawl victim was taken as "slightly positive, holds no
+grudge"; it was simply the default, and that inference was wrong.
+
+So the cost of beating someone is **individual and local**: their own
+relationship with the rider, not the faction reputation, which was separately
+measured as unmoved to six decimal places, and not the town at large.
+
+It lives in the save. `rat_ruch` read `-0.0000` after being beaten in an
+earlier session and reads 0.5682 after the save was reloaded.
+
+This is what the flee-on-approach follows, and it explains why paying the fine
+changed nothing: the crime and the relationship are different records, and
+only the first was settled.
+
+**It is also not this mod's doing.** The rider's own fists lower it. The mod
+arranges for a man to be willing to fight; what the rider then does to him is
+the rider's.
+
+Whether it recovers is the open question, and `soul:ModifyPlayerReputation`
+exists as a lever if it turns out not to.
