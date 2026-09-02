@@ -11846,3 +11846,86 @@ Two gaps against a tavern-style brawl, both untested:
   `enum:duelWeaponTypes` carries `Unarmed`, but that belongs to the duel
   scripted action rather than to the context system, and no context option in
   the catalog obviously forces an unarmed fight.
+
+---
+
+## How a civilian answers a hit, in full, and the two gates that matter
+
+`sb_combat.xml` lines 8308 to 8365 carry the whole decision for a victim whose
+`crimeSystemRole` is `civilian`:
+
+    if b_context['alwaysFightWhenHit'] or b_context['suppressFightMoraleChecks']
+        pass
+    else
+        CompareMorale(this, attacker)          -- must win to continue
+
+    if b_soul.gender == male                   -- women fail here, always
+        pass
+    else
+        fail
+
+    -> t_state = fight, t_fightParams.opponent = realAttacker
+       and if the attacker is the player and the player is not already an
+       enemy, t_fightParams.startInDefenseOnly = true
+
+    -- when the fight path fails:
+    if attacker == player and b_soul.caste <= normal
+        CreateInformation 'assault' -> t_state = report
+    else
+        t_state = flee, with t_fleeParams.fightIfHit = true
+
+### Female civilians cannot retaliate
+
+The `gender == male` test sits **after** the context check and is not
+bypassed by it. `alwaysFightWhenHit` removes the morale comparison and nothing
+else, so a woman set to always fight when hit still falls through to `report`
+or `flee`. Any retaliation feature is male-only among civilians unless some
+other path exists.
+
+### `startInDefenseOnly` is why the brawl behaved
+
+When the attacker is the player and the player is not already an enemy, the
+fight starts in defense only. The NPC squares up and blocks rather than
+opening with an attack, which is what a scuffle over being shoved looks like
+and is the reason the observed brawl read as proportionate.
+
+### Vanilla already has the annoyance idea
+
+The flee branch sets `t_fleeParams.fightIfHit = true`. A civilian who runs
+will turn and fight if struck again. The concept of wearing someone's patience
+down is the game's own, not an invention.
+
+### `real = false` sends a hit that costs no reputation
+
+`sb_switch_hitreactions.xml` line 481 gates the reputation change on
+`$hit.real`:
+
+    if hit.attacker == player
+       and not b_context['suppressReputationHitOnDudeHit']
+       and not isDudeBestFriend
+       and not (suppressAssaultReactions and suppressReputationHit)
+       and hit.real                              <-- here
+    then
+       reputationChangeName = hit_melee_weak | _medium | _strong | _brutal
+                              by hit.strength, 3 / 4 / 6 thresholds
+       if b_context['disableChangeHostilityOnHit']
+          reputationChangeName += '_noChangeHostility'
+       SetReputationNPC(reputationChange)
+
+So a `combat:hit` carrying `real = false` reaches the combat subbrain and
+drives the fight decision, but never reaches `SetReputationNPC`. Vanilla uses
+it for near misses and for horse collisions: `sb_switching_horse.xml` sets
+`$hit.real = false` for a hit relayed off a horse.
+
+That is the mechanism for a fight the crime system does not prosecute, and it
+needs no context option at all. `suppressReputationHitOnDudeHit` reaches the
+same place by another road, and `disableChangeHostilityOnHit` softens the
+reputation entry rather than removing it.
+
+### Witnessing appears to be modeled
+
+The same condition block reads `isKnockOutByPlayer` against
+`isKnockOutByPlayerAndSeen`, and the report path builds its case with
+`CreateInformation PerceivedWuid=... label='assault'`. Whether a bystander
+reacted to something it actually saw is therefore a distinction the game
+already draws. Not investigated further.
