@@ -12165,3 +12165,58 @@ A running victim is only a runaway when the rider is more than
 standing over you is correct behavior and interrupting it would be the fault.
 Below that range a running victim is classified as engaged: the incident stays
 open, nothing is sent, and the victim is left to do the sensible thing.
+
+---
+
+## Both endings observed cleanly, and the game does resolve its own fights
+
+First run on a reloaded save, with the rider stationary rather than following
+the victim. `rat_man19`, a townsman, provoked twice.
+
+    Retaliation    rat_man19 role=townsman count=3 chance=0.50 roll=0.36 provoked=true
+    RetaliationEnd rat_man19 why=natural  state=MotionTurn     stoodDown=false replanned=false
+
+    Retaliation    rat_man19 role=townsman count=2 chance=0.25 roll=0.04 provoked=true
+    RetaliationEnd rat_man19 why=runaway  state=MotionMovement stoodDown=true  replanned=true
+
+**The first is the answer to a question open all session.** The rider
+surrendered to the victim, the encounter resolved on its own, and the mod sent
+nothing at all. The game does clean up after its own fights, and the
+stand-down is a failsafe for the case where it does not rather than the
+mechanism.
+
+The second earned its intervention: after taking payment through the yield
+dialog the victim ran, cleared the 25 m range test, and sustained it.
+
+Sampled afterwards, at two-second intervals, with the rider stationary:
+
+| | state | speed | range to rider |
+|---|---|---|---|
+| t+2s | `MotionMovement` | 0.00 | 16.1 |
+| t+4s | `MotionMovement` | 0.97 | 14.2 |
+| t+6s | `MotionMovement` | 0.95 | 12.3 |
+| t+8s | `MotionMovement` | 0.99 | 10.4 |
+| t+10s | `MotionMovement` | 0.97 | 8.5 |
+
+A steady walking pace against the 4.79 m/s of a flee, and the range closing
+rather than opening: a victim walking back to his routine rather than running
+from anything. The replan did its job.
+
+## Two things the yield dialog raises, both parked
+
+Neither is this feature's, and neither has been investigated.
+
+**The surrender prompt is not shown.** Surrendering to a provoked victim
+resolves the encounter cleanly, but the on-screen input hint that normally
+appears when guards are attacking does not, so a player has no way of knowing
+the option exists. The engine carries
+`wh::xgenaimodule::BehaviorTree::C_SurrenderActionHint` and
+`S_SurrenderActionHintContext`, plus a `SurrenderActionHint` string, so the
+hint is a behavior tree node. Whether it can be raised from Lua is unknown.
+
+**The yield dialog can be used to extract money.** A victim who yields offers
+the usual options, including paying the player to be let go. A provoked brawl
+is not a crime unless witnessed, so this is a repeatable income with no legal
+consequence, which is a plausible early-game exploit. It is vanilla's dialog
+reached through a fight this mod arranges, so the mod is at least adjacent to
+it.

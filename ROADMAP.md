@@ -425,6 +425,20 @@ rather than missing.
 
 ## Phase 4: AI reaction
 
+- [ ] Show the surrender prompt during a provoked brawl. Surrendering to a
+      victim resolves the encounter cleanly, but the on-screen input hint
+      that appears when guards attack does not, so nothing tells a player
+      the option exists. The engine carries
+      `wh::xgenaimodule::BehaviorTree::C_SurrenderActionHint`,
+      `S_SurrenderActionHintContext` and a `SurrenderActionHint` string, so
+      the hint is a behavior tree node. Whether Lua can raise it is unknown.
+- [ ] Decide what to do about the yield dialog as an income. A victim who
+      yields offers the vanilla options, payment among them, and a provoked
+      brawl is not a crime unless witnessed. That is repeatable money with no
+      legal consequence and a plausible early-game exploit. The dialog is
+      vanilla's, but the fight reaching it is this mod's, so the mod is at
+      least adjacent to it. Not investigated.
+
 - [ ] Riding through a packed group inflicts a morale shock, so lightly armored enemies
       break and flee using native AI.
 
