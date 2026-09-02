@@ -12833,3 +12833,162 @@ samples fell on the same side of the event. In each case the fix was the same
 and was available from the start: **read the victim against untouched
 neighbors, never the absolute number, and confirm which side of an event each
 sample was taken on.**
+
+---
+
+## A shipped cheat mod contradicts five "unreachable" findings, and settles the assault question
+
+`references/kcd1tools/cheat-106-1-58-*.zip` is spraguep's Cheat mod, Nexus
+1.58. Unlike KCSE it is **pure Lua in a pak**, the same shape this project
+ships, so every call in it is proof rather than a candidate. Its
+`Cheat/Data/data.pak` holds twenty-three `Scripts/cheat_*.lua` files and a
+`Docs/` folder.
+
+Every entry point below was then **verified to exist in this build** by
+probing the running game: 43 of 43.
+
+### Time is directly settable, and the wait wheel is irrelevant
+
+`Calendar` is a Lua global. Read at the main menu: `GetWorldTime()` returned
+3,319,760 seconds, `GetWorldTimeRatio()` returned **15**, `GetWorldHourOfDay()`
+10.16, `IsWorldTimePaused()` false.
+
+    Calendar.SetWorldTime(Calendar.GetWorldTime() + hours * 3600)
+    XGenAIModule.SendMessageToEntity(player.this.id, "timekeeper:recalculate", "")
+    Calendar.SetWorldTimeRatio(1000)
+
+Also `SetWorldTimePaused`, `SetFakeTimeOfDay`, `UnfakeTimeOfDay`,
+`IsFakedTimeOfDay`.
+
+This retires the conclusion that passing in-game time is too expensive to test
+with. Seven days is one call. The 24-hour cap on the in-game wait dialog, and
+the ten real minutes a jail sentence costs, are both bypassed entirely.
+
+Note that `Calendar.GetWorldTimeRatio()` at 15 is the ordinary world time
+ratio and is a different quantity from the CVar
+`wh_pl_SkipTimeMaxWorldTimeRatio` at 360, which governs the skip dialog.
+
+### The reputation change table reads, and it answers the assault question
+
+Two mistakes had made this table look empty. `Database.LoadTable(name)` must be
+called first, and the row count is **`LineCount`**, not `RowCount`. With both
+corrected, `Database.GetTableLine(name, row)` returns a row keyed by column
+name and `reputation_change` has **71 lines**.
+
+The rows that matter:
+
+| name | change | can_change_hostility |
+|---|---|---|
+| `hit_melee_weak` | **-0.2** | **true** |
+| `hit_melee_medium` | -0.4 | true |
+| `hit_melee_strong` | -0.7 | true |
+| `hit_melee_brutal` | -1.25 | true |
+| `surrender_step` | **+0.25** | **true** |
+| `payToTalk` | +0.25 | **false** |
+| `best_friend` | +2 | true |
+| `sworn_enemy` | -2 | true |
+| `crime_assault_individual` | -0.3 | false |
+| `crime_assault_reported` | -0.3 | false |
+| `death` | -0.6 | true |
+
+The `_noChangeHostility` suffix seen in `sb_switch_hitreactions.xml` is not a
+modifier applied at runtime: rows 96 to 99 are separate entries,
+`hit_melee_weak_noChangeHostility` through `hit_melee_brutal_noChangeHostility`,
+carrying the same numbers with the flag false.
+
+**This explains every observation the assault investigation could not.**
+
+- A punch is `hit_melee_weak`, -0.2, and it **sets a hostility flag**. The
+  flag, not the number, is what makes the victim flee on recognition.
+- `payToTalk` is +0.25 with `can_change_hostility` **false**. It can raise the
+  number and cannot clear the flag. That is why applying it to a healthy
+  control moved the value and applying it to the beaten merchant did nothing
+  useful: the merchant's problem was the flag.
+- `surrender_step` is +0.25 with the flag **true**. Surrendering to the victim
+  is the designed repair, and it is the only common positive change that can
+  clear hostility.
+
+That is exactly what was observed and could not be explained: surrendering to
+a provoked victim resolved the encounter completely and left the beggar at
+0.7192, above his neighbors, while paying a guard a fine never repaired
+anything. The fine settles the crime; only the victim can lift the hostility,
+and surrendering to him is how.
+
+A ruined NPC should therefore be repairable with
+`soul:ModifyPlayerReputation('best_friend')`, +2 with the flag true, or more
+proportionately with `surrender_step`. Untested.
+
+### `angriness_enum` also reads
+
+Nine lines: `min_angriness` 0, `max_angriness` 1, `death` 0.55,
+`unatributedStealthKill` 0.15, `event_roadsideCorpse_unsolvedMurder` 0.2,
+`theft_large` 0.125, `theft_medium` 0.025, `theft_small` 0.01. So the
+angriness scale is 0 to 1 as measured, and the increments real events apply
+are small. Setting a faction to 1.0 was far outside anything the game does.
+
+### Entity links exist in Lua after all
+
+`Entity.CreateLink`, `Entity.GetLink`, `Entity.RemoveLink` and
+`Entity.CountLinks` are all present. The earlier finding that "no script bind
+exposes links to Lua, all 37 carry only readers" was drawn from the
+`C_ScriptBind*` headers and is **wrong**: the entity class table carries them.
+
+Whether these reach the behavior tree's tagged links, which is what
+`checkAssaultSuppression` walks for a `suppressAssaultReactions` tag between
+attacker and victim, is **not established**. CryEngine entity links take a
+name and a target id; the behavior tree's take From, To, Tag and Data. They
+may be the same system or two systems sharing a word. Testing it reopens the
+brawl a town ignores, which was closed as impossible.
+
+### Mass is readable, which matters for knockback
+
+`ent:GetPhysicalStats()` returns a table with `mass`, `gravity` and `flags`;
+the player reads mass 80. The cheat mod applies impulses as
+`ent:AddImpulse(-1, pos, dir, ent:GetPhysicalStats().mass * force)`, scaling by
+mass so the result is a velocity rather than an arbitrary number.
+
+The armor knockback item has been stuck on exactly this: a shipped `Knockback`
+of 50 was measured as indistinguishable from applying nothing to a 120 to
+160 kg body. Scaling by the target's own mass makes the figure mean meters per
+second, and armor weight can modulate a velocity rather than guess at a force.
+
+### Console commands can be registered from Lua
+
+`System.AddCCommand(name, "table:method(%line)", help)` registers a real
+console command backed by Lua, `%line` receiving the arguments. The cheat mod
+registers about eighty this way, including a `cheat_eval` that runs
+`loadstring` on its argument.
+
+`System.ExecuteCommand("...")` runs a console command from Lua, and
+`System.SetCVar` / `System.GetCVar` reach CVars directly. `System.SetCVar` was
+observed setting `wh_pl_SkipTimeMaxWorldTimeRatio`, a `VF_CHEAT` variable,
+from 360 to 3600. **That test is not conclusive**: the session had `-devmode`,
+which would have allowed it anyway. Whether Lua bypasses the flag without
+`-devmode` is untested and matters, because it decides whether a development
+console command can replace the `-devmode` requirement for probing.
+
+### Everything else confirmed present
+
+`Game.SetWantedLevel`, `Game.SaveGameViaResting`, `Game.RemoveSaveLock`,
+`Game.IsLoadingEngineSaveGame`, `Physics.RayWorldIntersection`,
+`Framework.IsValidWUID`, `EnvironmentModule.BlendTimeOfDay`,
+`EntityModule.GetInventoryOwner`, `Shops.IsLinkedWithShop`,
+`System.SpawnEntity`, `System.GetEntitiesByClass`, `Entity.AddImpulse`,
+`Entity.SetPhysicParams`, `Entity.AwakePhysics`, and `actor:ReviveToDefaults`.
+
+`Game.SetWantedLevel(0..3)` is the crime state this project could not even
+read, and it would have separated the transient town-wide depression from the
+personal penalty in one command.
+
+### Why this was missed
+
+The `C_ScriptBind*` headers in `references/libKCD1` describe the **script
+binds**. `Calendar`, `Game`, `Database`, `Entity` and `Physics` are reached
+another way and are not among them, so a survey of those headers cannot answer
+"what can Lua call". It answers "how is this bind declared", and it is not
+always right about that either: the header gives
+`AddReputation(const char* sEnumName)` while the cheat mod passes a number.
+
+The order to consult is now the cheat mod for what Lua can call, the
+decompilation for what the binary contains, and libKCD1 for how a bind is
+declared.

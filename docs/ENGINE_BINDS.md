@@ -610,3 +610,133 @@ dumps the same data from the console.
 a beating lowers. It moves globally for everyone as town standing changes, so
 compare a victim against an untouched neighbor rather than against an
 absolute.
+
+## Globals that are not script binds
+
+The sections above are `C_ScriptBind*` classes. Several of the most useful Lua
+globals are not among them, which is why a survey of those headers cannot
+answer "what can Lua call". Everything below was verified present in this
+build by probing the running game, 43 entry points out of 43 tried.
+
+The source is spraguep's Cheat mod, `references/kcd1tools/cheat-106-*.zip`,
+which is pure Lua in a pak and therefore demonstrates working calls rather
+than declarations.
+
+### Calendar
+
+World time, readable and settable, without the in-game wait dialog.
+
+| Function | Notes |
+| --- | --- |
+| `Calendar.GetWorldTime()` | seconds; 3,319,760 read at day 38 |
+| `Calendar.SetWorldTime(seconds)` | absolute; add `hours * 3600` to skip |
+| `Calendar.GetWorldTimeRatio()` | **15** by default |
+| `Calendar.SetWorldTimeRatio(n)` | higher is faster, 0 pauses |
+| `Calendar.IsWorldTimePaused()`, `SetWorldTimePaused(bool)` | |
+| `Calendar.GetWorldHourOfDay()` | |
+| `Calendar.SetFakeTimeOfDay(h)`, `UnfakeTimeOfDay()`, `IsFakedTimeOfDay()` | |
+
+Vanilla follows a time jump with
+`XGenAIModule.SendMessageToEntity(player.this.id, "timekeeper:recalculate", "")`
+so the world catches up.
+
+`GetWorldTimeRatio` at 15 is the ordinary ratio and is a different quantity
+from the CVar `wh_pl_SkipTimeMaxWorldTimeRatio` at 360, which governs the skip
+dialog only.
+
+### Database
+
+| Function | Notes |
+| --- | --- |
+| `Database.LoadTable(name)` | **required first**, or the table reads as empty |
+| `Database.GetTableInfo(name)` | `.LineCount` is the row count, **not** `.RowCount` |
+| `Database.GetColumnInfo(name, i)` | `.Name` |
+| `Database.GetTableLine(name, row)` | a row keyed by column name |
+| `Database.GetTableColumnData(name, col)` | returns nothing for some tables |
+
+`GetTableColumnData` returning nothing does not mean a table is empty.
+`reputation_change` and `angriness_enum` both read as empty through it and
+both read correctly through `LoadTable` plus `GetTableLine`.
+
+### Game
+
+| Function | Notes |
+| --- | --- |
+| `Game.SetWantedLevel(0..3)` | the player's wanted level, settable |
+| `Game.SaveGameViaResting()` | |
+| `Game.RemoveSaveLock()` | |
+| `Game.IsLoadingEngineSaveGame()` | |
+| `Game.ShowItemsTransfer()` | |
+
+### Entity
+
+Methods on the entity class table, so any entity carries them.
+
+| Function | Notes |
+| --- | --- |
+| `CreateLink(name, targetId)` | targetId optional |
+| `GetLink`, `RemoveLink`, `CountLinks` | |
+| `AddImpulse(-1, pos, dir, force)` | vanilla scales force by the target's mass |
+| `GetPhysicalStats()` | `.mass`, `.gravity`, `.flags`; the player is mass 80 |
+| `SetPhysicParams(group, table)` | `PHYSICPARAM_PLAYERDYN` carries gravity, zeroG, air_control |
+| `AwakePhysics(1)` | |
+
+Whether `CreateLink` reaches the behavior tree's **tagged** links, which
+`checkAssaultSuppression` walks looking for a `suppressAssaultReactions` tag
+between two entities, is unestablished. The entity link API takes a name and
+a target; the behavior tree's takes From, To, Tag and Data.
+
+### System, beyond the familiar
+
+| Function | Notes |
+| --- | --- |
+| `System.AddCCommand(name, "tbl:method(%line)", help)` | registers a console command backed by Lua |
+| `System.ExecuteCommand("...")` | runs a console command from Lua |
+| `System.SetCVar(name, value)`, `System.GetCVar(name)` | observed setting a `VF_CHEAT` variable, though under `-devmode` |
+| `System.SpawnEntity(table)` | |
+| `System.GetEntitiesByClass(class)` | |
+
+### Others confirmed present
+
+`Physics.RayWorldIntersection`, `Framework.IsValidWUID`,
+`EnvironmentModule.BlendTimeOfDay`, `EnvironmentModule.ForceImmediateWeatherUpdate`,
+`EntityModule.GetInventoryOwner`, `Shops.IsLinkedWithShop`,
+`CryAction.LoadXML`, `Minigame.StartLockPicking`, `QuestSystem.*`,
+`ItemManager.*`, and `actor:ReviveToDefaults()`.
+
+## The reputation change table
+
+`reputation_change` has 71 lines. `soul:ModifyPlayerReputation(name, propagate)`
+and `faction:AddReputation(...)` select from it by name. Each row carries a
+`change` and a **`can_change_hostility`** flag, and the flag is what decides
+whether an NPC stops treating the player as hostile.
+
+| name | change | can_change_hostility |
+| --- | --- | --- |
+| `hit_melee_weak` | -0.2 | **true** |
+| `hit_melee_medium` | -0.4 | true |
+| `hit_melee_strong` | -0.7 | true |
+| `hit_melee_brutal` | -1.25 | true |
+| `hit_melee_*_noChangeHostility` | the same numbers | false |
+| `surrender_step` | **+0.25** | **true** |
+| `payToTalk` | +0.25 | **false** |
+| `best_friend` | +2 | true |
+| `sworn_enemy` | -2 | true |
+| `death` | -0.6 | true |
+| `crime_assault_individual`, `_reported` | -0.3 each | false |
+| `crime_murder_individual` | -0.6 | false |
+| `crime_murder_reported` | -1.5 | false |
+| `crime_theft_individual` | -0.25 | false |
+| `haggle_tip` | +0.1 | false |
+| `shop_transaction` | +0.02 | false |
+| `impress_success` | +0.05 | false |
+| `quest_reward_1_micro` .. `_7_max` | +0.05 to +1.5 | true at 6 and 7 |
+
+The practical consequence: **punching someone sets a hostility flag, and only
+a change with `can_change_hostility` can clear it.** `payToTalk` raises the
+number and cannot clear the flag, which is why paying a fine never repairs a
+victim while surrendering to him does.
+
+`angriness_enum` has nine lines: `min_angriness` 0, `max_angriness` 1, `death`
+0.55, `event_roadsideCorpse_unsolvedMurder` 0.2, `unatributedStealthKill` 0.15,
+`theft_large` 0.125, `theft_medium` 0.025, `theft_small` 0.01.

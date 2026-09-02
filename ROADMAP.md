@@ -345,8 +345,16 @@ armor.
       per second. Raising it to 600 threw a villager 27 meters and threw one
       guard upward into the rider hard enough to nearly kill them, so
       `Uplift` has a hard ceiling that is a safety limit rather than an
-      aesthetic one: the rider sits directly above the victim. Raise
-      `Knockback` alone, moderately, and measure with the slide now removed.
+      aesthetic one: the rider sits directly above the victim.
+
+      **Scale the impulse by the target's own mass.** `ent:GetPhysicalStats()`
+      returns `.mass`, and vanilla's own code applies impulses as
+      `AddImpulse(-1, pos, dir, mass * force)`, which makes the number a
+      velocity in meters per second rather than an arbitrary force. That is
+      why 50 does nothing and 600 throws a villager 27 meters: the same figure
+      means different things against different bodies. With mass in hand,
+      armor weight can modulate a velocity, and the ceiling on `Uplift` can be
+      expressed as one too.
 - [ ] Striking a heavy target strips the horse's momentum rather than only
       its stamina, and shows on the horse. `kcd_horse_controllerdefs.xml`
       declares a `Rear` fragment, so a heavy impact can rear or check the
@@ -425,6 +433,33 @@ rather than missing.
 
 ## Phase 4: AI reaction
 
+- [ ] Reopened: a brawl the town ignores. `Entity.CreateLink`, `GetLink`,
+      `RemoveLink` and `CountLinks` all exist in Lua, which was checked and
+      denied on the strength of the `C_ScriptBind*` headers alone. Those
+      headers describe script binds, and the entity class table is not one.
+
+      The mechanism to reach is the link `sa_duel.xml` adds between the
+      duelist and the player, tagged `suppressAssaultReactions`, which
+      `checkAssaultSuppression` in `sb_combat.xml` walks and which gates the
+      assault perceptible volume that tells every bystander an assault
+      happened. If a Lua-created entity link is the same object the behavior
+      tree reads, a fight nobody reports is one call away. If it is a
+      different system sharing a word, the item closes for a better reason
+      than last time.
+
+      One probe answers it: create the link between a victim and the player,
+      punch the victim in front of a witness, and see whether a crime is
+      raised.
+- [ ] Reopened: repair a victim the player has beaten.
+      `soul:ModifyPlayerReputation('best_friend')` is +2 with
+      `can_change_hostility` true, and `surrender_step` is +0.25 with the same
+      flag. A punch is `hit_melee_weak`, -0.2, and it sets that flag; only a
+      change carrying the flag can clear it. This is why paying a fine never
+      repairs a victim and surrendering to him does.
+
+      Whether the mod should offer any of this is a design question, but it
+      is no longer an open mechanical one, and it means a victim ruined by
+      testing can be restored rather than left.
 - [ ] Show the surrender prompt during a provoked brawl. Surrendering to a
       victim resolves the encounter cleanly, but the on-screen input hint
       that appears when guards attack does not, so nothing tells a player
