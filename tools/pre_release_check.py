@@ -464,18 +464,39 @@ def check_generated_docs():
         return [("docs/api", 0, "ldoc failed",
                  tail[-1] if tail else "ldoc exited non-zero")]
 
-    changed = subprocess.run(["git", "status", "--porcelain", "--", "docs/api"],
-                             cwd=REPO_ROOT, capture_output=True,
-                             text=True).stdout.split()
+    # LDoc stamps "Last updated <timestamp>" into every page, so a byte
+    # comparison says every page changed on every run and the check would fire
+    # forever. Only differences other than that line mean anything.
+    diff = subprocess.run(["git", "diff", "--no-color", "--", "docs/api"],
+                          cwd=REPO_ROOT, capture_output=True,
+                          text=True).stdout
 
-    pages = [p for p in changed if p.endswith(".html")]
+    real = []
+    current = None
 
-    if not pages:
+    for line in diff.splitlines():
+        if line.startswith("+++ b/"):
+            current = line[6:]
+        elif line[:1] in "+-" and not line.startswith(("+++", "---")):
+            if "Last updated" in line:
+                continue
+
+            if current:
+                real.append(current)
+
+    real = sorted(set(real))
+
+    if not real:
+        # Only timestamps moved, so the reference was already correct. The
+        # working tree is put back rather than left dirty for nothing.
+        subprocess.run(["git", "checkout", "--", "docs/api"], cwd=REPO_ROOT,
+                       capture_output=True, text=True)
+
         return []
 
-    return [(pages[0], 0, "stale",
+    return [(real[0], 0, "stale",
              "%d generated page(s) were out of date and have been "
-             "regenerated; commit docs/api" % len(pages))]
+             "regenerated; commit docs/api" % len(real))]
 
 
 def check_file_description(version):
