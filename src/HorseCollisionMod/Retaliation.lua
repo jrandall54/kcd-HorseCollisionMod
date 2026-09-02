@@ -445,7 +445,7 @@ end
 
 --- Closes the incident out: takes the option back and, if needed, intervenes.
 --
--- `why` names which of `WatchRetaliation`'s three endings brought us here and
+-- `why` names which of `WatchRetaliation`'s three endings applied, and it
 -- goes straight into the telemetry, so a session can be read afterwards for
 -- how often the game resolved its own fight against how often this mod had to
 -- step in. That ratio is the thing worth knowing about this feature.
