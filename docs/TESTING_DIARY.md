@@ -12663,3 +12663,43 @@ Candidates, none tested:
 The practical conclusion drawn in the entry above, that ordinary play is safe
 and only a beating goes under the threshold, **does not hold** and is
 withdrawn. A single punch put a merchant under it.
+
+### Two effects, and the larger one is town-wide
+
+Reading 34 humans within 50 m at the end of the session: mean relationship
+**0.2346**, min -0.2501, max 0.6532, against a 0.5378 baseline measured
+earlier the same evening.
+
+**The whole town's standing with the player is sliding**, and it is sliding
+for NPCs the rider never touched. `rat_shop_guard_general`, never assaulted,
+went from about 0.54 to 0.2488 while the session ran. `rat_merchant_shop2`,
+raised deliberately to 0.6726 by the `payToTalk` proof, read -0.1401 later.
+
+So there are two effects and the larger is not the per-victim one:
+
+- a personal penalty on the victim, real but smaller than earlier entries
+  claimed
+- a town-wide slide driven by the rider's accumulated crime record, which
+  drags everyone toward the 0.2 threshold together
+
+Every absolute comparison in the entries above is contaminated by the second.
+The victim at the bottom of the distribution is not uniquely branded; he is
+the low end of a population that fell. A playthrough that does not include a
+night of assault testing would not see this.
+
+### Shop guards are renegades, and renegades keep no grievance
+
+`soul:GetSocialClass().SoulCrimeRoleId` reads **3** for the `security` class,
+which the `crimeSystemRole` enum names **renegade**, not soldier. The renegade
+branch of the hit handler in `sb_combat.xml` is the shortest of the three:
+
+    if crimeSystemRole == renegade:
+        t_state = fight, opponent = realAttacker
+
+with no `CreateInformation label='assault'` anywhere in it. The soldier branch
+creates one whenever the attacker is the player, and the civilian branch
+creates one on the path where the victim declines to fight.
+
+That is a concrete mechanical reason a shop guard leaves no lasting grievance
+where a merchant or a villager, both `civilian` and both `SoulCrimeRoleId` 1,
+does.
