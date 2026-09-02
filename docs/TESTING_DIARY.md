@@ -12467,3 +12467,59 @@ proportionally. Both are console values and a save reload wipes them.
 
 Note that `stamina` reads 150 on the player rather than 100, so setting it to
 100 lowers it.
+
+---
+
+## Corrections to the assault aftermath, and what a beaten NPC actually does
+
+Several claims made earlier in this session were wrong and are corrected here.
+
+### No state reading beyond about 25 m is trustworthy
+
+Three separate NPCs were called stuck on readings taken at 40 to 80 m, after
+the same session had already established, with a beggar at 116 m, that a
+distant actor reads as motionless because its AI is not ticking. The engine
+carries `wh::xgenaimodule::BehaviorTree::C_LODCombat`, so AI level of detail
+is real. The one NPC that genuinely was wedged, `rat_man12`, was read at 23 m.
+
+A useful tell: an unsimulated actor's position is identical to the decimal
+place across samples, while a simulated one that happens to be standing still
+still jitters.
+
+### `Lying` at full health is a routine activity
+
+The merchant was found in `Lying` and taken for injured or stuck. At the same
+moment ten NPCs within 80 m were `Lying`, **every one at 100 health**,
+including six guards, a scribe and a villager. It is a scheduled rest, not
+damage and not a fault.
+
+### An injured NPC does heal
+
+The claim that an NPC never heals, which the auto-cure suppression exists to
+work around, does not hold in general. The merchant's health was measured
+recovering on its own from 67.4 to 79.7 with nothing done to him.
+
+### What a beaten NPC actually does
+
+Repeated across two runs, the second on a fresh reload with a baseline of
+0.5378 on the victim and both controls:
+
+1. Punched on foot, with none of this mod running, he flees.
+2. The rider surrenders and the crime is settled.
+3. He **returns to his own stall**. His daycycle is intact and he is not
+   displaced permanently.
+4. He flees again as soon as the rider approaches, and runs far enough to
+   leave the streaming radius entirely.
+
+So the assault does not break the NPC. It leaves him unwilling to be near the
+player, which makes his shop unusable while it lasts.
+
+Whether the relationship value is what drives the flee is inference rather
+than measurement: two NPCs support it, one at `-0.0000` who fled and one at
+0.7192, above baseline after the rider surrendered to him, who did not. The
+value itself did not decay across four in-game days.
+
+`soul:ModifyPlayerReputation(repChangeName, propagateToFaction)` is the lever
+that would test recovery directly, but every reputation change name
+recoverable from behavior data is a penalty, and the `reputation_change`
+table's rows do not come back through the `Database` bind.
