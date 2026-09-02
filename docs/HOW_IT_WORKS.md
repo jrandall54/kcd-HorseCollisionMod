@@ -29,6 +29,31 @@ own behavior for the wounded, which stands them still until they slowly heal.
 The mod exempts anyone it knocks down from that, using the same mechanism the
 game uses for its own characters, so a victim gets up and carries on.
 
+### Losing patience
+
+Barging the same man at walking pace costs nobody anything: no damage, no
+stamina, no crime. Ridden into repeatedly he now runs out of patience. The
+first shove is free, and every one after that rolls against a chance that
+grows with the count, until he turns and fights.
+
+That fight is deliberately not a crime. No fine is levied and no guard is
+summoned for the provocation itself, because the message the mod sends is one
+the game's own data marks as costing no reputation. A charge appears only if
+**you** swing, and only if somebody sees it. Guards who witness the brawl wade
+in, which is them reacting to what they saw.
+
+A guard shoved the same way arrests rather than brawls. That is the game's
+own rule for soldiers and it is left alone: the crime-free scuffle is for the
+people who have no authority to arrest anyone.
+
+Women do not fight back. The game refuses them the fight branch outright, and
+nothing the mod sets changes it.
+
+The brawl ends when the victim's own state says it has ended, not on a timer.
+Usually the game resolves the encounter itself and the mod does nothing at
+all; only a victim who leaves the fight and keeps running with the rider well
+clear is told to stand down and sent back to work.
+
 ## The approach
 
 The first version was a physics hack: every impact applied a raw impulse and

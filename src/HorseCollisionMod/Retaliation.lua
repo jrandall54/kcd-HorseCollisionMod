@@ -51,6 +51,8 @@
 -- offered to her, and the reason is logged.
 --
 -- @module Retaliation
+-- @author jrandall54
+-- @release 4.6.0
 
 --- The context option that makes a victim answer a hit with a fight.
 --
@@ -253,6 +255,7 @@ end
 --
 -- @tparam string state the animation state
 -- @tparam number speed meters per second since the previous sample
+-- @tparam number playerRange meters between the victim and the rider
 -- @treturn string one of `engaged`, `fleeing` or `settled`
 function HorseCollisionMod:ClassifyVictim(state, speed, playerRange)
 	if state ~= nil then

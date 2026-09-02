@@ -23,18 +23,31 @@ number.
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-09-02
+
 ### Added
 
-- Victims lose patience. Barging the same person at a walk used to cost
-  nobody anything; now each shove is counted, and past the first one every
-  further shove rolls against a growing chance that they turn and fight.
-  `Retaliation`, `RetaliationFreeBumps`, `RetaliationChanceStep`,
-  `RetaliationMaxChance`, `RetaliationMemorySec` and `RetaliationHoldSec`
-  control it, and setting `Retaliation` to false restores the old behavior.
-- A provoked fight is not a crime. No fine is levied and no guard is
-  summoned, because the hit that starts it carries the engine's own
-  `real = false` and never reaches the reputation system. Guards who witness
-  the brawl still join in, which is the game deciding rather than this mod.
+- Victims lose patience. Barging the same man at a walk used to cost nobody
+  anything; now each shove is counted, and past the first one every further
+  shove rolls against a growing chance that he turns and fights. `Retaliation`,
+  `RetaliationFreeBumps`, `RetaliationChanceStep`, `RetaliationMaxChance` and
+  `RetaliationMemorySec` control it, and setting `Retaliation` to false
+  restores the old behavior.
+- A provoked fight is not a crime. No fine is levied and no guard is summoned
+  for the provocation, because the message that starts it never reaches the
+  reputation system. A charge appears only if you swing, and only if somebody
+  sees it. Guards who witness the brawl still wade in, which is the game
+  deciding rather than this mod. Faction reputation was measured across a
+  full provoked brawl and did not move.
+- A guard provoked the same way arrests rather than brawls. That is the
+  game's own rule for soldiers, kept deliberately.
+- Women do not fight back. The game refuses them the fight branch outright.
+- The brawl ends when the victim's own state says it has, never on a timer.
+  Usually the game resolves the encounter itself and the mod does nothing;
+  only a victim who leaves the fight and keeps running, with the rider well
+  clear, is told to stand down and sent back to work.
+  `RetaliationFleeSpeed`, `RetaliationFleeIgnoreRange`,
+  `RetaliationFleeSamples` and `RetaliationCeilingSec` tune that.
 
 ## [4.5.1] - 2026-09-02
 

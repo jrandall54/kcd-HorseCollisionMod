@@ -514,3 +514,99 @@ Reached through item entity. An item lying in the world.
 | `StartUse` | id |
 | `StopUse` | id |
 | `Use` | id |
+
+## Contexts
+
+Reached through `Contexts`. Global, from `Scripts/Script/Context.lua`. Per-NPC
+behavior switches, and the API vanilla quests use to change how an NPC
+behaves.
+
+    Contexts.SetPersistentOption(entity, option, handle, params)
+    Contexts.SetNonpersistentOption(entity, option, handle, params)
+    Contexts.ClearOption(entity, option, handle, params)
+    Contexts.CheckOption(entity, option)
+    Contexts.SetNonpersistentPreset(entity, preset, handle, params)
+    Contexts.SetPersistentPreset(entity, preset, handle, params)
+    Contexts.ClearPreset(entity, preset, handle, params)
+
+Every option is carried on a named **handle**, so several systems can request
+the same option and clearing one does not disturb another. `ClearOption`
+throws when the handle was never set, which is a useful way to tell "cleared"
+from "was never held". `Contexts.RestoreEntity`, `ResetEntity` and
+`EnsureEntityIsRestored` concern restoring context data after a load, not
+relocating an NPC.
+
+`Scripts/Script/ContextData.lua` catalogs **89 options and 14 presets**.
+Vanilla drives NPC behavior with them directly: `q_ledecko` sets
+`fightAllHostilePerceptibles` on four bandits, `q_huntPtacek` on two Cumans,
+`q_hareHunt` applies the `berserk` preset.
+
+The ones that bear on collisions and fights:
+
+| Option | Effect |
+| --- | --- |
+| `alwaysFightWhenHit` | answers a hit with a fight rather than the usual response |
+| `fightAllHostilePerceptibles` | fights anything perceived hostile |
+| `suppressFightMoraleChecks` | removes the morale gate that makes civilians flee |
+| `disableChangeHostilityOnHit` | a hit does not change hostility |
+| `neverAcceptSurrender` | refuses a yield |
+| `suppressDudeHostilePerceptionStimuli` | ignores the player being perceived as hostile |
+| `suppressReputationHitOnDudeHit` | being hit by the player costs no reputation |
+| `suppressCollisionsBark` | silences the collision bark |
+| `suppressHitReactions` | no hit reaction at all |
+| `suppressAutoCure` | exempt from the auto-cure daycycle |
+
+Presets compose them. `berserk` is `fightAllHostilePerceptibles` plus
+`suppressFightMoraleChecks`. `eventEnemyWithFriendlySuperfaction`, an enemy
+who fights the player without the world turning on them, is
+`suppressDudeProxBark`, `suppressPickNoticedItems` and
+`suppressReputationPreventForDudeHits`.
+
+## Combat subbrain messages
+
+Sent with `XGenAIModule.SendMessageToEntityData(wuid, type, table)`, where the
+table is built by `Utils.makeTable(type, {...})` and validated against
+`Libs/AI/TypeDefinitions.xml`. **The target is `npc.this.id`, the WUID, not
+`npc.id`**: sent to the entity id a message is accepted and discarded in
+silence.
+
+Thirty-seven `combat:` types appear across the vanilla behavior XML.
+`MessageTypes.xml` registers which are addressable. The ones used or
+evaluated here:
+
+| Message | Payload | Effect |
+| --- | --- | --- |
+| `combat:hit` | attacker, strength, hitType, real | a hit through `sb_switch_hitreactions.xml`, which both scores reputation and broadcasts an assault volume |
+| `combat:stimulus:hit` | attacker, kind, real | the same decision without the broadcast, straight to the combat subbrain |
+| `combat:stimulus:hostilePerception` | perceptible | fight, flee or report, chosen by `crimeSystemRole` and morale |
+| `combat:stimulus:standDownRequest` | *empty* | ends the combat state. The declared member `_` is a placeholder and passing it is rejected |
+| `combat:stimulus:customBehaviorRequest` | behaviorName or includeXml/includeTree, suppressStimuli, entity | runs a behavior with other stimuli suppressed |
+| `daycycle:restartRequest` | reason, speed | sends an NPC back to their activity |
+
+`sb_combat.xml` rejects any stimulus arriving while the receiver is already in
+`fight` or `flee`, **except** `standDownRequest` and `customBehaviorRequest`,
+which are named exemptions. That is the only way to reach someone mid-flight.
+
+## Faction
+
+Returned by `RPG.GetFactionById(id)` and `RPG.GetFactions()`, which answers 98.
+The methods are reached through a metatable rather than listed by `pairs`,
+which shows only `__FactionId`.
+
+| Method | Notes |
+| --- | --- |
+| `GetId` | |
+| `GetName` | e.g. `ui_fac_rataje_out_villagers` |
+| `GetLocationId` | |
+| `GetReputation`, `GetBaseReputation` | 0 to 1, 0.5 typical |
+| `AddReputation(sEnumName)` | takes an enum name, not a number |
+| `GetAngriness`, `SetAngriness(float)`, `AddAngriness(float)` | clamped to 1.0 |
+
+**Angriness is not a hostility switch.** Every faction in the game set to
+maximum produced no hostility whatsoever. `wh_rpg_angriness [-f ID [-a N]] [-p]`
+dumps the same data from the console.
+
+`soul:GetRelationship(playerWuid)` is the individual counterpart, and is what
+a beating lowers. It moves globally for everyone as town standing changes, so
+compare a victim against an untouched neighbor rather than against an
+absolute.

@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.5.0
+-- @release 4.6.0
 
 --- Applies the appropriate reaction for one collision.
 --
