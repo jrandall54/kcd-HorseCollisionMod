@@ -13051,3 +13051,51 @@ are not callable as they stand. What they establish is that combat against a
 mounted target, and mounted combat including a rear, are things the game
 already has written. The roadmap item about a heavy impact rearing the horse
 has a named behavior behind it rather than only a fragment.
+
+## `MessageTypes.xml` is not a whitelist, and two closures rested on reading it as one
+
+`Libs/AI/MessageTypes.xml` holds **41 entries**, each carrying an
+`ImportanceLevel` or an `IsContextRelated` attribute. Absence from it was
+twice treated as evidence that a message cannot be sent from Lua.
+
+That is wrong, and this mod disproves it every time a victim recovers.
+**`daycycle:restartRequest` does not appear in that file**, and
+`Recovery.lua` sends it through `XGenAIModule.SendMessageToEntityData` with a
+payload built by `Utils.makeTable`. It works, and it was measured: an empty
+payload moved a parked victim 0.00 m and a filled one moved him 3.94 m back to
+his stall.
+
+The file configures properties for the messages that need non-default ones.
+Everything else takes defaults. It says nothing about deliverability.
+
+### What that reopens
+
+- **Forcing an unarmed brawl.** `combat:order` carries a `restrictWeaponKind`
+  sub-order taking `weaponChange.unarmed`, and was set aside partly because
+  the type is not registered. It may well be sendable.
+  `human:HolsterWeapon()` is still the simpler route and should be tried
+  first, but the reasoning that closed this one was unsound.
+- **The duel and sparring system.** `sa_duel.xml` carries
+  `duel:startDuelWithPlayer` with a bet, a difficulty, `isWooden`, and
+  `enemyWeapons` from an enum that includes `Unarmed`, and it ends cleanly
+  through `duel:stopDuel` carrying a winner. That was closed with "none of the
+  `duel:` types appear in `MessageTypes.xml`, so they are almost certainly
+  local to the scripted action". Only the second half of that sentence is
+  still worth testing, and it needs testing rather than asserting: whether an
+  NPC not running `sa_duel` has anything listening.
+- **Behavior patches.** `daycycle:patch` is a message type used in the
+  behavior XML and absent from `MessageTypes.xml`, and
+  `XGenAIModule.RemoveDaycyclePatch` is a real Lua bind, so removal is
+  reachable. Whether a patch can be added by message is untested, and it is
+  the route to `man_chase`, the pursuit behavior closed as unreachable.
+
+### The general lesson
+
+Three separate closures in this project rested on a written artifact being
+read as more authoritative than it is: the `C_ScriptBind*` headers taken as
+the whole Lua surface, `MessageTypes.xml` taken as a whitelist, and
+`GetTableColumnData` returning nothing taken as a table being empty. In each
+case the artifact answered a narrower question than the one being asked.
+
+The check that would have caught all three is the same: **try it in the
+running game.** A probe costs a minute.
