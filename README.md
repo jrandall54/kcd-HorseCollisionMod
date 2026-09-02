@@ -147,6 +147,9 @@ tools/
                           item class GUIDs to readable names
   probe_tables.lua        dumps a game table's columns and rows through
                           the Database bind
+  dev_survival.lua        holds the player's nourishment and energy at 100,
+                          so a test needing game time is not also a test of
+                          finding food in hardcore
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   version_check.py        derives the next version from CHANGELOG.md
