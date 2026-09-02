@@ -48,10 +48,14 @@ Known gaps carried into later phases:
       vanilla to leave alone. Correcting the get-up pairings had already fixed the
       rotation behind most of it; `GroundRotation` and the ragdoll settle layer do
       nothing and are not used.
-- [ ] The horse and a staggering NPC can still push against each other instead of clearing
-      past. Setting the animation's collider mode to `Disabled` did not resolve it, and it
-      matches vanilla behavior when riding head-on into someone. Revisit with Phase 2
-      momentum, if at all.
+- [ ] The horse and a downed NPC push against each other instead of clearing
+      past, and the rider can be left stuck on a body. `ColliderMode` on this
+      mod's own fragments is `Interactive`, so a victim collides with
+      everything including the horse. Vanilla also defines `GroundedOnly`,
+      which keeps a body on the floor without colliding with other actors.
+      One value in a ProcLayer already generated, and the same change the
+      armor knockback item below depends on. `Disabled` does not resolve the
+      walk stagger case; `GroundedOnly` is untested.
 - [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
       physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
 - [ ] A one-frame animation fires as an NPC stands up from a trot ragdoll. It does not
@@ -210,33 +214,36 @@ and both axes of the footprint were each cleared against logged sessions.
 
 ### Parked
 
-- [ ] Drop the shipped armor weight table and read the game's tables directly.
-      The `Database` bind exposes them: `pickable_item` carries `item_id` and
-      `weight`, `armor` carries `item_id`, `smash_def` and `armor_type_id`, and
-      the class an item reports joins straight to `pickable_item.item_id`.
-      Membership of `armor` is what decides worn rather than carried. This was
-      built once and verified in game against a live inventory, 18 items matched
-      with none missed and 796 armor pieces indexed, and it removed
-      `build_item_weights.py`, its build step and the shipped file, cutting the
-      download by about a third. The figures are in the testing diary, which
-      records them as a measurement of that build rather than a claim about the
-      current one. It was then orphaned when `main` was
-      reset to 4.0.0 and is not in any branch; the implementation is in commit
-      `093ae77`, reachable only by SHA. Rebuild it forward onto
-      `HorseCollisionMod/Armor.lua` rather than cherry-picking, since the file
-      layout it was written against no longer exists.
+- [x] The shipped armor weight table is gone. `Armor.lua` reads the game's
+      own tables through the `Database` bind: `pickable_item` carries
+      `item_id` and `weight`, `armor` carries `item_id`, `smash_def` and
+      `armor_type_id`, and the class an item reports joins straight to
+      `pickable_item.item_id`. Membership of `armor` decides worn rather
+      than carried. The index builds 796 armor pieces in game, three victims
+      ridden down before and after the change reported identical weights,
+      and the download fell from 71,925 to 52,547 bytes.
+      `build_item_weights.py`, its build step and the shipped Startup script
+      are removed.
 
-- [ ] Close the gap between a trot fall clip ending and the engine beginning
-      the get-up. Roughly a second in `MotionIdle` with nothing happening and
-      nothing asked for, and the only part of the lie-down this mod can
-      shorten. The rest of it is `BlendRagdoll`, which is the engine's get-up
-      blend: 2,570 ms for men and 5,100 ms for women, the same on the gallop
-      path where no data of this mod's is involved, and unmoved by `ExitTime`,
-      `Sleep`, `g_ragdollPollTime` or `ca_DeathBlendTime`. Tuning
-      `FALL_SETTLE_AT` per direction, which this list previously proposed, is
-      not the fix: it decides when the body goes limp, not how long it stays
-      down, and the lie-down is the same length at every direction.
+- [ ] Shorten the wait between a trot victim going limp and standing up.
+      Nothing settable reaches it. Measured from the handover rather than
+      from the end of the clip it is a consistent 1,457 ms, the same for
+      both character sets, and unmoved by `ExitTime`, `Sleep`, `Stiffness`,
+      `p_group_damping`, `g_ragdollPollTime` and `ca_DeathBlendTime`. The
+      stand-up that follows runs 2,570 ms for men and 5,100 ms for women,
+      and the gallop tier reaches both through `actor:Fall` without touching
+      any data this mod ships. What governs the stand-up is a terminator on
+      vanilla's `BlendRagdoll` option, which resolves through
+      `ActionController`; this mod redirects only `AnimDatabase3P`,
+      deliberately, so an override of it is never read.
 
+      The best lead is an accident: Mutt walked onto a downed guard and the
+      wait grew. A fixed duration cannot do that, so the wait is a condition
+      being tested rather than a timer running out, and something about the
+      body or the space above it is what fails the test. That reframes the
+      problem and is worth more than another parameter sweep.
+      `g_hitDeathReactions_disableRagdoll`, which disables switching to
+      ragdoll at the end of animations, is the one setting in reach untried.
 - [x] A polearm guard's get-up plays wrong: he turns roughly a hundred and
       eighty degrees near the end of it and then swings back. Measured, and it
       is not this mod's. The turn tracks a drawn halberd exactly, at 114 to 178
@@ -281,12 +288,16 @@ armor.
       by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
       and the split between what the engine owns and what the mod owns does not hold as written
       at the top of this phase.
-- [ ] Read an entity's carried items and their weights, generic over the entity so Phase 3
-      barding uses the same call on the horse. `inventory:GetInventoryTable()` returns the
-      item WUIDs and `ItemManager.GetItem(wuid)` returns `class`, which joins to the item
-      tables for weight. No bind reports which items are equipped, but an NPC carries only
-      what it wears plus a few trinkets, so filtering the whole inventory to armor classes
-      is equivalent for a target.
+- [x] Read an entity's carried items and their weights, generic over the
+      entity so Phase 3 barding uses the same call on the horse.
+      `inventory:GetInventoryTable()` returns the item WUIDs and
+      `ItemManager.GetItem(wuid)` returns `class`, a GUID that joins to
+      `pickable_item.item_id`. `ItemManager.GetItemUIName(class)` turns that
+      into a readable name. No bind reports which items are equipped, but an
+      NPC carries only what it wears plus a few trinkets, so filtering the
+      inventory to the classes in the `armor` table is equivalent for a
+      target. `human:GetItemInHand(hand)` reports a held weapon, and only
+      while it is drawn.
 - [ ] Unarmored targets take proportionally heavier knockback and armored targets are moved
       less, through one multiplier on `Ragdoll`'s `impulseScale`. A naked target reaches 1.50
       and a target in mail 0.41, against 1.00 at `ArmorReferenceWeight`. Reopened: the
@@ -298,7 +309,22 @@ armor.
       rather than at the impulse being wrong. Measure the two separately before changing
       either: an armor multiplier tuned against a distance the horse is dictating will be
       tuned to the wrong thing.
-- [ ] Striking a heavy target strips the horse's momentum rather than only its stamina.
+
+- [ ] Prerequisite for the item above: stop the horse carrying its victim.
+      An armor multiplier tuned while the horse is still pushing the body is
+      tuned to the horse rather than to the armor, which is why armored and
+      unarmored targets are reported traveling alike. `GroundedOnly` on the
+      reaction fragment removes horse-to-victim contact after the impact,
+      leaving `Knockback` and `Uplift` to decide where a body lands. The hit
+      itself still lands first, so the damage the engine applies is
+      unchanged. A heavy target could also take an animated stagger in place
+      of a full ragdoll, so mass reads as refusing to be thrown rather than
+      as being thrown a shorter distance.
+- [ ] Striking a heavy target strips the horse's momentum rather than only
+      its stamina, and shows on the horse. `kcd_horse_controllerdefs.xml`
+      declares a `Rear` fragment, so a heavy impact can rear or check the
+      horse rather than only debiting a number the player cannot see. That is
+      the horse's half of what armor should feel like.
 - [x] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
       A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
       target in mail, multiplying with the combat multiplier already applied and with the
@@ -343,6 +369,12 @@ rather than missing.
       the one at 500 ms. Reaching the injury system is separate work from causing the damage.
       This is a statement about the window after an impact and not about the total cost of
       being trampled, which the item above covers.
+
+- [ ] A victim shows they were hurt. `actor:AddBlood(string, number)` and
+      `actor:AddDirt(number)` are both available, so someone ridden down at
+      trot can stand up bloodied and muddy instead of immaculate. Cosmetic,
+      cheap, and it is the feedback that makes an impact read as an injury
+      rather than as a stumble.
 - [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
 - [ ] Horse barding increases impact force and reduces momentum loss.
 - [ ] A braced polearm hit head-on acts as a wall: heavy stamina cost, near-certain dismount.
@@ -351,11 +383,27 @@ rather than missing.
 
 - [ ] Riding through a packed group inflicts a morale shock, so lightly armored enemies
       break and flee using native AI.
+
+- [ ] The collision bark fires while the victim is still falling or lying as
+      a ragdoll, which is nobody's idea of speaking. It should land as they
+      get up.
+
+      Reachable. The bark is vanilla's, not this mod's: it fires with
+      `SendHitReaction` switched off, and `sb_switch_hitreactions.xml` raises
+      it as `dialog:monologRequest` carrying the metarole `KOLIZE_S_HRACEM`,
+      or `KOLIZE_S_HRACEM_LEHKA` for a light contact and
+      `KOLIZE_S_HRACEM_NA_KONI` for a mounted one. A vanilla quest script
+      removes and restores those metaroles with
+      `soul:RemoveMetaRoleByName` and `soul:AddMetaRoleByName`, so the same
+      calls can silence the request at the impact and send one deliberately
+      once the victim is upright.
 - [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
       a guard down registers no bounty, but trampling a villager to death brought the
       guards down on the rider and carried a jail sentence, with no crime code in the mod.
-      So the threshold is the outcome rather than the hit, and non-lethal trampling being
-      free is the part still open.
+      The threshold was the outcome rather than the hit, and non-lethal
+      trampling being free is closed: 4.3.0 sends a real, player-attributed
+      `combat:hit`, so riding someone down at trot or gallop is charged as
+      a brawl whether or not they die. `CollisionIsCrime` turns it off.
 
 The `hitReaction` message the mod already sends is the hook for both, and vanilla
 distinguishes light from normal collisions through the `KOLIZE_S_HRACEM` and
