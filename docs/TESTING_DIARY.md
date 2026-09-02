@@ -13099,3 +13099,24 @@ case the artifact answered a narrower question than the one being asked.
 
 The check that would have caught all three is the same: **try it in the
 running game.** A probe costs a minute.
+
+### Confirmed: the unregistered types are all constructible
+
+Tested against the running game. `Utils.makeTable` builds every one of them:
+
+    combat:order                          ok
+    daycycle:patch                        ok
+    duel:startDuelWithPlayer              ok
+    combat:fightOptions                   ok
+    combat:stimulus:standDownRequest      ok
+    daycycle:restartRequest               ok
+    combat:stimulus:hostilePerception     ok
+
+Four of those seven were set aside on the grounds that they are absent from
+`MessageTypes.xml`. The type system knows all of them, because
+`Utils.makeTable` validates against **`TypeDefinitions.xml`**, which is the
+registry that matters. `MessageTypes.xml` was never it.
+
+Constructing a message is not the same as a tree listening for it, and that
+half still needs a target in a loaded world. But "it cannot even be built or
+addressed" is finished as a reason to close anything.
