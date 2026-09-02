@@ -70,7 +70,7 @@
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.5.0"
+HorseCollisionMod.Version = "4.5.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
