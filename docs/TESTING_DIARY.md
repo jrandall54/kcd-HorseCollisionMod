@@ -11482,3 +11482,450 @@ Nothing. The extender is still a C++ plugin loader with no Lua, still needs an
 address library per build, and is still not something to ship against. The
 value was never the loader; it is the headers, and those are readable without
 installing anything into the game.
+
+---
+
+## Trampled non-guards flee to report the crime, and none of them fights back
+
+Three non-guards ridden down at trot outside a town, at shipped defaults with
+`CollisionIsCrime` on, to settle whether choosing fight or flight is this mod's
+work or the crime system's. Two women and Miller Peshek.
+
+**Every one of them registered being attacked and ran for a guard to report the
+crime. None turned on the rider.**
+
+| victim | gender | speed | reaction | damage | travel at t+10s |
+|---|---|---|---|---|---|
+| `rat_spaAbbess` | female | 6.99 | `hcm_fall_forward` | -5.74 | 2.37 m |
+| `rat_woman11` | female | 6.81 | `hcm_fall_forward` | -5.61 | 6.36 m |
+| `rat_pesek` | male | 6.94 | `hcm_fall_back` | -6.59 | 20.46 m |
+
+All three took `CombatHit ok=true strength=5`, all three recovered without
+intervention, and `ReplanIfStranded` resumed all three from `MotionIdle` or
+`MotionMovement`.
+
+The travel figures separate walking away from running for help. Between
+t+6000ms and t+10000ms, Peshek covered 19.78 m, a sustained **4.95 m/s** — a
+full run, faster than the 4.5 m/s trot threshold that floored him. The two
+women managed 1.40 m/s and 0.42 m/s over the same window, which is a brisk walk
+and a limp, and both were still accelerating when sampling stopped.
+
+### What this settles
+
+The flight half of retaliation already exists and costs nothing to keep. It
+comes from the crime system, driven by the player-attributed `combat:hit` this
+mod has sent since 4.3.0, and it produces a witness walking to a guard rather
+than an NPC ignoring the impact.
+
+The fight half does not happen at all. Three victims, three reports, no
+aggression. Nothing in the crime response turns a trampled civilian hostile,
+so an NPC that comes after the rider has to be made hostile deliberately.
+
+### How angriness is reachable
+
+`C_ScriptBindRPGModule` is the Lua `RPG` table, and it registers
+`GetFactions()`, `GetFactionById(id)` and `IsPublicEnemy(wuid)`. The faction
+objects those return carry `C_FactionScriptBind`, which registers
+`GetAngriness()`, `SetAngriness(float)` and `AddAngriness(float)` alongside
+`GetReputation()` and `AddReputation(sEnumName)`. That is a complete path from
+Lua to faction hostility, without a behavior patch and without the script
+extender.
+
+The binary carries a console command for the same data:
+
+    wh_rpg_angriness [-f FACTION_ID [-a ANGRINESS]] [-p]
+
+which dumps all faction angriness and takes a value, so angriness can be
+watched across a collision before any code is written against it. The engine
+also names `GetActorAngriness` and `GetFactionAngriness` as XGen functions and
+ships an `angriness_enum` table and `C_AngrinessEnumDatabase`, so angriness is
+banded rather than a bare float.
+
+### Confirmed in the running game
+
+Probed over the remote console immediately after the ride above, so the
+catalog no longer carries the reverse-engineering caveat for this bind.
+
+`RPG` is a real Lua table. `RPG.GetFactions()` returns **98 factions**, each a
+table carrying `__FactionId` with the bound methods reached through its
+metatable rather than listed by `pairs`. `RPG.GetFactionById(42)` returns
+`Faction[#42, name=ui_fac_rataje_out_villagers]`, and on it:
+
+| call | result |
+|---|---|
+| `f:GetId()` | `42` |
+| `f:GetName()` | `ui_fac_rataje_out_villagers` |
+| `f:GetAngriness()` | `0` |
+| `f:GetReputation()` | `0.5` |
+
+`wh_rpg_angriness -p` dumps 56 rows with per-faction angriness, the faction's
+location and position, a last-update stamp and a max distance, plus each
+faction's relations to the others as a signed value and a distance.
+
+**Faction angriness did not move.** Every Rataje faction reads `0` after three
+trampling crimes committed minutes earlier, with a last-update stamp of
+`-6.44e-07` shared across all of them, which is a faction that has never been
+updated rather than one updated and decayed. So the crime hit this mod sends
+drives the witness-and-report response without touching faction hostility at
+all, and hostility would have to be set deliberately.
+
+Whether angriness is the right dial remains open: the engine names
+`GetActorAngriness` separately from `GetFactionAngriness`, so a single trampled
+villager may carry anger the faction does not. `SetAngriness` and
+`AddAngriness` are untested, deliberately — they write to faction state in a
+live save and could sour a whole town permanently.
+
+---
+
+## Faction angriness is not hostility, and `hostilePerception` is
+
+`SetAngriness` works, takes a float, and clamps at 1.0: writing 2, 10 and 100
+each read back as exactly 1. Written across **all 98 factions at once**, so
+that the question could be answered by walking up to whoever was nearest
+rather than by working out which faction an NPC belongs to.
+
+**Nothing happened.** Every NPC in Rataje behaved normally with their faction
+at maximum angriness: no drawn weapons, no squaring up, no aggression, and a
+walk stagger still produced the ordinary reaction rather than a fight.
+
+So angriness is not a hostility switch. It is a number the crime and faction
+systems read when they decide something, and setting it directly bypasses
+whatever consults it. The engine's dump confirms the write lands —
+`wh_rpg_angriness -f 42` reported `0.999919` with a fresh last-update stamp
+seconds after the write, so the value is real and decays — but no behavior
+hangs off it on its own.
+
+### The message that does decide
+
+`vanilla_scripts/Libs/AI/final/sb_combat.xml` handles
+**`combat:stimulus:hostilePerception`**, carrying a `perceptible`, and that
+single message is where fight, flee and report are chosen. The branch on
+`crimeSystemRole`:
+
+- **circator or monk** — flees if the perceptible is the player, otherwise
+  builds a `threat` information and goes to `report`.
+- **civilian, renegade or soldier** — reaches the fight branch, which sets
+  `t_state = fight`, `t_fightParams.opponent = perceptible`, and sends a
+  `combat:bark` with the metarole `SPATRENI_NEPRITELE_-_UTOK`, spotting an
+  enemy and attacking.
+
+The fight branch is gated, and the gates are the interesting part:
+
+- `b_context['fightAllHostilePerceptibles']`, a context flag that skips every
+  check below and goes straight to fighting.
+- otherwise a `LuaGate` running
+  `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat`. **`RPG.MoraleForCombat`
+  reads `0.2` in game.**
+- then a `MoraleCheck` at `ThreatLevel` 0.400000 for a soldier or renegade and
+  0.550000 for a civilian, or a `CompareMorale` of observer against target.
+
+That is a native courage gate. A brave NPC turns on the rider and a timid one
+does not, decided by the game's own morale stat against the rider's, with no
+probability constant invented by this mod.
+
+### Why this is reachable
+
+The delivery is the call this mod already makes.
+`XGenAIModule.SendMessageToEntityData(target, type, content)` is what `Crime.lua`
+uses to send `combat:hit`, and it is the same call vanilla's own `Crime.lua`
+uses to send `combat:confrontationFeedback` and `combat:friskFeedback` into the
+combat subbrain. `XGenAIModule.SendMessageToEntityData` is confirmed live.
+
+Thirty-seven `combat:` message types appear across the vanilla behavior XML,
+`combat:stimulus` at 154 uses being the most common by a wide margin, and the
+subbrain reads them from a `combatStimulus` inbox.
+
+### Status
+
+The message has not been sent yet. What is established is that faction
+angriness is the wrong dial, that a right one exists, that its gate is morale
+rather than a coin flip, and that the transport is already in the mod.
+
+---
+
+## `hostilePerception` works, and morale decides who fights
+
+`combat:stimulus:hostilePerception`, carrying the player as `perceptible`,
+sent to eight NPCs at once and sampled for ten seconds afterwards rather than
+watched. One attacked and seven fled.
+
+| NPC | morale | dist at send | dist at t+10s | travel | end state |
+|---|---|---|---|---|---|
+| `rat_guard23` | **0.668** | 11.71 | **2.02** | 13.91 | **`CombatMovement`** |
+| `rat_merchant_shop3` | 0.269 | 4.04 | 32.30 | 31.83 | `MotionMovement` |
+| `rat_man97` | 0.191 | 4.03 | 25.25 | 28.91 | `MotionMovement` |
+| `rat_merchant_shop1` | 0.171 | 13.52 | 31.32 | 29.84 | `MotionMovement` |
+| `rat_swordsmiths_wife` | 0.171 | 9.37 | 38.48 | 30.56 | `MotionMovement` |
+| `rat_refugee_Radan` | 0.171 | 14.21 | 47.93 | 35.35 | `MotionMovement` |
+| `rat_pickpocket_woman1` | 0.171 | 14.41 | 46.51 | 33.14 | `MotionMovement` |
+| `rat_woman3` | 0.171 | 14.51 | 49.50 | 39.16 | `IdleToMove` |
+
+The guard closed from 11.71 m to 2.02 m and entered `CombatMovement`, the
+combat locomotion state, while every other NPC ran 25 to 50 m in the opposite
+direction. Nothing else was sent and nothing in the mod was changed.
+
+### The address is `this.id`, not `id`
+
+An earlier attempt sent the same message to `ent.id` and produced nothing at
+all. The two are different objects:
+
+    rat_merchant_shop3   ent.id    = 000000000007C0FA
+                         this.id   = 0500000000000763
+    player                         = 0500000000000A53
+
+The `05` prefix marks a WUID, and `Crime.lua` already sends `combat:hit` to
+`this.id` for exactly this reason. A message sent to the entity id is accepted
+and discarded silently, which is the same failure recorded against
+`daycycle:restartRequest` and against a `key(value)` payload. **A null result
+from a typed message means the address or the shape is wrong before it means
+the mechanism is absent.**
+
+### The gate is not the constant alone
+
+`RPG.MoraleForCombat` reads `0.2`, and `sb_combat.xml` gates the fight branch
+on `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat`. But
+`rat_merchant_shop3` reads 0.269, clears that constant, and fled anyway.
+
+The `MoraleCheck` that follows explains it: threat level **0.400000** for a
+soldier or renegade against **0.550000** for a civilian. A townsman at 0.269
+fails the civilian check; a guard at 0.668 passes the soldier one. So the
+split observed is the one the tree describes, and it lands where it should —
+**guards fight, civilians run** — without this mod choosing anything.
+
+Civilian morale is strikingly uniform: 0.171 for six of the eight, which
+suggests a class default rather than a per-NPC roll.
+
+### `IsInCombatDanger` is not a hostility read
+
+It returned `false` for every NPC at every sample, including the guard at 2 m
+in `CombatMovement`. Whatever it reports, it is not "this NPC is fighting the
+player", and it should not be used to detect retaliation.
+
+---
+
+## The context system is the real API, and it is a menu of about ninety switches
+
+`Scripts/Script/ContextData.lua` catalogs **89 context options and 14 presets**,
+and `Scripts/Script/Context.lua` exposes them to Lua as `Contexts`:
+
+    Contexts.SetPersistentOption(entity, option, handle, params)
+    Contexts.SetNonpersistentOption(entity, option, handle, params)
+    Contexts.ClearOption(entity, option, handle, params)
+    Contexts.CheckOption(entity, option)
+    Contexts.SetNonpersistentPreset(entity, preset, handle, params)
+    Contexts.ClearPreset(entity, preset, handle, params)
+
+Vanilla quests drive NPC behavior with exactly these calls. `q_ledecko` sets
+`fightAllHostilePerceptibles` on four bandits, `q_huntPtacek` on two Cumans,
+and `q_hareHunt` applies the `berserk` preset. Every option is carried on a
+named **handle**, so several systems can request the same option and clearing
+one does not disturb another.
+
+Applied here to 20 NPCs at once: 19 accepted `alwaysFightWhenHit` and
+`Contexts.CheckOption` read back `true` for all of them. The one refusal was
+`rat_activity_vagabund`, an activity-spawned NPC, which errored inside
+`Context.lua` itself.
+
+### The options that bear on this mod
+
+Retaliation:
+
+| option | effect |
+|---|---|
+| `alwaysFightWhenHit` | answers a hit with a fight rather than the usual response |
+| `fightAllHostilePerceptibles` | fights anything perceived hostile, skipping the branch conditions |
+| `suppressFightMoraleChecks` | removes the morale gate that makes civilians flee |
+| `forceFightUncertainBehavior` | forces the uncertain-behavior branch to fight |
+| `disableChangeHostilityOnHit` | a hit does not change hostility |
+| `neverAcceptSurrender` | refuses a yield |
+
+A consensual brawl, where onlookers do not fetch a guard:
+
+| option | effect |
+|---|---|
+| `suppressDudeHostilePerceptionStimuli` | the NPC ignores the player being perceived as hostile |
+| `suppressDudeHostilePerceptionStimuliWhileNotInCombat` | the same, only outside combat |
+| `suppressReputationHitOnDudeHit` | being hit by the player costs no reputation |
+| `suppressReputationPreventForDudeHits` | player hits do not trip the reputation guard |
+| `suppressCollisionsBark` | silences the collision bark |
+| `suppressHitReactions` | no hit reaction at all |
+| `postMercyImmunity` | immunity after mercy is granted |
+| `impossiblePayingCrimeFine`, `impossibleCrimeSkillChecks`, `availableCrimeAuthority` | crime-dialog levers |
+
+The presets show how vanilla composes them. `berserk` is
+`fightAllHostilePerceptibles` plus `suppressFightMoraleChecks`, and nothing
+else. `eventEnemyWithFriendlySuperfaction` — an enemy who fights the player
+without the world turning on them — is `suppressDudeProxBark`,
+`suppressPickNoticedItems` and `suppressReputationPreventForDudeHits`.
+`kunoband` is the full eighteen-option bandit profile.
+
+### The duel system is separate and probably out of reach
+
+`sa_duel.xml` carries a complete sparring implementation: `duel:duelRequest`,
+`duel:startDuelWithPlayer`, `duel:stopDuel`, `duel:suspendDuel`,
+`duel:duelResult`. `startDuelWithPlayer` takes a `bet`, a `difficulty`, a
+`borrowArmor` flag, `myWeapons` and `enemyWeapons` of type
+`enum:duelWeaponTypes` — which includes **`Unarmed`** — an `isWooden` flag for
+training weapons, and a `customCombat` string.
+
+That is the trainer and tournament fight, and it ends cleanly:
+`duel:stopDuel` carries a `winner` wuid "so NPCs can recognize who need to
+play winner animation and who will play surrender".
+
+**None of the `duel:` types appear in `MessageTypes.xml`.** Only
+`skirmish:duelRequest` is registered there. So they are almost certainly
+local to the duel scripted action, and an NPC not running `sa_duel` has
+nothing listening. Unverified.
+
+### Custom behaviors suppress stimuli by design
+
+`combat:stimulus:customBehaviorRequest` is registered, is handled by the
+combat subbrain starter that every NPC runs, and carries:
+
+    behaviorSource + behaviorName, or includeXml + includeTree
+    suppressStimuli        default true
+    interruptRunningState  default true
+    entity, bool1..4, int1..2
+
+The comment on `suppressStimuli` in `TypeDefinitions.xml` reads "whether all
+other combat stimuli are suppressed while in the custom behavior". That is
+crime suppression stated in the game's own data, and it is the mechanism
+`sa_duel`, `sa_event_ambushplr` and eighteen other scripted actions use.
+
+### Hostility and crime are separate, and the seam shows
+
+Sending `hostilePerception` made guards fight without any crime being
+registered: on surrendering, the guards froze and the crime conversation
+never started. So the combat that message produces is not a prosecutable
+event, and the surrender path that normally resolves a guard fight has
+nothing to resolve. Any feature built on hostility alone inherits that dead
+end and needs its own ending.
+
+---
+
+## `alwaysFightWhenHit` produces the whole brawl, resolution included
+
+One context option, set on 19 NPCs before the ride, no code in the mod
+changed and nothing else sent:
+
+    Contexts.SetNonpersistentOption(ent, "alwaysFightWhenHit", "hcm_brawl_test")
+
+Ridden into at trot, **the merchant fought back** instead of fleeing. Guards
+witnessed it and joined in against the rider. The rider surrendered, every
+participant dropped hostility, the crossed-swords hostility indicator faded,
+and the encounter ended on its own.
+
+**No crime dialog occurred, and none was needed.** `CollisionIsCrime` was on
+and the mod sent its usual `combat:hit`, so the difference is not that the
+crime path was disabled. The fight simply resolved as a fight.
+
+That is the opposite of the earlier `hostilePerception` result, where guards
+made hostile the same way froze on surrender with no way to finish. The
+distinction worth keeping: a fight entered through **being hit** carries its
+own ending, and a fight entered through **being told someone is hostile**
+does not.
+
+### What this settles
+
+Retaliation is one context option. It needs no custom behavior tree, no
+faction write, no `hostilePerception` message, and no probability constant
+invented by this mod. The victim's own morale still decides how the fight
+goes; the option only decides that a fight is the answer.
+
+It also delivers most of what a consensual brawl needs for free: no crime
+prosecution, no cutscene, and a surrender that resolves cleanly.
+
+### What it does not yet do
+
+Two gaps against a tavern-style brawl, both untested:
+
+- **Guards joined in.** For a fight the town ignores, bystanders need
+  `suppressDudeHostilePerceptionStimuli`, which stops an NPC reacting to the
+  player being perceived as hostile.
+- **Weapons were not constrained.** Nothing here forces fists.
+  `enum:duelWeaponTypes` carries `Unarmed`, but that belongs to the duel
+  scripted action rather than to the context system, and no context option in
+  the catalog obviously forces an unarmed fight.
+
+---
+
+## How a civilian answers a hit, in full, and the two gates that matter
+
+`sb_combat.xml` lines 8308 to 8365 carry the whole decision for a victim whose
+`crimeSystemRole` is `civilian`:
+
+    if b_context['alwaysFightWhenHit'] or b_context['suppressFightMoraleChecks']
+        pass
+    else
+        CompareMorale(this, attacker)          -- must win to continue
+
+    if b_soul.gender == male                   -- women fail here, always
+        pass
+    else
+        fail
+
+    -> t_state = fight, t_fightParams.opponent = realAttacker
+       and if the attacker is the player and the player is not already an
+       enemy, t_fightParams.startInDefenseOnly = true
+
+    -- when the fight path fails:
+    if attacker == player and b_soul.caste <= normal
+        CreateInformation 'assault' -> t_state = report
+    else
+        t_state = flee, with t_fleeParams.fightIfHit = true
+
+### Female civilians cannot retaliate
+
+The `gender == male` test sits **after** the context check and is not
+bypassed by it. `alwaysFightWhenHit` removes the morale comparison and nothing
+else, so a woman set to always fight when hit still falls through to `report`
+or `flee`. Any retaliation feature is male-only among civilians unless some
+other path exists.
+
+### `startInDefenseOnly` is why the brawl behaved
+
+When the attacker is the player and the player is not already an enemy, the
+fight starts in defense only. The NPC squares up and blocks rather than
+opening with an attack, which is what a scuffle over being shoved looks like
+and is the reason the observed brawl read as proportionate.
+
+### Vanilla already has the annoyance idea
+
+The flee branch sets `t_fleeParams.fightIfHit = true`. A civilian who runs
+will turn and fight if struck again. The concept of wearing someone's patience
+down is the game's own, not an invention.
+
+### `real = false` sends a hit that costs no reputation
+
+`sb_switch_hitreactions.xml` line 481 gates the reputation change on
+`$hit.real`:
+
+    if hit.attacker == player
+       and not b_context['suppressReputationHitOnDudeHit']
+       and not isDudeBestFriend
+       and not (suppressAssaultReactions and suppressReputationHit)
+       and hit.real                              <-- here
+    then
+       reputationChangeName = hit_melee_weak | _medium | _strong | _brutal
+                              by hit.strength, 3 / 4 / 6 thresholds
+       if b_context['disableChangeHostilityOnHit']
+          reputationChangeName += '_noChangeHostility'
+       SetReputationNPC(reputationChange)
+
+So a `combat:hit` carrying `real = false` reaches the combat subbrain and
+drives the fight decision, but never reaches `SetReputationNPC`. Vanilla uses
+it for near misses and for horse collisions: `sb_switching_horse.xml` sets
+`$hit.real = false` for a hit relayed off a horse.
+
+That is the mechanism for a fight the crime system does not prosecute, and it
+needs no context option at all. `suppressReputationHitOnDudeHit` reaches the
+same place by another road, and `disableChangeHostilityOnHit` softens the
+reputation entry rather than removing it.
+
+### Witnessing appears to be modeled
+
+The same condition block reads `isKnockOutByPlayer` against
+`isKnockOutByPlayerAndSeen`, and the report path builds its case with
+`CreateInformation PerceivedWuid=... label='assault'`. Whether a bystander
+reacted to something it actually saw is therefore a distinction the game
+already draws. Not investigated further.

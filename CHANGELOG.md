@@ -23,6 +23,21 @@ number.
 
 ## [Unreleased]
 
+## [4.5.1] - 2026-09-02
+
+Research only. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The retaliation research is settled and recorded. Trampled non-guards
+  already flee to report the crime; faction angriness turns out to be inert
+  as a hostility switch; and the game's context system, which vanilla quests
+  drive from Lua, carries an `alwaysFightWhenHit` option that makes a victim
+  fight back instead. A `combat:hit` sent with `real = false` drives that
+  fight without any reputation or crime consequence, which is what a brawl
+  over a shove needs.
+- A polearm guard taking no walk stagger is recorded as an open question.
+
 ## [4.5.0] - 2026-09-01
 
 ### Added

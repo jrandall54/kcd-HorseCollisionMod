@@ -259,6 +259,18 @@ and both axes of the footprint were each cleared against logged sessions.
       at the same magnitudes through `actor:Fall`, which plays no clip this mod
       ships. The get-up carries no weapon tag to vary, four options per
       direction and nothing else, so there is nothing here to change.
+- [ ] A polearm guard took no walk stagger at all, where every other NPC
+      staggers reliably at that tier. Observed once, in passing, and not
+      instrumented: no telemetry was being read for that impact, so whether
+      the footprint missed him, the tier scored below walk, or the reaction
+      was suppressed is all unknown.
+
+      This is the second thing polearm carriers do differently. The get-up
+      turn above was chased to vanilla and closed, but two unrelated
+      anomalies on the same class of NPC is a pattern worth one deliberate
+      look: ride the same guard several times at walk with `DiagnoseMisses`
+      on, which names the reason an impact produced nothing, and compare
+      against a swordsman standing beside him.
 
 ## Phase 2: Mass, armor and momentum
 
@@ -429,22 +441,72 @@ rather than missing.
       shared soul and a behavior patch, `man_flee` for the thief and
       `man_chase` for his pursuer.
 
+      Half of it already works. Three non-guards ridden down at trot outside
+      a town each registered the attack and ran for a guard to report the
+      crime, Miller Peshek at a sustained 4.95 m/s. **Flight is the crime
+      system's and needs nothing built.** None of the three fought back, so
+      an NPC that comes after the rider has to be made hostile deliberately.
+
       No shipped script makes an NPC hostile: the only hostility call in the
       whole vanilla tree is the read `soul:IsInCombatDanger()`. That says
       what vanilla does, not what the engine exposes, and `references/libKCD1`
-      shows the engine exposes a good deal more.
-      `C_FactionScriptBind` registers `SetAngriness(float)`,
-      `AddAngriness(float)` and `AddReputation(sEnumName)`, and
-      `C_ScriptBindXGenAIModule` registers `SetBrainVariable`, which is how
-      the chase tree's own `event_chase_state` would be driven without the
-      patch nodes. All of it is reverse engineered and none of it is
-      confirmed in game.
+      shows the engine exposes a good deal more. The Lua `RPG` table
+      registers `GetFactions()`, `GetFactionById(id)` and `IsPublicEnemy()`,
+      and the faction objects they return register `GetAngriness()`,
+      `SetAngriness(float)`, `AddAngriness(float)` and
+      `AddReputation(sEnumName)`. `C_ScriptBindXGenAIModule` registers
+      `SetBrainVariable`, which is how the chase tree's own
+      `event_chase_state` would be driven without the patch nodes. All of it
+      is reverse engineered and none of it is confirmed in game.
 
-      Order of work. First ride down three non-guards at trot, away from town
-      so no guard intervenes, and record whether each attacks, flees or walks
-      away: the crime hit may already do this and cost nothing. Only if it
-      does not, probe the binds above for existence from the console before
-      designing anything around them.
+      **Angriness is not the dial.** The faction bind is entirely real —
+      `RPG.GetFactions()` returns 98, `SetAngriness` takes a float and clamps
+      at 1.0 — but every faction in the game set to maximum produced no
+      hostility whatsoever. NPCs behaved normally. Angriness is a number the
+      crime system reads when it decides something, not a switch.
+
+      **`combat:stimulus:hostilePerception` is the dial.** `sb_combat.xml`
+      handles it, and that one message carrying a `perceptible` is where
+      fight, flee and report are chosen. A civilian, renegade or soldier
+      reaches a fight branch that sets `t_state = fight`,
+      `t_fightParams.opponent = perceptible` and barks
+      `SPATRENI_NEPRITELE_-_UTOK`; a circator or monk flees from the player
+      or reports a `threat`. The fight branch is gated on
+      `b_context['fightAllHostilePerceptibles']`, or failing that on
+      `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat` — which reads
+      `0.2` in game — followed by a `MoraleCheck` at threat level 0.400000
+      for a soldier and 0.550000 for a civilian, or a `CompareMorale` against
+      the rider.
+
+      That gate is the feature. Courage decides who turns on the rider, using
+      the game's own morale stat, so no invented probability constant is
+      needed. Delivery is `XGenAIModule.SendMessageToEntityData`, the call
+      `Crime.lua` already makes to send `combat:hit` and the one vanilla's own
+      `Crime.lua` uses for `combat:confrontationFeedback`.
+
+      **Confirmed in game.** The message sent to eight NPCs at once produced
+      one attacker and seven runaways. `rat_guard23`, morale 0.668, closed
+      from 11.71 m to 2.02 m and entered `CombatMovement`; the other seven ran
+      25 to 50 m the other way. Nothing in the mod was changed to get it.
+
+      The split is the tree's own, and it lands where it should. The `0.2`
+      constant is not the whole gate: a merchant at 0.269 clears it and still
+      fled, because the `MoraleCheck` behind it asks 0.550000 of a civilian
+      and 0.400000 of a soldier. **Guards fight, civilians run**, decided by
+      the game's morale stat rather than by anything this mod picks.
+
+      Two things the implementation has to respect. The message goes to
+      `npc.this.id`, the WUID, not `npc.id`: sent to the entity id it is
+      accepted and discarded in silence. And `soul:IsInCombatDanger()` is not
+      a hostility read — it stayed `false` for the guard at two meters in
+      `CombatMovement` — so retaliation cannot be detected with it.
+
+      What remains is design, not discovery: which tiers send it, whether a
+      chance gate sits in front of it, and whether a fleeing civilian is
+      wanted at every trot impact or only some. Note that flight already
+      happens from the crime hit alone, so sending this at every impact would
+      change civilian behavior from walking to a guard into running away,
+      which is a different game.
 - [ ] The collision bark fires while the victim is still falling or lying as
       a ragdoll, which is nobody's idea of speaking. It should land as they
       get up.
