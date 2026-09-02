@@ -11640,3 +11640,63 @@ subbrain reads them from a `combatStimulus` inbox.
 The message has not been sent yet. What is established is that faction
 angriness is the wrong dial, that a right one exists, that its gate is morale
 rather than a coin flip, and that the transport is already in the mod.
+
+---
+
+## `hostilePerception` works, and morale decides who fights
+
+`combat:stimulus:hostilePerception`, carrying the player as `perceptible`,
+sent to eight NPCs at once and sampled for ten seconds afterwards rather than
+watched. One attacked and seven fled.
+
+| NPC | morale | dist at send | dist at t+10s | travel | end state |
+|---|---|---|---|---|---|
+| `rat_guard23` | **0.668** | 11.71 | **2.02** | 13.91 | **`CombatMovement`** |
+| `rat_merchant_shop3` | 0.269 | 4.04 | 32.30 | 31.83 | `MotionMovement` |
+| `rat_man97` | 0.191 | 4.03 | 25.25 | 28.91 | `MotionMovement` |
+| `rat_merchant_shop1` | 0.171 | 13.52 | 31.32 | 29.84 | `MotionMovement` |
+| `rat_swordsmiths_wife` | 0.171 | 9.37 | 38.48 | 30.56 | `MotionMovement` |
+| `rat_refugee_Radan` | 0.171 | 14.21 | 47.93 | 35.35 | `MotionMovement` |
+| `rat_pickpocket_woman1` | 0.171 | 14.41 | 46.51 | 33.14 | `MotionMovement` |
+| `rat_woman3` | 0.171 | 14.51 | 49.50 | 39.16 | `IdleToMove` |
+
+The guard closed from 11.71 m to 2.02 m and entered `CombatMovement`, the
+combat locomotion state, while every other NPC ran 25 to 50 m in the opposite
+direction. Nothing else was sent and nothing in the mod was changed.
+
+### The address is `this.id`, not `id`
+
+An earlier attempt sent the same message to `ent.id` and produced nothing at
+all. The two are different objects:
+
+    rat_merchant_shop3   ent.id    = 000000000007C0FA
+                         this.id   = 0500000000000763
+    player                         = 0500000000000A53
+
+The `05` prefix marks a WUID, and `Crime.lua` already sends `combat:hit` to
+`this.id` for exactly this reason. A message sent to the entity id is accepted
+and discarded silently, which is the same failure recorded against
+`daycycle:restartRequest` and against a `key(value)` payload. **A null result
+from a typed message means the address or the shape is wrong before it means
+the mechanism is absent.**
+
+### The gate is not the constant alone
+
+`RPG.MoraleForCombat` reads `0.2`, and `sb_combat.xml` gates the fight branch
+on `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat`. But
+`rat_merchant_shop3` reads 0.269, clears that constant, and fled anyway.
+
+The `MoraleCheck` that follows explains it: threat level **0.400000** for a
+soldier or renegade against **0.550000** for a civilian. A townsman at 0.269
+fails the civilian check; a guard at 0.668 passes the soldier one. So the
+split observed is the one the tree describes, and it lands where it should —
+**guards fight, civilians run** — without this mod choosing anything.
+
+Civilian morale is strikingly uniform: 0.171 for six of the eight, which
+suggests a class default rather than a per-NPC roll.
+
+### `IsInCombatDanger` is not a hostility read
+
+It returned `false` for every NPC at every sample, including the guard at 2 m
+in `CombatMovement`. Whatever it reports, it is not "this NPC is fighting the
+player", and it should not be used to detect retaliation.

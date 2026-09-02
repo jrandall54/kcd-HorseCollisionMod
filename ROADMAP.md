@@ -484,8 +484,29 @@ rather than missing.
       `Crime.lua` already makes to send `combat:hit` and the one vanilla's own
       `Crime.lua` uses for `combat:confrontationFeedback`.
 
-      Order of work. Send the message to one trampled victim from the console
-      and watch what happens, before any of it goes in the mod.
+      **Confirmed in game.** The message sent to eight NPCs at once produced
+      one attacker and seven runaways. `rat_guard23`, morale 0.668, closed
+      from 11.71 m to 2.02 m and entered `CombatMovement`; the other seven ran
+      25 to 50 m the other way. Nothing in the mod was changed to get it.
+
+      The split is the tree's own, and it lands where it should. The `0.2`
+      constant is not the whole gate: a merchant at 0.269 clears it and still
+      fled, because the `MoraleCheck` behind it asks 0.550000 of a civilian
+      and 0.400000 of a soldier. **Guards fight, civilians run**, decided by
+      the game's morale stat rather than by anything this mod picks.
+
+      Two things the implementation has to respect. The message goes to
+      `npc.this.id`, the WUID, not `npc.id`: sent to the entity id it is
+      accepted and discarded in silence. And `soul:IsInCombatDanger()` is not
+      a hostility read — it stayed `false` for the guard at two meters in
+      `CombatMovement` — so retaliation cannot be detected with it.
+
+      What remains is design, not discovery: which tiers send it, whether a
+      chance gate sits in front of it, and whether a fleeing civilian is
+      wanted at every trot impact or only some. Note that flight already
+      happens from the crime hit alone, so sending this at every impact would
+      change civilian behavior from walking to a guard into running away,
+      which is a different game.
 - [ ] The collision bark fires while the victim is still falling or lying as
       a ragdoll, which is nobody's idea of speaking. It should land as they
       get up.
