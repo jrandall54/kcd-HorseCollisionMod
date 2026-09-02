@@ -23,6 +23,25 @@ number.
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-09-01
+
+### Added
+
+- `RagdollDamping` and `RagdollMinEnergy` control how quickly a thrown body
+  sheds speed and comes to rest.
+- `ImpulseDelayMs` controls how long the mod waits for a body to become a
+  physics object before pushing it. An impulse applied before that is
+  ignored by the engine without reporting anything.
+- `LateralImpulse` pushes a victim across the horse's line of travel rather
+  than along it. Off by default.
+
+### Changed
+
+- A victim thrown by a collision no longer slides for meters after landing.
+  They travel a little over a meter after coming down, against nearly three
+  before, and where they end up is far more consistent from one impact to
+  the next. The sliding had been there since 1.0.
+
 ## [4.4.5] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.
