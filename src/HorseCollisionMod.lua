@@ -159,8 +159,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RetaliationMaxChance ceiling on that chance
 -- @field RetaliationMemorySec how long a victim remembers being shoved, in
 --   seconds, before the count decays to nothing
--- @field RetaliationHoldSec how long a provoked brawl may run, in seconds,
---   after which the victim is told to stand down and sent back to work
+-- @field RetaliationFleeSpeed meters per second above which a victim who has
+--   left combat is running away rather than walking somewhere
+-- @field RetaliationFleeSamples consecutive samples of that before the mod
+--   decides a flee has outlived its cause and intervenes
+-- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
+--   incident is closed however it looks
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
@@ -275,7 +279,9 @@ HorseCollisionMod.Config = {
 	RetaliationChanceStep    = 0.25,
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
-	RetaliationHoldSec       = 45,
+	RetaliationFleeSpeed     = 3.5,
+	RetaliationFleeSamples   = 8,
+	RetaliationCeilingSec    = 120,
 
 	-- Switches.
 	ProtectMutt              = true,
@@ -436,6 +442,14 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 -- Sent to an NPC standing in the street it reads as a one-frame snap, and the
 -- activity it tears down takes any prop the NPC was holding with it.
 HorseCollisionMod.ReplanHaltSpeed = 1
+
+--- How often a provoked victim is sampled while the incident is open.
+--
+-- A poll interval, not a duration: it decides how promptly the mod notices a
+-- fight has ended, never how long the fight is allowed to last. One second is
+-- fine for a state that changes on the scale of a scuffle, and it keeps the
+-- telemetry readable rather than a wall of lines.
+HorseCollisionMod.RetaliationPollMs = 1000
 
 
 -- How the ragdoll handover is watched, for the tier that hands recovery back

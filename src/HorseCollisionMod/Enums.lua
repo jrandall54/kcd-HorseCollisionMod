@@ -59,3 +59,28 @@ HorseCollisionMod.CombatAttackKind = {
 	Melee = 4,
 	DogBite = 5
 }
+
+--- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
+--
+-- Which set of branches an NPC takes through the crime and combat trees.
+-- Read from Lua as `soul:GetSocialClass().SoulCrimeRoleId`, which also
+-- carries the class `Name`: a village guard reports `soldier` and 2, a
+-- townsman and an innkeeper both report `civilian` and 1.
+--
+-- The distinction decides whether a provoked fight can avoid being a crime.
+-- In `sb_combat.xml` the soldier branch of the hit handler calls
+-- `CreateInformation label='assault'` unconditionally whenever the attacker
+-- is the player, with no `real` check and no context option in front of it.
+-- The civilian branch creates that information only on the path where the
+-- victim declines to fight. So a civilian can brawl without a charge and a
+-- soldier cannot.
+--
+-- @table CrimeSystemRole
+HorseCollisionMod.CrimeSystemRole = {
+	None = 0,
+	Civilian = 1,
+	Soldier = 2,
+	Renegade = 3,
+	Monk = 4,
+	Circator = 5
+}
