@@ -104,15 +104,20 @@
 	<td class="summary">Plays one of this mod's reactions on a victim.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:MassVictim">HorseCollisionMod:MassVictim (npc, armorScale)</a></td>
+	<td class="summary">Sets a ragdolled victim's physical mass, so the horse's own collision
+ does the work.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:DampVictim">HorseCollisionMod:DampVictim (npc)</a></td>
 	<td class="summary">Slows a ragdolled victim so it stops sliding.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:Ragdoll">HorseCollisionMod:Ragdoll (npc, velocity, speed, impulseScale)</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:Ragdoll">HorseCollisionMod:Ragdoll (npc, velocity, speed, impulseScale, horsePos)</a></td>
 	<td class="summary">Knocks a victim down with a physics ragdoll.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ImpulseVictim">HorseCollisionMod:ImpulseVictim (npc, velocity, impulseScale)</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ImpulseVictim">HorseCollisionMod:ImpulseVictim (npc, velocity, impulseScale, horsePos)</a></td>
 	<td class="summary">Pushes a victim who is already a physics body.</td>
 	</tr>
 </table>
@@ -204,6 +209,63 @@
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:MassVictim"></a>
+    <strong>HorseCollisionMod:MassVictim (npc, armorScale)</strong>
+    </dt>
+    <dd>
+    Sets a ragdolled victim's physical mass, so the horse's own collision
+ does the work. </p>
+
+<p> What throws a victim at gallop is the engine resolving a collision between
+ the horse, 480 kg at gravity -30, and the body. Measured across seventy
+ impacts, the distance correlates with the horse's speed at contact at
+ +0.34, with the armor scale at <strong>-0.07</strong>, and not at all with anything this
+ mod applies on top. Three rides comparing an impulse against a set velocity
+ produced the same distribution.</p>
+
+<p> Armor cannot matter while every human weighs the same. <code>GetMass</code> answers
+ <strong>80 for every human including the player</strong>, so the horse hits an identical
+ mass whether the target is a peasant or a man in mail.</p>
+
+<p> <code>pe_simulation_params</code> carries <code>mass</code> beside the <code>damping</code> and <code>min_energy</code>
+ that <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:DampVictim">DampVictim</a> already sets through the same group. Changing it changes
+ what the horse is hitting, and the engine does the rest.</p>
+
+<p> <strong>It only takes while ragdolled.</strong> Setting mass on a living entity is
+ accepted and ignored: measured, a value of 300 written to an actor on the
+ <code>alive</code> profile left <code>GetMass</code> reading 80, and the same write to the same
+ actor ragdolled read back 300.</p>
+
+<p> ### Timing is the open question</p>
+
+<p> The mass has to be in place before the collision resolves. The body is not
+ physicalized at the moment of contact, which is why the impulse path waits
+ <code>ImpulseDelayMs</code>, and a horse at ten meters per second covers a centimeter
+ a millisecond. So this retries on a short ladder rather than guessing one
+ delay, takes the first attempt that sticks, and logs which one that was
+ together with how far the victim had already travelled by then. That
+ reading is what says whether the window exists at all.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">armorScale</span>
+            <span class="types"><span class="type">number</span></span>
+         the tier's armor multiplier, high for an
+   unarmored target and low for one in mail
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:DampVictim"></a>
     <strong>HorseCollisionMod:DampVictim (npc)</strong>
     </dt>
@@ -239,7 +301,7 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:Ragdoll"></a>
-    <strong>HorseCollisionMod:Ragdoll (npc, velocity, speed, impulseScale)</strong>
+    <strong>HorseCollisionMod:Ragdoll (npc, velocity, speed, impulseScale, horsePos)</strong>
     </dt>
     <dd>
     Knocks a victim down with a physics ragdoll. </p>
@@ -268,6 +330,11 @@
             <span class="types"><span class="type">number</span></span>
          multiplier on the configured impulse, 0 to 1
         </li>
+        <li><span class="parameter">horsePos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse world position, the origin a push points away
+   from, so a victim is never thrown back under the rider
+        </li>
     </ul>
 
 
@@ -277,7 +344,7 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:ImpulseVictim"></a>
-    <strong>HorseCollisionMod:ImpulseVictim (npc, velocity, impulseScale)</strong>
+    <strong>HorseCollisionMod:ImpulseVictim (npc, velocity, impulseScale, horsePos)</strong>
     </dt>
     <dd>
     Pushes a victim who is already a physics body. </p>
@@ -301,6 +368,11 @@
             <span class="types"><span class="type">number</span></span>
          multiplier on the configured impulse, 0 to 1
         </li>
+        <li><span class="parameter">horsePos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse world position, the origin the push points away
+   from, so a victim is never thrown back under the rider
+        </li>
     </ul>
 
 
@@ -315,7 +387,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-02 15:11:32 </i>
+<i style="float:right;">Last updated 2026-09-02 16:12:29 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

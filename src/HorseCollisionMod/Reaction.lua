@@ -162,6 +162,129 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	return ok
 end
 
+--- Sets a ragdolled victim's physical mass, so the horse's own collision
+--- does the work.
+--
+-- What throws a victim at gallop is the engine resolving a collision between
+-- the horse, 480 kg at gravity -30, and the body. Measured across seventy
+-- impacts, the distance correlates with the horse's speed at contact at
+-- +0.34, with the armor scale at **-0.07**, and not at all with anything this
+-- mod applies on top. Three rides comparing an impulse against a set velocity
+-- produced the same distribution.
+--
+-- Armor cannot matter while every human weighs the same. `GetMass` answers
+-- **80 for every human including the player**, so the horse hits an identical
+-- mass whether the target is a peasant or a man in mail.
+--
+-- `pe_simulation_params` carries `mass` beside the `damping` and `min_energy`
+-- that `DampVictim` already sets through the same group. Changing it changes
+-- what the horse is hitting, and the engine does the rest.
+--
+-- **It only takes while ragdolled.** Setting mass on a living entity is
+-- accepted and ignored: measured, a value of 300 written to an actor on the
+-- `alive` profile left `GetMass` reading 80, and the same write to the same
+-- actor ragdolled read back 300.
+--
+-- ### Timing is the open question
+--
+-- The mass has to be in place before the collision resolves. The body is not
+-- physicalized at the moment of contact, which is why the impulse path waits
+-- `ImpulseDelayMs`, and a horse at ten meters per second covers a centimeter
+-- a millisecond. So this retries on a short ladder rather than guessing one
+-- delay, takes the first attempt that sticks, and logs which one that was
+-- together with how far the victim had already travelled by then. That
+-- reading is what says whether the window exists at all.
+--
+-- @tparam table npc victim entity
+-- @tparam number armorScale the tier's armor multiplier, high for an
+--   unarmored target and low for one in mail
+function HorseCollisionMod:MassVictim(npc, armorScale)
+	local base = self.Config.RagdollMass or 0
+
+	if base <= 0 then
+		return
+	end
+
+	-- Inverted against the impulse scale deliberately. That scale runs high
+	-- for an unarmored target, because it multiplied a force meant to throw
+	-- them further. Mass is the other way round: a man in mail should be the
+	-- heavier thing for the horse to move.
+	local scale = armorScale or 1.0
+
+	if scale <= 0 then
+		scale = 1.0
+	end
+
+	local wanted = base / scale
+	local generation = self.TimerTick
+	local origin = nil
+
+	pcall(function() origin = npc:GetWorldPos() end)
+
+	local attempts = self.RagdollMassAttemptsMs
+
+	local function try(index)
+		if generation ~= self.TimerTick or index > #attempts then
+			return
+		end
+
+		local took = false
+		local reading = -1
+
+		pcall(function()
+			npc:SetPhysicParams(PHYSICPARAM_SIMULATION, { mass = wanted })
+		end)
+
+		pcall(function()
+			reading = npc:GetMass()
+			took = math.abs(reading - wanted) < 1.0
+		end)
+
+		if took then
+			local moved = 0
+
+			pcall(function()
+				local p = npc:GetWorldPos()
+
+				if origin then
+					moved = self:VectorLength({
+						x = p.x - origin.x,
+						y = p.y - origin.y,
+						z = p.z - origin.z
+					})
+				end
+			end)
+
+			if self.Config.LogTelemetry then
+				self:Log("Mass " .. tostring(npc:GetName())
+						.. " scale=" .. string.format("%.2f", scale)
+						.. " wanted=" .. string.format("%.0f", wanted)
+						.. " took=" .. string.format("%.0f", reading)
+						.. " atMs=" .. tostring(attempts[index])
+						.. " movedBy=" .. string.format("%.2f", moved) .. "m")
+			end
+
+			return
+		end
+
+		if index == #attempts and self.Config.LogTelemetry then
+			self:Log("Mass " .. tostring(npc:GetName())
+					.. " never took, last read " .. string.format("%.0f", reading))
+		end
+
+		Script.SetTimer(attempts[index + 1] and
+				(attempts[index + 1] - attempts[index]) or 16, function()
+			try(index + 1)
+		end)
+	end
+
+	-- The first attempt is immediate rather than on a timer, because the body
+	-- may already be physicalized by the time this is reached and a frame
+	-- given away is a centimeter of horse travel per millisecond.
+	try(1)
+end
+
+
 --- Slows a ragdolled victim so it stops sliding.
 --
 -- A thrown body keeps going long after the throw, and that slide is most of
@@ -232,12 +355,18 @@ end
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam table horsePos horse world position, the origin a push points away
+--   from, so a victim is never thrown back under the rider
 function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos)
 	pcall(function()
 		if npc.actor then
 			npc.actor:Fall({x=0, y=0, z=0}, true)
 		end
 	end)
+
+	-- Before the impulse and the damping, because it is the only one of the
+	-- three that has to beat the horse's own collision rather than follow it.
+	self:MassVictim(npc, impulseScale)
 
 	self:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 	self:DampVictim(npc)
@@ -264,6 +393,8 @@ end
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam table horsePos horse world position, the origin the push points away
+--   from, so a victim is never thrown back under the rider
 function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 	local k_back = self.Config.Knockback * impulseScale
 	local k_up = self.Config.Uplift * impulseScale

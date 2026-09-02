@@ -26,6 +26,13 @@ HorseCollisionModSettings = {
 	-- Knockdown force, trot and gallop only.
 	Knockback                = 50.0,  -- horizontal, higher throws further
 	Uplift                   = 30.0,  -- vertical, higher throws upward
+
+	-- What the horse actually collides with, in kilograms. Every human is
+	-- 80 to the physics engine, so a peasant and a knight are the same
+	-- thing to hit, which is why armor has never been felt in a throw.
+	-- This is divided by the armor scale, so mail is heavier to move.
+	-- 0 leaves the engine's figure alone.
+	RagdollMass              = 80.0,
 	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 0.5,   -- higher puts it to rest sooner
 

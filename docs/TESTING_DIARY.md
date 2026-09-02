@@ -13269,3 +13269,82 @@ placement regardless, but the reason given for it was false. And the test that
 "proved" the tables were at fault, removing them and seeing the failure
 persist, was correct evidence that was then read the wrong way round: it
 should have ruled the tables out rather than being set aside.
+
+## Setting a victim's mass before the collision
+
+`Reaction:MassVictim` writes `PHYSICPARAM_SIMULATION` with a `mass` of
+`RagdollMass / armorScale` on a rung schedule of 0, 16, 33, 50, 80 and 120 ms,
+stopping at the first write that reads back. It runs before the impulse and
+the damping, because it is the only one of the three that has to beat the
+horse's own collision rather than follow it.
+
+### The write beats the collision
+
+Sixteen gallop impacts, every one of them taken:
+
+| rung | impacts | victim had moved |
+| --- | --- | --- |
+| 0 ms | 1 | 0.00 m |
+| 16 ms | 15 | 0.01 - 0.08 m |
+
+No impact needed a third rung. Guards were carried to 192 - 217 kg and
+villagers down to 63 - 85 kg from the engine's flat 80 for every human. The
+timing question is settled: a victim's mass can be changed while the body is
+still within eight centimeters of where it was standing.
+
+### It changes the throw, but not in the direction momentum predicts
+
+Twenty-one gallop impacts carrying a confirmed mass, against seventy on the
+shipped impulse path from the same log, measured at the settled distance of
+t+6s rather than mid-flight. Mean approach speeds were 7.26 and 7.64, so the
+two pools are comparable.
+
+| path | mean throw | armored | plain | ratio |
+| --- | --- | --- | --- | --- |
+| impulse, mass untouched | 3.76 m | 4.52 m | 3.12 m | 1.45x |
+| impulse plus mass | 2.17 m | 2.17 m | 2.18 m | 1.00x |
+
+Correlation of armor scale against settled throw falls from -0.247 to -0.002,
+and from -0.297 to -0.039 with approach speed partialed out.
+
+Two things happened, and neither was the intended one. Every victim traveled
+less, and the spread between armored and unarmored collapsed to nothing.
+
+The decisive detail is the villagers. They were made **lighter** than the
+engine's default, 63 to 85 kg against 80, and they were thrown **shorter**,
+3.12 m down to 2.18 m. Momentum transfer predicts the opposite: a lighter body
+struck by a 480 kg horse should leave faster and travel further. A uniform
+shortening that ignores the sign of the mass change is not a collision
+responding to mass. It is more consistent with the write settling the body,
+the same family of effect as the damping and `min_energy` this mod already
+sets through the same parameter block.
+
+So the mechanism works and the lever moves the outcome. What has not been
+shown is that it moves it through the collision.
+
+### A discriminating test
+
+Set a flat mass well below the default, the same figure for every victim
+regardless of armor, and ride. Momentum transfer predicts throws longer than
+the 3.76 m baseline. A settling artifact predicts the same shortening seen
+here, because the direction of the change would not matter. One ride separates
+them, and nothing else about the reaction needs to change.
+
+### Armor already governs the throw, opposite to the intent
+
+The seventy shipped-path impacts carry an armor signal that is real and points
+the wrong way. **Armored victims travel 45% further**, 4.52 m against 3.12 m,
+and the effect survives controlling for approach speed at a partial
+correlation of -0.297.
+
+The mod's own armor scaling works against this. `armorImpulse` runs from about
+0.37 for a mailed guard to 1.26 for a villager in cloth, so an armored victim
+is given roughly a third of the impulse a villager gets, and still outflies
+them. That is the clearest statement yet of a conclusion this project reached
+by other routes: the impulse is not what carries a body, and the collision
+between the horse and the victim is doing work the mod does not control.
+
+What is new is that the collision is not blind to armor. Something about an
+armored body already produces a longer throw. The cause is not established
+here; the correlation is measured across seventy impacts and is not an
+artifact of speed.
