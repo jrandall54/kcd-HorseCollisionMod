@@ -13240,3 +13240,32 @@ beaten victim needs and what `payToTalk` cannot give.
 
 That NPC was left 0.278 better disposed than found, which is a benefit rather
 than damage and was not reverted.
+
+### Correction: LDoc was broken by the version tool, not by the enum tables
+
+An earlier entry recorded that adding a third and fourth table to
+`Enums.lua` made LDoc fail with `'class' cannot have multiple values;
+{module,table,module}`, and that the fix was to move `CombatAttackKind` beside
+its consumer and delete the unused `CrimeSystemRole`. **That diagnosis was
+wrong.**
+
+The cause was `tools/set_version.py`, written in the same session. Its
+substitution read
+
+    re.sub(r"^(-- @release\s+)\S+\s*$", ..., flags=re.M)
+
+and `\s` matches newlines, so `\s*$` ran past the end of the line and consumed
+the blank line separating the module header from the doc block below it. LDoc
+reads the two as a single block, sees a module tag and a table tag and a
+module tag, and fails.
+
+The bump to 4.6.3 reproduced it exactly, on a file whose tables had not been
+touched since the supposed fix. The regex now matches horizontal whitespace
+only.
+
+Two things follow. The move of `CombatAttackKind` into `Crime.lua` was not
+necessary; it is kept because sitting beside its only consumer is better
+placement regardless, but the reason given for it was false. And the test that
+"proved" the tables were at fault, removing them and seeing the failure
+persist, was correct evidence that was then read the wrong way round: it
+should have ruled the tables out rather than being set aside.
