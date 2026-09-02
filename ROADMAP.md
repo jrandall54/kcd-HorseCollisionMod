@@ -459,9 +459,9 @@ rather than missing.
       `event_chase_state` would be driven without the patch nodes. All of it
       is reverse engineered and none of it is confirmed in game.
 
-      **Angriness is not the dial.** The faction bind is entirely real —
+      **Angriness is not the dial.** The faction bind is entirely real:
       `RPG.GetFactions()` returns 98, `SetAngriness` takes a float and clamps
-      at 1.0 — but every faction in the game set to maximum produced no
+      at 1.0. But every faction in the game set to maximum produced no
       hostility whatsoever. NPCs behaved normally. Angriness is a number the
       crime system reads when it decides something, not a switch.
 
@@ -473,8 +473,8 @@ rather than missing.
       `SPATRENI_NEPRITELE_-_UTOK`; a circator or monk flees from the player
       or reports a `threat`. The fight branch is gated on
       `b_context['fightAllHostilePerceptibles']`, or failing that on
-      `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat` — which reads
-      `0.2` in game — followed by a `MoraleCheck` at threat level 0.400000
+      `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat`, which reads
+      `0.2` in game, followed by a `MoraleCheck` at threat level 0.400000
       for a soldier and 0.550000 for a civilian, or a `CompareMorale` against
       the rider.
 
@@ -498,8 +498,8 @@ rather than missing.
       Two things the implementation has to respect. The message goes to
       `npc.this.id`, the WUID, not `npc.id`: sent to the entity id it is
       accepted and discarded in silence. And `soul:IsInCombatDanger()` is not
-      a hostility read — it stayed `false` for the guard at two meters in
-      `CombatMovement` — so retaliation cannot be detected with it.
+      a hostility read: it stayed `false` for the guard at two meters in
+      `CombatMovement`, so retaliation cannot be detected with it.
 
       What remains is design, not discovery: which tiers send it, whether a
       chance gate sits in front of it, and whether a fleeing civilian is
