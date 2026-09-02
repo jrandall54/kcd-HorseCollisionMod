@@ -12523,3 +12523,56 @@ value itself did not decay across four in-game days.
 that would test recovery directly, but every reputation change name
 recoverable from behavior data is a penalty, and the `reputation_change`
 table's rows do not come back through the `Database` bind.
+
+## The aversion triggers at six meters, and vanilla sells the cure
+
+### The flee is a recognition reaction, not a permanent state
+
+Sampled every two seconds while the rider walked in on a merchant beaten
+several in-game days earlier:
+
+| time | range | his speed | state |
+|---|---|---|---|
+| t+18 to t+24s | ~32 m | 0.00 | `ADLG_Speak`, `ADLG_Emphasis`, hawking his wares |
+| t+34 to t+38s | 19 to 12 m | 0.74 to 0.89 | walking normally at his stall |
+| t+42 to t+44s | 7.5 to **5.8 m** | **0.00** | `MotionIdle`, standing still |
+| t+46s | 7.6 m | 1.95 | starts moving |
+| t+48s | 16.9 m | **4.80** | full flight |
+
+He is not avoiding the player across the town. He works his stall untroubled
+until the rider is close enough to recognize, barks, and runs. That is why he
+keeps returning and why he keeps being lost again.
+
+### 0.2 is the threshold, and the game sells a way over it
+
+`Scripts/Script/Crime.lua` carries the whole mechanism:
+
+    function CrimeUtils.IncreasePayToTalkReputation (entity)
+        local soul = assert(entity.soul, ...)
+        for _ = 1, 4 do
+            soul:ModifyPlayerReputation('payToTalk')
+            if soul:GetRelationship(player.this.id, 'Current') >= 0.2 then
+                return
+            end
+        end
+
+with `CrimeUtils.CalcPayToTalkPrice` charging
+`700 * persuadeToTalkWithLowReputationPriceMultiplier`, a multiplier defined
+per social class in `Scripts/Script/SocialClass.lua` and ranging from 1 to 5.
+
+Measured on a control: one `ModifyPlayerReputation('payToTalk')` moved
+`GetRelationship` from 0.3948 to 0.5337, **+0.1389**, and the price for that
+merchant read **2100**.
+
+So an NPC beaten below the 0.2 threshold is recoverable by paying him, in two
+applications from zero, and the shop is not lost. The rider's judgment that
+Warhorse would not ship a permanent loss was correct, and several hours were
+spent looking for a decay curve when the intended remedy is a transaction.
+
+The one thing still unresolved is reaching the dialog at all, since the
+aversion makes him run at about six meters.
+
+### Note
+
+`rat_merchant_shop2`, a control, was left 0.1389 higher than it started by
+the proof above. A save reload restores it.
