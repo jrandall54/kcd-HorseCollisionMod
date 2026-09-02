@@ -23,6 +23,14 @@ number.
 
 ## [Unreleased]
 
+## [4.4.5] - 2026-09-01
+
+Internal. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The `TraceRecovery` diagnostic also measures how far a victim turns during a recovery, and names any weapon they are holding.
+
 ## [4.4.4] - 2026-09-01
 
 Internal. Nothing about a collision looks or behaves differently.
