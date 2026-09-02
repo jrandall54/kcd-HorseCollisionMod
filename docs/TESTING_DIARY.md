@@ -4867,7 +4867,7 @@ Guessing at mechanisms has now cost three rides. The watch is the instrument
 that can answer it directly, because it timestamps the loss instead of
 inferring it from the interval, and it now records the rider's distance and the
 horse's recent peak speed at that moment. A loss with the horse alongside is the
-rejected contact of explanation 2. A loss with the horse thirty metres away is
+rejected contact of explanation 2. A loss with the horse thirty meters away is
 none of the three.
 
 ## Reading what an NPC is wearing
@@ -7169,7 +7169,7 @@ is what follows the fall in a death. The mod puts the get-up there instead.
 The ragdoll the mod removed was created at the moment of impact, underneath a
 horse still travelling through that space, and the engine charged the trample
 that followed. This one is created **two seconds after the animation starts**,
-by which time a horse at trot has covered something like fourteen metres and is
+by which time a horse at trot has covered something like fourteen meters and is
 nowhere near the body.
 
 It is the deferred ragdoll the roadmap proposed and Lua could not deliver. The
@@ -7412,7 +7412,7 @@ fall against all four get-ups. There is no naming rule to infer them from.
 
 Each fall was played against all four get-ups, with the fall held constant so
 the recovery clip was the only variable. The subject was teleported three
-metres in front of the player once, allowed to settle, and then given the four
+meters in front of the player once, allowed to settle, and then given the four
 options in turn.
 
 | Fall | Get-up | Result |
@@ -7441,15 +7441,15 @@ chaining these clips and is not a pairing error.
 Reading a single frame of rotation needs the subject in front of the player at
 a known distance, and neither picking the nearest NPC nor asking the user to
 tag one held up: targets walked off, fell through scenery, despawned, or turned
-out to be a namesake two kilometres away, and several rounds were spent on
+out to be a namesake two kilometers away, and several rounds were spent on
 subjects nobody could see.
 
-Teleporting one NPC three metres in front of the player, once, then letting it
+Teleporting one NPC three meters in front of the player, once, then letting it
 settle before firing, is what worked. Repositioning between clips was tried
 first and was worse: it moved the subject mid-animation and left it floating.
 
 The harness now measures where the subject actually landed and refuses to fire
-beyond eight metres, so a bad placement fails loudly instead of costing a round.
+beyond eight meters, so a bad placement fails loudly instead of costing a round.
 
 The subject also floated at times during these rounds. That is the staging and
 not the mod: `SetWorldPos` places the entity at the player's own height, which
@@ -7514,7 +7514,7 @@ rotations. Readings from the staged pass supersede the ones before it.
 
 The first pass was run on whatever NPC was to hand and produced a mapping that
 did not survive scrutiny. This one staged the subject deliberately: teleported
-to a fixed spot four metres in front of the player, placed at terrain height,
+to a fixed spot four meters in front of the player, placed at terrain height,
 turned to face the player, and held for all four options of a round, so nothing
 varied within a round but the get-up. Sixteen pairings, then the same sixteen
 on the other character set.
@@ -7538,7 +7538,7 @@ inherent to chaining those two clips rather than a pairing that can be improved.
 It had front pairing with left. Both sets point at back. The readings behind it
 were taken before the subject was held still, before the user had settled on a
 vocabulary separating a yaw from a roll, and in several cases on a subject that
-walked away, fell through scenery or was a namesake two kilometres off.
+walked away, fell through scenery or was a namesake two kilometers off.
 
 Two hypotheses were raised and killed along the way, both worth the time:
 facing, which changed nothing across four orientations of the same clip, and
@@ -7546,9 +7546,9 @@ per-set mappings, which the matched pass shows are unnecessary.
 
 ### Women are a different entity class
 
-Scanning for a female subject reported none within two hundred metres while the
+Scanning for a female subject reported none within two hundred meters while the
 user could see four. **Women are class `NPC_Female`, not `NPC`.** Thirteen stood
-within sixty metres of a scan that had reported zero.
+within sixty meters of a scan that had reported zero.
 
 The mod's own filter accepts a victim on `class == 'NPC'`, `class == 'Player'`,
 or the presence of `Properties.esFaction`, so women reach it only through that
@@ -7581,7 +7581,7 @@ curiosity.
 
 The three human classes are now named: `NPC`, `NPC_Female`, `Player`. Confirmed
 against a live scan, which reported `NPC` at 47, `NPC_Female` at 13, `Dog` at 5,
-`Horse` at 1 and `Player` at 1 within sixty metres.
+`Horse` at 1 and `Player` at 1 within sixty meters.
 
 `ProtectMutt` is unaffected and still guards Henry's dog by name. It was never
 the thing keeping other animals out, because nothing was.
@@ -7664,7 +7664,7 @@ knockdown and reporting the largest single step:
 
 **They are modes, not switches.** Setting them to 1 pins the actor's origin
 completely, which is the opposite of following terrain. Setting them to 2, to
-match `Horizontal`, flings the body sixty metres in a single frame.
+match `Horizontal`, flings the body sixty meters in a single frame.
 
 Vanilla's values are already the correct ones and the mod copied them
 correctly. This is not a lever, and the slight improvement reported while
@@ -8094,7 +8094,7 @@ actually goes, and the engine already resolves both.
 
 The measurement that read as ruling this out is worth re-reading rather than
 deleting. `Vertical` and `ZMove` at 1 pinned the origin completely and at 2
-flung the body 58 metres, which was correctly read as proof that they are modes
+flung the body 58 meters, which was correctly read as proof that they are modes
 rather than switches, and correctly concluded that vanilla's values were right.
 The error was generalising from the fragment layer to the runtime call. They
 set the same property and are not the same lever: one is baked into every
@@ -11200,7 +11200,7 @@ comparison was against no layer at all rather than between values.
 
 ## Damping the ragdoll stops the sliding, and makes distance mean something
 
-Bodies thrown by a collision slid for metres after landing, which has been true
+Bodies thrown by a collision slid for meters after landing, which has been true
 since 1.0 and reads in game as the ground being ice.
 
 It also made every measurement of throw distance untrustworthy, because what
@@ -11231,7 +11231,7 @@ The clearer figure is the ground covered after landing, between the samples at
 
 **2.77 m undamped against 1.09 m damped, a reduction of sixty per cent.**
 
-The spread narrows with it, from six metres to under four, so an impact is now
+The spread narrows with it, from six meters to under four, so an impact is now
 far more repeatable than it was.
 
 ### What it does not change
@@ -11240,7 +11240,7 @@ Armor still does not separate: a multiplier of 1.26 averaged 5.05 m against
 4.79 m for mail. That is expected rather than disappointing, because the
 shipped `Knockback` of 50 was already measured as indistinguishable from
 applying no impulse at all. A body of 120 to 160 kilograms takes about 0.6
-metres per second from an impulse of that size.
+meters per second from an impulse of that size.
 
 The value of the damping here is that it removes the slide from any future
 measurement of that, which was drowning the armor signal in noise.

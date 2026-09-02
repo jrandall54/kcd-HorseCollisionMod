@@ -319,18 +319,18 @@ armor.
       tuned to the wrong thing.
 
 - [x] Prerequisite for the armor item above, and it was not the horse. A
-      thrown body slid for metres after landing, so distance measured the
+      thrown body slid for meters after landing, so distance measured the
       surface as much as the impact. Damping the ragdoll through
       `SetPhysicParams(PHYSICPARAM_SIMULATION, ...)` cuts the ground covered
       after landing from 2.77 m to 1.09 m and narrows the spread from six
-      metres to under four. Braking the horse hard on contact changed travel
+      meters to under four. Braking the horse hard on contact changed travel
       not at all, which rules the horse out as the thing carrying them.
 
 - [ ] Armor knockback, now measurable. The multiplier has always worked and
       the force it multiplies did not: `Knockback` of 50 is
       indistinguishable from applying no impulse at all, because an impulse
-      of that size moves a body of 120 to 160 kilograms at about 0.6 metres
-      per second. Raising it to 600 threw a villager 27 metres and threw one
+      of that size moves a body of 120 to 160 kilograms at about 0.6 meters
+      per second. Raising it to 600 threw a villager 27 meters and threw one
       guard upward into the rider hard enough to nearly kill them, so
       `Uplift` has a hard ceiling that is a safety limit rather than an
       aesthetic one: the rider sits directly above the victim. Raise
