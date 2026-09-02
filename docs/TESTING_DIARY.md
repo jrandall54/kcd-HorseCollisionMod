@@ -12220,3 +12220,43 @@ is not a crime unless witnessed, so this is a repeatable income with no legal
 consequence, which is a plausible early-game exploit. It is vanilla's dialog
 reached through a fight this mod arranges, so the mod is at least adjacent to
 it.
+
+---
+
+## A provoked brawl costs no reputation
+
+Five Rataje factions read before and after a complete provoked brawl on
+`rat_man29`, a townsman: three walk staggers, provoked on the fourth
+(`roll=0.01` against `chance=0.75`), a punch from the rider, and a yield.
+
+| faction | before | after |
+|---|---|---|
+| `ratays_traders` | 0.537924 | 0.537924 |
+| `ratays_citizens` | 0.446707 | 0.446707 |
+| `rataje_out_villagers` | 0.500000 | 0.500000 |
+| `ratays_soldiers` | 0.382400 | 0.382400 |
+| `kunes_rattay` | 0.160000 | 0.160000 |
+
+**Identical to six decimal places, every one.** A townsman belongs to
+`ratays_citizens`, so the faction that would have moved was measured and did
+not move.
+
+That is the `real = false` provocation and the `combat:stimulus:hit` route
+working as designed: neither reaches `SetReputationNPC`. The figures below
+base for citizens and soldiers are this save's own history and predate the
+test.
+
+The claim has one limit. This brawl raised no witnessed crime. A witnessed
+one, reported and fined, goes through the crime system's own reputation
+machinery, which has not been measured separately.
+
+The encounter also closed `why=natural state=MoveToIdle` with nothing sent,
+the second genuine natural resolution recorded.
+
+### The victim holds no grudge in any value that can be read
+
+Asked directly, `rat_man19` reported `relationshipToPlayer = 0.537791`,
+slightly **positive**, with `GetSuperfaction` and `GetPerceivedSuperfaction`
+both 3 and identical. Nothing persistent marks the rider as an enemy, which
+argues against the flee-on-approach being a permanent state. It is not
+evidence that it decays, only that no stored value carries it.
