@@ -416,6 +416,20 @@ rather than missing.
 - [ ] Riding through a packed group inflicts a morale shock, so lightly armored enemies
       break and flee using native AI.
 
+
+- [ ] Some victims come after the rider instead of recovering and moving on.
+      The combat subbrain already handles `combat:fightParams`,
+      `confrontParams`, `fleeParams` and `rallyParams`, and this mod already
+      sends `combat:hit`, which is what brings guards down on a rider, so the
+      machinery is connected rather than absent.
+
+      The open question is whether the choice can be made here at all.
+      Vanilla decides fight
+      or flight from the archetype and its courage, which is why a villager
+      runs and a guard does not, and a random chance of retaliation may be
+      that system's to make rather than this mod's. Establish which before
+      building anything: the model is the thief a townsman chases down and
+      fights unaided.
 - [ ] The collision bark fires while the victim is still falling or lying as
       a ragdoll, which is nobody's idea of speaking. It should land as they
       get up.
@@ -429,6 +443,18 @@ rather than missing.
       `soul:RemoveMetaRoleByName` and `soul:AddMetaRoleByName`, so the same
       calls can silence the request at the impact and send one deliberately
       once the victim is upright.
+
+- [ ] Give each tier its own voice. `dialog:monologRequest` is how the game
+      raises spoken reactions and vanilla sends it 958 times across its AI,
+      selecting a line by metarole. Eighty metaroles are in use and several
+      suit a trampled victim better than the collision bark does:
+      `RANENY_NA_ZEMI`, wounded and on the ground; `VZDAVANI_BARK`,
+      surrendering; `PRANYR_KRIK`, a scream; `ZASAH_ZBRANI_IGNOROVANY`, a hit
+      shrugged off. A grumble at walk, something hurt at trot and a scream at
+      gallop costs one message per impact and no new audio.
+
+      Composes with the item above: silence vanilla's bark at the impact and
+      send the chosen line once the victim is upright.
 - [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
       a guard down registers no bounty, but trampling a villager to death brought the
       guards down on the rider and carried a jail sentence, with no crime code in the mod.
