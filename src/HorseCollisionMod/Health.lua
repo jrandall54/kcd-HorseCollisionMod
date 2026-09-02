@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 4.4.4
+-- @release 4.4.5
 
 --- Logs a named entity's health whenever it changes.
 --

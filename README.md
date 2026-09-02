@@ -134,6 +134,8 @@ tools/
                           mod-driven animation apart from a vanilla one
   restore_alive.lua       returns nearby actors to the alive physicalization
                           profile, repairing one left in another
+  probe_inventory.lua     names what a named entity is carrying, resolving
+                          item class GUIDs to readable names
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   version_check.py        derives the next version from CHANGELOG.md
