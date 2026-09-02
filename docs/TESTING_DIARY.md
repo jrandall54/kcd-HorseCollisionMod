@@ -10954,3 +10954,109 @@ ms to rise if male and 5,100 ms if female. Neither figure responds to
 `ExitTime`, `Sleep`, `Stiffness`, `g_ragdollPollTime` or `ca_DeathBlendTime`,
 and the gallop tier reaches both through `actor:Fall` without touching any data
 this mod ships.
+
+## What drives the wait before a victim stands, and why it cannot be reached
+
+The wait is a terminator on the `BlendRagdoll` fragment's `blendIn` option: an
+empty Procedural at an ExitTime, which replaces the Ragdoll procedural and ends
+the hold.
+
+```
+<Blend ExitTime="2" StartTime="0" Duration="0" />
+<Procedural type="" />
+```
+
+`kcd_male_database.adb` carries one at 2 seconds across its 10 options.
+`wh_female_database.adb`, with 5 options, carries none at all. That is the
+whole of the gender difference: a man's hold is told to stop and a woman's is
+not, which is why `BlendRagdoll` measures 2,570 ms against 5,100 ms.
+
+### The override was built and is not read
+
+`build_adb.py` was extended to take authority over `BlendRagdoll` the same way
+it does over `AnimationControlled`, carrying all 10 male and all 5 female
+vanilla options with no clip lost, rewriting the male terminator and adding one
+to the female option. The generated file deployed correctly and contained the
+new value.
+
+It changes nothing. At a hold of 0.5 seconds the figures were unmoved, and at a
+deliberately absurd 8 seconds they were unmoved again, which rules out a clamp
+and shows the fragment is never consulted.
+
+`BlendRagdoll` resolves through `ActionController`, and this mod redirects only
+`AnimDatabase3P`. That is deliberate and recorded in `TECHNICAL_DETAILS.md`:
+redirecting `ActionController` requires copies of the controller def and the
+fragment id file, which puts the mod in the resolution path of every human
+animation rather than one fragment, and broke unrelated animations when it was
+tried. `verify_additive.py` asserts against it.
+
+### Where that leaves the wait
+
+Identified, understood, and gated behind a change the project has already
+rejected on stronger grounds than this symptom. Everything reachable was
+measured and moves it by nothing: `ExitTime` on the mod's own fall fragment,
+`Sleep`, `Stiffness`, `g_ragdollPollTime`, `ca_DeathBlendTime`, and the
+physicalization profile, which reads `alive` throughout and so leaves
+`actor:StandUp` and `SetPhysicalizationProfile` with nothing to act on.
+
+## `unragdoll` is a real profile, and is not the way out of the wait
+
+Read out of the game binary's string dispatch for
+`SetPhysicalizationProfile`, which accepts six values rather than the two this
+project knew about:
+
+| String | Profile |
+|---|---|
+| `alive` | 1 |
+| `unragdoll` | 0 |
+| `ragdoll` | 2 |
+| `sleep` | 3 |
+| `frozen` | 4 |
+| `spectator` | 6 |
+
+No vanilla script uses `unragdoll` and no modding documentation names it.
+
+### What it does
+
+Called two seconds into a fall reaction, it takes effect on every victim:
+`was=alive now=unragdoll ok=true`. What follows differs by gender, and neither
+outcome is the one wanted.
+
+| | Result |
+|---|---|
+| Men | no change. `BlendRagdoll` still runs 2,592 ms and the wait is untouched. |
+| Women | the get-up is skipped entirely. No `BlendRagdoll` at all, straight from the fall to `MotionMovement`, which reads in game as shooting upright. |
+
+It cancels the recovery rather than shortening the wait before it.
+
+### It strands the actor
+
+Nothing returns an actor to `alive`. One victim recorded
+`MotionIdle/unragdoll=9952ms` and two others alternated `MotionIdle` and
+`MotionMovement` while still in the profile, which is an animation state
+machine running while the body is not driven by it. In game that is an NPC
+walking on the spot.
+
+`tools/restore_alive.lua` repairs it, and four actors were returned to `alive`
+with it. That is the reason the tool exists and the reason the experiment is
+not kept: a setting that permanently breaks an NPC is not worth shipping
+switched off.
+
+### The ragdoll CVars were never candidates
+
+The engine registers its own help text for them, which the decompilation index
+now carries:
+
+| CVar | What the engine says it does |
+|---|---|
+| `g_ragdollMinTime` | minimum time in seconds that a ragdoll will be visible |
+| `g_ragdollPollTime` | time in seconds where 'unseen' polling is done |
+| `g_ragdollUnseenTime` | time the player has to look away before it disappears |
+| `g_ragdollDistance` | distance the player has to be away before it disappears |
+
+All four govern corpses being removed. None of them gates a recovery, and the
+rides spent testing two of them were spent on a reading of their names.
+
+`g_hitDeathReactions_disableRagdoll`, "disables switching to ragdoll at the end
+of animations", is the only one in that family that touches this behavior at
+all, and it has not been tried.
