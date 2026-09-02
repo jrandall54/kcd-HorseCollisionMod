@@ -12754,3 +12754,32 @@ Most of a session, because the absolute value was read as if it described the
 victim when it mostly described the player's current standing with the town.
 The gap against untouched neighbors was the correct instrument throughout and
 was only adopted late.
+
+### Correction: the jail comparison was two readings after jail
+
+The entry above concluded that jail does nothing, from a pair of readings
+described as before and after seven days served. **Both were taken after.**
+The rider had already served when the first was run, so the pair shows only
+that nothing changed between two post-jail moments, which is not the
+comparison that was claimed.
+
+Everything the entry infers from that pair is withdrawn:
+
+- that jail moves nothing
+- that the victim was already above the threshold before serving
+- that the recovery to 0.4259 happened without jail
+- that a fine and time reach the same place
+
+The one measurement that survives is that a second punch cost the victim
+nothing, since both readings bracket it. `hit_melee_*` has a floor per person
+and repeat offenses against the same person do not compound.
+
+**Whether jail clears something a fine does not is untested.** It needs the
+A/B the rider proposed: punch, pay the fine, observe; then reload, punch,
+serve the sentence, observe. Readings must be taken at each stage rather than
+at the end, since the town-wide depression while a crime is unsettled moves
+faster than the personal penalty and will otherwise be mistaken for it again.
+
+That mistake, reading a pair of samples as a before and after when both fell
+on the same side of the event, is the third time in this session that a
+conclusion outran the measurement.
