@@ -11574,3 +11574,69 @@ Whether angriness is the right dial remains open: the engine names
 villager may carry anger the faction does not. `SetAngriness` and
 `AddAngriness` are untested, deliberately — they write to faction state in a
 live save and could sour a whole town permanently.
+
+---
+
+## Faction angriness is not hostility, and `hostilePerception` is
+
+`SetAngriness` works, takes a float, and clamps at 1.0: writing 2, 10 and 100
+each read back as exactly 1. Written across **all 98 factions at once**, so
+that the question could be answered by walking up to whoever was nearest
+rather than by working out which faction an NPC belongs to.
+
+**Nothing happened.** Every NPC in Rataje behaved normally with their faction
+at maximum angriness: no drawn weapons, no squaring up, no aggression, and a
+walk stagger still produced the ordinary reaction rather than a fight.
+
+So angriness is not a hostility switch. It is a number the crime and faction
+systems read when they decide something, and setting it directly bypasses
+whatever consults it. The engine's dump confirms the write lands —
+`wh_rpg_angriness -f 42` reported `0.999919` with a fresh last-update stamp
+seconds after the write, so the value is real and decays — but no behavior
+hangs off it on its own.
+
+### The message that does decide
+
+`vanilla_scripts/Libs/AI/final/sb_combat.xml` handles
+**`combat:stimulus:hostilePerception`**, carrying a `perceptible`, and that
+single message is where fight, flee and report are chosen. The branch on
+`crimeSystemRole`:
+
+- **circator or monk** — flees if the perceptible is the player, otherwise
+  builds a `threat` information and goes to `report`.
+- **civilian, renegade or soldier** — reaches the fight branch, which sets
+  `t_state = fight`, `t_fightParams.opponent = perceptible`, and sends a
+  `combat:bark` with the metarole `SPATRENI_NEPRITELE_-_UTOK`, spotting an
+  enemy and attacking.
+
+The fight branch is gated, and the gates are the interesting part:
+
+- `b_context['fightAllHostilePerceptibles']`, a context flag that skips every
+  check below and goes straight to fighting.
+- otherwise a `LuaGate` running
+  `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat`. **`RPG.MoraleForCombat`
+  reads `0.2` in game.**
+- then a `MoraleCheck` at `ThreatLevel` 0.400000 for a soldier or renegade and
+  0.550000 for a civilian, or a `CompareMorale` of observer against target.
+
+That is a native courage gate. A brave NPC turns on the rider and a timid one
+does not, decided by the game's own morale stat against the rider's, with no
+probability constant invented by this mod.
+
+### Why this is reachable
+
+The delivery is the call this mod already makes.
+`XGenAIModule.SendMessageToEntityData(target, type, content)` is what `Crime.lua`
+uses to send `combat:hit`, and it is the same call vanilla's own `Crime.lua`
+uses to send `combat:confrontationFeedback` and `combat:friskFeedback` into the
+combat subbrain. `XGenAIModule.SendMessageToEntityData` is confirmed live.
+
+Thirty-seven `combat:` message types appear across the vanilla behavior XML,
+`combat:stimulus` at 154 uses being the most common by a wide margin, and the
+subbrain reads them from a `combatStimulus` inbox.
+
+### Status
+
+The message has not been sent yet. What is established is that faction
+angriness is the wrong dial, that a right one exists, that its gate is morale
+rather than a coin flip, and that the transport is already in the mod.
