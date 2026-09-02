@@ -11151,3 +11151,35 @@ Reaching it needs the collision class bits the horse and an actor use, which
 are not in the animation data and would have to come out of the binary or from
 experiment. That is a longer path than the one this entry started down, and it
 is recorded rather than taken.
+
+## Riding into a squared-up victim puts the rider inside them, and collision is not why
+
+Three collider modes were tried on the knocked-down tiers, against a baseline
+of `Interactive`: `NonPushable`, then `GroundedOnly`, with the walk stagger left
+alone in both. The generated data was correct each time and deployed each time,
+and neither was distinguishable in game.
+
+The premise was wrong. The player is not blocked by the victim, they are
+**inside** them, which is too little collision rather than too much. No collider
+mode places a body somewhere else.
+
+### Why the body is there
+
+At trot with `TrotReaction` set to `"fall"`, the dispatch calls `PlayReaction`
+and nothing else. **No impulse is applied at that tier at all.** The victim
+collapses where they were standing, and against a rider squared up head-on that
+is directly under the horse.
+
+Adding an impulse is not a small change either, for the reason the fall tier
+exists: an animation-driven actor ignores impulses, which is what sent this mod
+to an animated reaction rather than a physics knockdown in the first place. The
+fragment does hand the body to physics partway through, so an impulse timed to
+that handover would move them, but by then they are already on the ground
+underneath the horse and would be slid out rather than thrown clear.
+
+### What is ruled out
+
+`ColliderMode` cannot reach this, at any of its eight values. The one place it
+demonstrably mattered was the choice between writing the layer at all and not
+writing it, which is what stopped victims ending up inside wagons. Between its
+non-empty values, nothing a rider notices changes.
