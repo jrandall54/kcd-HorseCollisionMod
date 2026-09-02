@@ -12992,3 +12992,62 @@ always right about that either: the header gives
 The order to consult is now the cheat mod for what Lua can call, the
 decompilation for what the binary contains, and libKCD1 for how a bind is
 declared.
+
+## Second pass: the actor surface, and a native horse pull-down
+
+Reading the cheat mod pointed at a broader question, which is what the entity
+methods vanilla itself uses actually are. Gathered from `vanilla_scripts/`
+rather than from the reverse-engineered headers, because the headers cover
+script binds and these are reached another way.
+
+**Eighty-odd `actor:` methods and twenty `human:` ones**, of which this mod
+uses six. The ones that bear on open work, none tried here:
+
+- `actor:StandUp()` and `actor:IsUnconscious()`. Both would have replaced
+  improvisation: the stuck-NPC repairs reached for a stand-up through a
+  stand-down message and a daycycle restart, and `IsDead` was probed and
+  failed where `IsUnconscious` exists.
+- `actor:SetMovementTarget(...)`, which sends an actor somewhere directly
+  rather than asking the daycycle to replan and hoping.
+- `actor:RequestKnockOut()`, an ending for a brawl that is neither a death nor
+  a yield.
+- `actor:HolsterItem` and `actor:UnequipInventoryItem`. Vanilla's `Crime.lua`
+  holsters the **player's** weapon during a confrontation with the second of
+  these. Taking a victim's weapon out of his hand is a route to an unarmed
+  brawl that does not need `combat:order`'s unregistered `restrictWeaponKind`,
+  which is what closed that item.
+- `actor:CameraShake` and `actor:SetViewShake`. A collision currently costs
+  the rider a number they cannot see. Neither has ever been considered.
+- `actor:GetArmor()`, which reads armor directly where `Armor.lua` sums it out
+  of the item tables.
+
+### Horse pull-down is already in the game
+
+`BasicAIActions.lua` offers it as an interactor action beside knockout and
+hunt attack:
+
+    local canPullDown = user.actor:CanHorsePullDown(self.id)
+    user.actor:RequestHorsePullDown(self.id)
+
+hinted `@ui_hud_horse_pulldown`, interaction `inr_pullDown`, with
+`wh_cs_HorsePullDownAngle`, `wh_cs_HorsePullDownZAngle` and
+`wh_cs_HorsePullDownZeroAngle` governing the geometry.
+
+In vanilla the player pulls a mounted NPC down. Whether the roles can be
+reversed is untested. If they can, an NPC dragging the rider off the horse is
+native, and it is both the braced-polearm item and the strongest form of a
+victim fighting back.
+
+### The AI has rider-specific combat behaviour
+
+A combat action type group in the binary carries forty-six names, among them
+`freeRiderAttack`, `freeRiderAttackStatic`, `groupRiderAttack`,
+`groupRiderMovement`, `riderGuardIdle`, `riderGuardMovement`,
+`riderGuardFastStop`, `riderGuardJump`, **`riderGuardRear`**,
+`horsePullDownAttackSuccess` and `horsePullDownHitSuccess`.
+
+These are behavior and animation identifiers, not Lua entry points, so they
+are not callable as they stand. What they establish is that combat against a
+mounted target, and mounted combat including a rear, are things the game
+already has written. The roadmap item about a heavy impact rearing the horse
+has a named behavior behind it rather than only a fragment.

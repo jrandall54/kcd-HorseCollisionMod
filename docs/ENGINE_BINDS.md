@@ -740,3 +740,81 @@ victim while surrendering to him does.
 `angriness_enum` has nine lines: `min_angriness` 0, `max_angriness` 1, `death`
 0.55, `event_roadsideCorpse_unsolvedMurder` 0.2, `unatributedStealthKill` 0.15,
 `theft_large` 0.125, `theft_medium` 0.025, `theft_small` 0.01.
+
+## Actor and human methods vanilla uses
+
+Gathered from `vanilla_scripts/`, and listed because several bear directly on
+this mod and were not known to it. Presence in vanilla means the method exists;
+none of the ones marked untried has been called here.
+
+### Actor, reached as `ent.actor`
+
+Already used by this mod: `Fall`, `GetCurrentAnimationState`,
+`GetPhysicalizationProfile`, `SetPhysicalizationProfile`,
+`StartInteractiveActionByName`, `SetMovementRestriction`, `SetHealth`.
+
+Untried and relevant:
+
+| Method | Why it matters here |
+| --- | --- |
+| `StandUp()` | stands an actor up, which is what several improvised repairs were reaching for |
+| `IsUnconscious()` | the state read that `IsDead` failed to provide |
+| `RequestKnockOut()` | a knockout, which is how a brawl can end without a death |
+| `SetMovementTarget(...)` | send an actor somewhere, rather than asking the daycycle to replan |
+| `HolsterItem(...)` | put a weapon away |
+| `UnequipInventoryItem(item)` | vanilla's `Crime.lua` holsters the **player's** weapon with this during a confrontation |
+| `EquipWeaponPreset`, `EquipClothingPreset` | wholesale loadout changes |
+| `AddBlood(str, n)`, `AddDirt(n)`, `AddFrost`, `CleanDirt`, `WashDirtAndBlood` | the cosmetic roadmap item |
+| `CameraShake(...)`, `SetViewShake(...)` | impact feedback for the rider, never considered |
+| `SetForcedLookDir`, `SetForcedLookObjectId` | make a victim look at the rider |
+| `Revive()`, `ReviveToDefaults()` | reset an actor |
+| `GetArmor()` | armor, read directly rather than summed from the item tables |
+| `CanHorsePullDown(id)`, `RequestHorsePullDown(id)` | see below |
+| `CanStealthKnockout`, `RequestStealthKill`, `RequestMercyKill` | |
+| `CanHuntAttack`, `RequestHuntAttack` | |
+
+### Human, reached as `ent.human`
+
+Already used: `IsMounted`, `GetItemInHand`, `ForceDismount`.
+
+Untried: `DrawWeapon`, `DrawPrimaryWeapon`, `IsWeaponDrawn`, `CycleWeapon`,
+`EquipItemInSlot`, `CanBeRobbed`, `RequestDialog`, `RequestPickpocketing`,
+`Mount`, `GrabOnLadder`, `StartBuilding`, `StartBookTranscription`.
+
+`IsWeaponDrawn` is the read that the polearm get-up investigation inferred
+from item names.
+
+## Horse pull-down is a vanilla interaction
+
+`BasicAIActions.lua` offers it as an interactor action beside knockout and
+hunt attack:
+
+    local canPullDown = user.actor:CanHorsePullDown(self.id)
+    ...
+    user.actor:RequestHorsePullDown(self.id)
+
+with the hint `@ui_hud_horse_pulldown` and the interaction `inr_pullDown`. The
+binary carries `wh_cs_HorsePullDownAngle`, `wh_cs_HorsePullDownZAngle` and
+`wh_cs_HorsePullDownZeroAngle`, so the geometry that permits it is tunable.
+
+In vanilla the `user` is the player and the target is a mounted NPC. **Whether
+an NPC can be the `user` and the player the target is untested**, and if it
+can, an NPC pulling the rider off the horse is a native mechanic rather than
+something this mod would have to build. That is the roadmap's braced-polearm
+dismount and a large part of what victims fighting back should look like.
+
+## The engine names rider-specific combat behaviours
+
+A combat action type group in the binary carries, among forty-six entries:
+
+`freeRiderAttack`, `freeRiderAttackStatic`, `groupRiderAttack`,
+`groupRiderMovement`, `riderGuardIdle`, `riderGuardIdle2Move`,
+`riderGuardMove2Idle`, `riderGuardMovement`, `riderGuardFastStop`,
+`riderGuardJump`, `riderGuardJumpStart`, `riderGuardJumpEnd`,
+**`riderGuardRear`**, `horsePullDownAttackSuccess`, `horsePullDownHitSuccess`.
+
+These are behaviour and animation identifiers rather than Lua entry points, so
+they are not callable as they stand. What they establish is that the AI has
+combat behaviour written specifically for fighting a mounted target and for
+mounted guards, including a rear. The roadmap item about striking a heavy
+target rearing the horse has a named behaviour behind it.

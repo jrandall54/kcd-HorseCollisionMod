@@ -360,6 +360,26 @@ armor.
       declares a `Rear` fragment, so a heavy impact can rear or check the
       horse rather than only debiting a number the player cannot see. That is
       the horse's half of what armor should feel like.
+
+      The engine names a `riderGuardRear` combat behavior alongside
+      `riderGuardMovement`, `riderGuardJump` and the rest, so a rear while
+      mounted is something the game already does rather than something to
+      invent.
+- [ ] Shake the rider's camera on a heavy impact. `actor:CameraShake` and
+      `actor:SetViewShake` both exist and neither has been tried. A collision
+      currently costs the rider a number they cannot see; this is the cheapest
+      way to make weight felt from the saddle, and it composes with the rear
+      above.
+- [ ] An NPC pulls the rider off the horse. `CanHorsePullDown` and
+      `RequestHorsePullDown` are a vanilla interactor action, offered beside
+      knockout and hunt attack, with `wh_cs_HorsePullDownAngle` and two
+      companions governing the geometry. In vanilla the player is the one
+      pulling a mounted NPC down.
+
+      Whether an NPC can be the actor and the player the target is untested.
+      If it can, the braced-polearm dismount below and the most dramatic form
+      of a victim fighting back are both native mechanics rather than
+      something to build.
 - [x] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
       A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
       target in mail, multiplying with the combat multiplier already applied and with the
