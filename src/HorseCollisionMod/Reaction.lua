@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.4.5
+-- @release 4.5.0
 
 --- Posts the native `hitReaction` message to the victim's brain.
 --
@@ -163,6 +163,65 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	return ok
 end
 
+--- Slows a ragdolled victim so it stops sliding.
+--
+-- A thrown body keeps going long after the throw, and that slide is most of
+-- the distance an impact appears to produce. It makes the ground read as ice,
+-- and it makes distance a poor measure of force, because what is being
+-- measured is mostly the surface rather than the impulse.
+--
+-- `damping` bleeds velocity off the body and `min_energy` is the threshold
+-- below which physics puts it to rest. Both are fields of
+-- `pe_simulation_params`, which `PHYSICPARAM_SIMULATION` selects. Vanilla uses
+-- the same call for its own entities, with `PHYSICPARAM_COLLISION_CLASS` in
+-- `GeomEntity.lua`.
+--
+-- Applied after the impulse, so the throw is not damped before it happens.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:DampVictim(npc)
+	local damping = self.Config.RagdollDamping or 0
+	local minEnergy = self.Config.RagdollMinEnergy or 0
+
+	if damping <= 0 and minEnergy <= 0 then
+		return
+	end
+
+	-- After the impulse has been applied rather than alongside it, since the
+	-- impulse itself is deferred until the body has physicalized.
+	local delay = (self.Config.ImpulseDelayMs or 50) + 100
+	local generation = self.TimerTick
+
+	Script.SetTimer(delay, function()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local params = {}
+
+		if damping > 0 then
+			params.damping = damping
+		end
+
+		if minEnergy > 0 then
+			params.min_energy = minEnergy
+		end
+
+		local ok, err = pcall(function()
+			npc:SetPhysicParams(PHYSICPARAM_SIMULATION, params)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("Damped " .. tostring(npc:GetName())
+					.. " damping=" .. tostring(damping)
+					.. " minEnergy=" .. tostring(minEnergy)
+					.. " ok=" .. tostring(ok)
+					.. " err=" .. tostring(err))
+		end
+	end)
+end
+
+
 --- Knocks a victim down with a physics ragdoll.
 --
 -- Used at trot and gallop. `actor:Fall` switches the victim to a ragdoll,
@@ -174,14 +233,15 @@ end
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
-function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
+function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos)
 	pcall(function()
 		if npc.actor then
 			npc.actor:Fall({x=0, y=0, z=0}, true)
 		end
 	end)
 
-	self:ImpulseVictim(npc, velocity, impulseScale)
+	self:ImpulseVictim(npc, velocity, impulseScale, horsePos)
+	self:DampVictim(npc)
 
 	-- The control for the same reading taken on the fall path. This tier uses
 	-- actor:Fall and touches no animation data of this mod's, so a turn seen
@@ -205,7 +265,7 @@ end
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
-function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale)
+function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 	local k_back = self.Config.Knockback * impulseScale
 	local k_up = self.Config.Uplift * impulseScale
 
@@ -244,10 +304,44 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale)
 			dir.z = 0
 		end
 
+		-- A component across the horse's line, so the victim leaves it.
+		--
+		-- Thrown along the line they do not: at a gallop the horse covers
+		-- ground faster than the impulse moves a body of this mass, so it
+		-- overtakes its own victim and tramples them again. Pushing them
+		-- across the line clears it whatever the magnitude.
+		--
+		-- The side is the one the victim is already on, from the sign of the
+		-- cross product of the horse's heading with the offset to the victim.
+		-- Carrying them further the way a glancing blow already sent them
+		-- reads better than picking a side, and never pushes anyone back
+		-- through the horse.
+		local across = { x = 0, y = 0 }
+		local lateral = self.Config.LateralImpulse or 0
+
+		if lateral > 0 and horsePos then
+			local side = ((hitPos.x - horsePos.x) * dir.y)
+					- ((hitPos.y - horsePos.y) * dir.x)
+
+			-- Perpendicular to the heading, pointing at the victim's side.
+			local sign = 1
+
+			if side > 0 then
+				sign = -1
+			end
+
+			across.x = -dir.y * sign
+			across.y = dir.x * sign
+		end
+
 		-- Forward push and upward lift are combined into one vector, then
 		-- split back into a unit direction and a magnitude, because
 		-- AddImpulse wants those as separate arguments.
-		local combined = { x = dir.x * k_back, y = dir.y * k_back, z = k_up }
+		local combined = {
+			x = (dir.x * k_back) + (across.x * math.abs(k_back) * lateral),
+			y = (dir.y * k_back) + (across.y * math.abs(k_back) * lateral),
+			z = k_up
+		}
 		local impulseMag = math.sqrt((combined.x * combined.x)
 				+ (combined.y * combined.y)
 				+ (combined.z * combined.z))
@@ -269,11 +363,45 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale)
 				z = combined.z / impulseMag
 			}
 
-			-- The ragdoll needs a tick to physicalize before it accepts an
-			-- impulse.
-			Script.SetTimer(50, function()
+			-- The ragdoll needs time to physicalize before it accepts an
+			-- impulse, and one applied too early is ignored without saying so.
+			-- The wait is settable because a fixed 50 ms produced throws of
+			-- four meters and of nothing at all from the same magnitude.
+			Script.SetTimer(self.Config.ImpulseDelayMs or 50, function()
+				local before, after = nil, nil
+
 				pcall(function()
+					before = npc:GetWorldPos()
+				end)
+
+				local ok, err = pcall(function()
 					npc:AddImpulse(-1, hitPos, normDir, impulseMag, 1)
+				end)
+
+				-- Reported from inside the timer, and with what the body did
+				-- next. The line written when the impulse is computed says
+				-- only what was intended: the call itself happens a quarter of
+				-- a second later, and a failure or a body that does not move
+				-- looked identical to a throw from outside.
+				Script.SetTimer(300, function()
+					pcall(function()
+						after = npc:GetWorldPos()
+					end)
+
+					local moved = 0
+
+					if before and after then
+						moved = math.sqrt(((after.x - before.x) ^ 2)
+								+ ((after.y - before.y) ^ 2)
+								+ ((after.z - before.z) ^ 2))
+					end
+
+					if self.Config.LogTelemetry then
+						self:Log("ImpulseApplied " .. tostring(npc:GetName())
+								.. " ok=" .. tostring(ok)
+								.. " err=" .. tostring(err)
+								.. " movedIn300ms=" .. string.format("%.2f", moved) .. "m")
+					end
 				end)
 			end)
 		end

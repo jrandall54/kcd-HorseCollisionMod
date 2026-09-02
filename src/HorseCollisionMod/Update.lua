@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.4.5
+-- @release 4.5.0
 
 --- Applies the appropriate reaction for one collision.
 --
@@ -42,6 +42,15 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		horseWuid, sampledSpeed)
 	local npcId = tostring(npc.id)
 	local now = self:TimeMs()
+
+	-- Read here rather than passed in, because the detection loop's copy is
+	-- a tick old by the time a reaction is dispatched and the impulse needs
+	-- to know which side of the horse the victim is on right now.
+	local horsePos = nil
+
+	pcall(function()
+		horsePos = horseEnt:GetPos()
+	end)
 
 	-- The detection sphere is tested ten times a second, so without a
 	-- per-victim cooldown a single pass through a crowd would restart the
@@ -164,7 +173,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		elseif cfg.TrotReaction == "fall" then
 			self:PlayReaction(npc, velocity, speed, "hcm_fall_")
 		else
-			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse)
+			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse, horsePos)
 		end
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
@@ -178,7 +187,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- victim health of its own, and a probe that reads afterwards
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
-		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse)
+		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse, horsePos)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,

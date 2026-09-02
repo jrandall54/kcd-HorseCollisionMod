@@ -48,14 +48,20 @@ Known gaps carried into later phases:
       vanilla to leave alone. Correcting the get-up pairings had already fixed the
       rotation behind most of it; `GroundRotation` and the ragdoll settle layer do
       nothing and are not used.
-- [ ] The horse and a downed NPC push against each other instead of clearing
-      past, and the rider can be left stuck on a body. `ColliderMode` on this
-      mod's own fragments is `Interactive`, so a victim collides with
-      everything including the horse. Vanilla also defines `GroundedOnly`,
-      which keeps a body on the floor without colliding with other actors.
-      One value in a ProcLayer already generated, and the same change the
-      armor knockback item below depends on. `Disabled` does not resolve the
-      walk stagger case; `GroundedOnly` is untested.
+- [x] The horse and a downed NPC pass through each other, and a rider
+      squared up head-on ends up inside the body while the fall plays. Not
+      fixable through `ColliderMode`: `Interactive`, `NonPushable`,
+      `GroundedOnly` and `Disabled` were each ridden on the knocked-down
+      tiers and none is distinguishable from the others, including switching
+      collision off outright, which also produced none of the clipping that
+      layer exists to prevent.
+
+      The cause is that no impulse fires at trot. With `TrotReaction` set to
+      `"fall"` the dispatch plays the reaction and nothing else, so the
+      victim collapses where they stood, which against a squared-up rider is
+      under the horse. Adding an impulse is not small: an animation-driven
+      actor ignores them, which is why this tier is an animation rather than
+      a physics knockdown. Closed as understood rather than as fixed.
 - [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
       physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
 - [ ] A one-frame animation fires as an NPC stands up from a trot ragdoll. It does not
@@ -312,16 +318,23 @@ armor.
       either: an armor multiplier tuned against a distance the horse is dictating will be
       tuned to the wrong thing.
 
-- [ ] Prerequisite for the item above: stop the horse carrying its victim.
-      An armor multiplier tuned while the horse is still pushing the body is
-      tuned to the horse rather than to the armor, which is why armored and
-      unarmored targets are reported traveling alike. `GroundedOnly` on the
-      reaction fragment removes horse-to-victim contact after the impact,
-      leaving `Knockback` and `Uplift` to decide where a body lands. The hit
-      itself still lands first, so the damage the engine applies is
-      unchanged. A heavy target could also take an animated stagger in place
-      of a full ragdoll, so mass reads as refusing to be thrown rather than
-      as being thrown a shorter distance.
+- [x] Prerequisite for the armor item above, and it was not the horse. A
+      thrown body slid for meters after landing, so distance measured the
+      surface as much as the impact. Damping the ragdoll through
+      `SetPhysicParams(PHYSICPARAM_SIMULATION, ...)` cuts the ground covered
+      after landing from 2.77 m to 1.09 m and narrows the spread from six
+      meters to under four. Braking the horse hard on contact changed travel
+      not at all, which rules the horse out as the thing carrying them.
+
+- [ ] Armor knockback, now measurable. The multiplier has always worked and
+      the force it multiplies did not: `Knockback` of 50 is
+      indistinguishable from applying no impulse at all, because an impulse
+      of that size moves a body of 120 to 160 kilograms at about 0.6 meters
+      per second. Raising it to 600 threw a villager 27 meters and threw one
+      guard upward into the rider hard enough to nearly kill them, so
+      `Uplift` has a hard ceiling that is a safety limit rather than an
+      aesthetic one: the rider sits directly above the victim. Raise
+      `Knockback` alone, moderately, and measure with the slide now removed.
 - [ ] Striking a heavy target strips the horse's momentum rather than only
       its stamina, and shows on the horse. `kcd_horse_controllerdefs.xml`
       declares a `Rear` fragment, so a heavy impact can rear or check the
@@ -377,6 +390,23 @@ rather than missing.
       trot can stand up bloodied and muddy instead of immaculate. Cosmetic,
       cheap, and it is the feedback that makes an impact read as an injury
       rather than as a stumble.
+
+- [ ] An impact makes a noise and throws up dust. Vanilla ships 39
+      procedural clip types and this mod uses four of them, and two of the
+      rest are exactly this:
+
+      `PlaySound` takes a `StartTrigger`, a `Radius` and an obstruction
+      type, and vanilla drives combat impacts through it with triggers named
+      like `c_w_sword_clinch`. A trot collision is currently silent apart
+      from the victim's bark.
+
+      `ParticleEffect` takes an `EffectName`, an `AttachmentName` for the
+      joint to hang it on, position and rotation offsets, and `KillOnExit`.
+      Dust off the ground where a body lands, and it is authored per
+      fragment rather than needing anything in Lua.
+
+      Both ride along in animation data already generated, which makes them
+      the cheapest immersion on this list. Neither has been tried.
 - [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
 - [ ] Horse barding increases impact force and reduces momentum loss.
 - [ ] A braced polearm hit head-on acts as a wall: heavy stamina cost, near-certain dismount.

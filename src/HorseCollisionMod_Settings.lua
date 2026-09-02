@@ -26,6 +26,8 @@ HorseCollisionModSettings = {
 	-- Knockdown force, trot and gallop only.
 	Knockback                = 50.0,  -- horizontal, higher throws further
 	Uplift                   = 30.0,  -- vertical, higher throws upward
+	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner
+	RagdollMinEnergy         = 0.5,   -- higher puts it to rest sooner
 
 	-- Stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,

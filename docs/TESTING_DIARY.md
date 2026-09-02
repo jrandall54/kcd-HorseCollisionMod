@@ -4867,7 +4867,7 @@ Guessing at mechanisms has now cost three rides. The watch is the instrument
 that can answer it directly, because it timestamps the loss instead of
 inferring it from the interval, and it now records the rider's distance and the
 horse's recent peak speed at that moment. A loss with the horse alongside is the
-rejected contact of explanation 2. A loss with the horse thirty metres away is
+rejected contact of explanation 2. A loss with the horse thirty meters away is
 none of the three.
 
 ## Reading what an NPC is wearing
@@ -7169,7 +7169,7 @@ is what follows the fall in a death. The mod puts the get-up there instead.
 The ragdoll the mod removed was created at the moment of impact, underneath a
 horse still travelling through that space, and the engine charged the trample
 that followed. This one is created **two seconds after the animation starts**,
-by which time a horse at trot has covered something like fourteen metres and is
+by which time a horse at trot has covered something like fourteen meters and is
 nowhere near the body.
 
 It is the deferred ragdoll the roadmap proposed and Lua could not deliver. The
@@ -7412,7 +7412,7 @@ fall against all four get-ups. There is no naming rule to infer them from.
 
 Each fall was played against all four get-ups, with the fall held constant so
 the recovery clip was the only variable. The subject was teleported three
-metres in front of the player once, allowed to settle, and then given the four
+meters in front of the player once, allowed to settle, and then given the four
 options in turn.
 
 | Fall | Get-up | Result |
@@ -7441,15 +7441,15 @@ chaining these clips and is not a pairing error.
 Reading a single frame of rotation needs the subject in front of the player at
 a known distance, and neither picking the nearest NPC nor asking the user to
 tag one held up: targets walked off, fell through scenery, despawned, or turned
-out to be a namesake two kilometres away, and several rounds were spent on
+out to be a namesake two kilometers away, and several rounds were spent on
 subjects nobody could see.
 
-Teleporting one NPC three metres in front of the player, once, then letting it
+Teleporting one NPC three meters in front of the player, once, then letting it
 settle before firing, is what worked. Repositioning between clips was tried
 first and was worse: it moved the subject mid-animation and left it floating.
 
 The harness now measures where the subject actually landed and refuses to fire
-beyond eight metres, so a bad placement fails loudly instead of costing a round.
+beyond eight meters, so a bad placement fails loudly instead of costing a round.
 
 The subject also floated at times during these rounds. That is the staging and
 not the mod: `SetWorldPos` places the entity at the player's own height, which
@@ -7514,7 +7514,7 @@ rotations. Readings from the staged pass supersede the ones before it.
 
 The first pass was run on whatever NPC was to hand and produced a mapping that
 did not survive scrutiny. This one staged the subject deliberately: teleported
-to a fixed spot four metres in front of the player, placed at terrain height,
+to a fixed spot four meters in front of the player, placed at terrain height,
 turned to face the player, and held for all four options of a round, so nothing
 varied within a round but the get-up. Sixteen pairings, then the same sixteen
 on the other character set.
@@ -7538,7 +7538,7 @@ inherent to chaining those two clips rather than a pairing that can be improved.
 It had front pairing with left. Both sets point at back. The readings behind it
 were taken before the subject was held still, before the user had settled on a
 vocabulary separating a yaw from a roll, and in several cases on a subject that
-walked away, fell through scenery or was a namesake two kilometres off.
+walked away, fell through scenery or was a namesake two kilometers off.
 
 Two hypotheses were raised and killed along the way, both worth the time:
 facing, which changed nothing across four orientations of the same clip, and
@@ -7546,9 +7546,9 @@ per-set mappings, which the matched pass shows are unnecessary.
 
 ### Women are a different entity class
 
-Scanning for a female subject reported none within two hundred metres while the
+Scanning for a female subject reported none within two hundred meters while the
 user could see four. **Women are class `NPC_Female`, not `NPC`.** Thirteen stood
-within sixty metres of a scan that had reported zero.
+within sixty meters of a scan that had reported zero.
 
 The mod's own filter accepts a victim on `class == 'NPC'`, `class == 'Player'`,
 or the presence of `Properties.esFaction`, so women reach it only through that
@@ -7581,7 +7581,7 @@ curiosity.
 
 The three human classes are now named: `NPC`, `NPC_Female`, `Player`. Confirmed
 against a live scan, which reported `NPC` at 47, `NPC_Female` at 13, `Dog` at 5,
-`Horse` at 1 and `Player` at 1 within sixty metres.
+`Horse` at 1 and `Player` at 1 within sixty meters.
 
 `ProtectMutt` is unaffected and still guards Henry's dog by name. It was never
 the thing keeping other animals out, because nothing was.
@@ -7664,7 +7664,7 @@ knockdown and reporting the largest single step:
 
 **They are modes, not switches.** Setting them to 1 pins the actor's origin
 completely, which is the opposite of following terrain. Setting them to 2, to
-match `Horizontal`, flings the body sixty metres in a single frame.
+match `Horizontal`, flings the body sixty meters in a single frame.
 
 Vanilla's values are already the correct ones and the mod copied them
 correctly. This is not a lever, and the slight improvement reported while
@@ -8094,7 +8094,7 @@ actually goes, and the engine already resolves both.
 
 The measurement that read as ruling this out is worth re-reading rather than
 deleting. `Vertical` and `ZMove` at 1 pinned the origin completely and at 2
-flung the body 58 metres, which was correctly read as proof that they are modes
+flung the body 58 meters, which was correctly read as proof that they are modes
 rather than switches, and correctly concluded that vanilla's values were right.
 The error was generalising from the fragment layer to the runtime call. They
 set the same property and are not the same lever: one is baked into every
@@ -11109,3 +11109,138 @@ this mod ships is involved in it.
 Nothing here is fixable from the fall fragment, and the get-up options carry no
 weapon tag to vary: four per direction for an NPC, four more for the player,
 and nothing else.
+
+## ColliderMode cannot stop the horse dragging a downed victim
+
+The rider gets stuck on bodies, and the horse carries a victim it stays in
+contact with, which is what makes the armor impulse unmeasurable. The obvious
+lever looked like the `ColliderMode` layer this mod already writes.
+
+### The engine defines eight modes, not three
+
+Read from the binary's own string table:
+
+```
+Undefined  Disabled  GroundedOnly  Pushable
+NonPushable  PushesPlayersOnly  Spectator  Interactive
+```
+
+Vanilla's male database uses only `Disabled`, `GroundedOnly` and `Interactive`,
+so the other five are invisible from the animation data alone.
+
+### Setting it changes nothing, and cannot
+
+The knocked-down tiers were given `NonPushable` while the walk stagger kept
+`Interactive`. The generated data was correct and deployed, and the result in
+game was indistinguishable: still stuck on bodies, still dragged.
+
+`ColliderMode` is an `AnimatedCharacter` setting and governs collision while
+the body is animation driven. The dragging happens after the ragdoll takes the
+body, when physics owns it, so the layer has nothing to act on by then. No
+value of it can reach this, which also explains the older note that `Disabled`
+resolved nothing when it was tried against the same symptom.
+
+### Where the lever actually is
+
+Physics, not animation. The engine parses `collisionClass`,
+`collisionClassIgnore`, `collisionClassUNSET` and `collisionClassIgnoreUNSET`
+from a physics parameter block, and `entity:SetPhysicParams` is a real Lua
+function on an NPC entity, confirmed by type check in the running game.
+
+Reaching it needs the collision class bits the horse and an actor use, which
+are not in the animation data and would have to come out of the binary or from
+experiment. That is a longer path than the one this entry started down, and it
+is recorded rather than taken.
+
+## Riding into a squared-up victim puts the rider inside them, and collision is not why
+
+Three collider modes were tried on the knocked-down tiers, against a baseline
+of `Interactive`: `NonPushable`, then `GroundedOnly`, with the walk stagger left
+alone in both. The generated data was correct each time and deployed each time,
+and neither was distinguishable in game.
+
+The premise was wrong. The player is not blocked by the victim, they are
+**inside** them, which is too little collision rather than too much. No collider
+mode places a body somewhere else.
+
+### Why the body is there
+
+At trot with `TrotReaction` set to `"fall"`, the dispatch calls `PlayReaction`
+and nothing else. **No impulse is applied at that tier at all.** The victim
+collapses where they were standing, and against a rider squared up head-on that
+is directly under the horse.
+
+Adding an impulse is not a small change either, for the reason the fall tier
+exists: an animation-driven actor ignores impulses, which is what sent this mod
+to an animated reaction rather than a physics knockdown in the first place. The
+fragment does hand the body to physics partway through, so an impulse timed to
+that handover would move them, but by then they are already on the ground
+underneath the horse and would be slid out rather than thrown clear.
+
+### What is ruled out
+
+Four of the eight collider modes were ridden on the knocked-down tiers, with
+the walk stagger left on `Interactive` throughout:
+
+| Mode | Result |
+|---|---|
+| `Interactive` | baseline: the rider ends up inside the victim |
+| `NonPushable` | no observable difference |
+| `GroundedOnly` | no observable difference |
+| `Disabled` | no observable difference, and nothing clipped into the world |
+
+Nothing distinguishes them, including switching collision off entirely, and
+turning it off did not produce the clipping the layer is written to prevent.
+Whatever governs a mounted rider passing through a falling body, it is not this
+layer, and further values are not worth riding.
+
+The one place the layer demonstrably mattered was the choice between writing it
+and omitting it, which is what stopped victims ending up inside wagons. That
+comparison was against no layer at all rather than between values.
+
+## Damping the ragdoll stops the sliding, and makes distance mean something
+
+Bodies thrown by a collision slid for meters after landing, which has been true
+since 1.0 and reads in game as the ground being ice.
+
+It also made every measurement of throw distance untrustworthy, because what
+was being measured was the launch plus the slide, and the slide depends on the
+surface rather than on the impact.
+
+### The call
+
+`entity:SetPhysicParams(PHYSICPARAM_SIMULATION, params)` with `damping` and
+`min_energy`, which are fields of `pe_simulation_params`. Vanilla uses the same
+function for its own entities, with `PHYSICPARAM_COLLISION_CLASS` in
+`GeomEntity.lua`, and the constants come out of the binary's own registration
+table: `PHYSICPARAM_SIMULATION` is 5, `ARTICULATED` 6, `ROPE` 8, and the
+collision class block is 21.
+
+Applied after the impulse rather than with it, so a throw is not damped before
+it happens. Accepted on every victim, `ok=true` across twelve impacts.
+
+### What it changes
+
+| | n | mean landing | range |
+|---|---|---|---|
+| undamped | 9 | 6.19 m | 3.05 to 9.08 |
+| damped, 3.0 and 0.5 | 12 | 4.72 m | 2.40 to 6.31 |
+
+The clearer figure is the ground covered after landing, between the samples at
+500 ms and 3,000 ms, which is slide and nothing else:
+
+**2.77 m undamped against 1.09 m damped, a reduction of sixty per cent.**
+
+The spread narrows with it, from six meters to under four, so an impact is now
+far more repeatable than it was.
+
+### What it does not change
+
+Armor still does not separate: a multiplier of 1.26 averaged 5.05 m against
+4.79 m for mail. That is expected rather than disappointing, because the
+shipped `Knockback` of 50 was already measured as indistinguishable from
+applying no impulse at all. A body of 120 to 160 kilograms takes about 0.6
+meters per second from an impulse of that size.
+
+The value of the damping here is that it removes the slide from any future
+measurement of that, which was drowning the armor signal in noise.

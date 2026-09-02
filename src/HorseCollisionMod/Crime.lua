@@ -17,7 +17,7 @@
 --
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
--- @release 4.4.5
+-- @release 4.5.0
 
 --- Sends the victim a real combat hit, attributed to the player.
 --
