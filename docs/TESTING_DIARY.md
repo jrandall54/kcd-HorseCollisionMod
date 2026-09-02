@@ -11700,3 +11700,103 @@ suggests a class default rather than a per-NPC roll.
 It returned `false` for every NPC at every sample, including the guard at 2 m
 in `CombatMovement`. Whatever it reports, it is not "this NPC is fighting the
 player", and it should not be used to detect retaliation.
+
+---
+
+## The context system is the real API, and it is a menu of about ninety switches
+
+`Scripts/Script/ContextData.lua` catalogs **89 context options and 14 presets**,
+and `Scripts/Script/Context.lua` exposes them to Lua as `Contexts`:
+
+    Contexts.SetPersistentOption(entity, option, handle, params)
+    Contexts.SetNonpersistentOption(entity, option, handle, params)
+    Contexts.ClearOption(entity, option, handle, params)
+    Contexts.CheckOption(entity, option)
+    Contexts.SetNonpersistentPreset(entity, preset, handle, params)
+    Contexts.ClearPreset(entity, preset, handle, params)
+
+Vanilla quests drive NPC behavior with exactly these calls. `q_ledecko` sets
+`fightAllHostilePerceptibles` on four bandits, `q_huntPtacek` on two Cumans,
+and `q_hareHunt` applies the `berserk` preset. Every option is carried on a
+named **handle**, so several systems can request the same option and clearing
+one does not disturb another.
+
+Applied here to 20 NPCs at once: 19 accepted `alwaysFightWhenHit` and
+`Contexts.CheckOption` read back `true` for all of them. The one refusal was
+`rat_activity_vagabund`, an activity-spawned NPC, which errored inside
+`Context.lua` itself.
+
+### The options that bear on this mod
+
+Retaliation:
+
+| option | effect |
+|---|---|
+| `alwaysFightWhenHit` | answers a hit with a fight rather than the usual response |
+| `fightAllHostilePerceptibles` | fights anything perceived hostile, skipping the branch conditions |
+| `suppressFightMoraleChecks` | removes the morale gate that makes civilians flee |
+| `forceFightUncertainBehavior` | forces the uncertain-behavior branch to fight |
+| `disableChangeHostilityOnHit` | a hit does not change hostility |
+| `neverAcceptSurrender` | refuses a yield |
+
+A consensual brawl, where onlookers do not fetch a guard:
+
+| option | effect |
+|---|---|
+| `suppressDudeHostilePerceptionStimuli` | the NPC ignores the player being perceived as hostile |
+| `suppressDudeHostilePerceptionStimuliWhileNotInCombat` | the same, only outside combat |
+| `suppressReputationHitOnDudeHit` | being hit by the player costs no reputation |
+| `suppressReputationPreventForDudeHits` | player hits do not trip the reputation guard |
+| `suppressCollisionsBark` | silences the collision bark |
+| `suppressHitReactions` | no hit reaction at all |
+| `postMercyImmunity` | immunity after mercy is granted |
+| `impossiblePayingCrimeFine`, `impossibleCrimeSkillChecks`, `availableCrimeAuthority` | crime-dialog levers |
+
+The presets show how vanilla composes them. `berserk` is
+`fightAllHostilePerceptibles` plus `suppressFightMoraleChecks`, and nothing
+else. `eventEnemyWithFriendlySuperfaction` — an enemy who fights the player
+without the world turning on them — is `suppressDudeProxBark`,
+`suppressPickNoticedItems` and `suppressReputationPreventForDudeHits`.
+`kunoband` is the full eighteen-option bandit profile.
+
+### The duel system is separate and probably out of reach
+
+`sa_duel.xml` carries a complete sparring implementation: `duel:duelRequest`,
+`duel:startDuelWithPlayer`, `duel:stopDuel`, `duel:suspendDuel`,
+`duel:duelResult`. `startDuelWithPlayer` takes a `bet`, a `difficulty`, a
+`borrowArmor` flag, `myWeapons` and `enemyWeapons` of type
+`enum:duelWeaponTypes` — which includes **`Unarmed`** — an `isWooden` flag for
+training weapons, and a `customCombat` string.
+
+That is the trainer and tournament fight, and it ends cleanly:
+`duel:stopDuel` carries a `winner` wuid "so NPCs can recognize who need to
+play winner animation and who will play surrender".
+
+**None of the `duel:` types appear in `MessageTypes.xml`.** Only
+`skirmish:duelRequest` is registered there. So they are almost certainly
+local to the duel scripted action, and an NPC not running `sa_duel` has
+nothing listening. Unverified.
+
+### Custom behaviors suppress stimuli by design
+
+`combat:stimulus:customBehaviorRequest` is registered, is handled by the
+combat subbrain starter that every NPC runs, and carries:
+
+    behaviorSource + behaviorName, or includeXml + includeTree
+    suppressStimuli        default true
+    interruptRunningState  default true
+    entity, bool1..4, int1..2
+
+The comment on `suppressStimuli` in `TypeDefinitions.xml` reads "whether all
+other combat stimuli are suppressed while in the custom behavior". That is
+crime suppression stated in the game's own data, and it is the mechanism
+`sa_duel`, `sa_event_ambushplr` and eighteen other scripted actions use.
+
+### Hostility and crime are separate, and the seam shows
+
+Sending `hostilePerception` made guards fight without any crime being
+registered: on surrendering, the guards froze and the crime conversation
+never started. So the combat that message produces is not a prosecutable
+event, and the surrender path that normally resolves a guard fight has
+nothing to resolve. Any feature built on hostility alone inherits that dead
+end and needs its own ending.
