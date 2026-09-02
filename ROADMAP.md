@@ -318,16 +318,23 @@ armor.
       either: an armor multiplier tuned against a distance the horse is dictating will be
       tuned to the wrong thing.
 
-- [ ] Prerequisite for the item above: stop the horse carrying its victim.
-      An armor multiplier tuned while the horse is still pushing the body is
-      tuned to the horse rather than to the armor, which is why armored and
-      unarmored targets are reported traveling alike. `GroundedOnly` on the
-      reaction fragment removes horse-to-victim contact after the impact,
-      leaving `Knockback` and `Uplift` to decide where a body lands. The hit
-      itself still lands first, so the damage the engine applies is
-      unchanged. A heavy target could also take an animated stagger in place
-      of a full ragdoll, so mass reads as refusing to be thrown rather than
-      as being thrown a shorter distance.
+- [x] Prerequisite for the armor item above, and it was not the horse. A
+      thrown body slid for metres after landing, so distance measured the
+      surface as much as the impact. Damping the ragdoll through
+      `SetPhysicParams(PHYSICPARAM_SIMULATION, ...)` cuts the ground covered
+      after landing from 2.77 m to 1.09 m and narrows the spread from six
+      metres to under four. Braking the horse hard on contact changed travel
+      not at all, which rules the horse out as the thing carrying them.
+
+- [ ] Armor knockback, now measurable. The multiplier has always worked and
+      the force it multiplies did not: `Knockback` of 50 is
+      indistinguishable from applying no impulse at all, because an impulse
+      of that size moves a body of 120 to 160 kilograms at about 0.6 metres
+      per second. Raising it to 600 threw a villager 27 metres and threw one
+      guard upward into the rider hard enough to nearly kill them, so
+      `Uplift` has a hard ceiling that is a safety limit rather than an
+      aesthetic one: the rider sits directly above the victim. Raise
+      `Knockback` alone, moderately, and measure with the slide now removed.
 - [ ] Striking a heavy target strips the horse's momentum rather than only
       its stamina, and shows on the horse. `kcd_horse_controllerdefs.xml`
       declares a `Rear` fragment, so a heavy impact can rear or check the
