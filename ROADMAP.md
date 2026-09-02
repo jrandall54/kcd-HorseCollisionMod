@@ -457,7 +457,17 @@ rather than missing.
 
 ## Phase 4: AI reaction
 
-- [ ] Reopened: a brawl the town ignores. `Entity.CreateLink`, `GetLink`,
+- [x] A brawl the town ignores: closed again, on evidence this time.
+      `Entity.CreateLink` does create a link named `suppressAssaultReactions`
+      from an NPC to the player, retrievable with `GetLinkTarget`, but it does
+      not suppress anything. Thirty-three humans were linked, a civilian was
+      ridden down in public, and a crime was reported; the victim was
+      confirmed afterwards to have carried the link, so the test was sound.
+
+      The behavior tree either keeps its own link store or needs the `Data`
+      its own `AddLink` carries, which `questUtils.xml` sets an expiration
+      into and which `CreateLink(name, targetId)` has no way to supply.
+- [ ] Superseded: a brawl the town ignores. `Entity.CreateLink`, `GetLink`,
       `RemoveLink` and `CountLinks` all exist in Lua, which was checked and
       denied on the strength of the `C_ScriptBind*` headers alone. Those
       headers describe script binds, and the entity class table is not one.
