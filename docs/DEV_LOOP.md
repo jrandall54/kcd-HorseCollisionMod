@@ -195,7 +195,7 @@ So a branch lands like this:
 
     python tools/set_version.py
     ldoc .
-    .uild.ps1 -Version <the version it printed>
+    .\build.ps1 -Version <the version it printed>
     git add -A && git commit
     git checkout main && git merge --no-ff <branch>
     git tag -a v<version> -m "..."
