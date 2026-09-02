@@ -13120,3 +13120,63 @@ registry that matters. `MessageTypes.xml` was never it.
 Constructing a message is not the same as a tree listening for it, and that
 half still needs a target in a loaded world. But "it cannot even be built or
 addressed" is finished as a reason to close anything.
+
+## Live verification in a loaded world
+
+The game running with `-devmode` and a save loaded, 32 humans nearby, the
+rider mounted.
+
+### Weapons: an unarmed brawl is solved
+
+    villageGuard  IsWeaponDrawn  false
+    human:DrawWeapon()    -> drawn=true   inHand=020000000000FC2A
+    human:HolsterWeapon() -> drawn=false  inHand=0000000000000000
+
+Both calls work on an NPC and the state reads back correctly. Forcing a
+provoked brawl to fists needs no `combat:order`, no `restrictWeaponKind` and
+no behavior tree node: holster the victim's weapon before provoking, and
+`DrawWeapon` restores it afterwards. That item was closed for want of a
+mechanism it did not need.
+
+### Entity links are real, creatable, and retrievable by tag
+
+    subject links before = 2      (NPCs already carry links of their own)
+    e:CreateLink("suppressAssaultReactions", player.id)  -> ok
+    subject links after  = 3
+    e:GetLinkTarget("suppressAssaultReactions") -> the player table
+
+The signatures, established by probing: `CountLinks()` takes nothing,
+`GetLink(index)` returns the linked entity, `GetLinkTarget(name)` returns the
+entity a named link points at, and `GetLinkName(index)` returns nil in this
+build. `CreateLink(name, targetId)` is the writer.
+
+So a link carrying exactly the tag `sa_duel.xml` uses, pointing from an NPC at
+the player, can be created from Lua and read back by name. **Whether the
+behavior tree's `checkAssaultSuppression` reads the same store is the
+remaining question**, and it is a question rather than a closed door, which is
+where this stood before.
+
+### Mass and armor are not what they looked like
+
+`GetMass()` reads **80 for every human including the player**, so it is the
+character controller's mass rather than a body's, and it does not distinguish
+an armored target from a villager. `actor:GetArmor()` and `GetMaxArmor()` both
+read 0 on NPCs.
+
+That tempers the knockback plan. `SetVelocity` still states an outcome in
+meters per second rather than a force, which is the substantive improvement,
+but mass cannot be used to scale by build and armor still has to come from the
+item tables as `Armor.lua` already does.
+
+### Horse pull-down is not offered to an NPC as things stand
+
+`npc.actor:CanHorsePullDown(playerId)` returned **0** for every human nearby,
+against the constants `HPS_Enabled = 2` and `HPS_Disabled = 1`. Vanilla's own
+check offers the action only when the answer is one of those two, so 0 means
+not applicable at all.
+
+The rider was mounted at the time, which is the scenario that would make it
+applicable, so this is not simply a matter of the player being on foot. It may
+still depend on range or facing, which `wh_cs_HorsePullDownAngle` and its two
+companions govern, and that is untested. `Game.GetWantedLevel` does not exist;
+only the setter does.
