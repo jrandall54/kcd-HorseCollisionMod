@@ -23,6 +23,19 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- Victims lose patience. Barging the same person at a walk used to cost
+  nobody anything; now each shove is counted, and past the first one every
+  further shove rolls against a growing chance that they turn and fight.
+  `Retaliation`, `RetaliationFreeBumps`, `RetaliationChanceStep`,
+  `RetaliationMaxChance`, `RetaliationMemorySec` and `RetaliationHoldSec`
+  control it, and setting `Retaliation` to false restores the old behavior.
+- A provoked fight is not a crime. No fine is levied and no guard is
+  summoned, because the hit that starts it carries the engine's own
+  `real = false` and never reaches the reputation system. Guards who witness
+  the brawl still join in, which is the game deciding rather than this mod.
+
 ## [4.5.1] - 2026-09-02
 
 Research only. Nothing about a collision looks or behaves differently.

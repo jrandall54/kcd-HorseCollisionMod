@@ -104,3 +104,69 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 
 	return ok
 end
+
+--- Sends the victim a hit that starts a fight but is not a crime.
+--
+-- Same message and same attacker as `SendCombatHit`, with one field changed:
+-- `real` is false. That flag is the engine's own, and
+-- `sb_switch_hitreactions.xml` gates the whole reputation branch on it. A hit
+-- carrying `real = true` reaches `SetReputationNPC` and is scored as
+-- `hit_melee_weak` through `hit_melee_brutal` by strength; one carrying
+-- `real = false` never gets there.
+--
+-- Vanilla uses the same flag for two things: an attack that missed but is
+-- treated as a hit, and, in `sb_switching_horse.xml`, a hit relayed off a
+-- horse. The second is this mod's own situation.
+--
+-- The victim's combat subbrain still receives it and still decides what to do
+-- about it, which is the point: the fight happens, the fine does not. Guards
+-- who see the resulting brawl react to what they saw, which is intended.
+--
+-- Not gated on `CollisionIsCrime`, because this is the path that deliberately
+-- avoids the crime system rather than the one that feeds it.
+--
+-- @tparam table npc victim entity
+-- @tparam table playerEnt the player entity
+-- @tparam number strength a `HitReactionStrength` value
+-- @treturn boolean true when the call was accepted
+function HorseCollisionMod:SendProvocationHit(npc, playerEnt, strength)
+	if not playerEnt then
+		return false
+	end
+
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local playerWuid = nil
+
+	pcall(function()
+		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+	end)
+
+	if not playerWuid then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		local message = Utils.makeTable("combat:hit", {
+			attacker = playerWuid,
+			strength = strength,
+			hitType = self.HitReactionType.Melee,
+			real = false
+		})
+
+		XGenAIModule.SendMessageToEntityData(target, "combat:hit", message)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("ProvocationHit " .. tostring(npc:GetName())
+				.. " ok=" .. tostring(ok)
+				.. " strength=" .. tostring(strength)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
