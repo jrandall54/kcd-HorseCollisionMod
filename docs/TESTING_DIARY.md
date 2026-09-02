@@ -11109,3 +11109,45 @@ this mod ships is involved in it.
 Nothing here is fixable from the fall fragment, and the get-up options carry no
 weapon tag to vary: four per direction for an NPC, four more for the player,
 and nothing else.
+
+## ColliderMode cannot stop the horse dragging a downed victim
+
+The rider gets stuck on bodies, and the horse carries a victim it stays in
+contact with, which is what makes the armor impulse unmeasurable. The obvious
+lever looked like the `ColliderMode` layer this mod already writes.
+
+### The engine defines eight modes, not three
+
+Read from the binary's own string table:
+
+```
+Undefined  Disabled  GroundedOnly  Pushable
+NonPushable  PushesPlayersOnly  Spectator  Interactive
+```
+
+Vanilla's male database uses only `Disabled`, `GroundedOnly` and `Interactive`,
+so the other five are invisible from the animation data alone.
+
+### Setting it changes nothing, and cannot
+
+The knocked-down tiers were given `NonPushable` while the walk stagger kept
+`Interactive`. The generated data was correct and deployed, and the result in
+game was indistinguishable: still stuck on bodies, still dragged.
+
+`ColliderMode` is an `AnimatedCharacter` setting and governs collision while
+the body is animation driven. The dragging happens after the ragdoll takes the
+body, when physics owns it, so the layer has nothing to act on by then. No
+value of it can reach this, which also explains the older note that `Disabled`
+resolved nothing when it was tried against the same symptom.
+
+### Where the lever actually is
+
+Physics, not animation. The engine parses `collisionClass`,
+`collisionClassIgnore`, `collisionClassUNSET` and `collisionClassIgnoreUNSET`
+from a physics parameter block, and `entity:SetPhysicParams` is a real Lua
+function on an NPC entity, confirmed by type check in the running game.
+
+Reaching it needs the collision class bits the horse and an actor use, which
+are not in the animation data and would have to come out of the binary or from
+experiment. That is a longer path than the one this entry started down, and it
+is recorded rather than taken.
