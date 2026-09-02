@@ -12576,3 +12576,52 @@ aversion makes him run at about six meters.
 
 `rat_merchant_shop2`, a control, was left 0.1389 higher than it started by
 the proof above. A save reload restores it.
+
+## The 0.2 threshold is real, and only a beating to submission goes under it
+
+The resolving comparison. Both done on foot with none of this mod running,
+both followed by surrendering and paying the fine.
+
+| what the rider did | victim's relationship | against the 0.2 threshold | behavior |
+|---|---|---|---|
+| one punch on a shop guard | **0.2548** | **above** | back at his post `Leaning`, entirely normal |
+| a merchant beaten to a yield | **-0.0000** | **below** | flees at about 6 m, will not deal |
+
+So ordinary play is fine. A punch costs standing and leaves the victim above
+the line where he still deals with the player. The failure appears only when
+a victim is beaten all the way down.
+
+### At zero, the game's own remedy has nothing to grip
+
+`ModifyPlayerReputation('payToTalk')` behaves like this on a healthy NPC:
+
+| apply | value | delta |
+|---|---|---|
+| start | 0.5337 | |
+| 1 | 0.6726 | **+0.1389** |
+| 2, 3, 4 | 0.6726 | +0.0000 |
+
+It raises toward a ceiling near 0.67 and then does nothing, which is the
+`reputation_cap` column of the `reputation_change` table.
+
+Applied to the merchant sitting at `-0.0000` it moved him by **exactly
+nothing**, not a smaller amount. Sending `combat:stimulus:standDownRequest`
+and a daycycle restart first changed his animation state from `MotionTurn` to
+`MotionIdle` but did not unblock the raise, so a live combat state is not what
+gates it. His superfaction and perceived superfaction both read 3, matching
+his own faction, so it is not a temporary hostile faction either. Every
+variant of the read agrees: `GetRelationship` with the wuid, with
+`this.id`, and with the `Current` and `Base` second arguments all return the
+same figure.
+
+What blocks it is unidentified. The `reputation_change` table carries a
+`can_change_hostility` column and reputation names pick up a
+`_noChangeHostility` suffix elsewhere, so hostility is tracked separately from
+the number and is the leading suspect. The table's rows do not come back
+through the `Database` bind, so the row for `payToTalk` could not be read.
+
+### None of this is the mod's
+
+Every measurement above was taken on foot with the mod uninvolved. What the
+mod contributes is a victim willing to fight; the fists and the consequences
+of them are the player's, and a player could reach all of it in vanilla.
