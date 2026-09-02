@@ -12333,3 +12333,30 @@ the rider's.
 
 Whether it recovers is the open question, and `soul:ModifyPlayerReputation`
 exists as a lever if it turns out not to.
+
+## Side finding: the closeout pair unsticks an NPC the mod never touched
+
+Several NPCs were seen running into the inn area and stopping. Three were in
+`MotionMovement` and sampled: two were moving normally at 1.2 to 2.6 m/s and
+were not stuck at all. `rat_man12` read **0.00 m/s across every sample while
+in `MotionMovement`**, which is the genuine signature: a locomotion state with
+no locomotion.
+
+He is not this mod's. The log carries **zero** `HorseCollisionMod` lines
+mentioning him across the whole session: no collision, no stagger, no
+provocation. He held no context option, had no annoyance entry, and his
+relationship read the ordinary 0.461 baseline.
+
+The one thing that had touched him was a read-only morale probe that called
+`SetState("mor")` and `SetState("morale")`, which measurably changed nothing;
+two other NPCs from that same set were behaving normally at the time. Not a
+likely cause, but not excluded either.
+
+`SendStandDown` followed by `ReplanVictim`, the same pair `EndRetaliation`
+sends, freed him:
+
+    MotionMovement 0.00 -> StandUp -> MotionIdle -> MotionIdleVARdefault
+
+That is a point in the closeout's favour beyond its own feature: the pair is a
+general recovery for an actor wedged in a locomotion state, not something that
+only makes sense after a brawl.
