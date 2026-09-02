@@ -11179,7 +11179,21 @@ underneath the horse and would be slid out rather than thrown clear.
 
 ### What is ruled out
 
-`ColliderMode` cannot reach this, at any of its eight values. The one place it
-demonstrably mattered was the choice between writing the layer at all and not
-writing it, which is what stopped victims ending up inside wagons. Between its
-non-empty values, nothing a rider notices changes.
+Four of the eight collider modes were ridden on the knocked-down tiers, with
+the walk stagger left on `Interactive` throughout:
+
+| Mode | Result |
+|---|---|
+| `Interactive` | baseline: the rider ends up inside the victim |
+| `NonPushable` | no observable difference |
+| `GroundedOnly` | no observable difference |
+| `Disabled` | no observable difference, and nothing clipped into the world |
+
+Nothing distinguishes them, including switching collision off entirely, and
+turning it off did not produce the clipping the layer is written to prevent.
+Whatever governs a mounted rider passing through a falling body, it is not this
+layer, and further values are not worth riding.
+
+The one place the layer demonstrably mattered was the choice between writing it
+and omitting it, which is what stopped victims ending up inside wagons. That
+comparison was against no layer at all rather than between values.
