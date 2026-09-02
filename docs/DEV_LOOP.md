@@ -183,7 +183,7 @@ One command writes all of them, and dates the changelog section at the same
 time:
 
     python tools/set_version.py            derive the next version and apply it
-    python tools/set_version.py 4.7.0      apply one explicitly
+    python tools/set_version.py X.Y.Z      apply one explicitly
     python tools/set_version.py --check    report without writing
 
 Deriving uses the same rule the build enforces: the newest tag, bumped by what
