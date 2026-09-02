@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 4.4.3
+-- @release 4.4.4
 
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
