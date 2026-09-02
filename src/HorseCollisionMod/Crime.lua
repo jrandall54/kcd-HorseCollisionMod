@@ -17,7 +17,7 @@
 --
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
--- @release 4.5.0
+-- @release 4.6.0
 
 --- Sends the victim a real combat hit, attributed to the player.
 --
@@ -99,6 +99,81 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 	if self.Config.LogTelemetry then
 		self:Log("CombatHit ok=" .. tostring(ok)
 				.. " strength=" .. tostring(strength)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
+
+--- Sends the victim a fight-starting stimulus that no bystander witnesses.
+--
+-- Deliberately **not** `combat:hit`. That message is handled by
+-- `sb_switch_hitreactions.xml`, which runs two independent branches, and only
+-- one of them is gated on the `real` flag:
+--
+-- * the reputation branch, which computes a `hit_melee_*` change and calls
+--   `SetReputationNPC`. Gated on `real`, so `real = false` skips it.
+-- * the assault broadcast, which is not gated on `real` at all. It spawns a
+--   `SpawnExpiringPerceptibleVolume` one meter across at the victim, labeled
+--   `assault`, for six seconds, at full conspicuousness and visibility, then
+--   blinds the attacker and the victim to it and leaves everyone else able to
+--   see it. That volume is how a bystander learns an assault happened, and it
+--   is what charged the rider with brawling before a punch had been thrown.
+--
+-- `combat:stimulus:hit` is the message that switch ultimately sends onward to
+-- the victim's own combat subbrain. Sending it directly reaches the same
+-- handler in `sb_combat.xml`, where `alwaysFightWhenHit` is consulted, without
+-- passing through the switch that broadcasts. The subbrain starter listens for
+-- it by name on `combatStimulus_combatSubbrainStarter` and converts it into a
+-- stimulus impulse of kind `hit`, exactly as it would have done anyway.
+--
+-- So the victim decides to fight and nobody else is told an assault occurred.
+--
+-- `kind` is `Unarmed`, the mildest melee kind the engine defines. `real` stays
+-- false: nothing here should be scored as a real blow, and the flag is carried
+-- through to the subbrain where the distinction still exists.
+--
+-- Not gated on `CollisionIsCrime`, because this is the path that deliberately
+-- avoids the crime system rather than the one that feeds it.
+--
+-- @tparam table npc victim entity
+-- @tparam table playerEnt the player entity
+-- @treturn boolean true when the call was accepted
+function HorseCollisionMod:SendProvocationHit(npc, playerEnt)
+	if not playerEnt then
+		return false
+	end
+
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local playerWuid = nil
+
+	pcall(function()
+		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+	end)
+
+	if not playerWuid then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		local message = Utils.makeTable("combat:stimulus:hit", {
+			attacker = playerWuid,
+			kind = self.CombatAttackKind.Unarmed,
+			real = false
+		})
+
+		XGenAIModule.SendMessageToEntityData(target,
+				"combat:stimulus:hit", message)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("ProvocationHit " .. tostring(npc:GetName())
+				.. " ok=" .. tostring(ok)
 				.. " err=" .. tostring(err))
 	end
 

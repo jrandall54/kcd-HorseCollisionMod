@@ -1,0 +1,666 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+<li><a href="#Fields">Fields</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><strong>Retaliation</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>Retaliation</code></h1>
+<p>Victims who run out of patience and fight back.</p>
+<p> Barging someone at a walk costs nobody anything. It plays a stagger, takes
+ no health, drains no stamina and raises no crime, so riding into the same
+ person repeatedly is an annoyance with no consequence attached to it. This
+ file attaches one.</p>
+
+<p> Each walk impact is counted against its victim. Past <code>RetaliationFreeBumps</code>
+ every further shove rolls against a chance that grows with the count, and a
+ victim who fails that roll turns and fights.</p>
+
+<p> ### How the fight is started</p>
+
+<p> Two steps, and both are the game's own machinery rather than anything
+ invented here.</p>
+
+<p> <code>alwaysFightWhenHit</code> is a context option from the shipped catalog in
+ <code>Scripts/Script/ContextData.lua</code>. Vanilla quests set options exactly this
+ way: <code>q_ledecko</code> gives four bandits <code>fightAllHostilePerceptibles</code>, and
+ <code>q_hareHunt</code> applies the <code>berserk</code> preset. In <code>sb_combat.xml</code> the option
+ sits in front of the morale comparison that otherwise decides whether a
+ civilian fights or flees, and skipping that comparison is all it does.</p>
+
+<p> Then a <code>combat:hit</code> carrying <code>real = false</code>, which the victim's combat
+ subbrain answers without the reputation system ever seeing it. That is what
+ makes a provoked scuffle a scuffle rather than an assault charge.</p>
+
+<p> ### What the game decides, and this file does not</p>
+
+<p> The shape of the fight is vanilla's. Because the attacker is the player and
+ the player is not already an enemy, <code>sb_combat.xml</code> sets
+ <code>startInDefenseOnly</code>, so the victim squares up and blocks rather than
+ opening with an attack. Guards who witness the brawl join it, because the
+ game models what a bystander perceived. Neither is arranged here.</p>
+
+<p> ### Guards are included, and behave differently on purpose</p>
+
+<p> A provoked guard arrests the rider rather than brawling with him, because
+ the soldier branch of the hit handler raises assault information whenever
+ the attacker is the player. That is a guard using the authority a guard
+ has, and the crime-free brawl here is for the people who lack it.</p>
+
+<p> ### Women do not fight</p>
+
+<p> <code>sb_combat.xml</code> tests <code>b_soul.gender == male</code> <strong>after</strong> the context option
+ is consulted, and fails everyone else outright. <code>alwaysFightWhenHit</code>
+ removes the morale comparison and nothing more, so a woman carrying it
+ still falls through to the report or flee branches. Provoking her would
+ send her walking off to fetch a guard over an incident that raised no
+ crime, which reads as a bug rather than a character. So the roll is not
+ offered to her, and the reason is logged.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.6.0</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HasContexts">HorseCollisionMod:HasContexts ()</a></td>
+	<td class="summary">Whether the context system is available.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:CanRetaliate">HorseCollisionMod:CanRetaliate (npc)</a></td>
+	<td class="summary">Whether this victim is one the game would let fight back at all.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:NoteAnnoyance">HorseCollisionMod:NoteAnnoyance (npc)</a></td>
+	<td class="summary">Counts a shove against a victim and returns how many they have taken.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RetaliationChance">HorseCollisionMod:RetaliationChance (count)</a></td>
+	<td class="summary">The chance this shove ends in a fight.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HoldRetaliation">HorseCollisionMod:HoldRetaliation (npc)</a></td>
+	<td class="summary">Gives a victim the disposition to fight, and watches for the fight to end.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ClassifyVictim">HorseCollisionMod:ClassifyVictim (state, speed, playerRange)</a></td>
+	<td class="summary">What a victim is doing right now, in the terms this file cares about.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:WatchRetaliation">HorseCollisionMod:WatchRetaliation (npc)</a></td>
+	<td class="summary">Polls the victim and closes the incident out when their state says to.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:SendStandDown">HorseCollisionMod:SendStandDown (npc)</a></td>
+	<td class="summary">Tells a victim the incident is over and they may stand down.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:EndRetaliation">HorseCollisionMod:EndRetaliation (npc, why, intervene)</a></td>
+	<td class="summary">Closes the incident out: takes the option back and, if needed, intervenes.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ProvokeIfAnnoyed">HorseCollisionMod:ProvokeIfAnnoyed (npc, playerEnt)</a></td>
+	<td class="summary">Decides whether this walk impact provokes a fight, and starts one if so.</td>
+	</tr>
+</table>
+<h2><a href="#Fields">Fields</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.RetaliationOption">HorseCollisionMod.RetaliationOption</a></td>
+	<td class="summary">The context option that makes a victim answer a hit with a fight.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.RetaliationHandle">HorseCollisionMod.RetaliationHandle</a></td>
+	<td class="summary">The handle every context option this mod sets is carried on.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.GenderMale">HorseCollisionMod.GenderMale</a></td>
+	<td class="summary">The soul gender that <code>sb_combat.xml</code> lets through to the fight branch.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:HasContexts"></a>
+    <strong>HorseCollisionMod:HasContexts ()</strong>
+    </dt>
+    <dd>
+    Whether the context system is available. </p>
+
+<p> <code>Contexts</code> is a vanilla global from <code>Scripts/Script/Context.lua</code>. Every use
+ below is wrapped anyway, but checking once gives the telemetry a specific
+ reason rather than a failed call.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when contexts can be set
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:CanRetaliate"></a>
+    <strong>HorseCollisionMod:CanRetaliate (npc)</strong>
+    </dt>
+    <dd>
+    Whether this victim is one the game would let fight back at all. </p>
+
+<p> <strong>Gender</strong> is the only real gate, and it is the game's rather than this
+ mod's. <code>sb_combat.xml</code> tests <code>b_soul.gender == male</code> after the context
+ option is consulted and fails everyone else outright.
+ <code>alwaysFightWhenHit</code> removes the morale comparison and nothing more, so a
+ provoked woman falls through to the report or flee branches and would walk
+ off to fetch a guard over an incident that raised no crime.</p>
+
+<p> <strong>Guards are deliberately not excluded.</strong> They behave differently, and the
+ difference is correct: the soldier branch of the hit handler calls
+ <code>CreateInformation label=&apos;assault&apos;</code> whenever the attacker is the player,
+ with no <code>real</code> check and no context option in front of it, so provoking one
+ is a crime and ends in an arrest. That is a guard exercising the authority
+ a guard has, and the crime-free brawl this file builds is for the people
+ who lack it. An earlier revision gated soldiers out; the gate was wrong and
+ has been removed.</p>
+
+<p> <code>soul:GetSocialClass()</code> carries <code>SoulCrimeRoleId</code> and a class <code>Name</code> if the
+ distinction is ever wanted: a village guard reports <code>soldier</code> and 2 against
+ a townsman's <code>civilian</code> and 1. It is read here only for the telemetry, so a
+ log can be read afterwards for who was provoked.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><span class="type">boolean</span></span>
+        true when a provoked fight is possible</li>
+        <li>
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        why not, when it is not, or the role when it is</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:NoteAnnoyance"></a>
+    <strong>HorseCollisionMod:NoteAnnoyance (npc)</strong>
+    </dt>
+    <dd>
+    Counts a shove against a victim and returns how many they have taken. </p>
+
+<p> A count older than <code>RetaliationMemorySec</code> is discarded rather than aged
+ down. Someone barged twice this morning does not start today's ride one
+ shove from a fight.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        the running count, this shove included
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:RetaliationChance"></a>
+    <strong>HorseCollisionMod:RetaliationChance (count)</strong>
+    </dt>
+    <dd>
+    The chance this shove ends in a fight. </p>
+
+<p> Zero until the victim has taken more than <code>RetaliationFreeBumps</code>, then
+ <code>RetaliationChanceStep</code> per shove beyond that, capped at
+ <code>RetaliationMaxChance</code>. The first contact is always free, so brushing past
+ someone once never starts anything.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">count</span>
+            <span class="types"><span class="type">number</span></span>
+         how many shoves this victim has taken
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        a chance between 0 and 1
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:HoldRetaliation"></a>
+    <strong>HorseCollisionMod:HoldRetaliation (npc)</strong>
+    </dt>
+    <dd>
+    Gives a victim the disposition to fight, and watches for the fight to end. </p>
+
+<p> The option is nonpersistent, so it does not survive a save reload. It is
+ taken back deliberately as well: left set, every NPC the player had ever
+ shoved would answer any hit from anyone with a fight for the rest of the
+ session, which is a different mod.</p>
+
+<p> When it is taken back is decided by watching the victim, not by a duration.
+ A brawl has no characteristic length, and a timer either cuts a good fight
+ short or leaves a resolved one hanging. See <a href="../modules/Retaliation.html#HorseCollisionMod:WatchRetaliation">WatchRetaliation</a> for what is
+ actually read.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the option was set
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ClassifyVictim"></a>
+    <strong>HorseCollisionMod:ClassifyVictim (state, speed, playerRange)</strong>
+    </dt>
+    <dd>
+    What a victim is doing right now, in the terms this file cares about. </p>
+
+<p> Reads <code>actor:GetCurrentAnimationState()</code>, the same call the reaction
+ recovery polls, and classifies it alongside how far the victim moved since
+ the previous sample.</p>
+
+<ul>
+    <li><code>engaged</code> - the incident is still running. Two prefixes qualify.
+    <code>Combat</code> is the obvious one, and <code>CombatMovement</code> was observed on a guard
+    closing to two meters. <code>Surrender</code> is the one that was missed, and
+    missing it was a real fault: a victim who yields stands in <code>SurrenderIn</code>,
+    which carries neither prefix under the first version of this test and is
+    perfectly still, so three samples of it read as settled and the incident
+    was closed while the victim was in the middle of yielding. Both fights of
+    that build ended <code>why=natural state=SurrenderIn</code> and both victims were
+    left running afterwards. The engine's surrender states all share the
+    prefix: <code>SurrenderIn</code>, <code>SurrenderDialog</code>, <code>SurrenderDialogToIdle</code>,
+    <code>SurrenderDialogToMove</code>, <code>SurrenderForcedWait</code> and <code>SurrenderToCombat</code>.</li>
+    <li><code>fleeing</code> - not engaged, covering ground faster than an errand, <strong>and</strong>
+    the rider is far enough away that the running is no longer about him. A
+    runaway was measured at 4.79 m/s sustained, against roughly a meter per
+    second for someone walking to a stall.</li>
+</ul>
+
+<p>   The range test matters more than it looks. Every runaway observed while
+   developing this was observed by following the runaway, and a man who has
+   just been knocked down and is being pursued by the person who did it has
+   every reason to keep going. Fleeing with the rider on top of him is
+   counted as engaged instead: the incident is live, nothing is sent, and
+   the victim is left to do the sensible thing.
+ * <code>settled</code> - anything else, which includes every idle and every ordinary
+   working animation.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">state</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the animation state
+        </li>
+        <li><span class="parameter">speed</span>
+            <span class="types"><span class="type">number</span></span>
+         meters per second since the previous sample
+        </li>
+        <li><span class="parameter">playerRange</span>
+            <span class="types"><span class="type">number</span></span>
+         meters between the victim and the rider
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        one of <code>engaged</code>, <code>fleeing</code> or <code>settled</code>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:WatchRetaliation"></a>
+    <strong>HorseCollisionMod:WatchRetaliation (npc)</strong>
+    </dt>
+    <dd>
+    Polls the victim and closes the incident out when their state says to. </p>
+
+<p> Replaces a fixed hold. The question "is this over" has a readable answer,
+ and reading it is both more accurate and more honest than assuming a
+ duration: a fight that runs long is not interrupted, and one that ends in
+ four seconds is not left hanging for another forty.</p>
+
+<p> Three ways it finishes, and the telemetry names which:</p>
+
+<ul>
+    <li><code>natural</code> - the victim settled by themselves. Nothing is sent. This is
+    the outcome that proves the game resolves its own fights, and it is the
+    reason the poll exists rather than an unconditional stand-down: the
+    previous build could not tell a victim it had rescued from one that never
+    needed rescuing.</li>
+    <li><code>runaway</code> - the victim left combat but kept running, sustained across
+    <code>RetaliationFleeSamples</code> consecutive samples. This is the case that was
+    observed running out of town and not stopping, and it is the only one
+    that genuinely needs the stand-down.</li>
+    <li><code>ceiling</code> - a failsafe, not a mechanism. If neither of the above has
+    happened by <code>RetaliationCeilingSec</code>, the incident is closed anyway so a
+    poll cannot run for the rest of the session.</li>
+</ul>
+
+<p> The poll is generation-guarded: a load screen moves <code>TimerTick</code>, and a
+ sample scheduled before it would otherwise fire into a world that no longer
+ contains the entity it was about.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:SendStandDown"></a>
+    <strong>HorseCollisionMod:SendStandDown (npc)</strong>
+    </dt>
+    <dd>
+    Tells a victim the incident is over and they may stand down. </p>
+
+<p> <code>combat:stimulus:standDownRequest</code> sets <code>t_state = standDown</code> in
+ <code>sb_combat.xml</code>, and it is one of only two stimulus kinds exempt from the
+ acceptance rule that rejects a stimulus outright while the receiver is
+ already fighting or fleeing. That exemption is the whole reason it works
+ here: every other message this mod could send is discarded by someone
+ mid-flight, which is exactly who needs it.</p>
+
+<p> The payload is empty. <code>TypeDefinitions.xml</code> declares a single member <code>_</code>,
+ which is a placeholder rather than a field: passing it is rejected with
+ "override table does not match the type", and vanilla's own sends carry
+ <code>values=&quot;&quot;</code>.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the call was accepted
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:EndRetaliation"></a>
+    <strong>HorseCollisionMod:EndRetaliation (npc, why, intervene)</strong>
+    </dt>
+    <dd>
+    Closes the incident out: takes the option back and, if needed, intervenes. </p>
+
+<p> <code>why</code> names which of <a href="../modules/Retaliation.html#HorseCollisionMod:WatchRetaliation">WatchRetaliation</a>'s three endings brought us here and
+ goes straight into the telemetry, so a session can be read afterwards for
+ how often the game resolved its own fight against how often this mod had to
+ step in. That ratio is the thing worth knowing about this feature.</p>
+
+<p> <code>intervene</code> decides whether anything is sent at all. On a natural ending
+ the victim has already settled and the correct action is none: sending a
+ stand-down and a replan to someone who is fine interrupts whatever they
+ went back to.</p>
+
+<p> When intervention is warranted, both messages go out in order. The
+ stand-down ends the combat state, and it is the only message that reaches
+ someone mid-flight at all: <code>sb_combat.xml</code> rejects every stimulus arriving
+ during <code>fight</code> or <code>flee</code> except <code>standDownRequest</code> and
+ <code>customBehaviorRequest</code>, which are named exemptions in the condition.
+ Measured on a victim who would not stop, 16.95 m of travel per sample
+ became <code>MotionIdle</code> at 0.00 m within a second, and a daycycle idle ten
+ seconds later.</p>
+
+<p> The replan follows, and is the same <code>daycycle:restartRequest</code> the reaction
+ recovery uses. It covers a victim who has stopped but has nothing to return
+ to.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">why</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         one of <code>natural</code>, <code>runaway</code> or <code>ceiling</code>
+        </li>
+        <li><span class="parameter">intervene</span>
+            <span class="types"><span class="type">boolean</span></span>
+         whether to send the stand-down and the replan
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ProvokeIfAnnoyed"></a>
+    <strong>HorseCollisionMod:ProvokeIfAnnoyed (npc, playerEnt)</strong>
+    </dt>
+    <dd>
+    Decides whether this walk impact provokes a fight, and starts one if so. </p>
+
+<p> Called for every walk-tier impact. Everything before the roll is cheap, and
+ the expensive half only runs on a victim who has actually lost patience.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a fight was provoked
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Fields"></a>Fields</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod.RetaliationOption"></a>
+    <strong>HorseCollisionMod.RetaliationOption</strong>
+    </dt>
+    <dd>
+    The context option that makes a victim answer a hit with a fight. </p>
+
+<p> From the game's own catalog. Named here rather than written inline at each
+ use so a search for it finds one definition.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.RetaliationHandle"></a>
+    <strong>HorseCollisionMod.RetaliationHandle</strong>
+    </dt>
+    <dd>
+    The handle every context option this mod sets is carried on. </p>
+
+<p> <code>Contexts</code> tracks each option against a named handle and clears it per
+ handle, so several systems can request the same option without treading on
+ each other. Using one of this mod's own means clearing it can never disturb
+ a quest that wanted the same option for its own reasons.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.GenderMale"></a>
+    <strong>HorseCollisionMod.GenderMale</strong>
+    </dt>
+    <dd>
+    The soul gender that <code>sb_combat.xml</code> lets through to the fight branch. </p>
+
+<p> Confirmed against telemetry rather than assumed: logged reactions report
+ <code>gender=1</code> for men and <code>gender=2</code> for women.
+
+
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-02 12:44:51 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

@@ -66,11 +66,11 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.5.0
+-- @release 4.6.0
 
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.5.0"
+HorseCollisionMod.Version = "4.6.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -151,6 +151,23 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
 --   0 for the engine's own value
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
+-- @field Retaliation whether a victim shoved repeatedly at a walk can lose
+--   patience and fight back
+-- @field RetaliationFreeBumps how many walk impacts a victim tolerates before
+--   any chance of a fight begins
+-- @field RetaliationChanceStep how much each further shove adds to the chance
+-- @field RetaliationMaxChance ceiling on that chance
+-- @field RetaliationMemorySec how long a victim remembers being shoved, in
+--   seconds, before the count decays to nothing
+-- @field RetaliationFleeSpeed meters per second above which a victim who has
+--   left combat is running away rather than walking somewhere
+-- @field RetaliationFleeIgnoreRange meters the rider must be clear by before
+--   a running victim counts as a runaway rather than as someone sensibly
+--   getting away from him
+-- @field RetaliationFleeSamples consecutive samples of that before the mod
+--   decides a flee has outlived its cause and intervenes
+-- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
+--   incident is closed however it looks
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
@@ -249,6 +266,27 @@ HorseCollisionMod.Config = {
 	CombatStaminaMultiplier  = 2.2,
 	SuppressStaggerInCombat  = true,
 
+	-- Retaliation. Barging the same person at a walk costs nobody anything,
+	-- which makes it an annoyance rather than an act. These let a victim
+	-- run out of patience: each shove is counted, and once the count passes
+	-- `RetaliationFreeBumps` every further one rolls against a chance that
+	-- grows with the count, up to `RetaliationMaxChance`.
+	--
+	-- A provoked fight is deliberately not a crime. The hit that starts it
+	-- carries the engine's own `real = false`, which drives the victim's
+	-- decision without reaching the reputation system, so no fine is levied
+	-- and no guard is summoned. Guards who witness the brawl still join in,
+	-- because they witnessed it.
+	Retaliation              = true,
+	RetaliationFreeBumps     = 1,
+	RetaliationChanceStep    = 0.25,
+	RetaliationMaxChance     = 0.85,
+	RetaliationMemorySec     = 45,
+	RetaliationFleeSpeed     = 3.5,
+	RetaliationFleeIgnoreRange = 25.0,
+	RetaliationFleeSamples   = 8,
+	RetaliationCeilingSec    = 120,
+
 	-- Switches.
 	ProtectMutt              = true,
 	WalkStagger              = true,
@@ -326,6 +364,20 @@ HorseCollisionMod.VictimActivity = {}
 
 
 
+--- How often each victim has been shoved at a walk, keyed by entity id.
+--
+-- Each entry holds the running count and the time of the last shove, so a
+-- victim barged three times in a minute is treated differently from one
+-- barged three times across an afternoon. `RetaliationMemorySec` decides
+-- where the line falls, and a count that has gone stale is discarded rather
+-- than decremented, because a victim either still resents it or does not.
+--
+-- Lives in the entry point rather than in `Retaliation.lua` because the load
+-- screen clears the per-victim state before any part file has a chance to
+-- create its own tables.
+-- @table Annoyance
+HorseCollisionMod.Annoyance = {}
+
 --- Last time each entity was reported as a miss, keyed by entity id.
 HorseCollisionMod.RecentRejections = {}
 
@@ -394,6 +446,14 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 -- Sent to an NPC standing in the street it reads as a one-frame snap, and the
 -- activity it tears down takes any prop the NPC was holding with it.
 HorseCollisionMod.ReplanHaltSpeed = 1
+
+--- How often a provoked victim is sampled while the incident is open.
+--
+-- A poll interval, not a duration: it decides how promptly the mod notices a
+-- fight has ended, never how long the fight is allowed to last. One second is
+-- fine for a state that changes on the scale of a scuffle, and it keeps the
+-- telemetry readable rather than a wall of lines.
+HorseCollisionMod.RetaliationPollMs = 1000
 
 
 -- How the ragdoll handover is watched, for the tier that hands recovery back
@@ -576,6 +636,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- carried into a world it no longer describes.
 		self.RecentHits = {}
 		self.VictimActivity = {}
+		self.Annoyance = {}
 
 		local applied, rejected = self:ApplySettings()
 
@@ -627,6 +688,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 

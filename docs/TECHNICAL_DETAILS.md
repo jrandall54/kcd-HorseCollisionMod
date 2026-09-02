@@ -584,3 +584,104 @@ paks: which vanilla names are claimed, that nothing is dropped from the
 fragment the mod takes over, that every reference resolves, that pak entry
 names use forward slashes, and that the Lua redirects the classes the engine
 spawns. It reads those class names out of `Scripts.pak`.
+
+## Retaliation
+
+Walk impacts are counted per victim in `Annoyance`, keyed by entity id and
+holding a count and a timestamp. A count older than `RetaliationMemorySec` is
+discarded rather than aged down. Past `RetaliationFreeBumps` each further
+shove rolls `math.random()` against `count - free` steps of
+`RetaliationChanceStep`, capped at `RetaliationMaxChance`.
+
+### Starting the fight
+
+Two steps, both the game's own machinery.
+
+`Contexts.SetNonpersistentOption(npc, "alwaysFightWhenHit", handle)` sets a
+context option from the shipped catalog in `Scripts/Script/ContextData.lua`,
+which lists 89 options and 14 presets. Vanilla quests set options the same
+way: `q_ledecko` gives four bandits `fightAllHostilePerceptibles` and
+`q_hareHunt` applies the `berserk` preset. In `sb_combat.xml` the option sits
+in front of the morale comparison that otherwise decides whether a civilian
+fights or flees, and skipping that comparison is all it does. Options are
+carried on a named handle, so clearing this mod's cannot disturb a quest that
+wanted the same option.
+
+Then `combat:stimulus:hit` with `attacker`, `kind` of `Unarmed` and
+`real = false`.
+
+**Not `combat:hit`.** That message is handled by
+`sb_switch_hitreactions.xml`, which runs two independent branches and gates
+only one on `real`:
+
+- the reputation branch computes a `hit_melee_*` change by strength and calls
+  `SetReputationNPC`. Gated on `real`, so `real = false` skips it.
+- the assault broadcast is not gated on `real` at all. It spawns a
+  `SpawnExpiringPerceptibleVolume` one meter across at the victim, labeled
+  `assault`, for six seconds at full conspicuousness, blinds the attacker and
+  the victim to it, and leaves every bystander able to see it. That volume is
+  how a witness learns an assault happened, and sending `combat:hit` charged
+  the rider with brawling before a punch had been thrown.
+
+`combat:stimulus:hit` is what that switch forwards to the combat subbrain
+anyway. The subbrain starter listens for it by name on
+`combatStimulus_combatSubbrainStarter` and converts it to a stimulus impulse
+of kind `hit`, reaching the same handler without the broadcast.
+
+### What the game decides
+
+The civilian branch of that handler, `sb_combat.xml` lines 8308 to 8365:
+
+    if alwaysFightWhenHit or suppressFightMoraleChecks: pass
+    else: CompareMorale(this, attacker)
+    if gender == male: pass else: fail
+    -> t_state = fight, opponent = realAttacker
+       and startInDefenseOnly when the player is not already an enemy
+
+The `gender == male` test sits behind the context option and is not bypassed
+by it, so women fall through to the report or flee branches.
+`startInDefenseOnly` is why a provoked victim squares up and blocks rather
+than opening with an attack.
+
+The soldier branch instead calls `CreateInformation label='assault'` whenever
+the attacker is the player, unconditionally, which is why a provoked guard
+arrests. Read the distinction with
+`soul:GetSocialClass().SoulCrimeRoleId`: 1 for a civilian, 2 for a soldier.
+
+### Ending it
+
+`WatchRetaliation` polls `actor:GetCurrentAnimationState()` once a second
+alongside distance covered, and classifies the victim:
+
+- `engaged` for a `Combat` or `Surrender` prefix. Surrender matters: a victim
+  mid-yield stands in `SurrenderIn`, perfectly still, and reading that as
+  settled closed incidents during the surrender.
+- `fleeing` for speed at or above `RetaliationFleeSpeed` **and** the rider
+  more than `RetaliationFleeIgnoreRange` away. Running from someone stood over
+  you is not a fault.
+- `settled` otherwise.
+
+Three endings, named in the telemetry. `natural` after three settled samples,
+where nothing is sent because the game resolved its own fight. `runaway`
+after `RetaliationFleeSamples` consecutive fleeing samples, which sends
+`combat:stimulus:standDownRequest` followed by the reaction recovery's
+`daycycle:restartRequest`. `ceiling` at `RetaliationCeilingSec`, a failsafe.
+
+`standDownRequest` is the only message that reaches someone mid-flight:
+`sb_combat.xml` rejects every stimulus arriving during `fight` or `flee`
+except it and `customBehaviorRequest`, which are named exemptions. Its payload
+is empty; the declared member `_` is a placeholder and passing it is rejected
+by the type check.
+
+### Measured costs
+
+A provoked brawl moves no faction reputation. Five Rataje factions read
+identical to six decimal places before and after one, punch and yield
+included.
+
+Beating a man does lower `soul:GetRelationship(playerWuid)` for that man
+alone, by a fixed 0.5556 that did not decay across several in-game days. That
+is vanilla's: a fist fight started on foot with none of this mod running
+produces the same, measured against untouched controls. Read the gap against
+a neighbor rather than the absolute value, which tracks a town-wide standing
+and shifts for everyone at once.

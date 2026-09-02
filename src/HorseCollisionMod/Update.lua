@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.5.0
+-- @release 4.6.0
 
 --- Applies the appropriate reaction for one collision.
 --
@@ -153,6 +153,12 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 		self:ProbeImpactCost(npc, "Walk", strength.Tickle, armor)
 		self:SendHitReaction(npc, horseWuid, strength.Tickle)
+
+		-- After the stagger and the native hit reaction, so a provoked
+		-- victim has already played their reaction to this shove and the
+		-- fight starts from the shove rather than instead of it.
+		self:ProvokeIfAnnoyed(npc, playerEnt)
+
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainWalk * combatScale * armorStamina)
 		return

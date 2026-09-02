@@ -86,6 +86,15 @@ breaking the mod. Deleting a line restores its default.
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
+| `Retaliation` | true | Whether a man shoved repeatedly at walking pace can lose patience and fight back. |
+| `RetaliationFreeBumps` | 1 | How many walk impacts a victim tolerates before any chance of a fight begins. The first is always free. |
+| `RetaliationChanceStep` | 0.25 | How much each further shove adds to the chance. |
+| `RetaliationMaxChance` | 0.85 | The ceiling on that chance. |
+| `RetaliationMemorySec` | 45 | How long a victim stays annoyed. Leave them alone for longer and the count resets. |
+| `RetaliationFleeSpeed` | 3.5 | Meters per second that counts as running away rather than walking somewhere. |
+| `RetaliationFleeIgnoreRange` | 25.0 | How far you must be before a running victim counts as a runaway. Running from someone stood over them is fair. |
+| `RetaliationFleeSamples` | 8 | Seconds of sustained running, with you clear, before the mod steps in. |
+| `RetaliationCeilingSec` | 120 | Failsafe. Stop watching an incident after this. |
 
 A few detection internals are omitted here and commented in place in the file.
 

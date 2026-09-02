@@ -66,6 +66,30 @@ HorseCollisionModSettings = {
 	         -- "knockdown" adds an animated get-up, "ragdoll" is physics
 	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
+	-- Losing patience. Barging the same person at a walk costs nobody
+	-- anything, so this lets them run out of patience and swing back. The
+	-- first shove is always free; each one after that rolls against a
+	-- chance that grows with the count.
+	--
+	-- The fight it starts is deliberately not a crime: no fine, no guard
+	-- summoned. Guards who actually witness the brawl still wade in.
+	--
+	-- Only men fight back. The game itself refuses the fight branch to
+	-- women, and nothing this mod sets changes that.
+	Retaliation              = true,
+	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance
+	RetaliationChanceStep    = 0.25,  -- added per shove beyond that
+	RetaliationMaxChance     = 0.85,  -- the chance never exceeds this
+	RetaliationMemorySec     = 45,    -- how long a victim stays annoyed
+	-- The brawl is not timed. The mod watches the victim's own state and
+	-- steps in only if they leave the fight and keep running, which the
+	-- game sometimes does not resolve on its own.
+	RetaliationFleeSpeed     = 3.5,   -- m/s that counts as running away
+	RetaliationFleeIgnoreRange = 25.0,-- how far off you must be first; running
+	                                  -- from someone stood over you is fair
+	RetaliationFleeSamples   = 8,     -- seconds of that before stepping in
+	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
+
 	-- Switches.
 	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
 	                                  -- and gallop; never at a walk

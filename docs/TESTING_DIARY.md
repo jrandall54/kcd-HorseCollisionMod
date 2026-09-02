@@ -11929,3 +11929,541 @@ The same condition block reads `isKnockOutByPlayer` against
 `CreateInformation PerceivedWuid=... label='assault'`. Whether a bystander
 reacted to something it actually saw is therefore a distinction the game
 already draws. Not investigated further.
+
+---
+
+## Retaliation fires as designed, and a witness still reports the brawl
+
+First run of `Retaliation.lua` in game. Three walk staggers on `rat_man6`:
+
+    Retaliation rat_man6 count=2 chance=0.25 roll=0.34 provoked=false
+    Retaliation rat_man6 count=3 chance=0.50 roll=0.26 provoked=true
+    ProvocationHit rat_man6 ok=true strength=2 err=nil
+
+The first shove was free, the second rolled 0.34 against 0.25 and passed
+without incident, the third rolled 0.26 against 0.50 and he turned and
+fought. The count, the curve and the roll all behave as written, and
+`math.random` is seeded by the game rather than returning a fixed sequence.
+
+**A woman witnessed it and a crime was reported immediately.** Surrendering
+produced a charge of brawling rather than assault.
+
+### Why `real = false` did not prevent it
+
+It prevented what it gates and nothing else.
+`sb_switch_hitreactions.xml` runs two separate branches off a hit, and only
+the first is gated on `$hit.real`:
+
+- The **reputation** branch, at line 481, computes a `hit_melee_*` change and
+  calls `SetReputationNPC`. Gated on `$hit.real`, so `real = false` skips it.
+- The **assault broadcast**, at line 615, is gated on something else
+  entirely:
+
+        if suppressAssaultReactions and checkAssaultSuppression.suppressExternalReactions
+            Success                     -- nothing is broadcast
+        else
+            SpawnExpiringPerceptibleVolume
+                Expiration 6s, Radius 1, Height 1, Label 'assault',
+                conspicuousness 1, visibility 1
+            IgnorePerception for the attacker and for the victim
+            AddLink assaultVolumeData carrying attacker, victim and kind
+
+  So a one-meter perceptible volume labeled `assault` is spawned at the
+  victim for six seconds. The attacker and the victim are explicitly made
+  blind to it; **everyone else can see it**, and that is what a bystander
+  reports. It fires whether or not the hit was real.
+
+### The suppression is a link, and Lua cannot make links
+
+`suppressAssaultReactions` is not a context option. It is computed by the
+`checkAssaultSuppression` tree in `sb_combat.xml`, which walks **entity links
+tagged `suppressAssaultReactions`** between attacker and victim.
+`sa_duel.xml` is where that is used in anger:
+
+    AddLink    From='this.id' To='__player' Tag='suppressAssaultReactions'
+    RemoveLink From='this.id' To='__player' Tag='suppressAssaultReactions'
+
+`questUtils.xml` adds an `expiration` to the same link's data. That is the
+whole mechanism behind a sparring match the town ignores.
+
+**No script bind exposes links to Lua.** All 37 `C_ScriptBind*` headers
+carry only readers: `GetLinkedEntity`, `GetLinkedOwner`, `GetHelperLinks`,
+`GetHelperLinkTarget`, `IsLinkedWithShop`. There is no `AddLink`. Vanilla Lua
+never creates one either.
+
+The one untried route is `combat:stimulus:customBehaviorRequest`, which takes
+an `includeXml` and an `includeTree` and is reachable from Lua, pointed at a
+tree inside `sa_duel.xml` that adds the link. Speculative, and it would tie
+this mod to the internals of a scripted action.
+
+### Reputation was not cleanly measured
+
+`ui_fac_ratays_citizens` reads 0.357 against a base of 0.5, and
+`ui_fac_ratays_traders` 0.538. The same session included three trot
+tramplings that were real crimes with `real = true`, so this does not isolate
+what the brawl cost. A clean measurement needs a fresh save with no prior
+offense.
+
+---
+
+## The runaway was a flee that outlived its cause, and `standDownRequest` ends it
+
+The no-crime fix worked. A beggar provoked at the fourth shove
+(`roll=0.36` against `chance=0.75`) turned hostile with **no crime reported**,
+where the previous build had charged the rider with brawling before a punch
+was thrown. Sending `combat:stimulus:hit` instead of `combat:hit` is what did
+it: the assault perceptible volume lives in `sb_switch_hitreactions.xml`, and
+the stimulus goes straight to the combat subbrain without passing through it.
+
+He then yielded immediately rather than fighting, was released unconditionally
+through the surrender dialog, and ran out of town without stopping.
+
+### The mod was not holding him
+
+Inspected live while he ran. No context option was set on him at all, and the
+mod's own telemetry had already reported `RetaliationEnd cleared=true
+state=IdleToMove replanned=true`, so the option came off and the daycycle
+restart was accepted. He read `MotionMovement`, profile `alive`, health 100,
+morale 0.169. The flee was vanilla's, and it had outlived the incident that
+started it.
+
+Note the contrast in the log: `cleared=false` on victims the option was never
+set on, and `cleared=true` on the one it was. `Contexts.ClearOption` throws
+when the handle is absent, so that field distinguishes the two rather than
+reporting a failure.
+
+### The one message that reaches someone mid-flight
+
+`combat:stimulus:standDownRequest` sets `t_state = standDown`. It matters
+because of the acceptance rule in `sb_combat.xml`: a stimulus arriving while
+the receiver is already in `fight` or `flee` is rejected outright, **except**
+for `standDownRequest` and `customBehaviorRequest`. Those two are named in the
+condition and skip the check. So every other message this mod could send is
+discarded by exactly the victim who needs one.
+
+Measured on the runaway, samples taken 1, 3, 6 and 10 seconds apart:
+
+| | before | after |
+|---|---|---|
+| t+1s | | `MotionIdle`, 1.86 m |
+| t+3s | | `MotionIdle`, 0.00 m |
+| t+6s | `MotionMovement`, 12.95 m | `MotionIdle`, 0.00 m |
+| t+10s | `MotionMovement`, 16.95 m | `MotionIdleVARdefault`, 0.00 m |
+
+He stopped inside a second and was in a daycycle idle variant ten seconds
+later, which is a resumed routine rather than a frozen actor.
+
+### The payload is empty, and that is not the same as absent
+
+`TypeDefinitions.xml` declares one member on `standDownRequest`, named `_`.
+It is a placeholder, not a field: passing it is rejected outright with
+`override table does not match the type 'combat:stimulus:standDownRequest.',
+got member '_.'`. Vanilla's own sends carry `values=""`.
+
+`Utils.makeTable` validating against the type definition is worth noting on
+its own. It rejected a wrong payload with a precise message, where the same
+mistake made by hand would have been delivered and silently discarded.
+
+### A beggar yielding at once is not a fault
+
+`alwaysFightWhenHit` decides that a fight is the answer. It does not decide
+how the fight goes, and nothing in it makes a coward brave. A beggar at 0.169
+morale surrendering to a mounted man immediately is the game working.
+
+---
+
+## The crime lands on the player's own punch, and `SurrenderIn` broke the watch
+
+Two provoked brawls, `rat_ruch` and `rat_man19`, both civilians, both
+provoked on the third shove.
+
+### The crime timing is right, and it is the player's
+
+**No crime is reported when the victim turns hostile.** It is reported when
+the rider swings back. In the second encounter the rider threw no punch at
+all: the victim fought, guards joined and punched the rider, and still no
+crime existed. One punch from the rider, and the charge appeared.
+
+That is the correct division and it comes out of the behavior data rather
+than out of this mod. The provocation is a stimulus the victim answers; the
+assault is something the player does.
+
+A provoked **guard** is a different matter and is left that way deliberately.
+The soldier branch of the hit handler raises assault information whenever the
+attacker is the player, with no `real` check and no context option in front of
+it, so a provoked guard arrests rather than brawls. An earlier revision gated
+soldiers out of the roll. That gate was wrong: a guard exercising authority a
+townsman does not have is the distinction the crime-free brawl exists to draw,
+not a fault to design around. The gate has been removed.
+
+### `SurrenderIn` defeated the state watch
+
+Both incidents closed as `why=natural cleared=true state=SurrenderIn
+stoodDown=false replanned=false`, and both victims were left running
+afterwards. `rat_man19` was measured circulating between two points at
+**4.79 m/s sustained** for several minutes.
+
+The classifier tested `^Combat` for "the incident is still running" and
+treated everything else as settled once it stopped moving. A victim mid-yield
+stands in `SurrenderIn`, which carries no `Combat` prefix and is perfectly
+still, so three consecutive samples of it read as settled and the watch
+closed the incident while the victim was in the middle of surrendering.
+
+`why=natural` was therefore a false positive on both runs, and the question of
+whether the game resolves its own fights is **still unanswered**: no true
+natural resolution has been observed yet, only a misread one.
+
+The engine's surrender states all share a prefix, and all of them are now
+treated as engaged: `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
+`SurrenderDialogToMove`, `SurrenderForcedWait`, `SurrenderToCombat`.
+
+### The stand-down works on a circulating flee, more slowly
+
+Applied by hand to `rat_man19` while he ran. Speed by sample afterwards:
+3.94, 2.75, 3.45, then 1.58 m/s, decelerating below the 3.5 m/s flee
+threshold to a walking pace. Slower than the beggar, who reached `MotionIdle`
+inside a second, but the same outcome.
+
+---
+
+## Every runaway was observed by chasing the runaway
+
+`rat_man19` was still circulating after a hand-applied stand-down slowed him
+from 4.79 m/s to 1.58 m/s. Probed for a cause, expecting a temporary hostile
+superfaction, since the context catalog carries
+`suppressTempSuperfactionClearingInCombatVersusDude` and `combat:fightOptions`
+carries `clearTempSuperfactionAgainstPlayer`.
+
+That was not it. `GetSuperfaction` and `GetPerceivedSuperfaction` both read 3,
+identical, against the player's 5. He was in no hostile faction at all.
+
+**`distToPlayer=2.53`.** The rider was two and a half meters behind him.
+
+That confound runs through every runaway recorded today. The beggar followed
+out of town, and this one: in each case the flee that "would not end" was
+being watched by the one person whose presence sustains it. The stand-down
+demonstrably worked on both, and both resumed once the rider closed again,
+which is a fresh flee rather than an old one persisting.
+
+### Reading an NPC at distance proves nothing
+
+With the rider 116 m away, six samples two seconds apart reported
+`mps=0.00` and a position identical to the decimal, while the animation state
+stayed `MotionMovement` rather than becoming an idle. That is an actor frozen
+outside the simulation radius, not one that settled. The engine carries
+`wh::xgenaimodule::BehaviorTree::C_LODCombat`, so AI level of detail exists.
+
+**Any observation of a distant NPC's state is worthless.** A victim has to be
+watched from close enough to be simulated and far enough not to be the thing
+being fled, which is a narrow band, and every measurement taken today outside
+it should be discarded.
+
+### What the mod does about it
+
+A running victim is only a runaway when the rider is more than
+`RetaliationFleeIgnoreRange` away, 25 m by default. Running from someone
+standing over you is correct behavior and interrupting it would be the fault.
+Below that range a running victim is classified as engaged: the incident stays
+open, nothing is sent, and the victim is left to do the sensible thing.
+
+---
+
+## Both endings observed cleanly, and the game does resolve its own fights
+
+First run on a reloaded save, with the rider stationary rather than following
+the victim. `rat_man19`, a townsman, provoked twice.
+
+    Retaliation    rat_man19 role=townsman count=3 chance=0.50 roll=0.36 provoked=true
+    RetaliationEnd rat_man19 why=natural  state=MotionTurn     stoodDown=false replanned=false
+
+    Retaliation    rat_man19 role=townsman count=2 chance=0.25 roll=0.04 provoked=true
+    RetaliationEnd rat_man19 why=runaway  state=MotionMovement stoodDown=true  replanned=true
+
+**The first is the answer to a question open all session.** The rider
+surrendered to the victim, the encounter resolved on its own, and the mod sent
+nothing at all. The game does clean up after its own fights, and the
+stand-down is a failsafe for the case where it does not rather than the
+mechanism.
+
+The second earned its intervention: after taking payment through the yield
+dialog the victim ran, cleared the 25 m range test, and sustained it.
+
+Sampled afterwards, at two-second intervals, with the rider stationary:
+
+| | state | speed | range to rider |
+|---|---|---|---|
+| t+2s | `MotionMovement` | 0.00 | 16.1 |
+| t+4s | `MotionMovement` | 0.97 | 14.2 |
+| t+6s | `MotionMovement` | 0.95 | 12.3 |
+| t+8s | `MotionMovement` | 0.99 | 10.4 |
+| t+10s | `MotionMovement` | 0.97 | 8.5 |
+
+A steady walking pace against the 4.79 m/s of a flee, and the range closing
+rather than opening: a victim walking back to his routine rather than running
+from anything. The replan did its job.
+
+## Two things the yield dialog raises, both parked
+
+Neither is this feature's, and neither has been investigated.
+
+**The surrender prompt is not shown.** Surrendering to a provoked victim
+resolves the encounter cleanly, but the on-screen input hint that normally
+appears when guards are attacking does not, so a player has no way of knowing
+the option exists. The engine carries
+`wh::xgenaimodule::BehaviorTree::C_SurrenderActionHint` and
+`S_SurrenderActionHintContext`, plus a `SurrenderActionHint` string, so the
+hint is a behavior tree node. Whether it can be raised from Lua is unknown.
+
+**The yield dialog can be used to extract money.** A victim who yields offers
+the usual options, including paying the player to be let go. A provoked brawl
+is not a crime unless witnessed, so this is a repeatable income with no legal
+consequence, which is a plausible early-game exploit. It is vanilla's dialog
+reached through a fight this mod arranges, so the mod is at least adjacent to
+it.
+
+---
+
+## A provoked brawl costs no reputation
+
+Five Rataje factions read before and after a complete provoked brawl on
+`rat_man29`, a townsman: three walk staggers, provoked on the fourth
+(`roll=0.01` against `chance=0.75`), a punch from the rider, and a yield.
+
+| faction | before | after |
+|---|---|---|
+| `ratays_traders` | 0.537924 | 0.537924 |
+| `ratays_citizens` | 0.446707 | 0.446707 |
+| `rataje_out_villagers` | 0.500000 | 0.500000 |
+| `ratays_soldiers` | 0.382400 | 0.382400 |
+| `kunes_rattay` | 0.160000 | 0.160000 |
+
+**Identical to six decimal places, every one.** A townsman belongs to
+`ratays_citizens`, so the faction that would have moved was measured and did
+not move.
+
+That is the `real = false` provocation and the `combat:stimulus:hit` route
+working as designed: neither reaches `SetReputationNPC`. The figures below
+base for citizens and soldiers are this save's own history and predate the
+test.
+
+The claim has one limit. This brawl raised no witnessed crime. A witnessed
+one, reported and fined, goes through the crime system's own reputation
+machinery, which has not been measured separately.
+
+The encounter also closed `why=natural state=MoveToIdle` with nothing sent,
+the second genuine natural resolution recorded.
+
+### The victim holds no grudge in any value that can be read
+
+Asked directly, `rat_man19` reported `relationshipToPlayer = 0.537791`,
+slightly **positive**, with `GetSuperfaction` and `GetPerceivedSuperfaction`
+both 3 and identical. Nothing persistent marks the rider as an enemy, which
+argues against the flee-on-approach being a permanent state. It is not
+evidence that it decays, only that no stored value carries it.
+
+---
+
+## The flee-on-approach isolation test is confounded by an active crime
+
+Run with the mod entirely uninvolved: dismounted, a fresh civilian punched by
+hand. He was knocked out, a witness fled and reported it, and a crime was
+outstanding when he woke. Walking into his field of view made him flee.
+
+So vanilla does produce flee-on-approach after a beating. **But it does not
+separate the two candidate causes**, because the crime was still active: an
+NPC avoiding the man who beat him and an NPC avoiding a wanted criminal look
+identical from the saddle.
+
+The player's crime state could not be read to settle it from outside.
+`soul:IsPublicEnemy()` errors on the player, and `RPG.IsPublicEnemy` errors
+whether passed the wuid or a string. `XGenAIModule.GetWuidDebugString` does
+work and answers `WUID:(Soul)A53{Dude}`, so the player wuid itself is fine and
+the fault is in those two calls or in how they are addressed.
+
+### The test that removes the confound
+
+A mod-provoked brawl raises no crime at all as long as the rider throws no
+punch. That was established earlier: guards were seen punching the rider while
+no charge existed, and the charge appeared on the rider's first swing. So
+provoking a victim and never swinging produces a complete brawl with no crime
+anywhere in it, and approaching the victim afterwards tests the beating alone.
+
+Not yet run.
+
+### What is known against a permanent state
+
+`relationshipToPlayer` reads 0.537791, slightly positive, and both
+`GetSuperfaction` and `GetPerceivedSuperfaction` read 3 and match. No readable
+value marks the rider as an enemy. That is an argument against permanence, not
+proof of it, since whatever drives the flee is evidently not stored in any of
+the three.
+
+---
+
+## Beating a man to a yield zeroes his relationship, and only his
+
+Thirty humans within 40 m had their `soul:GetRelationship(playerWuid)` read
+before a provoked brawl and again after it. The rider provoked one man, beat
+him until he yielded, and touched nobody else.
+
+| NPC | before | after |
+|---|---|---|
+| `rat_man19` | 0.5378 | **-0.0000** |
+| the other 23 read both times | unchanged | unchanged |
+
+The common baseline is **0.5378**, shared by nearly every townsman, merchant
+and shop guard. Soldiers sit at 0.4052 and beggars at about 0.72. An earlier
+reading of 0.5378 on a brawl victim was taken as "slightly positive, holds no
+grudge"; it was simply the default, and that inference was wrong.
+
+So the cost of beating someone is **individual and local**: their own
+relationship with the rider, not the faction reputation, which was separately
+measured as unmoved to six decimal places, and not the town at large.
+
+It lives in the save. `rat_ruch` read `-0.0000` after being beaten in an
+earlier session and reads 0.5682 after the save was reloaded.
+
+This is what the flee-on-approach follows, and it explains why paying the fine
+changed nothing: the crime and the relationship are different records, and
+only the first was settled.
+
+**It is also not this mod's doing.** The rider's own fists lower it. The mod
+arranges for a man to be willing to fight; what the rider then does to him is
+the rider's.
+
+Whether it recovers is the open question, and `soul:ModifyPlayerReputation`
+exists as a lever if it turns out not to.
+
+## Side finding: the closeout pair unsticks an NPC the mod never touched
+
+Several NPCs were seen running into the inn area and stopping. Three were in
+`MotionMovement` and sampled: two were moving normally at 1.2 to 2.6 m/s and
+were not stuck at all. `rat_man12` read **0.00 m/s across every sample while
+in `MotionMovement`**, which is the genuine signature: a locomotion state with
+no locomotion.
+
+He is not this mod's. The log carries **zero** `HorseCollisionMod` lines
+mentioning him across the whole session: no collision, no stagger, no
+provocation. He held no context option, had no annoyance entry, and his
+relationship read the ordinary 0.461 baseline.
+
+The one thing that had touched him was a read-only morale probe that called
+`SetState("mor")` and `SetState("morale")`, which measurably changed nothing;
+two other NPCs from that same set were behaving normally at the time. Not a
+likely cause, but not excluded either.
+
+`SendStandDown` followed by `ReplanVictim`, the same pair `EndRetaliation`
+sends, freed him:
+
+    MotionMovement 0.00 -> StandUp -> MotionIdle -> MotionIdleVARdefault
+
+That is a point in the closeout's favour beyond its own feature: the pair is a
+general recovery for an actor wedged in a locomotion state, not something that
+only makes sense after a brawl.
+
+### Correction: the inn NPCs were stuck, and a load screen cleared it
+
+The sampling above was taken **after** the player fainted and woke, and a load
+screen resets NPC state. The NPCs read as normal because they had already been
+fixed, not because they were never stuck. The rider confirms they were frozen
+beforehand.
+
+The most likely cause is not the mod's collision system but a repair script
+run earlier in the same session, which sent `daycycle:restartRequest` to every
+human within 60 m, 50 of them, to free one runaway. It interrupted NPCs who
+were mid-activity, a butcher carving and a Konrad Hagen listening to dialogue
+among them, and was waved through as harmless at the time. An inn full of
+people running scripted activities is precisely where that would surface.
+
+Unproven, and recorded as the leading candidate rather than a conclusion. The
+practical rule it argues for: a repair sends its messages to the entity that
+needs repairing, never to everyone nearby.
+
+---
+
+## Vanilla control: a fist fight zeroes the relationship, with the mod uninvolved
+
+The decisive test for whether this mod causes victims to flee from the player
+permanently. The rider dismounted, so no part of this mod ran: no walk
+stagger, no provocation, no `alwaysFightWhenHit`, no `combat:stimulus:hit`.
+He punched a merchant, the merchant fled, the rider surrendered to the guards
+and resolved the crime, then followed the merchant.
+
+Read afterwards, against three untouched controls:
+
+| NPC | history | relationship | state |
+|---|---|---|---|
+| `rat_merchant_shop3` | punched on foot, crime resolved | **-0.0508** | `MotionMovement`, 108 m off |
+| `rat_merchant_shop2` | untouched | 0.5048 | `ADLG_Gesture27` |
+| `rat_bedrich` | untouched | 0.5048 | `Lying` |
+| `rat_shop_guard_general` | untouched | 0.5048 | `LeaningBackVAR` |
+
+The whole baseline had drifted from 0.5378 to 0.5048 over the session and all
+three controls moved together, so the merchant's -0.0508 is a real
+displacement rather than a shifted scale. Superfaction and perceived
+superfaction both read 3, unchanged.
+
+The rider reported him seeming normal at first and then recognizing the rider
+and fleeing again.
+
+**This is vanilla's consequence for beating someone, not this mod's.** The mod
+arranges for a man to be willing to fight; the fists and everything that
+follows from them are the player's. Resolving the crime does not restore the
+relationship, because the crime and the relationship are separate records.
+
+Whether a zeroed relationship recovers over time is a question about Kingdom
+Come rather than about this mod, and remains unmeasured. `rat_refugee_Radan`
+read `-0.0000` before a save reload and 0.7222 after it, which confirms only
+that the value is save state.
+
+## The relationship penalty does not decay, and the gap is the way to measure it
+
+Tracked across several in-game days after the vanilla fist fight:
+
+| | after 1 day | after several more |
+|---|---|---|
+| `rat_merchant_shop3` | -0.1608 | -0.1606 |
+| `rat_merchant_shop2` control | 0.3948 | 0.3949 |
+| `rat_bedrich` control | 0.3948 | 0.3949 |
+| **gap** | **0.5556** | **0.5556** |
+
+**The absolute value is not the measurement.** Between two readings minutes
+apart, the victim and both controls all moved by exactly 0.11, which is a
+global shift in the player's standing rather than anything about the victim.
+Read the gap between the victim and an untouched neighbor instead, and it has
+not moved at all.
+
+So the personal penalty for beating a man is **fixed at 0.5556 and does not
+decay over days**. Whether it decays over longer spans is unmeasured, but a
+value that has not moved a thousandth across several days is not on a fast
+curve.
+
+The global component does move, which implies the relationship is something
+like a town-wide standing plus a fixed personal penalty. If so, raising
+standing in the town lifts the victim's absolute value even while the penalty
+stands, and could carry him back above whatever threshold makes him flee.
+Untested.
+
+`AddReputation` and `soul:ModifyPlayerReputation` both take an enum name
+rather than a number. The `reputation_change` table exists with columns
+`reputation_change_id, name, change, reputation_change_target_id,
+can_change_hostility, reputation_cap, reputation_notification_id`, but its
+rows do not come back through the `Database` bind, the same limitation seen
+with `angriness_enum`. The names recoverable from behavior data are all
+penalties: `hit_melee_weak`, `hit_melee_medium`, `hit_melee_strong`,
+`hit_melee_brutal`, `death`, `pickpocket_fail`, `crime_theft_individual` and
+`surrender_step`.
+
+### Testing across game time is expensive and should be avoided
+
+Hardcore mode makes passing days costly: the player has to eat and sleep, and
+the skip runs at `wh_pl_SkipTimeMaxWorldTimeRatio` 360, one real second per
+six game minutes, so a day costs about four real minutes of watching a bar.
+
+Two mitigations, both applied. `soul:SetState` sets the player's `hunger` and
+`exhaust` to 100 directly, which removes the survival errand from any test
+needing time. Raising `wh_pl_SkipTimeMaxWorldTimeRatio` shortens the skip
+proportionally. Both are console values and a save reload wipes them.
+
+Note that `stamina` reads 150 on the player rather than 100, so setting it to
+100 lowers it.
