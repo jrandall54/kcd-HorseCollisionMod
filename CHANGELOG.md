@@ -23,6 +23,13 @@ number.
 
 ## [Unreleased]
 
+## [4.6.2] - 2026-09-02
+
+### Changed
+
+- Development tooling only. Nothing about a collision looks or behaves
+  differently.
+
 ## [4.6.1] - 2026-09-02
 
 Research only. Nothing about a collision looks or behaves differently.

@@ -172,6 +172,50 @@ successful reload ends with:
 [log] [HorseCollisionMod] Load screen ended. v3.0.0 initializing physics timer loop 1
 ```
 
+## Landing a branch
+
+The version lives in fourteen places: `src/mod.manifest`, the
+`HorseCollisionMod.Version` assignment, and an `@release` tag in the entry
+point and each of the eleven part files. `build.ps1` refuses a release if any
+of them disagrees.
+
+One command writes all of them, and dates the changelog section at the same
+time:
+
+    python tools/set_version.py            derive the next version and apply it
+    python tools/set_version.py 4.7.0      apply one explicitly
+    python tools/set_version.py --check    report without writing
+
+Deriving uses the same rule the build enforces: the newest tag, bumped by what
+the entries under `## [Unreleased]` call for. Applying it also moves those
+entries under a dated heading for the new version, which is the step the
+workflow requires when a branch merges.
+
+So a branch lands like this:
+
+    python tools/set_version.py
+    ldoc .
+    .uild.ps1 -Version <the version it printed>
+    git add -A && git commit
+    git checkout main && git merge --no-ff <branch>
+    git tag -a v<version> -m "..."
+    git push origin main --follow-tags
+
+`ldoc .` belongs in that order because the staleness check compares **commit**
+times rather than file times, so the regenerated pages have to be committed
+alongside the sources they describe. Regenerating after the commit leaves the
+check failing on the next build.
+
+### Two things that used to bite
+
+Rebuilding a version that is already tagged works. The version check compares
+against the newest tag *older than* the build target, so `dev_deploy.ps1` runs
+normally after a merge; it used to fail against the tag it had just created
+and needed `-NoBuild` to get past.
+
+A version mismatch reports every file at once. It used to fail on the first,
+which turned a bump into a build-fix-build cycle repeated once per file.
+
 ## Testing a packaged build
 
 The loop above runs on loose files. A player runs on paks only, where a pak with

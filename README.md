@@ -152,6 +152,8 @@ tools/
                           finding food in hardcore
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
+  set_version.py          writes the version into all fourteen places that
+                          carry it, and dates the changelog section
   version_check.py        derives the next version from CHANGELOG.md
   pre_release_check.py    finds claims the repository makes that are no
                           longer true

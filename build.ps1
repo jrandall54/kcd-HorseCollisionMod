@@ -294,14 +294,26 @@ if ($isRelease) {
     # stale unnoticed because nothing reads it back. Checked in every part
     # file that declares one, not just the entry point, since a part header is
     # read even less often than the entry point's.
+    # Every mismatch is collected and reported together. Failing on the first
+    # one turns a version bump into a build, fix, build cycle repeated once per
+    # file, which is how twelve files were bumped one at a time. The remedy is
+    # named in the message, because `set_version.py` does all of them at once.
+    $staleReleases = @()
+
     foreach ($script in (@($modScript) + $partScripts)) {
         $raw = Get-Content $script -Raw
         if ($raw -notmatch '@release\s+([^\s]+)') { continue }
 
         if ($Matches[1] -ne $Version) {
-            Write-Host "Build failed: the @release tag in $(Split-Path -Leaf $script) is $($Matches[1]), building $Version." -ForegroundColor Red
-            exit 1
+            $staleReleases += "  $(Split-Path -Leaf $script) says $($Matches[1])"
         }
+    }
+
+    if ($staleReleases.Count -gt 0) {
+        Write-Host "Build failed: $($staleReleases.Count) @release tag(s) do not say $Version." -ForegroundColor Red
+        $staleReleases | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+        Write-Host "         Fix them all at once:  python tools\set_version.py $Version"
+        exit 1
     }
 
     # A diagnostic left on writes thousands of lines to a player's kcd.log.

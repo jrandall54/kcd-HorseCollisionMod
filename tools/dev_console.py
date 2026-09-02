@@ -302,6 +302,12 @@ class Console(object):
         self.refusals = []
         self.setup_count = 0
 
+        # Whether the game has said anything of its own since the setup
+        # commands. A Lua chunk that draws nothing is the signature of a game
+        # launched without -devmode, and telling those apart needs a record of
+        # whether anything came back at all.
+        self.saw_output = False
+
     def connect(self, timeout=5.0):
         self.sock = socket.create_connection((HOST, PORT), timeout=timeout)
         self.sock.settimeout(0.5)
@@ -423,7 +429,16 @@ class Console(object):
                 self.refusals.append(COLOUR_CODES.sub("", text).strip())
 
             label = EVENT_NAMES.get(event, "event-%d" % event)
-            show("[%s] %s" % (label, COLOUR_CODES.sub("", text).strip()))
+            clean = COLOUR_CODES.sub("", text).strip()
+
+            # The setup commands echo their own assignments back, and those
+            # arrive whether or not anything the caller asked for ran. Counting
+            # them would defeat the whole point of the flag.
+            if not clean.startswith(("log_Verbosity", "con_restricted",
+                                     "log_SpamDelay")):
+                self.saw_output = True
+
+            show("[%s] %s" % (label, clean))
 
     def listen_forever(self):
         while self.alive:
@@ -576,6 +591,24 @@ def main():
     if console.sent == 0:
         print("warning: the server never asked for input, nothing was sent.")
         print("         re-run with --raw to see what it did send.")
+
+    # A Lua chunk that produced no output at all almost always means the game
+    # was launched without -devmode. The console accepts the expression, the
+    # server acknowledges it, and the evaluation is dropped in silence: there
+    # is no refusal message the way there is for a VF_CHEAT variable.
+    #
+    # That silence reads exactly like a chunk that ran and logged nothing, and
+    # a session was spent probing an unresponsive game before the cause was
+    # found. Saying so costs one line and removes the whole class of confusion.
+    if (args.lua or args.file) and console.sent > 0 and not console.saw_output:
+        print()
+        print("The chunk produced no output at all.")
+        print("The usual cause is that the game was not launched with "
+              "-devmode,")
+        print("which the Lua console needs; without it an expression is "
+              "accepted")
+        print("and dropped without a word. Relaunch with:")
+        print("    .\tools\dev_deploy.ps1 -NoBuild -Launch")
 
     console.close()
     console.report_muted()
