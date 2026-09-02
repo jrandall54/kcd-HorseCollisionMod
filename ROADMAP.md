@@ -347,14 +347,18 @@ armor.
       `Uplift` has a hard ceiling that is a safety limit rather than an
       aesthetic one: the rider sits directly above the victim.
 
-      **Scale the impulse by the target's own mass.** `ent:GetPhysicalStats()`
-      returns `.mass`, and vanilla's own code applies impulses as
-      `AddImpulse(-1, pos, dir, mass * force)`, which makes the number a
-      velocity in meters per second rather than an arbitrary force. That is
-      why 50 does nothing and 600 throws a villager 27 meters: the same figure
-      means different things against different bodies. With mass in hand,
-      armor weight can modulate a velocity, and the ceiling on `Uplift` can be
-      expressed as one too.
+      **Stop using an impulse.** `Entity.SetVelocity` and `SetVelocityEx`
+      exist, enumerated from the running game, and they state the outcome in
+      meters per second instead of a force that has to be divided by a mass
+      the code never knew. That is the whole reason 50 does nothing and 600
+      throws a villager 27 meters: the same figure means different things
+      against different bodies.
+
+      With velocity set directly, `Knockback` becomes a speed a person can
+      picture, armor modulates that speed, and the ceiling on `Uplift` is
+      expressible as one too. `Entity.GetMass` is there for the cases where an
+      impulse is genuinely wanted, and vanilla's own code applies impulses as
+      `mass * force` for exactly this reason.
 - [ ] Striking a heavy target strips the horse's momentum rather than only
       its stamina, and shows on the horse. `kcd_horse_controllerdefs.xml`
       declares a `Rear` fragment, so a heavy impact can rear or check the

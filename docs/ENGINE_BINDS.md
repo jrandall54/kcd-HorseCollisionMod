@@ -818,3 +818,91 @@ they are not callable as they stand. What they establish is that the AI has
 combat behaviour written specifically for fighting a mounted target and for
 mounted guards, including a rear. The roadmap item about striking a heavy
 target rearing the horse has a named behaviour behind it.
+
+## The verified surface, enumerated from the running game
+
+The lists above were gathered by reading vanilla scripts, which finds only
+what vanilla happens to call. These were read out of the running game by
+walking each object and its metatable's `__index`, so they are what this build
+actually exposes.
+
+| Object | Entries |
+| --- | --- |
+| `Entity` | 290 |
+| `player` | 437 |
+| `player.actor` | 100 |
+| `player.soul` | 56 |
+| `player.human` | 43 |
+| `player.player` | 30 |
+| `player.inventory` | 20 |
+
+### Entity: physics and links
+
+    AddImpulse  SetVelocity  SetVelocityEx  GetVelocity  GetVelocityEx
+    GetMass  GetPhysicalStats  GetCenterOfMassPos
+    Physicalize  PhysicalizeSlot  PhysicalizeAttachment  DestroyPhysics
+    EnablePhysics  ResetPhysics  AwakePhysics  AwakeCharacterPhysics
+    ActivatePlayerPhysics  SetPhysicParams  SetCharacterPhysicParams
+    UpdateSlotPhysics  IgnorePhysicsUpdatesOnSlot  GetExplosionImpulse
+    GetBonePos  GetBoneVelocity  GetBoneAngularVelocity
+    CreateLink  GetLink  GetLinkName  GetLinkTarget  SetLinkTarget
+    CountLinks  RemoveLink  RemoveAllLinks
+
+**`SetVelocity` is the one that matters most here.** This mod throws victims
+with `AddImpulse` and a `Knockback` figure that has never meant anything: 50
+was measured as indistinguishable from applying nothing, and 600 threw a
+villager 27 meters. An impulse must be divided by mass to become motion, and
+the mass of a victim is not constant. Setting velocity directly states the
+outcome in meters per second, and `GetMass` is there for the cases where an
+impulse is genuinely wanted.
+
+The link API is complete rather than read-only, which is the opposite of what
+this project recorded.
+
+### actor, the hundred
+
+Beyond what this mod already uses:
+
+    StandUp  IsUnconscious  RequestKnockOut  RagDollize  Revive
+    ReviveToDefaults  SetMovementTarget  SetMovementRestriction
+    CameraShake  SetViewShake  SetViewLimits  SetLookIK
+    SetForcedLookDir  SetForcedLookObjectId  ClearForcedLookDir
+    GetArmor  GetMaxArmor  GetHealth  GetMaxHealth  SetHealth  SetMaxHealth
+    AddBlood  AddDirt  AddFrost  CleanDirt  WashDirtAndBlood  WashItems
+    EquipInventoryItem  UnequipInventoryItem  EquipWeaponPreset
+    EquipClothingPreset  GetInitialWeaponPreset  GetInitialClothingPreset
+    CanHorsePullDown  RequestHorsePullDown  CanStealthKnockout
+    RequestStealthKill  RequestMercyKill  CanHuntAttack  RequestHuntAttack
+    CanGrabCorpse  RequestGrabCorpse  IsCarryingCorpse
+    GetCloseColliderParts  GetClosestAttachment  GetHeadPos  GetHeadDir
+    VectorToLocal  GetAngles  SetAngles  IsFlying  DumpActorInfo
+    AttachVulnerabilityEffect  ResetVulnerabilityEffects  SetStats
+
+`RagDollize` is a direct call where this mod goes through
+`SetPhysicalizationProfile("ragdoll")`. `DumpActorInfo` is an unexplored
+diagnostic. `GetCloseColliderParts` bears on the detection footprint, and
+`VectorToLocal` on the maths that decides which side of the horse a victim is
+on.
+
+### human, the forty-three
+
+    DrawWeapon  HolsterWeapon  HolsterToInventory  DrawFromInventory
+    ToggleWeapon  ToggleWeaponSet  IsWeaponDrawn
+    AttachEntityToHand  DetachFromHand  PickUpItem  PlaceItem
+    Mount  ForceMount  Dismount  ForceDismount  GetHorse  GetHorseMountPoint
+    PlayAnim  StopAnim  SetAnimMotionParam
+    RequestDialog  PrepareForDialog  ReadyForDialog  InterruptDialog
+    IsInDialog  CanTalk  CanBeRobbed  RequestPickpocketing  IsPickpocketing
+    GrabOnLadder  IsOnLadder  CanUseLadder
+    StartBuilding  StartReading  StartBookTranscription  PrepareFood
+
+**`human:HolsterWeapon()`** is the clean answer to forcing an unarmed brawl.
+It needs no unregistered message and no behavior tree node.
+
+### player.player
+
+    GetPlayerHorse  SetPlayerHorse  ClearPlayerHorse  GetHorseId
+    CanMountHorse  HorseInspect  EnablePlayerHorseInventory
+    PushBack  IsSitting  IsLaying  SetWhistling  TryDrawTorch
+    EnableFastTravel  CanSleepAndReportProblem
+    RequestDogObjective  CancelDogObjective  HasRunningDogObjective  FeedDog
