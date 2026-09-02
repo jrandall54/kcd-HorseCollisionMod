@@ -423,13 +423,25 @@ rather than missing.
       sends `combat:hit`, which is what brings guards down on a rider, so the
       machinery is connected rather than absent.
 
-      The open question is whether the choice can be made here at all.
-      Vanilla decides fight
-      or flight from the archetype and its courage, which is why a villager
-      runs and a guard does not, and a random chance of retaliation may be
-      that system's to make rather than this mod's. Establish which before
-      building anything: the model is the thief a townsman chases down and
-      fights unaided.
+      The thief a townsman chases was proposed as the model and does not
+      serve as one. It is `EventSystem`, scheduled in C++ and spawned by
+      `Scripts/Script/Events_chase.lua` through `System.SpawnEntity` with a
+      shared soul and a behaviour patch, `man_flee` for the thief and
+      `man_chase` for his pursuer. Patches are behaviour tree nodes,
+      `AddPatch`, `CallBehaviorPatch` and `RemovePatch`, with no Lua bind and
+      no use from Lua anywhere in vanilla. That route is closed.
+
+      What the search did establish is that vanilla Lua never makes an NPC
+      hostile at all. Across the whole shipped script tree the only call
+      touching hostility is `soul:IsInCombatDanger()`, which reads. Nothing
+      sets an alignment, a faction relation or starts a fight. Hostility
+      comes from the crime and faction system exclusively, and this mod
+      already drives it.
+
+      So the mechanism is likely already present and the question is only
+      whether it reaches non-guards. Ride down three non-guards at trot, away
+      from town so no guard intervenes, and record for each whether they
+      attack, flee or walk away. Build nothing before that ride.
 - [ ] The collision bark fires while the victim is still falling or lying as
       a ragdoll, which is nobody's idea of speaking. It should land as they
       get up.
