@@ -11410,3 +11410,75 @@ a separate companion plugin, never a change to this mod.
 The build path recorded in the PDB is a `Cheat_Tool_Set/KCD/RE` directory,
 consistent with a reverse engineering toolset, and it is a third-party DLL
 injected into the game process.
+
+---
+
+## libKCD1 supplies the engine's own script bind catalog, and reopens two closed items
+
+`github.com/JerryYOJ/libKCD1`, GPLv3, is the source the KCSE binary was built
+from: the header counts match the shipped PDB exactly, 590 under
+`xgenaimodule`, 394 `databasemodule`, 102 `combatmodule`, 70 `rpgmodule`. It is
+cloned to `references/libKCD1`.
+
+The entry above judged that archive a map rather than source, on the grounds
+that the PDB carried only header paths. **That was wrong about the project as a
+whole.** The definitions are public, and 1,990 files of them.
+
+The author's own caveat applies throughout: this is reverse engineered against
+game version 1.9.8, offered as a hobby project, and "not every RE'd member is
+guaranteed correct." Nothing below is confirmed in game yet.
+
+### The catalog
+
+`include/**/C_ScriptBind*.h` describes **37 script binds carrying roughly 530
+Lua methods**, each with its signature and the address it registers from. These
+are the engine's own registrations for the scripting layer this mod runs on,
+which no shipped documentation covers.
+
+| bind | methods |
+|---|---|
+| `C_ScriptBindGameRules` | 115 |
+| `C_ScriptBindSoul` | 54 |
+| `C_ScriptBindPickableItem` | 37 |
+| `CScriptBindGame` | 36 |
+| `C_ScriptBindXGenAIModule` | 28 |
+| `C_ScriptBindQuest` | 27 |
+| `C_ScriptBindInventory`, `C_ScriptBindEntityModule` | 17 each |
+| `C_ScriptBindActor`, `C_FactionScriptBind` | 10 each |
+
+### A faction API exists in Lua
+
+`include/rpgmodule/C_FactionScriptBind.h` registers `GetId`, `GetName`,
+`GetLocationId`, `GetReputation`, `GetBaseReputation`,
+`AddReputation(sEnumName)`, `GetAngriness`, **`SetAngriness(float)`** and
+**`AddAngriness(float)`**.
+
+The finding recorded against the retaliation item stands as stated: no shipped
+script calls anything that makes an NPC hostile, and the only hostility call in
+the whole vanilla tree is the read `soul:IsInCombatDanger()`. **The inference
+drawn from it does not stand.** That a vanilla script never calls something is
+evidence about vanilla's habits, not about what the engine exposes, and
+searching scripts was the wrong instrument for the question asked.
+
+### Brain variables are settable from Lua
+
+`C_ScriptBindXGenAIModule` registers `GetBrainVariable` and
+**`SetBrainVariable`**, alongside `SendMessageToEntity`,
+`SendMessageToEntityData`, `GetEntityByWUID`, `ProduceSound`,
+`ProduceSoundWUID`, `SpawnPerceptibleVolume`, `RemoveDaycyclePatch` and
+`SetPlayerDogMode`.
+
+The chase behavior tree is driven by blackboard variables, `event_chase_state`,
+`event_chase_state_request` and `event_chase_type`. If those are brain
+variables in the sense this bind means, the tree is drivable from Lua without
+any of the patch nodes that were judged unreachable. That is unverified and is
+the first thing to test.
+
+`ProduceSound` bears on the silent-impact item, and `SetPlayerDogMode` on Mutt.
+
+### What this changes about KCSE itself
+
+Nothing. The extender is still a C++ plugin loader with no Lua, still needs an
+address library per build, and is still not something to ship against. The
+value was never the loader; it is the headers, and those are readable without
+installing anything into the game.

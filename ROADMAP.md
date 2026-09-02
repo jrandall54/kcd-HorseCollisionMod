@@ -427,21 +427,24 @@ rather than missing.
       serve as one. It is `EventSystem`, scheduled in C++ and spawned by
       `Scripts/Script/Events_chase.lua` through `System.SpawnEntity` with a
       shared soul and a behavior patch, `man_flee` for the thief and
-      `man_chase` for his pursuer. Patches are behavior tree nodes,
-      `AddPatch`, `CallBehaviorPatch` and `RemovePatch`, with no Lua bind and
-      no use from Lua anywhere in vanilla. That route is closed.
+      `man_chase` for his pursuer.
 
-      What the search did establish is that vanilla Lua never makes an NPC
-      hostile at all. Across the whole shipped script tree the only call
-      touching hostility is `soul:IsInCombatDanger()`, which reads. Nothing
-      sets an alignment, a faction relation or starts a fight. Hostility
-      comes from the crime and faction system exclusively, and this mod
-      already drives it.
+      No shipped script makes an NPC hostile: the only hostility call in the
+      whole vanilla tree is the read `soul:IsInCombatDanger()`. That says
+      what vanilla does, not what the engine exposes, and `references/libKCD1`
+      shows the engine exposes a good deal more.
+      `C_FactionScriptBind` registers `SetAngriness(float)`,
+      `AddAngriness(float)` and `AddReputation(sEnumName)`, and
+      `C_ScriptBindXGenAIModule` registers `SetBrainVariable`, which is how
+      the chase tree's own `event_chase_state` would be driven without the
+      patch nodes. All of it is reverse engineered and none of it is
+      confirmed in game.
 
-      So the mechanism is likely already present and the question is only
-      whether it reaches non-guards. Ride down three non-guards at trot, away
-      from town so no guard intervenes, and record for each whether they
-      attack, flee or walk away. Build nothing before that ride.
+      Order of work. First ride down three non-guards at trot, away from town
+      so no guard intervenes, and record whether each attacks, flees or walks
+      away: the crime hit may already do this and cost nothing. Only if it
+      does not, probe the binds above for existence from the console before
+      designing anything around them.
 - [ ] The collision bark fires while the victim is still falling or lying as
       a ragdoll, which is nobody's idea of speaking. It should land as they
       get up.
