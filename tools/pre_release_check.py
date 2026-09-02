@@ -11,7 +11,9 @@ Run before tagging. Exits non-zero on anything found.
 import io
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 import sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -403,67 +405,77 @@ def check_readme_settings():
 
 
 def check_generated_docs():
-    """The generated API reference against the source it documents.
+    """The generated API reference against what LDoc would write today.
 
     docs/api is LDoc output committed to the repository, so it goes stale
     silently: the source grows new functions and fields and the published
-    reference keeps describing the old surface. Comparing commit times catches
-    that, where comparing file times would fire on every checkout.
+    reference keeps describing the old surface.
 
-    Every Lua file under src/ is compared against every generated page, rather
-    than the entry point against the index. The mod is split across part files
-    and LDoc writes one page per module, so a check on a single pair either
-    misses a part file that changed or misses a page that was not rewritten.
+    This regenerates into a temporary directory and compares. Nothing is
+    inferred from timestamps.
+
+    Commit times were the previous approach and they do not work here. LDoc
+    writes a page per module and git records a commit only for the ones whose
+    bytes changed, so a page that is already correct keeps whatever commit last
+    altered it. A version bump rewrites an `@release` tag in every source file
+    and changes no generated page at all, since the version does not appear in
+    the output; the sources then carry a newer commit than every page and the
+    check fired on a repository whose reference was perfectly current, with no
+    way to satisfy it except touching files to no purpose.
+
+    That is the state this report's own closing line warns against. Comparing
+    the artifact against what would be generated answers the real question and
+    cannot produce that false positive.
+
+    When LDoc is not installed the check reports nothing rather than guessing.
+    It is a documentation generator, not a build dependency, and a developer
+    without it is not thereby making the reference stale.
     """
-    def tracked(prefix, suffix):
-        out = subprocess.run(["git", "ls-files", "--", prefix],
+    api = os.path.join(REPO_ROOT, "docs", "api")
+
+    if not os.path.isdir(api):
+        return []
+
+    # Resolved through shutil.which rather than named directly. On Windows
+    # LDoc installs as ldoc.bat, and subprocess does not apply PATHEXT to a
+    # bare name, so running "ldoc" raised OSError on the machine that has it
+    # installed and the check quietly passed. A check that never fires is
+    # worse than the one it replaced.
+    ldoc = shutil.which("ldoc")
+
+    if not ldoc:
+        return []
+
+    # Run exactly as a person runs it, writing into docs/api.
+    #
+    # Generating into a temporary directory to compare would be tidier, but
+    # `ldoc -d <dir> .` fails on this project where `ldoc .` succeeds, so the
+    # tidier form cannot be trusted to answer the question.
+    #
+    # The working tree is therefore touched, and deliberately: if the pages
+    # were out of date they are now correct and only need committing, which is
+    # what the instruction would have been anyway. If they were already correct
+    # nothing changes, because LDoc is deterministic.
+    run = subprocess.run([ldoc, "."], cwd=REPO_ROOT, capture_output=True,
+                         text=True)
+
+    if run.returncode != 0:
+        tail = (run.stderr or run.stdout).strip().splitlines()
+        return [("docs/api", 0, "ldoc failed",
+                 tail[-1] if tail else "ldoc exited non-zero")]
+
+    changed = subprocess.run(["git", "status", "--porcelain", "--", "docs/api"],
                              cwd=REPO_ROOT, capture_output=True,
                              text=True).stdout.split()
 
-        return [p for p in out if p.endswith(suffix)]
+    pages = [p for p in changed if p.endswith(".html")]
 
-    sources = tracked("src", ".lua")
-    generated = tracked("docs/api", ".html")
-
-    if not sources or not generated:
+    if not pages:
         return []
 
-    def committed_at(path):
-        out = subprocess.run(["git", "log", "-1", "--format=%ct", "--", path],
-                             cwd=REPO_ROOT, capture_output=True,
-                             text=True).stdout.strip()
-
-        return int(out) if out.isdigit() else None
-
-    source_times = [(p, committed_at(p)) for p in sources]
-    generated_times = [(p, committed_at(p)) for p in generated]
-
-    if any(t is None for _, t in source_times + generated_times):
-        return []
-
-    # The newest page on both sides, not the oldest generated one.
-    #
-    # LDoc writes a page per module and git records a commit only for the ones
-    # whose bytes changed. A page that is already correct is therefore left at
-    # whatever commit last altered it, which can be far older than a later
-    # source commit, and taking the oldest page made the check fire on a
-    # repository whose documentation was perfectly current. There was no way to
-    # satisfy it except by touching files to no purpose, which is the state
-    # this check's own message warns against: a check that is usually wrong
-    # teaches everyone to skip the whole report.
-    #
-    # Comparing the newest of each still catches the case that matters, a
-    # source edited and LDoc never run, because any edit that reaches the
-    # generated reference rewrites at least one page.
-    newest_source, source_at = max(source_times, key=lambda pair: pair[1])
-    oldest_page, generated_at = max(generated_times, key=lambda pair: pair[1])
-
-    if source_at > generated_at:
-        return [(oldest_page, 0, "stale",
-                 "%s has changed since this was generated; run ldoc ."
-                 % newest_source)]
-
-    return []
+    return [(pages[0], 0, "stale",
+             "%d generated page(s) were out of date and have been "
+             "regenerated; commit docs/api" % len(pages))]
 
 
 def check_file_description(version):

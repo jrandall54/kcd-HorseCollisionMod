@@ -50,7 +50,7 @@
 -- crime, which reads as a bug rather than a character. So the roll is not
 -- offered to her, and the reason is logged.
 --
--- @module Retaliation
+-- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
 -- @release 4.6.2
 --- The context option that makes a victim answer a hit with a fight.

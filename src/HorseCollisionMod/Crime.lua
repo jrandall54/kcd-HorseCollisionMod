@@ -18,6 +18,31 @@
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
 -- @release 4.6.2
+-- The engine's `combatAttackKind`, transcribed from
+-- `Libs/AI/TypeDefinitions.xml`. Sequential, and the type definition's own
+-- comment says the melee entries are ordered by increasing violence.
+--
+-- `Unarmed` is what a shove from horseback is charged as: the mildest melee
+-- kind, so a provoked scuffle is a scuffle rather than an armed assault.
+--
+-- It lives here rather than in `Enums.lua` beside the other engine enums for
+-- a blunt reason: a third annotated table in that module makes LDoc fail
+-- outright with "'class' cannot have multiple values", whatever the tags on
+-- it say. Here it sits beside its only consumer, which is the better place
+-- for it anyway. Documented as an ordinary comment for the same reason the
+-- entry point does that for the tables LDoc misreads.
+--
+-- The full set is kept rather than only the value used, so the contract
+-- stays verifiable against the engine.
+HorseCollisionMod.CombatAttackKind = {
+	None = 0,
+	Missile = 1,
+	StealthAction = 2,
+	Unarmed = 3,
+	Melee = 4,
+	DogBite = 5
+}
+
 --- Sends the victim a real combat hit, attributed to the player.
 --
 -- `hitReaction` is a physical event, consumed by `sb_switch_hitreactions.xml`,
