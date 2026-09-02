@@ -210,32 +210,30 @@ and both axes of the footprint were each cleared against logged sessions.
 
 ### Parked
 
-- [ ] Drop the shipped armor weight table and read the game's tables directly.
-      The `Database` bind exposes them: `pickable_item` carries `item_id` and
-      `weight`, `armor` carries `item_id`, `smash_def` and `armor_type_id`, and
-      the class an item reports joins straight to `pickable_item.item_id`.
-      Membership of `armor` is what decides worn rather than carried. This was
-      built once and verified in game against a live inventory, 18 items matched
-      with none missed and 796 armor pieces indexed, and it removed
-      `build_item_weights.py`, its build step and the shipped file, cutting the
-      download by about a third. The figures are in the testing diary, which
-      records them as a measurement of that build rather than a claim about the
-      current one. It was then orphaned when `main` was
-      reset to 4.0.0 and is not in any branch; the implementation is in commit
-      `093ae77`, reachable only by SHA. Rebuild it forward onto
-      `HorseCollisionMod/Armor.lua` rather than cherry-picking, since the file
-      layout it was written against no longer exists.
+- [x] The shipped armor weight table is gone. `Armor.lua` reads the game's
+      own tables through the `Database` bind: `pickable_item` carries
+      `item_id` and `weight`, `armor` carries `item_id`, `smash_def` and
+      `armor_type_id`, and the class an item reports joins straight to
+      `pickable_item.item_id`. Membership of `armor` decides worn rather
+      than carried. The index builds 796 armor pieces in game, three victims
+      ridden down before and after the change reported identical weights,
+      and the download fell from 71,925 to 52,547 bytes.
+      `build_item_weights.py`, its build step and the shipped Startup script
+      are removed.
 
-- [ ] Close the gap between a trot fall clip ending and the engine beginning
-      the get-up. Roughly a second in `MotionIdle` with nothing happening and
-      nothing asked for, and the only part of the lie-down this mod can
-      shorten. The rest of it is `BlendRagdoll`, which is the engine's get-up
-      blend: 2,570 ms for men and 5,100 ms for women, the same on the gallop
-      path where no data of this mod's is involved, and unmoved by `ExitTime`,
-      `Sleep`, `g_ragdollPollTime` or `ca_DeathBlendTime`. Tuning
-      `FALL_SETTLE_AT` per direction, which this list previously proposed, is
-      not the fix: it decides when the body goes limp, not how long it stays
-      down, and the lie-down is the same length at every direction.
+- [ ] Shorten the wait between a trot victim going limp and standing up.
+      Nothing reachable does. Measured from the handover rather than from
+      the end of the clip it is a fixed 1,457 ms, the same for both
+      character sets, and unmoved by `ExitTime`, `Sleep`, `Stiffness`,
+      `p_group_damping`, `g_ragdollPollTime` and `ca_DeathBlendTime`. The
+      stand-up that follows runs 2,570 ms for men and 5,100 ms for women,
+      and the gallop tier reaches both figures through `actor:Fall` without
+      touching any data this mod ships. What governs it is a terminator on
+      vanilla's `BlendRagdoll` option, which resolves through
+      `ActionController`; this mod redirects only `AnimDatabase3P`,
+      deliberately, so an override of it is never read.
+      `g_hitDeathReactions_disableRagdoll`, which disables switching to
+      ragdoll at the end of animations, is the one lever in reach not tried.
 
 - [x] A polearm guard's get-up plays wrong: he turns roughly a hundred and
       eighty degrees near the end of it and then swings back. Measured, and it
@@ -281,12 +279,16 @@ armor.
       by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
       and the split between what the engine owns and what the mod owns does not hold as written
       at the top of this phase.
-- [ ] Read an entity's carried items and their weights, generic over the entity so Phase 3
-      barding uses the same call on the horse. `inventory:GetInventoryTable()` returns the
-      item WUIDs and `ItemManager.GetItem(wuid)` returns `class`, which joins to the item
-      tables for weight. No bind reports which items are equipped, but an NPC carries only
-      what it wears plus a few trinkets, so filtering the whole inventory to armor classes
-      is equivalent for a target.
+- [x] Read an entity's carried items and their weights, generic over the
+      entity so Phase 3 barding uses the same call on the horse.
+      `inventory:GetInventoryTable()` returns the item WUIDs and
+      `ItemManager.GetItem(wuid)` returns `class`, a GUID that joins to
+      `pickable_item.item_id`. `ItemManager.GetItemUIName(class)` turns that
+      into a readable name. No bind reports which items are equipped, but an
+      NPC carries only what it wears plus a few trinkets, so filtering the
+      inventory to the classes in the `armor` table is equivalent for a
+      target. `human:GetItemInHand(hand)` reports a held weapon, and only
+      while it is drawn.
 - [ ] Unarmored targets take proportionally heavier knockback and armored targets are moved
       less, through one multiplier on `Ragdoll`'s `impulseScale`. A naked target reaches 1.50
       and a target in mail 0.41, against 1.00 at `ArmorReferenceWeight`. Reopened: the
@@ -354,8 +356,10 @@ rather than missing.
 - [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
       a guard down registers no bounty, but trampling a villager to death brought the
       guards down on the rider and carried a jail sentence, with no crime code in the mod.
-      So the threshold is the outcome rather than the hit, and non-lethal trampling being
-      free is the part still open.
+      The threshold was the outcome rather than the hit, and non-lethal
+      trampling being free is closed: 4.3.0 sends a real, player-attributed
+      `combat:hit`, so riding someone down at trot or gallop is charged as
+      a brawl whether or not they die. `CollisionIsCrime` turns it off.
 
 The `hitReaction` message the mod already sends is the hook for both, and vanilla
 distinguishes light from normal collisions through the `KOLIZE_S_HRACEM` and
