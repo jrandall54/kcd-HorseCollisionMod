@@ -12703,3 +12703,54 @@ creates one on the path where the victim declines to fight.
 That is a concrete mechanical reason a shop guard leaves no lasting grievance
 where a merchant or a villager, both `civilian` and both `SoulCrimeRoleId` 1,
 does.
+
+## Resolution: three effects stacked, and only one of them lasts
+
+Jail was tested on the assumption it cleared something a fine does not. It
+does not. Measured before seven days in jail and after, with a further punch
+in between:
+
+| | before jail | after jail and another punch |
+|---|---|---|
+| `rat_merchant_shop3` | **0.2314** | **0.2314** |
+| three controls | 0.4259 | 0.4259 |
+
+Identical. Jail moved nothing, and the victim was already above the 0.2
+threshold before serving it. He traded normally afterwards, and would have
+traded beforehand.
+
+**The second punch cost nothing.** He was already at the floor for that
+reputation change, which is the `reputation_cap` column: `hit_melee_*` pushes
+a person down only so far, and repeat offenses against the same person do not
+compound.
+
+### What was actually happening
+
+Three effects, mistaken for one another repeatedly across the session:
+
+1. **A personal penalty**, about 0.22 below the victim's neighbors. Capped,
+   does not compound, and did not decay over the spans measured.
+2. **A large transient depression of the whole town's standing while a crime
+   is unsettled.** This is what took a 0.54 baseline to a 0.23 mean and
+   dragged NPCs the rider never touched down with it, `rat_shop_guard_general`
+   from about 0.54 to 0.2488 among them.
+3. **Recovery once the crime settles**, after which everyone returned to a
+   shared 0.4259.
+
+The victim fled because 1 and 2 together put him under 0.2. When 2 lifted he
+cleared the threshold with the personal penalty still in place, and dealt with
+the player again.
+
+**Paying a fine does work.** It is not instant, and every observation of a
+victim fleeing after a fine was made inside the window where the unsettled
+crime was still depressing the town. Jail passed seven days, which guaranteed
+the window had closed; a fine and some time reaches the same place. There is
+no missing mechanism, and the earlier suspicion of a design oversight is
+withdrawn.
+
+### What this cost
+
+Most of a session, because the absolute value was read as if it described the
+victim when it mostly described the player's current standing with the town.
+The gap against untouched neighbors was the correct instrument throughout and
+was only adopted late.
