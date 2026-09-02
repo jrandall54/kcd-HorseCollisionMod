@@ -13180,3 +13180,63 @@ applicable, so this is not simply a matter of the player being on foot. It may
 still depend on range or facing, which `wh_cs_HorsePullDownAngle` and its two
 companions govern, and that is untested. `Game.GetWantedLevel` does not exist;
 only the setter does.
+
+### The entity link does not suppress the assault, and the test was sound
+
+Every human within 35 m was given a link named `suppressAssaultReactions`
+pointing at the player, 33 of them, and the rider then rode a civilian down at
+trot in a public place. **A crime was reported.**
+
+The result was checked for the obvious confound. Seventeen further humans had
+streamed in since the links were placed and carried none, so the victim might
+have been one of those. He was not: the mod's telemetry names `rat_man97`, and
+read back afterwards he carried three links with
+`GetLinkTarget("suppressAssaultReactions")` returning the player.
+
+So a link created through `Entity.CreateLink` is **not** the object
+`checkAssaultSuppression` walks. Two explanations fit and neither is tested:
+the behavior tree keeps its own link store, or the tree's links carry `Data`
+that this one lacks. `questUtils.xml` sets
+`$suppressAssaultReactions.expiration` on the link through a
+`LinkDataExpression`, and the behavior tree's `AddLink` has a `Data` attribute
+where `CreateLink(name, targetId)` has no equivalent, so a dataless link may
+be read as expired or ignored.
+
+The item closes again, but on evidence this time rather than on a
+misreading of which headers describe what. All 23 test links were removed.
+
+### `SetVelocity` is the knockback mechanism this mod has wanted
+
+On a living, animation-driven NPC, `SetVelocity({0, 0, 6})` lifted them
+**0.86 m** within 700 ms before they came down. That alone is notable: this
+mod's own notes record that physics impulses are ignored because actors are
+animation-driven, and a velocity is evidently not.
+
+On a ragdolled victim, 6 m/s away from the rider:
+
+| | travelled |
+| --- | --- |
+| t+900ms | **4.43 m** |
+| t+2500ms | 5.57 m |
+| t+5000ms | 5.53 m, at rest |
+
+Six meters per second carried a body five and a half meters and the damping
+already in the mod brought it to rest. Against `Knockback = 50` being
+indistinguishable from applying nothing and `600` throwing a villager 27
+meters, that is a number a person can choose deliberately.
+
+The victim was returned to the `alive` profile and replanned.
+
+### `best_friend` repairs a relationship
+
+`soul:ModifyPlayerReputation('best_friend', false)` moved a bystander from
+0.5048 to **0.7826**, a delta of +0.2778.
+
+The table row says the change is +2, so the applied figure is normalized
+rather than added raw, the same way `payToTalk` reads +0.25 in the table and
+applied +0.1389. What matters is the direction, the size relative to a punch's
+-0.2, and that this row carries `can_change_hostility` true, which is what a
+beaten victim needs and what `payToTalk` cannot give.
+
+That NPC was left 0.278 better disposed than found, which is a benefit rather
+than damage and was not reverted.
