@@ -1,4 +1,4 @@
-# Builds the mod and installs it straight into the game, skipping Vortex.
+﻿# Builds the mod and installs it straight into the game, skipping Vortex.
 #
 # Vortex's deploy step does one thing that matters here: it copies a pak and a
 # manifest into Mods\<name>\ and lists that folder in Mods\mod_order.txt. None
@@ -278,6 +278,22 @@ if ($SetPlayEnvironment) {
 # Everything is moved rather than deleted, and -RestoreDevEnvironment puts it
 # all back.
 if ($PrepareShippingTest) {
+	# Nothing is moved while the game holds a file open.
+	#
+	# The pak is the one that matters: parking it fails with "the process
+	# cannot access the file", after the loose files have already moved and
+	# before the manifest line that would let the restore find it again. The
+	# result is a half-parked install whose restore cannot put the mod back,
+	# and that is how a mod folder was lost rather than parked.
+	#
+	# Checked before anything moves, so the install is either untouched or
+	# fully parked.
+	if (Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue) {
+		Write-Host "[DEPLOY] the game is running, so its pak cannot be parked." -ForegroundColor Red
+		Write-Host "         Quit the game and run this again. Nothing was moved."
+		exit 1
+	}
+
 	$park = Join-Path $gameRoot $parkedDir
 	New-Item -ItemType Directory -Force $park | Out-Null
 
@@ -371,6 +387,14 @@ if ($PrepareShippingTest) {
 }
 
 if ($RestoreDevEnvironment) {
+	# Same reason as the park above: the pak cannot be moved back into place
+	# while the game holds the copy it is running from.
+	if (Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue) {
+		Write-Host "[DEPLOY] the game is running, so the pak cannot be restored." -ForegroundColor Red
+		Write-Host "         Quit the game and run this again. Nothing was moved."
+		exit 1
+	}
+
 	$park = Join-Path $gameRoot $parkedDir
 
 	if (-not (Test-Path $park)) {

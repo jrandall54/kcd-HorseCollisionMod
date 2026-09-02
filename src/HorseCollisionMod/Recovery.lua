@@ -22,8 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.6.1
-
+-- @release 4.6.2
 --- Stops the animation driving a victim's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a

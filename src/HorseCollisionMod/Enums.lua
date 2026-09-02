@@ -7,8 +7,7 @@
 --
 -- @module HorseCollisionMod.Enums
 -- @author jrandall54
--- @release 4.6.1
-
+-- @release 4.6.2
 --- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
 --
 -- The values are deliberately non-sequential; they mirror a C++ enum. The

@@ -17,8 +17,7 @@
 --
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
--- @release 4.6.1
-
+-- @release 4.6.2
 --- Sends the victim a real combat hit, attributed to the player.
 --
 -- `hitReaction` is a physical event, consumed by `sb_switch_hitreactions.xml`,

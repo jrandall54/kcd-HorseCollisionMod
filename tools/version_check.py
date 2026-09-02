@@ -215,8 +215,26 @@ def main():
     tags = released_versions()
     last_tag, last_version = tags[0] if tags else (None, (0, 0, 0))
     blocks = dict(changelog_releases())
-    dropped = dropped_settings(last_tag)
     errors = []
+
+    if release:
+        # The version being built is compared against the newest tag *older
+        # than it*, not against the newest tag outright.
+        #
+        # Those are the same thing while a version is being prepared, and
+        # different the moment it is tagged. Comparing against the newest tag
+        # made a build of the version that had just been tagged fail against
+        # itself: 4.6.0 tagged, expected 4.7.0, "version and changelog
+        # disagree". Every deploy after a merge hit that until the next bump,
+        # and the workaround was to skip the build entirely.
+        #
+        # Rebuilding a tagged version is an ordinary thing to do. It is what
+        # installing the current build into the game does.
+        target = tuple(int(p) for p in release.split(".")[:3])
+        older = [t for t in tags if t[1] < target]
+        last_tag, last_version = older[0] if older else (None, (0, 0, 0))
+
+    dropped = dropped_settings(last_tag)
 
     if release:
         if release not in blocks:
