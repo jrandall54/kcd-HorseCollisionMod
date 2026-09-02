@@ -12415,3 +12415,55 @@ Whether a zeroed relationship recovers over time is a question about Kingdom
 Come rather than about this mod, and remains unmeasured. `rat_refugee_Radan`
 read `-0.0000` before a save reload and 0.7222 after it, which confirms only
 that the value is save state.
+
+## The relationship penalty does not decay, and the gap is the way to measure it
+
+Tracked across several in-game days after the vanilla fist fight:
+
+| | after 1 day | after several more |
+|---|---|---|
+| `rat_merchant_shop3` | -0.1608 | -0.1606 |
+| `rat_merchant_shop2` control | 0.3948 | 0.3949 |
+| `rat_bedrich` control | 0.3948 | 0.3949 |
+| **gap** | **0.5556** | **0.5556** |
+
+**The absolute value is not the measurement.** Between two readings minutes
+apart, the victim and both controls all moved by exactly 0.11, which is a
+global shift in the player's standing rather than anything about the victim.
+Read the gap between the victim and an untouched neighbor instead, and it has
+not moved at all.
+
+So the personal penalty for beating a man is **fixed at 0.5556 and does not
+decay over days**. Whether it decays over longer spans is unmeasured, but a
+value that has not moved a thousandth across several days is not on a fast
+curve.
+
+The global component does move, which implies the relationship is something
+like a town-wide standing plus a fixed personal penalty. If so, raising
+standing in the town lifts the victim's absolute value even while the penalty
+stands, and could carry him back above whatever threshold makes him flee.
+Untested.
+
+`AddReputation` and `soul:ModifyPlayerReputation` both take an enum name
+rather than a number. The `reputation_change` table exists with columns
+`reputation_change_id, name, change, reputation_change_target_id,
+can_change_hostility, reputation_cap, reputation_notification_id`, but its
+rows do not come back through the `Database` bind, the same limitation seen
+with `angriness_enum`. The names recoverable from behavior data are all
+penalties: `hit_melee_weak`, `hit_melee_medium`, `hit_melee_strong`,
+`hit_melee_brutal`, `death`, `pickpocket_fail`, `crime_theft_individual` and
+`surrender_step`.
+
+### Testing across game time is expensive and should be avoided
+
+Hardcore mode makes passing days costly: the player has to eat and sleep, and
+the skip runs at `wh_pl_SkipTimeMaxWorldTimeRatio` 360, one real second per
+six game minutes, so a day costs about four real minutes of watching a bar.
+
+Two mitigations, both applied. `soul:SetState` sets the player's `hunger` and
+`exhaust` to 100 directly, which removes the survival errand from any test
+needing time. Raising `wh_pl_SkipTimeMaxWorldTimeRatio` shortens the skip
+proportionally. Both are console values and a save reload wipes them.
+
+Note that `stamina` reads 150 on the player rather than 100, so setting it to
+100 lowers it.
