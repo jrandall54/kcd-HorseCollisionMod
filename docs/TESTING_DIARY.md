@@ -11197,3 +11197,50 @@ layer, and further values are not worth riding.
 The one place the layer demonstrably mattered was the choice between writing it
 and omitting it, which is what stopped victims ending up inside wagons. That
 comparison was against no layer at all rather than between values.
+
+## Damping the ragdoll stops the sliding, and makes distance mean something
+
+Bodies thrown by a collision slid for metres after landing, which has been true
+since 1.0 and reads in game as the ground being ice.
+
+It also made every measurement of throw distance untrustworthy, because what
+was being measured was the launch plus the slide, and the slide depends on the
+surface rather than on the impact.
+
+### The call
+
+`entity:SetPhysicParams(PHYSICPARAM_SIMULATION, params)` with `damping` and
+`min_energy`, which are fields of `pe_simulation_params`. Vanilla uses the same
+function for its own entities, with `PHYSICPARAM_COLLISION_CLASS` in
+`GeomEntity.lua`, and the constants come out of the binary's own registration
+table: `PHYSICPARAM_SIMULATION` is 5, `ARTICULATED` 6, `ROPE` 8, and the
+collision class block is 21.
+
+Applied after the impulse rather than with it, so a throw is not damped before
+it happens. Accepted on every victim, `ok=true` across twelve impacts.
+
+### What it changes
+
+| | n | mean landing | range |
+|---|---|---|---|
+| undamped | 9 | 6.19 m | 3.05 to 9.08 |
+| damped, 3.0 and 0.5 | 12 | 4.72 m | 2.40 to 6.31 |
+
+The clearer figure is the ground covered after landing, between the samples at
+500 ms and 3,000 ms, which is slide and nothing else:
+
+**2.77 m undamped against 1.09 m damped, a reduction of sixty per cent.**
+
+The spread narrows with it, from six metres to under four, so an impact is now
+far more repeatable than it was.
+
+### What it does not change
+
+Armor still does not separate: a multiplier of 1.26 averaged 5.05 m against
+4.79 m for mail. That is expected rather than disappointing, because the
+shipped `Knockback` of 50 was already measured as indistinguishable from
+applying no impulse at all. A body of 120 to 160 kilograms takes about 0.6
+metres per second from an impulse of that size.
+
+The value of the damping here is that it removes the slide from any future
+measurement of that, which was drowning the armor signal in noise.

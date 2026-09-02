@@ -143,6 +143,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   reaction is over, so they approach and re-align to whatever they were using
 -- @field LogTelemetry write diagnostics to kcd.log
 -- @field TraceRecovery time each animation state during a recovery
+-- @field ImpulseDelayMs how long to wait before the ragdoll impulse
+-- @field LateralImpulse how much of the impulse pushes across the
+--   horse's line rather than along it
+-- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
+--   engine's own value
+-- @field RagdollMinEnergy the energy below which a body is put to rest,
+--   0 for the engine's own value
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @table Config
 HorseCollisionMod.Config = {
@@ -258,7 +265,42 @@ HorseCollisionMod.Config = {
 	-- logs the sequence. Answers where a recovery spends its seconds, which
 	-- a single duration cannot. Off by default: one line per impact and a
 	-- poll running for the length of each recovery.
-	TraceRecovery            = false
+	TraceRecovery            = false,
+
+	-- How long to wait after the ragdoll before applying the impulse, in
+	-- milliseconds.
+	--
+	-- An impulse applied to a body that has not physicalized yet is
+	-- ignored silently, and the same magnitude has been measured throwing
+	-- one victim four meters and another none at all, which is the
+	-- signature of a window missed rather than of a force too small.
+	ImpulseDelayMs           = 50,
+
+	-- How much of the impulse pushes a victim sideways, against the
+	-- horse's line of travel. 0 is straight along it, 1 is as much across
+	-- as along.
+	--
+	-- A body thrown along the horse's line does not clear it. At a gallop
+	-- the horse travels near ten meters a second and the impulse moves a
+	-- 120 kilogram body at a fraction of that, so the horse overtakes its
+	-- own victim and tramples them a second time. Pushing them across the
+	-- line clears it regardless of how hard they are thrown.
+	--
+	-- The side is whichever one the victim is already on, so a glancing
+	-- contact carries them further the way they were already going.
+	LateralImpulse           = 0.0,
+
+	-- How quickly a ragdolled victim sheds speed, and how readily it comes
+	-- to rest. Both 0 leave the engine's own values alone.
+	--
+	-- A thrown body slides, and a slide is most of the distance an impact
+	-- appears to produce. That makes distance a poor reading of force and
+	-- it makes the ground feel like ice. `damping` bleeds velocity off the
+	-- body and `min_energy` is the threshold below which physics puts it to
+	-- rest, both fields of `pe_simulation_params`, reached through
+	-- `entity:SetPhysicParams(PHYSICPARAM_SIMULATION, ...)`.
+	RagdollDamping           = 3.0,
+	RagdollMinEnergy         = 0.5
 }
 
 
