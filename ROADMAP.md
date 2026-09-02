@@ -221,7 +221,9 @@ and both axes of the footprint were each cleared against logged sessions.
       `pickable_item.item_id`. Membership of `armor` decides worn rather
       than carried. The index builds 796 armor pieces in game, three victims
       ridden down before and after the change reported identical weights,
-      and the download fell from 71,925 to 52,547 bytes.
+      and the download fell by rather more than a quarter. The figures are
+      in the testing diary, which records them as a measurement of that
+      build rather than as a claim about the current one.
       `build_item_weights.py`, its build step and the shipped Startup script
       are removed.
 
