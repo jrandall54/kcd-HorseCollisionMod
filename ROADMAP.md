@@ -237,12 +237,13 @@ and both axes of the footprint were each cleared against logged sessions.
       not the fix: it decides when the body goes limp, not how long it stays
       down, and the lie-down is the same length at every direction.
 
-- [ ] A polearm guard's get-up plays wrong. The body turns fully sideways while
-      straightening and passes through the floor before settling. Observed twice
-      on the same guard, and not seen on villagers, women or unarmed guards, so
-      a held polearm occupying an animation scope is the first thing to check.
-      Unrelated to how a victim rejoins their activity, and parked rather than
-      folded into that work.
+- [x] A polearm guard's get-up plays wrong: he turns roughly a hundred and
+      eighty degrees near the end of it and then swings back. Measured, and it
+      is not this mod's. The turn tracks a drawn halberd exactly, at 114 to 178
+      degrees against 2 to 6 for anyone else, and the gallop tier reproduces it
+      at the same magnitudes through `actor:Fall`, which plays no clip this mod
+      ships. The get-up carries no weapon tag to vary, four options per
+      direction and nothing else, so there is nothing here to change.
 
 ## Phase 2: Mass, armor and momentum
 

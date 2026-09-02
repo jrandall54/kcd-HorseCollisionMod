@@ -142,6 +142,7 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- upright and still have no plan, and only the rebuild gives them one.
 	if prefix == "hcm_fall_" then
 		self:TraceRecovery(npc, action)
+		self:WatchTurn(npc, action)
 
 		local generation = self.TimerTick
 
@@ -181,6 +182,11 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale)
 	end)
 
 	self:ImpulseVictim(npc, velocity, impulseScale)
+
+	-- The control for the same reading taken on the fall path. This tier uses
+	-- actor:Fall and touches no animation data of this mod's, so a turn seen
+	-- here belongs to the game rather than to the reaction.
+	self:WatchTurn(npc, "engine-ragdoll")
 
 	-- Traced as the control for the fall path. This tier hands the body to
 	-- physics through actor:Fall with no fragment of this mod's involved, so

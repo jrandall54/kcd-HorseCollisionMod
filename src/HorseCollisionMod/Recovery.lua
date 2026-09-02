@@ -206,6 +206,136 @@ function HorseCollisionMod:TraceRecovery(npc, action)
 	poll()
 end
 
+--- Measures how far a victim has turned once the whole recovery is over.
+--
+-- A guard carrying a polearm was reported finishing his get-up facing roughly
+-- the opposite way, where other victims do not. The get-up options carry no
+-- weapon tag at all, four per direction and nothing else, so whatever is
+-- happening is not a different clip being chosen. That leaves the victim's
+-- orientation, which is what this measures.
+--
+-- Sampled at the impact and again well after the stand-up has finished, so it
+-- covers the whole sequence rather than a phase of it. The item in hand is
+-- recorded alongside, because the whole question is whether what a victim is
+-- carrying changes the result.
+--
+-- Diagnostic, and off unless `TraceRecovery` is set.
+--
+-- @tparam table npc victim entity
+-- @tparam string action the reaction that played
+function HorseCollisionMod:WatchTurn(npc, action)
+	if not self.Config.TraceRecovery then
+		return
+	end
+
+	local function facing()
+		local ok, dir = pcall(function()
+			return npc:GetDirectionVector(1)
+		end)
+
+		if not ok or not dir then
+			return nil
+		end
+
+		return { x = dir.x, y = dir.y }
+	end
+
+	-- Both hands, because a shouldered polearm is not in the main one, and the
+	-- whole inventory as a fallback, because a weapon that is neither drawn nor
+	-- held still reports nothing at all. Named by class rather than by WUID,
+	-- which is what the hand calls return and is not readable.
+	local held = {}
+
+	pcall(function()
+		for hand = 0, 1 do
+			local wuid = npc.human and npc.human:GetItemInHand(hand)
+			local entry = wuid and ItemManager.GetItem(wuid)
+
+			if entry and entry.class then
+				held[#held + 1] = "hand" .. hand .. "=" .. tostring(entry.class)
+			end
+		end
+	end)
+
+	pcall(function()
+		local drawn = npc.human and npc.human:IsWeaponDrawn()
+		held[#held + 1] = "drawn=" .. tostring(drawn)
+	end)
+
+	pcall(function()
+		local carried = {}
+
+		for _, wuid in pairs(npc.inventory:GetInventoryTable() or {}) do
+			local entry = ItemManager.GetItem(wuid)
+
+			if entry and entry.class then
+				local name = tostring(entry.class)
+
+				if string.find(name, "hlbrd") or string.find(name, "halberd")
+						or string.find(name, "spear") or string.find(name, "pole")
+						or string.find(name, "pike") or string.find(name, "axe") then
+					carried[#carried + 1] = name
+				end
+			end
+		end
+
+		if #carried > 0 then
+			held[#held + 1] = "polearm=" .. table.concat(carried, "/")
+		end
+	end)
+
+	held = table.concat(held, " ")
+
+	if held == "" then
+		held = "none"
+	end
+
+	local before = facing()
+
+	if not before then
+		return
+	end
+
+	local generation = self.TimerTick
+
+	local function report(at)
+		local after = facing()
+
+		if not after then
+			return
+		end
+
+		-- The angle between two unit headings, from their dot product. Clamped
+		-- because drift can push it outside the domain of acos and return nan
+		-- for two identical headings.
+		local dot = (before.x * after.x) + (before.y * after.y)
+
+		if dot > 1 then
+			dot = 1
+		elseif dot < -1 then
+			dot = -1
+		end
+
+		self:Log("Turn " .. tostring(npc:GetName())
+				.. " action=" .. tostring(action)
+				.. " at=" .. tostring(at) .. "ms"
+				.. " turned=" .. string.format("%.0f", math.deg(math.acos(dot)))
+				.. "deg " .. held)
+	end
+
+	-- Twice, because the turn was described as happening near the end of the
+	-- get-up and then being undone. One late sample cannot tell a victim who
+	-- turned and came back from one who never turned.
+	for _, at in pairs({ 5000, 9000 }) do
+		Script.SetTimer(at, function()
+			if generation == self.TimerTick then
+				report(at)
+			end
+		end)
+	end
+end
+
+
 --- Replans a victim only when the game has not recovered them itself.
 --
 -- The replan restarts the victim's daycycle, which is the only way a beggar or

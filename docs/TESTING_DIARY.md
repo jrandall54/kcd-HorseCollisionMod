@@ -11060,3 +11060,52 @@ rides spent testing two of them were spent on a reading of their names.
 `g_hitDeathReactions_disableRagdoll`, "disables switching to ragdoll at the end
 of animations", is the only one in that family that touches this behavior at
 all, and it has not been tried.
+
+## The polearm get-up is the game's, not the reaction's
+
+A guard carrying a halberd was reported turning roughly a hundred and eighty
+degrees near the end of his get-up and then swinging back, where other victims
+do not.
+
+### The weapon, named
+
+`ItemManager.GetItem(wuid).class` returns a GUID rather than a readable name,
+which is why an attempt to match class names against "halberd" or "spear"
+matched nothing. `ItemManager.GetItemUIName(class)` resolves it:
+`ui_nm_halberd`. The same GUID joins to `pickable_item.item_id` in the
+`Database` tables, which is the route `Armor.lua` already uses.
+
+`human:GetItemInHand(hand)` returns nothing unless the weapon is drawn, so an
+NPC carrying a halberd sheathed reports an empty hand.
+
+### The correlation, measured
+
+Facing at the impact against facing after the get-up, in degrees:
+
+| Victim | Weapon | Trot |
+|---|---|---|
+| `rat_guard2` | halberd, drawn | 156, 177 |
+| `rat_guard4` | halberd, drawn | 178, 114 |
+| `rat_guard22` | none drawn | 5, 5 |
+| `villageGuard` | none drawn | 6, 2 |
+
+Exact: every large turn is a drawn halberd and every small one is not.
+
+### It is not the mod's reaction
+
+The gallop tier hands the body over with `actor:Fall` and plays no clip of this
+mod's at all. The same guards, ridden down at gallop:
+
+| Victim | 5,000 ms | 9,000 ms |
+|---|---|---|
+| `rat_guard4` | 171 | 31 |
+| `rat_guard2` | 122 | 53 |
+| `rat_guard2` | 154 | 154 |
+
+The same magnitudes as the fall path. The turn belongs to what the game does
+when a drawn polearm carrier stands up from a ragdoll, and no animation data
+this mod ships is involved in it.
+
+Nothing here is fixable from the fall fragment, and the get-up options carry no
+weapon tag to vary: four per direction for an NPC, four more for the player,
+and nothing else.
