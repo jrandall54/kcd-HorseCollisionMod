@@ -12625,3 +12625,41 @@ through the `Database` bind, so the row for `payToTalk` could not be read.
 Every measurement above was taken on foot with the mod uninvolved. What the
 mod contributes is a victim willing to fight; the fists and the consequences
 of them are the player's, and a player could reach all of it in vanilla.
+
+### Correction: both merchant runs were a single punch
+
+The entry above attributed the merchant's `-0.0000` to being "beaten to a
+yield" and the guard's 0.2548 to "one punch". **That is wrong.** The rider
+punched the merchant once, exactly as he punched the guard once. Both were
+followed by surrendering and paying the fine, and the merchant run began from
+a fresh reload with the victim and both controls at 0.5378.
+
+So the corrected comparison is:
+
+| victim | role | one punch, fine paid | drop |
+|---|---|---|---|
+| `rat_shop_guard_butcher` | security | 0.5378 to **0.2548** | 0.283 |
+| `rat_merchant_shop3` | merchant | 0.5378 to **-0.0000** | 0.538 |
+
+The same action cost the merchant roughly twice what it cost the guard, and
+took him under the 0.2 threshold while the guard stayed above it. **Why is not
+established.**
+
+Social class does not explain it. `Scripts/Script/SocialClass.lua` carries
+`persuadeToTalkWithLowReputationPriceMultiplier` per class, which prices the
+remedy, but no multiplier on the penalty itself.
+
+Candidates, none tested:
+
+- the blow landed at a different `hit_melee_*` strength, which
+  `sb_switch_hitreactions.xml` selects from `hit.strength` at thresholds of
+  3, 4 and 6
+- the two took different branches of the hit handler entirely, the guard
+  being a soldier who arrests and the merchant a civilian who flees, and the
+  civilian branch creating `assault` information the soldier branch does not
+- the guard's encounter resolved, through the arrest, while the merchant's
+  never did, and something continued to apply while he fled
+
+The practical conclusion drawn in the entry above, that ordinary play is safe
+and only a beating goes under the threshold, **does not hold** and is
+withdrawn. A single punch put a merchant under it.
