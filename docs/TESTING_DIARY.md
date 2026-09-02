@@ -12260,3 +12260,40 @@ slightly **positive**, with `GetSuperfaction` and `GetPerceivedSuperfaction`
 both 3 and identical. Nothing persistent marks the rider as an enemy, which
 argues against the flee-on-approach being a permanent state. It is not
 evidence that it decays, only that no stored value carries it.
+
+---
+
+## The flee-on-approach isolation test is confounded by an active crime
+
+Run with the mod entirely uninvolved: dismounted, a fresh civilian punched by
+hand. He was knocked out, a witness fled and reported it, and a crime was
+outstanding when he woke. Walking into his field of view made him flee.
+
+So vanilla does produce flee-on-approach after a beating. **But it does not
+separate the two candidate causes**, because the crime was still active: an
+NPC avoiding the man who beat him and an NPC avoiding a wanted criminal look
+identical from the saddle.
+
+The player's crime state could not be read to settle it from outside.
+`soul:IsPublicEnemy()` errors on the player, and `RPG.IsPublicEnemy` errors
+whether passed the wuid or a string. `XGenAIModule.GetWuidDebugString` does
+work and answers `WUID:(Soul)A53{Dude}`, so the player wuid itself is fine and
+the fault is in those two calls or in how they are addressed.
+
+### The test that removes the confound
+
+A mod-provoked brawl raises no crime at all as long as the rider throws no
+punch. That was established earlier: guards were seen punching the rider while
+no charge existed, and the charge appeared on the rider's first swing. So
+provoking a victim and never swinging produces a complete brawl with no crime
+anywhere in it, and approaching the victim afterwards tests the beating alone.
+
+Not yet run.
+
+### What is known against a permanent state
+
+`relationshipToPlayer` reads 0.537791, slightly positive, and both
+`GetSuperfaction` and `GetPerceivedSuperfaction` read 3 and match. No readable
+value marks the rider as an enemy. That is an argument against permanence, not
+proof of it, since whatever drives the flee is evidently not stored in any of
+the three.
