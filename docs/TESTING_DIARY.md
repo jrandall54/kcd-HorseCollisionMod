@@ -12378,3 +12378,40 @@ people running scripted activities is precisely where that would surface.
 Unproven, and recorded as the leading candidate rather than a conclusion. The
 practical rule it argues for: a repair sends its messages to the entity that
 needs repairing, never to everyone nearby.
+
+---
+
+## Vanilla control: a fist fight zeroes the relationship, with the mod uninvolved
+
+The decisive test for whether this mod causes victims to flee from the player
+permanently. The rider dismounted, so no part of this mod ran: no walk
+stagger, no provocation, no `alwaysFightWhenHit`, no `combat:stimulus:hit`.
+He punched a merchant, the merchant fled, the rider surrendered to the guards
+and resolved the crime, then followed the merchant.
+
+Read afterwards, against three untouched controls:
+
+| NPC | history | relationship | state |
+|---|---|---|---|
+| `rat_merchant_shop3` | punched on foot, crime resolved | **-0.0508** | `MotionMovement`, 108 m off |
+| `rat_merchant_shop2` | untouched | 0.5048 | `ADLG_Gesture27` |
+| `rat_bedrich` | untouched | 0.5048 | `Lying` |
+| `rat_shop_guard_general` | untouched | 0.5048 | `LeaningBackVAR` |
+
+The whole baseline had drifted from 0.5378 to 0.5048 over the session and all
+three controls moved together, so the merchant's -0.0508 is a real
+displacement rather than a shifted scale. Superfaction and perceived
+superfaction both read 3, unchanged.
+
+The rider reported him seeming normal at first and then recognizing the rider
+and fleeing again.
+
+**This is vanilla's consequence for beating someone, not this mod's.** The mod
+arranges for a man to be willing to fight; the fists and everything that
+follows from them are the player's. Resolving the crime does not restore the
+relationship, because the crime and the relationship are separate records.
+
+Whether a zeroed relationship recovers over time is a question about Kingdom
+Come rather than about this mod, and remains unmeasured. `rat_refugee_Radan`
+read `-0.0000` before a save reload and 0.7222 after it, which confirms only
+that the value is save state.
