@@ -11244,3 +11244,76 @@ meters per second from an impulse of that size.
 
 The value of the damping here is that it removes the slide from any future
 measurement of that, which was drowning the armor signal in noise.
+
+---
+
+## How the road events actually spawn, and why none of it is reachable
+
+Asked whether the thief a townsman chases could be a model for making a
+trampled victim fight back, on the grounds that it looks like a random event in
+the way a roadside ambush or the riddler does.
+
+It is not a random event, and there turn out to be three separate systems that
+are easy to mistake for each other.
+
+### The random event system is empty
+
+`random_event` carries `ui_caption`, `condition_expression`, `base_run_chance`,
+`night_run_chance_modif`, `cooldown`, `map_icon_id` and `map_game_speed`, and
+`random_event_option` carries `success_cmd`, `fail_cmd` and a chance
+expression. The CVars behind it are `wh_pl_RandomEventsCooldown`,
+`wh_pl_RandomEventBaseChanceRunOffset` and `wh_pl_RandomEventAnswer`, all in
+the player module.
+
+It is the map travel system, the one that would interrupt a fast travel with a
+choice. **Every one of its tables is empty in this build.** Nothing in the
+shipped game uses it.
+
+### The situation system is ambient conversation
+
+`situation` holds fifteen rows, joined to `situation_role` for participants and
+scoped to a smart area by `sa_smart_area_id`. Only four are enabled:
+`talking`, `talkingOnBench`, `beggar` and `testOne`. Shipped disabled are
+`preachCrowd`, `dialogWithPasserby`, `talkingByFire`, `reactionToPillory`,
+`shoutPillory`, `fortuneTellingPositiv`, `fortuneTellingNegative`,
+`tournamentCivilTalk` and two quest situations.
+
+So it is the system that makes two villagers stand and chat, not the system
+that puts a thief on the road. It is also not exposed to Lua: `Situations` is
+nil in game, and `WH_Situations_StartNew` turns out to be a CVar rather than a
+function.
+
+### The thief is EventSystem, and it is Lua
+
+`vanilla_scripts/Scripts/Script/Events_chase.lua` is sixty two lines. C++ calls
+`EventSystem.SetupChase()` for a scenario table, `Chase_PickScenario()` to roll
+against the weights, and `SpawnChaseEntity()`, which is `System.SpawnEntity`
+with `sharedSoulGuid`, `bWH_PerceptibleObject`, `SetLootLegal` and
+`MarkAsIgnoredCorpse`. The same family covers `Events_wanderer.lua` and the
+ambush behaviours in `Libs/AI/final/sa_event_*.xml`.
+
+The behaviour comes from a **patch**: `man_flee` for the thief, `man_chase` for
+his pursuer, with the spawned entity set `bIdleUntilFirstPatch` until one
+arrives. The chase tree is then driven by blackboard variables,
+`event_chase_state`, `event_chase_state_request` and `event_chase_type`.
+
+Patches are behaviour tree nodes. The binary defines `AddPatch`,
+`CallBehaviorPatch`, `RemovePatch`, `GetPatches` and `FinishPatch` under
+`wh::xgenaimodule::BehaviorTree`, there is no Lua bind for any of them, and no
+vanilla script applies one. Lua supplies the scenario data and nothing else.
+
+### The finding that matters
+
+Searching the entire shipped script tree for a call that makes an NPC hostile
+returns one result, `soul:IsInCombatDanger()`, which is a read. Vanilla Lua
+never sets an alignment, never changes a faction relation and never starts a
+fight.
+
+Hostility is the crime and faction system's alone, and 4.3.0 already sends a
+real player attributed `combat:hit`, which is why a guard comes after the rider
+after an impact. Retaliation is therefore probably not a system to build but a
+behaviour to observe: the open question is only whether a non-guard responds to
+the same hit the way a guard does.
+
+`tools/probe_tables.lua` came out of this, and dumps any game table's columns
+and first column through the `Database` bind.
