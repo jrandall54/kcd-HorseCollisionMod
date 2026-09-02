@@ -39,3 +39,23 @@ HorseCollisionMod.HitReactionStrength = {
 	MajorInjury = 6,
 	Fatal = 7
 }
+
+--- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
+--
+-- The kind of attack a combat stimulus describes. Sequential here, unlike
+-- `HitReactionType`, and the comment in the type definition says the melee
+-- entries are ordered by increasing violence.
+--
+-- `Unarmed` is what a shove from horseback is charged as by this mod: it is
+-- the mildest melee kind, and a provoked scuffle is a scuffle rather than an
+-- armed assault.
+--
+-- @table CombatAttackKind
+HorseCollisionMod.CombatAttackKind = {
+	None = 0,
+	Missile = 1,
+	StealthAction = 2,
+	Unarmed = 3,
+	Melee = 4,
+	DogBite = 5
+}

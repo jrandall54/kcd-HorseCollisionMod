@@ -188,13 +188,46 @@ function HorseCollisionMod:HoldRetaliation(npc)
 			return
 		end
 
-		pcall(function()
-			Contexts.ClearOption(npc, self.RetaliationOption,
-					self.RetaliationHandle)
-		end)
+		self:EndRetaliation(npc)
 	end)
 
 	return true
+end
+
+--- Takes the disposition back and puts the victim back to work.
+--
+-- Clearing the option is not enough on its own. A brawl leaves its loser
+-- somewhere the daycycle does not resume from: a victim who yielded was
+-- observed still running long after the fight was over and the fine had been
+-- paid, because nothing had told him the incident was finished.
+--
+-- `ReplanVictim` is the same `daycycle:restartRequest` the reaction recovery
+-- uses, with the payload that was measured moving a parked victim 3.94 m back
+-- to his stall. Sent unconditionally rather than behind the idle test
+-- `ReplanIfStranded` applies, because a victim still fleeing is not idle and
+-- would fail that test while being exactly the case this is for.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:EndRetaliation(npc)
+	local cleared = pcall(function()
+		Contexts.ClearOption(npc, self.RetaliationOption,
+				self.RetaliationHandle)
+	end)
+
+	local state = nil
+
+	pcall(function()
+		state = tostring(npc.actor:GetCurrentAnimationState())
+	end)
+
+	local replanned = self:ReplanVictim(npc)
+
+	if self.Config.LogTelemetry then
+		self:Log("RetaliationEnd " .. tostring(npc:GetName())
+				.. " cleared=" .. tostring(cleared)
+				.. " state=" .. tostring(state)
+				.. " replanned=" .. tostring(replanned))
+	end
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.
@@ -252,9 +285,9 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	end
 
 	-- Sent after the option is in place, not before. The option decides how
-	-- the hit is answered, so a hit that arrives first is answered the old
+	-- the stimulus is answered, so one that arrives first is answered the old
 	-- way and the provocation is wasted.
-	self:SendProvocationHit(npc, playerEnt, self.HitReactionStrength.Tickle)
+	self:SendProvocationHit(npc, playerEnt)
 
 	-- The count is spent. Without this a victim already fighting keeps
 	-- rolling on every further contact during the brawl.
