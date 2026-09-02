@@ -12360,3 +12360,21 @@ sends, freed him:
 That is a point in the closeout's favour beyond its own feature: the pair is a
 general recovery for an actor wedged in a locomotion state, not something that
 only makes sense after a brawl.
+
+### Correction: the inn NPCs were stuck, and a load screen cleared it
+
+The sampling above was taken **after** the player fainted and woke, and a load
+screen resets NPC state. The NPCs read as normal because they had already been
+fixed, not because they were never stuck. The rider confirms they were frozen
+beforehand.
+
+The most likely cause is not the mod's collision system but a repair script
+run earlier in the same session, which sent `daycycle:restartRequest` to every
+human within 60 m, 50 of them, to free one runaway. It interrupted NPCs who
+were mid-activity, a butcher carving and a Konrad Hagen listening to dialogue
+among them, and was waved through as harmless at the time. An inn full of
+people running scripted activities is precisely where that would surface.
+
+Unproven, and recorded as the leading candidate rather than a conclusion. The
+practical rule it argues for: a repair sends its messages to the entity that
+needs repairing, never to everyone nearby.
