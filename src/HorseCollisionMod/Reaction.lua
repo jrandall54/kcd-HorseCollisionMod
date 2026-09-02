@@ -215,6 +215,17 @@ function HorseCollisionMod:MassVictim(npc, armorScale)
 		scale = 1.0
 	end
 
+	-- Turning the scaling off gives every victim the same mass, which is the
+	-- only way to read the direction of the effect. Armor scaling makes a
+	-- guard heavier and a villager lighter at the same time, so a uniform
+	-- shortening of the throw and a genuine momentum response look alike. A
+	-- flat figure below the engine's 80 separates them: momentum transfer
+	-- predicts a longer throw for everyone, a settling side effect predicts
+	-- a shorter one.
+	if self.Config.RagdollMassArmorScaled == false then
+		scale = 1.0
+	end
+
 	local wanted = base / scale
 	local generation = self.TimerTick
 	local origin = nil

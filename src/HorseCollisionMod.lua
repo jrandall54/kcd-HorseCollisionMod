@@ -112,6 +112,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field Uplift vertical ragdoll impulse at full strength
 -- @field RagdollMass what the horse collides with, in kilograms, divided by
 --   the armor scale so armor is felt as weight rather than as a force
+-- @field RagdollMassArmorScaled whether RagdollMass is divided by the armor
+--   scale; false gives every victim the same mass, which is how the direction
+--   of the effect is read
 -- @field ArmorReferenceWeight armor weight that scales a target by exactly one
 -- @field ArmorImpulseExponent how sharply armor weight reduces the impulse
 -- @field MinArmorImpulse floor on the armor impulse multiplier
@@ -205,6 +208,7 @@ HorseCollisionMod.Config = {
 	-- physics engine, which is why armor has never been felt in a throw.
 	-- 0 leaves the engine's own figure alone.
 	RagdollMass              = 80.0,
+	RagdollMassArmorScaled   = true,
 
 	-- What the target is wearing, as a multiplier on the impulse and on the
 	-- horse's stamina cost. Both are 1.0 at ArmorReferenceWeight; an

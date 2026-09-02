@@ -13348,3 +13348,104 @@ What is new is that the collision is not blind to armor. Something about an
 armored body already produces a longer throw. The cause is not established
 here; the correlation is measured across seventy impacts and is not an
 artifact of speed.
+
+## Contact geometry decides more of the throw than speed does
+
+The detection log already carries the geometry of every accepted collision.
+`Footprint fwd= lat= dz= sweep=` is written on the tick the victim is found,
+`fwd` being distance along the horse's facing and `lat` the perpendicular
+offset, so `lat` near zero is a victim square in front of the chest and `lat`
+near the limit is one clipped by the shoulder.
+
+117 gallop impacts carry both a footprint reading and a settled throw at t+6s.
+
+### The lateral offset costs half the throw
+
+Restricted to full gallop, where approach speed is effectively constant across
+the bands:
+
+| lateral offset | impacts | mean throw | mean speed |
+| --- | --- | --- | --- |
+| 0.00 - 0.12 | 9 | 4.87 m | 10.43 |
+| 0.12 - 0.22 | 20 | 4.84 m | 10.64 |
+| 0.22 - 0.36 | 8 | 3.15 m | 10.43 |
+
+Centered against clipped is 4.85 m against 3.15 m, a factor of 1.5 at the same
+speed. The partial correlation of lateral offset against throw, with speed
+held out, is -0.258.
+
+### Forward distance matters more, and is not only speed
+
+`fwd` correlates with speed at +0.808, because the front reach is extended by
+`speed * TickSeconds * SweepMultiplier` and a faster horse therefore finds its
+victim further ahead. It survives that: the partial correlation with speed
+held out is +0.312, and in the regression below it is the largest term.
+
+A large `fwd` is a victim still out in front when the tick fires, whom the
+horse then runs into chest first. A small `fwd` is a victim already beside the
+horse, brushed in passing.
+
+### Weighing the terms against each other
+
+Least squares on all 117 impacts, `R^2 = 0.313`, effects given as meters per
+standard deviation of each term:
+
+| term | effect |
+| --- | --- |
+| forward distance | +0.79 m |
+| lateral offset | -0.54 m |
+| armor scale | -0.34 m |
+| mass was set | -0.30 m |
+| approach speed | +0.25 m |
+
+Geometry is worth roughly 1.3 m of spread between a square hit and a glancing
+one. Speed, once geometry is accounted for, is worth 0.25 m. That ordering is
+the opposite of the assumption the tier system is built on.
+
+The model is weak in absolute terms and honestly so. At full gallop `R^2` is
+0.174 and the residual spread is 1.96 m against an actual spread of 2.16 m, so
+most of the variation is still unexplained. The footprint is read one tick
+before contact and is a coarse stand-in for the geometry of the collision
+itself, which is never measured.
+
+### Correction to the mass reading
+
+The earlier entry compared 21 mass impacts against 70 and reported a mean
+throw of 2.17 m against 3.76 m. Pairing more permissively recovers 47 mass
+impacts, and the comparison is then **3.00 m against 3.76 m**. The two pools
+have comparable geometry, mean lateral offset 0.154 against 0.136 and edge
+contacts 25.5% against 20.0%, so the difference is not a geometry artifact.
+
+With geometry, speed and armor all held out, setting the mass is worth -0.30 m
+per standard deviation, the smallest of the five terms. The effect is real,
+uniform, and small. It remains true that it did not differentiate by armor,
+which was the point of setting it.
+
+### Why a clear contact sometimes produces nothing
+
+The footprint is a box in the horse's frame, not a cone or a radius:
+
+| bound | value |
+| --- | --- |
+| front reach | 1.05 m, plus up to 0.35 m of sweep with speed |
+| rear reach | 0.20 m |
+| half width | 0.35 m |
+| vertical | 2.35 m |
+
+The corridor is **0.70 m wide and 0.20 m deep behind the origin**. A horse's
+body is wider than that before its legs are counted, and a victim has a radius
+of its own, so the surfaces meet while the centers are still well over 0.35 m
+apart. There is a band of genuine physical contact, roughly 0.35 m to 0.7 m of
+lateral offset, in which the engine collides and the mod does nothing. What
+the rider sees is a vanilla shove with no stagger, no fall and no ragdoll.
+
+The rear bound has the same shape of problem. Turning tightly puts the victim
+beside or behind the horse's origin, past the 0.20 m rear reach, while contact
+is still being made along the flank.
+
+Accepted impacts bear this out at the edge: of 117, only 6 fall in the last
+0.06 m of the corridor, where a uniform distribution of approaches would put
+many more. The corridor is clipping approaches, not merely bounding them.
+
+Rejections are logged only when `DiagnoseMisses` is on, and it has been off,
+which is why none of these appear in any log gathered so far. It is now on.

@@ -32,7 +32,13 @@ HorseCollisionModSettings = {
 	-- thing to hit, which is why armor has never been felt in a throw.
 	-- This is divided by the armor scale, so mail is heavier to move.
 	-- 0 leaves the engine's figure alone.
-	RagdollMass              = 80.0,
+	--
+	-- TEST RIDE: flat 40 for everyone, armor scaling off. Momentum transfer
+	-- predicts throws longer than the 3.76 m baseline; a settling side
+	-- effect predicts the same shortening measured with scaling on.
+	-- Restore to 80.0 and true afterwards.
+	RagdollMass              = 40.0,
+	RagdollMassArmorScaled   = false,
 	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 0.5,   -- higher puts it to rest sooner
 
@@ -98,7 +104,7 @@ HorseCollisionModSettings = {
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 
 	-- Switches.
-	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
+	CollisionIsCrime         = false,  -- riding someone down is a crime at trot
 	                                  -- and gallop; never at a walk
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
 	ReplanAfterReaction      = true,  -- sends them back to their stall or
@@ -112,6 +118,6 @@ HorseCollisionModSettings = {
 	-- every entity near the horse, including doors and audio areas, which is
 	-- thousands per session. Only useful while investigating why a specific
 	-- impact did nothing. `build.ps1` refuses a release build with this on.
-	DiagnoseMisses           = false
+	DiagnoseMisses           = true
 
 }
