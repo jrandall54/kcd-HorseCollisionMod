@@ -136,6 +136,8 @@ tools/
                           profile, repairing one left in another
   probe_inventory.lua     names what a named entity is carrying, resolving
                           item class GUIDs to readable names
+  probe_tables.lua        dumps a game table's columns and rows through
+                          the Database bind
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   version_check.py        derives the next version from CHANGELOG.md

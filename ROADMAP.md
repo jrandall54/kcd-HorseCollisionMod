@@ -426,8 +426,8 @@ rather than missing.
       The thief a townsman chases was proposed as the model and does not
       serve as one. It is `EventSystem`, scheduled in C++ and spawned by
       `Scripts/Script/Events_chase.lua` through `System.SpawnEntity` with a
-      shared soul and a behaviour patch, `man_flee` for the thief and
-      `man_chase` for his pursuer. Patches are behaviour tree nodes,
+      shared soul and a behavior patch, `man_flee` for the thief and
+      `man_chase` for his pursuer. Patches are behavior tree nodes,
       `AddPatch`, `CallBehaviorPatch` and `RemovePatch`, with no Lua bind and
       no use from Lua anywhere in vanilla. That route is closed.
 

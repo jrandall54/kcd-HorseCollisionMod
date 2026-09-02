@@ -11290,14 +11290,14 @@ function.
 against the weights, and `SpawnChaseEntity()`, which is `System.SpawnEntity`
 with `sharedSoulGuid`, `bWH_PerceptibleObject`, `SetLootLegal` and
 `MarkAsIgnoredCorpse`. The same family covers `Events_wanderer.lua` and the
-ambush behaviours in `Libs/AI/final/sa_event_*.xml`.
+ambush behaviors in `Libs/AI/final/sa_event_*.xml`.
 
-The behaviour comes from a **patch**: `man_flee` for the thief, `man_chase` for
+The behavior comes from a **patch**: `man_flee` for the thief, `man_chase` for
 his pursuer, with the spawned entity set `bIdleUntilFirstPatch` until one
 arrives. The chase tree is then driven by blackboard variables,
 `event_chase_state`, `event_chase_state_request` and `event_chase_type`.
 
-Patches are behaviour tree nodes. The binary defines `AddPatch`,
+Patches are behavior tree nodes. The binary defines `AddPatch`,
 `CallBehaviorPatch`, `RemovePatch`, `GetPatches` and `FinishPatch` under
 `wh::xgenaimodule::BehaviorTree`, there is no Lua bind for any of them, and no
 vanilla script applies one. Lua supplies the scenario data and nothing else.
@@ -11312,7 +11312,7 @@ fight.
 Hostility is the crime and faction system's alone, and 4.3.0 already sends a
 real player attributed `combat:hit`, which is why a guard comes after the rider
 after an impact. Retaliation is therefore probably not a system to build but a
-behaviour to observe: the open question is only whether a non-guard responds to
+behavior to observe: the open question is only whether a non-guard responds to
 the same hit the way a guard does.
 
 `tools/probe_tables.lua` came out of this, and dumps any game table's columns
