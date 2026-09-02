@@ -10998,3 +10998,65 @@ measured and moves it by nothing: `ExitTime` on the mod's own fall fragment,
 `Sleep`, `Stiffness`, `g_ragdollPollTime`, `ca_DeathBlendTime`, and the
 physicalization profile, which reads `alive` throughout and so leaves
 `actor:StandUp` and `SetPhysicalizationProfile` with nothing to act on.
+
+## `unragdoll` is a real profile, and is not the way out of the wait
+
+Read out of the game binary's string dispatch for
+`SetPhysicalizationProfile`, which accepts six values rather than the two this
+project knew about:
+
+| String | Profile |
+|---|---|
+| `alive` | 1 |
+| `unragdoll` | 0 |
+| `ragdoll` | 2 |
+| `sleep` | 3 |
+| `frozen` | 4 |
+| `spectator` | 6 |
+
+No vanilla script uses `unragdoll` and no modding documentation names it.
+
+### What it does
+
+Called two seconds into a fall reaction, it takes effect on every victim:
+`was=alive now=unragdoll ok=true`. What follows differs by gender, and neither
+outcome is the one wanted.
+
+| | Result |
+|---|---|
+| Men | no change. `BlendRagdoll` still runs 2,592 ms and the wait is untouched. |
+| Women | the get-up is skipped entirely. No `BlendRagdoll` at all, straight from the fall to `MotionMovement`, which reads in game as shooting upright. |
+
+It cancels the recovery rather than shortening the wait before it.
+
+### It strands the actor
+
+Nothing returns an actor to `alive`. One victim recorded
+`MotionIdle/unragdoll=9952ms` and two others alternated `MotionIdle` and
+`MotionMovement` while still in the profile, which is an animation state
+machine running while the body is not driven by it. In game that is an NPC
+walking on the spot.
+
+`tools/restore_alive.lua` repairs it, and four actors were returned to `alive`
+with it. That is the reason the tool exists and the reason the experiment is
+not kept: a setting that permanently breaks an NPC is not worth shipping
+switched off.
+
+### The ragdoll CVars were never candidates
+
+The engine registers its own help text for them, which the decompilation index
+now carries:
+
+| CVar | What the engine says it does |
+|---|---|
+| `g_ragdollMinTime` | minimum time in seconds that a ragdoll will be visible |
+| `g_ragdollPollTime` | time in seconds where 'unseen' polling is done |
+| `g_ragdollUnseenTime` | time the player has to look away before it disappears |
+| `g_ragdollDistance` | distance the player has to be away before it disappears |
+
+All four govern corpses being removed. None of them gates a recovery, and the
+rides spent testing two of them were spent on a reading of their names.
+
+`g_hitDeathReactions_disableRagdoll`, "disables switching to ragdoll at the end
+of animations", is the only one in that family that touches this behavior at
+all, and it has not been tried.
