@@ -441,8 +441,22 @@ def check_generated_docs():
     if any(t is None for _, t in source_times + generated_times):
         return []
 
+    # The newest page on both sides, not the oldest generated one.
+    #
+    # LDoc writes a page per module and git records a commit only for the ones
+    # whose bytes changed. A page that is already correct is therefore left at
+    # whatever commit last altered it, which can be far older than a later
+    # source commit, and taking the oldest page made the check fire on a
+    # repository whose documentation was perfectly current. There was no way to
+    # satisfy it except by touching files to no purpose, which is the state
+    # this check's own message warns against: a check that is usually wrong
+    # teaches everyone to skip the whole report.
+    #
+    # Comparing the newest of each still catches the case that matters, a
+    # source edited and LDoc never run, because any edit that reaches the
+    # generated reference rewrites at least one page.
     newest_source, source_at = max(source_times, key=lambda pair: pair[1])
-    oldest_page, generated_at = min(generated_times, key=lambda pair: pair[1])
+    oldest_page, generated_at = max(generated_times, key=lambda pair: pair[1])
 
     if source_at > generated_at:
         return [(oldest_page, 0, "stale",
