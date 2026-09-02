@@ -12783,3 +12783,53 @@ faster than the personal penalty and will otherwise be mistaken for it again.
 That mistake, reading a pair of samples as a before and after when both fell
 on the same side of the event, is the third time in this session that a
 conclusion outran the measurement.
+
+## Parked: what is known about assault aftermath, and what is not
+
+The investigation stops here. The remaining question needs in-game time to
+pass, and passing it is too expensive to be worth the answer: seven days
+served in jail costs about ten real minutes of watching a wheel turn, and the
+speed-up that made it bearable is `VF_CHEAT`, so it needs `-devmode`, which a
+plain launch does not have.
+
+### Established
+
+- **A punch lowers the victim's own relationship with the player** and nobody
+  else's, by an amount capped per person. A second punch on the same victim
+  cost nothing.
+- **An unsettled crime depresses the whole town at once**, including NPCs the
+  player never touched, and this effect is far larger than the personal one.
+  It lifts afterwards; the town returned to a shared 0.4259.
+- **0.2 is the threshold** at which an NPC stops dealing with the player.
+  `CrimeUtils.IncreasePayToTalkReputation` exists to lift someone over it,
+  priced by `CalcPayToTalkPrice` at 700 times a per social class multiplier.
+- **`payToTalk` raises by 0.1389 toward a ceiling near 0.67** and then does
+  nothing, which is the `reputation_cap` column.
+- **Shop guards are `renegade`**, `SoulCrimeRoleId` 3, and that branch of the
+  hit handler creates no assault information at all, where the soldier and
+  civilian branches both do.
+- **The aversion is a recognition reaction at about six meters.** The victim
+  works his stall untroubled until the player is close, then barks and runs.
+- **None of it is this mod's.** Every measurement was taken on foot, and the
+  final run was taken with every mod file parked and the `Mods` folder empty.
+
+### Not established
+
+- Whether serving a sentence clears something paying a fine does not. The A/B
+  was set up and abandoned before the first reading.
+- Whether the personal penalty decays over long spans. It did not move across
+  the days measured, but every one of those measurements sat inside the
+  town-wide depression and cannot be trusted.
+- What blocks `payToTalk` on a victim at zero. Hostility tracked separately
+  from the number is the leading suspect, from the `can_change_hostility`
+  column and the `_noChangeHostility` suffix, and is unconfirmed.
+
+### The methodological lesson
+
+Three conclusions in this session outran their measurements: NPCs called stuck
+from outside simulation range, a decay curve inferred from an absolute value
+that was tracking something else, and a before-and-after pair where both
+samples fell on the same side of the event. In each case the fix was the same
+and was available from the start: **read the victim against untouched
+neighbors, never the absolute number, and confirm which side of an event each
+sample was taken on.**
