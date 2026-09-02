@@ -23,6 +23,20 @@ number.
 
 ## [Unreleased]
 
+## [4.6.3] - 2026-09-02
+
+### Changed
+
+- Research and tooling only. Nothing about a collision looks or behaves
+  differently. A survey of a shipped pure-Lua cheat mod, verified against the
+  running game, overturned five findings this project had recorded as
+  unreachable, and settled why a beaten NPC keeps fleeing: a punch sets a
+  hostility flag that only a reputation change carrying
+  `can_change_hostility` can clear, which is why surrendering to a victim
+  repairs him and paying a fine never does. Two long-blocked roadmap items,
+  forcing a brawl to fists and making knockback mean something, are now
+  verified as buildable.
+
 ## [4.6.2] - 2026-09-02
 
 ### Changed

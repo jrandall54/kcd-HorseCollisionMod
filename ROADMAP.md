@@ -345,13 +345,45 @@ armor.
       per second. Raising it to 600 threw a villager 27 meters and threw one
       guard upward into the rider hard enough to nearly kill them, so
       `Uplift` has a hard ceiling that is a safety limit rather than an
-      aesthetic one: the rider sits directly above the victim. Raise
-      `Knockback` alone, moderately, and measure with the slide now removed.
+      aesthetic one: the rider sits directly above the victim.
+
+      **Stop using an impulse.** `Entity.SetVelocity` and `SetVelocityEx`
+      exist, enumerated from the running game, and they state the outcome in
+      meters per second instead of a force that has to be divided by a mass
+      the code never knew. That is the whole reason 50 does nothing and 600
+      throws a villager 27 meters: the same figure means different things
+      against different bodies.
+
+      With velocity set directly, `Knockback` becomes a speed a person can
+      picture, armor modulates that speed, and the ceiling on `Uplift` is
+      expressible as one too. `Entity.GetMass` is there for the cases where an
+      impulse is genuinely wanted, and vanilla's own code applies impulses as
+      `mass * force` for exactly this reason.
 - [ ] Striking a heavy target strips the horse's momentum rather than only
       its stamina, and shows on the horse. `kcd_horse_controllerdefs.xml`
       declares a `Rear` fragment, so a heavy impact can rear or check the
       horse rather than only debiting a number the player cannot see. That is
       the horse's half of what armor should feel like.
+
+      The engine names a `riderGuardRear` combat behavior alongside
+      `riderGuardMovement`, `riderGuardJump` and the rest, so a rear while
+      mounted is something the game already does rather than something to
+      invent.
+- [ ] Shake the rider's camera on a heavy impact. `actor:CameraShake` and
+      `actor:SetViewShake` both exist and neither has been tried. A collision
+      currently costs the rider a number they cannot see; this is the cheapest
+      way to make weight felt from the saddle, and it composes with the rear
+      above.
+- [ ] An NPC pulls the rider off the horse. `CanHorsePullDown` and
+      `RequestHorsePullDown` are a vanilla interactor action, offered beside
+      knockout and hunt attack, with `wh_cs_HorsePullDownAngle` and two
+      companions governing the geometry. In vanilla the player is the one
+      pulling a mounted NPC down.
+
+      Whether an NPC can be the actor and the player the target is untested.
+      If it can, the braced-polearm dismount below and the most dramatic form
+      of a victim fighting back are both native mechanics rather than
+      something to build.
 - [x] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
       A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
       target in mail, multiplying with the combat multiplier already applied and with the
@@ -425,6 +457,43 @@ rather than missing.
 
 ## Phase 4: AI reaction
 
+- [x] A brawl the town ignores: closed again, on evidence this time.
+      `Entity.CreateLink` does create a link named `suppressAssaultReactions`
+      from an NPC to the player, retrievable with `GetLinkTarget`, but it does
+      not suppress anything. Thirty-three humans were linked, a civilian was
+      ridden down in public, and a crime was reported; the victim was
+      confirmed afterwards to have carried the link, so the test was sound.
+
+      The behavior tree either keeps its own link store or needs the `Data`
+      its own `AddLink` carries, which `questUtils.xml` sets an expiration
+      into and which `CreateLink(name, targetId)` has no way to supply.
+- [ ] Superseded: a brawl the town ignores. `Entity.CreateLink`, `GetLink`,
+      `RemoveLink` and `CountLinks` all exist in Lua, which was checked and
+      denied on the strength of the `C_ScriptBind*` headers alone. Those
+      headers describe script binds, and the entity class table is not one.
+
+      The mechanism to reach is the link `sa_duel.xml` adds between the
+      duelist and the player, tagged `suppressAssaultReactions`, which
+      `checkAssaultSuppression` in `sb_combat.xml` walks and which gates the
+      assault perceptible volume that tells every bystander an assault
+      happened. If a Lua-created entity link is the same object the behavior
+      tree reads, a fight nobody reports is one call away. If it is a
+      different system sharing a word, the item closes for a better reason
+      than last time.
+
+      One probe answers it: create the link between a victim and the player,
+      punch the victim in front of a witness, and see whether a crime is
+      raised.
+- [ ] Reopened: repair a victim the player has beaten.
+      `soul:ModifyPlayerReputation('best_friend')` is +2 with
+      `can_change_hostility` true, and `surrender_step` is +0.25 with the same
+      flag. A punch is `hit_melee_weak`, -0.2, and it sets that flag; only a
+      change carrying the flag can clear it. This is why paying a fine never
+      repairs a victim and surrendering to him does.
+
+      Whether the mod should offer any of this is a design question, but it
+      is no longer an open mechanical one, and it means a victim ruined by
+      testing can be restored rather than left.
 - [ ] Show the surrender prompt during a provoked brawl. Surrendering to a
       victim resolves the encounter cleanly, but the on-screen input hint
       that appears when guards attack does not, so nothing tells a player

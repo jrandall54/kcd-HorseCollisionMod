@@ -172,6 +172,29 @@ successful reload ends with:
 [log] [HorseCollisionMod] Load screen ended. v3.0.0 initializing physics timer loop 1
 ```
 
+## Tests that need game time
+
+Passing in-game time used to be the most expensive thing a test could ask
+for. The in-game wait dialog caps at 24 hours, runs at about four real
+minutes a day, and in hardcore it also demands food and a bed, so a question
+needing several days was abandoned rather than answered.
+
+It is not necessary. `Calendar` is a Lua global and world time is directly
+settable:
+
+    python tools/dev_survival.lua-style setup, then
+    python tools/dev_console.py --file tools/dev_time.lua
+
+`dev_time.lua` carries an `HOURS` value at the top; 24 moves a full day in one
+call, verified moving day 38 to day 39 instantly. Setting `RATIO` instead
+leaves ordinary time running fast rather than jumping, for a measurement that
+needs the world to tick rather than to arrive. The shipped ratio is 15.
+
+Run `tools/dev_survival.lua` alongside it, which holds nourishment and energy
+at 100, so a multi-day skip does not turn into an errand.
+
+Neither survives a save load. Re-run both after one.
+
 ## Landing a branch
 
 The version lives in fourteen places: `src/mod.manifest`, the

@@ -150,6 +150,10 @@ tools/
   dev_survival.lua        holds the player's nourishment and energy at 100,
                           so a test needing game time is not also a test of
                           finding food in hardcore
+  dev_time.lua            moves game time forward without the wait dialog,
+                          through the Calendar global
+  probe_api.lua           lists the methods an object actually exposes in the
+                          running game, which the written references do not
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   set_version.py          writes the version into all fourteen places that

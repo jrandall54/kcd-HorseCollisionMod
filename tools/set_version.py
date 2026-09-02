@@ -122,8 +122,16 @@ def apply(version):
             new = re.sub(r'(HorseCollisionMod\.Version\s*=\s*)"[^"]+"',
                          r'\g<1>"%s"' % version, new, count=1)
 
-        new = re.sub(r"^(-- @release\s+)\S+\s*$", r"\g<1>%s" % version, new,
-                     flags=re.M)
+        # Horizontal whitespace only, never `\s`, which matches newlines.
+        #
+        # With `\s*$` under re.M the match ran past the end of the line and
+        # swallowed the blank line separating the module header from the doc
+        # block below it. LDoc then reads the two as one block and fails with
+        # "'class' cannot have multiple values". That was misdiagnosed as a
+        # problem with the tables in the file it named, and "fixed" by moving
+        # them, which was never the cause.
+        new = re.sub(r"^(-- @release[ \t]+)\S+[ \t]*$",
+                     r"\g<1>%s" % version, new, flags=re.M)
 
         if new != text:
             write(path, new)

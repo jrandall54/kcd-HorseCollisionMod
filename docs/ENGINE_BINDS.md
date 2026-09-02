@@ -610,3 +610,299 @@ dumps the same data from the console.
 a beating lowers. It moves globally for everyone as town standing changes, so
 compare a victim against an untouched neighbor rather than against an
 absolute.
+
+## Globals that are not script binds
+
+The sections above are `C_ScriptBind*` classes. Several of the most useful Lua
+globals are not among them, which is why a survey of those headers cannot
+answer "what can Lua call". Everything below was verified present in this
+build by probing the running game, 43 entry points out of 43 tried.
+
+The source is spraguep's Cheat mod, `references/kcd1tools/cheat-106-*.zip`,
+which is pure Lua in a pak and therefore demonstrates working calls rather
+than declarations.
+
+### Calendar
+
+World time, readable and settable, without the in-game wait dialog.
+
+| Function | Notes |
+| --- | --- |
+| `Calendar.GetWorldTime()` | seconds; 3,319,760 read at day 38 |
+| `Calendar.SetWorldTime(seconds)` | absolute; add `hours * 3600` to skip |
+| `Calendar.GetWorldTimeRatio()` | **15** by default |
+| `Calendar.SetWorldTimeRatio(n)` | higher is faster, 0 pauses |
+| `Calendar.IsWorldTimePaused()`, `SetWorldTimePaused(bool)` | |
+| `Calendar.GetWorldHourOfDay()` | |
+| `Calendar.SetFakeTimeOfDay(h)`, `UnfakeTimeOfDay()`, `IsFakedTimeOfDay()` | |
+
+Vanilla follows a time jump with
+`XGenAIModule.SendMessageToEntity(player.this.id, "timekeeper:recalculate", "")`
+so the world catches up.
+
+`GetWorldTimeRatio` at 15 is the ordinary ratio and is a different quantity
+from the CVar `wh_pl_SkipTimeMaxWorldTimeRatio` at 360, which governs the skip
+dialog only.
+
+### Database
+
+| Function | Notes |
+| --- | --- |
+| `Database.LoadTable(name)` | **required first**, or the table reads as empty |
+| `Database.GetTableInfo(name)` | `.LineCount` is the row count, **not** `.RowCount` |
+| `Database.GetColumnInfo(name, i)` | `.Name` |
+| `Database.GetTableLine(name, row)` | a row keyed by column name |
+| `Database.GetTableColumnData(name, col)` | returns nothing for some tables |
+
+`GetTableColumnData` returning nothing does not mean a table is empty.
+`reputation_change` and `angriness_enum` both read as empty through it and
+both read correctly through `LoadTable` plus `GetTableLine`.
+
+### Game
+
+| Function | Notes |
+| --- | --- |
+| `Game.SetWantedLevel(0..3)` | the player's wanted level, settable |
+| `Game.SaveGameViaResting()` | |
+| `Game.RemoveSaveLock()` | |
+| `Game.IsLoadingEngineSaveGame()` | |
+| `Game.ShowItemsTransfer()` | |
+
+### Entity
+
+Methods on the entity class table, so any entity carries them.
+
+| Function | Notes |
+| --- | --- |
+| `CreateLink(name, targetId)` | targetId optional |
+| `GetLink`, `RemoveLink`, `CountLinks` | |
+| `AddImpulse(-1, pos, dir, force)` | vanilla scales force by the target's mass |
+| `GetPhysicalStats()` | `.mass`, `.gravity`, `.flags`; the player is mass 80 |
+| `SetPhysicParams(group, table)` | `PHYSICPARAM_PLAYERDYN` carries gravity, zeroG, air_control |
+| `AwakePhysics(1)` | |
+
+Whether `CreateLink` reaches the behavior tree's **tagged** links, which
+`checkAssaultSuppression` walks looking for a `suppressAssaultReactions` tag
+between two entities, is unestablished. The entity link API takes a name and
+a target; the behavior tree's takes From, To, Tag and Data.
+
+### System, beyond the familiar
+
+| Function | Notes |
+| --- | --- |
+| `System.AddCCommand(name, "tbl:method(%line)", help)` | registers a console command backed by Lua |
+| `System.ExecuteCommand("...")` | runs a console command from Lua |
+| `System.SetCVar(name, value)`, `System.GetCVar(name)` | observed setting a `VF_CHEAT` variable, though under `-devmode` |
+| `System.SpawnEntity(table)` | |
+| `System.GetEntitiesByClass(class)` | |
+
+### Others confirmed present
+
+`Physics.RayWorldIntersection`, `Framework.IsValidWUID`,
+`EnvironmentModule.BlendTimeOfDay`, `EnvironmentModule.ForceImmediateWeatherUpdate`,
+`EntityModule.GetInventoryOwner`, `Shops.IsLinkedWithShop`,
+`CryAction.LoadXML`, `Minigame.StartLockPicking`, `QuestSystem.*`,
+`ItemManager.*`, and `actor:ReviveToDefaults()`.
+
+## The reputation change table
+
+`reputation_change` has 71 lines. `soul:ModifyPlayerReputation(name, propagate)`
+and `faction:AddReputation(...)` select from it by name. Each row carries a
+`change` and a **`can_change_hostility`** flag, and the flag is what decides
+whether an NPC stops treating the player as hostile.
+
+| name | change | can_change_hostility |
+| --- | --- | --- |
+| `hit_melee_weak` | -0.2 | **true** |
+| `hit_melee_medium` | -0.4 | true |
+| `hit_melee_strong` | -0.7 | true |
+| `hit_melee_brutal` | -1.25 | true |
+| `hit_melee_*_noChangeHostility` | the same numbers | false |
+| `surrender_step` | **+0.25** | **true** |
+| `payToTalk` | +0.25 | **false** |
+| `best_friend` | +2 | true |
+| `sworn_enemy` | -2 | true |
+| `death` | -0.6 | true |
+| `crime_assault_individual`, `_reported` | -0.3 each | false |
+| `crime_murder_individual` | -0.6 | false |
+| `crime_murder_reported` | -1.5 | false |
+| `crime_theft_individual` | -0.25 | false |
+| `haggle_tip` | +0.1 | false |
+| `shop_transaction` | +0.02 | false |
+| `impress_success` | +0.05 | false |
+| `quest_reward_1_micro` .. `_7_max` | +0.05 to +1.5 | true at 6 and 7 |
+
+The practical consequence: **punching someone sets a hostility flag, and only
+a change with `can_change_hostility` can clear it.** `payToTalk` raises the
+number and cannot clear the flag, which is why paying a fine never repairs a
+victim while surrendering to him does.
+
+`angriness_enum` has nine lines: `min_angriness` 0, `max_angriness` 1, `death`
+0.55, `event_roadsideCorpse_unsolvedMurder` 0.2, `unatributedStealthKill` 0.15,
+`theft_large` 0.125, `theft_medium` 0.025, `theft_small` 0.01.
+
+## Actor and human methods vanilla uses
+
+Gathered from `vanilla_scripts/`, and listed because several bear directly on
+this mod and were not known to it. Presence in vanilla means the method exists;
+none of the ones marked untried has been called here.
+
+### Actor, reached as `ent.actor`
+
+Already used by this mod: `Fall`, `GetCurrentAnimationState`,
+`GetPhysicalizationProfile`, `SetPhysicalizationProfile`,
+`StartInteractiveActionByName`, `SetMovementRestriction`, `SetHealth`.
+
+Untried and relevant:
+
+| Method | Why it matters here |
+| --- | --- |
+| `StandUp()` | stands an actor up, which is what several improvised repairs were reaching for |
+| `IsUnconscious()` | the state read that `IsDead` failed to provide |
+| `RequestKnockOut()` | a knockout, which is how a brawl can end without a death |
+| `SetMovementTarget(...)` | send an actor somewhere, rather than asking the daycycle to replan |
+| `HolsterItem(...)` | put a weapon away |
+| `UnequipInventoryItem(item)` | vanilla's `Crime.lua` holsters the **player's** weapon with this during a confrontation |
+| `EquipWeaponPreset`, `EquipClothingPreset` | wholesale loadout changes |
+| `AddBlood(str, n)`, `AddDirt(n)`, `AddFrost`, `CleanDirt`, `WashDirtAndBlood` | the cosmetic roadmap item |
+| `CameraShake(...)`, `SetViewShake(...)` | impact feedback for the rider, never considered |
+| `SetForcedLookDir`, `SetForcedLookObjectId` | make a victim look at the rider |
+| `Revive()`, `ReviveToDefaults()` | reset an actor |
+| `GetArmor()` | armor, read directly rather than summed from the item tables |
+| `CanHorsePullDown(id)`, `RequestHorsePullDown(id)` | see below |
+| `CanStealthKnockout`, `RequestStealthKill`, `RequestMercyKill` | |
+| `CanHuntAttack`, `RequestHuntAttack` | |
+
+### Human, reached as `ent.human`
+
+Already used: `IsMounted`, `GetItemInHand`, `ForceDismount`.
+
+Untried: `DrawWeapon`, `DrawPrimaryWeapon`, `IsWeaponDrawn`, `CycleWeapon`,
+`EquipItemInSlot`, `CanBeRobbed`, `RequestDialog`, `RequestPickpocketing`,
+`Mount`, `GrabOnLadder`, `StartBuilding`, `StartBookTranscription`.
+
+`IsWeaponDrawn` is the read that the polearm get-up investigation inferred
+from item names.
+
+## Horse pull-down is a vanilla interaction
+
+`BasicAIActions.lua` offers it as an interactor action beside knockout and
+hunt attack:
+
+    local canPullDown = user.actor:CanHorsePullDown(self.id)
+    ...
+    user.actor:RequestHorsePullDown(self.id)
+
+with the hint `@ui_hud_horse_pulldown` and the interaction `inr_pullDown`. The
+binary carries `wh_cs_HorsePullDownAngle`, `wh_cs_HorsePullDownZAngle` and
+`wh_cs_HorsePullDownZeroAngle`, so the geometry that permits it is tunable.
+
+In vanilla the `user` is the player and the target is a mounted NPC. **Whether
+an NPC can be the `user` and the player the target is untested**, and if it
+can, an NPC pulling the rider off the horse is a native mechanic rather than
+something this mod would have to build. That is the roadmap's braced-polearm
+dismount and a large part of what victims fighting back should look like.
+
+## The engine names rider-specific combat behaviours
+
+A combat action type group in the binary carries, among forty-six entries:
+
+`freeRiderAttack`, `freeRiderAttackStatic`, `groupRiderAttack`,
+`groupRiderMovement`, `riderGuardIdle`, `riderGuardIdle2Move`,
+`riderGuardMove2Idle`, `riderGuardMovement`, `riderGuardFastStop`,
+`riderGuardJump`, `riderGuardJumpStart`, `riderGuardJumpEnd`,
+**`riderGuardRear`**, `horsePullDownAttackSuccess`, `horsePullDownHitSuccess`.
+
+These are behaviour and animation identifiers rather than Lua entry points, so
+they are not callable as they stand. What they establish is that the AI has
+combat behaviour written specifically for fighting a mounted target and for
+mounted guards, including a rear. The roadmap item about striking a heavy
+target rearing the horse has a named behaviour behind it.
+
+## The verified surface, enumerated from the running game
+
+The lists above were gathered by reading vanilla scripts, which finds only
+what vanilla happens to call. These were read out of the running game by
+walking each object and its metatable's `__index`, so they are what this build
+actually exposes.
+
+| Object | Entries |
+| --- | --- |
+| `Entity` | 290 |
+| `player` | 437 |
+| `player.actor` | 100 |
+| `player.soul` | 56 |
+| `player.human` | 43 |
+| `player.player` | 30 |
+| `player.inventory` | 20 |
+
+### Entity: physics and links
+
+    AddImpulse  SetVelocity  SetVelocityEx  GetVelocity  GetVelocityEx
+    GetMass  GetPhysicalStats  GetCenterOfMassPos
+    Physicalize  PhysicalizeSlot  PhysicalizeAttachment  DestroyPhysics
+    EnablePhysics  ResetPhysics  AwakePhysics  AwakeCharacterPhysics
+    ActivatePlayerPhysics  SetPhysicParams  SetCharacterPhysicParams
+    UpdateSlotPhysics  IgnorePhysicsUpdatesOnSlot  GetExplosionImpulse
+    GetBonePos  GetBoneVelocity  GetBoneAngularVelocity
+    CreateLink  GetLink  GetLinkName  GetLinkTarget  SetLinkTarget
+    CountLinks  RemoveLink  RemoveAllLinks
+
+**`SetVelocity` is the one that matters most here.** This mod throws victims
+with `AddImpulse` and a `Knockback` figure that has never meant anything: 50
+was measured as indistinguishable from applying nothing, and 600 threw a
+villager 27 meters. An impulse must be divided by mass to become motion, and
+the mass of a victim is not constant. Setting velocity directly states the
+outcome in meters per second, and `GetMass` is there for the cases where an
+impulse is genuinely wanted.
+
+The link API is complete rather than read-only, which is the opposite of what
+this project recorded.
+
+### actor, the hundred
+
+Beyond what this mod already uses:
+
+    StandUp  IsUnconscious  RequestKnockOut  RagDollize  Revive
+    ReviveToDefaults  SetMovementTarget  SetMovementRestriction
+    CameraShake  SetViewShake  SetViewLimits  SetLookIK
+    SetForcedLookDir  SetForcedLookObjectId  ClearForcedLookDir
+    GetArmor  GetMaxArmor  GetHealth  GetMaxHealth  SetHealth  SetMaxHealth
+    AddBlood  AddDirt  AddFrost  CleanDirt  WashDirtAndBlood  WashItems
+    EquipInventoryItem  UnequipInventoryItem  EquipWeaponPreset
+    EquipClothingPreset  GetInitialWeaponPreset  GetInitialClothingPreset
+    CanHorsePullDown  RequestHorsePullDown  CanStealthKnockout
+    RequestStealthKill  RequestMercyKill  CanHuntAttack  RequestHuntAttack
+    CanGrabCorpse  RequestGrabCorpse  IsCarryingCorpse
+    GetCloseColliderParts  GetClosestAttachment  GetHeadPos  GetHeadDir
+    VectorToLocal  GetAngles  SetAngles  IsFlying  DumpActorInfo
+    AttachVulnerabilityEffect  ResetVulnerabilityEffects  SetStats
+
+`RagDollize` is a direct call where this mod goes through
+`SetPhysicalizationProfile("ragdoll")`. `DumpActorInfo` is an unexplored
+diagnostic. `GetCloseColliderParts` bears on the detection footprint, and
+`VectorToLocal` on the maths that decides which side of the horse a victim is
+on.
+
+### human, the forty-three
+
+    DrawWeapon  HolsterWeapon  HolsterToInventory  DrawFromInventory
+    ToggleWeapon  ToggleWeaponSet  IsWeaponDrawn
+    AttachEntityToHand  DetachFromHand  PickUpItem  PlaceItem
+    Mount  ForceMount  Dismount  ForceDismount  GetHorse  GetHorseMountPoint
+    PlayAnim  StopAnim  SetAnimMotionParam
+    RequestDialog  PrepareForDialog  ReadyForDialog  InterruptDialog
+    IsInDialog  CanTalk  CanBeRobbed  RequestPickpocketing  IsPickpocketing
+    GrabOnLadder  IsOnLadder  CanUseLadder
+    StartBuilding  StartReading  StartBookTranscription  PrepareFood
+
+**`human:HolsterWeapon()`** is the clean answer to forcing an unarmed brawl.
+It needs no unregistered message and no behavior tree node.
+
+### player.player
+
+    GetPlayerHorse  SetPlayerHorse  ClearPlayerHorse  GetHorseId
+    CanMountHorse  HorseInspect  EnablePlayerHorseInventory
+    PushBack  IsSitting  IsLaying  SetWhistling  TryDrawTorch
+    EnableFastTravel  CanSleepAndReportProblem
+    RequestDogObjective  CancelDogObjective  HasRunningDogObjective  FeedDog

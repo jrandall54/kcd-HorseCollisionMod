@@ -12833,3 +12833,439 @@ samples fell on the same side of the event. In each case the fix was the same
 and was available from the start: **read the victim against untouched
 neighbors, never the absolute number, and confirm which side of an event each
 sample was taken on.**
+
+---
+
+## A shipped cheat mod contradicts five "unreachable" findings, and settles the assault question
+
+`references/kcd1tools/cheat-106-1-58-*.zip` is spraguep's Cheat mod, Nexus
+1.58. Unlike KCSE it is **pure Lua in a pak**, the same shape this project
+ships, so every call in it is proof rather than a candidate. Its
+`Cheat/Data/data.pak` holds twenty-three `Scripts/cheat_*.lua` files and a
+`Docs/` folder.
+
+Every entry point below was then **verified to exist in this build** by
+probing the running game: 43 of 43.
+
+### Time is directly settable, and the wait wheel is irrelevant
+
+`Calendar` is a Lua global. Read at the main menu: `GetWorldTime()` returned
+3,319,760 seconds, `GetWorldTimeRatio()` returned **15**, `GetWorldHourOfDay()`
+10.16, `IsWorldTimePaused()` false.
+
+    Calendar.SetWorldTime(Calendar.GetWorldTime() + hours * 3600)
+    XGenAIModule.SendMessageToEntity(player.this.id, "timekeeper:recalculate", "")
+    Calendar.SetWorldTimeRatio(1000)
+
+Also `SetWorldTimePaused`, `SetFakeTimeOfDay`, `UnfakeTimeOfDay`,
+`IsFakedTimeOfDay`.
+
+This retires the conclusion that passing in-game time is too expensive to test
+with. Seven days is one call. The 24-hour cap on the in-game wait dialog, and
+the ten real minutes a jail sentence costs, are both bypassed entirely.
+
+Note that `Calendar.GetWorldTimeRatio()` at 15 is the ordinary world time
+ratio and is a different quantity from the CVar
+`wh_pl_SkipTimeMaxWorldTimeRatio` at 360, which governs the skip dialog.
+
+### The reputation change table reads, and it answers the assault question
+
+Two mistakes had made this table look empty. `Database.LoadTable(name)` must be
+called first, and the row count is **`LineCount`**, not `RowCount`. With both
+corrected, `Database.GetTableLine(name, row)` returns a row keyed by column
+name and `reputation_change` has **71 lines**.
+
+The rows that matter:
+
+| name | change | can_change_hostility |
+|---|---|---|
+| `hit_melee_weak` | **-0.2** | **true** |
+| `hit_melee_medium` | -0.4 | true |
+| `hit_melee_strong` | -0.7 | true |
+| `hit_melee_brutal` | -1.25 | true |
+| `surrender_step` | **+0.25** | **true** |
+| `payToTalk` | +0.25 | **false** |
+| `best_friend` | +2 | true |
+| `sworn_enemy` | -2 | true |
+| `crime_assault_individual` | -0.3 | false |
+| `crime_assault_reported` | -0.3 | false |
+| `death` | -0.6 | true |
+
+The `_noChangeHostility` suffix seen in `sb_switch_hitreactions.xml` is not a
+modifier applied at runtime: rows 96 to 99 are separate entries,
+`hit_melee_weak_noChangeHostility` through `hit_melee_brutal_noChangeHostility`,
+carrying the same numbers with the flag false.
+
+**This explains every observation the assault investigation could not.**
+
+- A punch is `hit_melee_weak`, -0.2, and it **sets a hostility flag**. The
+  flag, not the number, is what makes the victim flee on recognition.
+- `payToTalk` is +0.25 with `can_change_hostility` **false**. It can raise the
+  number and cannot clear the flag. That is why applying it to a healthy
+  control moved the value and applying it to the beaten merchant did nothing
+  useful: the merchant's problem was the flag.
+- `surrender_step` is +0.25 with the flag **true**. Surrendering to the victim
+  is the designed repair, and it is the only common positive change that can
+  clear hostility.
+
+That is exactly what was observed and could not be explained: surrendering to
+a provoked victim resolved the encounter completely and left the beggar at
+0.7192, above his neighbors, while paying a guard a fine never repaired
+anything. The fine settles the crime; only the victim can lift the hostility,
+and surrendering to him is how.
+
+A ruined NPC should therefore be repairable with
+`soul:ModifyPlayerReputation('best_friend')`, +2 with the flag true, or more
+proportionately with `surrender_step`. Untested.
+
+### `angriness_enum` also reads
+
+Nine lines: `min_angriness` 0, `max_angriness` 1, `death` 0.55,
+`unatributedStealthKill` 0.15, `event_roadsideCorpse_unsolvedMurder` 0.2,
+`theft_large` 0.125, `theft_medium` 0.025, `theft_small` 0.01. So the
+angriness scale is 0 to 1 as measured, and the increments real events apply
+are small. Setting a faction to 1.0 was far outside anything the game does.
+
+### Entity links exist in Lua after all
+
+`Entity.CreateLink`, `Entity.GetLink`, `Entity.RemoveLink` and
+`Entity.CountLinks` are all present. The earlier finding that "no script bind
+exposes links to Lua, all 37 carry only readers" was drawn from the
+`C_ScriptBind*` headers and is **wrong**: the entity class table carries them.
+
+Whether these reach the behavior tree's tagged links, which is what
+`checkAssaultSuppression` walks for a `suppressAssaultReactions` tag between
+attacker and victim, is **not established**. CryEngine entity links take a
+name and a target id; the behavior tree's take From, To, Tag and Data. They
+may be the same system or two systems sharing a word. Testing it reopens the
+brawl a town ignores, which was closed as impossible.
+
+### Mass is readable, which matters for knockback
+
+`ent:GetPhysicalStats()` returns a table with `mass`, `gravity` and `flags`;
+the player reads mass 80. The cheat mod applies impulses as
+`ent:AddImpulse(-1, pos, dir, ent:GetPhysicalStats().mass * force)`, scaling by
+mass so the result is a velocity rather than an arbitrary number.
+
+The armor knockback item has been stuck on exactly this: a shipped `Knockback`
+of 50 was measured as indistinguishable from applying nothing to a 120 to
+160 kg body. Scaling by the target's own mass makes the figure mean meters per
+second, and armor weight can modulate a velocity rather than guess at a force.
+
+### Console commands can be registered from Lua
+
+`System.AddCCommand(name, "table:method(%line)", help)` registers a real
+console command backed by Lua, `%line` receiving the arguments. The cheat mod
+registers about eighty this way, including a `cheat_eval` that runs
+`loadstring` on its argument.
+
+`System.ExecuteCommand("...")` runs a console command from Lua, and
+`System.SetCVar` / `System.GetCVar` reach CVars directly. `System.SetCVar` was
+observed setting `wh_pl_SkipTimeMaxWorldTimeRatio`, a `VF_CHEAT` variable,
+from 360 to 3600. **That test is not conclusive**: the session had `-devmode`,
+which would have allowed it anyway. Whether Lua bypasses the flag without
+`-devmode` is untested and matters, because it decides whether a development
+console command can replace the `-devmode` requirement for probing.
+
+### Everything else confirmed present
+
+`Game.SetWantedLevel`, `Game.SaveGameViaResting`, `Game.RemoveSaveLock`,
+`Game.IsLoadingEngineSaveGame`, `Physics.RayWorldIntersection`,
+`Framework.IsValidWUID`, `EnvironmentModule.BlendTimeOfDay`,
+`EntityModule.GetInventoryOwner`, `Shops.IsLinkedWithShop`,
+`System.SpawnEntity`, `System.GetEntitiesByClass`, `Entity.AddImpulse`,
+`Entity.SetPhysicParams`, `Entity.AwakePhysics`, and `actor:ReviveToDefaults`.
+
+`Game.SetWantedLevel(0..3)` is the crime state this project could not even
+read, and it would have separated the transient town-wide depression from the
+personal penalty in one command.
+
+### Why this was missed
+
+The `C_ScriptBind*` headers in `references/libKCD1` describe the **script
+binds**. `Calendar`, `Game`, `Database`, `Entity` and `Physics` are reached
+another way and are not among them, so a survey of those headers cannot answer
+"what can Lua call". It answers "how is this bind declared", and it is not
+always right about that either: the header gives
+`AddReputation(const char* sEnumName)` while the cheat mod passes a number.
+
+The order to consult is now the cheat mod for what Lua can call, the
+decompilation for what the binary contains, and libKCD1 for how a bind is
+declared.
+
+## Second pass: the actor surface, and a native horse pull-down
+
+Reading the cheat mod pointed at a broader question, which is what the entity
+methods vanilla itself uses actually are. Gathered from `vanilla_scripts/`
+rather than from the reverse-engineered headers, because the headers cover
+script binds and these are reached another way.
+
+**Eighty-odd `actor:` methods and twenty `human:` ones**, of which this mod
+uses six. The ones that bear on open work, none tried here:
+
+- `actor:StandUp()` and `actor:IsUnconscious()`. Both would have replaced
+  improvisation: the stuck-NPC repairs reached for a stand-up through a
+  stand-down message and a daycycle restart, and `IsDead` was probed and
+  failed where `IsUnconscious` exists.
+- `actor:SetMovementTarget(...)`, which sends an actor somewhere directly
+  rather than asking the daycycle to replan and hoping.
+- `actor:RequestKnockOut()`, an ending for a brawl that is neither a death nor
+  a yield.
+- `actor:HolsterItem` and `actor:UnequipInventoryItem`. Vanilla's `Crime.lua`
+  holsters the **player's** weapon during a confrontation with the second of
+  these. Taking a victim's weapon out of his hand is a route to an unarmed
+  brawl that does not need `combat:order`'s unregistered `restrictWeaponKind`,
+  which is what closed that item.
+- `actor:CameraShake` and `actor:SetViewShake`. A collision currently costs
+  the rider a number they cannot see. Neither has ever been considered.
+- `actor:GetArmor()`, which reads armor directly where `Armor.lua` sums it out
+  of the item tables.
+
+### Horse pull-down is already in the game
+
+`BasicAIActions.lua` offers it as an interactor action beside knockout and
+hunt attack:
+
+    local canPullDown = user.actor:CanHorsePullDown(self.id)
+    user.actor:RequestHorsePullDown(self.id)
+
+hinted `@ui_hud_horse_pulldown`, interaction `inr_pullDown`, with
+`wh_cs_HorsePullDownAngle`, `wh_cs_HorsePullDownZAngle` and
+`wh_cs_HorsePullDownZeroAngle` governing the geometry.
+
+In vanilla the player pulls a mounted NPC down. Whether the roles can be
+reversed is untested. If they can, an NPC dragging the rider off the horse is
+native, and it is both the braced-polearm item and the strongest form of a
+victim fighting back.
+
+### The AI has rider-specific combat behaviour
+
+A combat action type group in the binary carries forty-six names, among them
+`freeRiderAttack`, `freeRiderAttackStatic`, `groupRiderAttack`,
+`groupRiderMovement`, `riderGuardIdle`, `riderGuardMovement`,
+`riderGuardFastStop`, `riderGuardJump`, **`riderGuardRear`**,
+`horsePullDownAttackSuccess` and `horsePullDownHitSuccess`.
+
+These are behavior and animation identifiers, not Lua entry points, so they
+are not callable as they stand. What they establish is that combat against a
+mounted target, and mounted combat including a rear, are things the game
+already has written. The roadmap item about a heavy impact rearing the horse
+has a named behavior behind it rather than only a fragment.
+
+## `MessageTypes.xml` is not a whitelist, and two closures rested on reading it as one
+
+`Libs/AI/MessageTypes.xml` holds **41 entries**, each carrying an
+`ImportanceLevel` or an `IsContextRelated` attribute. Absence from it was
+twice treated as evidence that a message cannot be sent from Lua.
+
+That is wrong, and this mod disproves it every time a victim recovers.
+**`daycycle:restartRequest` does not appear in that file**, and
+`Recovery.lua` sends it through `XGenAIModule.SendMessageToEntityData` with a
+payload built by `Utils.makeTable`. It works, and it was measured: an empty
+payload moved a parked victim 0.00 m and a filled one moved him 3.94 m back to
+his stall.
+
+The file configures properties for the messages that need non-default ones.
+Everything else takes defaults. It says nothing about deliverability.
+
+### What that reopens
+
+- **Forcing an unarmed brawl.** `combat:order` carries a `restrictWeaponKind`
+  sub-order taking `weaponChange.unarmed`, and was set aside partly because
+  the type is not registered. It may well be sendable.
+  `human:HolsterWeapon()` is still the simpler route and should be tried
+  first, but the reasoning that closed this one was unsound.
+- **The duel and sparring system.** `sa_duel.xml` carries
+  `duel:startDuelWithPlayer` with a bet, a difficulty, `isWooden`, and
+  `enemyWeapons` from an enum that includes `Unarmed`, and it ends cleanly
+  through `duel:stopDuel` carrying a winner. That was closed with "none of the
+  `duel:` types appear in `MessageTypes.xml`, so they are almost certainly
+  local to the scripted action". Only the second half of that sentence is
+  still worth testing, and it needs testing rather than asserting: whether an
+  NPC not running `sa_duel` has anything listening.
+- **Behavior patches.** `daycycle:patch` is a message type used in the
+  behavior XML and absent from `MessageTypes.xml`, and
+  `XGenAIModule.RemoveDaycyclePatch` is a real Lua bind, so removal is
+  reachable. Whether a patch can be added by message is untested, and it is
+  the route to `man_chase`, the pursuit behavior closed as unreachable.
+
+### The general lesson
+
+Three separate closures in this project rested on a written artifact being
+read as more authoritative than it is: the `C_ScriptBind*` headers taken as
+the whole Lua surface, `MessageTypes.xml` taken as a whitelist, and
+`GetTableColumnData` returning nothing taken as a table being empty. In each
+case the artifact answered a narrower question than the one being asked.
+
+The check that would have caught all three is the same: **try it in the
+running game.** A probe costs a minute.
+
+### Confirmed: the unregistered types are all constructible
+
+Tested against the running game. `Utils.makeTable` builds every one of them:
+
+    combat:order                          ok
+    daycycle:patch                        ok
+    duel:startDuelWithPlayer              ok
+    combat:fightOptions                   ok
+    combat:stimulus:standDownRequest      ok
+    daycycle:restartRequest               ok
+    combat:stimulus:hostilePerception     ok
+
+Four of those seven were set aside on the grounds that they are absent from
+`MessageTypes.xml`. The type system knows all of them, because
+`Utils.makeTable` validates against **`TypeDefinitions.xml`**, which is the
+registry that matters. `MessageTypes.xml` was never it.
+
+Constructing a message is not the same as a tree listening for it, and that
+half still needs a target in a loaded world. But "it cannot even be built or
+addressed" is finished as a reason to close anything.
+
+## Live verification in a loaded world
+
+The game running with `-devmode` and a save loaded, 32 humans nearby, the
+rider mounted.
+
+### Weapons: an unarmed brawl is solved
+
+    villageGuard  IsWeaponDrawn  false
+    human:DrawWeapon()    -> drawn=true   inHand=020000000000FC2A
+    human:HolsterWeapon() -> drawn=false  inHand=0000000000000000
+
+Both calls work on an NPC and the state reads back correctly. Forcing a
+provoked brawl to fists needs no `combat:order`, no `restrictWeaponKind` and
+no behavior tree node: holster the victim's weapon before provoking, and
+`DrawWeapon` restores it afterwards. That item was closed for want of a
+mechanism it did not need.
+
+### Entity links are real, creatable, and retrievable by tag
+
+    subject links before = 2      (NPCs already carry links of their own)
+    e:CreateLink("suppressAssaultReactions", player.id)  -> ok
+    subject links after  = 3
+    e:GetLinkTarget("suppressAssaultReactions") -> the player table
+
+The signatures, established by probing: `CountLinks()` takes nothing,
+`GetLink(index)` returns the linked entity, `GetLinkTarget(name)` returns the
+entity a named link points at, and `GetLinkName(index)` returns nil in this
+build. `CreateLink(name, targetId)` is the writer.
+
+So a link carrying exactly the tag `sa_duel.xml` uses, pointing from an NPC at
+the player, can be created from Lua and read back by name. **Whether the
+behavior tree's `checkAssaultSuppression` reads the same store is the
+remaining question**, and it is a question rather than a closed door, which is
+where this stood before.
+
+### Mass and armor are not what they looked like
+
+`GetMass()` reads **80 for every human including the player**, so it is the
+character controller's mass rather than a body's, and it does not distinguish
+an armored target from a villager. `actor:GetArmor()` and `GetMaxArmor()` both
+read 0 on NPCs.
+
+That tempers the knockback plan. `SetVelocity` still states an outcome in
+meters per second rather than a force, which is the substantive improvement,
+but mass cannot be used to scale by build and armor still has to come from the
+item tables as `Armor.lua` already does.
+
+### Horse pull-down is not offered to an NPC as things stand
+
+`npc.actor:CanHorsePullDown(playerId)` returned **0** for every human nearby,
+against the constants `HPS_Enabled = 2` and `HPS_Disabled = 1`. Vanilla's own
+check offers the action only when the answer is one of those two, so 0 means
+not applicable at all.
+
+The rider was mounted at the time, which is the scenario that would make it
+applicable, so this is not simply a matter of the player being on foot. It may
+still depend on range or facing, which `wh_cs_HorsePullDownAngle` and its two
+companions govern, and that is untested. `Game.GetWantedLevel` does not exist;
+only the setter does.
+
+### The entity link does not suppress the assault, and the test was sound
+
+Every human within 35 m was given a link named `suppressAssaultReactions`
+pointing at the player, 33 of them, and the rider then rode a civilian down at
+trot in a public place. **A crime was reported.**
+
+The result was checked for the obvious confound. Seventeen further humans had
+streamed in since the links were placed and carried none, so the victim might
+have been one of those. He was not: the mod's telemetry names `rat_man97`, and
+read back afterwards he carried three links with
+`GetLinkTarget("suppressAssaultReactions")` returning the player.
+
+So a link created through `Entity.CreateLink` is **not** the object
+`checkAssaultSuppression` walks. Two explanations fit and neither is tested:
+the behavior tree keeps its own link store, or the tree's links carry `Data`
+that this one lacks. `questUtils.xml` sets
+`$suppressAssaultReactions.expiration` on the link through a
+`LinkDataExpression`, and the behavior tree's `AddLink` has a `Data` attribute
+where `CreateLink(name, targetId)` has no equivalent, so a dataless link may
+be read as expired or ignored.
+
+The item closes again, but on evidence this time rather than on a
+misreading of which headers describe what. All 23 test links were removed.
+
+### `SetVelocity` is the knockback mechanism this mod has wanted
+
+On a living, animation-driven NPC, `SetVelocity({0, 0, 6})` lifted them
+**0.86 m** within 700 ms before they came down. That alone is notable: this
+mod's own notes record that physics impulses are ignored because actors are
+animation-driven, and a velocity is evidently not.
+
+On a ragdolled victim, 6 m/s away from the rider:
+
+| | travelled |
+| --- | --- |
+| t+900ms | **4.43 m** |
+| t+2500ms | 5.57 m |
+| t+5000ms | 5.53 m, at rest |
+
+Six meters per second carried a body five and a half meters and the damping
+already in the mod brought it to rest. Against `Knockback = 50` being
+indistinguishable from applying nothing and `600` throwing a villager 27
+meters, that is a number a person can choose deliberately.
+
+The victim was returned to the `alive` profile and replanned.
+
+### `best_friend` repairs a relationship
+
+`soul:ModifyPlayerReputation('best_friend', false)` moved a bystander from
+0.5048 to **0.7826**, a delta of +0.2778.
+
+The table row says the change is +2, so the applied figure is normalized
+rather than added raw, the same way `payToTalk` reads +0.25 in the table and
+applied +0.1389. What matters is the direction, the size relative to a punch's
+-0.2, and that this row carries `can_change_hostility` true, which is what a
+beaten victim needs and what `payToTalk` cannot give.
+
+That NPC was left 0.278 better disposed than found, which is a benefit rather
+than damage and was not reverted.
+
+### Correction: LDoc was broken by the version tool, not by the enum tables
+
+An earlier entry recorded that adding a third and fourth table to
+`Enums.lua` made LDoc fail with `'class' cannot have multiple values;
+{module,table,module}`, and that the fix was to move `CombatAttackKind` beside
+its consumer and delete the unused `CrimeSystemRole`. **That diagnosis was
+wrong.**
+
+The cause was `tools/set_version.py`, written in the same session. Its
+substitution read
+
+    re.sub(r"^(-- @release\s+)\S+\s*$", ..., flags=re.M)
+
+and `\s` matches newlines, so `\s*$` ran past the end of the line and consumed
+the blank line separating the module header from the doc block below it. LDoc
+reads the two as a single block, sees a module tag and a table tag and a
+module tag, and fails.
+
+The bump to 4.6.3 reproduced it exactly, on a file whose tables had not been
+touched since the supposed fix. The regex now matches horizontal whitespace
+only.
+
+Two things follow. The move of `CombatAttackKind` into `Crime.lua` was not
+necessary; it is kept because sitting beside its only consumer is better
+placement regardless, but the reason given for it was false. And the test that
+"proved" the tables were at fault, removing them and seeing the failure
+persist, was correct evidence that was then read the wrong way round: it
+should have ruled the tables out rather than being set aside.

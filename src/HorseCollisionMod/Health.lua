@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 4.6.2
+-- @release 4.6.3
 --- Logs a named entity's health whenever it changes.
 --
 -- Health has moved in every ride with no impact to account for it, and an
