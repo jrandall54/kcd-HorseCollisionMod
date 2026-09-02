@@ -11800,3 +11800,49 @@ never started. So the combat that message produces is not a prosecutable
 event, and the surrender path that normally resolves a guard fight has
 nothing to resolve. Any feature built on hostility alone inherits that dead
 end and needs its own ending.
+
+---
+
+## `alwaysFightWhenHit` produces the whole brawl, resolution included
+
+One context option, set on 19 NPCs before the ride, no code in the mod
+changed and nothing else sent:
+
+    Contexts.SetNonpersistentOption(ent, "alwaysFightWhenHit", "hcm_brawl_test")
+
+Ridden into at trot, **the merchant fought back** instead of fleeing. Guards
+witnessed it and joined in against the rider. The rider surrendered, every
+participant dropped hostility, the crossed-swords hostility indicator faded,
+and the encounter ended on its own.
+
+**No crime dialog occurred, and none was needed.** `CollisionIsCrime` was on
+and the mod sent its usual `combat:hit`, so the difference is not that the
+crime path was disabled. The fight simply resolved as a fight.
+
+That is the opposite of the earlier `hostilePerception` result, where guards
+made hostile the same way froze on surrender with no way to finish. The
+distinction worth keeping: a fight entered through **being hit** carries its
+own ending, and a fight entered through **being told someone is hostile**
+does not.
+
+### What this settles
+
+Retaliation is one context option. It needs no custom behavior tree, no
+faction write, no `hostilePerception` message, and no probability constant
+invented by this mod. The victim's own morale still decides how the fight
+goes; the option only decides that a fight is the answer.
+
+It also delivers most of what a consensual brawl needs for free: no crime
+prosecution, no cutscene, and a surrender that resolves cleanly.
+
+### What it does not yet do
+
+Two gaps against a tavern-style brawl, both untested:
+
+- **Guards joined in.** For a fight the town ignores, bystanders need
+  `suppressDudeHostilePerceptionStimuli`, which stops an NPC reacting to the
+  player being perceived as hostile.
+- **Weapons were not constrained.** Nothing here forces fists.
+  `enum:duelWeaponTypes` carries `Unarmed`, but that belongs to the duel
+  scripted action rather than to the context system, and no context option in
+  the catalog obviously forces an unarmed fight.
