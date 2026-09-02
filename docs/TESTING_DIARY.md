@@ -11317,3 +11317,96 @@ the same hit the way a guard does.
 
 `tools/probe_tables.lua` came out of this, and dumps any game table's columns
 and first column through the `Database` bind.
+
+---
+
+## KCSE is a native plugin loader with no Lua, and a reverse-engineered map of the game
+
+Evaluated after the road-event research closed the behavior-tree patch route,
+on the question of whether the Kingdom Come Script Extender reopens anything
+this mod cannot reach from Lua.
+
+The name misleads. It does not extend the game's scripting.
+
+### What it actually is
+
+One file matters, `Bin/Win64/dinput8.dll`, a proxy the operating system loads
+in place of the real `dinput8` and which forwards the genuine calls onward.
+From inside the process it:
+
+- reads the distribution from `WHGame.dll`, distinguishing Steam, GOG and Epic
+  by which of `steam_api64.dll`, `Galaxy64.dll` or `EOSSDK-Win64-Shipping.dll`
+  is present, and the build from `wh_sys_version`
+- loads a matching `kcd_addresslib_*` file, which maps stable `REL::ID` numbers
+  to real addresses for that exact build and distribution
+- scans for DLLs exporting `KCSEPlugin_Version` and `KCSEPlugin_Load`
+- hands each one an `IKCSEInterface` offering `IMessagingInterface`, for
+  plugin-to-plugin traffic with a `kMessage_AllPluginsLoaded` broadcast, and
+  `ITaskInterface`, whose `AddTask` runs a `std::function` on the game thread
+- supplies a trampoline allocator and `vtable_hook.h`, the machinery for
+  hooking game functions
+
+It is the SKSE architecture, ported. The address library is the reason it works
+at all and the reason it breaks: the mapping is per build and per store, so a
+game patch invalidates it.
+
+### It contains no Lua
+
+Searched for `lua_`, `Lua`, any binding registration and any console command
+registration. **None of them appear anywhere in the binary.** It adds no
+functions to the scripting environment, no console commands and no script API.
+It is a supported way for C++ to be inside the process, and nothing else, so no
+Lua mod can call it.
+
+### The archive as distributed does nothing
+
+`KCSE 2244 3 2026-06-29T13-46Z b37E8uyAU.zip` holds four entries: two
+directories, `dinput8.dll` at 1.4 MB and `dinput8.pdb` at 32 MB. There is no
+address library and there are no plugins. Installed as it stands it reports
+`Address library not found` and stops.
+
+### What the symbols are worth
+
+The PDB carries **1,564 reverse-engineered headers of the game's own classes**,
+alongside 7,105 game-internal type names:
+
+| module | headers |
+|---|---|
+| `xgenaimodule` | 590 |
+| `databasemodule` | 394 |
+| `combatmodule` | 102 |
+| `rpgmodule` | 70 |
+| CryEngine and offsets | 118 |
+| `guimodule` | 34 |
+| `entitymodule` | 32 |
+| `playermodule` | 13 |
+
+Three of those bear directly on items closed elsewhere in this diary.
+`C_AddPatch.h`, `C_CallBehaviorPatch.h` and `C_RemovePatch.h`, under
+`include/xgenaimodule/BehaviorTree/bt/`, are the patch nodes that drive
+`man_chase` and have no Lua bind. `rpgmodule` carries `C_Faction` and
+`S_FactionRelation`, which is the hostility no vanilla Lua call can set.
+`combatmodule/C_CombatActor.h` carries the combat action set, including
+`C_CombatActorActionHit` and `C_CombatActorActionRiderMovement`.
+
+**The headers themselves are not in the archive**, only their paths and the
+type names compiled in. A PDB normally also carries struct layouts and member
+offsets, but recovering those requires a real PDB reader such as the DIA SDK or
+a Ghidra import, which has not been run. What exists today is a map of how the
+game's classes are organized, which the decompilation index does not provide,
+and not the definitions themselves.
+
+### Why it stays reference rather than becoming a dependency
+
+Adopting it changes what this project is. The mod is a Vortex-installable pak
+of data and Lua that survives game patches. A KCSE plugin is a C++ DLL that
+requires a proxy DLL placed in the game's `Bin/Win64`, goes stale whenever the
+address library does, and needs an MSVC toolchain and a separate test loop.
+Fewer players will install it and more of them will see it break.
+
+If the patch nodes or the faction classes ever justify that cost, the shape is
+a separate companion plugin, never a change to this mod.
+
+The build path recorded in the PDB is a `Cheat_Tool_Set/KCD/RE` directory,
+consistent with a reverse engineering toolset, and it is a third-party DLL
+injected into the game process.
