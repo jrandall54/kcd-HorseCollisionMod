@@ -11929,3 +11929,77 @@ The same condition block reads `isKnockOutByPlayer` against
 `CreateInformation PerceivedWuid=... label='assault'`. Whether a bystander
 reacted to something it actually saw is therefore a distinction the game
 already draws. Not investigated further.
+
+---
+
+## Retaliation fires as designed, and a witness still reports the brawl
+
+First run of `Retaliation.lua` in game. Three walk staggers on `rat_man6`:
+
+    Retaliation rat_man6 count=2 chance=0.25 roll=0.34 provoked=false
+    Retaliation rat_man6 count=3 chance=0.50 roll=0.26 provoked=true
+    ProvocationHit rat_man6 ok=true strength=2 err=nil
+
+The first shove was free, the second rolled 0.34 against 0.25 and passed
+without incident, the third rolled 0.26 against 0.50 and he turned and
+fought. The count, the curve and the roll all behave as written, and
+`math.random` is seeded by the game rather than returning a fixed sequence.
+
+**A woman witnessed it and a crime was reported immediately.** Surrendering
+produced a charge of brawling rather than assault.
+
+### Why `real = false` did not prevent it
+
+It prevented what it gates and nothing else.
+`sb_switch_hitreactions.xml` runs two separate branches off a hit, and only
+the first is gated on `$hit.real`:
+
+- The **reputation** branch, at line 481, computes a `hit_melee_*` change and
+  calls `SetReputationNPC`. Gated on `$hit.real`, so `real = false` skips it.
+- The **assault broadcast**, at line 615, is gated on something else
+  entirely:
+
+        if suppressAssaultReactions and checkAssaultSuppression.suppressExternalReactions
+            Success                     -- nothing is broadcast
+        else
+            SpawnExpiringPerceptibleVolume
+                Expiration 6s, Radius 1, Height 1, Label 'assault',
+                conspicuousness 1, visibility 1
+            IgnorePerception for the attacker and for the victim
+            AddLink assaultVolumeData carrying attacker, victim and kind
+
+  So a one-meter perceptible volume labeled `assault` is spawned at the
+  victim for six seconds. The attacker and the victim are explicitly made
+  blind to it; **everyone else can see it**, and that is what a bystander
+  reports. It fires whether or not the hit was real.
+
+### The suppression is a link, and Lua cannot make links
+
+`suppressAssaultReactions` is not a context option. It is computed by the
+`checkAssaultSuppression` tree in `sb_combat.xml`, which walks **entity links
+tagged `suppressAssaultReactions`** between attacker and victim.
+`sa_duel.xml` is where that is used in anger:
+
+    AddLink    From='this.id' To='__player' Tag='suppressAssaultReactions'
+    RemoveLink From='this.id' To='__player' Tag='suppressAssaultReactions'
+
+`questUtils.xml` adds an `expiration` to the same link's data. That is the
+whole mechanism behind a sparring match the town ignores.
+
+**No script bind exposes links to Lua.** All 37 `C_ScriptBind*` headers
+carry only readers: `GetLinkedEntity`, `GetLinkedOwner`, `GetHelperLinks`,
+`GetHelperLinkTarget`, `IsLinkedWithShop`. There is no `AddLink`. Vanilla Lua
+never creates one either.
+
+The one untried route is `combat:stimulus:customBehaviorRequest`, which takes
+an `includeXml` and an `includeTree` and is reachable from Lua, pointed at a
+tree inside `sa_duel.xml` that adds the link. Speculative, and it would tie
+this mod to the internals of a scripted action.
+
+### Reputation was not cleanly measured
+
+`ui_fac_ratays_citizens` reads 0.357 against a base of 0.5, and
+`ui_fac_ratays_traders` 0.538. The same session included three trot
+tramplings that were real crimes with `real = true`, so this does not isolate
+what the brawl cost. A clean measurement needs a fresh save with no prior
+offense.
