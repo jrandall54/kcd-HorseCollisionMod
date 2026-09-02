@@ -11541,5 +11541,36 @@ also names `GetActorAngriness` and `GetFactionAngriness` as XGen functions and
 ships an `angriness_enum` table and `C_AngrinessEnumDatabase`, so angriness is
 banded rather than a bare float.
 
-None of the above is confirmed in game. The bind signatures are reverse
-engineered against 1.9.8 and carry the author's caveat.
+### Confirmed in the running game
+
+Probed over the remote console immediately after the ride above, so the
+catalog no longer carries the reverse-engineering caveat for this bind.
+
+`RPG` is a real Lua table. `RPG.GetFactions()` returns **98 factions**, each a
+table carrying `__FactionId` with the bound methods reached through its
+metatable rather than listed by `pairs`. `RPG.GetFactionById(42)` returns
+`Faction[#42, name=ui_fac_rataje_out_villagers]`, and on it:
+
+| call | result |
+|---|---|
+| `f:GetId()` | `42` |
+| `f:GetName()` | `ui_fac_rataje_out_villagers` |
+| `f:GetAngriness()` | `0` |
+| `f:GetReputation()` | `0.5` |
+
+`wh_rpg_angriness -p` dumps 56 rows with per-faction angriness, the faction's
+location and position, a last-update stamp and a max distance, plus each
+faction's relations to the others as a signed value and a distance.
+
+**Faction angriness did not move.** Every Rataje faction reads `0` after three
+trampling crimes committed minutes earlier, with a last-update stamp of
+`-6.44e-07` shared across all of them, which is a faction that has never been
+updated rather than one updated and decayed. So the crime hit this mod sends
+drives the witness-and-report response without touching faction hostility at
+all, and hostility would have to be set deliberately.
+
+Whether angriness is the right dial remains open: the engine names
+`GetActorAngriness` separately from `GetFactionAngriness`, so a single trampled
+villager may carry anger the faction does not. `SetAngriness` and
+`AddAngriness` are untested, deliberately — they write to faction state in a
+live save and could sour a whole town permanently.
