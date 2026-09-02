@@ -12003,3 +12003,69 @@ this mod to the internals of a scripted action.
 tramplings that were real crimes with `real = true`, so this does not isolate
 what the brawl cost. A clean measurement needs a fresh save with no prior
 offense.
+
+---
+
+## The runaway was a flee that outlived its cause, and `standDownRequest` ends it
+
+The no-crime fix worked. A beggar provoked at the fourth shove
+(`roll=0.36` against `chance=0.75`) turned hostile with **no crime reported**,
+where the previous build had charged the rider with brawling before a punch
+was thrown. Sending `combat:stimulus:hit` instead of `combat:hit` is what did
+it: the assault perceptible volume lives in `sb_switch_hitreactions.xml`, and
+the stimulus goes straight to the combat subbrain without passing through it.
+
+He then yielded immediately rather than fighting, was released unconditionally
+through the surrender dialog, and ran out of town without stopping.
+
+### The mod was not holding him
+
+Inspected live while he ran. No context option was set on him at all, and the
+mod's own telemetry had already reported `RetaliationEnd cleared=true
+state=IdleToMove replanned=true`, so the option came off and the daycycle
+restart was accepted. He read `MotionMovement`, profile `alive`, health 100,
+morale 0.169. The flee was vanilla's, and it had outlived the incident that
+started it.
+
+Note the contrast in the log: `cleared=false` on victims the option was never
+set on, and `cleared=true` on the one it was. `Contexts.ClearOption` throws
+when the handle is absent, so that field distinguishes the two rather than
+reporting a failure.
+
+### The one message that reaches someone mid-flight
+
+`combat:stimulus:standDownRequest` sets `t_state = standDown`. It matters
+because of the acceptance rule in `sb_combat.xml`: a stimulus arriving while
+the receiver is already in `fight` or `flee` is rejected outright, **except**
+for `standDownRequest` and `customBehaviorRequest`. Those two are named in the
+condition and skip the check. So every other message this mod could send is
+discarded by exactly the victim who needs one.
+
+Measured on the runaway, samples taken 1, 3, 6 and 10 seconds apart:
+
+| | before | after |
+|---|---|---|
+| t+1s | | `MotionIdle`, 1.86 m |
+| t+3s | | `MotionIdle`, 0.00 m |
+| t+6s | `MotionMovement`, 12.95 m | `MotionIdle`, 0.00 m |
+| t+10s | `MotionMovement`, 16.95 m | `MotionIdleVARdefault`, 0.00 m |
+
+He stopped inside a second and was in a daycycle idle variant ten seconds
+later, which is a resumed routine rather than a frozen actor.
+
+### The payload is empty, and that is not the same as absent
+
+`TypeDefinitions.xml` declares one member on `standDownRequest`, named `_`.
+It is a placeholder, not a field: passing it is rejected outright with
+`override table does not match the type 'combat:stimulus:standDownRequest.',
+got member '_.'`. Vanilla's own sends carry `values=""`.
+
+`Utils.makeTable` validating against the type definition is worth noting on
+its own. It rejected a wrong payload with a precise message, where the same
+mistake made by hand would have been delivered and silently discarded.
+
+### A beggar yielding at once is not a fault
+
+`alwaysFightWhenHit` decides that a fight is the answer. It does not decide
+how the fight goes, and nothing in it makes a coward brave. A beggar at 0.169
+morale surrendering to a mounted man immediately is the game working.

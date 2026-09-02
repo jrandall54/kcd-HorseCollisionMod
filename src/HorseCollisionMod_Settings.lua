@@ -81,7 +81,8 @@ HorseCollisionModSettings = {
 	RetaliationChanceStep    = 0.25,  -- added per shove beyond that
 	RetaliationMaxChance     = 0.85,  -- the chance never exceeds this
 	RetaliationMemorySec     = 45,    -- how long a victim stays annoyed
-	RetaliationHoldSec       = 30,    -- how long they stay ready to fight
+	RetaliationHoldSec       = 45,    -- how long the brawl may run before
+	                                  -- they are told to stand down
 
 	-- Switches.
 	CollisionIsCrime         = true,  -- riding someone down is a crime at trot

@@ -194,18 +194,59 @@ function HorseCollisionMod:HoldRetaliation(npc)
 	return true
 end
 
+--- Tells a victim the incident is over and they may stand down.
+--
+-- `combat:stimulus:standDownRequest` sets `t_state = standDown` in
+-- `sb_combat.xml`, and it is one of only two stimulus kinds exempt from the
+-- acceptance rule that rejects a stimulus outright while the receiver is
+-- already fighting or fleeing. That exemption is the whole reason it works
+-- here: every other message this mod could send is discarded by someone
+-- mid-flight, which is exactly who needs it.
+--
+-- The payload is empty. `TypeDefinitions.xml` declares a single member `_`,
+-- which is a placeholder rather than a field: passing it is rejected with
+-- "override table does not match the type", and vanilla's own sends carry
+-- `values=""`.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true when the call was accepted
+function HorseCollisionMod:SendStandDown(npc)
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local ok = pcall(function()
+		local message = Utils.makeTable("combat:stimulus:standDownRequest", {})
+
+		XGenAIModule.SendMessageToEntityData(target,
+				"combat:stimulus:standDownRequest", message)
+	end)
+
+	return ok
+end
+
 --- Takes the disposition back and puts the victim back to work.
 --
--- Clearing the option is not enough on its own. A brawl leaves its loser
--- somewhere the daycycle does not resume from: a victim who yielded was
--- observed still running long after the fight was over and the fine had been
--- paid, because nothing had told him the incident was finished.
+-- Clearing the option is not enough on its own, and neither is the daycycle
+-- restart. A victim who yielded, was released unconditionally through the
+-- surrender dialog, and had nothing further done to him was observed running
+-- out of town and not stopping, long after the fight was over. Nothing had
+-- told him the incident was finished.
 --
--- `ReplanVictim` is the same `daycycle:restartRequest` the reaction recovery
--- uses, with the payload that was measured moving a parked victim 3.94 m back
--- to his stall. Sent unconditionally rather than behind the idle test
--- `ReplanIfStranded` applies, because a victim still fleeing is not idle and
--- would fail that test while being exactly the case this is for.
+-- Measured on that victim: while fleeing he covered 12.95 m and then 16.95 m
+-- between samples. A stand-down request put him in `MotionIdle` within a
+-- second, at 0.00 m of travel from there on, and ten seconds later he was in
+-- `MotionIdleVARdefault`, a daycycle idle, rather than merely stopped.
+--
+-- Both are sent, in order. The stand-down ends the combat state; the replan
+-- is the same `daycycle:restartRequest` the reaction recovery uses, with the
+-- payload measured moving a parked victim 3.94 m back to his stall, and it
+-- covers a victim who stopped but has nothing to return to. The replan goes
+-- out unconditionally rather than behind the idle test `ReplanIfStranded`
+-- applies, because a victim still fleeing is not idle and would fail that
+-- test while being precisely the case this exists for.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:EndRetaliation(npc)
@@ -220,12 +261,14 @@ function HorseCollisionMod:EndRetaliation(npc)
 		state = tostring(npc.actor:GetCurrentAnimationState())
 	end)
 
+	local stoodDown = self:SendStandDown(npc)
 	local replanned = self:ReplanVictim(npc)
 
 	if self.Config.LogTelemetry then
 		self:Log("RetaliationEnd " .. tostring(npc:GetName())
 				.. " cleared=" .. tostring(cleared)
 				.. " state=" .. tostring(state)
+				.. " stoodDown=" .. tostring(stoodDown)
 				.. " replanned=" .. tostring(replanned))
 	end
 end

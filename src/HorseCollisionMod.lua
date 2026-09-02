@@ -159,8 +159,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RetaliationMaxChance ceiling on that chance
 -- @field RetaliationMemorySec how long a victim remembers being shoved, in
 --   seconds, before the count decays to nothing
--- @field RetaliationHoldSec how long a provoked victim keeps the disposition
---   to fight, in seconds
+-- @field RetaliationHoldSec how long a provoked brawl may run, in seconds,
+--   after which the victim is told to stand down and sent back to work
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
@@ -275,7 +275,7 @@ HorseCollisionMod.Config = {
 	RetaliationChanceStep    = 0.25,
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
-	RetaliationHoldSec       = 30,
+	RetaliationHoldSec       = 45,
 
 	-- Switches.
 	ProtectMutt              = true,
