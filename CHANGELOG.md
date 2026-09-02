@@ -23,6 +23,21 @@ number.
 
 ## [Unreleased]
 
+## [4.6.1] - 2026-09-02
+
+Research only. Nothing about a collision looks or behaves differently.
+
+### Changed
+
+- The consequences of assaulting an NPC are recorded, along with what is
+  still unknown about them. Punching someone lowers their own relationship
+  with the player and nobody else's, capped so a second punch costs nothing
+  further; an unsettled crime depresses the whole town at once and lifts
+  afterwards; and 0.2 is the threshold below which an NPC stops dealing with
+  the player, which the game's own `payToTalk` remedy exists to lift them
+  over. None of it is caused by this mod: the measurements were taken on
+  foot, the last of them with every mod file parked.
+
 ## [4.6.0] - 2026-09-02
 
 ### Added

@@ -12467,3 +12467,369 @@ proportionally. Both are console values and a save reload wipes them.
 
 Note that `stamina` reads 150 on the player rather than 100, so setting it to
 100 lowers it.
+
+---
+
+## Corrections to the assault aftermath, and what a beaten NPC actually does
+
+Several claims made earlier in this session were wrong and are corrected here.
+
+### No state reading beyond about 25 m is trustworthy
+
+Three separate NPCs were called stuck on readings taken at 40 to 80 m, after
+the same session had already established, with a beggar at 116 m, that a
+distant actor reads as motionless because its AI is not ticking. The engine
+carries `wh::xgenaimodule::BehaviorTree::C_LODCombat`, so AI level of detail
+is real. The one NPC that genuinely was wedged, `rat_man12`, was read at 23 m.
+
+A useful tell: an unsimulated actor's position is identical to the decimal
+place across samples, while a simulated one that happens to be standing still
+still jitters.
+
+### `Lying` at full health is a routine activity
+
+The merchant was found in `Lying` and taken for injured or stuck. At the same
+moment ten NPCs within 80 m were `Lying`, **every one at 100 health**,
+including six guards, a scribe and a villager. It is a scheduled rest, not
+damage and not a fault.
+
+### An injured NPC does heal
+
+The claim that an NPC never heals, which the auto-cure suppression exists to
+work around, does not hold in general. The merchant's health was measured
+recovering on its own from 67.4 to 79.7 with nothing done to him.
+
+### What a beaten NPC actually does
+
+Repeated across two runs, the second on a fresh reload with a baseline of
+0.5378 on the victim and both controls:
+
+1. Punched on foot, with none of this mod running, he flees.
+2. The rider surrenders and the crime is settled.
+3. He **returns to his own stall**. His daycycle is intact and he is not
+   displaced permanently.
+4. He flees again as soon as the rider approaches, and runs far enough to
+   leave the streaming radius entirely.
+
+So the assault does not break the NPC. It leaves him unwilling to be near the
+player, which makes his shop unusable while it lasts.
+
+Whether the relationship value is what drives the flee is inference rather
+than measurement: two NPCs support it, one at `-0.0000` who fled and one at
+0.7192, above baseline after the rider surrendered to him, who did not. The
+value itself did not decay across four in-game days.
+
+`soul:ModifyPlayerReputation(repChangeName, propagateToFaction)` is the lever
+that would test recovery directly, but every reputation change name
+recoverable from behavior data is a penalty, and the `reputation_change`
+table's rows do not come back through the `Database` bind.
+
+## The aversion triggers at six meters, and vanilla sells the cure
+
+### The flee is a recognition reaction, not a permanent state
+
+Sampled every two seconds while the rider walked in on a merchant beaten
+several in-game days earlier:
+
+| time | range | his speed | state |
+|---|---|---|---|
+| t+18 to t+24s | ~32 m | 0.00 | `ADLG_Speak`, `ADLG_Emphasis`, hawking his wares |
+| t+34 to t+38s | 19 to 12 m | 0.74 to 0.89 | walking normally at his stall |
+| t+42 to t+44s | 7.5 to **5.8 m** | **0.00** | `MotionIdle`, standing still |
+| t+46s | 7.6 m | 1.95 | starts moving |
+| t+48s | 16.9 m | **4.80** | full flight |
+
+He is not avoiding the player across the town. He works his stall untroubled
+until the rider is close enough to recognize, barks, and runs. That is why he
+keeps returning and why he keeps being lost again.
+
+### 0.2 is the threshold, and the game sells a way over it
+
+`Scripts/Script/Crime.lua` carries the whole mechanism:
+
+    function CrimeUtils.IncreasePayToTalkReputation (entity)
+        local soul = assert(entity.soul, ...)
+        for _ = 1, 4 do
+            soul:ModifyPlayerReputation('payToTalk')
+            if soul:GetRelationship(player.this.id, 'Current') >= 0.2 then
+                return
+            end
+        end
+
+with `CrimeUtils.CalcPayToTalkPrice` charging
+`700 * persuadeToTalkWithLowReputationPriceMultiplier`, a multiplier defined
+per social class in `Scripts/Script/SocialClass.lua` and ranging from 1 to 5.
+
+Measured on a control: one `ModifyPlayerReputation('payToTalk')` moved
+`GetRelationship` from 0.3948 to 0.5337, **+0.1389**, and the price for that
+merchant read **2100**.
+
+So an NPC beaten below the 0.2 threshold is recoverable by paying him, in two
+applications from zero, and the shop is not lost. The rider's judgment that
+Warhorse would not ship a permanent loss was correct, and several hours were
+spent looking for a decay curve when the intended remedy is a transaction.
+
+The one thing still unresolved is reaching the dialog at all, since the
+aversion makes him run at about six meters.
+
+### Note
+
+`rat_merchant_shop2`, a control, was left 0.1389 higher than it started by
+the proof above. A save reload restores it.
+
+## The 0.2 threshold is real, and only a beating to submission goes under it
+
+The resolving comparison. Both done on foot with none of this mod running,
+both followed by surrendering and paying the fine.
+
+| what the rider did | victim's relationship | against the 0.2 threshold | behavior |
+|---|---|---|---|
+| one punch on a shop guard | **0.2548** | **above** | back at his post `Leaning`, entirely normal |
+| a merchant beaten to a yield | **-0.0000** | **below** | flees at about 6 m, will not deal |
+
+So ordinary play is fine. A punch costs standing and leaves the victim above
+the line where he still deals with the player. The failure appears only when
+a victim is beaten all the way down.
+
+### At zero, the game's own remedy has nothing to grip
+
+`ModifyPlayerReputation('payToTalk')` behaves like this on a healthy NPC:
+
+| apply | value | delta |
+|---|---|---|
+| start | 0.5337 | |
+| 1 | 0.6726 | **+0.1389** |
+| 2, 3, 4 | 0.6726 | +0.0000 |
+
+It raises toward a ceiling near 0.67 and then does nothing, which is the
+`reputation_cap` column of the `reputation_change` table.
+
+Applied to the merchant sitting at `-0.0000` it moved him by **exactly
+nothing**, not a smaller amount. Sending `combat:stimulus:standDownRequest`
+and a daycycle restart first changed his animation state from `MotionTurn` to
+`MotionIdle` but did not unblock the raise, so a live combat state is not what
+gates it. His superfaction and perceived superfaction both read 3, matching
+his own faction, so it is not a temporary hostile faction either. Every
+variant of the read agrees: `GetRelationship` with the wuid, with
+`this.id`, and with the `Current` and `Base` second arguments all return the
+same figure.
+
+What blocks it is unidentified. The `reputation_change` table carries a
+`can_change_hostility` column and reputation names pick up a
+`_noChangeHostility` suffix elsewhere, so hostility is tracked separately from
+the number and is the leading suspect. The table's rows do not come back
+through the `Database` bind, so the row for `payToTalk` could not be read.
+
+### None of this is the mod's
+
+Every measurement above was taken on foot with the mod uninvolved. What the
+mod contributes is a victim willing to fight; the fists and the consequences
+of them are the player's, and a player could reach all of it in vanilla.
+
+### Correction: both merchant runs were a single punch
+
+The entry above attributed the merchant's `-0.0000` to being "beaten to a
+yield" and the guard's 0.2548 to "one punch". **That is wrong.** The rider
+punched the merchant once, exactly as he punched the guard once. Both were
+followed by surrendering and paying the fine, and the merchant run began from
+a fresh reload with the victim and both controls at 0.5378.
+
+So the corrected comparison is:
+
+| victim | role | one punch, fine paid | drop |
+|---|---|---|---|
+| `rat_shop_guard_butcher` | security | 0.5378 to **0.2548** | 0.283 |
+| `rat_merchant_shop3` | merchant | 0.5378 to **-0.0000** | 0.538 |
+
+The same action cost the merchant roughly twice what it cost the guard, and
+took him under the 0.2 threshold while the guard stayed above it. **Why is not
+established.**
+
+Social class does not explain it. `Scripts/Script/SocialClass.lua` carries
+`persuadeToTalkWithLowReputationPriceMultiplier` per class, which prices the
+remedy, but no multiplier on the penalty itself.
+
+Candidates, none tested:
+
+- the blow landed at a different `hit_melee_*` strength, which
+  `sb_switch_hitreactions.xml` selects from `hit.strength` at thresholds of
+  3, 4 and 6
+- the two took different branches of the hit handler entirely, the guard
+  being a soldier who arrests and the merchant a civilian who flees, and the
+  civilian branch creating `assault` information the soldier branch does not
+- the guard's encounter resolved, through the arrest, while the merchant's
+  never did, and something continued to apply while he fled
+
+The practical conclusion drawn in the entry above, that ordinary play is safe
+and only a beating goes under the threshold, **does not hold** and is
+withdrawn. A single punch put a merchant under it.
+
+### Two effects, and the larger one is town-wide
+
+Reading 34 humans within 50 m at the end of the session: mean relationship
+**0.2346**, min -0.2501, max 0.6532, against a 0.5378 baseline measured
+earlier the same evening.
+
+**The whole town's standing with the player is sliding**, and it is sliding
+for NPCs the rider never touched. `rat_shop_guard_general`, never assaulted,
+went from about 0.54 to 0.2488 while the session ran. `rat_merchant_shop2`,
+raised deliberately to 0.6726 by the `payToTalk` proof, read -0.1401 later.
+
+So there are two effects and the larger is not the per-victim one:
+
+- a personal penalty on the victim, real but smaller than earlier entries
+  claimed
+- a town-wide slide driven by the rider's accumulated crime record, which
+  drags everyone toward the 0.2 threshold together
+
+Every absolute comparison in the entries above is contaminated by the second.
+The victim at the bottom of the distribution is not uniquely branded; he is
+the low end of a population that fell. A playthrough that does not include a
+night of assault testing would not see this.
+
+### Shop guards are renegades, and renegades keep no grievance
+
+`soul:GetSocialClass().SoulCrimeRoleId` reads **3** for the `security` class,
+which the `crimeSystemRole` enum names **renegade**, not soldier. The renegade
+branch of the hit handler in `sb_combat.xml` is the shortest of the three:
+
+    if crimeSystemRole == renegade:
+        t_state = fight, opponent = realAttacker
+
+with no `CreateInformation label='assault'` anywhere in it. The soldier branch
+creates one whenever the attacker is the player, and the civilian branch
+creates one on the path where the victim declines to fight.
+
+That is a concrete mechanical reason a shop guard leaves no lasting grievance
+where a merchant or a villager, both `civilian` and both `SoulCrimeRoleId` 1,
+does.
+
+## Resolution: three effects stacked, and only one of them lasts
+
+Jail was tested on the assumption it cleared something a fine does not. It
+does not. Measured before seven days in jail and after, with a further punch
+in between:
+
+| | before jail | after jail and another punch |
+|---|---|---|
+| `rat_merchant_shop3` | **0.2314** | **0.2314** |
+| three controls | 0.4259 | 0.4259 |
+
+Identical. Jail moved nothing, and the victim was already above the 0.2
+threshold before serving it. He traded normally afterwards, and would have
+traded beforehand.
+
+**The second punch cost nothing.** He was already at the floor for that
+reputation change, which is the `reputation_cap` column: `hit_melee_*` pushes
+a person down only so far, and repeat offenses against the same person do not
+compound.
+
+### What was actually happening
+
+Three effects, mistaken for one another repeatedly across the session:
+
+1. **A personal penalty**, about 0.22 below the victim's neighbors. Capped,
+   does not compound, and did not decay over the spans measured.
+2. **A large transient depression of the whole town's standing while a crime
+   is unsettled.** This is what took a 0.54 baseline to a 0.23 mean and
+   dragged NPCs the rider never touched down with it, `rat_shop_guard_general`
+   from about 0.54 to 0.2488 among them.
+3. **Recovery once the crime settles**, after which everyone returned to a
+   shared 0.4259.
+
+The victim fled because 1 and 2 together put him under 0.2. When 2 lifted he
+cleared the threshold with the personal penalty still in place, and dealt with
+the player again.
+
+**Paying a fine does work.** It is not instant, and every observation of a
+victim fleeing after a fine was made inside the window where the unsettled
+crime was still depressing the town. Jail passed seven days, which guaranteed
+the window had closed; a fine and some time reaches the same place. There is
+no missing mechanism, and the earlier suspicion of a design oversight is
+withdrawn.
+
+### What this cost
+
+Most of a session, because the absolute value was read as if it described the
+victim when it mostly described the player's current standing with the town.
+The gap against untouched neighbors was the correct instrument throughout and
+was only adopted late.
+
+### Correction: the jail comparison was two readings after jail
+
+The entry above concluded that jail does nothing, from a pair of readings
+described as before and after seven days served. **Both were taken after.**
+The rider had already served when the first was run, so the pair shows only
+that nothing changed between two post-jail moments, which is not the
+comparison that was claimed.
+
+Everything the entry infers from that pair is withdrawn:
+
+- that jail moves nothing
+- that the victim was already above the threshold before serving
+- that the recovery to 0.4259 happened without jail
+- that a fine and time reach the same place
+
+The one measurement that survives is that a second punch cost the victim
+nothing, since both readings bracket it. `hit_melee_*` has a floor per person
+and repeat offenses against the same person do not compound.
+
+**Whether jail clears something a fine does not is untested.** It needs the
+A/B the rider proposed: punch, pay the fine, observe; then reload, punch,
+serve the sentence, observe. Readings must be taken at each stage rather than
+at the end, since the town-wide depression while a crime is unsettled moves
+faster than the personal penalty and will otherwise be mistaken for it again.
+
+That mistake, reading a pair of samples as a before and after when both fell
+on the same side of the event, is the third time in this session that a
+conclusion outran the measurement.
+
+## Parked: what is known about assault aftermath, and what is not
+
+The investigation stops here. The remaining question needs in-game time to
+pass, and passing it is too expensive to be worth the answer: seven days
+served in jail costs about ten real minutes of watching a wheel turn, and the
+speed-up that made it bearable is `VF_CHEAT`, so it needs `-devmode`, which a
+plain launch does not have.
+
+### Established
+
+- **A punch lowers the victim's own relationship with the player** and nobody
+  else's, by an amount capped per person. A second punch on the same victim
+  cost nothing.
+- **An unsettled crime depresses the whole town at once**, including NPCs the
+  player never touched, and this effect is far larger than the personal one.
+  It lifts afterwards; the town returned to a shared 0.4259.
+- **0.2 is the threshold** at which an NPC stops dealing with the player.
+  `CrimeUtils.IncreasePayToTalkReputation` exists to lift someone over it,
+  priced by `CalcPayToTalkPrice` at 700 times a per social class multiplier.
+- **`payToTalk` raises by 0.1389 toward a ceiling near 0.67** and then does
+  nothing, which is the `reputation_cap` column.
+- **Shop guards are `renegade`**, `SoulCrimeRoleId` 3, and that branch of the
+  hit handler creates no assault information at all, where the soldier and
+  civilian branches both do.
+- **The aversion is a recognition reaction at about six meters.** The victim
+  works his stall untroubled until the player is close, then barks and runs.
+- **None of it is this mod's.** Every measurement was taken on foot, and the
+  final run was taken with every mod file parked and the `Mods` folder empty.
+
+### Not established
+
+- Whether serving a sentence clears something paying a fine does not. The A/B
+  was set up and abandoned before the first reading.
+- Whether the personal penalty decays over long spans. It did not move across
+  the days measured, but every one of those measurements sat inside the
+  town-wide depression and cannot be trusted.
+- What blocks `payToTalk` on a victim at zero. Hostility tracked separately
+  from the number is the leading suspect, from the `can_change_hostility`
+  column and the `_noChangeHostility` suffix, and is unconfirmed.
+
+### The methodological lesson
+
+Three conclusions in this session outran their measurements: NPCs called stuck
+from outside simulation range, a decay curve inferred from an absolute value
+that was tracking something else, and a before-and-after pair where both
+samples fell on the same side of the event. In each case the fix was the same
+and was available from the start: **read the victim against untouched
+neighbors, never the absolute number, and confirm which side of an event each
+sample was taken on.**
