@@ -12069,3 +12069,57 @@ mistake made by hand would have been delivered and silently discarded.
 `alwaysFightWhenHit` decides that a fight is the answer. It does not decide
 how the fight goes, and nothing in it makes a coward brave. A beggar at 0.169
 morale surrendering to a mounted man immediately is the game working.
+
+---
+
+## The crime lands on the player's own punch, and `SurrenderIn` broke the watch
+
+Two provoked brawls, `rat_ruch` and `rat_man19`, both civilians, both
+provoked on the third shove.
+
+### The crime timing is right, and it is the player's
+
+**No crime is reported when the victim turns hostile.** It is reported when
+the rider swings back. In the second encounter the rider threw no punch at
+all: the victim fought, guards joined and punched the rider, and still no
+crime existed. One punch from the rider, and the charge appeared.
+
+That is the correct division and it comes out of the behavior data rather
+than out of this mod. The provocation is a stimulus the victim answers; the
+assault is something the player does.
+
+A provoked **guard** is a different matter and is left that way deliberately.
+The soldier branch of the hit handler raises assault information whenever the
+attacker is the player, with no `real` check and no context option in front of
+it, so a provoked guard arrests rather than brawls. An earlier revision gated
+soldiers out of the roll. That gate was wrong: a guard exercising authority a
+townsman does not have is the distinction the crime-free brawl exists to draw,
+not a fault to design around. The gate has been removed.
+
+### `SurrenderIn` defeated the state watch
+
+Both incidents closed as `why=natural cleared=true state=SurrenderIn
+stoodDown=false replanned=false`, and both victims were left running
+afterwards. `rat_man19` was measured circulating between two points at
+**4.79 m/s sustained** for several minutes.
+
+The classifier tested `^Combat` for "the incident is still running" and
+treated everything else as settled once it stopped moving. A victim mid-yield
+stands in `SurrenderIn`, which carries no `Combat` prefix and is perfectly
+still, so three consecutive samples of it read as settled and the watch
+closed the incident while the victim was in the middle of surrendering.
+
+`why=natural` was therefore a false positive on both runs, and the question of
+whether the game resolves its own fights is **still unanswered**: no true
+natural resolution has been observed yet, only a misread one.
+
+The engine's surrender states all share a prefix, and all of them are now
+treated as engaged: `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
+`SurrenderDialogToMove`, `SurrenderForcedWait`, `SurrenderToCombat`.
+
+### The stand-down works on a circulating flee, more slowly
+
+Applied by hand to `rat_man19` while he ran. Speed by sample afterwards:
+3.94, 2.75, 3.45, then 1.58 m/s, decelerating below the 3.5 m/s flee
+threshold to a walking pace. Slower than the beggar, who reached `MotionIdle`
+inside a second, but the same outcome.

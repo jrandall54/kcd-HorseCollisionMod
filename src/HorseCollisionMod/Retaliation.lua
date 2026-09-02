@@ -33,6 +33,13 @@
 -- opening with an attack. Guards who witness the brawl join it, because the
 -- game models what a bystander perceived. Neither is arranged here.
 --
+-- ### Guards are included, and behave differently on purpose
+--
+-- A provoked guard arrests the rider rather than brawling with him, because
+-- the soldier branch of the hit handler raises assault information whenever
+-- the attacker is the player. That is a guard using the authority a guard
+-- has, and the crime-free brawl here is for the people who lack it.
+--
 -- ### Women do not fight
 --
 -- `sb_combat.xml` tests `b_soul.gender == male` **after** the context option
@@ -78,31 +85,32 @@ function HorseCollisionMod:HasContexts()
 			and type(contexts.SetNonpersistentOption) == "function"
 end
 
---- Whether this victim is one the game would let brawl without a charge.
+--- Whether this victim is one the game would let fight back at all.
 --
--- Three gates, and all three are the game's own rather than this mod's
--- preference.
+-- **Gender** is the only real gate, and it is the game's rather than this
+-- mod's. `sb_combat.xml` tests `b_soul.gender == male` after the context
+-- option is consulted and fails everyone else outright.
+-- `alwaysFightWhenHit` removes the morale comparison and nothing more, so a
+-- provoked woman falls through to the report or flee branches and would walk
+-- off to fetch a guard over an incident that raised no crime.
 --
--- **Gender.** `sb_combat.xml` tests `b_soul.gender == male` after the context
--- option is consulted and fails everyone else outright. `alwaysFightWhenHit`
--- removes the morale comparison and nothing more, so a provoked woman falls
--- through to the report or flee branches and would walk off to fetch a guard
--- over an incident that raised no crime.
+-- **Guards are deliberately not excluded.** They behave differently, and the
+-- difference is correct: the soldier branch of the hit handler calls
+-- `CreateInformation label='assault'` whenever the attacker is the player,
+-- with no `real` check and no context option in front of it, so provoking one
+-- is a crime and ends in an arrest. That is a guard exercising the authority
+-- a guard has, and the crime-free brawl this file builds is for the people
+-- who lack it. An earlier revision gated soldiers out; the gate was wrong and
+-- has been removed.
 --
--- **Crime system role.** The soldier branch of the hit handler calls
--- `CreateInformation label='assault'` unconditionally whenever the attacker
--- is the player. There is no `real` check on it and no context option in
--- front of it, so provoking a guard is always a crime and always ends in an
--- arrest. Observed exactly that way: a walk-staggered guard turned and tried
--- to arrest the rider the moment he was provoked. Only civilians are offered
--- the roll.
---
--- **Contexts.** Without the context system there is no way to set the option
--- at all.
+-- `soul:GetSocialClass()` carries `SoulCrimeRoleId` and a class `Name` if the
+-- distinction is ever wanted: a village guard reports `soldier` and 2 against
+-- a townsman's `civilian` and 1. It is read here only for the telemetry, so a
+-- log can be read afterwards for who was provoked.
 --
 -- @tparam table npc victim entity
--- @treturn boolean true when a provoked fight is possible and is not a crime
--- @treturn string why not, when it is not
+-- @treturn boolean true when a provoked fight is possible
+-- @treturn string why not, when it is not, or the role when it is
 function HorseCollisionMod:CanRetaliate(npc)
 	local gender = nil
 
@@ -114,25 +122,17 @@ function HorseCollisionMod:CanRetaliate(npc)
 		return false, "gender=" .. tostring(gender)
 	end
 
-	local role = nil
-	local roleName = nil
-
-	pcall(function()
-		local class = npc.soul:GetSocialClass()
-
-		role = class.SoulCrimeRoleId
-		roleName = class.Name
-	end)
-
-	if role ~= self.CrimeSystemRole.Civilian then
-		return false, "role=" .. tostring(roleName) .. "/" .. tostring(role)
-	end
-
 	if not self:HasContexts() then
 		return false, "no-contexts"
 	end
 
-	return true, ""
+	local roleName = "?"
+
+	pcall(function()
+		roleName = tostring(npc.soul:GetSocialClass().Name)
+	end)
+
+	return true, roleName
 end
 
 --- Counts a shove against a victim and returns how many they have taken.
@@ -226,20 +226,35 @@ end
 -- recovery polls, and classifies it alongside how far the victim moved since
 -- the previous sample.
 --
--- * `fighting` - the state carries the `Combat` prefix. `CombatMovement` was
---   observed on a guard closing to two meters, so the prefix is the marker.
--- * `fleeing` - not fighting, but covering ground fast enough that it cannot
---   be an errand. A runaway was measured at 12.95 m and then 16.95 m between
---   samples, against roughly a meter for someone walking to a stall.
+-- * `engaged` - the incident is still running. Two prefixes qualify.
+--   `Combat` is the obvious one, and `CombatMovement` was observed on a guard
+--   closing to two meters. `Surrender` is the one that was missed, and
+--   missing it was a real fault: a victim who yields stands in `SurrenderIn`,
+--   which carries neither prefix under the first version of this test and is
+--   perfectly still, so three samples of it read as settled and the incident
+--   was closed while the victim was in the middle of yielding. Both fights of
+--   that build ended `why=natural state=SurrenderIn` and both victims were
+--   left running afterwards. The engine's surrender states all share the
+--   prefix: `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
+--   `SurrenderDialogToMove`, `SurrenderForcedWait` and `SurrenderToCombat`.
+-- * `fleeing` - not engaged, but covering ground faster than an errand. A
+--   runaway was measured at 4.79 m/s sustained, against roughly a meter per
+--   second for someone walking to a stall.
 -- * `settled` - anything else, which includes every idle and every ordinary
 --   working animation.
 --
 -- @tparam string state the animation state
 -- @tparam number speed meters per second since the previous sample
--- @treturn string one of `fighting`, `fleeing` or `settled`
+-- @treturn string one of `engaged`, `fleeing` or `settled`
 function HorseCollisionMod:ClassifyVictim(state, speed)
-	if state ~= nil and string.find(state, "^Combat") ~= nil then
-		return "fighting"
+	if state ~= nil then
+		if string.find(state, "^Combat") ~= nil then
+			return "engaged"
+		end
+
+		if string.find(state, "^Surrender") ~= nil then
+			return "engaged"
+		end
 	end
 
 	if speed >= (self.Config.RetaliationFleeSpeed or 3.5) then
@@ -285,7 +300,7 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	local elapsed = 0
 	local fledFor = 0
 	local settledFor = 0
-	local sawFight = false
+	local sawEngaged = false
 	local last = nil
 
 	pcall(function()
@@ -325,8 +340,8 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		local speed = moved / (interval / 1000)
 		local what = self:ClassifyVictim(state, speed)
 
-		if what == "fighting" then
-			sawFight = true
+		if what == "engaged" then
+			sawEngaged = true
 			fledFor = 0
 			settledFor = 0
 		elseif what == "fleeing" then
@@ -340,7 +355,7 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		-- Settled has to hold for more than one sample. A fighter between
 		-- exchanges reads as settled for an instant, and closing the incident
 		-- there would end a fight still in progress.
-		if sawFight and settledFor >= 3 then
+		if sawEngaged and settledFor >= 3 then
 			self:EndRetaliation(npc, "natural", false)
 
 			return
@@ -475,13 +490,13 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 		return false
 	end
 
-	local able, why = self:CanRetaliate(npc)
+	local able, note = self:CanRetaliate(npc)
 
 	if not able then
 		if self.Config.LogTelemetry then
 			self:Log("Retaliation " .. tostring(npc:GetName())
 					.. " count=" .. tostring(count)
-					.. " skipped=" .. why)
+					.. " skipped=" .. note)
 		end
 
 		return false
@@ -492,6 +507,7 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 
 	if self.Config.LogTelemetry then
 		self:Log("Retaliation " .. tostring(npc:GetName())
+				.. " role=" .. note
 				.. " count=" .. tostring(count)
 				.. " chance=" .. string.format("%.2f", chance)
 				.. " roll=" .. string.format("%.2f", roll)
