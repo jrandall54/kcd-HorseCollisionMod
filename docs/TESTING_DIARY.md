@@ -11482,3 +11482,64 @@ Nothing. The extender is still a C++ plugin loader with no Lua, still needs an
 address library per build, and is still not something to ship against. The
 value was never the loader; it is the headers, and those are readable without
 installing anything into the game.
+
+---
+
+## Trampled non-guards flee to report the crime, and none of them fights back
+
+Three non-guards ridden down at trot outside a town, at shipped defaults with
+`CollisionIsCrime` on, to settle whether choosing fight or flight is this mod's
+work or the crime system's. Two women and Miller Peshek.
+
+**Every one of them registered being attacked and ran for a guard to report the
+crime. None turned on the rider.**
+
+| victim | gender | speed | reaction | damage | travel at t+10s |
+|---|---|---|---|---|---|
+| `rat_spaAbbess` | female | 6.99 | `hcm_fall_forward` | -5.74 | 2.37 m |
+| `rat_woman11` | female | 6.81 | `hcm_fall_forward` | -5.61 | 6.36 m |
+| `rat_pesek` | male | 6.94 | `hcm_fall_back` | -6.59 | 20.46 m |
+
+All three took `CombatHit ok=true strength=5`, all three recovered without
+intervention, and `ReplanIfStranded` resumed all three from `MotionIdle` or
+`MotionMovement`.
+
+The travel figures separate walking away from running for help. Between
+t+6000ms and t+10000ms, Peshek covered 19.78 m, a sustained **4.95 m/s** — a
+full run, faster than the 4.5 m/s trot threshold that floored him. The two
+women managed 1.40 m/s and 0.42 m/s over the same window, which is a brisk walk
+and a limp, and both were still accelerating when sampling stopped.
+
+### What this settles
+
+The flight half of retaliation already exists and costs nothing to keep. It
+comes from the crime system, driven by the player-attributed `combat:hit` this
+mod has sent since 4.3.0, and it produces a witness walking to a guard rather
+than an NPC ignoring the impact.
+
+The fight half does not happen at all. Three victims, three reports, no
+aggression. Nothing in the crime response turns a trampled civilian hostile,
+so an NPC that comes after the rider has to be made hostile deliberately.
+
+### How angriness is reachable
+
+`C_ScriptBindRPGModule` is the Lua `RPG` table, and it registers
+`GetFactions()`, `GetFactionById(id)` and `IsPublicEnemy(wuid)`. The faction
+objects those return carry `C_FactionScriptBind`, which registers
+`GetAngriness()`, `SetAngriness(float)` and `AddAngriness(float)` alongside
+`GetReputation()` and `AddReputation(sEnumName)`. That is a complete path from
+Lua to faction hostility, without a behavior patch and without the script
+extender.
+
+The binary carries a console command for the same data:
+
+    wh_rpg_angriness [-f FACTION_ID [-a ANGRINESS]] [-p]
+
+which dumps all faction angriness and takes a value, so angriness can be
+watched across a collision before any code is written against it. The engine
+also names `GetActorAngriness` and `GetFactionAngriness` as XGen functions and
+ships an `angriness_enum` table and `C_AngrinessEnumDatabase`, so angriness is
+banded rather than a bare float.
+
+None of the above is confirmed in game. The bind signatures are reverse
+engineered against 1.9.8 and carry the author's caveat.

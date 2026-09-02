@@ -429,22 +429,31 @@ rather than missing.
       shared soul and a behavior patch, `man_flee` for the thief and
       `man_chase` for his pursuer.
 
+      Half of it already works. Three non-guards ridden down at trot outside
+      a town each registered the attack and ran for a guard to report the
+      crime, Miller Peshek at a sustained 4.95 m/s. **Flight is the crime
+      system's and needs nothing built.** None of the three fought back, so
+      an NPC that comes after the rider has to be made hostile deliberately.
+
       No shipped script makes an NPC hostile: the only hostility call in the
       whole vanilla tree is the read `soul:IsInCombatDanger()`. That says
       what vanilla does, not what the engine exposes, and `references/libKCD1`
-      shows the engine exposes a good deal more.
-      `C_FactionScriptBind` registers `SetAngriness(float)`,
-      `AddAngriness(float)` and `AddReputation(sEnumName)`, and
-      `C_ScriptBindXGenAIModule` registers `SetBrainVariable`, which is how
-      the chase tree's own `event_chase_state` would be driven without the
-      patch nodes. All of it is reverse engineered and none of it is
-      confirmed in game.
+      shows the engine exposes a good deal more. The Lua `RPG` table
+      registers `GetFactions()`, `GetFactionById(id)` and `IsPublicEnemy()`,
+      and the faction objects they return register `GetAngriness()`,
+      `SetAngriness(float)`, `AddAngriness(float)` and
+      `AddReputation(sEnumName)`. `C_ScriptBindXGenAIModule` registers
+      `SetBrainVariable`, which is how the chase tree's own
+      `event_chase_state` would be driven without the patch nodes. All of it
+      is reverse engineered and none of it is confirmed in game.
 
-      Order of work. First ride down three non-guards at trot, away from town
-      so no guard intervenes, and record whether each attacks, flees or walks
-      away: the crime hit may already do this and cost nothing. Only if it
-      does not, probe the binds above for existence from the console before
-      designing anything around them.
+      Order of work. Watch `wh_rpg_angriness`, the engine's own dump of every
+      faction's angriness, across a trot collision, to learn whether the
+      crime hit already moves it and what the resting values are. Then probe
+      `RPG.GetFactions()` from the console for existence before designing
+      anything around it. Angriness is banded rather than a bare float —
+      the game ships an `angriness_enum` table — so the band a victim would
+      have to reach is part of what the probe has to establish.
 - [ ] The collision bark fires while the victim is still falling or lying as
       a ragdoll, which is nobody's idea of speaking. It should land as they
       get up.
