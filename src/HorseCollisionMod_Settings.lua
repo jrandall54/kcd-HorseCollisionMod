@@ -85,6 +85,8 @@ HorseCollisionModSettings = {
 	-- steps in only if they leave the fight and keep running, which the
 	-- game sometimes does not resolve on its own.
 	RetaliationFleeSpeed     = 3.5,   -- m/s that counts as running away
+	RetaliationFleeIgnoreRange = 25.0,-- how far off you must be first; running
+	                                  -- from someone stood over you is fair
 	RetaliationFleeSamples   = 8,     -- seconds of that before stepping in
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 

@@ -237,16 +237,24 @@ end
 --   left running afterwards. The engine's surrender states all share the
 --   prefix: `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
 --   `SurrenderDialogToMove`, `SurrenderForcedWait` and `SurrenderToCombat`.
--- * `fleeing` - not engaged, but covering ground faster than an errand. A
+-- * `fleeing` - not engaged, covering ground faster than an errand, **and**
+--   the rider is far enough away that the running is no longer about him. A
 --   runaway was measured at 4.79 m/s sustained, against roughly a meter per
 --   second for someone walking to a stall.
+--
+--   The range test matters more than it looks. Every runaway observed while
+--   developing this was observed by following the runaway, and a man who has
+--   just been knocked down and is being pursued by the person who did it has
+--   every reason to keep going. Fleeing with the rider on top of him is
+--   counted as engaged instead: the incident is live, nothing is sent, and
+--   the victim is left to do the sensible thing.
 -- * `settled` - anything else, which includes every idle and every ordinary
 --   working animation.
 --
 -- @tparam string state the animation state
 -- @tparam number speed meters per second since the previous sample
 -- @treturn string one of `engaged`, `fleeing` or `settled`
-function HorseCollisionMod:ClassifyVictim(state, speed)
+function HorseCollisionMod:ClassifyVictim(state, speed, playerRange)
 	if state ~= nil then
 		if string.find(state, "^Combat") ~= nil then
 			return "engaged"
@@ -258,7 +266,14 @@ function HorseCollisionMod:ClassifyVictim(state, speed)
 	end
 
 	if speed >= (self.Config.RetaliationFleeSpeed or 3.5) then
-		return "fleeing"
+		-- Running away from someone standing over you is not a fault, and
+		-- interrupting it would be. Only a victim still running with the
+		-- rider well clear has a flee that has outlived its cause.
+		if playerRange >= (self.Config.RetaliationFleeIgnoreRange or 25) then
+			return "fleeing"
+		end
+
+		return "engaged"
 	end
 
 	return "settled"
@@ -338,7 +353,20 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		end)
 
 		local speed = moved / (interval / 1000)
-		local what = self:ClassifyVictim(state, speed)
+		local playerRange = 999
+
+		pcall(function()
+			local pp = player:GetWorldPos()
+			local p = npc:GetWorldPos()
+
+			playerRange = self:VectorLength({
+				x = p.x - pp.x,
+				y = p.y - pp.y,
+				z = p.z - pp.z
+			})
+		end)
+
+		local what = self:ClassifyVictim(state, speed, playerRange)
 
 		if what == "engaged" then
 			sawEngaged = true

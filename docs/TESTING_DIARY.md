@@ -12123,3 +12123,45 @@ Applied by hand to `rat_man19` while he ran. Speed by sample afterwards:
 3.94, 2.75, 3.45, then 1.58 m/s, decelerating below the 3.5 m/s flee
 threshold to a walking pace. Slower than the beggar, who reached `MotionIdle`
 inside a second, but the same outcome.
+
+---
+
+## Every runaway was observed by chasing the runaway
+
+`rat_man19` was still circulating after a hand-applied stand-down slowed him
+from 4.79 m/s to 1.58 m/s. Probed for a cause, expecting a temporary hostile
+superfaction, since the context catalog carries
+`suppressTempSuperfactionClearingInCombatVersusDude` and `combat:fightOptions`
+carries `clearTempSuperfactionAgainstPlayer`.
+
+That was not it. `GetSuperfaction` and `GetPerceivedSuperfaction` both read 3,
+identical, against the player's 5. He was in no hostile faction at all.
+
+**`distToPlayer=2.53`.** The rider was two and a half meters behind him.
+
+That confound runs through every runaway recorded today. The beggar followed
+out of town, and this one: in each case the flee that "would not end" was
+being watched by the one person whose presence sustains it. The stand-down
+demonstrably worked on both, and both resumed once the rider closed again,
+which is a fresh flee rather than an old one persisting.
+
+### Reading an NPC at distance proves nothing
+
+With the rider 116 m away, six samples two seconds apart reported
+`mps=0.00` and a position identical to the decimal, while the animation state
+stayed `MotionMovement` rather than becoming an idle. That is an actor frozen
+outside the simulation radius, not one that settled. The engine carries
+`wh::xgenaimodule::BehaviorTree::C_LODCombat`, so AI level of detail exists.
+
+**Any observation of a distant NPC's state is worthless.** A victim has to be
+watched from close enough to be simulated and far enough not to be the thing
+being fled, which is a narrow band, and every measurement taken today outside
+it should be discarded.
+
+### What the mod does about it
+
+A running victim is only a runaway when the rider is more than
+`RetaliationFleeIgnoreRange` away, 25 m by default. Running from someone
+standing over you is correct behavior and interrupting it would be the fault.
+Below that range a running victim is classified as engaged: the incident stays
+open, nothing is sent, and the victim is left to do the sensible thing.

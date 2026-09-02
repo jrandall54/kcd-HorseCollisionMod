@@ -161,6 +161,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationFleeSpeed meters per second above which a victim who has
 --   left combat is running away rather than walking somewhere
+-- @field RetaliationFleeIgnoreRange meters the rider must be clear by before
+--   a running victim counts as a runaway rather than as someone sensibly
+--   getting away from him
 -- @field RetaliationFleeSamples consecutive samples of that before the mod
 --   decides a flee has outlived its cause and intervenes
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
@@ -280,6 +283,7 @@ HorseCollisionMod.Config = {
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
 	RetaliationFleeSpeed     = 3.5,
+	RetaliationFleeIgnoreRange = 25.0,
 	RetaliationFleeSamples   = 8,
 	RetaliationCeilingSec    = 120,
 
