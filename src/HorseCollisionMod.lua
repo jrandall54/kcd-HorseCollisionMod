@@ -494,6 +494,22 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- telemetry readable rather than a wall of lines.
 HorseCollisionMod.RetaliationPollMs = 1000
 
+--- How often a provoked victim is checked for having entered the fight.
+--
+-- Faster than the incident poll above, because this one is racing a victim
+-- who is standing still and not fighting: every quarter second he spends in
+-- a guard he was never going to break out of is a quarter second the shove
+-- reads as having done nothing.
+HorseCollisionMod.RetaliationReleaseMs = 250
+
+--- How many of those checks are made before giving up on the release.
+--
+-- Twenty at a quarter second is five seconds, which is far longer than the
+-- behavior tree takes to reach the fight subtree. Bounded so a victim who
+-- never arrives, because the provocation was refused or he was interrupted,
+-- cannot leave a timer running for the rest of the session.
+HorseCollisionMod.RetaliationReleaseTries = 20
+
 
 -- How the ragdoll handover is watched, for the tier that hands recovery back
 -- to the game. `GetPhysicalizationProfile` reads `alive` throughout a ragdoll

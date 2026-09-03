@@ -203,3 +203,84 @@ function HorseCollisionMod:SendProvocationHit(npc, playerEnt)
 
 	return ok
 end
+
+--- Releases a defense-only fighter into actually attacking.
+--
+-- A civilian the player provokes enters the fight carrying
+-- `startInDefenseOnly`, which `sb_combat_fight.xml` turns into
+-- `$offense = false`. Such a fighter squares up, holds his guard and never
+-- strikes, which is what a provoked victim was observed doing for twenty-two
+-- seconds before the rider swung first.
+--
+-- Exactly one node in that subtree sets the flag true. It reads the
+-- `hitReaction` inbox and requires a strength above `Zero` and a type of
+-- `Melee` or `Bullet`; it then sets `$offense` and registers the attacker as
+-- an opponent. Nothing else in the tree turns offense on, so without this
+-- message the fight the provocation starts cannot become a fight.
+--
+-- `Tickle` is the mildest strength that clears `Zero`, and the type
+-- definition records that it costs the victim no health and only minor
+-- stamina. `Melee` is not a stylistic choice: `Collision`, which is what a
+-- horse impact is, is not one of the two types the condition accepts, so the
+-- horse's own contact can never release a fighter however hard it lands.
+--
+-- ### The attacker named is the victim himself, and that is the whole trick
+--
+-- `sb_switch_hitreactions.xml` reads the `hitReaction` inbox as well, so this
+-- message reaches the assault broadcast described above `SendProvocationHit`,
+-- which is **not** gated on `real` and which charges the rider with brawling
+-- before he has thrown a punch. There is no message that reaches one consumer
+-- and not the other: they share the inbox, so the trick that keeps the
+-- provocation quiet, sending the onward message directly, has no equivalent
+-- here.
+--
+-- What the broadcast does key on is `hit.attacker`. Naming the victim as his
+-- own attacker leaves an assault attributed to nobody the crime system cares
+-- about, and measured against a null control it costs exactly nothing:
+--
+--     attacker = player   victim -0.31, every bystander -0.030
+--     attacker = victim   victim  0.00, every bystander  0.000
+--
+-- The flag is still set, because the condition that guards it tests only the
+-- strength and the type and never looks at who threw the blow. The opponent
+-- the victim fights is not taken from here either: `t_fightParams.opponent`
+-- was set to the player when the provocation was answered, and this message
+-- only adds one alongside it.
+--
+-- @tparam table npc victim entity, who is also named as the attacker
+-- @treturn boolean true when the message was sent
+function HorseCollisionMod:SendOffenseRelease(npc)
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local victimWuid = nil
+
+	pcall(function()
+		victimWuid = XGenAIModule.GetMyWUID(npc)
+	end)
+
+	if not victimWuid then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		local message = Utils.makeTable("hitReaction", {
+			attacker = victimWuid,
+			hitStrength = self.HitReactionStrength.Tickle,
+			hitType = self.HitReactionType.Melee
+		})
+
+		XGenAIModule.SendMessageToEntityData(target, "hitReaction", message)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("OffenseRelease " .. tostring(npc:GetName())
+				.. " ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end

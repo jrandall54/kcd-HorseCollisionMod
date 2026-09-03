@@ -11,8 +11,8 @@
 --
 -- ### How the fight is started
 --
--- Two steps, and both are the game's own machinery rather than anything
--- invented here.
+-- Three steps, and all of them are the game's own machinery rather than
+-- anything invented here.
 --
 -- `alwaysFightWhenHit` is a context option from the shipped catalog in
 -- `Scripts/Script/ContextData.lua`. Vanilla quests set options exactly this
@@ -24,6 +24,14 @@
 -- Then a `combat:hit` carrying `real = false`, which the victim's combat
 -- subbrain answers without the reputation system ever seeing it. That is what
 -- makes a provoked scuffle a scuffle rather than an assault charge.
+--
+-- Those two decide that he fights. A third decides that he attacks, and it is
+-- needed because the first two do not: a victim struck by a player who is not
+-- already an enemy enters the fight with `startInDefenseOnly`, holds his
+-- guard and never strikes. `ReleaseWhenFighting` waits for him to reach the
+-- fight and sends the one message that turns offense on. See
+-- `SendOffenseRelease` for why it is a `hitReaction` and why it costs the
+-- victim nothing.
 --
 -- ### What the game decides, and this file does not
 --
@@ -219,6 +227,64 @@ function HorseCollisionMod:HoldRetaliation(npc)
 	self:WatchRetaliation(npc)
 
 	return true
+end
+
+--- Waits for a provoked victim to reach the fight, then lets him throw a punch.
+--
+-- The release cannot travel with the provocation. The node that reads it runs
+-- inside the fight subtree, which the victim is not in yet when the
+-- provocation is sent, and `sb_combat.xml` clears that inbox on the way in.
+-- A message sent too early therefore has nobody to read it, or is discarded
+-- by the entry that follows.
+--
+-- The victim's own animation state says when he has arrived, so it is polled
+-- rather than waited out. A fixed delay would be a guess about how long a
+-- behavior tree takes to switch subtrees, and the answer is readable instead:
+-- every combat state the tree reports carries the `Combat` prefix, and the
+-- guard the victim holds during the stall reports `CombatIdle`.
+--
+-- Giving up is logged rather than silent, because a victim who never reaches
+-- the fight is the interesting case: it means the provocation itself was
+-- refused, which the `Retaliation` line above would not have shown.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:ReleaseWhenFighting(npc)
+	local generation = self.TimerTick
+	local interval = self.RetaliationReleaseMs
+	local left = self.RetaliationReleaseTries
+
+	local function attempt()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		if state ~= nil and string.find(state, "^Combat") ~= nil then
+			self:SendOffenseRelease(npc)
+
+			return
+		end
+
+		left = left - 1
+
+		if left > 0 then
+			Script.SetTimer(interval, attempt)
+
+			return
+		end
+
+		if self.Config.LogTelemetry then
+			self:Log("OffenseRelease " .. tostring(npc:GetName())
+					.. " never reached the fight, state=" .. tostring(state))
+		end
+	end
+
+	Script.SetTimer(interval, attempt)
 end
 
 --- What a victim is doing right now, in the terms this file cares about.
@@ -559,6 +625,12 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	-- the stimulus is answered, so one that arrives first is answered the old
 	-- way and the provocation is wasted.
 	self:SendProvocationHit(npc, playerEnt)
+
+	-- The provocation decides that he fights; this decides that he attacks.
+	-- Without it he enters the fight in defense only and holds a guard until
+	-- something else closes the incident, which is the whole of what a
+	-- provoked victim did before it existed.
+	self:ReleaseWhenFighting(npc)
 
 	-- The count is spent. Without this a victim already fighting keeps
 	-- rolling on every further contact during the brawl.

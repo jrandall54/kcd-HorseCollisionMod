@@ -14099,3 +14099,234 @@ forcing the exact original failure again, which needs a victim sitting in the
 0.46-0.63 m band, a health drop past 40, and enough in-game time for the
 auto-cure daycycle to reach them — conditions this fix already removes the
 cause of, so deliberately reproducing them again would not test anything new.
+
+## A stale pak ran alongside the current build, not just instead of it
+
+While testing an unarmed-brawl feature (`human:HolsterWeapon()` in the
+retaliation path), the log showed two `Load screen ended` lines on every load,
+one naming v4.7.1 and the other v4.7.2. That is not the previously documented
+failure mode, where an old pak's copy loads *instead of* the current one. Both
+were live at once: the stale dev pak's old `HorseCollisionMod` table kept its
+own registered listener on the loading-screen event alongside the current
+loose-file table's listener, so two independent copies of the mod's detection
+and retaliation logic ran against the same NPCs for the length of the session.
+`Setting 'RetaliationUnarmed' is not a setting, ignored` was the tell: the old
+instance's `Config` had no such key, so its own `ApplySettings` rejected the
+setting the new instance was reading correctly.
+
+A full `dev_deploy.ps1 -Version dev` rebuild, game fully closed rather than
+reloaded, and a fresh launch replaced the stale pak's contents and cleared the
+duplicate. `-ScriptOnly -Reload` alone does not fix this, because it only
+touches the loose files the current instance reads; the old instance's copy
+lives inside the pak and is untouched by a script-only reload.
+
+## Provoked civilian brawls stall in a defensive standoff, and the mod's own ceiling closes them
+
+Testing the unarmed-brawl feature above surfaced a second, unrelated, and
+larger problem: a provoked brawl does not develop into an exchange of blows on
+its own.
+
+A huntsman-area civilian (`rat_berthold`, role `merchant`) was provoked while
+mounted, then approached on foot. He raised his guard and did not throw a
+punch. The rider threw one; the victim threw one back; then nothing. The
+encounter sat in `state=CombatIdle` until `WatchRetaliation`'s 120-second
+failsafe closed it: `RetaliationEnd rat_berthold why=ceiling ... state=CombatIdle
+rearmed=false`. What read in the moment as the fight "ending randomly" was
+that failsafe, not a natural resolution.
+
+`rearmed=false` also means `IsWeaponDrawn()` was false at the moment the
+victim was provoked, in this case and in every other provocation logged this
+session (`turnaj_benes`, the earlier `rat_berthold`). The holster feature never
+had anything to holster. Whether that is because civilian defense-only brawls
+never draw a weapon at all, or because the check runs before an AI-driven draw
+would happen, is not yet known — but across every sample so far, the weapon
+was already down.
+
+`docs/TESTING_DIARY.md`'s own record of `startInDefenseOnly` explains the
+guard stance: the fight starts in defense only because the player is not
+already flagged an enemy, so the victim blocks rather than opens. It does not
+explain why the fight stays inert after the rider's own punch is answered.
+An earlier entry recorded a victim who *did* keep fighting unprompted and
+guards who joined in swinging, so a standoff is not universal — what decides
+which happens is still open.
+
+This is a defect in the retaliation feature as shipped in 4.6.0, not in
+anything on the branch that surfaced it. `feat/retaliation-unarmed` is parked,
+committed and unmerged, pending a scenario that actually exercises the
+holster path. The stalled brawl is the next thing to investigate.
+
+## Why a provoked victim never swings: `$offense` is never set
+
+`tools/dev_watchfight.lua` samples every human within 10 m once a second,
+along with the player, so a swing and whatever answers it sit in one timeline.
+A provoked merchant was watched through a stall and out the far side of it.
+
+### The stall, measured
+
+Twenty-two consecutive samples with both parties in `CombatIdle` at a distance
+of exactly 2.0 m. The victim's relationship to the player held at 0.57, his
+weapon stayed undrawn, and he neither closed nor struck. He is in the fight
+state the whole time: this is not a victim who failed to enter combat, it is
+one who entered it and will not act.
+
+The rider then attacked. The victim answered with a single counter, and from
+the sample where the rider's own hits began landing the relationship dropped
+to -0.00 and stayed there. Every sample afterwards is a real fight:
+`CombatAttack`, `CombatDodge`, `CombatBlockNW`, `CombatBlockBroken`,
+`CombatHit`.
+
+### The relationship is a side effect, not the cause
+
+The obvious reading is that hostility gates the fight and 0.57 is too friendly
+a number to attack over. That reading is wrong, and building on it would have
+produced the wrong fix.
+
+`sb_combat_fight.xml:514` initializes the flag that decides whether a fighter
+attacks at all:
+
+    $offense = !$t_fightOptions.startInDefenseOnly
+
+A civilian struck by the player, who is not already an enemy, is given
+`startInDefenseOnly = true` by `sb_combat.xml:8340`, so `$offense` begins
+false. There is exactly one place in the whole subtree that sets it true, at
+`sb_combat_fight.xml:574`:
+
+    ReadMessage inbox = hitReaction
+    if hitReaction.hitStrength > HitReactionStrength.Zero
+       and (hitReaction.hitType == Melee or hitReaction.hitType == Bullet)
+        $offense = true
+        AddOpponent(hitReaction.attacker)
+        InstantSendMessageToNPC(this, encounter:addOpponent)
+
+So a defense-only fighter leaves defense only when a hit reaction of non-zero
+strength reaches him, and never otherwise. The relationship falling to zero is
+what the rider's real hits do to reputation on their way past; it is
+correlated with the fight starting because the same punch causes both.
+
+### Why the mod's provocation cannot start a fight
+
+`SendProvocationHit` sends `combat:stimulus:hit` carrying `attacker`, `kind`
+and `real = false`. That reaches the civilian hit handler and wins the
+argument about whether to fight, which is why the victim stands up and guards.
+It does not put a `hitReaction` of non-zero strength in the victim's inbox, so
+`$offense` is never set, and a fighter with `$offense` false has nothing to do
+but hold his guard until something closes the incident. The mod's own
+`RetaliationCeilingSec` failsafe is usually what does.
+
+The feature's central design decision is what defeats it. `real = false` is
+carried precisely so the provocation raises no crime and no reputation change,
+and that same flag is why no hit reaction of consequence is ever produced.
+
+### The horse's own collision cannot set it either
+
+`HitReactionType` is `Melee` 1, `Collision` 2, `Fall` 7, `Bullet` 10,
+`MeleeStealth` 16. The `$offense` condition accepts `Melee` and `Bullet` and
+nothing else, so a hit reaction arising from a horse collision is the wrong
+type to release a defense-only fighter however hard it lands.
+
+### The route out, confirmed constructible
+
+`hitReaction` is a declared type in `TypeDefinitions.xml`, carrying `attacker`,
+`hitStrength`, `hitType` and `targetOrigMat`, and it is registered in
+`MessageTypes.xml`. `HitReactionStrength.Tickle`, value 2, is documented there
+as costing the target no health and only minor stamina, and it clears the
+`> Zero` test.
+
+Built against the running game:
+
+    Utils.makeTable('hitReaction',
+        { attacker = playerWuid, hitStrength = 2, hitType = 1 })   ok
+
+Sending that to a provoked victim should set `$offense` and register the
+player as an opponent without a health cost and without touching reputation,
+since the block that reads it does neither. That it constructs is not proof
+that the fight tree answers it, and the send is untested.
+
+## Reputation does not drive the flee, measured mid-flight
+
+The permanent flee after a beating was attributed to the hostility flag a
+punch sets, on the strength of the `reputation_change` table: `hit_melee_weak`
+carries `can_change_hostility` true, `surrender_step` carries it true and
+raises the number, and a paid fine carries it false. The reading was that
+surrendering repairs a victim and a fine cannot.
+
+That explains the reputation and not the behavior.
+
+`tools/dev_fleerepair.lua` was armed before a full cycle: provoke, fight, pay
+the fine, release through the yield menu. It watches every human within 60 m,
+and when one whose relationship is under 0.35 moves away at more than 2.5 m/s
+for two consecutive samples it applies `surrender_step` eight times on the
+spot, inside the game, then keeps sampling. Doing it from the console is too
+slow, because a fleeing victim covers five meters a second and unloads.
+
+The victim, a townsman, was repaired in mid-flight:
+
+| relationship | distance | speed away |
+| --- | --- | --- |
+| 0.260 | 4.2 m | 3.5 |
+| 0.260 | 8.8 m | 4.7 |
+| **0.816** | 13.6 m | 4.7 |
+| 0.816 | 23.2 m | 4.9 |
+| 0.816 | 32.8 m | 4.8 |
+| 0.816 | 47.3 m | 4.6 |
+
+The repair landed and took him to 0.816, above a healthy villager. He did not
+slow for a single sample.
+
+The same log rules it out a second way, from bystanders sampled at the same
+moment:
+
+| entity | relationship | behavior |
+| --- | --- | --- |
+| a soldier | 0.209 | `MotionIdle`, 1.5 m from the player |
+| a beggar | 0.253 | `Beggar`, standing still |
+| the victim | 0.260 | running at 4.7 m/s |
+
+Three NPCs within five hundredths of each other, two of them entirely
+unbothered. **The relationship value neither causes the flee nor predicts it**,
+and `surrender_step` moves the number without touching the behavior.
+
+### What this closes and what it leaves
+
+`can_change_hostility` remains a correct reading of the reputation table. It is
+not an explanation of the flee, and repairing reputation is not a cure. Any
+further work on this belongs to the behavior side.
+
+`XGenAIModule.GetBrainVariable` and `SetBrainVariable` exist and accept both an
+entity and a WUID without error. Queried on a peaceful NPC for `t_state`,
+`t_fightParams`, `t_fleeParams` and `offense` they all answer nil, which is
+consistent with subbrain-local variables that exist only while that subbrain
+runs. Reading them off a victim **while he is fleeing** is untried, and is the
+next thing worth doing.
+
+### What the flee is not, after four probes
+
+Each of these was run against a victim mid-flight, in game, and none changed
+his speed away from the player or told us what drives it.
+
+| probe | result |
+| --- | --- |
+| `surrender_step` to 0.816 | kept running, 4.7 m/s unchanged |
+| `XGenAIModule.TryEndCombat` | not bound at runtime, despite the header list |
+| `Contexts.ResetEntity` | accepted, kept running at 5.1 m/s |
+| `GetBrainVariable` for combat state | nil for every name |
+
+The context option diff between a freshly broken NPC and a healthy one found
+three differences, `availableToSelfTalk`, `availableToUseLight` and
+`availableToSing`, none of which bear on fleeing. Twenty-six soul getters
+compared across the same pair differ only in gender and name string.
+
+`GetBrainVariable` does work: it returns the option table under
+`Contexts.__brainVarName__`. It answers nil for `currentState`, `t_state`,
+`t_state_current`, `t_state_next`, `t_fleeParams`, `isPlayerHostile`,
+`isHostile`, `threat` and `t_stateSwitchQueued`, all of which are declared in
+`sb_combat.xml`. The reading is that the bind reaches the context brain only
+and not subbrain-local variables, so the combat state is not readable from Lua
+by this route.
+
+**The cause remains unknown.** It is not reputation, not a context option, not
+a daycycle patch, and not anything exposed on the soul. Whether the state is
+even permanent has not been measured under controlled conditions; the seven-day
+report was from ordinary play. Skipping days with `tools/dev_time.lua` against
+a deliberately broken victim would settle that, and it is the cheapest
+remaining question.
