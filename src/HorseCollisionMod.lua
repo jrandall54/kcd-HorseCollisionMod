@@ -543,10 +543,12 @@ HorseCollisionMod.RepairMaxSteps = 5
 -- Forty samples at `AftermathStopMs` is twenty seconds.
 HorseCollisionMod.AftermathSamples = 40
 
---- Meters gained per second that count as running rather than walking away.
+--- The victim's own speed, in meters per second, that counts as running.
 --
--- A measured flee held four and a half; somebody walking to a stall makes
--- about one.
+-- His own movement, not his distance from the rider. Measured against the
+-- rider a victim being followed reads as standing still while he sprints,
+-- which is what made an earlier flee test useless. A measured flee held four
+-- and a half; somebody walking to a stall makes about one.
 HorseCollisionMod.AftermathFleeSpeed = 2.5
 
 --- How far a fleeing victim is allowed to get before he is stopped.

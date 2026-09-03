@@ -616,6 +616,24 @@ function HorseCollisionMod:WatchAftermath(npc)
 	local stopped = false
 	local last = nil
 
+	-- Two different measurements, and using one for both is what made an
+	-- earlier version of this blind. How fast he is moving is his own
+	-- movement between samples, which is true whatever the rider does; a
+	-- victim measured by his distance from a rider who is following him reads
+	-- as standing still while he sprints. How far he has got is the distance
+	-- from the rider, which is what "clear of him" means.
+	local function where()
+		local p = nil
+
+		pcall(function()
+			local q = npc:GetWorldPos()
+
+			p = { x = q.x, y = q.y }
+		end)
+
+		return p
+	end
+
 	local function range()
 		local d = nil
 
@@ -629,7 +647,7 @@ function HorseCollisionMod:WatchAftermath(npc)
 		return d
 	end
 
-	last = range()
+	last = where()
 
 	local function finish(why, at)
 		self:RepairVictim(npc)
@@ -649,16 +667,21 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 		left = left - 1
 
+		local at = where()
 		local now = range()
-		local gained = 0
+		local speed = 0
 
-		if now ~= nil and last ~= nil then
-			gained = (now - last) / (self.AftermathStopMs / 1000)
+		if at ~= nil and last ~= nil then
+			speed = self:VectorLength({
+				x = at.x - last.x,
+				y = at.y - last.y,
+				z = 0
+			}) / (self.AftermathStopMs / 1000)
 		end
 
-		last = now
+		last = at
 
-		if gained > self.AftermathFleeSpeed then
+		if speed > self.AftermathFleeSpeed then
 			running = running + 1
 			still = 0
 		else
