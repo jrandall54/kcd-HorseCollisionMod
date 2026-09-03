@@ -23,6 +23,8 @@ number.
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-09-02
+
 ### Added
 
 - Armor is now felt in the collision, not only in the horse's stamina. A man

@@ -157,6 +157,9 @@ tools/
   probe_horse_mass.lua    reports the mass and physics identity of the horse,
                           the player and the nearest NPC, which are the two
                           sides of every collision the mod scores
+  probe_mass_persistence.lua
+                          lists nearby humans by mass, to prove a written
+                          ragdoll mass does not survive the victim standing up
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   set_version.py          writes the version into all fourteen places that

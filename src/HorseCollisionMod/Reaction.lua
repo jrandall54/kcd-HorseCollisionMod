@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.6.3
+-- @release 4.7.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -166,11 +166,9 @@ end
 --- does the work.
 --
 -- What throws a victim at gallop is the engine resolving a collision between
--- the horse, 480 kg at gravity -30, and the body. Measured across seventy
--- impacts, the distance correlates with the horse's speed at contact at
--- +0.34, with the armor scale at **-0.07**, and not at all with anything this
--- mod applies on top. Three rides comparing an impulse against a set velocity
--- produced the same distribution.
+-- the horse, 480 kg at gravity -30, and the body. Nothing this mod adds on
+-- top of that collision moves the body: an impulse and a set velocity produce
+-- the same distribution across three rides.
 --
 -- Armor cannot matter while every human weighs the same. `GetMass` answers
 -- **80 for every human including the player**, so the horse hits an identical
@@ -185,15 +183,30 @@ end
 -- `alive` profile left `GetMass` reading 80, and the same write to the same
 -- actor ragdolled read back 300.
 --
--- ### Timing is the open question
+-- Nothing here is written back. It does not need to be: standing up
+-- re-physicalizes the actor as a living entity and the engine restores its own
+-- 80. Measured on a guard written to 2543 kg, which read that figure while
+-- down and 80 once it was walking again.
+--
+-- ### The coupling is weak, which is the whole design problem
+--
+-- The throw goes as roughly `mass ^ -0.185`, measured across a fiftyfold flat
+-- comparison at p = 0.012. Doubling a victim's mass shortens the throw by 12%,
+-- so a visible difference between armor and cloth costs a spread around a
+-- hundredfold, and `RagdollMassArmorScaled` on its own, which is a 3.4x
+-- spread, is worth nothing that can be seen. `RagdollMassArmorExponent` is
+-- what buys the spread; see the config comments for which number does what.
+--
+-- ### Timing
 --
 -- The mass has to be in place before the collision resolves. The body is not
 -- physicalized at the moment of contact, which is why the impulse path waits
 -- `ImpulseDelayMs`, and a horse at ten meters per second covers a centimeter
 -- a millisecond. So this retries on a short ladder rather than guessing one
 -- delay, takes the first attempt that sticks, and logs which one that was
--- together with how far the victim had already travelled by then. That
--- reading is what says whether the window exists at all.
+-- together with how far the victim had already travelled by then. Every
+-- impact measured has taken, almost all at 16 ms with the victim still within
+-- 8 cm of where they stood, so the write beats the horse.
 --
 -- @tparam table npc victim entity
 -- @tparam number armorScale the tier's armor multiplier, high for an
