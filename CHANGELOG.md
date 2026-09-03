@@ -23,6 +23,17 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+
+- A provoked victim now actually fights. Since the feature shipped he would
+  square up, raise his guard and never throw a punch unless the player swung
+  first, because a civilian struck by someone who is not already an enemy
+  enters the fight in defense only and one message in the whole combat tree
+  turns offense back on. That message is now sent once he reaches the fight,
+  naming him as his own attacker so it costs no health, no reputation and no
+  crime: a bystander sampled through the change moved 0.000, where naming the
+  player moved the victim -0.31 and everyone nearby -0.030.
+
 ## [4.7.2] - 2026-09-03
 
 ### Fixed
