@@ -522,17 +522,21 @@ HorseCollisionMod.RepairFloor = 0.35
 -- of the rider than his neighbors do and still trades with him.
 HorseCollisionMod.RepairFightCost = 0.15
 
---- How the repair walks a victim back up, one change at a time.
+--- How far one `surrender_step` moves a relationship.
 --
--- `surrender_step` is the only common positive reputation change carrying
--- `can_change_hostility`, and it is what vanilla's own surrender path applies
--- in a loop. Each rung is aimed at the remaining gap rather than taken blind,
--- which converges in two or three rather than six, and the ladder is kept
--- because the aim undershoots: the relationship read back is a compressed
--- view of the engine's own value, so asking for 0.5 from zero moves 0.32.
--- A change does not read back in the frame it is applied either, so the rungs
--- are spaced.
-HorseCollisionMod.RepairStepMs = 400
+-- Measured by applying it repeatedly from zero and reading between each: the
+-- move is exactly 0.1389 every time, and the second argument the bind accepts
+-- does not scale it. 0.1, 0.2 and no argument at all all produced the same
+-- figure, so the count of applications is the only control there is.
+--
+-- `surrender_step` also cannot carry anyone past 0.8430, which the same sweep
+-- reached and then stopped at.
+HorseCollisionMod.RepairStepValue = 0.1389
+
+--- A ceiling on the applications any single repair will make.
+--
+-- Nothing legitimate needs more: a victim at 0.0 restored to a townsman's
+-- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
 --- The standing assumed for a victim nothing was recorded for.

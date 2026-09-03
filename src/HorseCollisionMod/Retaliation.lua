@@ -536,89 +536,65 @@ end
 -- The target is the victim's own standing before he was provoked, less
 -- `RepairFightCost`, held above `RepairFloor`. He remembers the fight, which
 -- is right, and he is never left under the threshold that ruins him, which is
--- the bug. A first attempt applied a fixed six changes instead, which is
--- calibrated for a victim at 0.0 and took one to 0.84 against the 0.50 his
--- untouched neighbors read, so a beating paid the rider a bonus. The ladder
--- stops the moment the target is met, so the worst overshoot is one change.
+-- the bug. The count is worked from his own figure rather than fixed, because
+-- a count calibrated for a victim at 0.0 carries one to 0.84 against the 0.50
+-- his untouched neighbors read, and a beating would pay the rider a bonus.
 --
--- The steps are spaced because a reputation change does not read back in the
--- frame it is applied. Reading immediately reports the old value and the
--- ladder would spend every rung it has.
+-- ### The step is a fixed quantum, so the count is arithmetic
 --
--- There is no way to write a relationship outright. `ModifyPlayerReputation`
--- takes the name of a row in the reputation table and applies it as a change,
--- and its second argument scales that change, so a target is approached
--- rather than assigned.
+-- `surrender_step` moves the relationship by `RepairStepValue` every time it
+-- is applied, whatever second argument it is given: 0.1, 0.2 and no argument
+-- at all each moved exactly 0.1389 in a measured sweep. The magnitude cannot
+-- be tuned, so the number of applications is what decides where a victim
+-- lands, and that is worked out once from the gap rather than approached by
+-- trial. They apply in one pass, because a change does not read back in the
+-- frame it is applied and re-reading between them would report stale values.
+--
+-- The quantum is also the precision: a victim lands within one step above his
+-- target and no closer, and `surrender_step` cannot take anyone past 0.8430
+-- however many are applied.
 --
 -- @tparam table npc victim entity
--- @treturn boolean true when a repair was started
+-- @treturn boolean true when a repair was applied
 function HorseCollisionMod:RepairVictim(npc)
 	local id = tostring(npc.id)
 	local baseline = self.Baseline[id] or self.RepairDefaultTarget
 	local target = baseline - self.RepairFightCost
 
+	self.Baseline[id] = nil
+
 	if target < self.RepairFloor then
 		target = self.RepairFloor
 	end
 
-	local function current()
-		local r = nil
+	local before = nil
 
-		pcall(function()
-			r = npc.soul:GetRelationship(player.this.id)
-		end)
-
-		return r
-	end
-
-	local before = current()
+	pcall(function()
+		before = npc.soul:GetRelationship(player.this.id)
+	end)
 
 	if before == nil or before >= target then
-		self.Baseline[id] = nil
-
 		return false
 	end
 
-	local generation = self.TimerTick
-	local left = self.RepairMaxSteps
+	local steps = math.ceil((target - before) / self.RepairStepValue)
 
-	local function rung()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local now = current()
-
-		if now == nil or now >= target or left <= 0 then
-			if self.Config.LogTelemetry then
-				self:Log("RepairVictim " .. tostring(npc:GetName())
-						.. " from=" .. string.format("%.3f", before)
-						.. " to=" .. string.format("%.3f", now or -9)
-						.. " target=" .. string.format("%.3f", target)
-						.. " spare=" .. tostring(left))
-			end
-
-			self.Baseline[id] = nil
-
-			return
-		end
-
-		left = left - 1
-
-		-- Aimed at what is left rather than taken blind. The second argument
-		-- scales the change, so the gap itself is the best available guess at
-		-- the size needed; it undershoots, because the returned relationship
-		-- is a compressed view of the value the engine keeps, and asking for
-		-- 0.5 from zero moves 0.32 while asking for 0.1 moves 0.14. Aiming
-		-- still converges in two or three rungs where a fixed step took six.
-		pcall(function()
-			npc.soul:ModifyPlayerReputation("surrender_step", target - now)
-		end)
-
-		Script.SetTimer(self.RepairStepMs, rung)
+	if steps > self.RepairMaxSteps then
+		steps = self.RepairMaxSteps
 	end
 
-	rung()
+	for _ = 1, steps do
+		pcall(function()
+			npc.soul:ModifyPlayerReputation("surrender_step")
+		end)
+	end
+
+	if self.Config.LogTelemetry then
+		self:Log("RepairVictim " .. tostring(npc:GetName())
+				.. " from=" .. string.format("%.3f", before)
+				.. " target=" .. string.format("%.3f", target)
+				.. " steps=" .. tostring(steps))
+	end
 
 	return true
 end
