@@ -7167,7 +7167,7 @@ is what follows the fall in a death. The mod puts the get-up there instead.
 ### Why this is not a return to the physics knockdown
 
 The ragdoll the mod removed was created at the moment of impact, underneath a
-horse still travelling through that space, and the engine charged the trample
+horse still traveling through that space, and the engine charged the trample
 that followed. This one is created **two seconds after the animation starts**,
 by which time a horse at trot has covered something like fourteen meters and is
 nowhere near the body.
@@ -7711,7 +7711,7 @@ while 29 of the 32 vanilla options in `AnimationControlled` declare
 `Interactive`. The builder's own comment explained the faulty reasoning: it
 matched the fragment the clips come from rather than the fragment the options
 live in. It does not stop the clipping, and a victim was still put through a
-wall having travelled 1.59 m, but it was wrong before.
+wall having traveled 1.59 m, but it was wrong before.
 
 **`Horizontal = 6` is for synchronised pairs.** Vanilla uses it in
 `HorseCombatHitSync` on fragments tagged `throw`, which is a rider throwing
@@ -9032,7 +9032,7 @@ Measured on beggars held in the stuck state, each tried on its own:
 4.5 m away followed by `daycycle:restartRequest`, `Contexts.ClearOption`, and
 turning off the movement control release for the whole reaction.
 
-Every one left the victim in `MotionIdle` having travelled at most the distance
+Every one left the victim in `MotionIdle` having traveled at most the distance
 the call itself moved them. Only a save load restores them.
 
 ### Where that leaves the tier
@@ -13214,7 +13214,7 @@ animation-driven, and a velocity is evidently not.
 
 On a ragdolled victim, 6 m/s away from the rider:
 
-| | travelled |
+| | traveled |
 | --- | --- |
 | t+900ms | **4.43 m** |
 | t+2500ms | 5.57 m |
@@ -13612,7 +13612,7 @@ way. The gap between them did not open.
 
 ### The impact excluded, and why
 
-One refugee travelled 14.36 m, three times the next largest throw in the set.
+One refugee traveled 14.36 m, three times the next largest throw in the set.
 It is a real launch rather than a parse error: the footprint recorded `dz`
 -0.90, so the horse was most of a meter above the victim, the body moved 5.90 m
 in the first 300 ms and rose 1.14 m by the half-second sample. It is terrain
@@ -13629,7 +13629,7 @@ one from 3.4x to 11.6x, putting guards at 230 to 327 kg and villagers at 25 to
 30. The masses were confirmed live before the ride and every write took, all
 but two at 16 ms.
 
-The ratio did not move. Armored victims travelled 0.90x as far as unarmored
+The ratio did not move. Armored victims traveled 0.90x as far as unarmored
 ones, against 0.94x at an exponent of 1. Tripling the mass of every guard and
 squaring the spread between the two groups changed the measured separation by
 0.04x.
@@ -13791,7 +13791,7 @@ table says.
 
 ### The light end is now the problem
 
-Two villagers at 17 kg travelled 12.23 and 13.84 m. Neither is terrain: the
+Two villagers at 17 kg traveled 12.23 and 13.84 m. Neither is terrain: the
 footprint `dz` is -0.13 and +0.09, so the ground was level, and both were
 already 6 m out at the half-second sample. They are genuine launches, and a
 person hit by a horse and thrown fourteen meters does not look like a person

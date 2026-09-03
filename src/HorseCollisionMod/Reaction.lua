@@ -204,7 +204,7 @@ end
 -- `ImpulseDelayMs`, and a horse at ten meters per second covers a centimeter
 -- a millisecond. So this retries on a short ladder rather than guessing one
 -- delay, takes the first attempt that sticks, and logs which one that was
--- together with how far the victim had already travelled by then. Every
+-- together with how far the victim had already traveled by then. Every
 -- impact measured has taken, almost all at 16 ms with the victim still within
 -- 8 cm of where they stood, so the write beats the horse.
 --

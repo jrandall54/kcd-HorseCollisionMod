@@ -217,7 +217,7 @@ HorseCollisionMod.Config = {
 	-- armor scale raised to this, so the ratio between an armored victim and
 	-- an unarmored one is the scale ratio raised to it as well. The base
 	-- cancels out of that ratio entirely, which is why 40 and 80 both left
-	-- armored and unarmored victims travelling the same distance: both
+	-- armored and unarmored victims traveling the same distance: both
 	-- present the horse with the same 3.4x spread. Above 1 widens the spread;
 	-- 1 is the plain division and 0 removes the scaling.
 	RagdollMassArmorExponent = 3.7,
