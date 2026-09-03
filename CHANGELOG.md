@@ -29,9 +29,11 @@ number.
   at a relationship of 0.0, against roughly 0.5 for a healthy villager, and
   below vanilla's 0.2 threshold he decided to run again every time he saw you
   afterwards, across save loads and days of game time. Every provoked fight
-  now ends by putting him back above that threshold, so he goes back to work,
-  and will talk and trade with you again. A victim who is already fine is left
-  alone, so a brawl cannot be used to raise anyone's opinion of you.
+  now ends by restoring what he thought of you before you provoked him, so he
+  goes back to work and will talk and trade with you again. It restores rather
+  than rewards: he is walked back up one step at a time and stopped the moment
+  he reaches his old standing, so beating a man cannot leave him thinking
+  better of you than his untouched neighbors do.
 
 ## [4.7.3] - 2026-09-03
 

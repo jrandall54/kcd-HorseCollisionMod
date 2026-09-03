@@ -401,6 +401,17 @@ HorseCollisionMod.VictimActivity = {}
 -- @table Annoyance
 HorseCollisionMod.Annoyance = {}
 
+--- Each victim's regard for the rider before the fight, keyed by entity id.
+--
+-- Recorded at the moment of provocation, which is still clean: the shoves
+-- that lead up to it raise no crime and the provocation names the victim as
+-- his own attacker, so neither touches reputation. The repair afterwards
+-- restores this figure rather than a fixed amount, because a fixed amount
+-- calibrated for a ruined victim overshoots and leaves a man who was beaten
+-- thinking better of the rider than he did beforehand.
+-- @table Baseline
+HorseCollisionMod.Baseline = {}
+
 --- Last time each entity was reported as a miss, keyed by entity id.
 HorseCollisionMod.RecentRejections = {}
 
@@ -506,14 +517,21 @@ HorseCollisionMod.RetaliationPollMs = 1000
 -- used to raise somebody's opinion of the rider.
 HorseCollisionMod.RepairRelationshipFloor = 0.35
 
---- How many `surrender_step` changes are applied to a victim under the floor.
+--- How the repair walks a victim back up, one change at a time.
 --
 -- `surrender_step` is the only common positive reputation change carrying
 -- `can_change_hostility`, and it is what vanilla's own surrender path applies
--- in a loop. The change does not read back within the frame it is applied, so
--- a fixed count is used rather than a loop that measures as it goes. Six takes
--- a victim from 0.0 to roughly 0.76, which is a normal villager's regard.
-HorseCollisionMod.RepairSteps = 6
+-- in a loop. It is worth roughly 0.13 here and does not read back in the
+-- frame it is applied, so the ladder waits between rungs and stops as soon as
+-- the victim is back where he started. Six applied blind took a victim from
+-- 0.0 to 0.84, well above the 0.50 an untouched townsman reads.
+HorseCollisionMod.RepairStepMs = 400
+HorseCollisionMod.RepairMaxSteps = 8
+
+--- Where a victim is restored to when nothing was recorded for him.
+--
+-- Untouched townsmen sampled across a village all read 0.50.
+HorseCollisionMod.RepairDefaultTarget = 0.50
 
 --- How often a provoked victim is checked for having entered the fight.
 --
@@ -713,6 +731,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		self.RecentHits = {}
 		self.VictimActivity = {}
 		self.Annoyance = {}
+		self.Baseline = {}
 
 		local applied, rejected = self:ApplySettings()
 

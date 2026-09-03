@@ -510,11 +510,11 @@ end
 
 --- Puts a victim right once the fight is over.
 --
--- A man the rider fought is left at a relationship of 0.0 against a healthy
--- villager's 0.5, and below vanilla's 0.2 threshold he decides to run every
--- time he perceives the rider. Riding past him a week later still sends him
--- sprinting, which reads as a permanently ruined NPC rather than a man who
--- lost a fight.
+-- A man the rider fought is left at a relationship of 0.0 against the 0.50 an
+-- untouched townsman reads, and below vanilla's 0.2 threshold he decides to
+-- run every time he perceives the rider. Riding past him a week later still
+-- sends him sprinting, which reads as a permanently ruined NPC rather than a
+-- man who lost a fight.
 --
 -- **Two things are needed and neither works alone**, which is what made this
 -- hard to see. Measured on a victim who had been fleeing on sight across a
@@ -531,33 +531,78 @@ end
 -- Together they hold. The same victim stopped, stood at a meter and a half
 -- for twelve seconds, and afterwards would talk and trade.
 --
--- A victim already at or above `RepairRelationshipFloor` keeps his own
--- number, so a brawl is never a way to improve somebody's opinion.
+-- ### It restores, it does not reward
+--
+-- The target is what the victim thought of the rider before he was provoked,
+-- so a beating costs him nothing in the end and earns the rider nothing
+-- either. A first attempt applied a fixed six changes, which is calibrated
+-- for a victim at 0.0 and took one to 0.84, leaving a man who had just been
+-- knocked out with a better opinion of the rider than his untouched
+-- neighbors. The ladder stops as soon as he is back where he started, so the
+-- worst overshoot is a single change.
+--
+-- The steps are spaced because a reputation change does not read back in the
+-- frame it is applied. Reading immediately reports the old value and the
+-- ladder would spend every rung it has.
 --
 -- @tparam table npc victim entity
--- @treturn boolean true when the relationship was raised
+-- @treturn boolean true when a repair was started
 function HorseCollisionMod:RepairVictim(npc)
-	local before = nil
+	local id = tostring(npc.id)
+	local target = self.Baseline[id] or self.RepairDefaultTarget
 
-	pcall(function()
-		before = npc.soul:GetRelationship(player.this.id)
-	end)
+	local function current()
+		local r = nil
 
-	if before == nil or before >= self.RepairRelationshipFloor then
+		pcall(function()
+			r = npc.soul:GetRelationship(player.this.id)
+		end)
+
+		return r
+	end
+
+	local before = current()
+
+	if before == nil or before >= target then
+		self.Baseline[id] = nil
+
 		return false
 	end
 
-	for _ = 1, self.RepairSteps do
+	local generation = self.TimerTick
+	local left = self.RepairMaxSteps
+
+	local function rung()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local now = current()
+
+		if now == nil or now >= target or left <= 0 then
+			if self.Config.LogTelemetry then
+				self:Log("RepairVictim " .. tostring(npc:GetName())
+						.. " from=" .. string.format("%.3f", before)
+						.. " to=" .. string.format("%.3f", now or -9)
+						.. " target=" .. string.format("%.3f", target)
+						.. " spare=" .. tostring(left))
+			end
+
+			self.Baseline[id] = nil
+
+			return
+		end
+
+		left = left - 1
+
 		pcall(function()
 			npc.soul:ModifyPlayerReputation("surrender_step")
 		end)
+
+		Script.SetTimer(self.RepairStepMs, rung)
 	end
 
-	if self.Config.LogTelemetry then
-		self:Log("RepairVictim " .. tostring(npc:GetName())
-				.. " from=" .. string.format("%.3f", before)
-				.. " steps=" .. tostring(self.RepairSteps))
-	end
+	rung()
 
 	return true
 end
@@ -658,6 +703,15 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 
 		return false
 	end
+
+	-- Taken before the fight rather than after it, so the repair has a figure
+	-- to restore rather than a guess. Nothing up to here has touched it: the
+	-- shoves raise no crime and the provocation names the victim as his own
+	-- attacker.
+	pcall(function()
+		self.Baseline[tostring(npc.id)] =
+				npc.soul:GetRelationship(player.this.id)
+	end)
 
 	local roll = math.random()
 	local provoked = roll < chance
