@@ -540,9 +540,8 @@ HorseCollisionMod.RepairMaxSteps = 5
 --
 -- Long enough to cover a flee that starts late, because a yield resolves
 -- through a dialog that reads as finished and the running begins after it.
--- Twenty seconds at a flee's four and a half meters per second is ninety
--- meters, well past the distance he is stopped at.
-HorseCollisionMod.AftermathSamples = 20
+-- Forty samples at `AftermathStopMs` is twenty seconds.
+HorseCollisionMod.AftermathSamples = 40
 
 --- Meters gained per second that count as running rather than walking away.
 --
@@ -554,17 +553,23 @@ HorseCollisionMod.AftermathFleeSpeed = 2.5
 --
 -- He is not stopped where he stands. A man who has just been beaten should
 -- get away, and a rider who is not chasing him should see him go rather than
--- watch him halt a second later and stand about. Forty meters clears the
--- immediate area and is roughly nine seconds of running.
-HorseCollisionMod.AftermathReleaseDistance = 40.0
+-- watch him halt a second later and stand about. Fifteen meters puts him out
+-- of the rider's immediate area while staying close enough to watch.
+HorseCollisionMod.AftermathReleaseDistance = 15.0
 
---- How often a stopping victim is checked, and for how long.
+--- How often the victim is sampled through the aftermath.
 --
--- Once the stand-down is sent he is watched at a shorter interval than the
--- flee itself needs, because the point is to catch the moment he stops and
--- put him back to work in it rather than leave him standing in the road.
+-- Half a second rather than a full one for two reasons: a short burst of
+-- running is missed entirely at one second, and the point of the second half
+-- of this is to catch the moment he stops and put him back to work in it
+-- rather than leave him standing in the road.
 HorseCollisionMod.AftermathStopMs = 500
-HorseCollisionMod.AftermathStopSamples = 8
+
+--- Consecutive samples of each state before it is believed.
+--
+-- One sample either way is noise: a stride reads as running and the pause
+-- between two reads as stopped.
+HorseCollisionMod.AftermathConfirmSamples = 2
 
 --- The standing assumed for a victim nothing was recorded for.
 --

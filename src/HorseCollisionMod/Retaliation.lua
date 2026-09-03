@@ -578,37 +578,42 @@ end
 -- vanilla yield menu settles first, which is what closes the incident, and
 -- only then walks away in a flee that does not stop on its own.
 --
--- ### He is allowed to get away first
+-- Three things are watched for, and they are independent of each other.
+--
+-- ### A flee, which he is allowed to finish
 --
 -- The stand-down is not sent the moment he runs. A man who has just been
--- beaten should put some distance between himself and the rider, and a rider
--- who is not chasing him should see him leave rather than watch him stop dead
--- a second later. So he runs until he is `AftermathReleaseDistance` clear,
--- and is stopped then, or at the end of the window if he has not made it.
+-- beaten should put distance between himself and the rider, and a rider who
+-- is not chasing him should see him leave rather than watch him halt a second
+-- later. So he runs until he is `AftermathReleaseDistance` clear, and is
+-- stopped then, or as the window closes if he has not made it.
 --
--- ### Then he is put straight back to work
+-- ### The moment he stops, whoever stopped him
 --
--- `standDownRequest` ends the flee but does not give him anywhere to be, and
--- a victim left in that state stands in the road for a while before his own
--- routine picks him up. So the stop is confirmed rather than assumed: he is
--- sampled at `AftermathStopMs` until he is no longer gaining ground, and the
--- replan goes out in the same moment. That is the only reason a replan is
--- sent at all, and the reason it is worth sending here where it was not
--- worth sending blind.
+-- `standDownRequest` ends a flee but gives him nowhere to be, and a victim
+-- with nowhere to be stands in the road until his own routine picks him up.
+-- So the replan goes out the moment he is no longer gaining ground, and that
+-- is not conditional on this having stopped him: a victim who runs a few
+-- paces and halts by himself is left standing just the same, which is what a
+-- measured run showed. This is the only reason a replan is sent at all, and
+-- the reason it is worth sending here where it was not worth sending blind.
 --
--- ### And his standing is checked once more
+-- ### His standing, once the rider is finished with him
 --
--- The repair at the end of the incident runs before the rider has finished
--- with him: a victim knocked down again, or beaten while he stands up, loses
--- more afterwards and was left carrying it. One measured victim was repaired
--- at the close, dropped back to 0.0 by what followed, and was restored by
--- this second look.
+-- The repair at the end of the incident runs before the rider necessarily
+-- is: a victim knocked down again, or beaten while he stands up, loses more
+-- afterwards and was left carrying it. One measured victim was repaired at
+-- the close, dropped back to 0.0 by what followed, and was restored by this
+-- second look.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
 	local left = self.AftermathSamples
-	local fled = 0
+	local confirm = self.AftermathConfirmSamples
+	local running = 0
+	local still = 0
+	local stopped = false
 	local last = nil
 
 	local function range()
@@ -626,57 +631,18 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 	last = range()
 
-	local function finish(why)
+	local function finish(why, at)
 		self:RepairVictim(npc)
 		self.Baseline[tostring(npc.id)] = nil
 
 		if self.Config.LogTelemetry then
 			self:Log("Aftermath " .. tostring(npc:GetName())
-					.. " done=" .. tostring(why))
+					.. " done=" .. tostring(why)
+					.. " at=" .. string.format("%.0f", at or -1) .. "m")
 		end
 	end
 
-	-- Second phase. The stand-down has gone out and what matters now is the
-	-- moment he stops, because that is when a replan reaches him.
-	local function waitForStop(stopsLeft)
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local now = range()
-		local moving = now ~= nil and last ~= nil
-				and (now - last) > self.AftermathFleeSpeed
-
-		last = now
-
-		if not moving then
-			local replanned = self:ReplanVictim(npc)
-
-			if self.Config.LogTelemetry then
-				self:Log("Aftermath " .. tostring(npc:GetName())
-						.. " stopped at " .. string.format("%.0f", now or -1)
-						.. "m, replanned=" .. tostring(replanned))
-			end
-
-			finish("stopped")
-
-			return
-		end
-
-		if stopsLeft <= 0 then
-			finish("still-running")
-
-			return
-		end
-
-		Script.SetTimer(self.AftermathStopMs, function()
-			waitForStop(stopsLeft - 1)
-		end)
-	end
-
-	-- First phase. He is left alone while he runs, and stopped once he is
-	-- clear of the rider or the window runs out, whichever comes first.
-	local function watch()
+	local function sample()
 		if generation ~= self.TimerTick then
 			return
 		end
@@ -684,46 +650,66 @@ function HorseCollisionMod:WatchAftermath(npc)
 		left = left - 1
 
 		local now = range()
+		local gained = 0
 
-		if now ~= nil and last ~= nil
-				and (now - last) > self.AftermathFleeSpeed then
-			fled = fled + 1
-		else
-			fled = 0
-		end
-
-		local clear = now ~= nil and now >= self.AftermathReleaseDistance
-
-		if fled >= 2 and (clear or left <= 0) then
-			local sent = self:SendStandDown(npc)
-
-			if self.Config.LogTelemetry then
-				self:Log("Aftermath " .. tostring(npc:GetName())
-						.. " stopping him at " .. string.format("%.0f", now)
-						.. "m, stoodDown=" .. tostring(sent))
-			end
-
-			last = now
-
-			Script.SetTimer(self.AftermathStopMs, function()
-				waitForStop(self.AftermathStopSamples)
-			end)
-
-			return
+		if now ~= nil and last ~= nil then
+			gained = (now - last) / (self.AftermathStopMs / 1000)
 		end
 
 		last = now
 
-		if left <= 0 then
-			finish("no-flee")
+		if gained > self.AftermathFleeSpeed then
+			running = running + 1
+			still = 0
+		else
+			still = still + 1
+			running = 0
+		end
+
+		-- Stopped, however he came to stop. He is put back to work here.
+		if still >= confirm then
+			local replanned = self:ReplanVictim(npc)
+
+			if self.Config.LogTelemetry then
+				self:Log("Aftermath " .. tostring(npc:GetName())
+						.. " stopped, replanned=" .. tostring(replanned))
+			end
+
+			finish("replanned", now)
 
 			return
 		end
 
-		Script.SetTimer(1000, watch)
+		-- Still running. He is stopped once he is clear, or as the window
+		-- closes, so that he cannot simply keep going.
+		if not stopped and running >= confirm then
+			local clear = now ~= nil
+					and now >= self.AftermathReleaseDistance
+
+			if clear or left <= confirm then
+				stopped = true
+
+				local sent = self:SendStandDown(npc)
+
+				if self.Config.LogTelemetry then
+					self:Log("Aftermath " .. tostring(npc:GetName())
+							.. " stopping him at "
+							.. string.format("%.0f", now or -1)
+							.. "m, stoodDown=" .. tostring(sent))
+				end
+			end
+		end
+
+		if left <= 0 then
+			finish("window", now)
+
+			return
+		end
+
+		Script.SetTimer(self.AftermathStopMs, sample)
 	end
 
-	Script.SetTimer(1000, watch)
+	Script.SetTimer(self.AftermathStopMs, sample)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.
