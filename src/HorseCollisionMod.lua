@@ -551,13 +551,17 @@ HorseCollisionMod.AftermathSamples = 40
 -- and a half; somebody walking to a stall makes about one.
 HorseCollisionMod.AftermathFleeSpeed = 2.5
 
---- How far a fleeing victim is allowed to get before he is stopped.
+--- How long a fleeing victim is allowed to run before he is stopped.
 --
--- He is not stopped where he stands. A man who has just been beaten should
--- get away, and a rider who is not chasing him should see him go rather than
--- watch him halt a second later and stand about. Fifteen meters puts him out
--- of the rider's immediate area while staying close enough to watch.
-HorseCollisionMod.AftermathReleaseDistance = 8.0
+-- Timed rather than measured in meters. Distance from the rider is the wrong
+-- lever, because it depends on where the rider happens to be standing: a
+-- victim who breaks away from someone already backing off clears any distance
+-- threshold in a stride and stops a second later, which reads as him thinking
+-- better of it. A man who has just been beaten should get properly clear.
+--
+-- Four seconds is roughly twenty meters at a flee's pace, which leaves the
+-- rider's immediate area without carrying him out of the district.
+HorseCollisionMod.AftermathRunMs = 4000
 
 --- How often the victim is sampled through the aftermath.
 --
@@ -566,6 +570,15 @@ HorseCollisionMod.AftermathReleaseDistance = 8.0
 -- of this is to catch the moment he stops and put him back to work in it
 -- rather than leave him standing in the road.
 HorseCollisionMod.AftermathStopMs = 500
+
+--- How long after the stand-down the victim is told to resume his routine.
+--
+-- `standDownRequest` ends the flee but gives him nowhere to be, and a victim
+-- with nowhere to be stands in the road looking vacant. The two go out
+-- together, with only enough delay for the first to land, rather than waiting
+-- to observe him come to a halt: waiting is what produced a five second stare
+-- into the middle distance.
+HorseCollisionMod.AftermathReplanMs = 500
 
 --- Consecutive samples of each state before it is believed.
 --

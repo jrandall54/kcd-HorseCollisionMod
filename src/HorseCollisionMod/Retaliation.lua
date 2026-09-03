@@ -578,52 +578,44 @@ end
 -- vanilla yield menu settles first, which is what closes the incident, and
 -- only then walks away in a flee that does not stop on its own.
 --
--- Three things are watched for, and they are independent of each other.
+-- ### He runs for a set time, then is stopped
 --
--- ### A flee, which he is allowed to finish
+-- `AftermathRunMs` of running, timed from the moment he is seen to run. Not
+-- a distance from the rider: that depends on where the rider is standing, so
+-- a victim breaking away from someone already walking off clears it in a
+-- stride and pulls up almost immediately, which looks like he changed his
+-- mind rather than fled.
 --
--- The stand-down is not sent the moment he runs. A man who has just been
--- beaten should put distance between himself and the rider, and a rider who
--- is not chasing him should see him leave rather than watch him halt a second
--- later. So he runs until he is `AftermathReleaseDistance` clear, and is
--- stopped then, or as the window closes if he has not made it.
+-- ### And is put straight back to work
 --
--- ### The moment he stops, whoever stopped him
+-- The stand-down and the replan go out together, separated only by
+-- `AftermathReplanMs` so the first has landed before the second arrives.
+-- `standDownRequest` ends the flee and gives him nowhere to be, and waiting
+-- to watch him come to a halt before offering him somewhere leaves him
+-- standing in the road for several seconds looking vacant.
 --
--- `standDownRequest` ends a flee but gives him nowhere to be, and a victim
--- with nowhere to be stands in the road until his own routine picks him up.
--- So the replan goes out the moment he is no longer gaining ground, and that
--- is not conditional on this having stopped him: a victim who runs a few
--- paces and halts by himself is left standing just the same, which is what a
--- measured run showed. This is the only reason a replan is sent at all, and
--- the reason it is worth sending here where it was not worth sending blind.
+-- A victim who stops by himself is replanned there and then, for the same
+-- reason: stopping is not the same as having something to do.
 --
--- ### His standing, once the rider is finished with him
+-- ### His standing is checked once more
 --
--- The repair at the end of the incident runs before the rider necessarily
--- is: a victim knocked down again, or beaten while he stands up, loses more
--- afterwards and was left carrying it. One measured victim was repaired at
--- the close, dropped back to 0.0 by what followed, and was restored by this
--- second look.
+-- The repair at the end of the incident runs before the rider necessarily is
+-- finished: a victim knocked down again, or beaten while he stands up, loses
+-- more afterwards and was left carrying it. One measured victim was repaired
+-- at the close, dropped back to 0.0 by what followed, and was restored by
+-- this second look.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
-	local began = self:TimeMs()
-	local ranFrom = nil
 	local left = self.AftermathSamples
 	local confirm = self.AftermathConfirmSamples
 	local running = 0
 	local still = 0
-	local stopped = false
+	local runningSince = nil
+	local done = false
 	local last = nil
 
-	-- Two different measurements, and using one for both is what made an
-	-- earlier version of this blind. How fast he is moving is his own
-	-- movement between samples, which is true whatever the rider does; a
-	-- victim measured by his distance from a rider who is following him reads
-	-- as standing still while he sprints. How far he has got is the distance
-	-- from the rider, which is what "clear of him" means.
 	local function where()
 		local p = nil
 
@@ -636,42 +628,70 @@ function HorseCollisionMod:WatchAftermath(npc)
 		return p
 	end
 
-	local function range()
-		local d = nil
-
-		pcall(function()
-			local p = npc:GetWorldPos()
-			local o = player:GetWorldPos()
-
-			d = self:VectorLength({ x = p.x - o.x, y = p.y - o.y, z = 0 })
-		end)
-
-		return d
-	end
-
 	last = where()
 
-	local function finish(why, at)
+	local function finish(why)
+		if done then
+			return
+		end
+
+		done = true
+
 		self:RepairVictim(npc)
 		self.Baseline[tostring(npc.id)] = nil
 
 		if self.Config.LogTelemetry then
 			self:Log("Aftermath " .. tostring(npc:GetName())
-					.. " done=" .. tostring(why)
-					.. " at=" .. string.format("%.0f", at or -1) .. "m"
-					.. " after=" .. tostring(self:TimeMs() - began) .. "ms")
+					.. " done=" .. tostring(why))
 		end
 	end
 
+	-- Stop him and hand him his routine back, in that order and close
+	-- together. Used both for a victim who ran his time out and one who
+	-- pulled up by himself.
+	local function settle(why, ranFor)
+		if done then
+			return
+		end
+
+		local sent = false
+
+		if why == "ran" then
+			sent = self:SendStandDown(npc)
+		end
+
+		if self.Config.LogTelemetry then
+			self:Log("Aftermath " .. tostring(npc:GetName())
+					.. " " .. why
+					.. " ranFor=" .. tostring(ranFor or 0) .. "ms"
+					.. " stoodDown=" .. tostring(sent))
+		end
+
+		Script.SetTimer(self.AftermathReplanMs, function()
+			if generation ~= self.TimerTick or done then
+				return
+			end
+
+			local replanned = self:ReplanVictim(npc)
+
+			if self.Config.LogTelemetry then
+				self:Log("Aftermath " .. tostring(npc:GetName())
+						.. " replanned=" .. tostring(replanned)
+						.. " gap=" .. tostring(self.AftermathReplanMs) .. "ms")
+			end
+
+			finish(why)
+		end)
+	end
+
 	local function sample()
-		if generation ~= self.TimerTick then
+		if generation ~= self.TimerTick or done then
 			return
 		end
 
 		left = left - 1
 
 		local at = where()
-		local now = range()
 		local speed = 0
 
 		if at ~= nil and last ~= nil then
@@ -687,53 +707,36 @@ function HorseCollisionMod:WatchAftermath(npc)
 		if speed > self.AftermathFleeSpeed then
 			running = running + 1
 			still = 0
+
+			if running >= confirm and runningSince == nil then
+				runningSince = self:TimeMs()
+			end
 		else
 			still = still + 1
 			running = 0
 		end
 
-		-- Stopped, however he came to stop. He is put back to work here.
-		if still >= confirm then
-			local replanned = self:ReplanVictim(npc)
-
-			if self.Config.LogTelemetry then
-				self:Log("Aftermath " .. tostring(npc:GetName())
-						.. " stopped, replanned=" .. tostring(replanned)
-						.. " gapFromStandDown="
-						.. tostring(ranFrom and (self:TimeMs() - ranFrom)
-								or -1) .. "ms")
-			end
-
-			finish("replanned", now)
+		-- He has had his run. Stop him and give him his day back.
+		if runningSince ~= nil
+				and (self:TimeMs() - runningSince) >= self.AftermathRunMs then
+			settle("ran", self:TimeMs() - runningSince)
 
 			return
 		end
 
-		-- Still running. He is stopped once he is clear, or as the window
-		-- closes, so that he cannot simply keep going.
-		if not stopped and running >= confirm then
-			local clear = now ~= nil
-					and now >= self.AftermathReleaseDistance
+		-- He pulled up by himself, which still leaves him with nowhere to be.
+		if runningSince ~= nil and still >= confirm then
+			settle("halted", self:TimeMs() - runningSince)
 
-			if clear or left <= confirm then
-				stopped = true
-				ranFrom = self:TimeMs()
-
-				local sent = self:SendStandDown(npc)
-
-				if self.Config.LogTelemetry then
-					self:Log("Aftermath " .. tostring(npc:GetName())
-							.. " stopping him at "
-							.. string.format("%.0f", now or -1)
-							.. "m, stoodDown=" .. tostring(sent)
-							.. " ranFor=" .. tostring(self:TimeMs() - began)
-							.. "ms")
-				end
-			end
+			return
 		end
 
 		if left <= 0 then
-			finish("window", now)
+			if runningSince ~= nil then
+				settle("window", self:TimeMs() - runningSince)
+			else
+				finish("no-flee")
+			end
 
 			return
 		end
