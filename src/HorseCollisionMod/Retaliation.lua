@@ -609,6 +609,8 @@ end
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
+	local began = self:TimeMs()
+	local ranFrom = nil
 	local left = self.AftermathSamples
 	local confirm = self.AftermathConfirmSamples
 	local running = 0
@@ -656,7 +658,8 @@ function HorseCollisionMod:WatchAftermath(npc)
 		if self.Config.LogTelemetry then
 			self:Log("Aftermath " .. tostring(npc:GetName())
 					.. " done=" .. tostring(why)
-					.. " at=" .. string.format("%.0f", at or -1) .. "m")
+					.. " at=" .. string.format("%.0f", at or -1) .. "m"
+					.. " after=" .. tostring(self:TimeMs() - began) .. "ms")
 		end
 	end
 
@@ -695,7 +698,10 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 			if self.Config.LogTelemetry then
 				self:Log("Aftermath " .. tostring(npc:GetName())
-						.. " stopped, replanned=" .. tostring(replanned))
+						.. " stopped, replanned=" .. tostring(replanned)
+						.. " gapFromStandDown="
+						.. tostring(ranFrom and (self:TimeMs() - ranFrom)
+								or -1) .. "ms")
 			end
 
 			finish("replanned", now)
@@ -711,6 +717,7 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 			if clear or left <= confirm then
 				stopped = true
+				ranFrom = self:TimeMs()
 
 				local sent = self:SendStandDown(npc)
 
@@ -718,7 +725,9 @@ function HorseCollisionMod:WatchAftermath(npc)
 					self:Log("Aftermath " .. tostring(npc:GetName())
 							.. " stopping him at "
 							.. string.format("%.0f", now or -1)
-							.. "m, stoodDown=" .. tostring(sent))
+							.. "m, stoodDown=" .. tostring(sent)
+							.. " ranFor=" .. tostring(self:TimeMs() - began)
+							.. "ms")
 				end
 			end
 		end

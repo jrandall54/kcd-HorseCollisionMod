@@ -557,7 +557,7 @@ HorseCollisionMod.AftermathFleeSpeed = 2.5
 -- get away, and a rider who is not chasing him should see him go rather than
 -- watch him halt a second later and stand about. Fifteen meters puts him out
 -- of the rider's immediate area while staying close enough to watch.
-HorseCollisionMod.AftermathReleaseDistance = 15.0
+HorseCollisionMod.AftermathReleaseDistance = 8.0
 
 --- How often the victim is sampled through the aftermath.
 --
