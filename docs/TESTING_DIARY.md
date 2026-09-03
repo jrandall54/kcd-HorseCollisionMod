@@ -14298,3 +14298,35 @@ entity and a WUID without error. Queried on a peaceful NPC for `t_state`,
 consistent with subbrain-local variables that exist only while that subbrain
 runs. Reading them off a victim **while he is fleeing** is untried, and is the
 next thing worth doing.
+
+### What the flee is not, after four probes
+
+Each of these was run against a victim mid-flight, in game, and none changed
+his speed away from the player or told us what drives it.
+
+| probe | result |
+| --- | --- |
+| `surrender_step` to 0.816 | kept running, 4.7 m/s unchanged |
+| `XGenAIModule.TryEndCombat` | not bound at runtime, despite the header list |
+| `Contexts.ResetEntity` | accepted, kept running at 5.1 m/s |
+| `GetBrainVariable` for combat state | nil for every name |
+
+The context option diff between a freshly broken NPC and a healthy one found
+three differences, `availableToSelfTalk`, `availableToUseLight` and
+`availableToSing`, none of which bear on fleeing. Twenty-six soul getters
+compared across the same pair differ only in gender and name string.
+
+`GetBrainVariable` does work: it returns the option table under
+`Contexts.__brainVarName__`. It answers nil for `currentState`, `t_state`,
+`t_state_current`, `t_state_next`, `t_fleeParams`, `isPlayerHostile`,
+`isHostile`, `threat` and `t_stateSwitchQueued`, all of which are declared in
+`sb_combat.xml`. The reading is that the bind reaches the context brain only
+and not subbrain-local variables, so the combat state is not readable from Lua
+by this route.
+
+**The cause remains unknown.** It is not reputation, not a context option, not
+a daycycle patch, and not anything exposed on the soul. Whether the state is
+even permanent has not been measured under controlled conditions; the seven-day
+report was from ordinary play. Skipping days with `tools/dev_time.lua` against
+a deliberately broken victim would settle that, and it is the cheapest
+remaining question.

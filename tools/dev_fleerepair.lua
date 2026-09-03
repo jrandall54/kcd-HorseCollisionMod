@@ -1,15 +1,8 @@
---- Watches for a victim left fleeing after a fight, and tries the repair.
+--- Dumps a fleeing victim's brain state the moment he runs.
 --
--- Answers one question with nothing required from the rider after the fight:
--- does raising a beaten NPC's reputation stop him running on sight.
---
--- It runs in the game rather than from the console because of timing. A
--- fleeing victim covers five meters per second and unloads once far enough
--- out, taking the entity and any way of repairing it with him, so a console
--- round trip does not finish in time.
---
--- Each `[FLEE]` line carries the social class the rider can see, the
--- reputation, the animation state and the speed away from the player.
+-- Reputation was measured not to drive the flee, so this dumps the context
+-- options set on a victim and tries a reset, in game because he unloads
+-- before a console round trip lands.
 --
 --     python tools/dev_console.py --file tools/dev_fleerepair.lua
 --
@@ -33,7 +26,14 @@ local DAMAGED = 0.35
 -- one; the measured flee was four and a half.
 local FLEE_SPEED = 2.5
 local CONFIRM = 2
-local STEPS = 8
+
+-- Declared in sb_combat.xml, so these are the real names rather than guesses.
+local VARS = {
+	"currentState", "t_state", "t_state_current", "t_state_next",
+	"t_fleeParams", "t_fleeParams_current", "isPlayerHostile", "isHostile",
+	"threat", "t_stateSwitchQueued"
+}
+
 
 local generation = HorseCollisionModFleeRepair.generation
 local seen = {}
@@ -101,18 +101,32 @@ local function sample()
 							end
 
 							if rec.fled >= CONFIRM and not rec.fixed then
-								for _ = 1, STEPS do
-									pcall(function()
-										ent.soul:ModifyPlayerReputation(
-												"surrender_step")
-									end)
-								end
-
 								rec.fixed = true
 
-								System.LogAlways("[FLEE] REPAIR APPLIED to "
-										.. name .. " after " .. rec.fled
-										.. " fleeing samples")
+								local w = nil
+								local out = {}
+
+								pcall(function()
+									w = XGenAIModule.GetMyWUID(ent)
+								end)
+
+								for _, v in ipairs(VARS) do
+									local got = nil
+
+									pcall(function()
+										got = XGenAIModule.GetBrainVariable(
+												w, v)
+									end)
+
+									if got ~= nil then
+										out[#out + 1] = v .. "="
+												.. tostring(got)
+									end
+								end
+
+								System.LogAlways("[FLEE] BRAIN " .. name
+										.. " hits=" .. #out .. " "
+										.. table.concat(out, " "))
 							end
 						end
 
