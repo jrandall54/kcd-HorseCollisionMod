@@ -494,6 +494,27 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- telemetry readable rather than a wall of lines.
 HorseCollisionMod.RetaliationPollMs = 1000
 
+--- The relationship at or above which a victim is treated as unharmed.
+--
+-- A healthy villager reads around 0.5 and a victim left ruined by a fight
+-- reads 0.0. Vanilla stops an NPC dealing with the player below 0.2, and
+-- below that threshold he decides to flee again every time he perceives the
+-- player, which is what made the damage look permanent. The floor sits above
+-- 0.2 rather than on it, so a victim is not left balanced on the edge.
+--
+-- A victim already above it is left alone, so an ordinary brawl cannot be
+-- used to raise somebody's opinion of the rider.
+HorseCollisionMod.RepairRelationshipFloor = 0.35
+
+--- How many `surrender_step` changes are applied to a victim under the floor.
+--
+-- `surrender_step` is the only common positive reputation change carrying
+-- `can_change_hostility`, and it is what vanilla's own surrender path applies
+-- in a loop. The change does not read back within the frame it is applied, so
+-- a fixed count is used rather than a loop that measures as it goes. Six takes
+-- a victim from 0.0 to roughly 0.76, which is a normal villager's regard.
+HorseCollisionMod.RepairSteps = 6
+
 --- How often a provoked victim is checked for having entered the fight.
 --
 -- Faster than the incident poll above, because this one is racing a victim

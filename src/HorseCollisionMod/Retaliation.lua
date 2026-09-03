@@ -508,6 +508,60 @@ function HorseCollisionMod:SendStandDown(npc)
 	return ok
 end
 
+--- Puts a victim right once the fight is over.
+--
+-- A man the rider fought is left at a relationship of 0.0 against a healthy
+-- villager's 0.5, and below vanilla's 0.2 threshold he decides to run every
+-- time he perceives the rider. Riding past him a week later still sends him
+-- sprinting, which reads as a permanently ruined NPC rather than a man who
+-- lost a fight.
+--
+-- **Two things are needed and neither works alone**, which is what made this
+-- hard to see. Measured on a victim who had been fleeing on sight across a
+-- save reload and an in game wait:
+--
+-- * `combat:stimulus:standDownRequest` cancels the flee that is running. Sent
+--   by itself it bought five seconds, and then the next time he perceived the
+--   rider he decided to flee again.
+-- * Raising the relationship changes the decision but not the behavior
+--   already executing, so sent by itself while he is mid-flight it does
+--   nothing visible. That is why an earlier reading of this called reputation
+--   irrelevant; the measurement could not have shown an effect either way.
+--
+-- Together they hold. The same victim stopped, stood at a meter and a half
+-- for twelve seconds, and afterwards would talk and trade.
+--
+-- A victim already at or above `RepairRelationshipFloor` keeps his own
+-- number, so a brawl is never a way to improve somebody's opinion.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true when the relationship was raised
+function HorseCollisionMod:RepairVictim(npc)
+	local before = nil
+
+	pcall(function()
+		before = npc.soul:GetRelationship(player.this.id)
+	end)
+
+	if before == nil or before >= self.RepairRelationshipFloor then
+		return false
+	end
+
+	for _ = 1, self.RepairSteps do
+		pcall(function()
+			npc.soul:ModifyPlayerReputation("surrender_step")
+		end)
+	end
+
+	if self.Config.LogTelemetry then
+		self:Log("RepairVictim " .. tostring(npc:GetName())
+				.. " from=" .. string.format("%.3f", before)
+				.. " steps=" .. tostring(self.RepairSteps))
+	end
+
+	return true
+end
+
 --- Closes the incident out: takes the option back and, if needed, intervenes.
 --
 -- `why` names which of `WatchRetaliation`'s three endings applied, and it
@@ -548,6 +602,12 @@ function HorseCollisionMod:EndRetaliation(npc, why, intervene)
 		state = tostring(npc.actor:GetCurrentAnimationState())
 	end)
 
+	-- Every ending, not only the ones that need a stand-down. However the
+	-- fight finished, whether he yielded, ran, or was knocked out and got up
+	-- again, he is left below the threshold that decides he should run from
+	-- the rider on sight, and that is what has to be undone.
+	local repaired = self:RepairVictim(npc)
+
 	local stoodDown = false
 	local replanned = false
 
@@ -562,7 +622,8 @@ function HorseCollisionMod:EndRetaliation(npc, why, intervene)
 				.. " cleared=" .. tostring(cleared)
 				.. " state=" .. tostring(state)
 				.. " stoodDown=" .. tostring(stoodDown)
-				.. " replanned=" .. tostring(replanned))
+				.. " replanned=" .. tostring(replanned)
+				.. " repaired=" .. tostring(repaired))
 	end
 end
 
