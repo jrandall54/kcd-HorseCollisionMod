@@ -226,6 +226,18 @@ function HorseCollisionMod:MassVictim(npc, armorScale)
 		scale = 1.0
 	end
 
+	-- Raising the scale to an exponent is the only term that widens the gap
+	-- between an armored victim and an unarmored one. The written mass is
+	-- `base / scale^k`, so the ratio between two victims is their scale ratio
+	-- raised to k and the base cancels out of it. Bases of 80 and 40 both
+	-- present the horse with the same 3.4x spread and both measured at parity;
+	-- k is what moves that number.
+	local exponent = self.Config.RagdollMassArmorExponent or 1.0
+
+	if exponent ~= 1.0 then
+		scale = scale ^ exponent
+	end
+
 	local wanted = base / scale
 	local generation = self.TimerTick
 	local origin = nil

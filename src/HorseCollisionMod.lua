@@ -115,6 +115,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollMassArmorScaled whether RagdollMass is divided by the armor
 --   scale; false gives every victim the same mass, which is how the direction
 --   of the effect is read
+-- @field RagdollMassArmorExponent how sharply armor is felt as weight. The
+--   base cancels out of the ratio between an armored victim's mass and an
+--   unarmored one, so only this widens the gap between them
 -- @field ArmorReferenceWeight armor weight that scales a target by exactly one
 -- @field ArmorImpulseExponent how sharply armor weight reduces the impulse
 -- @field MinArmorImpulse floor on the armor impulse multiplier
@@ -209,6 +212,15 @@ HorseCollisionMod.Config = {
 	-- 0 leaves the engine's own figure alone.
 	RagdollMass              = 80.0,
 	RagdollMassArmorScaled   = true,
+
+	-- How hard armor is felt as weight. The mass written is the base over the
+	-- armor scale raised to this, so the ratio between an armored victim and
+	-- an unarmored one is the scale ratio raised to it as well. The base
+	-- cancels out of that ratio entirely, which is why 40 and 80 both left
+	-- armored and unarmored victims travelling the same distance: both
+	-- present the horse with the same 3.4x spread. Above 1 widens the spread;
+	-- 1 is the plain division and 0 removes the scaling.
+	RagdollMassArmorExponent = 1.0,
 
 	-- What the target is wearing, as a multiplier on the impulse and on the
 	-- horse's stamina cost. Both are 1.0 at ArmorReferenceWeight; an

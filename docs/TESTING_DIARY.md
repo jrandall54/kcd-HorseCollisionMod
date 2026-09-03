@@ -13561,3 +13561,61 @@ registered.
 This follows from the call order and matches a rider's report of a guard that
 produced no reaction and afterwards behaved as though auto-cured. It has not
 been reproduced deliberately.
+
+## Base mass cannot move the armored-to-unarmored ratio
+
+Base 40 with armor scaling on was ridden to test whether halving the base
+would overshoot parity and leave armored victims visibly harder to move. It
+did not, and the reason is arithmetic rather than physics.
+
+Forty gallop impacts were recorded, 23 of them above 8 m/s. Restricted to
+those, and with one terrain-launched impact excluded for the reason given
+below:
+
+| condition | n | mean throw | median |
+| --- | --- | --- | --- |
+| armored | 12 | 3.39 m | 3.13 m |
+| unarmored | 10 | 3.59 m | 3.70 m |
+
+The armored-to-unarmored ratio is 0.94x by mean and 0.85x by median, against
+1.00x measured at base 80. A Mann-Whitney test over the two groups gives
+p = 0.64, so this sample cannot distinguish the two conditions from each other
+or from parity. A least-squares fit over the same 22 impacts puts armor at
+-0.06 m per standard deviation, against +0.25 m for forward contact distance;
+armor is the weakest term in the model and `R^2` is 0.052.
+
+### Why the base was never going to change it
+
+The mass written is `base / armorScale`. The ratio between an armored victim's
+mass and an unarmored one is therefore `scaleUnarmored / scaleArmored`, and the
+base cancels out of it entirely.
+
+| base | guard at scale 0.37 | villager at scale 1.26 | ratio |
+| --- | --- | --- | --- |
+| 80 | 216 kg | 63 kg | 3.4x |
+| 40 | 108 kg | 32 kg | 3.4x |
+
+Both conditions present the horse with the same 3.4x mass ratio and differ only
+in absolute mass. Reproducing parity was the expected outcome, not a surprise.
+
+**The base sets how far everyone travels. Only the spread of the armor scale
+sets how far armored victims travel relative to unarmored ones.** Scaling
+harder means widening that spread, which the current formula has no term for.
+
+### What the base did change
+
+Absolute throws moved in the direction momentum transfer predicts. Against the
+shipped path, where armored victims travel 4.52 m and unarmored 3.12 m,
+lightening every body to a third of the engine's figure brought armored victims
+down to 3.39 m and lifted unarmored ones to 3.59 m. Both halves moved the right
+way. The gap between them did not open.
+
+### The impact excluded, and why
+
+One refugee travelled 14.36 m, three times the next largest throw in the set.
+It is a real launch rather than a parse error: the footprint recorded `dz`
+-0.90, so the horse was most of a meter above the victim, the body moved 5.90 m
+in the first 300 ms and rose 1.14 m by the half-second sample. It is terrain
+geometry, not mass, and with n around ten per group it carries the comparison
+on its own. Including it moves the ratio to 0.74x with p = 0.42, which reads as
+an effect and is one impact wide.

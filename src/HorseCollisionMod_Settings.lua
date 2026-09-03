@@ -33,12 +33,15 @@ HorseCollisionModSettings = {
 	-- This is divided by the armor scale, so mail is heavier to move.
 	-- 0 leaves the engine's figure alone.
 	--
-	-- TEST RIDE: flat 40 for everyone, armor scaling off. Momentum transfer
-	-- predicts throws longer than the 3.76 m baseline; a settling side
-	-- effect predicts the same shortening measured with scaling on.
-	-- Restore to 80.0 and true afterwards.
+	-- The exponent is what separates armored victims from unarmored ones.
+	-- The base cancels out of the ratio between them, which is why 80 and 40
+	-- both measured at parity: both hand the horse the same 3.4x spread.
+	--
+	-- TEST RIDE: base 40, exponent 2. That squares the spread to 11.6x,
+	-- putting villagers at 25-30 kg and guards at 227-327.
 	RagdollMass              = 40.0,
-	RagdollMassArmorScaled   = false,
+	RagdollMassArmorScaled   = true,
+	RagdollMassArmorExponent = 2.0,
 	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 0.5,   -- higher puts it to rest sooner
 
