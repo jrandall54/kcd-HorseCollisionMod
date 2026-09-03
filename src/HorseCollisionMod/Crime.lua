@@ -203,3 +203,73 @@ function HorseCollisionMod:SendProvocationHit(npc, playerEnt)
 
 	return ok
 end
+
+--- Releases a defense-only fighter into actually attacking.
+--
+-- A civilian the player provokes enters the fight carrying
+-- `startInDefenseOnly`, which `sb_combat_fight.xml` turns into
+-- `$offense = false`. Such a fighter squares up, holds his guard and never
+-- strikes, which is what a provoked victim was observed doing for twenty-two
+-- seconds before the rider swung first.
+--
+-- Exactly one node in that subtree sets the flag true. It reads the
+-- `hitReaction` inbox and requires a strength above `Zero` and a type of
+-- `Melee` or `Bullet`; it then sets `$offense` and registers the attacker as
+-- an opponent. Nothing else in the tree turns offense on, so without this
+-- message the fight the provocation starts cannot become a fight.
+--
+-- `Tickle` is the mildest strength that clears `Zero`, and the type
+-- definition records that it costs the victim no health and only minor
+-- stamina. `Melee` is not a stylistic choice: `Collision`, which is what a
+-- horse impact is, is not one of the two types the condition accepts, so the
+-- horse's own contact can never release a fighter however hard it lands.
+--
+-- This file's header says a `hitReaction` is consumed by a passive observer
+-- that cannot drive a body or raise a crime. That still describes
+-- `sb_switch_hitreactions.xml`, which is the consumer it was written about,
+-- and it is why this send stays crime-free. The fight subtree reads the same
+-- inbox for a different purpose, and setting a behavior flag is not driving
+-- a body.
+--
+-- @tparam table npc victim entity
+-- @tparam table playerEnt the player entity
+-- @treturn boolean true when the message was sent
+function HorseCollisionMod:SendOffenseRelease(npc, playerEnt)
+	if not playerEnt then
+		return false
+	end
+
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local playerWuid = nil
+
+	pcall(function()
+		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+	end)
+
+	if not playerWuid then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		local message = Utils.makeTable("hitReaction", {
+			attacker = playerWuid,
+			hitStrength = self.HitReactionStrength.Tickle,
+			hitType = self.HitReactionType.Melee
+		})
+
+		XGenAIModule.SendMessageToEntityData(target, "hitReaction", message)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("OffenseRelease " .. tostring(npc:GetName())
+				.. " ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
