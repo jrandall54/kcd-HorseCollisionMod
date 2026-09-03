@@ -13619,3 +13619,81 @@ in the first 300 ms and rose 1.14 m by the half-second sample. It is terrain
 geometry, not mass, and with n around ten per group it carries the comparison
 on its own. Including it moves the ratio to 0.74x with p = 0.42, which reads as
 an effect and is one impact wide.
+
+## Squaring the armor spread does not separate the victims either
+
+`RagdollMassArmorExponent` was added to widen the gap the base could not, and
+ridden at base 40 with an exponent of 2. That squares the armor scale before
+the division and takes the spread between an armored victim and an unarmored
+one from 3.4x to 11.6x, putting guards at 230 to 327 kg and villagers at 25 to
+30. The masses were confirmed live before the ride and every write took, all
+but two at 16 ms.
+
+The ratio did not move. Armored victims travelled 0.90x as far as unarmored
+ones, against 0.94x at an exponent of 1. Tripling the mass of every guard and
+squaring the spread between the two groups changed the measured separation by
+0.04x.
+
+### The same-armor comparisons run backwards
+
+Comparing victims wearing the same armor across the two conditions removes the
+armor confound entirely, and both comparisons move the wrong way.
+
+| group | condition | mass | n | mean throw |
+| --- | --- | --- | --- | --- |
+| armored | exponent 1 | 73-114 kg | 12 | 3.39 m |
+| armored | exponent 2 | 155-295 kg | 6 | 3.69 m |
+| unarmored | exponent 1 | 32-42 kg | 11 | 4.57 m |
+| unarmored | exponent 2 | 25-35 kg | 9 | 4.01 m |
+
+Nearly tripling an armored victim's mass lengthened the throw by 0.30 m.
+Lightening an unarmored victim shortened it by 0.56 m. Momentum transfer
+predicts the opposite of both. The standard deviations are 1.4 to 3.5 m, so
+neither difference is distinguishable from zero; that is the point. These are
+the fingerprint of noise, not of a lever.
+
+### Pooled across every condition, mass does not predict the throw
+
+Sixty-seven full-gallop impacts with a mass write and near-level contact,
+spanning 25 to 295 kg over four conditions, regressed on log mass with contact
+geometry and approach speed controlled:
+
+| term | effect | p |
+| --- | --- | --- |
+| ln(mass) | -0.47 m per sd | 0.260 |
+| forward distance | +0.44 m per sd | 0.306 |
+| lateral offset | +0.04 m per sd | 0.919 |
+| approach speed | +0.45 m per sd | 0.287 |
+
+`R^2` is 0.052. Nothing measured reaches significance and the model explains
+five percent of the variance, so 95% of what decides a throw is not being
+recorded by any instrument this mod has.
+
+The binned means do fall with mass, from 4.80 m below 35 kg to 2.44 m above
+250, and that is the shape the earlier reading rested on. It does not survive
+controlling for geometry, and it is carried by the unarmored band, which is
+also the band with the most samples.
+
+### What this does and does not establish
+
+It does not re-open whether the mass write reaches the collision. It does, at
+16 ms, with the victim still centimeters from where they stood.
+
+What it establishes is narrower and more useful: **no setting of the base or
+the exponent produces a visible difference between an armored victim and an
+unarmored one.** The test was not powered to resolve a small effect, but it did
+not need to be. An armor difference worth shipping would be obvious at an 11.6x
+mass spread, and at that spread the ratio is 0.90x.
+
+### A methodological check that came back clean
+
+Before drawing any of this, `travel` was checked for measuring locomotion
+rather than the throw, since recovery runs about 5.9 s and a victim who stands
+up keeps accumulating distance. Across 136 gallop impacts the body is at rest
+by three seconds and stays there: the median change from t+3000 to t+6000 is
+-0.08 m, and 15% of victims move more than half a meter.
+
+The t+10000 sample is a different matter. It gains 2.08 m on average and 61% of
+victims move more than half a meter, because by ten seconds they are up and
+walking. **t+6000 is the correct sample and t+10000 must not be used for
+throw distance.**
