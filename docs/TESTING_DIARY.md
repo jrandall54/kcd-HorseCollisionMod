@@ -14154,3 +14154,90 @@ This is a defect in the retaliation feature as shipped in 4.6.0, not in
 anything on the branch that surfaced it. `feat/retaliation-unarmed` is parked,
 committed and unmerged, pending a scenario that actually exercises the
 holster path. The stalled brawl is the next thing to investigate.
+
+## Why a provoked victim never swings: `$offense` is never set
+
+`tools/dev_watchfight.lua` samples every human within 10 m once a second,
+along with the player, so a swing and whatever answers it sit in one timeline.
+A provoked merchant was watched through a stall and out the far side of it.
+
+### The stall, measured
+
+Twenty-two consecutive samples with both parties in `CombatIdle` at a distance
+of exactly 2.0 m. The victim's relationship to the player held at 0.57, his
+weapon stayed undrawn, and he neither closed nor struck. He is in the fight
+state the whole time: this is not a victim who failed to enter combat, it is
+one who entered it and will not act.
+
+The rider then attacked. The victim answered with a single counter, and from
+the sample where the rider's own hits began landing the relationship dropped
+to -0.00 and stayed there. Every sample afterwards is a real fight:
+`CombatAttack`, `CombatDodge`, `CombatBlockNW`, `CombatBlockBroken`,
+`CombatHit`.
+
+### The relationship is a side effect, not the cause
+
+The obvious reading is that hostility gates the fight and 0.57 is too friendly
+a number to attack over. That reading is wrong, and building on it would have
+produced the wrong fix.
+
+`sb_combat_fight.xml:514` initializes the flag that decides whether a fighter
+attacks at all:
+
+    $offense = !$t_fightOptions.startInDefenseOnly
+
+A civilian struck by the player, who is not already an enemy, is given
+`startInDefenseOnly = true` by `sb_combat.xml:8340`, so `$offense` begins
+false. There is exactly one place in the whole subtree that sets it true, at
+`sb_combat_fight.xml:574`:
+
+    ReadMessage inbox = hitReaction
+    if hitReaction.hitStrength > HitReactionStrength.Zero
+       and (hitReaction.hitType == Melee or hitReaction.hitType == Bullet)
+        $offense = true
+        AddOpponent(hitReaction.attacker)
+        InstantSendMessageToNPC(this, encounter:addOpponent)
+
+So a defense-only fighter leaves defense only when a hit reaction of non-zero
+strength reaches him, and never otherwise. The relationship falling to zero is
+what the rider's real hits do to reputation on their way past; it is
+correlated with the fight starting because the same punch causes both.
+
+### Why the mod's provocation cannot start a fight
+
+`SendProvocationHit` sends `combat:stimulus:hit` carrying `attacker`, `kind`
+and `real = false`. That reaches the civilian hit handler and wins the
+argument about whether to fight, which is why the victim stands up and guards.
+It does not put a `hitReaction` of non-zero strength in the victim's inbox, so
+`$offense` is never set, and a fighter with `$offense` false has nothing to do
+but hold his guard until something closes the incident. The mod's own
+`RetaliationCeilingSec` failsafe is usually what does.
+
+The feature's central design decision is what defeats it. `real = false` is
+carried precisely so the provocation raises no crime and no reputation change,
+and that same flag is why no hit reaction of consequence is ever produced.
+
+### The horse's own collision cannot set it either
+
+`HitReactionType` is `Melee` 1, `Collision` 2, `Fall` 7, `Bullet` 10,
+`MeleeStealth` 16. The `$offense` condition accepts `Melee` and `Bullet` and
+nothing else, so a hit reaction arising from a horse collision is the wrong
+type to release a defense-only fighter however hard it lands.
+
+### The route out, confirmed constructible
+
+`hitReaction` is a declared type in `TypeDefinitions.xml`, carrying `attacker`,
+`hitStrength`, `hitType` and `targetOrigMat`, and it is registered in
+`MessageTypes.xml`. `HitReactionStrength.Tickle`, value 2, is documented there
+as costing the target no health and only minor stamina, and it clears the
+`> Zero` test.
+
+Built against the running game:
+
+    Utils.makeTable('hitReaction',
+        { attacker = playerWuid, hitStrength = 2, hitType = 1 })   ok
+
+Sending that to a provoked victim should set `$offense` and register the
+player as an opponent without a health cost and without touching reputation,
+since the block that reads it does neither. That it constructs is not proof
+that the fight tree answers it, and the send is untested.
