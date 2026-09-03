@@ -37,11 +37,15 @@ HorseCollisionModSettings = {
 	-- The base cancels out of the ratio between them, which is why 80 and 40
 	-- both measured at parity: both hand the horse the same 3.4x spread.
 	--
-	-- TEST RIDE: base 40, exponent 2. That squares the spread to 11.6x,
-	-- putting villagers at 25-30 kg and guards at 227-327.
-	RagdollMass              = 40.0,
-	RagdollMassArmorScaled   = true,
-	RagdollMassArmorExponent = 2.0,
+	-- TEST RIDE: a flat 2000 kg for every victim, armor scaling off. The
+	-- horse is 480 kg and carries an 80 kg rider, so this makes every body
+	-- it hits roughly four times the mass of the thing hitting it. Against
+	-- the flat 40 kg control, which threw 5.01 m over 23 impacts, that is a
+	-- 50x change in mass. Momentum transfer predicts the throw collapses. If
+	-- it does not move, victim mass is inert and the whole lever is dead.
+	RagdollMass              = 2000.0,
+	RagdollMassArmorScaled   = false,
+	RagdollMassArmorExponent = 1.0,
 	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 0.5,   -- higher puts it to rest sooner
 
