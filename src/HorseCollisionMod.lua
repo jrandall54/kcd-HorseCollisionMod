@@ -505,30 +505,37 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- telemetry readable rather than a wall of lines.
 HorseCollisionMod.RetaliationPollMs = 1000
 
---- The relationship at or above which a victim is treated as unharmed.
+--- The lowest a repair will leave a victim, whatever the arithmetic says.
 --
--- A healthy villager reads around 0.5 and a victim left ruined by a fight
--- reads 0.0. Vanilla stops an NPC dealing with the player below 0.2, and
--- below that threshold he decides to flee again every time he perceives the
--- player, which is what made the damage look permanent. The floor sits above
--- 0.2 rather than on it, so a victim is not left balanced on the edge.
+-- Vanilla stops an NPC dealing with the player below 0.2, and below that he
+-- decides to flee again every time he perceives the rider, which is what made
+-- the damage look permanent. This sits above that rather than on it, so a
+-- victim is never left balanced on the edge of it.
+HorseCollisionMod.RepairFloor = 0.35
+
+--- What losing the fight costs a victim permanently.
 --
--- A victim already above it is left alone, so an ordinary brawl cannot be
--- used to raise somebody's opinion of the rider.
-HorseCollisionMod.RepairRelationshipFloor = 0.35
+-- The repair deliberately does not restore a victim to exactly what he was.
+-- He was ridden down and then beaten, and remembering it is correct; what is
+-- not correct is being ruined for good. So the target is his own standing
+-- less this, held above the floor above, which leaves a man who thinks less
+-- of the rider than his neighbors do and still trades with him.
+HorseCollisionMod.RepairFightCost = 0.15
 
 --- How the repair walks a victim back up, one change at a time.
 --
 -- `surrender_step` is the only common positive reputation change carrying
 -- `can_change_hostility`, and it is what vanilla's own surrender path applies
--- in a loop. It is worth roughly 0.13 here and does not read back in the
--- frame it is applied, so the ladder waits between rungs and stops as soon as
--- the victim is back where he started. Six applied blind took a victim from
--- 0.0 to 0.84, well above the 0.50 an untouched townsman reads.
+-- in a loop. There is no way to write a relationship directly: the only bind
+-- is `ModifyPlayerReputation`, which applies a named row from the reputation
+-- table as a delta, so a target is reached by stepping toward it rather than
+-- by assignment. Each step is worth roughly 0.13 and does not read back in
+-- the frame it is applied, so the ladder waits between rungs and stops as
+-- soon as the target is met.
 HorseCollisionMod.RepairStepMs = 400
 HorseCollisionMod.RepairMaxSteps = 8
 
---- Where a victim is restored to when nothing was recorded for him.
+--- The standing assumed for a victim nothing was recorded for.
 --
 -- Untouched townsmen sampled across a village all read 0.50.
 HorseCollisionMod.RepairDefaultTarget = 0.50

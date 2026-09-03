@@ -531,15 +531,15 @@ end
 -- Together they hold. The same victim stopped, stood at a meter and a half
 -- for twelve seconds, and afterwards would talk and trade.
 --
--- ### It restores, it does not reward
+-- ### It marks him down, it does not reward him
 --
--- The target is what the victim thought of the rider before he was provoked,
--- so a beating costs him nothing in the end and earns the rider nothing
--- either. A first attempt applied a fixed six changes, which is calibrated
--- for a victim at 0.0 and took one to 0.84, leaving a man who had just been
--- knocked out with a better opinion of the rider than his untouched
--- neighbors. The ladder stops as soon as he is back where he started, so the
--- worst overshoot is a single change.
+-- The target is the victim's own standing before he was provoked, less
+-- `RepairFightCost`, held above `RepairFloor`. He remembers the fight, which
+-- is right, and he is never left under the threshold that ruins him, which is
+-- the bug. A first attempt applied a fixed six changes instead, which is
+-- calibrated for a victim at 0.0 and took one to 0.84 against the 0.50 his
+-- untouched neighbors read, so a beating paid the rider a bonus. The ladder
+-- stops the moment the target is met, so the worst overshoot is one change.
 --
 -- The steps are spaced because a reputation change does not read back in the
 -- frame it is applied. Reading immediately reports the old value and the
@@ -549,7 +549,12 @@ end
 -- @treturn boolean true when a repair was started
 function HorseCollisionMod:RepairVictim(npc)
 	local id = tostring(npc.id)
-	local target = self.Baseline[id] or self.RepairDefaultTarget
+	local baseline = self.Baseline[id] or self.RepairDefaultTarget
+	local target = baseline - self.RepairFightCost
+
+	if target < self.RepairFloor then
+		target = self.RepairFloor
+	end
 
 	local function current()
 		local r = nil
