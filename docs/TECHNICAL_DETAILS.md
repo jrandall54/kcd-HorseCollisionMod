@@ -344,6 +344,36 @@ reaction restarts every tick and they never finish staggering.
 Why the defaults in `HorseCollisionMod.Config` are set where they are. The
 config table itself is kept scannable, since it is read to change a setting.
 
+### Ragdoll mass and the armor exponent
+
+Every human is 80 kg to the physics engine, so without intervention a peasant
+and a knight are the same thing for a horse to hit. `RagdollMass` replaces that
+figure on the victim, written once the body is a ragdoll and before the horse
+reaches it, and `RagdollMassArmorExponent` divides it by the armor scale raised
+to a power.
+
+The two numbers do different jobs, and this is the part worth understanding
+before changing either:
+
+- **The exponent sets how far apart armored and unarmored victims land.** The
+  base cancels out of the ratio between two victims, so it cannot widen the
+  gap no matter what it is set to.
+- **The base sets how far everyone travels**, armored and unarmored alike.
+
+The throw responds to mass as roughly `mass ^ -0.185`, measured across a
+fiftyfold flat comparison. That coupling is weak enough to matter: doubling a
+victim's mass shortens the throw by 12%, so a spread around a hundredfold is
+what a visible difference costs, and an exponent of 1 is worth nothing at all.
+
+At the shipped figures a villager is about 43 kg and a mailed guard about 4900,
+and the measured six-second throws are 4.19 m against 1.92 m.
+
+Lowering the base widens the separation on the ground while shortening nothing
+else, which is tempting and has a limit. At a base of 40 light victims reach 17
+kg, where the mod's own knockdown impulse stops being negligible and adds up to
+4.34 m/s to a body the horse has already launched. Those victims travel twelve
+meters and more, which does not read as a person being hit by a horse.
+
 ### Stamina
 
 A full horse stamina pool is 210. At the current values a gallop costs roughly

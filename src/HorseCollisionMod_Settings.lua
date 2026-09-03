@@ -33,16 +33,16 @@ HorseCollisionModSettings = {
 	-- This is divided by the armor scale, so mail is heavier to move.
 	-- 0 leaves the engine's figure alone.
 	--
-	-- The exponent is what separates armored victims from unarmored ones.
-	-- The base cancels out of the ratio between them, which is why 80 and 40
-	-- both measured at parity: both hand the horse the same 3.4x spread.
+	-- The exponent decides how far apart armored and unarmored victims land,
+	-- and the base decides how far everyone travels. The base cancels out of
+	-- the ratio between the two, so raising it shortens every throw without
+	-- changing which victim resists; only the exponent widens the gap.
 	--
-	-- TEST RIDE: the exponent stays at 3.7, which measured a 0.40x throw
-	-- ratio and is the setting that works. The base rises to 100 because at
-	-- 40 the light end launched: villagers at 17 kg were thrown 12 and 14 m,
-	-- which does not read as a person being hit by a horse. The base moves
-	-- everyone without touching the ratio, putting villagers near 42 kg and
-	-- guards near 4350, predicting roughly 5.0 m against 2.1 m.
+	-- At these figures a villager is about 43 kg and a mailed guard about
+	-- 4900, and the measured throws are 4.19 m against 1.92 m. Lowering the
+	-- base to 40 roughly doubles the separation on the ground but launches
+	-- light victims twelve meters and further, which does not read as a
+	-- person being hit by a horse.
 	RagdollMass              = 100.0,
 	RagdollMassArmorScaled   = true,
 	RagdollMassArmorExponent = 3.7,
@@ -111,7 +111,7 @@ HorseCollisionModSettings = {
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 
 	-- Switches.
-	CollisionIsCrime         = false,  -- riding someone down is a crime at trot
+	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
 	                                  -- and gallop; never at a walk
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
 	ReplanAfterReaction      = true,  -- sends them back to their stall or
@@ -125,6 +125,6 @@ HorseCollisionModSettings = {
 	-- every entity near the horse, including doors and audio areas, which is
 	-- thousands per session. Only useful while investigating why a specific
 	-- impact did nothing. `build.ps1` refuses a release build with this on.
-	DiagnoseMisses           = true
+	DiagnoseMisses           = false
 
 }

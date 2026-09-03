@@ -23,6 +23,19 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- Armor is now felt in the collision, not only in the horse's stamina. A man
+  in mail is harder for a horse to move than a villager in cloth and lands
+  about half as far away: measured six-second throws are 1.92 m against
+  4.19 m, where the shipped mod threw armored victims 45% *further* than
+  unarmored ones. Two settings control it. `RagdollMass` is what the horse
+  collides with in kilograms, replacing the engine's flat 80 for every human,
+  and `RagdollMassArmorExponent` divides that by the armor scale raised to a
+  power. The exponent sets how far apart the two land and the base sets how
+  far everyone travels; `docs/TECHNICAL_DETAILS.md` explains why lowering the
+  base is tempting and where it stops working.
+
 ## [4.6.3] - 2026-09-02
 
 ### Changed

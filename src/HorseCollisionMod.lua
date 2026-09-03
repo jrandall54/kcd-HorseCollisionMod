@@ -210,7 +210,7 @@ HorseCollisionMod.Config = {
 	-- a man in mail is the heavier thing to move. Every human is 80 to the
 	-- physics engine, which is why armor has never been felt in a throw.
 	-- 0 leaves the engine's own figure alone.
-	RagdollMass              = 80.0,
+	RagdollMass              = 100.0,
 	RagdollMassArmorScaled   = true,
 
 	-- How hard armor is felt as weight. The mass written is the base over the
@@ -220,7 +220,7 @@ HorseCollisionMod.Config = {
 	-- armored and unarmored victims travelling the same distance: both
 	-- present the horse with the same 3.4x spread. Above 1 widens the spread;
 	-- 1 is the plain division and 0 removes the scaling.
-	RagdollMassArmorExponent = 1.0,
+	RagdollMassArmorExponent = 3.7,
 
 	-- What the target is wearing, as a multiplier on the impulse and on the
 	-- horse's stamina cost. Both are 1.0 at ArmorReferenceWeight; an
