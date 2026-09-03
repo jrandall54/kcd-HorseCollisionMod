@@ -545,6 +545,11 @@ end
 -- frame it is applied. Reading immediately reports the old value and the
 -- ladder would spend every rung it has.
 --
+-- There is no way to write a relationship outright. `ModifyPlayerReputation`
+-- takes the name of a row in the reputation table and applies it as a change,
+-- and its second argument scales that change, so a target is approached
+-- rather than assigned.
+--
 -- @tparam table npc victim entity
 -- @treturn boolean true when a repair was started
 function HorseCollisionMod:RepairVictim(npc)
@@ -600,8 +605,14 @@ function HorseCollisionMod:RepairVictim(npc)
 
 		left = left - 1
 
+		-- Aimed at what is left rather than taken blind. The second argument
+		-- scales the change, so the gap itself is the best available guess at
+		-- the size needed; it undershoots, because the returned relationship
+		-- is a compressed view of the value the engine keeps, and asking for
+		-- 0.5 from zero moves 0.32 while asking for 0.1 moves 0.14. Aiming
+		-- still converges in two or three rungs where a fixed step took six.
 		pcall(function()
-			npc.soul:ModifyPlayerReputation("surrender_step")
+			npc.soul:ModifyPlayerReputation("surrender_step", target - now)
 		end)
 
 		Script.SetTimer(self.RepairStepMs, rung)

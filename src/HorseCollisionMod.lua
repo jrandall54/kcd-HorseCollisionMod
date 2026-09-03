@@ -526,14 +526,14 @@ HorseCollisionMod.RepairFightCost = 0.15
 --
 -- `surrender_step` is the only common positive reputation change carrying
 -- `can_change_hostility`, and it is what vanilla's own surrender path applies
--- in a loop. There is no way to write a relationship directly: the only bind
--- is `ModifyPlayerReputation`, which applies a named row from the reputation
--- table as a delta, so a target is reached by stepping toward it rather than
--- by assignment. Each step is worth roughly 0.13 and does not read back in
--- the frame it is applied, so the ladder waits between rungs and stops as
--- soon as the target is met.
+-- in a loop. Each rung is aimed at the remaining gap rather than taken blind,
+-- which converges in two or three rather than six, and the ladder is kept
+-- because the aim undershoots: the relationship read back is a compressed
+-- view of the engine's own value, so asking for 0.5 from zero moves 0.32.
+-- A change does not read back in the frame it is applied either, so the rungs
+-- are spaced.
 HorseCollisionMod.RepairStepMs = 400
-HorseCollisionMod.RepairMaxSteps = 8
+HorseCollisionMod.RepairMaxSteps = 5
 
 --- The standing assumed for a victim nothing was recorded for.
 --
