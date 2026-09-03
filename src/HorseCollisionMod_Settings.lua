@@ -17,7 +17,7 @@ HorseCollisionModSettings = {
 
 	-- What counts as contact. Lower these if NPCs react when you ride past.
 	HorseFrontReach          = 1.05,  -- meters ahead of the horse
-	HorseHalfWidth           = 0.35,  -- meters to either side
+	HorseHalfWidth           = 0.70,  -- meters to either side
 	HorseRearReach           = 0.20,  -- meters behind
 	HitCooldownMs            = 3000,  -- before a staggered NPC can react again
 	KnockdownRecoveryMs      = 6000,  -- before a floored one can, they lie

@@ -23,6 +23,18 @@ number.
 
 ## [Unreleased]
 
+## [4.7.2] - 2026-09-03
+
+### Fixed
+
+- The detection corridor was 0.70 m wide against a horse that is wider than
+  that, so bodies struck against the flank were rejected: the engine still
+  damaged them, and the mod never registered the hit to suppress vanilla's
+  auto-cure daycycle, which stood the victim in the street replaying
+  `PretendingIllness` once their health passed below 40. `HorseHalfWidth` is
+  now 0.70, wide enough to catch the whole documented cluster of flank
+  contacts and still reject people the horse passes with real clearance.
+
 ## [4.7.0] - 2026-09-02
 
 ### Added

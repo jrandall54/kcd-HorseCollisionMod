@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.7.1
+-- @release 4.7.2
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.7.1"
+HorseCollisionMod.Version = "4.7.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -188,7 +188,7 @@ HorseCollisionMod.Config = {
 	HitRadius                = 2.5,
 	HorseFrontReach          = 1.05,
 	HorseRearReach           = 0.20,
-	HorseHalfWidth           = 0.35,
+	HorseHalfWidth           = 0.70,
 	HorseMaxVerticalDiff     = 2.35,
 	TickSeconds              = 0.1,
 	SweepMultiplier          = 0.50,
