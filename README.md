@@ -152,6 +152,9 @@ tools/
                           finding food in hardcore
   dev_time.lua            moves game time forward without the wait dialog,
                           through the Calendar global
+  dev_nocrime.lua         clears the player's wanted level and holds the two
+                          context options that stop a victim turning hostile,
+                          so a measurement ride is not ended by a brawl
   probe_api.lua           lists the methods an object actually exposes in the
                           running game, which the written references do not
   probe_horse_mass.lua    reports the mass and physics identity of the horse,
