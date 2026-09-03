@@ -561,8 +561,6 @@ function HorseCollisionMod:RepairVictim(npc)
 	local baseline = self.Baseline[id] or self.RepairDefaultTarget
 	local target = baseline - self.RepairFightCost
 
-	self.Baseline[id] = nil
-
 	if target < self.RepairFloor then
 		target = self.RepairFloor
 	end
@@ -682,9 +680,15 @@ end
 -- reads as damaged; he simply never comes back.
 --
 -- Sampling his distance from the rider catches it. Anything faster than an
--- errand, sustained rather than a single step, takes another stand-down. It
--- is sent at most once, because a second changes nothing and the incident is
--- already over.
+-- errand, sustained rather than a single step, takes another stand-down.
+--
+-- The window closes on a second look at his reputation, which is what makes
+-- the figure trustworthy. The repair at the end of the incident is applied
+-- before the rider has necessarily finished with him: a victim knocked down
+-- again, or beaten while he stands up, loses more afterwards and was left
+-- carrying it. One measured victim came out of a repair at 0.737 and was at
+-- 0.590 by the time he settled. The recheck restores whatever was lost after
+-- the first pass, and costs nothing when nothing was.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:GuardAgainstFlee(npc)
@@ -730,12 +734,17 @@ function HorseCollisionMod:GuardAgainstFlee(npc)
 					self:Log("FleeGuard " .. tostring(npc:GetName())
 							.. " late flee, stoodDown=" .. tostring(sent))
 				end
-
-				return
 			end
 		end
 
 		last = now
+
+		if left <= 0 then
+			self:RepairVictim(npc)
+			self.Baseline[tostring(npc.id)] = nil
+
+			return
+		end
 
 		Script.SetTimer(1000, sample)
 	end
