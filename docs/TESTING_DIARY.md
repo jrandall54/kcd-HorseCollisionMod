@@ -13807,3 +13807,62 @@ At base 100 with the same exponent, villagers land near 42 kg and guards near
 4350. The power law predicts roughly 5.0 m against 2.1 m: a villager thrown
 about as far as the shipped mod throws them today, and a guard thrown less than
 half that.
+
+## Raising the base holds the ratio and halves what the rider can see
+
+Base 100 at an exponent of 3.7, putting guards between 2543 and 4863 kg and
+villagers between 42 and 124. Nothing broke at five tonnes: every mass write
+took, all but a handful at 16 ms, and no victim stuck to the horse, jittered or
+sank.
+
+| set | n | armored | unarmored | ratio | p |
+| --- | --- | --- | --- | --- | --- |
+| full gallop | 16 | 1.92 m | 4.19 m | 0.46x | 0.011 |
+| all gallop tiers | 40 | 1.96 m | 2.66 m | 0.74x | 0.116 |
+
+The light end is fixed. The longest unarmored throw fell from 13.84 m to 6.15,
+so the launches are gone.
+
+### The ratio is not what the rider sees
+
+Against the previous ride, at the same exponent:
+
+| base | armored | unarmored | ratio | **gap** | unarmored max |
+| --- | --- | --- | --- | --- | --- |
+| 40 | 3.09 m | 6.86 m | 0.45x | **3.77 m** | 13.84 m |
+| 100 | 1.92 m | 4.19 m | 0.46x | **2.27 m** | 6.15 m |
+
+The ratio is identical to two decimal places and the separation on the ground
+fell by 40%. The rider described the effect as subtle without having seen these
+numbers, and that is what a gap shrinking from 3.8 m to 2.3 m looks like.
+
+**The visible quantity is the gap in meters, not the ratio.** Every earlier
+entry in this branch reported the ratio, which is the right measure of whether
+armor is doing something and the wrong measure of whether anyone can tell.
+
+### Lowering the mass reactivates the impulse
+
+The impulse the mod applies was measured as inert and set aside. That
+measurement was made at the engine's default 80 kg, and it does not survive a
+change of mass, because an impulse divided by a small mass is a large velocity.
+
+| condition | victim | mass | impulse | delta-v |
+| --- | --- | --- | --- | --- |
+| base 40 | unarmored | 17-50 kg | 66 | 2.97 m/s, up to 4.34 |
+| base 40 | armored | 490-1945 kg | 23 | 0.020 m/s |
+| base 100 | unarmored | 42-124 kg | 64 | 1.00 m/s |
+| base 100 | armored | 2543-4863 kg | 22 | 0.007 m/s |
+
+Against a horse imparting something near 10 m/s, 4.34 is a third again on top
+and 0.007 is nothing. So at a low base the impulse stops being noise and starts
+being a second armor-differentiating mechanism, because `armorImpulse` already
+runs 1.26 for cloth against 0.35 for mail and the mass divides it further the
+same way.
+
+This does not contradict the finding that the impulse is inert; it bounds it.
+The impulse is inert **at the engine's default mass**, which is the only mass it
+was ever measured at.
+
+It also means the two mechanisms compound at a low base, and that the long
+throws at base 40 were not purely a mass effect. Roughly a third of that
+launch velocity came from the mod's own impulse.
