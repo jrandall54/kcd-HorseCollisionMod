@@ -17,7 +17,7 @@ HorseCollisionModSettings = {
 
 	-- What counts as contact. Lower these if NPCs react when you ride past.
 	HorseFrontReach          = 1.05,  -- meters ahead of the horse
-	HorseHalfWidth           = 0.35,  -- meters to either side
+	HorseHalfWidth           = 0.70,  -- meters to either side
 	HorseRearReach           = 0.20,  -- meters behind
 	HitCooldownMs            = 3000,  -- before a staggered NPC can react again
 	KnockdownRecoveryMs      = 6000,  -- before a floored one can, they lie
@@ -111,7 +111,7 @@ HorseCollisionModSettings = {
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 
 	-- Switches.
-	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
+	CollisionIsCrime         = false, -- riding someone down is a crime at trot
 	                                  -- and gallop; never at a walk
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
 	ReplanAfterReaction      = true,  -- sends them back to their stall or
@@ -125,6 +125,6 @@ HorseCollisionModSettings = {
 	-- every entity near the horse, including doors and audio areas, which is
 	-- thousands per session. Only useful while investigating why a specific
 	-- impact did nothing. `build.ps1` refuses a release build with this on.
-	DiagnoseMisses           = false
+	DiagnoseMisses           = true
 
 }
