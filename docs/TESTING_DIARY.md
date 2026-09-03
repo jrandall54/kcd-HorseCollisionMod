@@ -14241,3 +14241,60 @@ Sending that to a provoked victim should set `$offense` and register the
 player as an opponent without a health cost and without touching reputation,
 since the block that reads it does neither. That it constructs is not proof
 that the fight tree answers it, and the send is untested.
+
+## Reputation does not drive the flee, measured mid-flight
+
+The permanent flee after a beating was attributed to the hostility flag a
+punch sets, on the strength of the `reputation_change` table: `hit_melee_weak`
+carries `can_change_hostility` true, `surrender_step` carries it true and
+raises the number, and a paid fine carries it false. The reading was that
+surrendering repairs a victim and a fine cannot.
+
+That explains the reputation and not the behavior.
+
+`tools/dev_fleerepair.lua` was armed before a full cycle: provoke, fight, pay
+the fine, release through the yield menu. It watches every human within 60 m,
+and when one whose relationship is under 0.35 moves away at more than 2.5 m/s
+for two consecutive samples it applies `surrender_step` eight times on the
+spot, inside the game, then keeps sampling. Doing it from the console is too
+slow, because a fleeing victim covers five meters a second and unloads.
+
+The victim, a townsman, was repaired in mid-flight:
+
+| relationship | distance | speed away |
+| --- | --- | --- |
+| 0.260 | 4.2 m | 3.5 |
+| 0.260 | 8.8 m | 4.7 |
+| **0.816** | 13.6 m | 4.7 |
+| 0.816 | 23.2 m | 4.9 |
+| 0.816 | 32.8 m | 4.8 |
+| 0.816 | 47.3 m | 4.6 |
+
+The repair landed and took him to 0.816, above a healthy villager. He did not
+slow for a single sample.
+
+The same log rules it out a second way, from bystanders sampled at the same
+moment:
+
+| entity | relationship | behavior |
+| --- | --- | --- |
+| a soldier | 0.209 | `MotionIdle`, 1.5 m from the player |
+| a beggar | 0.253 | `Beggar`, standing still |
+| the victim | 0.260 | running at 4.7 m/s |
+
+Three NPCs within five hundredths of each other, two of them entirely
+unbothered. **The relationship value neither causes the flee nor predicts it**,
+and `surrender_step` moves the number without touching the behavior.
+
+### What this closes and what it leaves
+
+`can_change_hostility` remains a correct reading of the reputation table. It is
+not an explanation of the flee, and repairing reputation is not a cure. Any
+further work on this belongs to the behavior side.
+
+`XGenAIModule.GetBrainVariable` and `SetBrainVariable` exist and accept both an
+entity and a WUID without error. Queried on a peaceful NPC for `t_state`,
+`t_fightParams`, `t_fleeParams` and `offense` they all answer nil, which is
+consistent with subbrain-local variables that exist only while that subbrain
+runs. Reading them off a victim **while he is fleeing** is untried, and is the
+next thing worth doing.

@@ -6,6 +6,10 @@
 -- alongside them, so the moment of a swing and whatever the victim does next
 -- sit in the same timeline.
 --
+-- The range is wide enough to catch a victim reacting to being recognized,
+-- which starts well before conversation distance, rather than only what
+-- happens once the player is on top of him.
+--
 -- Read the `[FIGHT]` lines in kcd.log. Each carries the animation state,
 -- whether a weapon is drawn, the distance to the player, and the victim's
 -- relationship to him, which is the value several `sb_combat.xml` branches
@@ -27,7 +31,7 @@ HorseCollisionModWatchFight.stop = false
 HorseCollisionModWatchFight.passes = 0
 
 local INTERVAL = 1000
-local RANGE = 10
+local RANGE = 25
 
 local generation = HorseCollisionModWatchFight.generation
 
