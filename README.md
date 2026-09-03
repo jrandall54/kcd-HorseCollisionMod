@@ -152,6 +152,9 @@ tools/
                           finding food in hardcore
   dev_time.lua            moves game time forward without the wait dialog,
                           through the Calendar global
+  dev_watchfight.lua      samples everyone near the player once a second, with
+                          the player alongside them, so a fight reads as one
+                          timeline rather than an impression
   probe_api.lua           lists the methods an object actually exposes in the
                           running game, which the written references do not
   probe_horse_mass.lua    reports the mass and physics identity of the horse,
