@@ -345,26 +345,13 @@ function HorseCollisionMod:SafeUpdate()
 				end)
 
 				if not isHuman then
-					-- Only when it is close enough to be worth a line.
-					-- Dropped weapons, holster items and tag points sit
-					-- inside the search radius constantly, and logging all of
-					-- them buries the human misses this diagnostic exists to
-					-- find. A plain distance test rather than the footprint,
-					-- because the footprint test logs when it passes and
-					-- those lines are paired against impacts in analysis.
-					local near = false
-
-					pcall(function()
-						local p = ent:GetPos()
-						local dx, dy = p.x - horsePos.x, p.y - horsePos.y
-
-						near = (dx * dx + dy * dy) <= 4.0
-					end)
-
-					if near then
-						self:LogRejection(ent, "not-human",
-								"class=" .. tostring(ent.class))
-					end
+					-- Deliberately silent. The diagnostic exists to find
+					-- people the mod failed to react to, and an item is never
+					-- one. The player's own holster and any dropped weapon
+					-- ride along inside the search radius permanently, so
+					-- logging these buried the human misses entirely and a
+					-- distance gate did not help: the holster is on the
+					-- player.
 				elseif not ent.actor then
 					self:LogRejection(ent, "no-actor",
 							"class=" .. tostring(ent.class))

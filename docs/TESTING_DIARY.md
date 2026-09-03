@@ -13449,3 +13449,115 @@ many more. The corridor is clipping approaches, not merely bounding them.
 
 Rejections are logged only when `DiagnoseMisses` is on, and it has been off,
 which is why none of these appear in any log gathered so far. It is now on.
+
+## Correction: mass does reach the collision
+
+The flat-mass ride reverses the earlier reading. Setting `RagdollMass = 40`
+with `RagdollMassArmorScaled = false` gives every victim the same 40 kg, half
+the engine's figure for a human, which is the only configuration that shows
+the direction of the effect.
+
+130 gallop impacts across the three conditions carry footprint geometry and a
+settled throw at t+6s. Each is labeled by its own `Mass` log line rather than
+by when it was recorded, so a reload in the middle of a session cannot
+mislabel it.
+
+Restricted to full gallop, where approach speed and contact geometry are
+closest to comparable:
+
+| mass | impacts | mean throw |
+| --- | --- | --- |
+| flat 40 kg | 20 | **5.26 m** |
+| untouched, 80 kg | 37 | 4.48 m |
+| armor scaled, 63 - 217 kg | 8 | 3.28 m |
+
+The ordering is monotonic in mass and it is the ordering momentum transfer
+predicts. Halving the mass adds 17% to the throw. In the regression across all
+130 impacts, mass carries a coefficient of -0.0138 m/kg, which over the 40 to
+217 kg range actually used is 2.44 m of swing, standing beside lateral offset
+at -0.66 m and armor scale at -0.71 m per standard deviation.
+
+### Why the earlier entry got it backwards
+
+The previous reading compared the armor-scaled condition against the untouched
+one and concluded that mass produced a uniform shortening unrelated to the
+sign of the change, which would have made it a settling artifact rather than a
+collision term.
+
+Two errors produced that. The full-gallop sample for the flat condition was
+taken from a single segment of the log and held three impacts; labeling by the
+`Mass` line recovers twenty. And the armor-scaled condition is not a test of
+direction at all: it made guards much heavier, from 80 to between 192 and 217,
+while making villagers only slightly lighter, from 80 to between 63 and 85. The
+mean of that is heavier, so the mean throw fell. Reading it as "everyone got
+shorter regardless of direction" mistook an asymmetric treatment for a
+symmetric one.
+
+The villager half of that condition was the piece of evidence that looked
+decisive and was not. Villagers at 63 to 85 kg are barely below 80, and the
+throw difference across that narrow band is far smaller than the spread
+contributed by contact geometry, which was not controlled at the time.
+
+### What the armor-scaled result actually showed
+
+It did what it was built to do. Armored victims on the shipped path travel 45%
+further than unarmored ones, and scaling mass by armor removed that advantage:
+the armored-to-plain ratio went from 1.45x to 1.00x. That is the mechanism
+working, not failing. It neutralized the gap rather than reversing it because
+the scaling was sized to reach parity, not to overshoot it.
+
+Making armor visibly resist a horse is therefore a matter of scaling harder,
+and the lever is known to work across at least 40 to 217 kg.
+
+## The detection corridor is narrower than the horse
+
+`DiagnoseMisses` recorded 115 rejections during the ride. Sorting them by
+which bound rejected them separates a real defect from two harmless ones.
+
+| rejected by | count | consequence |
+| --- | --- | --- |
+| width, while in range front to back | 34 | the defect |
+| front reach, while inside the width | 13 | harmless, the next tick brings them closer |
+| rear reach, while inside the width | 1 | a body already on the ground, `dz` -1.00 |
+| both axes | 67 | not a contact |
+
+Eight of the width rejections sit within a plausible contact width, lateral
+offset between the 0.35 m limit and 0.80 m:
+
+| victim | forward | lateral |
+| --- | --- | --- |
+| a village guard | 0.10 | 0.73 |
+| a village guard | 0.13 | 0.69 |
+| a village guard | 0.21 | 0.67 |
+| a guard | 0.26 | 0.65 |
+| a refugee | 0.24 | 0.79 |
+| a woman | 0.67 | 0.74 |
+| a woman | 1.39 | 0.63 |
+| a village guard | 1.04 | 0.80 |
+
+A forward distance near zero with a lateral offset of 0.7 m is a body directly
+alongside the horse's flank. A horse and a person cannot both occupy that
+space without touching, so these are contacts the engine resolved and the mod
+declined to see.
+
+The rear reach and the sweep are exonerated. One rejection in the whole ride
+was past the rear bound, and it was a corpse a meter below the horse. At 0.1 s
+per tick and 10.7 m/s the horse advances 1.07 m between samples against a
+window 1.60 m deep, so nothing is tunneling through.
+
+### The lockup this explains
+
+`SuppressAutoCure` is called from `TriggerCollision`, which runs only after
+the footprint test passes. A victim the footprint rejects is therefore struck
+by the engine, can lose health to that collision, and never receives the
+exemption that keeps vanilla's auto-cure daycycle from taking them over.
+
+That daycycle is what stands a victim in the street playing
+`PretendingIllness`, and avoiding it is the reason the suppression exists. So
+the width defect does not merely lose a reaction; it produces exactly the
+lockup the suppression was written to prevent, on the victims the mod never
+registered.
+
+This follows from the call order and matches a rider's report of a guard that
+produced no reaction and afterwards behaved as though auto-cured. It has not
+been reproduced deliberately.
