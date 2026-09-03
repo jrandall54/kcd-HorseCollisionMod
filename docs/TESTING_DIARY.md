@@ -13697,3 +13697,65 @@ The t+10000 sample is a different matter. It gains 2.08 m on average and 61% of
 victims move more than half a meter, because by ten seconds they are up and
 walking. **t+6000 is the correct sample and t+10000 must not be used for
 throw distance.**
+
+## Correction: mass is a working lever, and it is very weakly coupled
+
+A flat 2000 kg for every victim, armor scaling off, ridden against the existing
+flat 40 kg control. This is a 50x change in mass with no armor confound on
+either side, and it moved the throw.
+
+| condition | n | mean | median | sd | range |
+| --- | --- | --- | --- | --- | --- |
+| flat 40 kg | 23 | 5.01 m | 3.75 m | 4.54 | 1.03-22.89 |
+| flat 2000 kg | 13 | 2.43 m | 1.93 m | 1.41 | 0.59-5.36 |
+
+The ratio is 0.48x by mean and 0.51x by median, at p = 0.012 on a rank test,
+which is robust to the one 22.89 m outlier in the control. The two groups are
+matched on everything else that matters: mean forward contact distance 1.17
+against 1.10, mean lateral offset 0.14 against 0.13, mean approach speed 10.49
+against 10.50 m/s. The difference is mass.
+
+**The conclusion recorded in the previous entry was wrong.** Mass is not inert
+and the lever is not dead. The earlier rides did not fail because mass does
+nothing; they failed because they were run across a range far too narrow to
+show anything.
+
+### The coupling is a weak power law
+
+Two flat conditions 50x apart, with the throw halving between them, give:
+
+    throw is proportional to mass ^ -0.185
+
+That is an extremely compressed response. Doubling a victim's mass shortens the
+throw by 12%. Every earlier ride worked inside a 3.4x or 11.6x spread, which
+this predicts is worth 21% and 35% respectively, against a between-victim
+standard deviation of 1.4 to 3.5 m. Those rides were measuring an effect a
+quarter the size of their own noise, which is why they read as null.
+
+It also explains the results retrospectively. An 11.6x spread predicts a 0.65x
+mass effect, and armor's own unexplained +45% advantage puts the net at 0.94x
+against the 0.90x measured.
+
+### What spread the goal actually requires
+
+Taking the power law and armor's +45% advantage together, the spread needed to
+make armored victims visibly harder to move:
+
+| target ratio | mass spread | exponent |
+| --- | --- | --- |
+| 0.8x | 25x | 2.50 |
+| 0.7x | 51x | 3.07 |
+| 0.6x | 117x | 3.71 |
+| 0.5x | 312x | 4.48 |
+
+An exponent of 3.7 on a base of 40 puts villagers near 17 kg and guards near
+1940, predicting roughly 5.9 m against 2.5 m. Both ends sit inside a range now
+directly measured: 2000 kg was just ridden and behaves.
+
+### The methodological lesson
+
+Four rides concluded that a lever did nothing while testing it across a range
+the lever's own coupling could never have made visible. The mistake was not
+the measurement, which was careful, but never asking what spread the effect
+size actually required before spending a ride on it. A null result across an
+untested range is not a null result about the lever.
