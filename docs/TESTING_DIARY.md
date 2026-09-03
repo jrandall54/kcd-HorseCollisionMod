@@ -14099,3 +14099,58 @@ forcing the exact original failure again, which needs a victim sitting in the
 0.46-0.63 m band, a health drop past 40, and enough in-game time for the
 auto-cure daycycle to reach them — conditions this fix already removes the
 cause of, so deliberately reproducing them again would not test anything new.
+
+## A stale pak ran alongside the current build, not just instead of it
+
+While testing an unarmed-brawl feature (`human:HolsterWeapon()` in the
+retaliation path), the log showed two `Load screen ended` lines on every load,
+one naming v4.7.1 and the other v4.7.2. That is not the previously documented
+failure mode, where an old pak's copy loads *instead of* the current one. Both
+were live at once: the stale dev pak's old `HorseCollisionMod` table kept its
+own registered listener on the loading-screen event alongside the current
+loose-file table's listener, so two independent copies of the mod's detection
+and retaliation logic ran against the same NPCs for the length of the session.
+`Setting 'RetaliationUnarmed' is not a setting, ignored` was the tell: the old
+instance's `Config` had no such key, so its own `ApplySettings` rejected the
+setting the new instance was reading correctly.
+
+A full `dev_deploy.ps1 -Version dev` rebuild, game fully closed rather than
+reloaded, and a fresh launch replaced the stale pak's contents and cleared the
+duplicate. `-ScriptOnly -Reload` alone does not fix this, because it only
+touches the loose files the current instance reads; the old instance's copy
+lives inside the pak and is untouched by a script-only reload.
+
+## Provoked civilian brawls stall in a defensive standoff, and the mod's own ceiling closes them
+
+Testing the unarmed-brawl feature above surfaced a second, unrelated, and
+larger problem: a provoked brawl does not develop into an exchange of blows on
+its own.
+
+A huntsman-area civilian (`rat_berthold`, role `merchant`) was provoked while
+mounted, then approached on foot. He raised his guard and did not throw a
+punch. The rider threw one; the victim threw one back; then nothing. The
+encounter sat in `state=CombatIdle` until `WatchRetaliation`'s 120-second
+failsafe closed it: `RetaliationEnd rat_berthold why=ceiling ... state=CombatIdle
+rearmed=false`. What read in the moment as the fight "ending randomly" was
+that failsafe, not a natural resolution.
+
+`rearmed=false` also means `IsWeaponDrawn()` was false at the moment the
+victim was provoked, in this case and in every other provocation logged this
+session (`turnaj_benes`, the earlier `rat_berthold`). The holster feature never
+had anything to holster. Whether that is because civilian defense-only brawls
+never draw a weapon at all, or because the check runs before an AI-driven draw
+would happen, is not yet known — but across every sample so far, the weapon
+was already down.
+
+`docs/TESTING_DIARY.md`'s own record of `startInDefenseOnly` explains the
+guard stance: the fight starts in defense only because the player is not
+already flagged an enemy, so the victim blocks rather than opens. It does not
+explain why the fight stays inert after the rider's own punch is answered.
+An earlier entry recorded a victim who *did* keep fighting unprompted and
+guards who joined in swinging, so a standoff is not universal — what decides
+which happens is still open.
+
+This is a defect in the retaliation feature as shipped in 4.6.0, not in
+anything on the branch that surfaced it. `feat/retaliation-unarmed` is parked,
+committed and unmerged, pending a scenario that actually exercises the
+holster path. The stalled brawl is the next thing to investigate.
