@@ -320,8 +320,16 @@ anything a horse holds.
 A horse is long and narrow. A sphere alone catches people alongside and behind
 it who were never struck, so the second stage tests an oriented box.
 
-`HorseHalfWidth = 0.35` is about a horse chest's half-width, giving a footprint
-0.7 m wide. Anything wider admits NPCs standing clear of the flank.
+`HorseHalfWidth = 0.70` gives a footprint 1.4 m wide, wide enough to catch a
+body struck against the flank rather than only a dead-center hit. A narrower
+value was tried and measured: at 0.35, 22 of 104 pooled rejections across
+three instrumented rides were contacts the footprint wrongly rejected, three
+of them unambiguous flank hits on stationary guards, and the engine still
+damaged those victims without the mod ever registering the hit to suppress
+vanilla's auto-cure daycycle. At 0.70 a follow-up ride found no rejections
+inside the 0.70-0.90 m band that would mean a real near-touch was still being
+missed, and people the horse passed with genuine clearance, out to 2.46 m,
+were still correctly rejected.
 
 ### Forward sweep
 

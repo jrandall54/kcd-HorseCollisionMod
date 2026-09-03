@@ -68,7 +68,7 @@ breaking the mod. Deleting a line restores its default.
 | `SpeedTrot` | 4.5 | Meters per second. At or above, NPCs are knocked down instead of staggered. |
 | `SpeedGallop` | 8.5 | Meters per second. At or above, the knockdown uses full force. |
 | `HorseFrontReach` | 1.05 | Meters ahead of the horse that count as contact. Lower to require a closer hit. |
-| `HorseHalfWidth` | 0.35 | Meters to either side that count as contact. Lower if NPCs react when you ride past. |
+| `HorseHalfWidth` | 0.70 | Meters to either side that count as contact. Lower if NPCs react when you ride past. |
 | `HorseRearReach` | 0.20 | Meters behind the horse that count as contact. |
 | `HitCooldownMs` | 3000 | Milliseconds before the same NPC can react again. Stops one person reacting repeatedly. |
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
