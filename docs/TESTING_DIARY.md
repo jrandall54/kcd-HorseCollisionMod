@@ -13269,3 +13269,600 @@ placement regardless, but the reason given for it was false. And the test that
 "proved" the tables were at fault, removing them and seeing the failure
 persist, was correct evidence that was then read the wrong way round: it
 should have ruled the tables out rather than being set aside.
+
+## Setting a victim's mass before the collision
+
+`Reaction:MassVictim` writes `PHYSICPARAM_SIMULATION` with a `mass` of
+`RagdollMass / armorScale` on a rung schedule of 0, 16, 33, 50, 80 and 120 ms,
+stopping at the first write that reads back. It runs before the impulse and
+the damping, because it is the only one of the three that has to beat the
+horse's own collision rather than follow it.
+
+### The write beats the collision
+
+Sixteen gallop impacts, every one of them taken:
+
+| rung | impacts | victim had moved |
+| --- | --- | --- |
+| 0 ms | 1 | 0.00 m |
+| 16 ms | 15 | 0.01 - 0.08 m |
+
+No impact needed a third rung. Guards were carried to 192 - 217 kg and
+villagers down to 63 - 85 kg from the engine's flat 80 for every human. The
+timing question is settled: a victim's mass can be changed while the body is
+still within eight centimeters of where it was standing.
+
+### It changes the throw, but not in the direction momentum predicts
+
+Twenty-one gallop impacts carrying a confirmed mass, against seventy on the
+shipped impulse path from the same log, measured at the settled distance of
+t+6s rather than mid-flight. Mean approach speeds were 7.26 and 7.64, so the
+two pools are comparable.
+
+| path | mean throw | armored | plain | ratio |
+| --- | --- | --- | --- | --- |
+| impulse, mass untouched | 3.76 m | 4.52 m | 3.12 m | 1.45x |
+| impulse plus mass | 2.17 m | 2.17 m | 2.18 m | 1.00x |
+
+Correlation of armor scale against settled throw falls from -0.247 to -0.002,
+and from -0.297 to -0.039 with approach speed partialed out.
+
+Two things happened, and neither was the intended one. Every victim traveled
+less, and the spread between armored and unarmored collapsed to nothing.
+
+The decisive detail is the villagers. They were made **lighter** than the
+engine's default, 63 to 85 kg against 80, and they were thrown **shorter**,
+3.12 m down to 2.18 m. Momentum transfer predicts the opposite: a lighter body
+struck by a 480 kg horse should leave faster and travel further. A uniform
+shortening that ignores the sign of the mass change is not a collision
+responding to mass. It is more consistent with the write settling the body,
+the same family of effect as the damping and `min_energy` this mod already
+sets through the same parameter block.
+
+So the mechanism works and the lever moves the outcome. What has not been
+shown is that it moves it through the collision.
+
+### A discriminating test
+
+Set a flat mass well below the default, the same figure for every victim
+regardless of armor, and ride. Momentum transfer predicts throws longer than
+the 3.76 m baseline. A settling artifact predicts the same shortening seen
+here, because the direction of the change would not matter. One ride separates
+them, and nothing else about the reaction needs to change.
+
+### Armor already governs the throw, opposite to the intent
+
+The seventy shipped-path impacts carry an armor signal that is real and points
+the wrong way. **Armored victims travel 45% further**, 4.52 m against 3.12 m,
+and the effect survives controlling for approach speed at a partial
+correlation of -0.297.
+
+The mod's own armor scaling works against this. `armorImpulse` runs from about
+0.37 for a mailed guard to 1.26 for a villager in cloth, so an armored victim
+is given roughly a third of the impulse a villager gets, and still outflies
+them. That is the clearest statement yet of a conclusion this project reached
+by other routes: the impulse is not what carries a body, and the collision
+between the horse and the victim is doing work the mod does not control.
+
+What is new is that the collision is not blind to armor. Something about an
+armored body already produces a longer throw. The cause is not established
+here; the correlation is measured across seventy impacts and is not an
+artifact of speed.
+
+## Contact geometry decides more of the throw than speed does
+
+The detection log already carries the geometry of every accepted collision.
+`Footprint fwd= lat= dz= sweep=` is written on the tick the victim is found,
+`fwd` being distance along the horse's facing and `lat` the perpendicular
+offset, so `lat` near zero is a victim square in front of the chest and `lat`
+near the limit is one clipped by the shoulder.
+
+117 gallop impacts carry both a footprint reading and a settled throw at t+6s.
+
+### The lateral offset costs half the throw
+
+Restricted to full gallop, where approach speed is effectively constant across
+the bands:
+
+| lateral offset | impacts | mean throw | mean speed |
+| --- | --- | --- | --- |
+| 0.00 - 0.12 | 9 | 4.87 m | 10.43 |
+| 0.12 - 0.22 | 20 | 4.84 m | 10.64 |
+| 0.22 - 0.36 | 8 | 3.15 m | 10.43 |
+
+Centered against clipped is 4.85 m against 3.15 m, a factor of 1.5 at the same
+speed. The partial correlation of lateral offset against throw, with speed
+held out, is -0.258.
+
+### Forward distance matters more, and is not only speed
+
+`fwd` correlates with speed at +0.808, because the front reach is extended by
+`speed * TickSeconds * SweepMultiplier` and a faster horse therefore finds its
+victim further ahead. It survives that: the partial correlation with speed
+held out is +0.312, and in the regression below it is the largest term.
+
+A large `fwd` is a victim still out in front when the tick fires, whom the
+horse then runs into chest first. A small `fwd` is a victim already beside the
+horse, brushed in passing.
+
+### Weighing the terms against each other
+
+Least squares on all 117 impacts, `R^2 = 0.313`, effects given as meters per
+standard deviation of each term:
+
+| term | effect |
+| --- | --- |
+| forward distance | +0.79 m |
+| lateral offset | -0.54 m |
+| armor scale | -0.34 m |
+| mass was set | -0.30 m |
+| approach speed | +0.25 m |
+
+Geometry is worth roughly 1.3 m of spread between a square hit and a glancing
+one. Speed, once geometry is accounted for, is worth 0.25 m. That ordering is
+the opposite of the assumption the tier system is built on.
+
+The model is weak in absolute terms and honestly so. At full gallop `R^2` is
+0.174 and the residual spread is 1.96 m against an actual spread of 2.16 m, so
+most of the variation is still unexplained. The footprint is read one tick
+before contact and is a coarse stand-in for the geometry of the collision
+itself, which is never measured.
+
+### Correction to the mass reading
+
+The earlier entry compared 21 mass impacts against 70 and reported a mean
+throw of 2.17 m against 3.76 m. Pairing more permissively recovers 47 mass
+impacts, and the comparison is then **3.00 m against 3.76 m**. The two pools
+have comparable geometry, mean lateral offset 0.154 against 0.136 and edge
+contacts 25.5% against 20.0%, so the difference is not a geometry artifact.
+
+With geometry, speed and armor all held out, setting the mass is worth -0.30 m
+per standard deviation, the smallest of the five terms. The effect is real,
+uniform, and small. It remains true that it did not differentiate by armor,
+which was the point of setting it.
+
+### Why a clear contact sometimes produces nothing
+
+The footprint is a box in the horse's frame, not a cone or a radius:
+
+| bound | value |
+| --- | --- |
+| front reach | 1.05 m, plus up to 0.35 m of sweep with speed |
+| rear reach | 0.20 m |
+| half width | 0.35 m |
+| vertical | 2.35 m |
+
+The corridor is **0.70 m wide and 0.20 m deep behind the origin**. A horse's
+body is wider than that before its legs are counted, and a victim has a radius
+of its own, so the surfaces meet while the centers are still well over 0.35 m
+apart. There is a band of genuine physical contact, roughly 0.35 m to 0.7 m of
+lateral offset, in which the engine collides and the mod does nothing. What
+the rider sees is a vanilla shove with no stagger, no fall and no ragdoll.
+
+The rear bound has the same shape of problem. Turning tightly puts the victim
+beside or behind the horse's origin, past the 0.20 m rear reach, while contact
+is still being made along the flank.
+
+Accepted impacts bear this out at the edge: of 117, only 6 fall in the last
+0.06 m of the corridor, where a uniform distribution of approaches would put
+many more. The corridor is clipping approaches, not merely bounding them.
+
+Rejections are logged only when `DiagnoseMisses` is on, and it has been off,
+which is why none of these appear in any log gathered so far. It is now on.
+
+## Correction: mass does reach the collision
+
+The flat-mass ride reverses the earlier reading. Setting `RagdollMass = 40`
+with `RagdollMassArmorScaled = false` gives every victim the same 40 kg, half
+the engine's figure for a human, which is the only configuration that shows
+the direction of the effect.
+
+130 gallop impacts across the three conditions carry footprint geometry and a
+settled throw at t+6s. Each is labeled by its own `Mass` log line rather than
+by when it was recorded, so a reload in the middle of a session cannot
+mislabel it.
+
+Restricted to full gallop, where approach speed and contact geometry are
+closest to comparable:
+
+| mass | impacts | mean throw |
+| --- | --- | --- |
+| flat 40 kg | 20 | **5.26 m** |
+| untouched, 80 kg | 37 | 4.48 m |
+| armor scaled, 63 - 217 kg | 8 | 3.28 m |
+
+The ordering is monotonic in mass and it is the ordering momentum transfer
+predicts. Halving the mass adds 17% to the throw. In the regression across all
+130 impacts, mass carries a coefficient of -0.0138 m/kg, which over the 40 to
+217 kg range actually used is 2.44 m of swing, standing beside lateral offset
+at -0.66 m and armor scale at -0.71 m per standard deviation.
+
+### Why the earlier entry got it backwards
+
+The previous reading compared the armor-scaled condition against the untouched
+one and concluded that mass produced a uniform shortening unrelated to the
+sign of the change, which would have made it a settling artifact rather than a
+collision term.
+
+Two errors produced that. The full-gallop sample for the flat condition was
+taken from a single segment of the log and held three impacts; labeling by the
+`Mass` line recovers twenty. And the armor-scaled condition is not a test of
+direction at all: it made guards much heavier, from 80 to between 192 and 217,
+while making villagers only slightly lighter, from 80 to between 63 and 85. The
+mean of that is heavier, so the mean throw fell. Reading it as "everyone got
+shorter regardless of direction" mistook an asymmetric treatment for a
+symmetric one.
+
+The villager half of that condition was the piece of evidence that looked
+decisive and was not. Villagers at 63 to 85 kg are barely below 80, and the
+throw difference across that narrow band is far smaller than the spread
+contributed by contact geometry, which was not controlled at the time.
+
+### What the armor-scaled result actually showed
+
+It did what it was built to do. Armored victims on the shipped path travel 45%
+further than unarmored ones, and scaling mass by armor removed that advantage:
+the armored-to-plain ratio went from 1.45x to 1.00x. That is the mechanism
+working, not failing. It neutralized the gap rather than reversing it because
+the scaling was sized to reach parity, not to overshoot it.
+
+Making armor visibly resist a horse is therefore a matter of scaling harder,
+and the lever is known to work across at least 40 to 217 kg.
+
+## The detection corridor is narrower than the horse
+
+`DiagnoseMisses` recorded 115 rejections during the ride. Sorting them by
+which bound rejected them separates a real defect from two harmless ones.
+
+| rejected by | count | consequence |
+| --- | --- | --- |
+| width, while in range front to back | 34 | the defect |
+| front reach, while inside the width | 13 | harmless, the next tick brings them closer |
+| rear reach, while inside the width | 1 | a body already on the ground, `dz` -1.00 |
+| both axes | 67 | not a contact |
+
+Eight of the width rejections sit within a plausible contact width, lateral
+offset between the 0.35 m limit and 0.80 m:
+
+| victim | forward | lateral |
+| --- | --- | --- |
+| a village guard | 0.10 | 0.73 |
+| a village guard | 0.13 | 0.69 |
+| a village guard | 0.21 | 0.67 |
+| a guard | 0.26 | 0.65 |
+| a refugee | 0.24 | 0.79 |
+| a woman | 0.67 | 0.74 |
+| a woman | 1.39 | 0.63 |
+| a village guard | 1.04 | 0.80 |
+
+A forward distance near zero with a lateral offset of 0.7 m is a body directly
+alongside the horse's flank. A horse and a person cannot both occupy that
+space without touching, so these are contacts the engine resolved and the mod
+declined to see.
+
+The rear reach and the sweep are exonerated. One rejection in the whole ride
+was past the rear bound, and it was a corpse a meter below the horse. At 0.1 s
+per tick and 10.7 m/s the horse advances 1.07 m between samples against a
+window 1.60 m deep, so nothing is tunneling through.
+
+### The lockup this explains
+
+`SuppressAutoCure` is called from `TriggerCollision`, which runs only after
+the footprint test passes. A victim the footprint rejects is therefore struck
+by the engine, can lose health to that collision, and never receives the
+exemption that keeps vanilla's auto-cure daycycle from taking them over.
+
+That daycycle is what stands a victim in the street playing
+`PretendingIllness`, and avoiding it is the reason the suppression exists. So
+the width defect does not merely lose a reaction; it produces exactly the
+lockup the suppression was written to prevent, on the victims the mod never
+registered.
+
+This follows from the call order and matches a rider's report of a guard that
+produced no reaction and afterwards behaved as though auto-cured. It has not
+been reproduced deliberately.
+
+## Base mass cannot move the armored-to-unarmored ratio
+
+Base 40 with armor scaling on was ridden to test whether halving the base
+would overshoot parity and leave armored victims visibly harder to move. It
+did not, and the reason is arithmetic rather than physics.
+
+Forty gallop impacts were recorded, 23 of them above 8 m/s. Restricted to
+those, and with one terrain-launched impact excluded for the reason given
+below:
+
+| condition | n | mean throw | median |
+| --- | --- | --- | --- |
+| armored | 12 | 3.39 m | 3.13 m |
+| unarmored | 10 | 3.59 m | 3.70 m |
+
+The armored-to-unarmored ratio is 0.94x by mean and 0.85x by median, against
+1.00x measured at base 80. A Mann-Whitney test over the two groups gives
+p = 0.64, so this sample cannot distinguish the two conditions from each other
+or from parity. A least-squares fit over the same 22 impacts puts armor at
+-0.06 m per standard deviation, against +0.25 m for forward contact distance;
+armor is the weakest term in the model and `R^2` is 0.052.
+
+### Why the base was never going to change it
+
+The mass written is `base / armorScale`. The ratio between an armored victim's
+mass and an unarmored one is therefore `scaleUnarmored / scaleArmored`, and the
+base cancels out of it entirely.
+
+| base | guard at scale 0.37 | villager at scale 1.26 | ratio |
+| --- | --- | --- | --- |
+| 80 | 216 kg | 63 kg | 3.4x |
+| 40 | 108 kg | 32 kg | 3.4x |
+
+Both conditions present the horse with the same 3.4x mass ratio and differ only
+in absolute mass. Reproducing parity was the expected outcome, not a surprise.
+
+**The base sets how far everyone travels. Only the spread of the armor scale
+sets how far armored victims travel relative to unarmored ones.** Scaling
+harder means widening that spread, which the current formula has no term for.
+
+### What the base did change
+
+Absolute throws moved in the direction momentum transfer predicts. Against the
+shipped path, where armored victims travel 4.52 m and unarmored 3.12 m,
+lightening every body to a third of the engine's figure brought armored victims
+down to 3.39 m and lifted unarmored ones to 3.59 m. Both halves moved the right
+way. The gap between them did not open.
+
+### The impact excluded, and why
+
+One refugee travelled 14.36 m, three times the next largest throw in the set.
+It is a real launch rather than a parse error: the footprint recorded `dz`
+-0.90, so the horse was most of a meter above the victim, the body moved 5.90 m
+in the first 300 ms and rose 1.14 m by the half-second sample. It is terrain
+geometry, not mass, and with n around ten per group it carries the comparison
+on its own. Including it moves the ratio to 0.74x with p = 0.42, which reads as
+an effect and is one impact wide.
+
+## Squaring the armor spread does not separate the victims either
+
+`RagdollMassArmorExponent` was added to widen the gap the base could not, and
+ridden at base 40 with an exponent of 2. That squares the armor scale before
+the division and takes the spread between an armored victim and an unarmored
+one from 3.4x to 11.6x, putting guards at 230 to 327 kg and villagers at 25 to
+30. The masses were confirmed live before the ride and every write took, all
+but two at 16 ms.
+
+The ratio did not move. Armored victims travelled 0.90x as far as unarmored
+ones, against 0.94x at an exponent of 1. Tripling the mass of every guard and
+squaring the spread between the two groups changed the measured separation by
+0.04x.
+
+### The same-armor comparisons run backwards
+
+Comparing victims wearing the same armor across the two conditions removes the
+armor confound entirely, and both comparisons move the wrong way.
+
+| group | condition | mass | n | mean throw |
+| --- | --- | --- | --- | --- |
+| armored | exponent 1 | 73-114 kg | 12 | 3.39 m |
+| armored | exponent 2 | 155-295 kg | 6 | 3.69 m |
+| unarmored | exponent 1 | 32-42 kg | 11 | 4.57 m |
+| unarmored | exponent 2 | 25-35 kg | 9 | 4.01 m |
+
+Nearly tripling an armored victim's mass lengthened the throw by 0.30 m.
+Lightening an unarmored victim shortened it by 0.56 m. Momentum transfer
+predicts the opposite of both. The standard deviations are 1.4 to 3.5 m, so
+neither difference is distinguishable from zero; that is the point. These are
+the fingerprint of noise, not of a lever.
+
+### Pooled across every condition, mass does not predict the throw
+
+Sixty-seven full-gallop impacts with a mass write and near-level contact,
+spanning 25 to 295 kg over four conditions, regressed on log mass with contact
+geometry and approach speed controlled:
+
+| term | effect | p |
+| --- | --- | --- |
+| ln(mass) | -0.47 m per sd | 0.260 |
+| forward distance | +0.44 m per sd | 0.306 |
+| lateral offset | +0.04 m per sd | 0.919 |
+| approach speed | +0.45 m per sd | 0.287 |
+
+`R^2` is 0.052. Nothing measured reaches significance and the model explains
+five percent of the variance, so 95% of what decides a throw is not being
+recorded by any instrument this mod has.
+
+The binned means do fall with mass, from 4.80 m below 35 kg to 2.44 m above
+250, and that is the shape the earlier reading rested on. It does not survive
+controlling for geometry, and it is carried by the unarmored band, which is
+also the band with the most samples.
+
+### What this does and does not establish
+
+It does not re-open whether the mass write reaches the collision. It does, at
+16 ms, with the victim still centimeters from where they stood.
+
+What it establishes is narrower and more useful: **no setting of the base or
+the exponent produces a visible difference between an armored victim and an
+unarmored one.** The test was not powered to resolve a small effect, but it did
+not need to be. An armor difference worth shipping would be obvious at an 11.6x
+mass spread, and at that spread the ratio is 0.90x.
+
+### A methodological check that came back clean
+
+Before drawing any of this, `travel` was checked for measuring locomotion
+rather than the throw, since recovery runs about 5.9 s and a victim who stands
+up keeps accumulating distance. Across 136 gallop impacts the body is at rest
+by three seconds and stays there: the median change from t+3000 to t+6000 is
+-0.08 m, and 15% of victims move more than half a meter.
+
+The t+10000 sample is a different matter. It gains 2.08 m on average and 61% of
+victims move more than half a meter, because by ten seconds they are up and
+walking. **t+6000 is the correct sample and t+10000 must not be used for
+throw distance.**
+
+## Correction: mass is a working lever, and it is very weakly coupled
+
+A flat 2000 kg for every victim, armor scaling off, ridden against the existing
+flat 40 kg control. This is a 50x change in mass with no armor confound on
+either side, and it moved the throw.
+
+| condition | n | mean | median | sd | range |
+| --- | --- | --- | --- | --- | --- |
+| flat 40 kg | 23 | 5.01 m | 3.75 m | 4.54 | 1.03-22.89 |
+| flat 2000 kg | 13 | 2.43 m | 1.93 m | 1.41 | 0.59-5.36 |
+
+The ratio is 0.48x by mean and 0.51x by median, at p = 0.012 on a rank test,
+which is robust to the one 22.89 m outlier in the control. The two groups are
+matched on everything else that matters: mean forward contact distance 1.17
+against 1.10, mean lateral offset 0.14 against 0.13, mean approach speed 10.49
+against 10.50 m/s. The difference is mass.
+
+**The conclusion recorded in the previous entry was wrong.** Mass is not inert
+and the lever is not dead. The earlier rides did not fail because mass does
+nothing; they failed because they were run across a range far too narrow to
+show anything.
+
+### The coupling is a weak power law
+
+Two flat conditions 50x apart, with the throw halving between them, give:
+
+    throw is proportional to mass ^ -0.185
+
+That is an extremely compressed response. Doubling a victim's mass shortens the
+throw by 12%. Every earlier ride worked inside a 3.4x or 11.6x spread, which
+this predicts is worth 21% and 35% respectively, against a between-victim
+standard deviation of 1.4 to 3.5 m. Those rides were measuring an effect a
+quarter the size of their own noise, which is why they read as null.
+
+It also explains the results retrospectively. An 11.6x spread predicts a 0.65x
+mass effect, and armor's own unexplained +45% advantage puts the net at 0.94x
+against the 0.90x measured.
+
+### What spread the goal actually requires
+
+Taking the power law and armor's +45% advantage together, the spread needed to
+make armored victims visibly harder to move:
+
+| target ratio | mass spread | exponent |
+| --- | --- | --- |
+| 0.8x | 25x | 2.50 |
+| 0.7x | 51x | 3.07 |
+| 0.6x | 117x | 3.71 |
+| 0.5x | 312x | 4.48 |
+
+An exponent of 3.7 on a base of 40 puts villagers near 17 kg and guards near
+1940, predicting roughly 5.9 m against 2.5 m. Both ends sit inside a range now
+directly measured: 2000 kg was just ridden and behaves.
+
+### The methodological lesson
+
+Four rides concluded that a lever did nothing while testing it across a range
+the lever's own coupling could never have made visible. The mistake was not
+the measurement, which was careful, but never asking what spread the effect
+size actually required before spending a ride on it. A null result across an
+untested range is not a null result about the lever.
+
+## An exponent of 3.7 makes armor visibly resist, and launches villagers too far
+
+Ridden at base 40 with the exponent at 3.7, putting guards between 490 and 1945
+kg and villagers between 17 and 50, a spread of 114x. The prediction from the
+measured power law was a 0.6x throw ratio; the ride came in at 0.40x.
+
+| set | n | armored | unarmored | ratio | p |
+| --- | --- | --- | --- | --- | --- |
+| all gallop impacts | 26 | 2.08 m | 5.24 m | 0.40x | 0.013 |
+| full gallop only | 12 | 3.09 m | 6.86 m | 0.45x | 0.109 |
+
+The full-gallop subset is six impacts a side and cannot carry a result on its
+own; the significant figure is the 26-impact set. Contact geometry and approach
+speed are matched across the two groups at full gallop, 1.14 m forward and
+10.68 m/s against 1.20 m and 10.67, so the separation is not a sampling
+artifact of where the horse hit.
+
+The whole series now reads:
+
+| spread | armored | unarmored | ratio |
+| --- | --- | --- | --- |
+| 3.4x | 3.39 m | 4.57 m | 0.74x |
+| 11.6x | 3.69 m | 4.01 m | 0.92x |
+| 114x | 3.09 m | 6.86 m | 0.45x |
+
+The rider's unprompted description before seeing any of this was that some
+unarmored victims went flying and no guard was thrown far. That is what the
+table says.
+
+### The light end is now the problem
+
+Two villagers at 17 kg travelled 12.23 and 13.84 m. Neither is terrain: the
+footprint `dz` is -0.13 and +0.09, so the ground was level, and both were
+already 6 m out at the half-second sample. They are genuine launches, and a
+person hit by a horse and thrown fourteen meters does not look like a person
+being hit by a horse.
+
+This is an aesthetic ceiling rather than a statistical one, and it is separable
+from the effect. The exponent sets the ratio between armored and unarmored; the
+base sets how far everyone travels. The ratio is now where it should be, so the
+remaining move is to raise the base until the light end returns to a plausible
+distance, which slides the heavy end further up without touching the ratio.
+
+At base 100 with the same exponent, villagers land near 42 kg and guards near
+4350. The power law predicts roughly 5.0 m against 2.1 m: a villager thrown
+about as far as the shipped mod throws them today, and a guard thrown less than
+half that.
+
+## Raising the base holds the ratio and halves what the rider can see
+
+Base 100 at an exponent of 3.7, putting guards between 2543 and 4863 kg and
+villagers between 42 and 124. Nothing broke at five tonnes: every mass write
+took, all but a handful at 16 ms, and no victim stuck to the horse, jittered or
+sank.
+
+| set | n | armored | unarmored | ratio | p |
+| --- | --- | --- | --- | --- | --- |
+| full gallop | 16 | 1.92 m | 4.19 m | 0.46x | 0.011 |
+| all gallop tiers | 40 | 1.96 m | 2.66 m | 0.74x | 0.116 |
+
+The light end is fixed. The longest unarmored throw fell from 13.84 m to 6.15,
+so the launches are gone.
+
+### The ratio is not what the rider sees
+
+Against the previous ride, at the same exponent:
+
+| base | armored | unarmored | ratio | **gap** | unarmored max |
+| --- | --- | --- | --- | --- | --- |
+| 40 | 3.09 m | 6.86 m | 0.45x | **3.77 m** | 13.84 m |
+| 100 | 1.92 m | 4.19 m | 0.46x | **2.27 m** | 6.15 m |
+
+The ratio is identical to two decimal places and the separation on the ground
+fell by 40%. The rider described the effect as subtle without having seen these
+numbers, and that is what a gap shrinking from 3.8 m to 2.3 m looks like.
+
+**The visible quantity is the gap in meters, not the ratio.** Every earlier
+entry in this branch reported the ratio, which is the right measure of whether
+armor is doing something and the wrong measure of whether anyone can tell.
+
+### Lowering the mass reactivates the impulse
+
+The impulse the mod applies was measured as inert and set aside. That
+measurement was made at the engine's default 80 kg, and it does not survive a
+change of mass, because an impulse divided by a small mass is a large velocity.
+
+| condition | victim | mass | impulse | delta-v |
+| --- | --- | --- | --- | --- |
+| base 40 | unarmored | 17-50 kg | 66 | 2.97 m/s, up to 4.34 |
+| base 40 | armored | 490-1945 kg | 23 | 0.020 m/s |
+| base 100 | unarmored | 42-124 kg | 64 | 1.00 m/s |
+| base 100 | armored | 2543-4863 kg | 22 | 0.007 m/s |
+
+Against a horse imparting something near 10 m/s, 4.34 is a third again on top
+and 0.007 is nothing. So at a low base the impulse stops being noise and starts
+being a second armor-differentiating mechanism, because `armorImpulse` already
+runs 1.26 for cloth against 0.35 for mail and the mass divides it further the
+same way.
+
+This does not contradict the finding that the impulse is inert; it bounds it.
+The impulse is inert **at the engine's default mass**, which is the only mass it
+was ever measured at.
+
+It also means the two mechanisms compound at a low base, and that the long
+throws at base 40 were not purely a mass effect. Roughly a third of that
+launch velocity came from the mod's own impulse.

@@ -608,7 +608,11 @@ def main():
         print("which the Lua console needs; without it an expression is "
               "accepted")
         print("and dropped without a word. Relaunch with:")
-        print("    .\tools\dev_deploy.ps1 -NoBuild -Launch")
+        # Raw, so `\t` and `\d` stay literal. Without it Python emits a
+        # SyntaxWarning on import, and PowerShell treats anything a native
+        # command writes to stderr as an error, which failed the deploy's
+        # reload step for a message that is only ever printed on advice.
+        print(r"    .\tools\dev_deploy.ps1 -NoBuild -Launch")
 
     console.close()
     console.report_muted()

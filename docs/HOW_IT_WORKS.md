@@ -18,6 +18,10 @@ horse's speed at the moment of contact and picks a reaction to match:
 The horse pays for it in stamina, more so during combat and more against an
 armored target, and an exhausted horse throws its rider.
 
+Armor is felt in the collision as well as in the stamina. A man in mail is
+harder for a horse to move than a villager in cloth, and lands about half as
+far away. A peasant is thrown clear; a guard mostly goes down where he stood.
+
 Being ridden down hurts, and enough of it kills. That damage is the game's own
 rather than the mod's: knocking someone down makes them a physical object, and
 the game charges for a horse striking one at speed. A bump costs nothing and a

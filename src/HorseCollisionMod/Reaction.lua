@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.6.3
+-- @release 4.7.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -162,6 +162,165 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	return ok
 end
 
+--- Sets a ragdolled victim's physical mass, so the horse's own collision
+--- does the work.
+--
+-- What throws a victim at gallop is the engine resolving a collision between
+-- the horse, 480 kg at gravity -30, and the body. Nothing this mod adds on
+-- top of that collision moves the body: an impulse and a set velocity produce
+-- the same distribution across three rides.
+--
+-- Armor cannot matter while every human weighs the same. `GetMass` answers
+-- **80 for every human including the player**, so the horse hits an identical
+-- mass whether the target is a peasant or a man in mail.
+--
+-- `pe_simulation_params` carries `mass` beside the `damping` and `min_energy`
+-- that `DampVictim` already sets through the same group. Changing it changes
+-- what the horse is hitting, and the engine does the rest.
+--
+-- **It only takes while ragdolled.** Setting mass on a living entity is
+-- accepted and ignored: measured, a value of 300 written to an actor on the
+-- `alive` profile left `GetMass` reading 80, and the same write to the same
+-- actor ragdolled read back 300.
+--
+-- Nothing here is written back. It does not need to be: standing up
+-- re-physicalizes the actor as a living entity and the engine restores its own
+-- 80. Measured on a guard written to 2543 kg, which read that figure while
+-- down and 80 once it was walking again.
+--
+-- ### The coupling is weak, which is the whole design problem
+--
+-- The throw goes as roughly `mass ^ -0.185`, measured across a fiftyfold flat
+-- comparison at p = 0.012. Doubling a victim's mass shortens the throw by 12%,
+-- so a visible difference between armor and cloth costs a spread around a
+-- hundredfold, and `RagdollMassArmorScaled` on its own, which is a 3.4x
+-- spread, is worth nothing that can be seen. `RagdollMassArmorExponent` is
+-- what buys the spread; see the config comments for which number does what.
+--
+-- ### Timing
+--
+-- The mass has to be in place before the collision resolves. The body is not
+-- physicalized at the moment of contact, which is why the impulse path waits
+-- `ImpulseDelayMs`, and a horse at ten meters per second covers a centimeter
+-- a millisecond. So this retries on a short ladder rather than guessing one
+-- delay, takes the first attempt that sticks, and logs which one that was
+-- together with how far the victim had already travelled by then. Every
+-- impact measured has taken, almost all at 16 ms with the victim still within
+-- 8 cm of where they stood, so the write beats the horse.
+--
+-- @tparam table npc victim entity
+-- @tparam number armorScale the tier's armor multiplier, high for an
+--   unarmored target and low for one in mail
+function HorseCollisionMod:MassVictim(npc, armorScale)
+	local base = self.Config.RagdollMass or 0
+
+	if base <= 0 then
+		return
+	end
+
+	-- Inverted against the impulse scale deliberately. That scale runs high
+	-- for an unarmored target, because it multiplied a force meant to throw
+	-- them further. Mass is the other way round: a man in mail should be the
+	-- heavier thing for the horse to move.
+	local scale = armorScale or 1.0
+
+	if scale <= 0 then
+		scale = 1.0
+	end
+
+	-- Turning the scaling off gives every victim the same mass, which is the
+	-- only way to read the direction of the effect. Armor scaling makes a
+	-- guard heavier and a villager lighter at the same time, so a uniform
+	-- shortening of the throw and a genuine momentum response look alike. A
+	-- flat figure below the engine's 80 separates them: momentum transfer
+	-- predicts a longer throw for everyone, a settling side effect predicts
+	-- a shorter one.
+	if self.Config.RagdollMassArmorScaled == false then
+		scale = 1.0
+	end
+
+	-- Raising the scale to an exponent is the only term that widens the gap
+	-- between an armored victim and an unarmored one. The written mass is
+	-- `base / scale^k`, so the ratio between two victims is their scale ratio
+	-- raised to k and the base cancels out of it. Bases of 80 and 40 both
+	-- present the horse with the same 3.4x spread and both measured at parity;
+	-- k is what moves that number.
+	local exponent = self.Config.RagdollMassArmorExponent or 1.0
+
+	if exponent ~= 1.0 then
+		scale = scale ^ exponent
+	end
+
+	local wanted = base / scale
+	local generation = self.TimerTick
+	local origin = nil
+
+	pcall(function() origin = npc:GetWorldPos() end)
+
+	local attempts = self.RagdollMassAttemptsMs
+
+	local function try(index)
+		if generation ~= self.TimerTick or index > #attempts then
+			return
+		end
+
+		local took = false
+		local reading = -1
+
+		pcall(function()
+			npc:SetPhysicParams(PHYSICPARAM_SIMULATION, { mass = wanted })
+		end)
+
+		pcall(function()
+			reading = npc:GetMass()
+			took = math.abs(reading - wanted) < 1.0
+		end)
+
+		if took then
+			local moved = 0
+
+			pcall(function()
+				local p = npc:GetWorldPos()
+
+				if origin then
+					moved = self:VectorLength({
+						x = p.x - origin.x,
+						y = p.y - origin.y,
+						z = p.z - origin.z
+					})
+				end
+			end)
+
+			if self.Config.LogTelemetry then
+				self:Log("Mass " .. tostring(npc:GetName())
+						.. " scale=" .. string.format("%.2f", scale)
+						.. " wanted=" .. string.format("%.0f", wanted)
+						.. " took=" .. string.format("%.0f", reading)
+						.. " atMs=" .. tostring(attempts[index])
+						.. " movedBy=" .. string.format("%.2f", moved) .. "m")
+			end
+
+			return
+		end
+
+		if index == #attempts and self.Config.LogTelemetry then
+			self:Log("Mass " .. tostring(npc:GetName())
+					.. " never took, last read " .. string.format("%.0f", reading))
+		end
+
+		Script.SetTimer(attempts[index + 1] and
+				(attempts[index + 1] - attempts[index]) or 16, function()
+			try(index + 1)
+		end)
+	end
+
+	-- The first attempt is immediate rather than on a timer, because the body
+	-- may already be physicalized by the time this is reached and a frame
+	-- given away is a centimeter of horse travel per millisecond.
+	try(1)
+end
+
+
 --- Slows a ragdolled victim so it stops sliding.
 --
 -- A thrown body keeps going long after the throw, and that slide is most of
@@ -232,12 +391,18 @@ end
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam table horsePos horse world position, the origin a push points away
+--   from, so a victim is never thrown back under the rider
 function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos)
 	pcall(function()
 		if npc.actor then
 			npc.actor:Fall({x=0, y=0, z=0}, true)
 		end
 	end)
+
+	-- Before the impulse and the damping, because it is the only one of the
+	-- three that has to beat the horse's own collision rather than follow it.
+	self:MassVictim(npc, impulseScale)
 
 	self:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 	self:DampVictim(npc)
@@ -264,6 +429,8 @@ end
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam table horsePos horse world position, the origin the push points away
+--   from, so a victim is never thrown back under the rider
 function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 	local k_back = self.Config.Knockback * impulseScale
 	local k_up = self.Config.Uplift * impulseScale

@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.6.3
+-- @release 4.7.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -345,8 +345,13 @@ function HorseCollisionMod:SafeUpdate()
 				end)
 
 				if not isHuman then
-					self:LogRejection(ent, "not-human",
-							"class=" .. tostring(ent.class))
+					-- Deliberately silent. The diagnostic exists to find
+					-- people the mod failed to react to, and an item is never
+					-- one. The player's own holster and any dropped weapon
+					-- ride along inside the search radius permanently, so
+					-- logging these buried the human misses entirely and a
+					-- distance gate did not help: the holster is on the
+					-- player.
 				elseif not ent.actor then
 					self:LogRejection(ent, "no-actor",
 							"class=" .. tostring(ent.class))

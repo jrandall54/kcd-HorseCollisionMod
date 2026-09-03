@@ -26,6 +26,26 @@ HorseCollisionModSettings = {
 	-- Knockdown force, trot and gallop only.
 	Knockback                = 50.0,  -- horizontal, higher throws further
 	Uplift                   = 30.0,  -- vertical, higher throws upward
+
+	-- What the horse actually collides with, in kilograms. Every human is
+	-- 80 to the physics engine, so a peasant and a knight are the same
+	-- thing to hit, which is why armor has never been felt in a throw.
+	-- This is divided by the armor scale, so mail is heavier to move.
+	-- 0 leaves the engine's figure alone.
+	--
+	-- The exponent decides how far apart armored and unarmored victims land,
+	-- and the base decides how far everyone travels. The base cancels out of
+	-- the ratio between the two, so raising it shortens every throw without
+	-- changing which victim resists; only the exponent widens the gap.
+	--
+	-- At these figures a villager is about 43 kg and a mailed guard about
+	-- 4900, and the measured throws are 4.19 m against 1.92 m. Lowering the
+	-- base to 40 roughly doubles the separation on the ground but launches
+	-- light victims twelve meters and further, which does not read as a
+	-- person being hit by a horse.
+	RagdollMass              = 100.0,
+	RagdollMassArmorScaled   = true,
+	RagdollMassArmorExponent = 3.7,
 	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 0.5,   -- higher puts it to rest sooner
 
