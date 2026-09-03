@@ -27,6 +27,11 @@ HorseCollisionModSurvival.generation =
 		(HorseCollisionModSurvival.generation or 0) + 1
 HorseCollisionModSurvival.stop = false
 
+-- Advanced on every pass. A load screen discards the timer while leaving
+-- this table behind, so the generation number alone cannot say whether the
+-- loop is still running; a pass count that stops rising can.
+HorseCollisionModSurvival.passes = 0
+
 local INTERVAL = 20000
 
 local generation = HorseCollisionModSurvival.generation
@@ -50,6 +55,8 @@ local function topUp()
 			pe.soul:SetState("exhaust", 100)
 		end)
 	end
+
+	HorseCollisionModSurvival.passes = HorseCollisionModSurvival.passes + 1
 
 	Script.SetTimer(INTERVAL, topUp)
 end

@@ -134,6 +134,33 @@ SETTINGS_SCRIPT = "Scripts/Startup/HorseCollisionMod_Settings.lua"
 # console command this build registers, which is a better bet than driving
 # Script.ReloadScript through the "#" Lua prefix. Both are listed so a failure
 # of the first can be told apart from a failure of the mechanism.
+# What a measurement ride needs running, in the order it wants starting.
+#
+# None of it survives a save load: these are Script.SetTimer chains, and a load
+# screen discards the timers while leaving the Lua globals behind, so a loop
+# looks alive from its generation number long after it has stopped. Running
+# --ride again after any reload is the whole remedy, and the loops report a
+# rising pass count so that "is it actually running" has an answer.
+# Largest Lua chunk the remote console will accept, in bytes.
+#
+# Found the same way as the two limits above: a padded chunk ending in a
+# LogAlways was sent at rising sizes, and the last one to produce any output at
+# all was 4200 bytes, with 4250 and everything above it silent. The server
+# drops an oversized command without a word, so an over-long script looks
+# exactly like a game launched without -devmode, and a working development
+# script can be broken by adding a comment to it.
+#
+# The guard is set below the measured edge because the edge was located to
+# within fifty bytes rather than exactly, and because a file that sits on it
+# would break again the next time a line was added.
+MAX_CHUNK_BYTES = 4000
+
+RIDE_SCRIPTS = [
+    "tools/dev_survival.lua",
+    "tools/dev_nocrime.lua",
+]
+
+
 RELOAD_COMMANDS = [
     # The settings file defines the global table the mod reads while applying
     # settings, and it is a separate file, so it is re-executed first.
@@ -465,7 +492,12 @@ def main():
     parser.add_argument("command", nargs="?", help="console command to send")
     parser.add_argument("--lua", metavar="CODE",
                         help="evaluate CODE as Lua in the running game")
-    parser.add_argument("--file", metavar="PATH",
+    parser.add_argument("--ride", action="store_true",
+                        help="start everything a measurement ride needs: the "
+                             "survival loop and the no-crime loop. None of it "
+                             "survives a save load, so this is what to run "
+                             "again after one")
+    parser.add_argument("--file", metavar="PATH", nargs="+",
                         help="evaluate the Lua in PATH as one chunk. The remote "
                              "console takes a whole file as readily as a line, "
                              "and a probe worth running twice belongs in a file "
@@ -540,26 +572,49 @@ def main():
         if args.reload:
             for command in RELOAD_COMMANDS:
                 console.queue(command)
-    elif args.file:
-        try:
-            with io.open(args.file, "r", encoding="utf-8") as handle:
-                body = handle.read()
-        except OSError as err:
-            print("cannot read %s: %s" % (args.file, err))
+    elif args.file or args.ride:
+        # Each file goes as its own chunk. Concatenating them would make one
+        # script out of two, so a local at the top of the second would collide
+        # with the first, and a syntax error anywhere would drop both.
+        paths = list(args.file or [])
 
-            return 2
+        if args.ride:
+            paths = RIDE_SCRIPTS + paths
 
-        problem = check_lua_syntax(body)
+        for path in paths:
+            try:
+                with io.open(path, "r", encoding="utf-8") as handle:
+                    body = handle.read()
+            except OSError as err:
+                print("cannot read %s: %s" % (path, err))
 
-        if problem:
-            print("%s does not compile, so the game would drop it without a "
-                  "word:" % args.file)
-            print("  " + problem)
+                return 2
 
-            return 2
+            problem = check_lua_syntax(body)
 
-        print("sending %s, %d lines" % (args.file, body.count(chr(10)) + 1))
-        console.lua(body)
+            if problem:
+                print("%s does not compile, so the game would drop it without "
+                      "a word:" % path)
+                print("  " + problem)
+
+                return 2
+
+            size = len(body.encode("utf-8"))
+
+            if size > MAX_CHUNK_BYTES:
+                print("%s is %d bytes, over the %d the remote console accepts."
+                      % (path, size, MAX_CHUNK_BYTES))
+                print("  The server drops an oversized command silently, so "
+                      "this would look")
+                print("  exactly like a game launched without -devmode. "
+                      "Shorten the file,")
+                print("  usually by trimming its comment header, or split it "
+                      "in two.")
+
+                return 2
+
+            print("sending %s, %d lines" % (path, body.count(chr(10)) + 1))
+            console.lua(body)
     elif args.lua:
         problem = check_lua_syntax(args.lua)
 
@@ -600,7 +655,7 @@ def main():
     # That silence reads exactly like a chunk that ran and logged nothing, and
     # a session was spent probing an unresponsive game before the cause was
     # found. Saying so costs one line and removes the whole class of confusion.
-    if (args.lua or args.file) and console.sent > 0 and not console.saw_output:
+    if (args.lua or args.file or args.ride) and console.sent > 0 and not console.saw_output:
         print()
         print("The chunk produced no output at all.")
         print("The usual cause is that the game was not launched with "

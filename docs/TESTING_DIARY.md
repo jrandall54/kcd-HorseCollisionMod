@@ -13951,3 +13951,126 @@ anywhere. The rider's instinct that the game rarely touches its own physics
 engine is right about the script layer: vanilla's mounted collision produces an
 audio bark and nothing else, and every physical reaction in this mod is
 something the shipped game never asks for.
+
+## Writing the mass before contact removes the race, and the corridor lockup is real
+
+`PrimeMassBeforeContact` writes a victim's mass through `PHYSICPARAM_PLAYERDYN`
+while they are still standing, from the detection sweep, rather than onto the
+ragdoll afterward. Twenty-two gallop impacts were recorded with it live.
+
+### The race is gone, measured
+
+The `Mass` line already reported which rung of the retry ladder the write took
+on and how far the victim had moved by then. Before and after, from the same
+session:
+
+| condition | atMs | movedBy |
+| --- | --- | --- |
+| ragdoll write | 16, occasionally 33 | 0.01 to 0.04 m |
+| primed before contact | **0 on every impact** | **0.00 m on every impact** |
+
+Every write now lands on the first attempt with the victim exactly where they
+stood. The mass is correct at the moment the ragdoll forms rather than sixteen
+milliseconds into its flight, and the retry ladder no longer fires at all.
+
+### A refusal is a body already on the ground
+
+Fifty-three of eighty-seven priming attempts were refused, and the pattern is
+uniform: the same victim, refused on consecutive ticks, wanting a scaled figure
+and reading back 80. `PHYSICPARAM_PLAYERDYN` addresses the living entity, and a
+victim already knocked down is not one, so the write is correctly rejected.
+
+This is expected rather than a fault, since `MassVictim` still handles a body
+that is already a ragdoll. It was costing a write, a read and a log line ten
+times a second per downed victim beside the horse, so a refusal now backs off
+for twenty ticks and logs once.
+
+### The detection corridor lockup, reproduced
+
+The rider reported a guard beside them in `PretendingIllness`. Probed:
+
+    villageGuard  dist=2.5  anim=PretendingIllness  hcm=no  health=35.3
+
+`hcm=no` means the mod holds no record of ever having hit him, and his health
+is 35.3 against a full pool. He was struck hard enough to lose two thirds of
+his health by a collision the mod never registered, so `SuppressAutoCure` was
+never called on him, and vanilla's daycycle for the wounded took him over.
+
+This is the lockup predicted from the call order and never before reproduced:
+`SuppressAutoCure` runs from `TriggerCollision`, which runs only after the
+footprint test passes, so a victim the corridor rejects is hurt by the engine
+and left unprotected. Every impact the mod *did* register in the same session
+was suppressed, twenty-two of twenty-two, which is what makes the missing one
+diagnostic rather than ambiguous.
+
+He was repaired in place with `SuppressAutoCure` followed by the same
+hide-and-unhide rebuild and replan the mod runs on its own victims, and he
+stood up and walked off.
+
+**What this does not establish** is the cause of the missed contact. The ride
+ran with `DiagnoseMisses` off, so no rejection was recorded and the width
+hypothesis is unconfirmed for this specific guard. It is also not yet ruled out
+that priming bystanders to several tonnes changes how the engine resolves a
+contact the mod declines to see, which would make the lockup easier to provoke
+rather than merely visible. `DiagnoseMisses` is back on for the next ride.
+
+## Writing the mass before contact changes nothing the rider can see
+
+Two paired-sample rides, 49 full-gallop impacts, with each victim assigned to
+the primed or unprimed half by alternating **within armor band** so the two
+groups hold the same mix of guards and villagers. The condition labels itself
+in the log: a primed victim's mass is correct when the ragdoll forms and
+`MassVictim` reports `atMs=0`, an unprimed one reports 16 or 33.
+
+The second ride's groups matched on everything that matters: mean armor scale
+0.77 against 0.75, mean mass 1630 kg against 1669, forward contact distance
+1.13 m against 1.19, approach speed 10.51 m/s against 10.61.
+
+### The result is nothing
+
+Centering each impact on its own armor band's mean, which removes armor
+entirely and uses all 49 impacts:
+
+| condition | n | mean deviation from band |
+| --- | --- | --- |
+| primed | 24 | +0.06 m |
+| unprimed | 25 | -0.05 m |
+
+A difference of 0.11 m at p = 0.70.
+
+Split by band the two halves point in opposite directions and cancel:
+
+| band | primed | unprimed | difference | p |
+| --- | --- | --- | --- | --- |
+| armored | 5.55 m (n=15) | 2.59 m (n=9) | +2.97 m | 0.049 |
+| unarmored | 3.98 m (n=9) | 6.64 m (n=16) | -2.66 m | 0.141 |
+
+The armored figure is not evidence. Two subgroups were tested and one landed
+just under 0.05, which is what testing two subgroups produces by chance, and it
+is contradicted by the other band moving the same distance the other way. The
+band-centered test over the whole sample is the honest one.
+
+### What this settles
+
+`PrimeMassBeforeContact` does what it claims mechanically. The write lands at
+`atMs=0` with the victim not yet moved, against 16 or 33 ms and one to eight
+centimeters for the ragdoll write, and it removes the variance of a retry
+ladder that landed on different rungs for different victims.
+
+**None of that reaches the throw.** The one-frame-late write was not costing
+anything measurable, so correcting it buys nothing a player could see. This is
+consistent with `p_max_bone_velocity` at 10 against a horse traveling at 10.7:
+if the launch speed is imposed by the animation rather than computed from the
+colliding masses, then when the mass is written cannot matter, and the mass
+affects only the deceleration afterward.
+
+The armor effect shipped in 4.7.0 therefore stands as measured. It was taken
+through the late write, and the late write is not the reason it works.
+
+### A design note worth keeping
+
+The first paired ride was wasted by randomizing per entity. Armor decides the
+throw, one ride reaches roughly twenty distinct victims, and one of them was
+hit seven times, so a per-entity coin flip put guards on one side and villagers
+on the other: mean armor scale 0.69 against 0.99. Randomize on the unit that
+carries the variance, or stratify by it.
