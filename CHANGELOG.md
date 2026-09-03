@@ -23,6 +23,8 @@ number.
 
 ## [Unreleased]
 
+## [4.7.3] - 2026-09-03
+
 ### Fixed
 
 - A provoked victim now actually fights. Since the feature shipped he would
