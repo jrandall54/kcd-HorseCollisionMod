@@ -248,8 +248,7 @@ end
 -- refused, which the `Retaliation` line above would not have shown.
 --
 -- @tparam table npc victim entity
--- @tparam table playerEnt the player entity
-function HorseCollisionMod:ReleaseWhenFighting(npc, playerEnt)
+function HorseCollisionMod:ReleaseWhenFighting(npc)
 	local generation = self.TimerTick
 	local interval = self.RetaliationReleaseMs
 	local left = self.RetaliationReleaseTries
@@ -266,7 +265,7 @@ function HorseCollisionMod:ReleaseWhenFighting(npc, playerEnt)
 		end)
 
 		if state ~= nil and string.find(state, "^Combat") ~= nil then
-			self:SendOffenseRelease(npc, playerEnt)
+			self:SendOffenseRelease(npc)
 
 			return
 		end
@@ -631,7 +630,7 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	-- Without it he enters the fight in defense only and holds a guard until
 	-- something else closes the incident, which is the whole of what a
 	-- provoked victim did before it existed.
-	self:ReleaseWhenFighting(npc, playerEnt)
+	self:ReleaseWhenFighting(npc)
 
 	-- The count is spent. Without this a victim already fighting keeps
 	-- rolling on every further contact during the brawl.

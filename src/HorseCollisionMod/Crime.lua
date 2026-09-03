@@ -224,40 +224,51 @@ end
 -- horse impact is, is not one of the two types the condition accepts, so the
 -- horse's own contact can never release a fighter however hard it lands.
 --
--- This file's header says a `hitReaction` is consumed by a passive observer
--- that cannot drive a body or raise a crime. That still describes
--- `sb_switch_hitreactions.xml`, which is the consumer it was written about,
--- and it is why this send stays crime-free. The fight subtree reads the same
--- inbox for a different purpose, and setting a behavior flag is not driving
--- a body.
+-- ### The attacker named is the victim himself, and that is the whole trick
 --
--- @tparam table npc victim entity
--- @tparam table playerEnt the player entity
+-- `sb_switch_hitreactions.xml` reads the `hitReaction` inbox as well, so this
+-- message reaches the assault broadcast described above `SendProvocationHit`,
+-- which is **not** gated on `real` and which charges the rider with brawling
+-- before he has thrown a punch. There is no message that reaches one consumer
+-- and not the other: they share the inbox, so the trick that keeps the
+-- provocation quiet, sending the onward message directly, has no equivalent
+-- here.
+--
+-- What the broadcast does key on is `hit.attacker`. Naming the victim as his
+-- own attacker leaves an assault attributed to nobody the crime system cares
+-- about, and measured against a null control it costs exactly nothing:
+--
+--     attacker = player   victim -0.31, every bystander -0.030
+--     attacker = victim   victim  0.00, every bystander  0.000
+--
+-- The flag is still set, because the condition that guards it tests only the
+-- strength and the type and never looks at who threw the blow. The opponent
+-- the victim fights is not taken from here either: `t_fightParams.opponent`
+-- was set to the player when the provocation was answered, and this message
+-- only adds one alongside it.
+--
+-- @tparam table npc victim entity, who is also named as the attacker
 -- @treturn boolean true when the message was sent
-function HorseCollisionMod:SendOffenseRelease(npc, playerEnt)
-	if not playerEnt then
-		return false
-	end
-
+function HorseCollisionMod:SendOffenseRelease(npc)
 	local target = npc.id
 
 	if npc.this and npc.this.id then
 		target = npc.this.id
 	end
 
-	local playerWuid = nil
+	local victimWuid = nil
 
 	pcall(function()
-		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+		victimWuid = XGenAIModule.GetMyWUID(npc)
 	end)
 
-	if not playerWuid then
+	if not victimWuid then
 		return false
 	end
 
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("hitReaction", {
-			attacker = playerWuid,
+			attacker = victimWuid,
 			hitStrength = self.HitReactionStrength.Tickle,
 			hitType = self.HitReactionType.Melee
 		})
