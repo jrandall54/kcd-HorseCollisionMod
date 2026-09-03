@@ -166,13 +166,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RetaliationMaxChance ceiling on that chance
 -- @field RetaliationMemorySec how long a victim remembers being shoved, in
 --   seconds, before the count decays to nothing
--- @field RetaliationFleeSpeed meters per second above which a victim who has
---   left combat is running away rather than walking somewhere
--- @field RetaliationFleeIgnoreRange meters the rider must be clear by before
---   a running victim counts as a runaway rather than as someone sensibly
---   getting away from him
--- @field RetaliationFleeSamples consecutive samples of that before the mod
---   decides a flee has outlived its cause and intervenes
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
 -- @table Config
@@ -305,9 +298,6 @@ HorseCollisionMod.Config = {
 	RetaliationChanceStep    = 0.25,
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
-	RetaliationFleeSpeed     = 3.5,
-	RetaliationFleeIgnoreRange = 25.0,
-	RetaliationFleeSamples   = 8,
 	RetaliationCeilingSec    = 120,
 
 	-- Switches.
@@ -504,6 +494,12 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- fine for a state that changes on the scale of a scuffle, and it keeps the
 -- telemetry readable rather than a wall of lines.
 HorseCollisionMod.RetaliationPollMs = 1000
+
+--- Consecutive samples out of the fight before the incident is closed.
+--
+-- More than one, because a fighter between exchanges reads as finished for an
+-- instant and closing there would cut a live fight short.
+HorseCollisionMod.RetaliationSettledSamples = 3
 
 --- The lowest a repair will leave a victim, whatever the arithmetic says.
 --

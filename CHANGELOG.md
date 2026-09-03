@@ -31,9 +31,25 @@ number.
   afterwards, across save loads and days of game time. Every provoked fight
   now ends by restoring what he thought of you before you provoked him, so he
   goes back to work and will talk and trade with you again. It restores rather
-  than rewards: he is walked back up one step at a time and stopped the moment
-  he reaches his old standing, so beating a man cannot leave him thinking
-  better of you than his untouched neighbors do.
+  than rewards: he is put back to what he thought of you less a standing cost
+  for the fight, so beating a man cannot leave him thinking better of you than
+  his untouched neighbors do, and he is checked a second time once you have
+  finished with him in case he lost more on the way.
+
+### Changed
+
+- The retaliation watcher is simpler and closes an incident when the fight
+  actually ends. It used to sort a victim into fighting, running away or
+  settled, and treat running as a separate case needing its own rescue, but
+  the test for it required you to be 25 m clear before it counted, which never
+  happens while you are chasing him: it fired in none of six measured
+  incidents. Running is now simply the fight being over, which closes the
+  incident within three seconds and hands him to the same repair as any other
+  ending. `RetaliationFleeSpeed`, `RetaliationFleeIgnoreRange` and
+  `RetaliationFleeSamples` are gone with it. They were added in 4.6.0 and no
+  published version has ever carried them, so no existing configuration
+  changes; an unrecognized setting is ignored and named in `kcd.log` as
+  always.
 
 ## [4.7.3] - 2026-09-03
 
