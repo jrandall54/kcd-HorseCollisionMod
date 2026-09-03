@@ -37,12 +37,13 @@ HorseCollisionModSettings = {
 	-- The base cancels out of the ratio between them, which is why 80 and 40
 	-- both measured at parity: both hand the horse the same 3.4x spread.
 	--
-	-- TEST RIDE: base 40 at an exponent of 3.7, putting villagers near 17 kg
-	-- and guards near 1940. The throw goes as mass to the -0.185, measured
-	-- across a 50x flat comparison, so a visible armor difference needs a
-	-- spread around 117x rather than the 3.4x and 11.6x already ridden. This
-	-- predicts roughly 5.9 m for a villager against 2.5 m for a guard.
-	RagdollMass              = 40.0,
+	-- TEST RIDE: the exponent stays at 3.7, which measured a 0.40x throw
+	-- ratio and is the setting that works. The base rises to 100 because at
+	-- 40 the light end launched: villagers at 17 kg were thrown 12 and 14 m,
+	-- which does not read as a person being hit by a horse. The base moves
+	-- everyone without touching the ratio, putting villagers near 42 kg and
+	-- guards near 4350, predicting roughly 5.0 m against 2.1 m.
+	RagdollMass              = 100.0,
 	RagdollMassArmorScaled   = true,
 	RagdollMassArmorExponent = 3.7,
 	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner

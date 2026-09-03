@@ -13759,3 +13759,51 @@ the lever's own coupling could never have made visible. The mistake was not
 the measurement, which was careful, but never asking what spread the effect
 size actually required before spending a ride on it. A null result across an
 untested range is not a null result about the lever.
+
+## An exponent of 3.7 makes armor visibly resist, and launches villagers too far
+
+Ridden at base 40 with the exponent at 3.7, putting guards between 490 and 1945
+kg and villagers between 17 and 50, a spread of 114x. The prediction from the
+measured power law was a 0.6x throw ratio; the ride came in at 0.40x.
+
+| set | n | armored | unarmored | ratio | p |
+| --- | --- | --- | --- | --- | --- |
+| all gallop impacts | 26 | 2.08 m | 5.24 m | 0.40x | 0.013 |
+| full gallop only | 12 | 3.09 m | 6.86 m | 0.45x | 0.109 |
+
+The full-gallop subset is six impacts a side and cannot carry a result on its
+own; the significant figure is the 26-impact set. Contact geometry and approach
+speed are matched across the two groups at full gallop, 1.14 m forward and
+10.68 m/s against 1.20 m and 10.67, so the separation is not a sampling
+artifact of where the horse hit.
+
+The whole series now reads:
+
+| spread | armored | unarmored | ratio |
+| --- | --- | --- | --- |
+| 3.4x | 3.39 m | 4.57 m | 0.74x |
+| 11.6x | 3.69 m | 4.01 m | 0.92x |
+| 114x | 3.09 m | 6.86 m | 0.45x |
+
+The rider's unprompted description before seeing any of this was that some
+unarmored victims went flying and no guard was thrown far. That is what the
+table says.
+
+### The light end is now the problem
+
+Two villagers at 17 kg travelled 12.23 and 13.84 m. Neither is terrain: the
+footprint `dz` is -0.13 and +0.09, so the ground was level, and both were
+already 6 m out at the half-second sample. They are genuine launches, and a
+person hit by a horse and thrown fourteen meters does not look like a person
+being hit by a horse.
+
+This is an aesthetic ceiling rather than a statistical one, and it is separable
+from the effect. The exponent sets the ratio between armored and unarmored; the
+base sets how far everyone travels. The ratio is now where it should be, so the
+remaining move is to raise the base until the light end returns to a plausible
+distance, which slides the heavy end further up without touching the ratio.
+
+At base 100 with the same exponent, villagers land near 42 kg and guards near
+4350. The power law predicts roughly 5.0 m against 2.1 m: a villager thrown
+about as far as the shipped mod throws them today, and a guard thrown less than
+half that.
