@@ -157,7 +157,6 @@ MAX_CHUNK_BYTES = 4000
 
 RIDE_SCRIPTS = [
     "tools/dev_survival.lua",
-    "tools/dev_nocrime.lua",
 ]
 
 
@@ -494,9 +493,8 @@ def main():
                         help="evaluate CODE as Lua in the running game")
     parser.add_argument("--ride", action="store_true",
                         help="start everything a measurement ride needs: the "
-                             "survival loop and the no-crime loop. None of it "
-                             "survives a save load, so this is what to run "
-                             "again after one")
+                             "survival loop. It does not survive a save load, "
+                             "so this is what to run again after one")
     parser.add_argument("--file", metavar="PATH", nargs="+",
                         help="evaluate the Lua in PATH as one chunk. The remote "
                              "console takes a whole file as readily as a line, "
