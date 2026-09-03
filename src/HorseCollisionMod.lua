@@ -501,14 +501,6 @@ HorseCollisionMod.RetaliationPollMs = 1000
 -- instant and closing there would cut a live fight short.
 HorseCollisionMod.RetaliationSettledSamples = 3
 
---- How long a provoked victim is given to square up before he is closed out.
---
--- Not every provocation produces a fight. A weak victim runs instead, and one
--- that never enters a combat state would otherwise be held open until the
--- failsafe, putting the repair two minutes behind him. `ReleaseWhenFighting`
--- gives up on the same question after five seconds, so this is comfortably
--- past the point where a fight was going to start.
-HorseCollisionMod.RetaliationStartGraceMs = 10000
 
 --- The lowest a repair will leave a victim, whatever the arithmetic says.
 --

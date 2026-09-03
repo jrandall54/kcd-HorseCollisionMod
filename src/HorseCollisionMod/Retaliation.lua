@@ -330,6 +330,11 @@ end
 -- sample, because a fighter between exchanges reads as finished for an
 -- instant and closing there would cut a live fight short.
 --
+-- The fight is waited for rather than assumed, but it always arrives:
+-- `alwaysFightWhenHit` skips the morale comparison that would otherwise let a
+-- timid victim decline, so courage decides how the fight goes and not whether
+-- there is one. A victim who yields to the first punch has still fought.
+--
 -- `RetaliationCeilingSec` bounds the poll so a victim who never resolves
 -- cannot leave it running for the session. It is a failsafe rather than a
 -- mechanism, and in six measured incidents it was never reached.
@@ -370,17 +375,6 @@ function HorseCollisionMod:WatchRetaliation(npc)
 
 		if sawFight and finishedFor >= self.RetaliationSettledSamples then
 			self:EndRetaliation(npc, "settled")
-
-			return
-		end
-
-		-- A victim who never fights at all still has to be closed out. A weak
-		-- one runs instead of squaring up, and waiting on a fight that is
-		-- never coming would hold him to the failsafe two minutes away, by
-		-- which time he has left the district. The grace is only long enough
-		-- to cover a victim who is slow to square up.
-		if not sawFight and elapsed >= self.RetaliationStartGraceMs then
-			self:EndRetaliation(npc, "nofight")
 
 			return
 		end
@@ -544,7 +538,7 @@ end
 --   `MotionIdle` at 0.00 m within a second.
 --
 -- @tparam table npc victim entity
--- @tparam string why `settled`, `nofight` or `ceiling`
+-- @tparam string why either `settled` or `ceiling`
 function HorseCollisionMod:EndRetaliation(npc, why)
 	local cleared = pcall(function()
 		Contexts.ClearOption(npc, self.RetaliationOption,
