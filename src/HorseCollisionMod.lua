@@ -571,14 +571,20 @@ HorseCollisionMod.AftermathRunMs = 4000
 -- rather than leave him standing in the road.
 HorseCollisionMod.AftermathStopMs = 500
 
---- How long after the stand-down the victim is told to resume his routine.
+--- How often the victim is checked for having left the fight, and for how long.
 --
 -- `standDownRequest` ends the flee but gives him nowhere to be, and a victim
--- with nowhere to be stands in the road looking vacant. The two go out
--- together, with only enough delay for the first to land, rather than waiting
--- to observe him come to a halt: waiting is what produced a five second stare
--- into the middle distance.
-HorseCollisionMod.AftermathReplanMs = 500
+-- with nowhere to be stands in the road looking vacant. The replan that gives
+-- him somewhere cannot simply follow on a fixed delay: `sb_combat.xml`
+-- rejects a stimulus arriving during `fight` or `flee`, the stand-down and
+-- `customBehaviorRequest` excepted, so one sent while he is still unwinding
+-- is discarded and nothing tells him to resume afterwards. Sent half a second
+-- behind the stand-down it was measured going out and being ignored.
+--
+-- So his state is read instead, and the replan goes the moment he is out of
+-- combat. Six seconds of checking is far past when that happens.
+HorseCollisionMod.AftermathReplanMs = 250
+HorseCollisionMod.AftermathReplanTries = 24
 
 --- Consecutive samples of each state before it is believed.
 --

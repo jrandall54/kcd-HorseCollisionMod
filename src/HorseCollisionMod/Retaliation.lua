@@ -588,11 +588,11 @@ end
 --
 -- ### And is put straight back to work
 --
--- The stand-down and the replan go out together, separated only by
--- `AftermathReplanMs` so the first has landed before the second arrives.
--- `standDownRequest` ends the flee and gives him nowhere to be, and waiting
--- to watch him come to a halt before offering him somewhere leaves him
--- standing in the road for several seconds looking vacant.
+-- The stand-down goes out, and the replan follows the moment he is out of
+-- combat rather than on a fixed delay. `standDownRequest` ends the flee and
+-- gives him nowhere to be, but a replan sent while he is still unwinding is
+-- rejected by `sb_combat.xml` and nothing tells him to resume afterwards, so
+-- he stands in the road looking vacant.
 --
 -- A victim who stops by himself is replanned there and then, for the same
 -- reason: stopping is not the same as having something to do.
@@ -667,8 +667,26 @@ function HorseCollisionMod:WatchAftermath(npc)
 					.. " stoodDown=" .. tostring(sent))
 		end
 
-		Script.SetTimer(self.AftermathReplanMs, function()
+		-- Waited on his state rather than a delay, because a replan arriving
+		-- while he is still in combat is rejected outright.
+		local waitedFrom = self:TimeMs()
+
+		local function offerRoutine(triesLeft)
 			if generation ~= self.TimerTick or done then
+				return
+			end
+
+			local state = nil
+
+			pcall(function()
+				state = tostring(npc.actor:GetCurrentAnimationState())
+			end)
+
+			if self:IsStillFighting(state) and triesLeft > 0 then
+				Script.SetTimer(self.AftermathReplanMs, function()
+					offerRoutine(triesLeft - 1)
+				end)
+
 				return
 			end
 
@@ -677,10 +695,16 @@ function HorseCollisionMod:WatchAftermath(npc)
 			if self.Config.LogTelemetry then
 				self:Log("Aftermath " .. tostring(npc:GetName())
 						.. " replanned=" .. tostring(replanned)
-						.. " gap=" .. tostring(self.AftermathReplanMs) .. "ms")
+						.. " state=" .. tostring(state)
+						.. " waited=" .. tostring(self:TimeMs() - waitedFrom)
+						.. "ms")
 			end
 
 			finish(why)
+		end
+
+		Script.SetTimer(self.AftermathReplanMs, function()
+			offerRoutine(self.AftermathReplanTries)
 		end)
 	end
 
