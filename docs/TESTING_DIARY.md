@@ -14074,3 +14074,28 @@ throw, one ride reaches roughly twenty distinct victims, and one of them was
 hit seven times, so a per-entity coin flip put guards on one side and villagers
 on the other: mean armor scale 0.69 against 0.99. Randomize on the unit that
 carries the variance, or stratify by it.
+
+## Widening the corridor to 0.70 confirmed against the ride
+
+`HorseHalfWidth` raised from 0.35 to 0.70. One ride, `CollisionIsCrime = false`
+and `DiagnoseMisses = true`, mixing squarely ridden hits with deliberate close
+passes at arm's length.
+
+45 rejections total. Nine were width-only while inside the front/rear range,
+and every one is at a lateral offset of 0.70 or beyond, up to 2.46 m — people
+the horse passed with real clearance. None fall in the 0.70-0.90 m band that
+would mean a genuine near-touch is still being missed, and none reproduce the
+0.46-0.63 m cluster that was the documented defect.
+
+25 real collisions, every one followed by `SuppressAutoCure`. Zero
+`PretendingIllness` this ride.
+
+The rider's own read of it, which the log cannot supply: every visible hit at
+trot and gallop produced the mod's own reaction, and the vanilla fall
+animation the corridor bug used to let through never appeared. That vanilla
+handoff was the visible symptom of a victim the footprint test rejected, so
+its absence over a full ride is the strongest evidence available short of
+forcing the exact original failure again, which needs a victim sitting in the
+0.46-0.63 m band, a health drop past 40, and enough in-game time for the
+auto-cure daycycle to reach them — conditions this fix already removes the
+cause of, so deliberately reproducing them again would not test anything new.

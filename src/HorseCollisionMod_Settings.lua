@@ -111,7 +111,7 @@ HorseCollisionModSettings = {
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 
 	-- Switches.
-	CollisionIsCrime         = false, -- riding someone down is a crime at trot
+	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
 	                                  -- and gallop; never at a walk
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
 	ReplanAfterReaction      = true,  -- sends them back to their stall or
@@ -125,6 +125,6 @@ HorseCollisionModSettings = {
 	-- every entity near the horse, including doors and audio areas, which is
 	-- thousands per session. Only useful while investigating why a specific
 	-- impact did nothing. `build.ps1` refuses a release build with this on.
-	DiagnoseMisses           = true
+	DiagnoseMisses           = false
 
 }
