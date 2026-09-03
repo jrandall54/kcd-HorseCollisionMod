@@ -529,13 +529,9 @@ end
 --   session, which is a different mod.
 -- * His standing is repaired, because below vanilla's threshold he decides to
 --   run from the rider on sight, for good. See `RepairVictim`.
--- * A stand-down goes out, because the fight can end with a flee already
---   running that his standing does not explain and that nothing else stops.
---   It is the only message that reaches someone mid-flight at all:
---   `sb_combat.xml` rejects every stimulus arriving during `fight` or `flee`
---   except `standDownRequest` and `customBehaviorRequest`. Measured on a
---   victim who would not stop, 16.95 m of travel per sample became
---   `MotionIdle` at 0.00 m within a second.
+-- * `WatchAftermath` takes him from here, because the fight can end with a
+--   flee already running that his standing does not explain and that nothing
+--   else stops.
 --
 -- @tparam table npc victim entity
 -- @tparam string why either `settled` or `ceiling`
@@ -562,10 +558,9 @@ function HorseCollisionMod:EndRetaliation(npc, why)
 	-- his own standing does not explain: measured at 0.737, well clear of the
 	-- threshold that decides a man should run, and running anyway. Reputation
 	-- cannot reach that and only the stand-down ends it.
-	local stoodDown = self:SendStandDown(npc)
-
-	-- The rider is not necessarily finished with him, and a flee can begin
-	-- after the incident closes, so he is watched a while longer.
+	-- The stand-down is deliberately not sent here. A victim who runs should
+	-- be allowed to get away first, and the rider is not necessarily finished
+	-- with him either, so both are left to the aftermath.
 	self:WatchAftermath(npc)
 
 	if self.Config.LogTelemetry then
@@ -573,90 +568,162 @@ function HorseCollisionMod:EndRetaliation(npc, why)
 				.. " why=" .. tostring(why)
 				.. " cleared=" .. tostring(cleared)
 				.. " state=" .. tostring(state)
-				.. " stoodDown=" .. tostring(stoodDown)
 				.. " repaired=" .. tostring(repaired))
 	end
 end
 
 --- Watches a victim after the incident, and leaves him right.
 --
--- Closing the incident is not the end of the danger. A victim released
--- through the vanilla yield menu settles first, which is what closes the
--- incident, and only then walks away in a flee that does not stop. His
--- relationship is untouched and healthy throughout, so nothing about him
--- reads as damaged; he simply never comes back.
+-- Closing the incident is not the end of it. A victim released through the
+-- vanilla yield menu settles first, which is what closes the incident, and
+-- only then walks away in a flee that does not stop on its own.
 --
--- Sampling his distance from the rider catches it. Anything faster than an
--- errand, sustained rather than a single step, takes another stand-down.
+-- ### He is allowed to get away first
 --
--- The window closes on a second look at his reputation, which is what makes
--- the figure trustworthy. The repair at the end of the incident is applied
--- before the rider has necessarily finished with him: a victim knocked down
--- again, or beaten while he stands up, loses more afterwards and was left
--- carrying it. One measured victim came out of a repair at 0.737 and was at
--- 0.590 by the time he settled. The recheck restores whatever was lost after
--- the first pass, and costs nothing when nothing was.
+-- The stand-down is not sent the moment he runs. A man who has just been
+-- beaten should put some distance between himself and the rider, and a rider
+-- who is not chasing him should see him leave rather than watch him stop dead
+-- a second later. So he runs until he is `AftermathReleaseDistance` clear,
+-- and is stopped then, or at the end of the window if he has not made it.
+--
+-- ### Then he is put straight back to work
+--
+-- `standDownRequest` ends the flee but does not give him anywhere to be, and
+-- a victim left in that state stands in the road for a while before his own
+-- routine picks him up. So the stop is confirmed rather than assumed: he is
+-- sampled at `AftermathStopMs` until he is no longer gaining ground, and the
+-- replan goes out in the same moment. That is the only reason a replan is
+-- sent at all, and the reason it is worth sending here where it was not
+-- worth sending blind.
+--
+-- ### And his standing is checked once more
+--
+-- The repair at the end of the incident runs before the rider has finished
+-- with him: a victim knocked down again, or beaten while he stands up, loses
+-- more afterwards and was left carrying it. One measured victim was repaired
+-- at the close, dropped back to 0.0 by what followed, and was restored by
+-- this second look.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
-	local left = self.FleeGuardSamples
+	local left = self.AftermathSamples
 	local fled = 0
 	local last = nil
 
-	pcall(function()
-		local p = npc:GetWorldPos()
-		local o = player:GetWorldPos()
-
-		last = self:VectorLength({ x = p.x - o.x, y = p.y - o.y, z = 0 })
-	end)
-
-	local function sample()
-		if generation ~= self.TimerTick or left <= 0 then
-			return
-		end
-
-		left = left - 1
-
-		local now = nil
+	local function range()
+		local d = nil
 
 		pcall(function()
 			local p = npc:GetWorldPos()
 			local o = player:GetWorldPos()
 
-			now = self:VectorLength({ x = p.x - o.x, y = p.y - o.y, z = 0 })
+			d = self:VectorLength({ x = p.x - o.x, y = p.y - o.y, z = 0 })
 		end)
 
-		if now ~= nil and last ~= nil then
-			if (now - last) > self.FleeGuardSpeed then
-				fled = fled + 1
-			else
-				fled = 0
+		return d
+	end
+
+	last = range()
+
+	local function finish(why)
+		self:RepairVictim(npc)
+		self.Baseline[tostring(npc.id)] = nil
+
+		if self.Config.LogTelemetry then
+			self:Log("Aftermath " .. tostring(npc:GetName())
+					.. " done=" .. tostring(why))
+		end
+	end
+
+	-- Second phase. The stand-down has gone out and what matters now is the
+	-- moment he stops, because that is when a replan reaches him.
+	local function waitForStop(stopsLeft)
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local now = range()
+		local moving = now ~= nil and last ~= nil
+				and (now - last) > self.AftermathFleeSpeed
+
+		last = now
+
+		if not moving then
+			local replanned = self:ReplanVictim(npc)
+
+			if self.Config.LogTelemetry then
+				self:Log("Aftermath " .. tostring(npc:GetName())
+						.. " stopped at " .. string.format("%.0f", now or -1)
+						.. "m, replanned=" .. tostring(replanned))
 			end
 
-			if fled >= 2 then
-				local sent = self:SendStandDown(npc)
+			finish("stopped")
 
-				if self.Config.LogTelemetry then
-					self:Log("FleeGuard " .. tostring(npc:GetName())
-							.. " late flee, stoodDown=" .. tostring(sent))
-				end
+			return
+		end
+
+		if stopsLeft <= 0 then
+			finish("still-running")
+
+			return
+		end
+
+		Script.SetTimer(self.AftermathStopMs, function()
+			waitForStop(stopsLeft - 1)
+		end)
+	end
+
+	-- First phase. He is left alone while he runs, and stopped once he is
+	-- clear of the rider or the window runs out, whichever comes first.
+	local function watch()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		left = left - 1
+
+		local now = range()
+
+		if now ~= nil and last ~= nil
+				and (now - last) > self.AftermathFleeSpeed then
+			fled = fled + 1
+		else
+			fled = 0
+		end
+
+		local clear = now ~= nil and now >= self.AftermathReleaseDistance
+
+		if fled >= 2 and (clear or left <= 0) then
+			local sent = self:SendStandDown(npc)
+
+			if self.Config.LogTelemetry then
+				self:Log("Aftermath " .. tostring(npc:GetName())
+						.. " stopping him at " .. string.format("%.0f", now)
+						.. "m, stoodDown=" .. tostring(sent))
 			end
+
+			last = now
+
+			Script.SetTimer(self.AftermathStopMs, function()
+				waitForStop(self.AftermathStopSamples)
+			end)
+
+			return
 		end
 
 		last = now
 
 		if left <= 0 then
-			self:RepairVictim(npc)
-			self.Baseline[tostring(npc.id)] = nil
+			finish("no-flee")
 
 			return
 		end
 
-		Script.SetTimer(1000, sample)
+		Script.SetTimer(1000, watch)
 	end
 
-	Script.SetTimer(1000, sample)
+	Script.SetTimer(1000, watch)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.

@@ -536,18 +536,35 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
---- How long a closed incident's victim is watched for a flee starting late.
+--- How long a victim is watched after the incident closes.
 --
--- A yield resolves through a dialog that reads as settled, so the incident
--- closes and the victim only then walks away and keeps going. Twenty seconds
--- covers the gap without leaving a timer running on every man ever shoved.
-HorseCollisionMod.FleeGuardSamples = 20
+-- Long enough to cover a flee that starts late, because a yield resolves
+-- through a dialog that reads as finished and the running begins after it.
+-- Twenty seconds at a flee's four and a half meters per second is ninety
+-- meters, well past the distance he is stopped at.
+HorseCollisionMod.AftermathSamples = 20
 
 --- Meters gained per second that count as running rather than walking away.
 --
 -- A measured flee held four and a half; somebody walking to a stall makes
 -- about one.
-HorseCollisionMod.FleeGuardSpeed = 2.5
+HorseCollisionMod.AftermathFleeSpeed = 2.5
+
+--- How far a fleeing victim is allowed to get before he is stopped.
+--
+-- He is not stopped where he stands. A man who has just been beaten should
+-- get away, and a rider who is not chasing him should see him go rather than
+-- watch him halt a second later and stand about. Forty meters clears the
+-- immediate area and is roughly nine seconds of running.
+HorseCollisionMod.AftermathReleaseDistance = 40.0
+
+--- How often a stopping victim is checked, and for how long.
+--
+-- Once the stand-down is sent he is watched at a shorter interval than the
+-- flee itself needs, because the point is to catch the moment he stops and
+-- put him back to work in it rather than leave him standing in the road.
+HorseCollisionMod.AftermathStopMs = 500
+HorseCollisionMod.AftermathStopSamples = 8
 
 --- The standing assumed for a victim nothing was recorded for.
 --
