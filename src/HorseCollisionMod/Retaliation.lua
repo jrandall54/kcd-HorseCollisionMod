@@ -645,13 +645,22 @@ function HorseCollisionMod:EndRetaliation(npc, why, intervene)
 	-- the rider on sight, and that is what has to be undone.
 	local repaired = self:RepairVictim(npc)
 
-	local stoodDown = false
+	-- Sent on every ending, not only the runaway and ceiling ones. A victim
+	-- released through the yield menu walks away in a flee
+	-- his own standing does not explain: measured at 0.737, well clear of the
+	-- threshold that decides a man should run, and running anyway. Reputation
+	-- cannot reach that and only the stand-down ends it.
+	local stoodDown = self:SendStandDown(npc)
 	local replanned = false
 
 	if intervene then
-		stoodDown = self:SendStandDown(npc)
 		replanned = self:ReplanVictim(npc)
 	end
+
+	-- The flee can also begin after the incident is closed, because a yield
+	-- resolves through a dialog the watcher reads as settled. So the victim
+	-- is watched a while longer for one starting late.
+	self:GuardAgainstFlee(npc)
 
 	if self.Config.LogTelemetry then
 		self:Log("RetaliationEnd " .. tostring(npc:GetName())
@@ -662,6 +671,76 @@ function HorseCollisionMod:EndRetaliation(npc, why, intervene)
 				.. " replanned=" .. tostring(replanned)
 				.. " repaired=" .. tostring(repaired))
 	end
+end
+
+--- Watches a closed incident's victim for a flee that starts late.
+--
+-- Closing the incident is not the end of the danger. A victim released
+-- through the vanilla yield menu settles first, which is what closes the
+-- incident, and only then walks away in a flee that does not stop. His
+-- relationship is untouched and healthy throughout, so nothing about him
+-- reads as damaged; he simply never comes back.
+--
+-- Sampling his distance from the rider catches it. Anything faster than an
+-- errand, sustained rather than a single step, takes another stand-down. It
+-- is sent at most once, because a second changes nothing and the incident is
+-- already over.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:GuardAgainstFlee(npc)
+	local generation = self.TimerTick
+	local left = self.FleeGuardSamples
+	local fled = 0
+	local last = nil
+
+	pcall(function()
+		local p = npc:GetWorldPos()
+		local o = player:GetWorldPos()
+
+		last = self:VectorLength({ x = p.x - o.x, y = p.y - o.y, z = 0 })
+	end)
+
+	local function sample()
+		if generation ~= self.TimerTick or left <= 0 then
+			return
+		end
+
+		left = left - 1
+
+		local now = nil
+
+		pcall(function()
+			local p = npc:GetWorldPos()
+			local o = player:GetWorldPos()
+
+			now = self:VectorLength({ x = p.x - o.x, y = p.y - o.y, z = 0 })
+		end)
+
+		if now ~= nil and last ~= nil then
+			if (now - last) > self.FleeGuardSpeed then
+				fled = fled + 1
+			else
+				fled = 0
+			end
+
+			if fled >= 2 then
+				local sent = self:SendStandDown(npc)
+
+				if self.Config.LogTelemetry then
+					self:Log("FleeGuard " .. tostring(npc:GetName())
+							.. " late flee, stoodDown=" .. tostring(sent))
+				end
+
+				return
+			end
+		end
+
+		last = now
+
+		Script.SetTimer(1000, sample)
+	end
+
+	Script.SetTimer(1000, sample)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.

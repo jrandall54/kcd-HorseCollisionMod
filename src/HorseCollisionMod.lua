@@ -539,6 +539,19 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
+--- How long a closed incident's victim is watched for a flee starting late.
+--
+-- A yield resolves through a dialog that reads as settled, so the incident
+-- closes and the victim only then walks away and keeps going. Twenty seconds
+-- covers the gap without leaving a timer running on every man ever shoved.
+HorseCollisionMod.FleeGuardSamples = 20
+
+--- Meters gained per second that count as running rather than walking away.
+--
+-- A measured flee held four and a half; somebody walking to a stall makes
+-- about one.
+HorseCollisionMod.FleeGuardSpeed = 2.5
+
 --- The standing assumed for a victim nothing was recorded for.
 --
 -- Untouched townsmen sampled across a village all read 0.50.
