@@ -13866,3 +13866,88 @@ was ever measured at.
 It also means the two mechanisms compound at a low base, and that the long
 throws at base 40 were not purely a mass effect. Roughly a third of that
 launch velocity came from the mod's own impulse.
+
+## What the engine does with the values this mod writes
+
+A survey of `references/libKCD1`, the decompilation index and `vanilla_scripts`
+for anything that reads, writes or bounds the parameters this mod sets. Three
+findings change what is reachable; the rest bound how much the current approach
+can ever achieve.
+
+### The living-entity mass is a different parameter, and it is writable
+
+`pe_simulation_params` carries `mass` for rigid bodies and ragdolls.
+**A living entity does not use that struct at all.** Its mass lives in
+`pe_player_dynamics`, a separate structure, and the Lua binding exposes both:
+`PHYSICPARAM_SIMULATION` and `PHYSICPARAM_PLAYERDYN` are each in the string
+table of the shipped binary.
+
+This overturns a finding recorded here and repeated in the `MassVictim`
+docstring, that mass cannot be set on a living actor. It cannot be set through
+`PHYSICPARAM_SIMULATION`, which is the only thing that was ever tried. Through
+`PHYSICPARAM_PLAYERDYN` it takes immediately:
+
+| target | state | parameter | before | after |
+| --- | --- | --- | --- | --- |
+| a guard | standing, alive | `PHYSICPARAM_PLAYERDYN` | 80 | 900 |
+| the player's horse | ridden | `PHYSICPARAM_PLAYERDYN` | 480 | 2000 |
+
+Both were restored afterwards. The consequence is large: the mass could be
+written **before the collision** on a standing victim, rather than raced onto a
+ragdoll sixteen milliseconds after contact, which removes the retry ladder and
+the timing question with it.
+
+### The horse's own mass is reachable
+
+480 kg, and writable by the same call. Every measurement on this branch varied
+one side of a two-body collision. The other side is a single parameter away,
+and no ride has ever changed it.
+
+### What bounds the effect
+
+Live CVar values from the running game:
+
+| CVar | value | meaning |
+| --- | --- | --- |
+| `p_max_bone_velocity` | **10** | clamps character bone velocities estimated from animations |
+| `p_max_unproj_vel` | **2.5** | limits the velocity used to push overlapping bodies apart |
+| `p_max_MC_mass_ratio` | 100 | mass ratio above which the microcontact solver is not considered safe |
+| `p_max_velocity` | 100 | clamp on physicalized object velocity |
+| `p_max_player_velocity` | 150 | clamp on living entity velocity |
+| `p_penalty_scale` | 0.3 | scales the penalty impulse for the simple solver |
+| `wh_rd_StillSpeedThreshold` | 0.3 | speed below which a ragdoll counts as still |
+| `wh_rd_StillDuration` | 1 | seconds of stillness before standing up |
+| `wh_horse_CollisionAvoidance` | 0 | the player's horse does not steer around people |
+
+`p_max_bone_velocity = 10` is the one worth attention. A galloping horse travels
+at 10.7 m/s, so the bone velocities that carry its collision into a victim are
+clamped at very nearly the speed it is moving. `p_max_unproj_vel = 2.5` bounds
+the separation velocity when two bodies interpenetrate.
+
+Taken together these bound the collision from above regardless of either mass,
+which is a plausible mechanical account of why the throw responds to mass as
+weakly as `mass ^ -0.185` rather than the way momentum transfer predicts.
+
+The mass ratio matters as well. At base 40 and an exponent of 3.7 a guard is
+1945 kg and a villager 17, a ratio of 114 against a solver whose documented
+safe limit is 100. The shipped base of 100 keeps every pair inside it.
+
+### What is not a confound
+
+- **`damping` and `minEnergy` are both mass independent.** `damping` is defined
+  as a fraction of velocity per unit time, and `minEnergy` is documented in
+  `physinterface.h` as energy *divided by mass*, so both act on velocity alone.
+  `RagdollDamping` and `RagdollMinEnergy` do not interact with the mass write.
+- **Ragdoll standup is velocity gated**, at 0.3 m/s held for one second, so a
+  heavy victim is not put to rest sooner for being heavy.
+- **Horse collision avoidance is off**, so the horse is not steering away from
+  victims and biasing the contact geometry.
+
+### Vanilla never does this
+
+Across 495 vanilla scripts, `PHYSICPARAM_SIMULATION` is set on rope entities,
+breakable objects, rigid bodies and tactical entities, and on no actor
+anywhere. The rider's instinct that the game rarely touches its own physics
+engine is right about the script layer: vanilla's mounted collision produces an
+audio bark and nothing else, and every physical reaction in this mod is
+something the shipped game never asks for.
