@@ -374,6 +374,17 @@ function HorseCollisionMod:WatchRetaliation(npc)
 			return
 		end
 
+		-- A victim who never fights at all still has to be closed out. A weak
+		-- one runs instead of squaring up, and waiting on a fight that is
+		-- never coming would hold him to the failsafe two minutes away, by
+		-- which time he has left the district. The grace is only long enough
+		-- to cover a victim who is slow to square up.
+		if not sawFight and elapsed >= self.RetaliationStartGraceMs then
+			self:EndRetaliation(npc, "nofight")
+
+			return
+		end
+
 		if elapsed >= ceiling then
 			self:EndRetaliation(npc, "ceiling")
 
@@ -533,7 +544,7 @@ end
 --   `MotionIdle` at 0.00 m within a second.
 --
 -- @tparam table npc victim entity
--- @tparam string why either `settled` or `ceiling`
+-- @tparam string why `settled`, `nofight` or `ceiling`
 function HorseCollisionMod:EndRetaliation(npc, why)
 	local cleared = pcall(function()
 		Contexts.ClearOption(npc, self.RetaliationOption,
