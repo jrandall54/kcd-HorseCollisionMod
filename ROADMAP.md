@@ -628,9 +628,9 @@ rather than missing.
       happens from the crime hit alone, so sending this at every impact would
       change civilian behavior from walking to a guard into running away,
       which is a different game.
-- [ ] The collision bark fires while the victim is still falling or lying as
-      a ragdoll, which is nobody's idea of speaking. It should land as they
-      get up.
+- [x] Closed as unreachable. The collision bark fires while the victim is
+      still falling or lying as a ragdoll, which is nobody's idea of speaking,
+      and it cannot be moved: see the evidence under the item below.
 
       Reachable. The bark is vanilla's, not this mod's: it fires with
       `SendHitReaction` switched off, and `sb_switch_hitreactions.xml` raises
@@ -642,7 +642,7 @@ rather than missing.
       calls can silence the request at the impact and send one deliberately
       once the victim is upright.
 
-- [ ] Give each tier its own voice. `dialog:monologRequest` is how the game
+- [x] Closed as unreachable. Give each tier its own voice. `dialog:monologRequest` is how the game
       raises spoken reactions and vanilla sends it 958 times across its AI,
       selecting a line by metarole. Eighty metaroles are in use and several
       suit a trampled victim better than the collision bark does:
@@ -654,23 +654,32 @@ rather than missing.
       Composes with the item above: silence vanilla's bark at the impact and
       send the chosen line once the victim is upright.
 
-      **Both items are blocked on a step neither of them names.** Sending
-      `dialog:monologRequest` from Lua does not produce a line. It was sent
-      the way vanilla's own `DialogUtils.RequestPlayerMonologByMetarole`
-      sends it, with `SendMessageToEntityData` and `Utils.makeTable`, with
-      and without `lookAtId`, `priority` and `overrideContextSuppress`, to a
-      merchant and to a village guard, and with
-      `KOLIZE_S_HRACEM_NA_KONI`, the role the target demonstrably speaks when
-      ridden into. Every send was accepted with no error and every one was
-      silent. Vanilla only ever raises this from inside the victim's own hit
-      reaction tree, which sends it to itself.
+      **Both are closed: a spoken line cannot be raised from Lua.** Three
+      approaches, all accepted without error and all silent.
 
-      The untried step is the metarole itself. `soul:AddMetaRoleByName` and
-      `soul:RemoveMetaRoleByName` are both live functions on an NPC, and the
-      receiving tree resolves a request against the roles the soul holds, so
-      a role the victim has not been given may simply resolve to nothing.
-      **Assign the metarole first, then send.** That is the next thing to try
-      and it has not been tried.
+      Sending `dialog:monologRequest` the way vanilla's own
+      `DialogUtils.RequestPlayerMonologByMetarole` sends it, with
+      `SendMessageToEntityData` and `Utils.makeTable`. Tried with and without
+      `lookAtId`, `priority` and `overrideContextSuppress`; on a merchant, a
+      village guard and a refugee; with the near-miss role
+      `ZASAH_ZBRANI_IGNOROVANY` and with `KOLIZE_S_HRACEM_NA_KONI`, the role a
+      target demonstrably speaks when ridden into.
+
+      Assigning the role to the soul first with `soul:AddMetaRoleByName`, which
+      is a live function and returns cleanly, then sending. Silent on a beggar
+      and on a guard.
+
+      Vanilla only ever raises this from inside the victim's own hit reaction
+      tree, which sends the message to itself. `monologRequestRead` in
+      `sb_dialog.xml` reads from a dedicated `DialogMailbox` and captures a
+      `common:senderInfo` that a Lua send does not supply, which is the
+      remaining difference and is not something a mod can forge.
+
+      Changing the bark therefore means overriding
+      `sb_switch_hitreactions.xml`, which this mod stopped doing in 2.0.0-rc1
+      to be Lua-only and conflict with nothing. That file is preserved in
+      `mod_xmls.disabled/`. It is a compatibility decision, not a technical
+      one.
 - [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
       a guard down registers no bounty, but trampling a villager to death brought the
       guards down on the rider and carried a jail sentence, with no crime code in the mod.

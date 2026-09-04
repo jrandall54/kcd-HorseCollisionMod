@@ -14773,3 +14773,21 @@ inside a wrapped call and the error was swallowed. Every offset proxy leaked
 for the life of the session. The sound still played, because the trigger is
 executed before the timer is booked, which is exactly why nothing in testing
 ever pointed at it.
+
+## The metarole was not the missing step either
+
+The roadmap's two bark items both assumed `dialog:monologRequest` would work
+from Lua, and named `soul:AddMetaRoleByName` in passing. That was the one
+untried possibility after the earlier attempts failed: the receiving tree
+resolves a request against the roles a soul holds, so a role the victim was
+never given would resolve to nothing.
+
+`soul:AddMetaRoleByName` is a live function and returns cleanly. Assigning
+`KOLIZE_S_HRACEM_NA_KONI` and then sending the request, four hundred
+milliseconds later, produced nothing on a refugee and nothing on a village
+guard.
+
+That is the third distinct approach to fail, all of them accepted without
+error. Spoken barks are closed as unreachable from Lua. The only send that
+works is the one inside `sb_switch_hitreactions.xml`, and reaching it means
+reopening the compatibility decision made in 2.0.0-rc1.
