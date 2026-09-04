@@ -14612,3 +14612,79 @@ than from Lua, so no mod can remove it.
   callback, used by `RigidBodyLight.lua`. Attached to the ridden horse it never
   fired, through two collisions that the mod's own log recorded. The engine
   does not deliver physics collision events to that entity's script table.
+
+## What the audio system actually exposes
+
+Research done while the rider was away, after the layered impact sound landed
+and the remaining complaint was that it is too loud and cannot be balanced.
+
+### The vocabulary is 2310 triggers, and it is now written down
+
+`Libs/GameAudio/*.xml` in `GameData.pak` is the audio translation layer: 21
+files declaring every trigger, parameter, switch and reverb environment the
+game has. The earlier figure of 1803 counted only triggers wrapping an
+`FmodEvent`; the rest wrap `SqcVariable`, `FmodSnapshotAsEvent`, `SqcMacro` or
+`WhMiscTrigger`, and some declare no backing at all.
+
+The whole table is extracted to `references/audio_triggers.tsv`, which is
+untracked. Alongside it, the way to check a name without playing it:
+
+    Sound.GetAudioTriggerID(name)   -- a handle, or nil if it does not exist
+
+That is how `n_ge_body_plate_stopped` and `n_ge_body_plate_passed` were found
+to be real. They are the armored counterpart of the body collision pair and
+have not been auditioned yet.
+
+### There is no volume control, and this is now settled
+
+The ATL parser is at line 3610277 of the decompilation. It reads `fmod_name`,
+`sustained`, `sustained_cutscene_audio` and `distance_culling` from an
+`FmodEvent`, and **never reads `fmod_id`**, so an event is resolved by path.
+There is no gain, no pitch and no filter attribute, and none of the 66 RTPCs is
+one either: they are `battle_intensity`, `horse_speed`, `player_health`,
+`pub_people_count` and the like. The only volume RTPCs in the game are
+`volume_music`, `volume_sfx` and `volume_voice`, declared in
+`g_volume_control.xml` against FMOD buses. Those are the player's own settings
+sliders and a mod has no business writing them.
+
+Material effects offer nothing more. `Libs/MaterialEffects/FXLibs/*.xml`
+declares its audio as `<Audio trigger="..."/>` and that element takes no other
+attribute anywhere in the shipped data.
+
+### Distance is the only substitute, and it depends on the object
+
+An aux audio proxy can be created on an entity and offset from it, which is how
+`Lightning.lua` makes distant thunder quieter:
+
+    local proxy = entity:CreateAuxAudioProxy()
+    entity:SetAudioProxyOffset({ x = 0, y = 0, z = 10 }, proxy)
+    entity:ExecuteAudioTrigger(id, proxy)
+    -- and RemoveAuxAudioProxy once it has finished
+
+Measured on the player: `blunt_unarmed_body_fabric` was inaudible at twelve
+meters, and `a_o_jump_landing` was exactly as loud at twelve as at zero.
+
+The reason for the second result is probably not the event. `default_controls.xml`
+declares an `environment_listener` switch whose `Dude` state sets
+`player_audio_object_hack:=this_is_player`, which is how the game marks an
+audio object as the listener's own. **Every distance test so far was run on the
+player entity**, the one object carrying that mark, while the mod itself plays
+on the victim. The test has to be repeated on an NPC before concluding that the
+landing cannot be attenuated. A probe for exactly that is prepared.
+
+### Why the game has no horse collision sound
+
+`Libs/MaterialEffects/MaterialEffects.xml` is a surface-type matrix, and the
+`mat_flesh` row maps to `bulletimpacts:blank_event` against every other
+material. Flesh collisions are deliberately silent. `mat_fabric` maps to
+`collisions:fabric_default`, and the collision library does carry
+`body_fabric_stopped`, `body_plate_stopped` and their `passed` variants, so the
+sounds exist; nothing routes a horse into them.
+
+The parser resolving events by name rather than by id means a mod could declare
+its own `ATLConfig` exposing any FMOD event by path, and the config loader
+enumerates its folder with a wildcard rather than reading a manifest, so a new
+file would be picked up. That is the route if a wanted sound turns out to exist
+in the bank without an ATL trigger. It does not help with volume, and it cannot
+add a sound the bank does not contain: `KCD.bank` is a 28 MB FMOD build and the
+project that produced it does not ship.
