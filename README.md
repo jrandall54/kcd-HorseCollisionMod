@@ -86,10 +86,10 @@ breaking the mod. Deleting a line restores its default.
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
-| `ImpactSoundWalk` | cloth layers | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
-| `ImpactSoundTrot` | impact layers | The same for a trot. |
-| `ImpactSoundGallop` | impact layers | The same for a gallop. |
-| `ImpactSoundCrack` | leg break | An occasional injury layer, gallop only. |
+| `ImpactSoundWalk` | layered | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
+| `ImpactSoundTrot` | layered | The same for a trot. |
+| `ImpactSoundGallop` | layered | The same for a gallop. |
+| `ImpactSoundCrack` | layered | An occasional injury layer, gallop only. |
 | `ImpactSoundCrackChance` | 0.12 | How often a gallop adds it. |
 | `VictimMarks` | true | Whether a knockdown leaves dirt and blood on the victim. Nothing is applied at walking pace. |
 | `VictimDirtTrot` | 0.35 | Dirt added to everything a trot victim is wearing, 0 to 1. 0 switches it off. |

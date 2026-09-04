@@ -383,6 +383,10 @@ def check_readme_settings():
     row is not a fault. A row quoting a value the mod does not use is, and it
     is the kind that reaches a player: they set a number from the table,
     nothing changes the way it says, and the mod looks broken.
+
+    Table-valued settings are exempt. Their value spans several lines and the
+    comparison here reads only as far as the first comma, so there is no cell
+    text that could ever match one.
     """
     settings = read(os.path.join("src", "HorseCollisionMod_Settings.lua"))
     shipped = dict(re.findall(r"^\t(\w+)\s*=\s*([^,]+),", settings, re.M))
@@ -396,6 +400,14 @@ def check_readme_settings():
             continue
 
         actual = shipped[key].strip()
+
+        # A setting whose value is a table cannot be quoted as one default.
+        # The pattern above truncates at the first comma, so a layered sound
+        # reads as `{ { "f_n_mat_foleyal_cl"`, which no README cell should
+        # contain. The rule is narrowed rather than satisfied: for these the
+        # README describes the shape and the settings file carries the values.
+        if actual.startswith("{"):
+            continue
 
         if quoted != actual:
             found.append(("README.md", 0, "%s = %s" % (key, quoted),
