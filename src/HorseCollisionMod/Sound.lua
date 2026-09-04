@@ -35,7 +35,7 @@
 --
 -- @module HorseCollisionMod.Sound
 -- @author jrandall54
--- @release 4.8.0
+-- @release 4.9.0
 
 --- Blunt body impacts, keyed by what the victim is wearing.
 --

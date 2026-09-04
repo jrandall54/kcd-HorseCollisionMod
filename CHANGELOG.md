@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-09-04
+
 ### Added
 
 - A collision makes a noise. There is no sound in the game for a horse
