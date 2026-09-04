@@ -559,15 +559,18 @@ HorseCollisionMod.AftermathFleeSpeed = 2.5
 -- threshold in a stride and stops a second later, which reads as him thinking
 -- better of it. A man who has just been beaten should get properly clear.
 --
--- The pause that follows cannot be shortened, so the run is what keeps it
--- away from the rider. Five seconds is roughly twenty five meters at a flee's
--- pace: far enough that a victim finishes standing about somewhere other than
--- underfoot, and short enough that he is still in the district rather than
--- out in the woods.
+-- The pause that follows has not been shortened by anything reachable from
+-- Lua, so the run is what keeps it away from the rider. Ten seconds is around
+-- fifty meters at a flee's pace: clear of the rider and of wherever the
+-- incident happened, while still short of leaving the district.
 --
--- Raising it further is safe. It buys distance and costs nothing, because the
--- wind-down runs on its own clock either way.
-HorseCollisionMod.AftermathRunMs = 5000
+-- Zero is the other end of this setting and is not the same feature. The
+-- stand-down then lands before the flee is under way, which is what the
+-- earlier build did, and the pause that followed was reported at about five
+-- seconds rather than twenty five. Whether that is because a flee never
+-- established has not been tested. If it holds, run length and pause length
+-- are two ends of one setting and cannot both be had.
+HorseCollisionMod.AftermathRunMs = 10000
 
 --- Whether a fleeing victim is stopped with a stand-down at all.
 --
