@@ -14,6 +14,12 @@ heading when the branch merges. An entry that breaks an existing install is
 marked **BREAKING**. `tools/version_check.py` derives the next version from
 these sections and refuses a build made at any other number.
 
+Removing a setting forces a major version, because a key a player has in their
+settings file disappearing is a broken install. An entry marked **NOT
+BREAKING** overrides that, and is only honest for a setting that no released
+version ever carried: the check compares against the last tag, so it cannot
+tell a key players have from one that only ever existed between releases.
+
 Every merge to `main` takes a version and a tag, whether or not that build is
 published, because `main` is always releasable and a merged version is
 therefore stable. A prerelease suffix belongs to a build still being tested on
@@ -22,6 +28,8 @@ against whatever version is current at the time, and it does not change the
 number.
 
 ## [Unreleased]
+
+## [4.7.4] - 2026-09-03
 
 ### Fixed
 
@@ -46,10 +54,10 @@ number.
   incidents. Running is now simply the fight being over, which closes the
   incident within three seconds and hands him to the same repair as any other
   ending. `RetaliationFleeSpeed`, `RetaliationFleeIgnoreRange` and
-  `RetaliationFleeSamples` are gone with it. They were added in 4.6.0 and no
-  published version has ever carried them, so no existing configuration
-  changes; an unrecognized setting is ignored and named in `kcd.log` as
-  always.
+  `RetaliationFleeSamples` are gone with it. **NOT BREAKING**: they were added
+  in 4.6.0 and the newest published version is 4.2.2, so no player has ever
+  had them in a settings file and no existing configuration changes. An
+  unrecognized setting is ignored and named in `kcd.log` as always.
 
 ## [4.7.3] - 2026-09-03
 

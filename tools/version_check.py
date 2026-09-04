@@ -26,6 +26,19 @@ USER_FACING = ("src/",)
 
 BREAKING = "**BREAKING**"
 
+# The counterpart, and the only way to drop a setting without forcing a major.
+# The rule below is deliberately strict because removing a key a player has in
+# their settings file breaks their install, and prose saying otherwise is not
+# something a script can check. This marker is the author saying otherwise on
+# the record, in the entry itself, where a reader of the changelog sees the
+# claim next to the removal it excuses.
+#
+# It exists because the strict rule compares against the last **tag**, not
+# against what players actually have. A setting added and removed between two
+# releases never reached anybody, so removing it breaks nothing, and the check
+# has no way to know that on its own.
+NOT_BREAKING = "**NOT BREAKING**"
+
 
 def git(*args):
     return subprocess.run(["git"] + list(args), cwd=REPO_ROOT,
@@ -117,11 +130,14 @@ def implied_bump(body, dropped=None):
     capability is a minor. Anything else is a patch.
 
     A setting that existed at the last release and no longer does forces a
-    major too, whatever the prose says about it.
+    major too, whatever the prose says about it, unless the entry carries
+    `NOT_BREAKING`. That marker is for a setting that never reached a player:
+    the comparison is against the last tag, and a key added and removed
+    between two releases was only ever visible to whoever built them.
     """
     parts = sections(body)
 
-    if dropped:
+    if dropped and NOT_BREAKING not in body:
         return "major"
 
     if BREAKING in body or "Removed" in parts:

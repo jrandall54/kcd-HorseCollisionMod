@@ -136,7 +136,7 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.7.3</li>
+        <li><strong>Release</strong>: 4.7.4</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -175,6 +175,10 @@
 	<td class="summary">How often each victim has been shoved at a walk, keyed by entity id.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#Baseline">Baseline</a></td>
+	<td class="summary">Each victim's regard for the rider before the fight, keyed by entity id.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#RecentRejections">RecentRejections</a></td>
 	<td class="summary">Last time each entity was reported as a miss, keyed by entity id.</td>
 	</tr>
@@ -200,6 +204,58 @@
 	<tr>
 	<td class="name" nowrap><a href="#RetaliationPollMs">RetaliationPollMs</a></td>
 	<td class="summary">How often a provoked victim is sampled while the incident is open.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#RetaliationSettledSamples">RetaliationSettledSamples</a></td>
+	<td class="summary">Consecutive samples out of the fight before the incident is closed.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#RepairFloor">RepairFloor</a></td>
+	<td class="summary">The lowest a repair will leave a victim, whatever the arithmetic says.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#RepairFightCost">RepairFightCost</a></td>
+	<td class="summary">What losing the fight costs a victim permanently.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#RepairStepValue">RepairStepValue</a></td>
+	<td class="summary">How far one <code>surrender_step</code> moves a relationship.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#RepairMaxSteps">RepairMaxSteps</a></td>
+	<td class="summary">A ceiling on the applications any single repair will make.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#AftermathStandDown">AftermathStandDown</a></td>
+	<td class="summary">Whether a fleeing victim is stopped with a stand-down at all.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#CatchYieldImmediately">CatchYieldImmediately</a></td>
+	<td class="summary">Whether a yielding victim is stopped the instant the yield ends.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#AftermathRunMs">AftermathRunMs</a></td>
+	<td class="summary">How long a fleeing victim is left to run before he is stopped.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#AftermathPollMs">AftermathPollMs</a></td>
+	<td class="summary">How often the victim is read while the aftermath is open.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#AftermathPollLimit">AftermathPollLimit</a></td>
+	<td class="summary">How many reads before the aftermath gives up on him.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#AftermathFleeSpeed">AftermathFleeSpeed</a></td>
+	<td class="summary">The victim's own speed, in meters per second, that counts as running.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#AftermathSettleMs">AftermathSettleMs</a></td>
+	<td class="summary">How long after stopping him his standing is checked a second time.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#RepairDefaultTarget">RepairDefaultTarget</a></td>
+	<td class="summary">The standing assumed for a victim nothing was recorded for.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#RetaliationReleaseMs">RetaliationReleaseMs</a></td>
@@ -519,19 +575,6 @@
          how long a victim remembers being shoved, in
    seconds, before the count decays to nothing
         </li>
-        <li><span class="parameter">RetaliationFleeSpeed</span>
-         meters per second above which a victim who has
-   left combat is running away rather than walking somewhere
-        </li>
-        <li><span class="parameter">RetaliationFleeIgnoreRange</span>
-         meters the rider must be clear by before
-   a running victim counts as a runaway rather than as someone sensibly
-   getting away from him
-        </li>
-        <li><span class="parameter">RetaliationFleeSamples</span>
-         consecutive samples of that before the mod
-   decides a flee has outlived its cause and intervenes
-        </li>
         <li><span class="parameter">RetaliationCeilingSec</span>
          failsafe, in seconds, after which a watched
    incident is closed however it looks
@@ -599,6 +642,27 @@
 <p> Lives in the entry point rather than in <code>Retaliation.lua</code> because the load
  screen clears the per-victim state before any part file has a chance to
  create its own tables.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Baseline"></a>
+    <strong>Baseline</strong>
+    </dt>
+    <dd>
+    Each victim's regard for the rider before the fight, keyed by entity id. </p>
+
+<p> Recorded at the moment of provocation, which is still clean: the shoves
+ that lead up to it raise no crime and the provocation names the victim as
+ his own attacker, so neither touches reputation. The repair afterwards
+ restores this figure rather than a fixed amount, because a fixed amount
+ calibrated for a ruined victim overshoots and leaves a man who was beaten
+ thinking better of the rider than he did beforehand.
 
 
 
@@ -757,6 +821,252 @@
 
 </dd>
     <dt>
+    <a name = "RetaliationSettledSamples"></a>
+    <strong>RetaliationSettledSamples</strong>
+    </dt>
+    <dd>
+    Consecutive samples out of the fight before the incident is closed. </p>
+
+<p> More than one, because a fighter between exchanges reads as finished for an
+ instant and closing there would cut a live fight short.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "RepairFloor"></a>
+    <strong>RepairFloor</strong>
+    </dt>
+    <dd>
+    The lowest a repair will leave a victim, whatever the arithmetic says. </p>
+
+<p> Vanilla stops an NPC dealing with the player below 0.2, and below that he
+ decides to flee again every time he perceives the rider, which is what made
+ the damage look permanent. This sits above that rather than on it, so a
+ victim is never left balanced on the edge of it.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "RepairFightCost"></a>
+    <strong>RepairFightCost</strong>
+    </dt>
+    <dd>
+    What losing the fight costs a victim permanently. </p>
+
+<p> The repair deliberately does not restore a victim to exactly what he was.
+ He was ridden down and then beaten, and remembering it is correct; what is
+ not correct is being ruined for good. So the target is his own standing
+ less this, held above the floor above, which leaves a man who thinks less
+ of the rider than his neighbors do and still trades with him.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "RepairStepValue"></a>
+    <strong>RepairStepValue</strong>
+    </dt>
+    <dd>
+    How far one <code>surrender_step</code> moves a relationship. </p>
+
+<p> Measured by applying it repeatedly from zero and reading between each: the
+ move is exactly 0.1389 every time, and the second argument the bind accepts
+ does not scale it. 0.1, 0.2 and no argument at all all produced the same
+ figure, so the count of applications is the only control there is.</p>
+
+<p> <code>surrender_step</code> also cannot carry anyone past 0.8430, which the same sweep
+ reached and then stopped at.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "RepairMaxSteps"></a>
+    <strong>RepairMaxSteps</strong>
+    </dt>
+    <dd>
+    A ceiling on the applications any single repair will make. </p>
+
+<p> Nothing legitimate needs more: a victim at 0.0 restored to a townsman's
+ 0.35 takes three. It bounds a victim whose relationship cannot be read.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "AftermathStandDown"></a>
+    <strong>AftermathStandDown</strong>
+    </dt>
+    <dd>
+    Whether a fleeing victim is stopped with a stand-down at all. </p>
+
+<p> On, because the flee does not end without it: a victim repaired to 0.816 in
+ mid-flight held four and a half meters per second out to forty seven meters
+ and never slowed. The repair decides whether he runs again and does nothing
+ to a run already under way.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "CatchYieldImmediately"></a>
+    <strong>CatchYieldImmediately</strong>
+    </dt>
+    <dd>
+    Whether a yielding victim is stopped the instant the yield ends. </p>
+
+<p> Off, and kept because it works rather than because it might. On the first
+ read after a surrender ends, which is the earliest the run can be caught at
+ all, the stand-down goes out and he never gets going: measured as
+ <code>YieldCaught state=MotionIdle stoodDown=true</code> with no run after it.</p>
+
+<p> Stopping the flee is not the whole cost, which is why it is off. The
+ stand-down hands him to the combat subbrain's wind-down, about twenty five
+ seconds that nothing reachable from Lua shortens, so a victim caught at
+ once spends it standing vacant beside the rider. Letting him run first
+ spends the same pause where the rider is not, which reads better even
+ though the mechanism is cruder.</p>
+
+<p> Turn it on if that wind-down is ever solved, because it is then strictly
+ the better of the two.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "AftermathRunMs"></a>
+    <strong>AftermathRunMs</strong>
+    </dt>
+    <dd>
+    How long a fleeing victim is left to run before he is stopped. </p>
+
+<p> The pause that follows a stand-down is the combat subbrain's own wind-down,
+ and nothing reachable from Lua shortens it, so this decides where he spends
+ it rather than whether he does. Fifteen seconds carries him well clear of
+ the rider and of wherever the fight happened, without taking him out of the
+ district.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "AftermathPollMs"></a>
+    <strong>AftermathPollMs</strong>
+    </dt>
+    <dd>
+    How often the victim is read while the aftermath is open. </p>
+
+<p> Long enough that a position difference is meaningful, short enough that the
+ moment he stops running is not missed by much.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "AftermathPollLimit"></a>
+    <strong>AftermathPollLimit</strong>
+    </dt>
+    <dd>
+    How many reads before the aftermath gives up on him. </p>
+
+<p> A bound rather than a mechanism, so a victim who neither settles nor runs
+ cannot leave a poll going for the session. Ninety at half a second is
+ forty five, comfortably past a fifteen second run and the yield before it.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "AftermathFleeSpeed"></a>
+    <strong>AftermathFleeSpeed</strong>
+    </dt>
+    <dd>
+    The victim's own speed, in meters per second, that counts as running. </p>
+
+<p> His own movement, not his distance from the rider, which reads as standing
+ still when the rider follows him. A measured flee held four and a half;
+ somebody walking to a stall makes about one.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "AftermathSettleMs"></a>
+    <strong>AftermathSettleMs</strong>
+    </dt>
+    <dd>
+    How long after stopping him his standing is checked a second time.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "RepairDefaultTarget"></a>
+    <strong>RepairDefaultTarget</strong>
+    </dt>
+    <dd>
+    The standing assumed for a victim nothing was recorded for. </p>
+
+<p> Untouched townsmen sampled across a village all read 0.50.
+
+
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "RetaliationReleaseMs"></a>
     <strong>RetaliationReleaseMs</strong>
     </dt>
@@ -801,7 +1111,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-03 11:09:18 </i>
+<i style="float:right;">Last updated 2026-09-03 20:33:43 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
