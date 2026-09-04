@@ -105,7 +105,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	local strength = self.HitReactionStrength
 	local cfg = self.Config
 	local combatScale = 1.0
-	local isCombat, combatDetail = self:IsCombatCollision(npc)
+	local isCombat, combatDetail, playerInDanger = self:IsCombatCollision(npc)
 
 	-- Only the knockdown tiers put anyone on the ground, so the walk tier
 	-- keeps the shorter wait.
@@ -148,7 +148,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	self:PlayImpactSound(npc, tierName, armor)
 
 	if tierName == "Walk" then
-		local suppressed = cfg.SuppressStaggerInCombat and combatScale > 1.0
+		-- Only a real fight suppresses the stagger. The combat test is also
+		-- true for a victim merely holding a weapon, and a guard on patrol
+		-- with a polearm holds his all day, so keying this off the combined
+		-- signal meant he could never be staggered at all.
+		local suppressed = cfg.SuppressStaggerInCombat and playerInDanger
 
 		if cfg.WalkStagger and not suppressed then
 			self:PlayReaction(npc, velocity, speed, "hcm_stagger_")

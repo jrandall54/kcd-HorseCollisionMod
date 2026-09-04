@@ -25,9 +25,15 @@
 --   reflects immediate danger rather than "a fight is happening", and reads
 --   false for long stretches of an ongoing fight. Mounted and moving, the
 --   player may not be in danger at the instant of each impact.
--- * The victim having a weapon drawn. Townsfolk do not walk around armed, so
---   this catches the case the first signal misses: charging someone who is
---   actively fighting.
+-- * The victim having a weapon drawn, which catches the case the first signal
+--   misses: charging someone who is actively fighting.
+--
+-- **A drawn weapon does not mean a fight.** That signal was written believing
+-- townsfolk never walk around armed, and a guard carrying a polearm does: he
+-- holds it on patrol all day and so reads as armed permanently. That is why
+-- polearm guards took no stagger at walking pace while every other NPC did.
+-- The two signals are returned separately, and a caller meaning "a fight is
+-- happening" must use the danger one alone.
 --
 -- Both raw values are logged so a disagreement between them is visible
 -- rather than being hidden behind a single boolean.
@@ -35,6 +41,8 @@
 -- @tparam table npc victim entity
 -- @treturn boolean true when combat rules should apply
 -- @treturn string diagnostic describing both signals
+-- @treturn boolean whether the player is actually fighting, the only one of
+--   the two signals that means combat rather than equipment
 function HorseCollisionMod:IsCombatCollision(npc)
 	local danger = false
 	local dangerOk = false
@@ -56,7 +64,7 @@ function HorseCollisionMod:IsCombatCollision(npc)
 	local detail = "danger=" .. tostring(danger) .. "/" .. tostring(dangerOk)
 			.. " armed=" .. tostring(armed) .. "/" .. tostring(armedOk)
 
-	return (danger == true or armed == true), detail
+	return (danger == true or armed == true), detail, danger == true
 end
 
 --- Throws the rider from the horse.
