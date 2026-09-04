@@ -586,6 +586,19 @@ HorseCollisionMod.AftermathStopMs = 500
 HorseCollisionMod.AftermathReplanMs = 250
 HorseCollisionMod.AftermathReplanTries = 24
 
+--- The speed that counts as a victim having got on with his day.
+--
+-- Walking pace is about one meter per second, so anything appreciably above
+-- standing still says his routine has picked him up.
+HorseCollisionMod.AftermathResumeSpeed = 0.5
+
+--- How long the wait for him to get on with it is measured for.
+--
+-- Sixty checks at a quarter second is fifteen seconds, which is longer than
+-- the delay a rider would tolerate watching, so the figure logged is the
+-- real one rather than a ceiling.
+HorseCollisionMod.AftermathResumeTries = 60
+
 --- Consecutive samples of each state before it is believed.
 --
 -- One sample either way is noise: a stride reads as running and the pause

@@ -700,6 +700,60 @@ function HorseCollisionMod:WatchAftermath(npc)
 						.. "ms")
 			end
 
+			-- How long he stands about before his routine actually picks him
+			-- up. The replan reports sent and accepted either way, so this is
+			-- the only figure that says whether it did anything, and it is
+			-- the one a rider watching him is complaining about.
+			local since = self:TimeMs()
+			local mark = where()
+
+			local function watchResume(triesLeft)
+				if generation ~= self.TimerTick then
+					return
+				end
+
+				local at = where()
+				local moved = 0
+
+				if at ~= nil and mark ~= nil then
+					moved = self:VectorLength({
+						x = at.x - mark.x,
+						y = at.y - mark.y,
+						z = 0
+					})
+				end
+
+				mark = at
+
+				local speed = moved / (self.AftermathReplanMs / 1000)
+
+				if speed > self.AftermathResumeSpeed or triesLeft <= 0 then
+					local st = nil
+
+					pcall(function()
+						st = tostring(npc.actor:GetCurrentAnimationState())
+					end)
+
+					if self.Config.LogTelemetry then
+						self:Log("Aftermath " .. tostring(npc:GetName())
+								.. " resumed=" .. tostring(
+										speed > self.AftermathResumeSpeed)
+								.. " idle=" .. tostring(self:TimeMs() - since)
+								.. "ms state=" .. tostring(st))
+					end
+
+					return
+				end
+
+				Script.SetTimer(self.AftermathReplanMs, function()
+					watchResume(triesLeft - 1)
+				end)
+			end
+
+			Script.SetTimer(self.AftermathReplanMs, function()
+				watchResume(self.AftermathResumeTries)
+			end)
+
 			finish(why)
 		end
 
