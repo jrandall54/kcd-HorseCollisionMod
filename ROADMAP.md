@@ -318,8 +318,18 @@ armor.
       inventory to the classes in the `armor` table is equivalent for a
       target. `human:GetItemInHand(hand)` reports a held weapon, and only
       while it is drawn.
-- [ ] Unarmored targets take proportionally heavier knockback and armored targets are moved
-      less, through one multiplier on `Ragdoll`'s `impulseScale`. A naked target reaches 1.50
+- [x] Closed, not achievable. Unarmored targets taking proportionally heavier knockback
+      than armored ones cannot be delivered by scaling this mod's impulse, because that
+      impulse does not decide how far a body travels. Three gallop rides, one applying
+      velocity and two the shipped impulse, produced the same spread of travel, and within
+      one ride the weakest applied figure moved a mailed guard furthest. What throws a body
+      is the engine's own collision between a ten-meter-per-second horse and a person.
+      `armorImpulse` still scales a contribution that does not move anybody.
+
+      Retained below for the reasoning only.
+
+      Original item: unarmored targets take proportionally heavier knockback and armored
+      targets are moved less, through one multiplier on `Ragdoll`'s `impulseScale`. A naked target reaches 1.50
       and a target in mail 0.41, against 1.00 at `ArmorReferenceWeight`. Reopened: the
       multiplier is computed and logged on every impact but no longer governs what a player
       sees. `TrotReaction` has defaulted to `"fall"` since 4.2.0, and the trot branch reaches
@@ -338,7 +348,12 @@ armor.
       meters to under four. Braking the horse hard on contact changed travel
       not at all, which rules the horse out as the thing carrying them.
 
-- [ ] Armor knockback, now measurable. The multiplier has always worked and
+- [x] Closed with the item above, on the same measurement. Armor knockback is not
+      reachable by scaling the mod's impulse whatever the figure, because the horse's
+      collision decides the throw. Raising `Knockback` far enough to matter throws victims
+      distances that do not read as a person being hit by a horse.
+
+      Original item: armor knockback, now measurable. The multiplier has always worked and
       the force it multiplies did not: `Knockback` of 50 is
       indistinguishable from applying no impulse at all, because an impulse
       of that size moves a body of 120 to 160 kilograms at about 0.6 meters
@@ -359,7 +374,11 @@ armor.
       expressible as one too. `Entity.GetMass` is there for the cases where an
       impulse is genuinely wanted, and vanilla's own code applies impulses as
       `mass * force` for exactly this reason.
-- [ ] Striking a heavy target strips the horse's momentum rather than only
+- [ ] Striking a heavy target shows on the horse. The momentum half is not reachable
+      for the same reason the knockback items above are closed, so what is left here is
+      the visible half: rearing or checking the horse on a heavy impact.
+
+      Original item: striking a heavy target strips the horse's momentum rather than only
       its stamina, and shows on the horse. `kcd_horse_controllerdefs.xml`
       declares a `Rear` fragment, so a heavy impact can rear or check the
       horse rather than only debiting a number the player cannot see. That is
@@ -484,7 +503,17 @@ rather than missing.
       One probe answers it: create the link between a victim and the player,
       punch the victim in front of a witness, and see whether a crime is
       raised.
-- [ ] Reopened: repair a victim the player has beaten.
+- [x] Repair a victim the player has beaten. Shipped in 4.7.4. Every provoked
+      fight now ends by restoring what the victim thought of the rider before
+      he was provoked, less a standing cost, floored clear of the 0.2
+      threshold that makes him flee on sight. He is checked a second time once
+      the rider has finished with him, because a victim beaten while standing
+      up loses more afterwards. Measured: a victim at 0.000 restored to 0.418
+      and walking his routine, talking and trading.
+
+      The mechanism below was the right table and the wrong conclusion about
+      the flee. Reputation decides whether he runs *again*; it does nothing to
+      a run already under way, and a run ends on its own.
       `soul:ModifyPlayerReputation('best_friend')` is +2 with
       `can_change_hostility` true, and `surrender_step` is +0.25 with the same
       flag. A punch is `hit_melee_weak`, -0.2, and it sets that flag; only a
