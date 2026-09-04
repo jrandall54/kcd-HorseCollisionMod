@@ -180,6 +180,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		else
 			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse, horsePos)
 		end
+		self:MarkVictim(npc, "Trot", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,
@@ -193,6 +194,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
 		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse, horsePos)
+		self:MarkVictim(npc, "Gallop", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
 		self:DrainHorseStamina(horseEnt, playerEnt,

@@ -1,0 +1,240 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+<li><a href="#Tables">Tables</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><strong>HorseCollisionMod.Marks</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Retaliation.html">HorseCollisionMod.Retaliation</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Marks</code></h1>
+<p>Marks: the dirt and blood a collision leaves on the victim.</p>
+<p> Someone ridden down and put on the ground stands back up immaculate. The
+ animation plays, health is spent, the crime is charged, and nothing about
+ the victim afterwards says anything happened to them. This file leaves the
+ evidence on their body and their clothes.</p>
+
+<p> Two engine calls do the work, both on the actor. <code>actor:AddDirt(n)</code> adds
+ dirt to everything the victim is wearing and takes no zone. `actor:AddBlood
+ (zone, n)` takes a named zone of the body and adds blood to the body and to
+ whatever covers it. Both arguments are deltas in the range -1 to 1, so
+ repeated collisions accumulate and a negative figure would wash it off.
+ Vanilla uses both this way: <code>deadBody.xml</code> bloods a corpse on spawn, and
+ <code>q_huntPtacek.xml</code> dirties a man dragged through a wood.</p>
+
+<p> The zones are chosen from the impact direction <code>Detection.lua</code> already
+ computes for the reaction clips, so a rider who is run down from behind is
+ marked across the back rather than the face. Only zone names that vanilla
+ itself passes are used: the engine reads them from a database this mod
+ cannot see, and an unrecognized name fails silently, which would look
+ exactly like the feature not working.</p>
+
+<p> The walk tier is deliberately unmarked. A shove that does not put anyone on
+ the ground should not leave them bloodied, and dirt on a victim who never
+ fell would read as a bug.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.7.5</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:MarkVictim">HorseCollisionMod:MarkVictim (npc, tierName, velocity, speed)</a></td>
+	<td class="summary">Marks a victim with the dirt and blood their impact earned.</td>
+	</tr>
+</table>
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#BloodZones">BloodZones</a></td>
+	<td class="summary">Body zones bloodied for each impact direction.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:MarkVictim"></a>
+    <strong>HorseCollisionMod:MarkVictim (npc, tierName, velocity, speed)</strong>
+    </dt>
+    <dd>
+    Marks a victim with the dirt and blood their impact earned. </p>
+
+<p> Called at the moment of impact, from the trot and gallop branches of
+ <code>OnImpact</code>. Nothing is applied at a walk.</p>
+
+<p> The amounts come from the settings, per tier, and each application is
+ jittered by a quarter either way so a victim ridden down twice does not
+ carry two identical marks. An amount of zero skips its call rather than
+ passing a delta the engine would ignore.</p>
+
+<p> Every call is wrapped, because an actor can be unstreamed between the
+ impact and this line and a raw error would kill the collision tick.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Trot" or "Gallop"; "Walk" leaves no mark
+        </li>
+        <li><span class="parameter">velocity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse velocity vector
+        </li>
+        <li><span class="parameter">speed</span>
+            <span class="types"><span class="type">number</span></span>
+         horse speed in meters per second
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when something was applied
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "BloodZones"></a>
+    <strong>BloodZones</strong>
+    </dt>
+    <dd>
+    Body zones bloodied for each impact direction. </p>
+
+<p> Keyed by the strings <code>GetImpactDir</code> returns, which name the side of the
+ victim the blow arrives on: <code>so_forward</code> is a victim struck on the front,
+ <code>so_back</code> one run down from behind.</p>
+
+<p> Every name here is attested in the vanilla quest scripts. The sets are not
+ mirror images of one another because the vanilla scripts do not use a
+ symmetrical set of names, and a name invented to balance a list would be
+ discarded by the engine without a word.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">so_forward</span>
+
+
+
+        </li>
+        <li><span class="parameter">body_front_down</span>
+
+
+
+        </li>
+        <li><span class="parameter">arm_left_upper_front</span>
+
+
+
+        </li>
+        <li><span class="parameter">arm_right_forearm_front</span>
+
+
+
+        </li>
+        <li><span class="parameter">leg_left_upper_front</span>
+
+
+
+        </li>
+        <li><span class="parameter">leg_right_upper_front</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-04 08:36:14 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>
