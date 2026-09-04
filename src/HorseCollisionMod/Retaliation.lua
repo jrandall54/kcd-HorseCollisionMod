@@ -372,27 +372,21 @@ function HorseCollisionMod:WatchRetaliation(npc)
 			sawFight = true
 			finishedFor = 0
 
-			if state ~= nil
-					and string.find(state, "^Surrender") ~= nil then
+			if state ~= nil and string.find(state, "^Surrender") ~= nil then
 				sawYield = true
 			end
 		else
 			finishedFor = finishedFor + 1
 
-			-- The first read after a yield ends, and the only moment the run
-			-- can be caught before he has covered ground. It has to happen
-			-- here rather than in the aftermath: a surrender counts as still
-			-- fighting, so the incident stays open for the whole yield and
-			-- does not close until he is already moving, by which time the
-			-- transition is gone.
-			if sawYield and not caught then
+			-- Off by default. See `CatchYieldImmediately` for why something
+			-- that works is not the thing used.
+			if self.CatchYieldImmediately and sawYield and not caught then
 				caught = true
 
 				local stoodDown = false
 
 				if self.AftermathStandDown then
 					stoodDown = self:SendStandDown(npc)
-					self:OfferYield(npc)
 				end
 
 				if self.Config.LogTelemetry then
@@ -624,15 +618,15 @@ end
 -- * **Settled.** Anything else, which is every idle and every ordinary
 --   working animation.
 --
--- **A victim who yielded is stopped the moment the yield ends**, on the state
--- transition itself, before he has covered any ground. That is the earliest
--- point the run can be caught at all, because waiting for his speed to
--- confirm a flee means waiting for the flee to be under way.
+-- `AftermathRunMs` is a budget rather than a trigger: he runs for that long
+-- and is stopped when he has spent it, or is left alone if he pulls up of his
+-- own accord first.
 --
--- `AftermathRunMs` covers the victim who never yielded and simply broke away.
--- For him there is no transition to catch, so it is a budget: he runs for
--- that long and is stopped when he has spent it, or left alone if he pulls up
--- of his own accord first. The stand-down is only sent to somebody actually
+-- `CatchYieldImmediately` stops him on the yield transition instead, and is
+-- off. The stand-down hands him to the combat subbrain's wind-down whichever
+-- way he is stopped, so catching him at once has him serve those twenty five
+-- seconds standing beside the rider, where running first spends the same
+-- pause out of sight. The stand-down is only sent to somebody actually
 -- running, because it parks him for the combat subbrain's wind-down and a man
 -- who has already settled does not need that.
 --
@@ -641,7 +635,6 @@ function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
 	local ran = 0
 	local left = self.AftermathPollLimit
-	local yielded = false
 	local last = nil
 
 	local function where()
@@ -709,8 +702,6 @@ function HorseCollisionMod:WatchAftermath(npc)
 		-- but the fact of it is remembered, because leaving it is the moment
 		-- that matters.
 		if state ~= nil and string.find(state, "^Surrender") ~= nil then
-			yielded = true
-
 			if left > 0 then
 				Script.SetTimer(self.AftermathPollMs, poll)
 			else
@@ -720,24 +711,7 @@ function HorseCollisionMod:WatchAftermath(npc)
 			return
 		end
 
-		-- The first read after a yield ends. A victim who has just given up a
-		-- fight breaks into the run here, and this is the only moment it can
-		-- be stopped before he has covered any ground: waiting for his speed
-		-- to prove he is running means waiting for him to be running. The
-		-- stand-down goes out on the transition itself rather than on
-		-- evidence of its consequences.
-		if yielded then
-			local stoodDown = false
 
-			if self.AftermathStandDown then
-				stoodDown = self:SendStandDown(npc)
-				self:OfferYield(npc)
-			end
-
-			finish("left-yield stoodDown=" .. tostring(stoodDown), speed)
-
-			return
-		end
 
 		if speed > self.AftermathFleeSpeed then
 			ran = ran + self.AftermathPollMs
@@ -747,7 +721,6 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 				if self.AftermathStandDown then
 					stoodDown = self:SendStandDown(npc)
-					self:OfferYield(npc)
 				end
 
 				finish("stopped stoodDown=" .. tostring(stoodDown), speed)
@@ -771,69 +744,6 @@ function HorseCollisionMod:WatchAftermath(npc)
 	end
 
 	Script.SetTimer(self.AftermathPollMs, poll)
-end
-
---- Offers the yield behavior until the victim takes it.
---
--- Delayed rather than immediate, and repeated rather than sent once. A yield
--- arriving while he is still coming out of the flee is discarded and he
--- serves the full wind-down standing still; one arriving after he has settled
--- had him walking 1.25 seconds later. Rather than trust a single delay to
--- suit every victim, it is offered again while he has not moved.
---
--- Stops as soon as he is under way, so a victim who took the first offer is
--- not sent another.
---
--- @tparam table npc victim entity
-function HorseCollisionMod:OfferYield(npc)
-	local generation = self.TimerTick
-	local last = nil
-
-	local function where()
-		local p = nil
-
-		pcall(function()
-			local q = npc:GetWorldPos()
-
-			p = { x = q.x, y = q.y }
-		end)
-
-		return p
-	end
-
-	local function offer(triesLeft)
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local at = where()
-
-		if at ~= nil and last ~= nil then
-			local moved = self:VectorLength({
-				x = at.x - last.x,
-				y = at.y - last.y,
-				z = 0
-			})
-
-			if moved > 0.5 then
-				return
-			end
-		end
-
-		last = at
-
-		self:SendYieldBehavior(npc)
-
-		if triesLeft > 0 then
-			Script.SetTimer(self.YieldRetryMs, function()
-				offer(triesLeft - 1)
-			end)
-		end
-	end
-
-	Script.SetTimer(self.YieldDelayMs, function()
-		offer(self.YieldRetries)
-	end)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.

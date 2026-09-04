@@ -544,6 +544,24 @@ HorseCollisionMod.RepairMaxSteps = 5
 -- to a run already under way.
 HorseCollisionMod.AftermathStandDown = true
 
+--- Whether a yielding victim is stopped the instant the yield ends.
+--
+-- Off, and kept because it works rather than because it might. On the first
+-- read after a surrender ends, which is the earliest the run can be caught at
+-- all, the stand-down goes out and he never gets going: measured as
+-- `YieldCaught state=MotionIdle stoodDown=true` with no run after it.
+--
+-- Stopping the flee is not the whole cost, which is why it is off. The
+-- stand-down hands him to the combat subbrain's wind-down, about twenty five
+-- seconds that nothing reachable from Lua shortens, so a victim caught at
+-- once spends it standing vacant beside the rider. Letting him run first
+-- spends the same pause where the rider is not, which reads better even
+-- though the mechanism is cruder.
+--
+-- Turn it on if that wind-down is ever solved, because it is then strictly
+-- the better of the two.
+HorseCollisionMod.CatchYieldImmediately = false
+
 --- How long a fleeing victim is left to run before he is stopped.
 --
 -- The pause that follows a stand-down is the combat subbrain's own wind-down,
