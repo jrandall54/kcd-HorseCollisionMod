@@ -29,6 +29,16 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- A victim knocked to the ground now shows it. Dirt goes on everything they
+  are wearing and, at a gallop, blood goes on whichever side of the body the
+  horse struck. Both accumulate across impacts and both wash off the way any
+  other dirt and blood does. Five settings control it: `VictimMarks`,
+  `VictimDirtTrot`, `VictimDirtGallop`, `VictimBloodTrot` and
+  `VictimBloodGallop`. Nothing is applied at walking pace, where nobody goes
+  down.
+
 ## [4.7.5] - 2026-09-03
 
 ### Changed

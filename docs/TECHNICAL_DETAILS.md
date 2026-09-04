@@ -147,7 +147,7 @@ prints each entry name so the separators are visible.
 
 `Scripts/Startup/HorseCollisionMod.lua` is the entry point. It creates the
 table, holds `Config`, the state tables and the timing constants, and applies
-the settings file; the behavior lives in ten part files under
+the settings file; the behavior lives in twelve part files under
 `Scripts/HorseCollisionMod/`, named at the foot of the entry point in the order
 they are wanted:
 
@@ -158,8 +158,10 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Armor.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Marks.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 ```
@@ -172,8 +174,10 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 | `Detection.lua` | the horse footprint test and the impact direction |
 | `Health.lua` | what an impact cost, and the auto-cure suppression |
 | `Reaction.lua` | the brain message, the reaction clip, the physics ragdoll |
+| `Marks.lua` | the dirt and blood a knockdown leaves on the victim |
 | `Recovery.lua` | the waits, the rebuild and the replan that follow |
 | `Crime.lua` | the combat hit that makes riding someone down an offence |
+| `Retaliation.lua` | a victim losing patience at a walk, and the brawl that follows |
 | `Rider.lua` | horse stamina, the combat multiplier and the dismount |
 | `Update.lua` | the detection loop, and dispatching one collision |
 
@@ -420,6 +424,34 @@ either way.
 
 Turning it off compares against vanilla collision handling without uninstalling
 the mod. The knockdown tiers are unaffected.
+
+## Marks left on a victim
+
+Two actor binds, both taking a delta between -1 and 1 and both accumulating:
+
+```lua
+actor:AddDirt(0.6)
+actor:AddBlood("head_front", 0.45)
+```
+
+`AddDirt` covers everything the victim is wearing and takes no zone.
+`AddBlood` takes a named body zone and marks the body and whatever covers it.
+The engine resolves the zone name against a database that is not exposed to
+Lua, and it discards a name it does not recognize without an error, so the
+names the mod passes are drawn only from the set vanilla's own quest scripts
+use. `q_ledecko.xml` and `q_counterfeiters.xml` between them list most of it.
+
+`Marks.lua` keys its zones off the impact direction `Detection.lua` already
+computes for the reaction clips, so a man run down from behind is bloodied
+across his back rather than his face. The four sets are not mirror images,
+because vanilla's names are not symmetrical and inventing one to balance a
+list would produce a call the engine silently drops.
+
+Each application is jittered by a quarter either way, so a victim ridden down
+twice does not carry two identical marks.
+
+Nothing is applied at the walk tier: a stagger puts nobody on the ground, and
+dirt on a victim who never fell reads as a bug.
 
 ## Collision damage
 
