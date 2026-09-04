@@ -653,6 +653,24 @@ rather than missing.
 
       Composes with the item above: silence vanilla's bark at the impact and
       send the chosen line once the victim is upright.
+
+      **Both items are blocked on a step neither of them names.** Sending
+      `dialog:monologRequest` from Lua does not produce a line. It was sent
+      the way vanilla's own `DialogUtils.RequestPlayerMonologByMetarole`
+      sends it, with `SendMessageToEntityData` and `Utils.makeTable`, with
+      and without `lookAtId`, `priority` and `overrideContextSuppress`, to a
+      merchant and to a village guard, and with
+      `KOLIZE_S_HRACEM_NA_KONI`, the role the target demonstrably speaks when
+      ridden into. Every send was accepted with no error and every one was
+      silent. Vanilla only ever raises this from inside the victim's own hit
+      reaction tree, which sends it to itself.
+
+      The untried step is the metarole itself. `soul:AddMetaRoleByName` and
+      `soul:RemoveMetaRoleByName` are both live functions on an NPC, and the
+      receiving tree resolves a request against the roles the soul holds, so
+      a role the victim has not been given may simply resolve to nothing.
+      **Assign the metarole first, then send.** That is the next thing to try
+      and it has not been tried.
 - [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
       a guard down registers no bounty, but trampling a villager to death brought the
       guards down on the rider and carried a jail sentence, with no crime code in the mod.
