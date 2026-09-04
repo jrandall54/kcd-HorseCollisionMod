@@ -105,6 +105,18 @@ HorseCollisionModSettings = {
 	-- when the fight is over it puts him back the way it found him.
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 
+	-- What a victim looks like afterwards. Someone ridden down at a gallop
+	-- otherwise stands back up immaculate. Dirt covers everything they are
+	-- wearing; blood goes on the side of the body the horse struck. Both are
+	-- amounts between 0 and 1 and both accumulate, so a man ridden down
+	-- repeatedly gets steadily filthier. Setting either to 0 switches that
+	-- half off. Nothing is applied at a walk, where nobody hits the ground.
+	VictimMarks              = true,
+	VictimDirtTrot           = 0.35,
+	VictimDirtGallop         = 0.60,
+	VictimBloodTrot          = 0.15,
+	VictimBloodGallop        = 0.45,
+
 	-- Switches.
 	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
 	                                  -- and gallop; never at a walk

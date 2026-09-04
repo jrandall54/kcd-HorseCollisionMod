@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.7.5
+-- @release 4.8.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.7.5"
+HorseCollisionMod.Version = "4.8.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -168,6 +168,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
+-- @field VictimMarks whether a collision leaves dirt and blood on the victim
+-- @field VictimDirtTrot dirt added by a trot impact, 0 to 1
+-- @field VictimDirtGallop dirt added by a gallop impact, 0 to 1
+-- @field VictimBloodTrot blood added by a trot impact, 0 to 1
+-- @field VictimBloodGallop blood added by a gallop impact, 0 to 1
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
@@ -299,6 +304,17 @@ HorseCollisionMod.Config = {
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
 	RetaliationCeilingSec    = 120,
+
+	-- The dirt and blood a collision leaves on the victim, applied at trot
+	-- and gallop only. Deltas in the range 0 to 1, accumulating across
+	-- impacts. Dirt covers everything the victim is wearing; blood is
+	-- applied to the body zones on the side the blow landed on. Zero
+	-- switches either half off without touching the other.
+	VictimMarks              = true,
+	VictimDirtTrot           = 0.35,
+	VictimDirtGallop         = 0.60,
+	VictimBloodTrot          = 0.15,
+	VictimBloodGallop        = 0.45,
 
 	-- Switches.
 	ProtectMutt              = true,
@@ -805,6 +821,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Armor.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Marks.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")

@@ -85,6 +85,11 @@ breaking the mod. Deleting a line restores its default.
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
+| `VictimMarks` | true | Whether a knockdown leaves dirt and blood on the victim. Nothing is applied at walking pace. |
+| `VictimDirtTrot` | 0.35 | Dirt added to everything a trot victim is wearing, 0 to 1. 0 switches it off. |
+| `VictimDirtGallop` | 0.60 | The same at a gallop. |
+| `VictimBloodTrot` | 0.15 | Blood added to the side of the body a trot impact struck, 0 to 1. 0 switches it off. |
+| `VictimBloodGallop` | 0.45 | The same at a gallop. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
 | `Retaliation` | true | Whether a man shoved repeatedly at walking pace can lose patience and fight back. |
 | `RetaliationFreeBumps` | 1 | How many walk impacts a victim tolerates before any chance of a fight begins. The first is always free. |

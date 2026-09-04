@@ -33,6 +33,13 @@ own behavior for the wounded, which stands them still until they slowly heal.
 The mod exempts anyone it knocks down from that, using the same mechanism the
 game uses for its own characters, so a victim gets up and carries on.
 
+A victim who hits the ground shows it afterwards. Their clothes pick up dirt,
+and a gallop draws blood on whichever side of them the horse struck. Both
+accumulate, so a man ridden down repeatedly gets steadily filthier. Neither is
+permanent: a man ridden down and left alone was found clean again after a night
+had passed, without the mod doing anything to clean him. Nothing is marked at walking
+pace, where nobody goes down.
+
 ### Losing patience
 
 Barging the same man at walking pace costs nobody anything: no damage, no
@@ -56,7 +63,8 @@ nothing the mod sets changes it.
 The brawl ends when the victim's own state says it has ended, not on a timer.
 Usually the game resolves the encounter itself and the mod does nothing at
 all; only a victim who leaves the fight and keeps running with the rider well
-clear is told to stand down and sent back to work.
+clear is left to run, because that flee ends by itself in ten to fifteen
+seconds unless the rider follows him.
 
 ## The approach
 

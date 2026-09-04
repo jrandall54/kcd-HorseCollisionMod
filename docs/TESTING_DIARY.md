@@ -14383,3 +14383,82 @@ throw a punch draw an axe and fight properly. That menu sends
 timidity that `alwaysFightWhenHit` only partly removes. `exitCombat` is a
 sanctioned way out of combat, which is what a long search for one failed to
 find; it is not needed for the pause any more, and it is worth knowing.
+
+## A victim now carries the marks of being ridden down
+
+`actor:AddBlood` takes a body zone name, not a material or an effect. The
+question had been open since the bind was catalogued, and it was answered from
+vanilla's own quest scripts rather than from the game: `q_ledecko.xml`,
+`q_counterfeiters.xml` and `q_horse_on_the_run.xml` between them pass around
+two dozen names of the form `head_front`, `body_left`,
+`arm_left_forearm_back`, `leg_right_upper_back`, `foot_right`, and `all` for
+every zone at once. The second argument is a delta between -1 and 1, so marks
+accumulate and a negative figure washes them off. `deadBody.xml` bloods every
+corpse on spawn this way. The engine resolves the name against a database that
+is not exposed to Lua and drops an unrecognized one without an error, so
+`Marks.lua` passes only names vanilla itself uses.
+
+No probe ride was needed, and the engine call needed no machinery around it.
+
+### Both tiers verified in one session
+
+`Marks.lua` keys its zone set off the impact direction `Detection.lua` already
+computes for the reaction clips. Two impacts confirmed it end to end:
+
+    VictimMarks tier=Gallop dir=so_forward dirt=0.60 blood=0.45 zones=6 applied=true
+    VictimMarks tier=Trot   dir=so_back    dirt=0.35 blood=0.15 zones=6 applied=true
+
+The gallop victim was struck from the front and the rider reported "a lot of
+blood on him". The trot victim was run down from behind, and the rider found
+blood on his leg without being told where to look; `so_back` carries
+`leg_right_upper_back` and `leg_right_lower_back`, so the direction keying is
+visible on the body rather than only in the log.
+
+The walk tier is deliberately unmarked. A stagger puts nobody on the ground.
+
+## The marks clear after a night, and standing there waiting does not do it
+
+The concern was whether marking a victim leaves them permanently altered in a
+way vanilla would not. The script evidence said dirt clears and blood does not:
+NPCs call `actor:CleanDirt(1)` in `so_water_tube.xml`, `sa_home.xml` and
+`so_hostel.xml`, and the daycycle cleans them in rain, but `CleanDirt` is
+documented as leaving blood alone and the only bind that removes blood,
+`WashDirtAndBlood`, is called on the player and nowhere else.
+
+The game disagrees, and what was done is worth recording exactly, because the
+result depended on it.
+
+A merchant was ridden down twice at a gallop. He was visibly covered in dirt
+with blood on both arms. Waiting twenty four hours **standing at his booth**
+left him bloody and filthy. Waiting another twenty four the same way changed
+nothing either. Waiting until late night, when he was away at home, and then
+waiting again until the afternoon when he was back at his booth, produced a
+completely clean man.
+
+**Why** is not established. The plausible reading is that an NPC waited at is
+held where they are and reloaded in place, so the daycycle behaviors that
+would have changed them never run, and only a night spent with the target
+somewhere else puts them through their routine. That is a hypothesis fitted to
+three observations, not a measurement: nothing here read the NPC's schedule or
+watched a wash behavior fire.
+
+What is established is the procedure. Any future test of a routine-driven
+effect should wait through a night with the target elsewhere, because that is
+the only form of waiting that has produced a change.
+
+### What that means for the feature
+
+Nothing the mod applies is permanent. A victim was seen marked, and seen clean
+again a night later, without the mod doing anything to clean him. That is
+enough to close the question the feature raised, and no cleanup code is needed
+on the mod's side. What in the game removed the blood is unidentified, and it
+is not the two binds the scripts pointed at.
+
+### A direct time jump is not a substitute and breaks the session
+
+`Calendar.SetWorldTime` moved the clock a day forward correctly, log confirmed,
+and the rider reported that "everything broke" and had to reload. The in-game
+wait is the only safe way to pass time here.
+`wh_pl_SkipTimeMaxWorldTimeRatio` defaults to 360 and takes 7200 without
+complaint, which turns a full day's wait into about twelve seconds and changes
+nothing about how the world simulates it.

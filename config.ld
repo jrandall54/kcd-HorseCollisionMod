@@ -28,6 +28,7 @@ file = {
 	"src/HorseCollisionMod/Detection.lua",
 	"src/HorseCollisionMod/Health.lua",
 	"src/HorseCollisionMod/Reaction.lua",
+	"src/HorseCollisionMod/Marks.lua",
 	"src/HorseCollisionMod/Recovery.lua",
 	"src/HorseCollisionMod/Crime.lua",
 	"src/HorseCollisionMod/Retaliation.lua",
