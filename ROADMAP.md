@@ -628,7 +628,7 @@ rather than missing.
       happens from the crime hit alone, so sending this at every impact would
       change civilian behavior from walking to a guard into running away,
       which is a different game.
-- [x] Closed as unreachable. The collision bark fires while the victim is
+- [ ] Parked, not closed. The collision bark fires while the victim is
       still falling or lying as a ragdoll, which is nobody's idea of speaking,
       and it cannot be moved: see the evidence under the item below.
 
@@ -642,7 +642,7 @@ rather than missing.
       calls can silence the request at the impact and send one deliberately
       once the victim is upright.
 
-- [x] Closed as unreachable. Give each tier its own voice. `dialog:monologRequest` is how the game
+- [ ] Parked, not closed. Give each tier its own voice. `dialog:monologRequest` is how the game
       raises spoken reactions and vanilla sends it 958 times across its AI,
       selecting a line by metarole. Eighty metaroles are in use and several
       suit a trampled victim better than the collision bark does:
@@ -654,8 +654,9 @@ rather than missing.
       Composes with the item above: silence vanilla's bark at the impact and
       send the chosen line once the victim is upright.
 
-      **Both are closed: a spoken line cannot be raised from Lua.** Three
-      approaches, all accepted without error and all silent.
+      **Both are parked. A spoken line cannot be raised from Lua, but the
+      data route is unbuilt rather than impossible.** Five approaches were
+      tried, all accepted without error and all silent.
 
       Sending `dialog:monologRequest` the way vanilla's own
       `DialogUtils.RequestPlayerMonologByMetarole` sends it, with
@@ -681,11 +682,42 @@ rather than missing.
       in the game is raised inside a behavior tree, sent by the speaker to
       itself.
 
-      Changing the bark therefore means overriding
-      `sb_switch_hitreactions.xml`, which this mod stopped doing in 2.0.0-rc1
-      to be Lua-only and conflict with nothing. That file is preserved in
-      `mod_xmls.disabled/`. It is a compatibility decision, not a technical
-      one.
+      `DialogModule.StartMonolog(entity.id, topicId)` is the real API and it
+      does drive the dialog system: `IsSoulInDialog` goes false, true, then
+      false again, a complete cycle, with no audio at any point. It behaves
+      the same with a topic the target's own voice has 63 recorded lines for,
+      with the victim ragdolled through `actor:Fall`, and through vanilla's own
+      `DialogModule.ForceDialog` and `RequestPlayerMonologByMetarole`. Note it
+      leaves souls flagged in dialog until a save reload.
+
+      **The voice and topic mapping is fully derivable from shipped data**, and
+      is worth keeping: `soul.xml` gives `soul_id` from a soul name,
+      `v_soul_character_data.xml` maps that to `voice_id`,
+      `v_voice_abbreviation.xml` gives the four letter code, and the dialog ogg
+      filenames in `Localization/English.pak` encode
+      `<voice>_t<topic>_s<sequence>_`. So the exact topics any character can
+      speak are computable offline. Collision barks turn out not to be authored
+      for refugee voices at all, which explains much of the silence: `kmic` and
+      `pdea` carry about four hundred topics each and not one collision topic.
+
+      Two routes remain, neither closed:
+
+      Override `sb_switch_hitreactions.xml`, where the send works because the
+      tree sends to itself. Preserved in `mod_xmls.disabled/`. That reopens the
+      Lua-only decision made in 2.0.0-rc1 and is a compatibility trade rather
+      than a technical problem.
+
+      Or ship the audio, which is the same move already made for animation.
+      Vanilla would not play this mod's fall clips either until it shipped
+      `hcm_male_database.adb` and pointed the game at it. The dialog lines are
+      75,000 loose oggs streamed by the dialog system with no trigger name, so
+      the equivalent is an FMOD bank containing the wanted lines plus a
+      `Libs/GameAudio/*.xml` declaring triggers into it: the parser resolves
+      events by `fmod_name` and never reads `fmod_id`, the config loader
+      wildcard scans its folder, and `<FmodBank>` exists in the schema because
+      vanilla uses it for `cin_test.bank`. Then a bark is an
+      `ExecuteAudioTrigger` call like any other sound. It needs FMOD Studio and
+      a decision about redistributing Warhorse voice assets.
 - [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
       a guard down registers no bounty, but trampling a villager to death brought the
       guards down on the rider and carried a jail sentence, with no crime code in the mod.

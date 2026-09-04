@@ -14862,3 +14862,55 @@ This is a model that fits the evidence rather than something measured directly.
 Before spending effort on a message that does nothing, find its
 `ProcessMessage` and ask whether that part of the tree can be running at the
 moment the send happens.
+
+## The bark work, parked with the route mapped
+
+`DialogModule.StartMonolog(entity.id, topicId)` is the API that matters, found
+after the message route failed. It is a direct call rather than a message, and
+it does drive the dialog system: `IsSoulInDialog` reads false, then true, then
+false again, a complete cycle. No audio at any point.
+
+It behaves identically with a topic the target's own voice has sixty three
+recorded lines for, with the victim ragdolled through `actor:Fall`, and through
+vanilla's own `ForceDialog` and `RequestPlayerMonologByMetarole`. It also
+leaves souls flagged in dialog until a save reload, which is worth knowing
+before probing it again.
+
+Two mistakes of mine are worth recording. The signature takes a `ScriptHandle`,
+so `entity.id` and not the entity table, which is why the first attempts did
+nothing at all. And the whole thing was declared closed twice before it was,
+once on my own judgment mid-investigation; the rider was right both times that
+there was more to try.
+
+### The voice and topic mapping, which is worth keeping
+
+Every character's speakable topics can be computed offline from shipped data:
+
+    soul.xml                     soul_name -> soul_id
+    v_soul_character_data.xml    soul_id   -> voice_id
+    v_voice_abbreviation.xml     voice_id  -> four letter code
+    Localization/English.pak     <code>_t<topic>_s<sequence>_*.ogg
+
+`rat_refugee_lokna` is voice `kmic`, `rat_refugee_tonda_rumpal` is `pdea`, and
+both carry about four hundred topics each with **no collision topic among
+them**. The collision barks were never recorded for those voices, which
+accounts for much of the silence chased today.
+
+### Why this is parked rather than closed
+
+Audio is not privileged over animation. Any of the game's 2310 audio triggers
+can already be played on any NPC, voice events included. The bark lines are out
+of reach because they are not in the audio system at all: 75,000 loose oggs
+streamed by the dialog system with no trigger name.
+
+That is the same wall the fall clips presented, and it was solved the same way
+it would be solved here. Vanilla would not play this mod's animations either
+until the mod shipped its own database and pointed the game at it. The audio
+equivalent is an FMOD bank carrying the wanted lines plus a
+`Libs/GameAudio/*.xml` declaring triggers into it, which the engine will load:
+the ATL parser resolves events by `fmod_name` and never reads `fmod_id`, the
+config loader wildcard scans its folder, and `<FmodBank>` is in the schema
+because vanilla uses it. A bark then becomes an ordinary `ExecuteAudioTrigger`.
+
+It is unbuilt, not impossible. It needs FMOD Studio and a decision about
+redistributing Warhorse voice assets.
