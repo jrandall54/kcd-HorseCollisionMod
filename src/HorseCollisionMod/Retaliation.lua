@@ -352,6 +352,8 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	local elapsed = 0
 	local finishedFor = 0
 	local sawFight = false
+	local sawYield = false
+	local caught = false
 
 	local function sample()
 		if generation ~= self.TimerTick then
@@ -369,8 +371,36 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		if self:IsStillFighting(state) then
 			sawFight = true
 			finishedFor = 0
+
+			if state ~= nil
+					and string.find(state, "^Surrender") ~= nil then
+				sawYield = true
+			end
 		else
 			finishedFor = finishedFor + 1
+
+			-- The first read after a yield ends, and the only moment the run
+			-- can be caught before he has covered ground. It has to happen
+			-- here rather than in the aftermath: a surrender counts as still
+			-- fighting, so the incident stays open for the whole yield and
+			-- does not close until he is already moving, by which time the
+			-- transition is gone.
+			if sawYield and not caught then
+				caught = true
+
+				local stoodDown = false
+
+				if self.AftermathStandDown then
+					stoodDown = self:SendStandDown(npc)
+					self:OfferYield(npc)
+				end
+
+				if self.Config.LogTelemetry then
+					self:Log("YieldCaught " .. tostring(npc:GetName())
+							.. " state=" .. tostring(state)
+							.. " stoodDown=" .. tostring(stoodDown))
+				end
+			end
 		end
 
 		if sawFight and finishedFor >= self.RetaliationSettledSamples then

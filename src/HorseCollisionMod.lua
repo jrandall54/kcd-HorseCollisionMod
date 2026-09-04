@@ -536,6 +536,14 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
+--- Whether a fleeing victim is stopped with a stand-down at all.
+--
+-- On, because the flee does not end without it: a victim repaired to 0.816 in
+-- mid-flight held four and a half meters per second out to forty seven meters
+-- and never slowed. The repair decides whether he runs again and does nothing
+-- to a run already under way.
+HorseCollisionMod.AftermathStandDown = true
+
 --- How long a fleeing victim is left to run before he is stopped.
 --
 -- The pause that follows a stand-down is the combat subbrain's own wind-down,
