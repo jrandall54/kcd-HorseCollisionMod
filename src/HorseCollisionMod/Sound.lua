@@ -117,17 +117,16 @@ end
 -- Called from `OnImpact` before the reaction is chosen, so the request goes
 -- out ahead of the animation rather than behind it.
 --
--- Firing it earlier than the collision was tried and abandoned. A footprint
--- reaching sixty milliseconds of travel further forward sounded near misses
--- and sounded the same victim twice, which is worse than a sound that is
--- slightly late.
+-- Firing it earlier than the collision does not work. A footprint reaching
+-- sixty milliseconds of travel further forward sounds near misses, and sounds
+-- the same victim twice, which is worse than a sound that is slightly late.
 --
 -- ### Layers
 --
 -- A tier names a list of `{ trigger, delayMs }` pairs rather than one sound,
 -- because no single sound in the game is a horse striking a person. Vanilla
--- never makes that noise, so its library does not contain it, and twenty three
--- candidates were auditioned and rejected before layering was tried.
+-- never makes that noise, so its library does not contain it: of twenty three
+-- candidates, every one reads as a weapon, a footstep or a dropped object.
 --
 -- What works is the horse's own weight underneath a body impact:
 -- `a_o_jump_landing` is the sound of the horse landing from a jump, and it is

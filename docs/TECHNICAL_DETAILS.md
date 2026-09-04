@@ -481,8 +481,9 @@ without playing it or rebuilding anything.
 ### There is no sound for this, so it is built from layers
 
 Vanilla horse collisions are silent, so nothing in the game's library is a
-horse striking a person. Twenty three single candidates were auditioned and
-rejected before layering was tried. A tier therefore names a list of
+horse striking a person. No single trigger works: twenty three of them were
+auditioned and every one reads as a weapon, a footstep or a dropped object. A
+tier therefore names a list of
 `{ trigger, delay, distance, chance }`, played a few milliseconds apart so the
 ear takes them as one event.
 
@@ -501,8 +502,8 @@ sliders. Material effects declare `<Audio trigger="..."/>` and nothing else.
 
 Distance is the substitute. A layer with a distance is played through an aux
 audio proxy offset along the line from the listener to the victim, so it
-arrives from the same direction and quieter — the way `Lightning.lua` makes
-distant thunder quieter. Because a victim is a meter or two away at impact, the
+arrives from the same direction and quieter, which is how `Lightning.lua`
+places distant thunder. Because a victim is a meter or two away at impact, the
 figure behaves as a level rather than as a position.
 
 It reaches only events authored in 3D. Measured through speakers spawned at
