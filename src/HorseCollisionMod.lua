@@ -536,126 +536,21 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
---- How long a victim is watched after the incident closes.
+--- The gap over which the victim's speed is read, once, before stopping him.
 --
--- Long enough to cover a flee that starts late, because a yield resolves
--- through a dialog that reads as finished and the running begins after it.
--- Forty samples at `AftermathStopMs` is twenty seconds.
-HorseCollisionMod.AftermathSamples = 40
+-- Long enough that a position difference is meaningful and short enough not
+-- to delay the stand-down noticeably.
+HorseCollisionMod.AftermathSampleMs = 400
 
 --- The victim's own speed, in meters per second, that counts as running.
 --
--- His own movement, not his distance from the rider. Measured against the
--- rider a victim being followed reads as standing still while he sprints,
--- which is what made an earlier flee test useless. A measured flee held four
--- and a half; somebody walking to a stall makes about one.
+-- His own movement, not his distance from the rider, which reads as standing
+-- still when the rider follows him. A measured flee held four and a half;
+-- somebody walking to a stall makes about one.
 HorseCollisionMod.AftermathFleeSpeed = 2.5
 
---- How long a fleeing victim is allowed to run before he is stopped.
---
--- Timed rather than measured in meters. Distance from the rider is the wrong
--- lever, because it depends on where the rider happens to be standing: a
--- victim who breaks away from someone already backing off clears any distance
--- threshold in a stride and stops a second later, which reads as him thinking
--- better of it. A man who has just been beaten should get properly clear.
---
--- The pause that follows has not been shortened by anything reachable from
--- Lua, so the run is what keeps it away from the rider. Ten seconds is around
--- fifty meters at a flee's pace: clear of the rider and of wherever the
--- incident happened, while still short of leaving the district.
---
--- Zero is the other end of this setting and is not the same feature. The
--- stand-down then lands before the flee is under way, which is what the
--- earlier build did, and the pause that followed was reported at about five
--- seconds rather than twenty five. Whether that is because a flee never
--- established has not been tested. If it holds, run length and pause length
--- are two ends of one setting and cannot both be had.
-HorseCollisionMod.AftermathRunMs = 10000
-
---- Whether a fleeing victim is stopped with a stand-down at all.
---
--- It works, and it costs more than it is worth. `standDownRequest` moves him
--- into `state_standDown`, which sets `t_exitCombatSubbrain` and then holds him
--- through a hot entity cooldown loop before it releases him. Traced at four
--- samples a second he sat in `MotionIdle` at 0.00 m/s for the whole
--- twenty five second window, out of combat animation, with the context option
--- already cleared, ignoring three replans sent at two, five and nine seconds.
--- Before the stand-down was sent on every ending that pause was about five
--- seconds.
---
--- It is sent anyway, because the flee does not end without it. A victim
--- repaired to 0.816 in mid-flight held four and a half meters per second out
--- to forty seven meters and never slowed: the repair decides whether he runs
--- again, and does nothing to a run already under way. Off, he runs
--- indefinitely, which is the defect this whole path exists to cure.
-HorseCollisionMod.AftermathStandDown = true
-
---- The vanilla behavior a beaten victim is handed once the fight is over.
---
--- From the catalog `customBehaviorRequest` sends are made with across the
--- shipped trees. It is what the game runs for a man who has yielded, and
--- handing it to him is what releases him from the combat subbrain's wind-down
--- rather than leaving him standing for twenty five seconds.
-HorseCollisionMod.YieldBehaviorName = "combat_yield"
-
---- How long after the stand-down the yield behavior is offered.
---
--- Not immediately. Sent in the same moment as the stand-down it is swallowed
--- while he is still coming out of the flee, and he serves the full wind-down;
--- sent three seconds later, once he has come to rest, he was walking 1.25
--- seconds afterwards. The replan behaves the same way, which is the same
--- lesson twice: a stimulus arriving mid-transition is discarded.
-HorseCollisionMod.YieldDelayMs = 3000
-
---- How often the offer is repeated while he is still standing there.
---
--- One send is enough when it lands, and the delay above cannot be right for
--- every victim, so it is repeated while he has not moved rather than tuned to
--- a figure that happens to suit one test.
-HorseCollisionMod.YieldRetryMs = 2000
-HorseCollisionMod.YieldRetries = 4
-
---- How often the victim is sampled through the aftermath.
---
--- Half a second rather than a full one for two reasons: a short burst of
--- running is missed entirely at one second, and the point of the second half
--- of this is to catch the moment he stops and put him back to work in it
--- rather than leave him standing in the road.
-HorseCollisionMod.AftermathStopMs = 500
-
---- How often the victim is checked for having left the fight, and for how long.
---
--- `standDownRequest` ends the flee but gives him nowhere to be, and a victim
--- with nowhere to be stands in the road looking vacant. The replan that gives
--- him somewhere cannot simply follow on a fixed delay: `sb_combat.xml`
--- rejects a stimulus arriving during `fight` or `flee`, the stand-down and
--- `customBehaviorRequest` excepted, so one sent while he is still unwinding
--- is discarded and nothing tells him to resume afterwards. Sent half a second
--- behind the stand-down it was measured going out and being ignored.
---
--- So his state is read instead, and the replan goes the moment he is out of
--- combat. Six seconds of checking is far past when that happens.
-HorseCollisionMod.AftermathReplanMs = 250
-HorseCollisionMod.AftermathReplanTries = 24
-
---- The speed that counts as a victim having got on with his day.
---
--- Walking pace is about one meter per second, so anything appreciably above
--- standing still says his routine has picked him up.
-HorseCollisionMod.AftermathResumeSpeed = 0.5
-
---- How long the wait for him to get on with it is measured for.
---
--- Sixty checks at a quarter second is fifteen seconds, which is longer than
--- the delay a rider would tolerate watching, so the figure logged is the
--- real one rather than a ceiling.
-HorseCollisionMod.AftermathResumeTries = 60
-
---- Consecutive samples of each state before it is believed.
---
--- One sample either way is noise: a stride reads as running and the pause
--- between two reads as stopped.
-HorseCollisionMod.AftermathConfirmSamples = 2
+--- How long after stopping him his standing is checked a second time.
+HorseCollisionMod.AftermathSettleMs = 8000
 
 --- The standing assumed for a victim nothing was recorded for.
 --

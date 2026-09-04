@@ -572,49 +572,35 @@ function HorseCollisionMod:EndRetaliation(npc, why)
 	end
 end
 
---- Watches a victim after the incident, and leaves him right.
+--- Lets a beaten victim run, then stops him and leaves him right.
 --
--- Closing the incident is not the end of it. A victim released through the
--- vanilla yield menu settles first, which is what closes the incident, and
--- only then walks away in a flee that does not stop on its own.
+-- The incident closing is the event everything here hangs off, so this is a
+-- timer rather than a search. A victim released through the vanilla yield
+-- menu settles first, which is what closes the incident, and only then walks
+-- away in a flee that does not stop on its own.
 --
--- ### He runs for a set time, then is stopped
+-- He is given `AftermathRunMs` to get clear, and then stopped. The pause that
+-- follows a stand-down is the combat subbrain's own wind-down and nothing
+-- reachable from Lua shortens it, so the run is what decides whether he does
+-- his standing about near the rider or somewhere else.
 --
--- `AftermathRunMs` of running, timed from the moment he is seen to run. Not
--- a distance from the rider: that depends on where the rider is standing, so
--- a victim breaking away from someone already walking off clears it in a
--- stride and pulls up almost immediately, which looks like he changed his
--- mind rather than fled.
+-- Whether he is actually running is read once, at the moment of stopping him,
+-- from his own speed. That is the only signal that separates the two cases:
+-- `GetCurrentAnimationState` reports `MotionMovement` both for a man fleeing
+-- at four and a half meters per second and for one walking to his stall at
+-- one, and the combat state that would say `flee` is subbrain local and reads
+-- nil. A victim who is not running is left alone, because a stand-down would
+-- park him for the wind-down he did not need.
 --
--- ### And is put straight back to work
---
--- The stand-down goes out, and the replan follows the moment he is out of
--- combat rather than on a fixed delay. `standDownRequest` ends the flee and
--- gives him nowhere to be, but a replan sent while he is still unwinding is
--- rejected by `sb_combat.xml` and nothing tells him to resume afterwards, so
--- he stands in the road looking vacant.
---
--- A victim who stops by himself is replanned there and then, for the same
--- reason: stopping is not the same as having something to do.
---
--- ### His standing is checked once more
---
--- The repair at the end of the incident runs before the rider necessarily is
--- finished: a victim knocked down again, or beaten while he stands up, loses
--- more afterwards and was left carrying it. One measured victim was repaired
--- at the close, dropped back to 0.0 by what followed, and was restored by
--- this second look.
+-- His standing is then checked a second time. The repair at the end of the
+-- incident runs before the rider is necessarily finished with him, and a
+-- victim knocked down again loses more afterwards; one measured victim was
+-- repaired at the close, dropped back to 0.0 by what followed, and restored
+-- here.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
-	local left = self.AftermathSamples
-	local confirm = self.AftermathConfirmSamples
-	local running = 0
-	local still = 0
-	local runningSince = nil
-	local done = false
-	local last = nil
 
 	local function where()
 		local p = nil
@@ -628,153 +614,69 @@ function HorseCollisionMod:WatchAftermath(npc)
 		return p
 	end
 
-	last = where()
-
-	local function finish(why)
-		if done then
-			return
-		end
-
-		done = true
-
+	local function finish()
 		self:RepairVictim(npc)
 		self.Baseline[tostring(npc.id)] = nil
-
-		if self.Config.LogTelemetry then
-			self:Log("Aftermath " .. tostring(npc:GetName())
-					.. " done=" .. tostring(why))
-		end
 	end
 
-	-- Stop him and hand him his routine back, in that order and close
-	-- together. Used both for a victim who ran his time out and one who
-	-- pulled up by himself.
-	local function settle(why, ranFor)
-		if done then
-			return
-		end
+	-- One reading, taken where the decision is made rather than tracked
+	-- throughout.
+	local function speedThen(after)
+		local first = where()
 
-		local sent = false
-
-		if why == "ran" and self.AftermathStandDown then
-			sent = self:SendStandDown(npc)
-		end
-
-		-- The stand-down stops him and then parks him for the combat
-		-- subbrain's wind-down, and the yield is what lets him go. It is
-		-- offered on a delay and repeated while he has not moved, because one
-		-- sent in this same moment is discarded: see `SendYieldBehavior`.
-		self:OfferYield(npc)
-
-		if self.Config.LogTelemetry then
-			self:Log("Aftermath " .. tostring(npc:GetName())
-					.. " " .. why
-					.. " ranFor=" .. tostring(ranFor or 0) .. "ms"
-					.. " stoodDown=" .. tostring(sent))
-		end
-
-		-- Waited on his state rather than a delay, because a replan arriving
-		-- while he is still in combat is rejected outright.
-		local waitedFrom = self:TimeMs()
-
-		local function offerRoutine(triesLeft)
-			if generation ~= self.TimerTick or done then
+		Script.SetTimer(self.AftermathSampleMs, function()
+			if generation ~= self.TimerTick then
 				return
 			end
 
-			local state = nil
+			local second = where()
+			local speed = 0
 
-			pcall(function()
-				state = tostring(npc.actor:GetCurrentAnimationState())
-			end)
+			if first ~= nil and second ~= nil then
+				speed = self:VectorLength({
+					x = second.x - first.x,
+					y = second.y - first.y,
+					z = 0
+				}) / (self.AftermathSampleMs / 1000)
+			end
 
-			if self:IsStillFighting(state) and triesLeft > 0 then
-				Script.SetTimer(self.AftermathReplanMs, function()
-					offerRoutine(triesLeft - 1)
-				end)
+			after(speed)
+		end)
+	end
 
-				return
+	Script.SetTimer(self.AftermathRunMs, function()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		speedThen(function(speed)
+			local running = speed > self.AftermathFleeSpeed
+			local stoodDown = false
+
+			if running and self.AftermathStandDown then
+				stoodDown = self:SendStandDown(npc)
+				self:OfferYield(npc)
 			end
 
 			local replanned = self:ReplanVictim(npc)
 
 			if self.Config.LogTelemetry then
 				self:Log("Aftermath " .. tostring(npc:GetName())
-						.. " replanned=" .. tostring(replanned)
-						.. " state=" .. tostring(state)
-						.. " waited=" .. tostring(self:TimeMs() - waitedFrom)
-						.. "ms")
+						.. " speed=" .. string.format("%.1f", speed)
+						.. " running=" .. tostring(running)
+						.. " stoodDown=" .. tostring(stoodDown)
+						.. " replanned=" .. tostring(replanned))
 			end
 
-			finish(why)
-		end
+			Script.SetTimer(self.AftermathSettleMs, function()
+				if generation ~= self.TimerTick then
+					return
+				end
 
-		Script.SetTimer(self.AftermathReplanMs, function()
-			offerRoutine(self.AftermathReplanTries)
+				finish()
+			end)
 		end)
-	end
-
-	local function sample()
-		if generation ~= self.TimerTick or done then
-			return
-		end
-
-		left = left - 1
-
-		local at = where()
-		local speed = 0
-
-		if at ~= nil and last ~= nil then
-			speed = self:VectorLength({
-				x = at.x - last.x,
-				y = at.y - last.y,
-				z = 0
-			}) / (self.AftermathStopMs / 1000)
-		end
-
-		last = at
-
-		if speed > self.AftermathFleeSpeed then
-			running = running + 1
-			still = 0
-
-			if running >= confirm and runningSince == nil then
-				runningSince = self:TimeMs()
-			end
-		else
-			still = still + 1
-			running = 0
-		end
-
-		-- He has had his run. Stop him and give him his day back.
-		if runningSince ~= nil
-				and (self:TimeMs() - runningSince) >= self.AftermathRunMs then
-			settle("ran", self:TimeMs() - runningSince)
-
-			return
-		end
-
-		-- He pulled up by himself, which still leaves him with nowhere to be.
-		if runningSince ~= nil and still >= confirm then
-			settle("halted", self:TimeMs() - runningSince)
-
-			return
-		end
-
-		if left <= 0 then
-			if runningSince ~= nil then
-				settle("window", self:TimeMs() - runningSince)
-			else
-				finish("no-flee")
-			end
-
-			return
-		end
-
-		Script.SetTimer(self.AftermathStopMs, sample)
-	end
-
-	Script.SetTimer(self.AftermathStopMs, sample)
+	end)
 end
 
 --- Offers the yield behavior until the victim takes it.
