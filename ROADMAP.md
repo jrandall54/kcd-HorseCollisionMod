@@ -669,11 +669,17 @@ rather than missing.
       is a live function and returns cleanly, then sending. Silent on a beggar
       and on a guard.
 
-      Vanilla only ever raises this from inside the victim's own hit reaction
-      tree, which sends the message to itself. `monologRequestRead` in
-      `sb_dialog.xml` reads from a dedicated `DialogMailbox` and captures a
-      `common:senderInfo` that a Lua send does not supply, which is the
-      remaining difference and is not something a mod can forge.
+      The payload is not the problem: `Utils.makeTable` builds every declared
+      field with correct defaults. Nor is victim state: `actor:CanTalk()`
+      returns false for every NPC nearby, including ones that plainly converse.
+
+      What settles it is that vanilla's own helper fails the same way.
+      `DialogUtils.RequestPlayerMonologByMetarole`, called unmodified on the
+      player with a valid metarole, produces nothing, and that helper is
+      **defined in the shipped scripts and never called by any of them**.
+      Warhorse wrote a Lua entry point for this and never used it. Every bark
+      in the game is raised inside a behavior tree, sent by the speaker to
+      itself.
 
       Changing the bark therefore means overriding
       `sb_switch_hitreactions.xml`, which this mod stopped doing in 2.0.0-rc1

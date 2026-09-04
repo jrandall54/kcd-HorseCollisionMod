@@ -14791,3 +14791,29 @@ That is the third distinct approach to fail, all of them accepted without
 error. Spoken barks are closed as unreachable from Lua. The only send that
 works is the one inside `sb_switch_hitreactions.xml`, and reaching it means
 reopening the compatibility decision made in 2.0.0-rc1.
+
+### The payload was never the problem, and vanilla's own helper is silent too
+
+Two fair challenges to the closure above: whether the message was well formed,
+and whether a victim has to be in some state first. Both were checked.
+
+The payload is correct. `Utils.makeTable("dialog:monologRequest", ...)` builds
+every field the type declares, with the right defaults, and accepts the
+optional ones without complaint:
+
+    metarole=KOLIZE_S_HRACEM_NA_KONI  topicId=0  alias=  priority=0
+    forceSubtitles=false  canBeDelayed=false  sendAnswer=false
+    overrideContextSuppress=false  lookAtId=userdata  defaultAnimState=0
+    forceOnMuted=false  playStandingTransition=false
+    doNotInterruptOnActorDeath=false
+
+State is a red herring. `actor:CanTalk()` returns false for every NPC within
+25 meters, including a butcher's wife who obviously converses, so it is a
+narrower check than its name suggests and not the gate.
+
+What settles it: `DialogUtils.RequestPlayerMonologByMetarole` is vanilla's own
+helper, and calling it unmodified on the player with a valid metarole produces
+nothing either. That helper is also defined and **never called by any shipped
+script**. Warhorse wrote a Lua entry point for this and never used it; every
+bark in the game is raised inside a behavior tree, sent by the speaker to
+itself.
