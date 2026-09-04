@@ -704,7 +704,8 @@ function HorseCollisionMod:WatchAftermath(npc)
 			-- up. The replan reports sent and accepted either way, so this is
 			-- the only figure that says whether it did anything, and it is
 			-- the one a rider watching him is complaining about.
-			local since = self:TimeMs()
+			local since = nil
+			local atRest = 0
 			local mark = where()
 
 			local function watchResume(triesLeft)
@@ -726,8 +727,33 @@ function HorseCollisionMod:WatchAftermath(npc)
 				mark = at
 
 				local speed = moved / (self.AftermathReplanMs / 1000)
+				local moving = speed > self.AftermathResumeSpeed
 
-				if speed > self.AftermathResumeSpeed or triesLeft <= 0 then
+				-- The idle does not start until he has actually come to rest.
+				-- He coasts out of a four second run for a moment, and timing
+				-- from the replan counted that as him getting on with his day
+				-- and reported a quarter second where a rider watched ten.
+				if since == nil then
+					if not moving then
+						atRest = atRest + 1
+
+						if atRest >= self.AftermathConfirmSamples then
+							since = self:TimeMs()
+						end
+					else
+						atRest = 0
+					end
+
+					if triesLeft > 0 then
+						Script.SetTimer(self.AftermathReplanMs, function()
+							watchResume(triesLeft - 1)
+						end)
+
+						return
+					end
+				end
+
+				if (since ~= nil and moving) or triesLeft <= 0 then
 					local st = nil
 
 					pcall(function()
@@ -736,9 +762,9 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 					if self.Config.LogTelemetry then
 						self:Log("Aftermath " .. tostring(npc:GetName())
-								.. " resumed=" .. tostring(
-										speed > self.AftermathResumeSpeed)
-								.. " idle=" .. tostring(self:TimeMs() - since)
+								.. " resumed=" .. tostring(moving)
+								.. " idle=" .. tostring(since
+										and (self:TimeMs() - since) or -1)
 								.. "ms state=" .. tostring(st))
 					end
 
