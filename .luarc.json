@@ -14,6 +14,7 @@
     "archived_dev_session_5"
   ],
   "diagnostics.globals": [
+    "PlayAudioTrigger",
     "Contexts",
     "Framework",
     "HorseCollisionMod",

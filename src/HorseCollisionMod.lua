@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.8.0
+-- @release 4.9.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.8.0"
+HorseCollisionMod.Version = "4.9.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -168,6 +168,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
+-- @field ImpactSound whether a collision makes a noise
+-- @field ImpactSoundWalk layers played by a walk impact
+-- @field ImpactSoundTrot layers played by a trot impact
+-- @field ImpactSoundGallop layers played by a gallop impact
+-- @field ImpactSoundCrack the occasional bone crack layer
+-- @field ImpactSoundCrackChance how often a gallop adds it
 -- @field VictimMarks whether a collision leaves dirt and blood on the victim
 -- @field VictimDirtTrot dirt added by a trot impact, 0 to 1
 -- @field VictimDirtGallop dirt added by a gallop impact, 0 to 1
@@ -188,7 +194,14 @@ HorseCollisionMod.Config = {
 	HorseRearReach           = 0.20,
 	HorseHalfWidth           = 0.70,
 	HorseMaxVerticalDiff     = 2.35,
-	TickSeconds              = 0.1,
+	-- The detection interval, and the only figure the loop rate and the
+	-- forward sweep are both taken from. It was 0.1 while the timer itself was
+	-- hardcoded to 100 ms, which agreed by accident rather than by design.
+	--
+	-- A tenth of a second is a long time to wait for the noise of being hit by
+	-- a horse. The impact sound made that audible, and the rider heard it
+	-- arrive after the visual and the physical feedback at every speed.
+	TickSeconds              = 0.033,
 	SweepMultiplier          = 0.50,
 	MaxSweepExtra            = 0.35,
 	HitCooldownMs            = 3000,
@@ -197,7 +210,9 @@ HorseCollisionMod.Config = {
 	-- A collision is scored on the peak of the last ImpactSpeedSamples ticks,
 	-- not on the speed read when the victim is noticed. MaxImpactSpeed is the
 	-- ceiling on that value, a little above the top of the gallop plateau.
-	ImpactSpeedSamples       = 3,
+	-- Nine ticks rather than three, because the tick is a third as long. The
+	-- window a collision is scored over is what matters, and it is unchanged.
+	ImpactSpeedSamples       = 9,
 	MaxImpactSpeed           = 11.0,
 
 	-- Knockdown impulse. Trot and gallop only; the walk tier never ragdolls.
@@ -304,6 +319,102 @@ HorseCollisionMod.Config = {
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
 	RetaliationCeilingSec    = 120,
+
+	-- The noise a collision makes, played on the victim at the moment of
+	-- impact. The names are audio triggers from the game's own .animevents
+	-- vocabulary; a name outside it resolves to nothing. An empty string
+	-- silences one tier without touching the others.
+	ImpactSound              = true,
+
+	-- Each tier is a list of { trigger, delay in milliseconds }. The trigger
+	-- name "body" is replaced with the blunt impact matching what the victim
+	-- is wearing: cloth, mail or plate.
+	-- A third entry is a distance in meters, and it is the volume control:
+	-- the layer is pushed that far back along the line from the listener, so
+	-- it arrives from the same direction and quieter. Higher is quieter, and
+	-- it does nothing to `a_o_jump_landing`, which is a 2D event whose level
+	-- is fixed.
+	--
+	-- Walk names the cloth impact outright rather than using the `body` token.
+	-- A shove at walking pace should not ring somebody's mail, which the token
+	-- would do for an armored victim.
+	-- A layer is { trigger, delay in ms, distance in meters, chance }.
+	--
+	-- Distance is the volume control. There is no gain anywhere in this
+	-- engine's audio, so a layer is quietened by being played from further
+	-- away: the offset is added along the line from the listener to the
+	-- victim, so it arrives from the same direction and only its level drops.
+	-- Because a victim is always a meter or two away at the moment of impact,
+	-- the number behaves as a volume knob rather than as a position.
+	--
+	-- It does nothing to a 2D event. `a_o_jump_landing` and
+	-- `c_special_bone_crack1` both ignore position entirely, so the only
+	-- control over those is `chance`, which is how often the layer appears.
+	--
+	-- Two trigger names are tokens, replaced with the sample matching what the
+	-- victim is wearing: `body` is the blunt impact against that material and
+	-- `foley` is the movement rustle it makes.
+
+	-- A shove disturbs someone's clothing rather than striking them, so the
+	-- walk tier is cloth foley over a body settling, with a single hoofstep
+	-- underneath for the horse. Quiet by being pushed back five meters.
+	-- A layer is { trigger, delay in milliseconds, distance in meters, chance }.
+	--
+	-- Distance is the volume control, because the engine has no gain: a layer
+	-- is quietened by being played from further away, offset along the line
+	-- from the listener to the victim so it arrives from the same direction.
+	-- A victim is always a meter or two away at impact, so the number behaves
+	-- as a volume knob rather than as a position. The curve is steep and short:
+	-- for the blunt impacts the usable range is about a meter, and past
+	-- roughly 1.5 the sound is gone entirely, so the fine adjustments are
+	-- fractional and are made to one copy of a layer rather than to all of it.
+	--
+	-- Distance does nothing to a 2D event. `a_o_jump_landing` and
+	-- `c_special_bone_crack1` ignore position completely, which is why neither
+	-- is used here.
+	--
+	-- Loudness otherwise comes from repetition. Naming a sample twice a few
+	-- milliseconds apart thickens and lifts it, which is the only way up once
+	-- a layer is already at zero distance.
+	--
+	-- Two trigger names are tokens, replaced with the sample matching what the
+	-- victim is wearing: `body` is the blunt impact against that material and
+	-- `foley` is the movement rustle it makes.
+
+	-- A shove disturbs someone's clothing rather than striking them, so the
+	-- walk tier carries no impact at all: two cloth foleys and a body
+	-- settling, each doubled because those samples are very quiet, over a
+	-- single hoofstep.
+	ImpactSoundWalk          = { { "f_n_mat_foleyal_cl", 0 },
+	                             { "hs_hp_soil", 4 },
+	                             { "f_n_mat_foleyal_cl", 5 },
+	                             { "f_n_mat_foleyam_cl", 8 },
+	                             { "f_bodyfall1", 12 },
+	                             { "f_n_mat_foleyam_cl", 13 },
+	                             { "f_bodyfall1", 18 } },
+
+	-- A trot puts someone on the ground, so the blunt impact leads, doubled
+	-- with the second copy taken back a fraction to shade it down.
+	ImpactSoundTrot          = { { "body", 0 },
+	                             { "body", 8, 0.9 },
+	                             { "f_bodyfall1", 14 } },
+
+	-- A gallop is the same impact with the horse's mass stacked underneath:
+	-- four copies, a heavy dull thud held back so it reads as weight rather
+	-- than as wood, a hoofstep, and the body settling.
+	ImpactSoundGallop        = { { "body", 0 },
+	                             { "body", 6 },
+	                             { "n_lu_log_ground", 4, 8 },
+	                             { "hs_hp_soil", 10 },
+	                             { "body", 12 },
+	                             { "body", 18 },
+	                             { "f_bodyfall1", 22 } },
+
+	-- The occasional injury, gallop only. A foley event, so unlike
+	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out
+	-- at cartoon volume whatever was done to it.
+	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
+	ImpactSoundCrackChance   = 0.12,
 
 	-- The dirt and blood a collision leaves on the victim, applied at trot
 	-- and gallop only. Deltas in the range 0 to 1, accumulating across
@@ -596,6 +707,14 @@ HorseCollisionMod.RetaliationReleaseTries = 20
 --
 -- The ceiling is generous because this waits on the game's own recovery rather
 -- than on a clip of known length.
+--- How long an offset audio proxy is kept before it is removed.
+--
+-- One is created per distanced impact sound layer, so they must not
+-- accumulate. Every sample the mod plays is well under a second, and the call
+-- that creates the proxy was measured at four microseconds, so the lifetime is
+-- the only part of this worth bounding at all.
+HorseCollisionMod.AudioProxyLifetimeMs = 2000
+
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
@@ -791,7 +910,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 				.. " initializing physics timer loop "
 				.. tostring(currentTick))
 
-		Script.SetTimer(100, function()
+		Script.SetTimer(self:TickMs(), function()
 			HorseCollisionMod:UpdateTimer(currentTick)
 		end)
 	end
@@ -822,6 +941,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Marks.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Sound.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")

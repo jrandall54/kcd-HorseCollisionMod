@@ -448,25 +448,34 @@ rather than missing.
       This is a statement about the window after an impact and not about the total cost of
       being trampled, which the item above covers.
 
-- [ ] A victim shows they were hurt. `actor:AddBlood(string, number)` and
-      `actor:AddDirt(number)` are both available, so someone ridden down at
-      trot can stand up bloodied and muddy instead of immaculate. Cosmetic,
-      cheap, and it is the feedback that makes an impact read as an injury
-      rather than as a stumble.
+- [x] A victim shows they were hurt. `actor:AddBlood(zone, delta)` and
+      `actor:AddDirt(delta)` mark a knocked-down victim with dirt on their
+      clothes and blood on the side the horse struck, keyed off the impact
+      direction. Shipped in 4.8.0. The marks are not permanent: a victim
+      seen filthy came back clean after a night away.
 
-- [ ] An impact makes a noise and throws up dust. Vanilla ships 39
-      procedural clip types and this mod uses four of them, and two of the
-      rest are exactly this:
+- [x] An impact makes a noise. Not through the animation data, which cannot
+      make a sound before its fragment starts, and not with any single
+      trigger: the game has no sound for a horse striking a person because
+      vanilla never makes one. It is layered from Lua instead, the horse's
+      own `a_o_jump_landing` under a blunt body impact matched to the
+      victim's armor, with an occasional bone crack at a gallop. The full
+      1803-name vocabulary and how to validate a name are in the diary.
 
-      `PlaySound` takes a `StartTrigger`, a `Radius` and an obstruction
-      type, and vanilla drives combat impacts through it with triggers named
-      like `c_w_sword_clinch`. A trot collision is currently silent apart
-      from the victim's bark.
+- [ ] Correlate the collision's severity with what the player sees and hears.
+      The damage system is not fully mapped: what an impact actually costs a
+      victim, and how that varies with speed and armor, is known only in
+      outline. Once it is, the blood applied and the sound layers chosen can
+      both follow from it, so a glancing shove and a killing gallop are told
+      apart by the feedback rather than only by the tier they fell into.
+      Raised by the rider while tuning the impact sound.
 
-      `ParticleEffect` takes an `EffectName`, an `AttachmentName` for the
-      joint to hang it on, position and rotation offsets, and `KillOnExit`.
-      Dust off the ground where a body lands, and it is authored per
-      fragment rather than needing anything in Lua.
+- [ ] An impact throws up dust. `ParticleEffect` is a procedural clip taking
+      an `EffectName`, an `AttachmentName` for the joint to hang it on,
+      position and rotation offsets, and `KillOnExit`. Dust off the ground
+      where a body lands, authored per fragment rather than needing anything
+      in Lua. Unlike the sound, this has no timing problem to solve: the dust
+      belongs to the landing, which is where the fragment already is.
 
       Both ride along in animation data already generated, which makes them
       the cheapest immersion on this list. Neither has been tried.

@@ -14497,13 +14497,14 @@ with the near-miss role and with `KOLIZE_S_HRACEM_NA_KONI`, the role the target
 demonstrably speaks when ridden into; with and without `lookAtId`, priority and
 `overrideContextSuppress`; on a merchant and on a village guard.
 
-One attempt was not inert. The rider saw the target "go into slow motion around
-the 8 second mark for about the length of what would be the bark and then pop
-back into his normal walk". So the monolog machinery does run and does take the
-actor for the duration of a line, and the line itself never resolves. The
-receiving tree, `monologRequestRead` in `sb_dialog.xml`, reads from a dedicated
-`DialogMailbox` and captures a `common:senderInfo` that a Lua send does not
-supply, which is the most likely place the resolution fails.
+A slow-motion stutter seen on one target was briefly taken as evidence that the
+monolog machinery had run and reserved the actor for a line's duration. The
+rider then saw the same stutter with nothing being fired at all, so it is
+unrelated and proves nothing about these sends. Every send remains accepted and
+silent, with no evidence either way about how far into the dialog system it
+gets. The receiving tree, `monologRequestRead` in `sb_dialog.xml`, reads from a
+dedicated `DialogMailbox` and captures a `common:senderInfo` that a Lua send
+does not supply, which remains an untested guess at where it fails.
 
 Calling this closed rather than firing more variants of the same call.
 
@@ -14516,3 +14517,259 @@ one inside `sb_switch_hitreactions.xml`. That file was overridden by this mod
 once and the override was removed in 2.0.0-rc1 to make the mod Lua-only and
 conflict-free; it is still preserved in `mod_xmls.disabled/`. Changing the bark
 means reopening that decision for a one-line change.
+
+## The audio vocabulary, and why the collision still has no sound
+
+A collision can be given a noise from Lua. Finding a noise worth giving it
+failed, and both halves are worth recording.
+
+### Playing a sound from Lua
+
+`Scripts/Utils/SoundUtils.lua` declares globals that reach the audio system
+directly:
+
+    PlayAudioTrigger(entity, name)      -- ExecuteAudioTrigger on the entity's
+                                        -- default aux audio proxy
+    SetAudioTriggerParam(entity, p, v)  -- an FMOD RTPC on that proxy
+
+`Sound.GetAudioTriggerID(name)` returns a handle for a real trigger and `nil`
+for one that does not exist, so **any name can be validated silently from the
+console** without playing it or rebuilding anything.
+
+### The vocabulary is 1803 triggers, and it is enumerable
+
+The 242 `audio_trigger` parameters in the game's `.animevents` files are only
+what animation clips happen to fire. The authoritative list is the audio
+translation layer, in `Libs/GameAudio/*.xml` inside `GameData.pak`: 21 files
+mapping an `atl_name` to an `fmod_name`.
+
+    1803 triggers   66 RTPCs   15 switches   52 environments
+
+Categories: cinematics 758, world 168, npcs 156, music_cutscenes 139, combat
+136, special 103, footsteps 98, foleys 90, animals 56, ui 36, hoofsteps 26,
+voices 15, music 11, test 11.
+
+### There is no effects processing to reach for
+
+The RTPCs are event-specific and none of them is a gain, pitch or filter:
+`battle_intensity`, `horse_speed`, `player_health`, `pub_people_count`,
+`alcohol_level` and so on. The 15 switches are equally specific: `sword_mat`,
+`sword_mat_opponent`, `bow_type`, `dog_type`, `player_who`. The 52
+environments are positional reverb zones (`indoor_cave1`,
+`indoor_rat_church_nave`, `outdoor`), applied per entity with
+`SetAudioEnvironmentID`, which is the reverb heard in game.
+
+A trigger sounds like whatever the FMOD event author baked. It cannot be
+pitched down, quietened or filtered from a mod.
+
+### Nothing in it sounds like a horse hitting a person
+
+Twenty three candidates were auditioned in game across three rounds, played on
+the player three seconds apart. The rider rejected all of them.
+
+- The combat blunt family is keyed by armor material and looked ideal:
+  `blunt_unarmed_body_fabric`, `blunt_unarmed_body_chainmail`,
+  `blunt_unarmed_body_plate`, with `face_` and `armed_` variants. The mod
+  already knows what a victim is wearing, so it could pick correctly. They
+  read as weapon strikes, because that is what they are.
+- `event:/npc/general/collisions/` holds exactly two triggers,
+  `n_ge_body_fabric_stopped` and `n_ge_body_fabric_passed`. Also rejected.
+- The horse itself has no impact sound at all: hoofsteps, snorts, whinnies,
+  foley, mount, and `a_o_jump_landing`. Nothing for striking anything.
+- Non-weapon heavy impacts were tried too: `n_so_ram_door`, `n_lu_log_ground`,
+  `special_stash_sack`, `f_bodyfall1`, `f_bodyfall_rolling`, `f_break_neck`,
+  `c_trebuchet_stone_impact`, `stone_falling`, `n_ge_cracking_body`,
+  `c_special_bone_crack1`.
+
+Vanilla never makes this sound, so the library does not contain it. Giving the
+collision a noise worth hearing means authoring one: an FMOD bank plus an ATL
+control file added under `Libs/GameAudio/`, which is a different kind of
+project from anything this mod has done.
+
+### What was fixed on the way
+
+The detection loop was a hardcoded `Script.SetTimer(100, ...)` while the
+forward sweep was computed from `TickSeconds`, so the two agreed only by
+accident. They are one figure now and it is 0.033, which cut the largest part
+of the delay between contact and reaction. `ImpactSpeedSamples` went from 3 to
+9 to keep the window a collision is scored over unchanged.
+
+The residual delay is the audio path itself. The rider confirmed it is present
+on vanilla's own punches, which are fired from an animation event track rather
+than from Lua, so no mod can remove it.
+
+### Two routes that were tried and closed
+
+- **A `PlaySound` procedural layer in the generated animation data** works: the
+  layer fires and vanilla ships twenty four of them in `kcd_male_database.adb`,
+  all `c_w_sword_clinch`. It was abandoned because a fragment cannot make a
+  sound before it starts, so even at `ExitTime="0.0"` the noise follows the
+  contact that caused it.
+- **Firing ahead of the collision**, against a footprint extended by 60 ms of
+  travel, sounded near misses and sounded the same victim twice. Rejected by
+  the rider on sight, correctly.
+- **An engine collision callback.** `OnCollision` is a real CryEngine Lua entity
+  callback, used by `RigidBodyLight.lua`. Attached to the ridden horse it never
+  fired, through two collisions that the mod's own log recorded. The engine
+  does not deliver physics collision events to that entity's script table.
+
+## What the audio system actually exposes
+
+Research done while the rider was away, after the layered impact sound landed
+and the remaining complaint was that it is too loud and cannot be balanced.
+
+### The vocabulary is 2310 triggers, and it is now written down
+
+`Libs/GameAudio/*.xml` in `GameData.pak` is the audio translation layer: 21
+files declaring every trigger, parameter, switch and reverb environment the
+game has. The earlier figure of 1803 counted only triggers wrapping an
+`FmodEvent`; the rest wrap `SqcVariable`, `FmodSnapshotAsEvent`, `SqcMacro` or
+`WhMiscTrigger`, and some declare no backing at all.
+
+The whole table is extracted to `references/audio_triggers.tsv`, which is
+untracked. Alongside it, the way to check a name without playing it:
+
+    Sound.GetAudioTriggerID(name)   -- a handle, or nil if it does not exist
+
+That is how `n_ge_body_plate_stopped` and `n_ge_body_plate_passed` were found
+to be real. They are the armored counterpart of the body collision pair and
+have not been auditioned yet.
+
+### There is no volume control, and this is now settled
+
+The ATL parser is at line 3610277 of the decompilation. It reads `fmod_name`,
+`sustained`, `sustained_cutscene_audio` and `distance_culling` from an
+`FmodEvent`, and **never reads `fmod_id`**, so an event is resolved by path.
+There is no gain, no pitch and no filter attribute, and none of the 66 RTPCs is
+one either: they are `battle_intensity`, `horse_speed`, `player_health`,
+`pub_people_count` and the like. The only volume RTPCs in the game are
+`volume_music`, `volume_sfx` and `volume_voice`, declared in
+`g_volume_control.xml` against FMOD buses. Those are the player's own settings
+sliders and a mod has no business writing them.
+
+Material effects offer nothing more. `Libs/MaterialEffects/FXLibs/*.xml`
+declares its audio as `<Audio trigger="..."/>` and that element takes no other
+attribute anywhere in the shipped data.
+
+### Distance is the only substitute, and it depends on the object
+
+An aux audio proxy can be created on an entity and offset from it, which is how
+`Lightning.lua` makes distant thunder quieter:
+
+    local proxy = entity:CreateAuxAudioProxy()
+    entity:SetAudioProxyOffset({ x = 0, y = 0, z = 10 }, proxy)
+    entity:ExecuteAudioTrigger(id, proxy)
+    -- and RemoveAuxAudioProxy once it has finished
+
+Measured on the player: `blunt_unarmed_body_fabric` was inaudible at twelve
+meters, and `a_o_jump_landing` was exactly as loud at twelve as at zero.
+
+The reason for the second result is probably not the event. `default_controls.xml`
+declares an `environment_listener` switch whose `Dude` state sets
+`player_audio_object_hack:=this_is_player`, which is how the game marks an
+audio object as the listener's own. **Every distance test so far was run on the
+player entity**, the one object carrying that mark, while the mod itself plays
+on the victim. The test has to be repeated on an NPC before concluding that the
+landing cannot be attenuated. A probe for exactly that is prepared.
+
+### Why the game has no horse collision sound
+
+`Libs/MaterialEffects/MaterialEffects.xml` is a surface-type matrix, and the
+`mat_flesh` row maps to `bulletimpacts:blank_event` against every other
+material. Flesh collisions are deliberately silent. `mat_fabric` maps to
+`collisions:fabric_default`, and the collision library does carry
+`body_fabric_stopped`, `body_plate_stopped` and their `passed` variants, so the
+sounds exist; nothing routes a horse into them.
+
+The parser resolving events by name rather than by id means a mod could declare
+its own `ATLConfig` exposing any FMOD event by path, and the config loader
+enumerates its folder with a wildcard rather than reading a manifest, so a new
+file would be picked up. That is the route if a wanted sound turns out to exist
+in the bank without an ATL trigger. It does not help with volume, and it cannot
+add a sound the bank does not contain: `KCD.bank` is a 28 MB FMOD build and the
+project that produced it does not ship.
+
+## Tuning the impact sound, and the two things that made it hard
+
+The layered impact sound was tuned over a long session. Two discoveries did
+more than any of the sample choices.
+
+### Levels cannot be judged while parked
+
+Every candidate is clearly audible standing still, and most vanish under the
+horse's own hoofbeats at speed. Round after round went "that is too loud",
+then a step down, then "it is gone", with the log showing the layers firing
+correctly the whole time. The mod was never at fault: a mix that sounds right
+in a stationary audition is not the mix heard from the saddle.
+
+**Audition to choose a sample. Ride to choose a level.**
+
+### The attenuation curve is short and steep
+
+`blunt_unarmed_body_fabric` declares `distance_culling="20"`, but its curve
+reaches silence far sooner. With the victim about a meter and a half away at
+impact, a layer at distance 1 is quiet and at 1.5 it is gone. The usable range
+is roughly a meter, which is why every whole-number adjustment overshot.
+
+Fine adjustment is fractional, and applied to one copy of a layer rather than
+to all of them. Upward there is only repetition.
+
+### What was ruled out for the landing
+
+`a_o_jump_landing` is the only sample in the game with a horse's mass behind
+it, and it could not be used:
+
+- **Distance does nothing.** Speakers spawned at verified distances of 2 and
+  25 meters played it identically, while the body impact was inaudible at the
+  far one. It is authored under `hoofsteps_player`, and player-relative events
+  ignore position.
+- **Obstruction does nothing.** Buried 8, 200 and 2000 meters underground with
+  MultiRay and SingleRay obstruction, it was unchanged until it passed the
+  culling distance of about 33 meters and vanished outright.
+- **No parameter drives it.** `object_speed`, `horse_speed` and `player_speed`
+  all resolve and all did nothing, at 0, 1 and 20.
+- **Its sub-samples cannot be chosen.** The event holds a randomized set, some
+  of them multi-hoof rhythms recorded much louder. The order looked fixed
+  across runs, but a genuine playlist would carry on rather than restarting, so
+  what was heard is first-hit-after-silence rather than something steerable.
+
+It was dropped. `c_special_bone_crack1` was dropped for the same reason: its
+`distance_culling` is 65535 and it behaves the same way, which is why it kept
+arriving at cartoon volume. `f_bodyfall_leg_break` replaced it and is a foley
+event, so it can be quietened.
+
+### A leftover that wasted an hour
+
+The walk tier kept playing a sword clink long after the Lua stopped asking for
+one. The `PlaySound` procedural layer added to the generated animation data
+early in the session had been reverted in `build_adb.py` and regenerated, but
+every deploy afterwards was `-ScriptOnly`, which does not push animation data.
+The game ran the old databases for hours, adding `c_w_sword_clinch` to every
+stagger and `c_arm_elbow_head` to every fall underneath whatever was being
+tested.
+
+**A revert to generated data is not deployed until the data is deployed.**
+Check the installed file, not the source.
+
+### What the sound actually costs, and one leak it exposed
+
+Measured in the running game against `System.GetCurrAsyncTime`, which is a wall
+clock; `System.GetCurrTime` is frame time and reads zero for anything inside a
+single frame.
+
+    trigger name lookup   about 0 ms, it is cached
+    plain play            0.001 ms
+    play via an offset proxy  0.004 ms
+    booking a timer       about 0 ms
+
+A seven layer gallop with two distanced layers costs about **0.013 ms**, which
+is under a tenth of one percent of a 16.7 ms frame. Riding down ten people at
+once would still be 0.13 ms. There is no performance argument for reducing the
+layer count; it is an aesthetic decision only.
+
+The benchmark did expose a real defect. `AudioProxyLifetimeMs` was referenced
+in `PlayAtDistance` and never defined, so `Script.SetTimer(nil, ...)` threw
+inside a wrapped call and the error was swallowed. Every offset proxy leaked
+for the life of the session. The sound still played, because the trigger is
+executed before the timer is booked, which is exactly why nothing in testing
+ever pointed at it.

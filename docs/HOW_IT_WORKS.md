@@ -40,6 +40,13 @@ permanent: a man ridden down and left alone was found clean again after a night
 had passed, without the mod doing anything to clean him. Nothing is marked at walking
 pace, where nobody goes down.
 
+A collision also makes a noise, which vanilla never did. There is no single
+sound in the game for a horse hitting a person, so each speed builds one from
+layers a few milliseconds apart: a shove at walking pace is cloth and a body
+settling, a trot leads with a blunt impact, and a gallop stacks that impact
+four times over a dull heavy thud. What the impact sounds like depends on what
+the victim is wearing, from the same armor the collision already weighs.
+
 ### Losing patience
 
 Barging the same man at walking pace costs nobody anything: no damage, no

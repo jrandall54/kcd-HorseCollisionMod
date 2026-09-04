@@ -465,6 +465,72 @@ the merchant's booth changed nothing about him at all; the night that cleaned
 him was one he spent elsewhere. Why that is so is untested, so a routine-driven
 effect should be checked the way this one was rather than by waiting in place.
 
+## The sound a collision makes
+
+`Sound.lua` plays it, from Lua, at the moment of impact. Vanilla's own helper
+in `Scripts/Utils/SoundUtils.lua` reaches the audio system directly:
+
+```lua
+PlayAudioTrigger(entity, name)   -- ExecuteAudioTrigger on the entity's proxy
+Sound.GetAudioTriggerID(name)    -- a handle, or nil if the name is not real
+```
+
+The second is a validator: any trigger name can be checked from the console
+without playing it or rebuilding anything.
+
+### There is no sound for this, so it is built from layers
+
+Vanilla horse collisions are silent, so nothing in the game's library is a
+horse striking a person. Twenty three single candidates were auditioned and
+rejected before layering was tried. A tier therefore names a list of
+`{ trigger, delay, distance, chance }`, played a few milliseconds apart so the
+ear takes them as one event.
+
+Two trigger names are tokens resolved per victim from the armor data
+`Armor.lua` already computes: `body` is the blunt impact against that material
+and `foley` the movement rustle it makes. Cloth, leather, mail and plate each
+have both.
+
+### Volume, of which there is none
+
+The audio translation layer in `Libs/GameAudio/*.xml` declares no gain, and the
+parser at line 3610277 of the decompilation reads only `fmod_name`,
+`sustained`, `sustained_cutscene_audio` and `distance_culling`. None of the 66
+parameters is a volume; the only ones that exist are the player's own master
+sliders. Material effects declare `<Audio trigger="..."/>` and nothing else.
+
+Distance is the substitute. A layer with a distance is played through an aux
+audio proxy offset along the line from the listener to the victim, so it
+arrives from the same direction and quieter — the way `Lightning.lua` makes
+distant thunder quieter. Because a victim is a meter or two away at impact, the
+figure behaves as a level rather than as a position.
+
+It reaches only events authored in 3D. Measured through speakers spawned at
+verified distances of 2 and 25 meters, `blunt_unarmed_body_fabric` was
+inaudible at the far one while `a_o_jump_landing` was identical at both:
+`hoofsteps_player` events ignore position, and obstruction does not touch them
+either. Neither that landing nor `c_special_bone_crack1`, which shares the
+behavior, is used.
+
+The curve is also short and steep. For the blunt impacts the usable range is
+about a meter, and past roughly 1.5 the sound is gone, so adjustments are
+fractional and are applied to one copy of a layer rather than to all of them.
+Upward there is only repetition: naming a sample twice lifts it.
+
+### Levels can only be judged from the saddle
+
+Every sample is clearly audible standing still, and most disappear under the
+horse's own hoofbeats at speed. A mix tuned while parked will not survive
+being ridden, which cost several rounds of tuning before it was understood.
+
+### Why not the animation data
+
+The generated databases can carry a `PlaySound` procedural layer, and it works:
+the stock male database ships twenty four of them, all `c_w_sword_clinch`. It
+was built, tested and abandoned, because a fragment cannot make a sound before
+it starts. Even at `ExitTime="0.0"` the noise follows the contact that caused
+it.
+
 ## Collision damage
 
 The mod contains no damage code. Health lost to a knockdown is the engine's,
