@@ -117,31 +117,97 @@ HorseCollisionModSettings = {
 	-- plays nothing rather than breaking anything, and an empty list silences
 	-- that tier alone.
 	--
-	-- ImpactSoundOnRider hangs the sound on you rather than on the victim,
-	-- which is louder and less positional.
 	ImpactSound              = true,
-	ImpactSoundOnRider       = false,
 
 	-- Each tier is a list of { trigger, delay in milliseconds }. The trigger
 	-- name "body" is replaced with the blunt impact matching what the victim
 	-- is wearing: cloth, mail or plate.
-	ImpactSoundWalk          = { { "f_body_tap", 0 } },
-	-- The body impact appears twice because the landing's volume is fixed and
-	-- the body's is not, so doubling it is how the impact is lifted against
-	-- the hooves. A third entry in a layer is a distance in meters, which
-	-- plays it from that far away and therefore quieter; it does nothing to a
-	-- player-relative event such as the landing.
-	ImpactSoundTrot          = { { "a_o_jump_landing", 0 },
-	                             { "body", 8 },
-	                             { "body", 16 } },
-	ImpactSoundGallop        = { { "a_o_jump_landing", 0 },
-	                             { "a_o_jump_landing", 25 },
-	                             { "body", 8 },
-	                             { "body", 16 } },
+	-- A third entry is a distance in meters, and it is the volume control:
+	-- the layer is pushed that far back along the line from the listener, so
+	-- it arrives from the same direction and quieter. Higher is quieter, and
+	-- it does nothing to `a_o_jump_landing`, which is a 2D event whose level
+	-- is fixed.
+	--
+	-- Walk names the cloth impact outright rather than using the `body` token.
+	-- A shove at walking pace should not ring somebody's mail, which the token
+	-- would do for an armored victim.
+	-- A layer is { trigger, delay in ms, distance in meters, chance }.
+	--
+	-- Distance is the volume control. There is no gain anywhere in this
+	-- engine's audio, so a layer is quietened by being played from further
+	-- away: the offset is added along the line from the listener to the
+	-- victim, so it arrives from the same direction and only its level drops.
+	-- Because a victim is always a meter or two away at the moment of impact,
+	-- the number behaves as a volume knob rather than as a position.
+	--
+	-- It does nothing to a 2D event. `a_o_jump_landing` and
+	-- `c_special_bone_crack1` both ignore position entirely, so the only
+	-- control over those is `chance`, which is how often the layer appears.
+	--
+	-- Two trigger names are tokens, replaced with the sample matching what the
+	-- victim is wearing: `body` is the blunt impact against that material and
+	-- `foley` is the movement rustle it makes.
 
-	-- An occasional bone crack, gallop only.
-	ImpactSoundCrack         = { "c_special_bone_crack1", 20 },
-	ImpactSoundCrackChance   = 0.3,
+	-- A shove disturbs someone's clothing rather than striking them, so the
+	-- walk tier is cloth foley over a body settling, with a single hoofstep
+	-- underneath for the horse. Quiet by being pushed back five meters.
+	-- A layer is { trigger, delay in milliseconds, distance in meters, chance }.
+	--
+	-- Distance is the volume control, because the engine has no gain: a layer
+	-- is quietened by being played from further away, offset along the line
+	-- from the listener to the victim so it arrives from the same direction.
+	-- A victim is always a meter or two away at impact, so the number behaves
+	-- as a volume knob rather than as a position. The curve is steep and short:
+	-- for the blunt impacts the usable range is about a meter, and past
+	-- roughly 1.5 the sound is gone entirely, so the fine adjustments are
+	-- fractional and are made to one copy of a layer rather than to all of it.
+	--
+	-- Distance does nothing to a 2D event. `a_o_jump_landing` and
+	-- `c_special_bone_crack1` ignore position completely, which is why neither
+	-- is used here.
+	--
+	-- Loudness otherwise comes from repetition. Naming a sample twice a few
+	-- milliseconds apart thickens and lifts it, which is the only way up once
+	-- a layer is already at zero distance.
+	--
+	-- Two trigger names are tokens, replaced with the sample matching what the
+	-- victim is wearing: `body` is the blunt impact against that material and
+	-- `foley` is the movement rustle it makes.
+
+	-- A shove disturbs someone's clothing rather than striking them, so the
+	-- walk tier carries no impact at all: two cloth foleys and a body
+	-- settling, each doubled because those samples are very quiet, over a
+	-- single hoofstep.
+	ImpactSoundWalk          = { { "f_n_mat_foleyal_cl", 0 },
+	                             { "hs_hp_soil", 4 },
+	                             { "f_n_mat_foleyal_cl", 5 },
+	                             { "f_n_mat_foleyam_cl", 8 },
+	                             { "f_bodyfall1", 12 },
+	                             { "f_n_mat_foleyam_cl", 13 },
+	                             { "f_bodyfall1", 18 } },
+
+	-- A trot puts someone on the ground, so the blunt impact leads, doubled
+	-- with the second copy taken back a fraction to shade it down.
+	ImpactSoundTrot          = { { "body", 0 },
+	                             { "body", 8, 0.9 },
+	                             { "f_bodyfall1", 14 } },
+
+	-- A gallop is the same impact with the horse's mass stacked underneath:
+	-- four copies, a heavy dull thud held back so it reads as weight rather
+	-- than as wood, a hoofstep, and the body settling.
+	ImpactSoundGallop        = { { "body", 0 },
+	                             { "body", 6 },
+	                             { "n_lu_log_ground", 4, 8 },
+	                             { "hs_hp_soil", 10 },
+	                             { "body", 12 },
+	                             { "body", 18 },
+	                             { "f_bodyfall1", 22 } },
+
+	-- The occasional injury, gallop only. A foley event, so unlike
+	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out
+	-- at cartoon volume whatever was done to it.
+	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
+	ImpactSoundCrackChance   = 0.12,
 
 	-- What a victim looks like afterwards. Someone ridden down at a gallop
 	-- otherwise stands back up immaculate. Dirt covers everything they are

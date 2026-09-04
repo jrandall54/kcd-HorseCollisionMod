@@ -1,0 +1,475 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+<li><a href="#Tables">Tables</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Marks.html">HorseCollisionMod.Marks</a></li>
+  <li><strong>HorseCollisionMod.Sound</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Retaliation.html">HorseCollisionMod.Retaliation</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Sound</code></h1>
+<p>Sound: the noise a collision makes.</p>
+<p> A collision is silent. The victim's bark and the horse's own foley are all
+ there is, and nothing in the moment says that eighty kilograms of person was
+ struck by half a ton of horse.</p>
+
+<p> Vanilla's audio triggers are reachable from Lua through a global helper in
+ <code>Scripts/Utils/SoundUtils.lua</code>:</p>
+
+
+<pre>
+<span class="keyword">function</span> <span class="function-name">PlayAudioTrigger</span>(entity, param)
+    entity:<span class="function-name">ExecuteAudioTrigger</span>(AudioUtils.<span class="function-name">LookupTriggerID</span>(param),
+            entity:<span class="function-name">GetDefaultAuxAudioProxyID</span>())
+<span class="keyword">end</span>
+</pre>
+
+<p> The trigger names come from the game's own <code>.animevents</code> files, which carry
+ 242 distinct <code>audio_trigger</code> parameters between them. That is the authored
+ vocabulary, and a name outside it does not resolve.</p>
+
+<p> ### Why this is not in the animation data</p>
+
+<p> The animation databases this mod generates can carry a <code>PlaySound</code>
+ procedural layer, and that route works: a trigger fired that way is audible,
+ and the stock male database ships twenty four of them. It was built, tested
+ in game, and abandoned, because a fragment cannot make a sound before it
+ starts. Even at <code>ExitTime=&quot;0.0&quot;</code> the noise arrives after the horse has
+ already hit, since the reaction animation begins a detection tick and an
+ interactive-action call later than the contact that caused it. The rider's
+ verdict on that build was that the timing was "way off".</p>
+
+<p> Firing from here instead puts the sound on the same line as the impact that
+ detected it, and leaves the animation data unchanged.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 4.8.0</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BodyFoleySound">HorseCollisionMod:BodyFoleySound (armor)</a></td>
+	<td class="summary">Resolves the <code>foley</code> token to the movement foley for a victim's armor.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BodyImpactSound">HorseCollisionMod:BodyImpactSound (armor)</a></td>
+	<td class="summary">Resolves the <code>body</code> token in a layer list to an armor-matched trigger.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayImpactSound">HorseCollisionMod:PlayImpactSound (npc, tierName[, armor])</a></td>
+	<td class="summary">Plays the impact sound for one collision.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayAtDistance">HorseCollisionMod:PlayAtDistance (entity, trigger, distance)</a></td>
+	<td class="summary">Plays a trigger as if it came from further away, which is the only volume
+ control the engine offers.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:AwayFromListener">HorseCollisionMod:AwayFromListener (entity, distance)</a></td>
+	<td class="summary">An entity-local offset that pushes a sound directly away from the listener.</td>
+	</tr>
+</table>
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#BodyImpactSounds">BodyImpactSounds</a></td>
+	<td class="summary">Blunt body impacts, keyed by what the victim is wearing.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#BodyFoleySounds">BodyFoleySounds</a></td>
+	<td class="summary">Movement foley, keyed by what the victim is wearing.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:BodyFoleySound"></a>
+    <strong>HorseCollisionMod:BodyFoleySound (armor)</strong>
+    </dt>
+    <dd>
+    Resolves the <code>foley</code> token to the movement foley for a victim's armor. </p>
+
+<p> The same <code>heaviestType</code> indices <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:BodyImpactSound">BodyImpactSound</a> reads, transcribed in
+ <code>ArmorTypeNames</code>: 2 and 3 are leather, 4 is chain, 5 is plate.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the total from <code>ArmorOf</code>, or nil
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        a trigger name
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BodyImpactSound"></a>
+    <strong>HorseCollisionMod:BodyImpactSound (armor)</strong>
+    </dt>
+    <dd>
+    Resolves the <code>body</code> token in a layer list to an armor-matched trigger. </p>
+
+<p> <code>heaviestType</code> is the engine's armor type index, transcribed in
+ <code>ArmorTypeNames</code>: 4 is chain and 5 is plate. Everything else, including
+ leather and bare cloth, takes the fabric sample.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the total from <code>ArmorOf</code>, or nil
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        a trigger name
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:PlayImpactSound"></a>
+    <strong>HorseCollisionMod:PlayImpactSound (npc, tierName[, armor])</strong>
+    </dt>
+    <dd>
+    Plays the impact sound for one collision. </p>
+
+<p> Called from <code>OnImpact</code> before the reaction is chosen, so the request goes
+ out ahead of the animation rather than behind it.</p>
+
+<p> Firing it earlier than the collision was tried and abandoned. A footprint
+ reaching sixty milliseconds of travel further forward sounded near misses
+ and sounded the same victim twice, which is worse than a sound that is
+ slightly late.</p>
+
+<p> ### Layers</p>
+
+<p> A tier names a list of <code>{ trigger, delayMs }</code> pairs rather than one sound,
+ because no single sound in the game is a horse striking a person. Vanilla
+ never makes that noise, so its library does not contain it, and twenty three
+ candidates were auditioned and rejected before layering was tried.</p>
+
+<p> What works is the horse's own weight underneath a body impact:
+ <code>a_o_jump_landing</code> is the sound of the horse landing from a jump, and it is
+ the only sample in the game carrying that mass. A blunt body impact ten
+ milliseconds later reads as the thing it struck.</p>
+
+<p> The offsets are small on purpose. Far enough apart to thicken the hit,
+ close enough that the ear takes them as one event rather than as a stack.</p>
+
+<p> A layer is <code>{ trigger, delay, distance, chance }</code>. Distance is the volume
+ control and chance is how often the layer appears at all, which is the only
+ lever on a sample whose level cannot be changed.</p>
+
+<p> Two literal trigger names are tokens, both replaced with the sample matching
+ the victim's armor: <code>body</code> is the blunt impact against that material, and
+ <code>foley</code> is the movement rustle it makes.</p>
+
+<p> ### Balancing layers without a volume control</p>
+
+<p> There is no gain on a trigger. Distance is the substitute, and it only
+ reaches events authored in 3D; <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayAtDistance">PlayAtDistance</a> documents what was measured.
+ Loudness upward comes from repetition instead, which is why a tier names the
+ same sample two or four times a few milliseconds apart.</p>
+
+<p> Levels can only be judged from the saddle. Every sample here is clearly
+ audible standing still and most of them disappear under the horse's own
+ hoofbeats at speed, so a mix that sounds correct while parked is not the
+ mix that will be heard.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot" or "Gallop"
+        </li>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim's armor total, for the body layer
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when at least one layer was played
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:PlayAtDistance"></a>
+    <strong>HorseCollisionMod:PlayAtDistance (entity, trigger, distance)</strong>
+    </dt>
+    <dd>
+    Plays a trigger as if it came from further away, which is the only volume
+ control the engine offers. </p>
+
+<p> No gain exists anywhere: the audio translation layer parses no volume
+ attribute, none of the game's 66 parameters is one, and the only volume
+ controls are the player's own master sliders. Distance is the substitute.</p>
+
+<p> The offset is pushed along the line from the listener to the source, so the
+ sound arrives from the same direction it would have anyway and only its
+ level changes. Offsetting along an arbitrary axis instead moves the sound
+ across the stereo field, which is audible as panning rather than as volume.</p>
+
+<p> <code>SetAudioProxyOffset</code> takes an entity-local vector, which is why the world
+ direction is converted through the entity's own axes. <code>Lightning.lua</code> uses
+ the same call for distant thunder.</p>
+
+<p> It only works on events authored in 3D. Measured through speakers placed at
+ verified distances of 2 and 25 meters, <code>blunt_unarmed_body_fabric</code> was
+ inaudible at the far one and <code>a_o_jump_landing</code> was identical at both: the
+ landing lives under <code>hoofsteps_player</code> and ignores position entirely, so its
+ level is fixed and no distance will lower it.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the entity the sound belongs to
+        </li>
+        <li><span class="parameter">trigger</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the audio trigger name
+        </li>
+        <li><span class="parameter">distance</span>
+            <span class="types"><span class="type">number</span></span>
+         meters to push it back by
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the trigger resolved and was executed
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:AwayFromListener"></a>
+    <strong>HorseCollisionMod:AwayFromListener (entity, distance)</strong>
+    </dt>
+    <dd>
+    An entity-local offset that pushes a sound directly away from the listener. </p>
+
+<p> The world vector from the player to the entity, normalized and scaled, then
+ expressed in the entity's own frame, because that is the space
+ <code>SetAudioProxyOffset</code> reads. Falls back to straight up when the listener is
+ on top of the entity, which happens while mounted and would otherwise push
+ the sound into the ground.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the entity the proxy belongs to
+        </li>
+        <li><span class="parameter">distance</span>
+            <span class="types"><span class="type">number</span></span>
+         meters to push back by
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        an entity-local offset vector
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "BodyImpactSounds"></a>
+    <strong>BodyImpactSounds</strong>
+    </dt>
+    <dd>
+    Blunt body impacts, keyed by what the victim is wearing. </p>
+
+<p> The combat audio in <code>Libs/GameAudio/combat.xml</code> carries one of these per
+ armor material. <code>Armor.lua</code> already reports the heaviest type a victim is
+ wearing, so the layer that lands on the body can match it: cloth thuds,
+ mail rings, plate bangs.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">fabric</span>
+
+
+
+        </li>
+        <li><span class="parameter">chainmail</span>
+
+
+
+        </li>
+        <li><span class="parameter">plate</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "BodyFoleySounds"></a>
+    <strong>BodyFoleySounds</strong>
+    </dt>
+    <dd>
+    Movement foley, keyed by what the victim is wearing. </p>
+
+<p> The third-person material foley the game plays when an NPC moves: cloth
+ swishes, leather creaks, mail rings, plate clanks. Right for a shove at
+ walking pace, which disturbs somebody's clothing rather than striking them.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">cloth</span>
+
+
+
+        </li>
+        <li><span class="parameter">leather</span>
+
+
+
+        </li>
+        <li><span class="parameter">chainmail</span>
+
+
+
+        </li>
+        <li><span class="parameter">plate</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-04 15:05:19 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

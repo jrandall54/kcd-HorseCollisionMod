@@ -51,6 +51,45 @@ HorseCollisionMod.BodyImpactSounds = {
 	plate = "blunt_unarmed_body_plate"
 }
 
+--- Movement foley, keyed by what the victim is wearing.
+--
+-- The third-person material foley the game plays when an NPC moves: cloth
+-- swishes, leather creaks, mail rings, plate clanks. Right for a shove at
+-- walking pace, which disturbs somebody's clothing rather than striking them.
+--
+-- @table BodyFoleySounds
+HorseCollisionMod.BodyFoleySounds = {
+	cloth = "f_n_mat_move_cl",
+	leather = "f_n_mat_move_le",
+	chainmail = "f_n_mat_move_ch",
+	plate = "f_n_mat_move_pl"
+}
+
+--- Resolves the `foley` token to the movement foley for a victim's armor.
+--
+-- The same `heaviestType` indices `BodyImpactSound` reads, transcribed in
+-- `ArmorTypeNames`: 2 and 3 are leather, 4 is chain, 5 is plate.
+--
+-- @tparam table armor the total from `ArmorOf`, or nil
+-- @treturn string a trigger name
+function HorseCollisionMod:BodyFoleySound(armor)
+	local heaviest = armor and armor.heaviestType or 0
+
+	if heaviest == 5 then
+		return self.BodyFoleySounds.plate
+	end
+
+	if heaviest == 4 then
+		return self.BodyFoleySounds.chainmail
+	end
+
+	if heaviest == 2 or heaviest == 3 then
+		return self.BodyFoleySounds.leather
+	end
+
+	return self.BodyFoleySounds.cloth
+end
+
 --- Resolves the `body` token in a layer list to an armor-matched trigger.
 --
 -- `heaviestType` is the engine's armor type index, transcribed in
@@ -98,27 +137,25 @@ end
 -- The offsets are small on purpose. Far enough apart to thicken the hit,
 -- close enough that the ear takes them as one event rather than as a stack.
 --
--- The literal trigger name `body` is a token, replaced with the sample
--- matching the victim's armor.
+-- A layer is `{ trigger, delay, distance, chance }`. Distance is the volume
+-- control and chance is how often the layer appears at all, which is the only
+-- lever on a sample whose level cannot be changed.
+--
+-- Two literal trigger names are tokens, both replaced with the sample matching
+-- the victim's armor: `body` is the blunt impact against that material, and
+-- `foley` is the movement rustle it makes.
 --
 -- ### Balancing layers without a volume control
 --
--- There is no gain on a trigger. The only RTPCs that touch volume are the
--- player's own master sliders for music, effects and voice, which a mod has
--- no business writing.
+-- There is no gain on a trigger. Distance is the substitute, and it only
+-- reaches events authored in 3D; `PlayAtDistance` documents what was measured.
+-- Loudness upward comes from repetition instead, which is why a tier names the
+-- same sample two or four times a few milliseconds apart.
 --
--- Distance is the substitute, and it works on some events and not others. A
--- layer may name a distance in meters, which plays it through an aux audio
--- proxy offset that far from the entity, the way `Lightning.lua` makes
--- distant thunder quieter. Measured in game: `blunt_unarmed_body_fabric` is
--- inaudible at twelve meters, and `a_o_jump_landing` is exactly as loud there
--- as at zero, because it is authored under `hoofsteps_player` and
--- player-relative events carry no falloff.
---
--- So the horse's landing cannot be turned down. A layer is made louder
--- instead by naming it twice a few milliseconds apart, which is why the body
--- impact appears twice: it lifts the impact against a base whose volume is
--- fixed.
+-- Levels can only be judged from the saddle. Every sample here is clearly
+-- audible standing still and most of them disappear under the horse's own
+-- hoofbeats at speed, so a mix that sounds correct while parked is not the
+-- mix that will be heard.
 --
 -- @tparam table npc victim entity
 -- @tparam string tierName "Walk", "Trot" or "Gallop"
@@ -149,16 +186,6 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 		return false
 	end
 
-	-- Which entity the sound is hung on. The victim is the honest choice,
-	-- because that is where the impact is and the helper positions the sound
-	-- at the entity it is given. The rider is the alternative, and is louder
-	-- and less positional.
-	local on = npc
-
-	if cfg.ImpactSoundOnRider and player then
-		on = player
-	end
-
 	-- A copy, because the crack is appended per collision and the config list
 	-- must not grow every time someone is ridden down.
 	local plan = {}
@@ -179,18 +206,32 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	end
 
 	local played = 0
+	local names = {}
 
 	for _, layer in ipairs(plan) do
 		local trigger = layer[1]
 		local delay = layer[2] or 0
 		local distance = layer[3] or 0
+		local chance = layer[4] or 1
+
+		-- A layer may fire only some of the time. It is the only control over
+		-- a sample whose level is fixed: `a_o_jump_landing` cannot be made
+		-- quieter by distance or by obstruction, so the way to stop it
+		-- dominating every collision is for it not to be in every collision.
+		if chance < 1 and math.random() >= chance then
+			trigger = nil
+		end
 
 		if trigger == "body" then
 			trigger = self:BodyImpactSound(armor)
+		elseif trigger == "foley" then
+			trigger = self:BodyFoleySound(armor)
 		end
 
 		if type(trigger) == "string" and trigger ~= "" then
 			played = played + 1
+			names[#names + 1] = trigger
+					.. (distance > 0 and ("@" .. tostring(distance)) or "")
 
 			-- Captured, because the loop variable is reused and a timer fires
 			-- long after this iteration has ended.
@@ -200,9 +241,9 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 			local function fire()
 				pcall(function()
 					if far > 0 then
-						self:PlayAtDistance(on, queued, far)
+						self:PlayAtDistance(npc, queued, far)
 					else
-						PlayAudioTrigger(on, queued)
+						PlayAudioTrigger(npc, queued)
 					end
 				end)
 			end
@@ -218,29 +259,38 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	if cfg.LogTelemetry then
 		self:Log("ImpactSound tier=" .. tostring(tierName)
 				.. " layers=" .. tostring(played)
-				.. " body=" .. tostring(self:BodyImpactSound(armor))
-				.. " cracked=" .. tostring(cracked)
-				.. " onRider=" .. tostring(cfg.ImpactSoundOnRider and true or false))
+				.. " played=" .. table.concat(names, ",")
+				.. " cracked=" .. tostring(cracked))
 	end
 
 	return played > 0
 end
 
---- Plays a trigger from a point offset from the entity, so it arrives quieter.
+--- Plays a trigger as if it came from further away, which is the only volume
+-- control the engine offers.
 --
--- The only substitute for a volume control this engine offers a mod. An aux
--- audio proxy is created on the entity, moved `distance` meters above it, and
--- the trigger executed through it; `Lightning.lua` makes distant thunder
--- quieter the same way. The proxy is removed once the sound has had time to
--- finish, because one is created per layer per collision.
+-- No gain exists anywhere: the audio translation layer parses no volume
+-- attribute, none of the game's 66 parameters is one, and the only volume
+-- controls are the player's own master sliders. Distance is the substitute.
 --
--- It has no effect on a player-relative event. `a_o_jump_landing` lives under
--- `hoofsteps_player` and measured identically at zero and twelve meters,
--- while `blunt_unarmed_body_fabric` was inaudible at twelve.
+-- The offset is pushed along the line from the listener to the source, so the
+-- sound arrives from the same direction it would have anyway and only its
+-- level changes. Offsetting along an arbitrary axis instead moves the sound
+-- across the stereo field, which is audible as panning rather than as volume.
 --
--- @tparam table entity the entity to hang the proxy on
+-- `SetAudioProxyOffset` takes an entity-local vector, which is why the world
+-- direction is converted through the entity's own axes. `Lightning.lua` uses
+-- the same call for distant thunder.
+--
+-- It only works on events authored in 3D. Measured through speakers placed at
+-- verified distances of 2 and 25 meters, `blunt_unarmed_body_fabric` was
+-- inaudible at the far one and `a_o_jump_landing` was identical at both: the
+-- landing lives under `hoofsteps_player` and ignores position entirely, so its
+-- level is fixed and no distance will lower it.
+--
+-- @tparam table entity the entity the sound belongs to
 -- @tparam string trigger the audio trigger name
--- @tparam number distance meters to offset the proxy by
+-- @tparam number distance meters to push it back by
 -- @treturn boolean true when the trigger resolved and was executed
 function HorseCollisionMod:PlayAtDistance(entity, trigger, distance)
 	local id = Sound.GetAudioTriggerID(trigger)
@@ -249,9 +299,10 @@ function HorseCollisionMod:PlayAtDistance(entity, trigger, distance)
 		return false
 	end
 
+	local offset = self:AwayFromListener(entity, distance)
 	local proxy = entity:CreateAuxAudioProxy()
 
-	entity:SetAudioProxyOffset({ x = 0, y = 0, z = distance }, proxy)
+	entity:SetAudioProxyOffset(offset, proxy)
 	entity:ExecuteAudioTrigger(id, proxy)
 
 	Script.SetTimer(self.AudioProxyLifetimeMs, function()
@@ -261,4 +312,60 @@ function HorseCollisionMod:PlayAtDistance(entity, trigger, distance)
 	end)
 
 	return true
+end
+
+--- An entity-local offset that pushes a sound directly away from the listener.
+--
+-- The world vector from the player to the entity, normalized and scaled, then
+-- expressed in the entity's own frame, because that is the space
+-- `SetAudioProxyOffset` reads. Falls back to straight up when the listener is
+-- on top of the entity, which happens while mounted and would otherwise push
+-- the sound into the ground.
+--
+-- @tparam table entity the entity the proxy belongs to
+-- @tparam number distance meters to push back by
+-- @treturn table an entity-local offset vector
+function HorseCollisionMod:AwayFromListener(entity, distance)
+	local up = { x = 0, y = 0, z = distance }
+	local listener, source = nil, nil
+
+	pcall(function()
+		listener = player:GetWorldPos()
+		source = entity:GetWorldPos()
+	end)
+
+	if not listener or not source then
+		return up
+	end
+
+	local vx = source.x - listener.x
+	local vy = source.y - listener.y
+	local vz = source.z - listener.z
+	local length = math.sqrt((vx * vx) + (vy * vy) + (vz * vz))
+
+	-- Too close to have a direction, so there is no line to push along.
+	if length < 0.5 then
+		return up
+	end
+
+	vx, vy, vz = (vx / length) * distance, (vy / length) * distance,
+			(vz / length) * distance
+
+	local ax, ay, az = nil, nil, nil
+
+	pcall(function()
+		ax = entity:GetDirectionVector(0)
+		ay = entity:GetDirectionVector(1)
+		az = entity:GetDirectionVector(2)
+	end)
+
+	if not ax or not ay or not az then
+		return up
+	end
+
+	return {
+		x = (vx * ax.x) + (vy * ax.y) + (vz * ax.z),
+		y = (vx * ay.x) + (vy * ay.y) + (vz * ay.z),
+		z = (vx * az.x) + (vy * az.y) + (vz * az.z)
+	}
 end

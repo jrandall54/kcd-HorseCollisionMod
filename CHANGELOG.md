@@ -29,6 +29,25 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- A collision makes a noise. There is no sound in the game for a horse
+  striking a person, so each speed tier builds one from layered audio
+  triggers a few milliseconds apart: cloth and a body settling at walking
+  pace, a blunt impact at a trot, and that impact four times over a dull
+  heavy thud at a gallop, with an occasional injury. What the impact sounds
+  like follows what the victim is wearing, read from the armor the mod
+  already weighs. Seven settings control it, and any of the game's own
+  trigger names may be used.
+
+### Changed
+
+- The detection loop now runs from `TickSeconds` rather than a hardcoded
+  100 ms timer, at 33 ms. The two figures had agreed only by accident, and
+  the gap between a contact and the mod noticing it was the largest part of
+  the delay before a reaction. `ImpactSpeedSamples` moved from 3 to 9 to keep
+  the window a collision is scored over unchanged.
+
 ## [4.8.0] - 2026-09-04
 
 ### Added

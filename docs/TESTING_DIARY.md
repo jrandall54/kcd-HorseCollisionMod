@@ -14688,3 +14688,65 @@ file would be picked up. That is the route if a wanted sound turns out to exist
 in the bank without an ATL trigger. It does not help with volume, and it cannot
 add a sound the bank does not contain: `KCD.bank` is a 28 MB FMOD build and the
 project that produced it does not ship.
+
+## Tuning the impact sound, and the two things that made it hard
+
+The layered impact sound was tuned over a long session. Two discoveries did
+more than any of the sample choices.
+
+### Levels cannot be judged while parked
+
+Every candidate is clearly audible standing still, and most vanish under the
+horse's own hoofbeats at speed. Round after round went "that is too loud",
+then a step down, then "it is gone", with the log showing the layers firing
+correctly the whole time. The mod was never at fault: a mix that sounds right
+in a stationary audition is not the mix heard from the saddle.
+
+**Audition to choose a sample. Ride to choose a level.**
+
+### The attenuation curve is short and steep
+
+`blunt_unarmed_body_fabric` declares `distance_culling="20"`, but its curve
+reaches silence far sooner. With the victim about a meter and a half away at
+impact, a layer at distance 1 is quiet and at 1.5 it is gone. The usable range
+is roughly a meter, which is why every whole-number adjustment overshot.
+
+Fine adjustment is fractional, and applied to one copy of a layer rather than
+to all of them. Upward there is only repetition.
+
+### What was ruled out for the landing
+
+`a_o_jump_landing` is the only sample in the game with a horse's mass behind
+it, and it could not be used:
+
+- **Distance does nothing.** Speakers spawned at verified distances of 2 and
+  25 meters played it identically, while the body impact was inaudible at the
+  far one. It is authored under `hoofsteps_player`, and player-relative events
+  ignore position.
+- **Obstruction does nothing.** Buried 8, 200 and 2000 meters underground with
+  MultiRay and SingleRay obstruction, it was unchanged until it passed the
+  culling distance of about 33 meters and vanished outright.
+- **No parameter drives it.** `object_speed`, `horse_speed` and `player_speed`
+  all resolve and all did nothing, at 0, 1 and 20.
+- **Its sub-samples cannot be chosen.** The event holds a randomized set, some
+  of them multi-hoof rhythms recorded much louder. The order looked fixed
+  across runs, but a genuine playlist would carry on rather than restarting, so
+  what was heard is first-hit-after-silence rather than something steerable.
+
+It was dropped. `c_special_bone_crack1` was dropped for the same reason: its
+`distance_culling` is 65535 and it behaves the same way, which is why it kept
+arriving at cartoon volume. `f_bodyfall_leg_break` replaced it and is a foley
+event, so it can be quietened.
+
+### A leftover that wasted an hour
+
+The walk tier kept playing a sword clink long after the Lua stopped asking for
+one. The `PlaySound` procedural layer added to the generated animation data
+early in the session had been reverted in `build_adb.py` and regenerated, but
+every deploy afterwards was `-ScriptOnly`, which does not push animation data.
+The game ran the old databases for hours, adding `c_w_sword_clinch` to every
+stagger and `c_arm_elbow_head` to every fall underneath whatever was being
+tested.
+
+**A revert to generated data is not deployed until the data is deployed.**
+Check the installed file, not the source.
