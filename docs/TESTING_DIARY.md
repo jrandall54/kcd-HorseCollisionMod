@@ -14817,3 +14817,48 @@ nothing either. That helper is also defined and **never called by any shipped
 script**. Warhorse wrote a Lua entry point for this and never used it; every
 bark in the game is raised inside a behavior tree, sent by the speaker to
 itself.
+
+## Why some messages land and others are accepted and do nothing
+
+A recurring pattern across this project: `XGenAIModule.SendMessageToEntity`
+returns cleanly and nothing happens. It has been met with `monologRequest`,
+`daycycle:restartRequest`, `combat:order:rally`, `customBehaviorRequest` and
+`SetBrainVariable` on `t_exitCombatSubbrain`, while `hitReaction`, `combat:hit`,
+`combat:mercy:dialogResult` and `combat:stimulus:standDownRequest` all work.
+
+### It is not the mailbox
+
+Every `ProcessMessage` node in the AI reads from a named inbox, and there are
+dozens of them: `QuestMailbox`, `DialogMailbox`, `combatHit`, `awarenessImpulse`
+and so on. Mapping the message types this project has sent to the inbox their
+handler listens on:
+
+    dialog:monologRequest              DialogMailbox
+    hitReaction                        HitReactionMailbox and five others
+    combat:hit                         combatHit
+    daycycle:restartRequest            daycycleRestartRequest
+    customBehaviorRequest              combatStimulus_combatSubbrainStarter
+    combat:stimulus:standDownRequest   combatStimulus_combatSubbrainStarter
+    combat:mercy:dialogResult          combatMercyDialogResult
+    awareness:impulse                  awarenessImpulse
+
+The ones that work read from named inboxes too, so the send routes by message
+type on its own and a named inbox is not the barrier.
+
+### The discriminator is whether the listening subtree is running
+
+`combat:stimulus:standDownRequest` and `customBehaviorRequest` share an inbox
+and behave differently, which rules out the inbox and points at the node. A
+`ProcessMessage` receives only while it is active in the tree, and the subtree
+holding it has to be running at the moment the message arrives.
+
+That fits everything observed. The combat subbrain starter is always live, so
+standDown lands. The hit reaction switch is a passive parallel observer that is
+always running, so `hitReaction` and `combat:hit` land. A dialog subbrain on an
+idle townsman is not running, so a monolog request is dropped, which is why
+even vanilla's own helper produces nothing.
+
+This is a model that fits the evidence rather than something measured directly.
+Before spending effort on a message that does nothing, find its
+`ProcessMessage` and ask whether that part of the tree can be running at the
+moment the send happens.
