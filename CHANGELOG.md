@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.7.5] - 2026-09-03
+
 ### Changed
 
 - A victim who runs after a brawl is left to run. The mod used to stop him

@@ -136,7 +136,7 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.7.4</li>
+        <li><strong>Release</strong>: 4.7.5</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -226,28 +226,8 @@
 	<td class="summary">A ceiling on the applications any single repair will make.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#AftermathStandDown">AftermathStandDown</a></td>
-	<td class="summary">Whether a fleeing victim is stopped with a stand-down at all.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#CatchYieldImmediately">CatchYieldImmediately</a></td>
 	<td class="summary">Whether a yielding victim is stopped the instant the yield ends.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#AftermathRunMs">AftermathRunMs</a></td>
-	<td class="summary">How long a fleeing victim is left to run before he is stopped.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#AftermathPollMs">AftermathPollMs</a></td>
-	<td class="summary">How often the victim is read while the aftermath is open.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#AftermathPollLimit">AftermathPollLimit</a></td>
-	<td class="summary">How many reads before the aftermath gives up on him.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#AftermathFleeSpeed">AftermathFleeSpeed</a></td>
-	<td class="summary">The victim's own speed, in meters per second, that counts as running.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#AftermathSettleMs">AftermathSettleMs</a></td>
@@ -916,118 +896,21 @@
 
 </dd>
     <dt>
-    <a name = "AftermathStandDown"></a>
-    <strong>AftermathStandDown</strong>
-    </dt>
-    <dd>
-    Whether a fleeing victim is stopped with a stand-down at all. </p>
-
-<p> On, because the flee does not end without it: a victim repaired to 0.816 in
- mid-flight held four and a half meters per second out to forty seven meters
- and never slowed. The repair decides whether he runs again and does nothing
- to a run already under way.
-
-
-
-
-
-
-
-</dd>
-    <dt>
     <a name = "CatchYieldImmediately"></a>
     <strong>CatchYieldImmediately</strong>
     </dt>
     <dd>
     Whether a yielding victim is stopped the instant the yield ends. </p>
 
-<p> Off, and kept because it works rather than because it might. On the first
- read after a surrender ends, which is the earliest the run can be caught at
- all, the stand-down goes out and he never gets going: measured as
+<p> Off, and kept deliberately rather than because it is used. On the first
+ read after a surrender ends, the earliest the run can be caught at all, the
+ stand-down goes out and he never gets going: measured as
  <code>YieldCaught state=MotionIdle stoodDown=true</code> with no run after it.</p>
 
-<p> Stopping the flee is not the whole cost, which is why it is off. The
- stand-down hands him to the combat subbrain's wind-down, about twenty five
- seconds that nothing reachable from Lua shortens, so a victim caught at
- once spends it standing vacant beside the rider. Letting him run first
- spends the same pause where the rider is not, which reads better even
- though the mechanism is cruder.</p>
-
-<p> Turn it on if that wind-down is ever solved, because it is then strictly
- the better of the two.
-
-
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "AftermathRunMs"></a>
-    <strong>AftermathRunMs</strong>
-    </dt>
-    <dd>
-    How long a fleeing victim is left to run before he is stopped. </p>
-
-<p> The pause that follows a stand-down is the combat subbrain's own wind-down,
- and nothing reachable from Lua shortens it, so this decides where he spends
- it rather than whether he does. Fifteen seconds carries him well clear of
- the rider and of wherever the fight happened, without taking him out of the
- district.
-
-
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "AftermathPollMs"></a>
-    <strong>AftermathPollMs</strong>
-    </dt>
-    <dd>
-    How often the victim is read while the aftermath is open. </p>
-
-<p> Long enough that a position difference is meaningful, short enough that the
- moment he stops running is not missed by much.
-
-
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "AftermathPollLimit"></a>
-    <strong>AftermathPollLimit</strong>
-    </dt>
-    <dd>
-    How many reads before the aftermath gives up on him. </p>
-
-<p> A bound rather than a mechanism, so a victim who neither settles nor runs
- cannot leave a poll going for the session. Ninety at half a second is
- forty five, comfortably past a fifteen second run and the yield before it.
-
-
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "AftermathFleeSpeed"></a>
-    <strong>AftermathFleeSpeed</strong>
-    </dt>
-    <dd>
-    The victim's own speed, in meters per second, that counts as running. </p>
-
-<p> His own movement, not his distance from the rider, which reads as standing
- still when the rider follows him. A measured flee held four and a half;
- somebody walking to a stall makes about one.
+<p> It is off because the run it prevents ends by itself, and stopping it hands
+ him to <code>state_standDown</code> and about twenty five seconds of standing still.
+ Turn it on only if a victim is ever seen running who should not be, and
+ expect that pause to come with it.
 
 
 
@@ -1111,7 +994,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-03 20:33:43 </i>
+<i style="float:right;">Last updated 2026-09-03 21:36:40 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
