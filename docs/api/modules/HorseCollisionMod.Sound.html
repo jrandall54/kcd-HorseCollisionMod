@@ -99,7 +99,7 @@
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.9.0</li>
+        <li><strong>Release</strong>: 4.9.1</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -107,12 +107,16 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ArmorMaterial">HorseCollisionMod:ArmorMaterial (armor)</a></td>
+	<td class="summary">The material a victim's armor sounds like, by engine armor type.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BodyFoleySound">HorseCollisionMod:BodyFoleySound (armor)</a></td>
 	<td class="summary">Resolves the <code>foley</code> token to the movement foley for a victim's armor.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:BodyImpactSound">HorseCollisionMod:BodyImpactSound (armor)</a></td>
-	<td class="summary">Resolves the <code>body</code> token in a layer list to an armor-matched trigger.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ResolveTrigger">HorseCollisionMod:ResolveTrigger (trigger[, armor])</a></td>
+	<td class="summary">Resolves a layer's trigger, substituting the victim's armor into a token.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:PlayImpactSound">HorseCollisionMod:PlayImpactSound (npc, tierName[, armor])</a></td>
@@ -131,8 +135,8 @@
 <h2><a href="#Tables">Tables</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#BodyImpactSounds">BodyImpactSounds</a></td>
-	<td class="summary">Blunt body impacts, keyed by what the victim is wearing.</td>
+	<td class="name" nowrap><a href="#ImpactTokens">ImpactTokens</a></td>
+	<td class="summary">Trigger name patterns for each token a layer may use.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#BodyFoleySounds">BodyFoleySounds</a></td>
@@ -148,14 +152,46 @@
 
     <dl class="function">
     <dt>
+    <a name = "HorseCollisionMod:ArmorMaterial"></a>
+    <strong>HorseCollisionMod:ArmorMaterial (armor)</strong>
+    </dt>
+    <dd>
+    The material a victim's armor sounds like, by engine armor type. </p>
+
+<p> <code>Armor.lua</code> reports the heaviest type a victim is wearing, transcribed in
+ <code>ArmorTypeNames</code>: 4 is chain and 5 is plate. Everything lighter, leather
+ included, sounds like cloth, because the blunt impact families are only
+ authored for three materials.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the total from <code>ArmorOf</code>, or nil
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        "fabric", "chainmail" or "plate"
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:BodyFoleySound"></a>
     <strong>HorseCollisionMod:BodyFoleySound (armor)</strong>
     </dt>
     <dd>
     Resolves the <code>foley</code> token to the movement foley for a victim's armor. </p>
 
-<p> The same <code>heaviestType</code> indices <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:BodyImpactSound">BodyImpactSound</a> reads, transcribed in
- <code>ArmorTypeNames</code>: 2 and 3 are leather, 4 is chain, 5 is plate.
+<p> Leather has its own rustle here, unlike the impact families, so this reads
+ the armor type directly rather than going through <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:ArmorMaterial">ArmorMaterial</a>.
 
 
     <h3>Parameters:</h3>
@@ -178,22 +214,26 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:BodyImpactSound"></a>
-    <strong>HorseCollisionMod:BodyImpactSound (armor)</strong>
+    <a name = "HorseCollisionMod:ResolveTrigger"></a>
+    <strong>HorseCollisionMod:ResolveTrigger (trigger[, armor])</strong>
     </dt>
     <dd>
-    Resolves the <code>body</code> token in a layer list to an armor-matched trigger. </p>
+    Resolves a layer's trigger, substituting the victim's armor into a token. </p>
 
-<p> <code>heaviestType</code> is the engine's armor type index, transcribed in
- <code>ArmorTypeNames</code>: 4 is chain and 5 is plate. Everything else, including
- leather and bare cloth, takes the fabric sample.
+<p> A name that is not a token is returned untouched, so a tier may still name
+ a specific trigger where matching the armor would be wrong.
 
 
     <h3>Parameters:</h3>
     <ul>
+        <li><span class="parameter">trigger</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the name a layer carries
+        </li>
         <li><span class="parameter">armor</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the total from <code>ArmorOf</code>, or nil
+         the victim's armor total
+         (<em>optional</em>)
         </li>
     </ul>
 
@@ -201,7 +241,7 @@
     <ol>
 
            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-        a trigger name
+        the trigger to play
     </ol>
 
 
@@ -383,31 +423,45 @@
 
     <dl class="function">
     <dt>
-    <a name = "BodyImpactSounds"></a>
-    <strong>BodyImpactSounds</strong>
+    <a name = "ImpactTokens"></a>
+    <strong>ImpactTokens</strong>
     </dt>
     <dd>
-    Blunt body impacts, keyed by what the victim is wearing. </p>
+    Trigger name patterns for each token a layer may use. </p>
 
-<p> The combat audio in <code>Libs/GameAudio/combat.xml</code> carries one of these per
- armor material. <code>Armor.lua</code> already reports the heaviest type a victim is
- wearing, so the layer that lands on the body can match it: cloth thuds,
- mail rings, plate bangs.
+<p> A tier names a token rather than a trigger, and the material the victim is
+ wearing is substituted at the moment of impact. Every family here is
+ authored for all three materials, so a mailed guard and a peasant in cloth
+ are told apart by ear on every layer rather than only on one.</p>
+
+<p> <code>foley</code> is the odd one out: it is movement rustle rather than impact, and
+ the game authors it for four materials under different short names, so it
+ carries its own table.
 
 
     <h3>Fields:</h3>
     <ul>
-        <li><span class="parameter">fabric</span>
+        <li><span class="parameter">body</span>
 
 
 
         </li>
-        <li><span class="parameter">chainmail</span>
+        <li><span class="parameter">body_armed</span>
 
 
 
         </li>
-        <li><span class="parameter">plate</span>
+        <li><span class="parameter">face</span>
+
+
+
+        </li>
+        <li><span class="parameter">face_armed</span>
+
+
+
+        </li>
+        <li><span class="parameter">blunt</span>
 
 
 
@@ -467,7 +521,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-04 15:20:09 </i>
+<i style="float:right;">Last updated 2026-09-04 15:35:47 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

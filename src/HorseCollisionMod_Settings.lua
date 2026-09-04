@@ -192,16 +192,18 @@ HorseCollisionModSettings = {
 	                             { "body", 8, 0.9 },
 	                             { "f_bodyfall1", 14 } },
 
-	-- A gallop is the same impact with the horse's mass stacked underneath:
-	-- four copies, a heavy dull thud held back so it reads as weight rather
-	-- than as wood, a hoofstep, and the body settling.
+	-- A gallop stacks four different blunt impacts rather than repeats of one,
+	-- so it reads as a collision instead of a flam, over a dull heavy thud
+	-- held back to sit underneath, a hoofstep, and the body settling. Every
+	-- impact layer is a token, so a mailed guard and a peasant in cloth sound
+	-- different on all four.
 	ImpactSoundGallop        = { { "body", 0 },
-	                             { "body", 6 },
-	                             { "n_lu_log_ground", 4, 8 },
+	                             { "n_lu_log_ground", 4, 5 },
+	                             { "body_armed", 6 },
+	                             { "blunt", 9, 1 },
 	                             { "hs_hp_soil", 10 },
-	                             { "body", 12 },
-	                             { "body", 18 },
-	                             { "f_bodyfall1", 22 } },
+	                             { "face_armed", 18 },
+	                             { "f_bodyfall1", 24 } },
 
 	-- The occasional injury, gallop only. A foley event, so unlike
 	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out

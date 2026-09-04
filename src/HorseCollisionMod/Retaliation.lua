@@ -60,7 +60,7 @@
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 4.9.0
+-- @release 4.9.1
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
