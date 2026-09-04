@@ -850,8 +850,8 @@ function HorseCollisionMod:TraceAftermath(npc)
 		-- The combat subbrain holds him until `t_exitCombatSubbrain` is set,
 		-- and vanilla only sets it at the end of a fifteen second flee and an
 		-- eight second rally. If the flag can be written from here he should
-		-- move the moment it is, and if he does not the subbrain variable is
-		-- out of reach and the wait is not ours to shorten.
+		-- move the moment it is; if he does not, the subbrain variable is out
+		-- of reach and the wait cannot be shortened from Lua at all.
 		if t >= 3000 and not nudged[3000] then
 			nudged[3000] = true
 
