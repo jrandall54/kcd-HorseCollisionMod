@@ -14750,3 +14750,26 @@ tested.
 
 **A revert to generated data is not deployed until the data is deployed.**
 Check the installed file, not the source.
+
+### What the sound actually costs, and one leak it exposed
+
+Measured in the running game against `System.GetCurrAsyncTime`, which is a wall
+clock; `System.GetCurrTime` is frame time and reads zero for anything inside a
+single frame.
+
+    trigger name lookup   about 0 ms, it is cached
+    plain play            0.001 ms
+    play via an offset proxy  0.004 ms
+    booking a timer       about 0 ms
+
+A seven layer gallop with two distanced layers costs about **0.013 ms**, which
+is under a tenth of one percent of a 16.7 ms frame. Riding down ten people at
+once would still be 0.13 ms. There is no performance argument for reducing the
+layer count; it is an aesthetic decision only.
+
+The benchmark did expose a real defect. `AudioProxyLifetimeMs` was referenced
+in `PlayAtDistance` and never defined, so `Script.SetTimer(nil, ...)` threw
+inside a wrapped call and the error was swallowed. Every offset proxy leaked
+for the life of the session. The sound still played, because the trigger is
+executed before the timer is booked, which is exactly why nothing in testing
+ever pointed at it.

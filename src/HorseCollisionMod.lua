@@ -707,6 +707,14 @@ HorseCollisionMod.RetaliationReleaseTries = 20
 --
 -- The ceiling is generous because this waits on the game's own recovery rather
 -- than on a clip of known length.
+--- How long an offset audio proxy is kept before it is removed.
+--
+-- One is created per distanced impact sound layer, so they must not
+-- accumulate. Every sample the mod plays is well under a second, and the call
+-- that creates the proxy was measured at four microseconds, so the lifetime is
+-- the only part of this worth bounding at all.
+HorseCollisionMod.AudioProxyLifetimeMs = 2000
+
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
