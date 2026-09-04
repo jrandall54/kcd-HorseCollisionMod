@@ -852,34 +852,38 @@ function HorseCollisionMod:TraceAftermath(npc)
 		-- not what is holding him.
 		local nudge = ""
 
-		-- `combat:order:rally` and `combat:order:win` are both declared under
-		-- `combat:order` and both construct and address without error, where
-		-- `combat:subbrain:stop` is refused by `makeTable` outright. Rally is
-		-- the state vanilla itself enters after a flee, and it is the one that
-		-- sets `t_exitCombatSubbrain` when it finishes, so ordering it should
-		-- cut the wait short if anything can.
-		if t >= 3000 and not nudged[3000] then
-			nudged[3000] = true
+		-- `combat:stimulus:customBehaviorRequest` is the second of the two
+		-- stimuli `sb_combat.xml` accepts during `fight` or `flee`, the
+		-- stand-down being the first, and unlike an order it names a behavior
+		-- to run rather than asking the tree to change its own mind. Three
+		-- candidates from vanilla's own catalog are tried in turn, because a
+		-- behavior the NPC cannot resolve costs nothing but a log line.
+		local behaviors = { [3000] = "combat_yield", [8000] = "leave",
+				[14000] = "battle_lost" }
 
-			pcall(function()
-				XGenAIModule.SendMessageToEntityData(target,
-						"combat:order:rally",
-						Utils.makeTable("combat:order:rally", {}))
-			end)
+		for when, name in pairs(behaviors) do
+			if t >= when and not nudged[when] then
+				nudged[when] = true
 
-			nudge = " RALLY-ORDERED"
-		end
+				local w = nil
 
-		if t >= 9000 and not nudged[9000] then
-			nudged[9000] = true
+				pcall(function()
+					w = XGenAIModule.GetMyWUID(npc)
+				end)
 
-			pcall(function()
-				XGenAIModule.SendMessageToEntityData(target,
-						"combat:order:win",
-						Utils.makeTable("combat:order:win", {}))
-			end)
+				pcall(function()
+					XGenAIModule.SendMessageToEntityData(target,
+							"combat:stimulus:customBehaviorRequest",
+							Utils.makeTable(
+									"combat:stimulus:customBehaviorRequest", {
+								behaviorName = name,
+								behaviorSource = w,
+								suppressStimuli = false
+							}))
+				end)
 
-			nudge = " WIN-ORDERED"
+				nudge = " BEHAVIOR-" .. name
+			end
 		end
 
 		self:Log("Trace t=" .. tostring(t)
