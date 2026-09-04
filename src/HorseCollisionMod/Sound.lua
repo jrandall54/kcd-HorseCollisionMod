@@ -101,6 +101,25 @@ end
 -- The literal trigger name `body` is a token, replaced with the sample
 -- matching the victim's armor.
 --
+-- ### Balancing layers without a volume control
+--
+-- There is no gain on a trigger. The only RTPCs that touch volume are the
+-- player's own master sliders for music, effects and voice, which a mod has
+-- no business writing.
+--
+-- Distance is the substitute, and it works on some events and not others. A
+-- layer may name a distance in meters, which plays it through an aux audio
+-- proxy offset that far from the entity, the way `Lightning.lua` makes
+-- distant thunder quieter. Measured in game: `blunt_unarmed_body_fabric` is
+-- inaudible at twelve meters, and `a_o_jump_landing` is exactly as loud there
+-- as at zero, because it is authored under `hoofsteps_player` and
+-- player-relative events carry no falloff.
+--
+-- So the horse's landing cannot be turned down. A layer is made louder
+-- instead by naming it twice a few milliseconds apart, which is why the body
+-- impact appears twice: it lifts the impact against a base whose volume is
+-- fixed.
+--
 -- @tparam table npc victim entity
 -- @tparam string tierName "Walk", "Trot" or "Gallop"
 -- @tparam[opt] table armor the victim's armor total, for the body layer
@@ -164,6 +183,7 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	for _, layer in ipairs(plan) do
 		local trigger = layer[1]
 		local delay = layer[2] or 0
+		local distance = layer[3] or 0
 
 		if trigger == "body" then
 			trigger = self:BodyImpactSound(armor)
@@ -172,20 +192,25 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 		if type(trigger) == "string" and trigger ~= "" then
 			played = played + 1
 
-			if delay <= 0 then
-				pcall(function()
-					PlayAudioTrigger(on, trigger)
-				end)
-			else
-				-- Captured, because the loop variable is reused and the timer
-				-- fires long after this iteration has ended.
-				local queued = trigger
+			-- Captured, because the loop variable is reused and a timer fires
+			-- long after this iteration has ended.
+			local queued = trigger
+			local far = distance
 
-				Script.SetTimer(delay, function()
-					pcall(function()
+			local function fire()
+				pcall(function()
+					if far > 0 then
+						self:PlayAtDistance(on, queued, far)
+					else
 						PlayAudioTrigger(on, queued)
-					end)
+					end
 				end)
+			end
+
+			if delay <= 0 then
+				fire()
+			else
+				Script.SetTimer(delay, fire)
 			end
 		end
 	end
@@ -199,4 +224,41 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	end
 
 	return played > 0
+end
+
+--- Plays a trigger from a point offset from the entity, so it arrives quieter.
+--
+-- The only substitute for a volume control this engine offers a mod. An aux
+-- audio proxy is created on the entity, moved `distance` meters above it, and
+-- the trigger executed through it; `Lightning.lua` makes distant thunder
+-- quieter the same way. The proxy is removed once the sound has had time to
+-- finish, because one is created per layer per collision.
+--
+-- It has no effect on a player-relative event. `a_o_jump_landing` lives under
+-- `hoofsteps_player` and measured identically at zero and twelve meters,
+-- while `blunt_unarmed_body_fabric` was inaudible at twelve.
+--
+-- @tparam table entity the entity to hang the proxy on
+-- @tparam string trigger the audio trigger name
+-- @tparam number distance meters to offset the proxy by
+-- @treturn boolean true when the trigger resolved and was executed
+function HorseCollisionMod:PlayAtDistance(entity, trigger, distance)
+	local id = Sound.GetAudioTriggerID(trigger)
+
+	if not id then
+		return false
+	end
+
+	local proxy = entity:CreateAuxAudioProxy()
+
+	entity:SetAudioProxyOffset({ x = 0, y = 0, z = distance }, proxy)
+	entity:ExecuteAudioTrigger(id, proxy)
+
+	Script.SetTimer(self.AudioProxyLifetimeMs, function()
+		pcall(function()
+			entity:RemoveAuxAudioProxy(proxy)
+		end)
+	end)
+
+	return true
 end

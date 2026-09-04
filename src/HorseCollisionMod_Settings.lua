@@ -126,10 +126,18 @@ HorseCollisionModSettings = {
 	-- name "body" is replaced with the blunt impact matching what the victim
 	-- is wearing: cloth, mail or plate.
 	ImpactSoundWalk          = { { "f_body_tap", 0 } },
-	ImpactSoundTrot          = { { "a_o_jump_landing", 0 }, { "body", 10 } },
+	-- The body impact appears twice because the landing's volume is fixed and
+	-- the body's is not, so doubling it is how the impact is lifted against
+	-- the hooves. A third entry in a layer is a distance in meters, which
+	-- plays it from that far away and therefore quieter; it does nothing to a
+	-- player-relative event such as the landing.
+	ImpactSoundTrot          = { { "a_o_jump_landing", 0 },
+	                             { "body", 8 },
+	                             { "body", 16 } },
 	ImpactSoundGallop        = { { "a_o_jump_landing", 0 },
 	                             { "a_o_jump_landing", 25 },
-	                             { "body", 10 } },
+	                             { "body", 8 },
+	                             { "body", 16 } },
 
 	-- An occasional bone crack, gallop only.
 	ImpactSoundCrack         = { "c_special_bone_crack1", 20 },
