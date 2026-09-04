@@ -352,6 +352,8 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	local elapsed = 0
 	local finishedFor = 0
 	local sawFight = false
+	local sawYield = false
+	local caught = false
 
 	local function sample()
 		if generation ~= self.TimerTick then
@@ -369,8 +371,25 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		if self:IsStillFighting(state) then
 			sawFight = true
 			finishedFor = 0
+
+			if state ~= nil and string.find(state, "^Surrender") ~= nil then
+				sawYield = true
+			end
 		else
 			finishedFor = finishedFor + 1
+
+			-- Off by default. See `CatchYieldImmediately`.
+			if self.CatchYieldImmediately and sawYield and not caught then
+				caught = true
+
+				local stoodDown = self:SendStandDown(npc)
+
+				if self.Config.LogTelemetry then
+					self:Log("YieldCaught " .. tostring(npc:GetName())
+							.. " state=" .. tostring(state)
+							.. " stoodDown=" .. tostring(stoodDown))
+				end
+			end
 		end
 
 		if sawFight and finishedFor >= self.RetaliationSettledSamples then
@@ -389,6 +408,39 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	end
 
 	Script.SetTimer(interval, sample)
+end
+
+--- Tells a victim the incident is over and they may stand down.
+--
+-- `combat:stimulus:standDownRequest` sets `t_state = standDown` in
+-- `sb_combat.xml`, and it is one of only two stimulus kinds exempt from the
+-- acceptance rule that rejects a stimulus outright while the receiver is
+-- already fighting or fleeing. That exemption is the whole reason it works
+-- here: every other message this mod could send is discarded by someone
+-- mid-flight, which is exactly who needs it.
+--
+-- The payload is empty. `TypeDefinitions.xml` declares a single member `_`,
+-- which is a placeholder rather than a field: passing it is rejected with
+-- "override table does not match the type", and vanilla's own sends carry
+-- `values=""`.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true when the call was accepted
+function HorseCollisionMod:SendStandDown(npc)
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local ok = pcall(function()
+		local message = Utils.makeTable("combat:stimulus:standDownRequest", {})
+
+		XGenAIModule.SendMessageToEntityData(target,
+				"combat:stimulus:standDownRequest", message)
+	end)
+
+	return ok
 end
 
 --- Puts a victim right once the fight is over.

@@ -536,6 +536,19 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
+--- Whether a yielding victim is stopped the instant the yield ends.
+--
+-- Off, and kept deliberately rather than because it is used. On the first
+-- read after a surrender ends, the earliest the run can be caught at all, the
+-- stand-down goes out and he never gets going: measured as
+-- `YieldCaught state=MotionIdle stoodDown=true` with no run after it.
+--
+-- It is off because the run it prevents ends by itself, and stopping it hands
+-- him to `state_standDown` and about twenty five seconds of standing still.
+-- Turn it on only if a victim is ever seen running who should not be, and
+-- expect that pause to come with it.
+HorseCollisionMod.CatchYieldImmediately = false
+
 --- How long after stopping him his standing is checked a second time.
 HorseCollisionMod.AftermathSettleMs = 8000
 
