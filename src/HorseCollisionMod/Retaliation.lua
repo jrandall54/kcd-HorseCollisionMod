@@ -661,10 +661,10 @@ function HorseCollisionMod:WatchAftermath(npc)
 		end
 
 		-- The stand-down stops him and then parks him for the combat
-		-- subbrain's wind-down. This is what lets him go: see
-		-- `SendYieldBehavior` for the twenty five seconds it saves and the
-		-- seven things that did not work.
-		self:SendYieldBehavior(npc)
+		-- subbrain's wind-down, and the yield is what lets him go. It is
+		-- offered on a delay and repeated while he has not moved, because one
+		-- sent in this same moment is discarded: see `SendYieldBehavior`.
+		self:OfferYield(npc)
 
 		if self.Config.LogTelemetry then
 			self:Log("Aftermath " .. tostring(npc:GetName())
@@ -775,6 +775,69 @@ function HorseCollisionMod:WatchAftermath(npc)
 	end
 
 	Script.SetTimer(self.AftermathStopMs, sample)
+end
+
+--- Offers the yield behavior until the victim takes it.
+--
+-- Delayed rather than immediate, and repeated rather than sent once. A yield
+-- arriving while he is still coming out of the flee is discarded and he
+-- serves the full wind-down standing still; one arriving after he has settled
+-- had him walking 1.25 seconds later. Rather than trust a single delay to
+-- suit every victim, it is offered again while he has not moved.
+--
+-- Stops as soon as he is under way, so a victim who took the first offer is
+-- not sent another.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:OfferYield(npc)
+	local generation = self.TimerTick
+	local last = nil
+
+	local function where()
+		local p = nil
+
+		pcall(function()
+			local q = npc:GetWorldPos()
+
+			p = { x = q.x, y = q.y }
+		end)
+
+		return p
+	end
+
+	local function offer(triesLeft)
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local at = where()
+
+		if at ~= nil and last ~= nil then
+			local moved = self:VectorLength({
+				x = at.x - last.x,
+				y = at.y - last.y,
+				z = 0
+			})
+
+			if moved > 0.5 then
+				return
+			end
+		end
+
+		last = at
+
+		self:SendYieldBehavior(npc)
+
+		if triesLeft > 0 then
+			Script.SetTimer(self.YieldRetryMs, function()
+				offer(triesLeft - 1)
+			end)
+		end
+	end
+
+	Script.SetTimer(self.YieldDelayMs, function()
+		offer(self.YieldRetries)
+	end)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.

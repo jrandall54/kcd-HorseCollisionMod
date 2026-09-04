@@ -593,6 +593,23 @@ HorseCollisionMod.AftermathStandDown = true
 -- rather than leaving him standing for twenty five seconds.
 HorseCollisionMod.YieldBehaviorName = "combat_yield"
 
+--- How long after the stand-down the yield behavior is offered.
+--
+-- Not immediately. Sent in the same moment as the stand-down it is swallowed
+-- while he is still coming out of the flee, and he serves the full wind-down;
+-- sent three seconds later, once he has come to rest, he was walking 1.25
+-- seconds afterwards. The replan behaves the same way, which is the same
+-- lesson twice: a stimulus arriving mid-transition is discarded.
+HorseCollisionMod.YieldDelayMs = 3000
+
+--- How often the offer is repeated while he is still standing there.
+--
+-- One send is enough when it lands, and the delay above cannot be right for
+-- every victim, so it is repeated while he has not moved rather than tuned to
+-- a figure that happens to suit one test.
+HorseCollisionMod.YieldRetryMs = 2000
+HorseCollisionMod.YieldRetries = 4
+
 --- How often the victim is sampled through the aftermath.
 --
 -- Half a second rather than a full one for two reasons: a short burst of
