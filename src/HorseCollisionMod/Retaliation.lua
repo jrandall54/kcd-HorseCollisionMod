@@ -352,8 +352,6 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	local elapsed = 0
 	local finishedFor = 0
 	local sawFight = false
-	local sawYield = false
-	local caught = false
 
 	local function sample()
 		if generation ~= self.TimerTick then
@@ -371,30 +369,8 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		if self:IsStillFighting(state) then
 			sawFight = true
 			finishedFor = 0
-
-			if state ~= nil and string.find(state, "^Surrender") ~= nil then
-				sawYield = true
-			end
 		else
 			finishedFor = finishedFor + 1
-
-			-- Off by default. See `CatchYieldImmediately` for why something
-			-- that works is not the thing used.
-			if self.CatchYieldImmediately and sawYield and not caught then
-				caught = true
-
-				local stoodDown = false
-
-				if self.AftermathStandDown then
-					stoodDown = self:SendStandDown(npc)
-				end
-
-				if self.Config.LogTelemetry then
-					self:Log("YieldCaught " .. tostring(npc:GetName())
-							.. " state=" .. tostring(state)
-							.. " stoodDown=" .. tostring(stoodDown))
-				end
-			end
 		end
 
 		if sawFight and finishedFor >= self.RetaliationSettledSamples then
@@ -413,39 +389,6 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	end
 
 	Script.SetTimer(interval, sample)
-end
-
---- Tells a victim the incident is over and they may stand down.
---
--- `combat:stimulus:standDownRequest` sets `t_state = standDown` in
--- `sb_combat.xml`, and it is one of only two stimulus kinds exempt from the
--- acceptance rule that rejects a stimulus outright while the receiver is
--- already fighting or fleeing. That exemption is the whole reason it works
--- here: every other message this mod could send is discarded by someone
--- mid-flight, which is exactly who needs it.
---
--- The payload is empty. `TypeDefinitions.xml` declares a single member `_`,
--- which is a placeholder rather than a field: passing it is rejected with
--- "override table does not match the type", and vanilla's own sends carry
--- `values=""`.
---
--- @tparam table npc victim entity
--- @treturn boolean true when the call was accepted
-function HorseCollisionMod:SendStandDown(npc)
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
-
-	local ok = pcall(function()
-		local message = Utils.makeTable("combat:stimulus:standDownRequest", {})
-
-		XGenAIModule.SendMessageToEntityData(target,
-				"combat:stimulus:standDownRequest", message)
-	end)
-
-	return ok
 end
 
 --- Puts a victim right once the fight is over.
@@ -596,154 +539,46 @@ function HorseCollisionMod:EndRetaliation(npc, why)
 	end
 end
 
---- Watches a beaten victim and acts on what he is actually doing.
+--- Leaves a victim right once the fight is over.
 --
--- Driven by his state rather than by elapsed time. A timer alone gets this
--- wrong: a victim who gives up running after eight seconds is still standing
--- there when a fifteen second timer fires, and a stand-down aimed at a flee
--- that already ended helps nobody.
+-- He is replanned so he has somewhere to be, and his standing is checked
+-- again a little later, because the repair at the close of the incident runs
+-- before the rider is necessarily finished with him: a victim knocked down
+-- again, or beaten while he stands up, loses more afterwards. One measured
+-- victim was repaired at the close, dropped back to 0.0 by what followed, and
+-- was restored here.
 --
--- Three things are read every `AftermathPollMs`, and each is a real signal
--- rather than an inference:
+-- Nothing is done about a victim who runs, because a flee ends by itself.
+-- Measured on one beggar, one build, the only difference being what the rider
+-- did: left alone he stopped after fourteen seconds, and chased he was still
+-- at full speed forty seconds later. `fleeFromNPCParams` gives the reason,
+-- with a `distance` of 150 and `t_fleeParams.entityToFleeFrom` set to the
+-- player, so the run ends when he is that far from the man he is running
+-- from and following him means he never gets there.
 --
--- * **Yielding.** Every surrender state carries the `Surrender` prefix:
---   `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
---   `SurrenderDialogToMove`, `SurrenderForcedWait`, `SurrenderToCombat`. A
---   victim in one is mid-yield and is left alone until he is out of it.
--- * **Fleeing.** His own speed. This is the one place a reading has to stand
---   in for a state, because `GetCurrentAnimationState` reports
---   `MotionMovement` both for a man fleeing at four and a half meters per
---   second and for one walking to his stall at one, and the combat state that
---   would say `flee` is subbrain local and reads nil.
--- * **Settled.** Anything else, which is every idle and every ordinary
---   working animation.
---
--- `AftermathRunMs` is a budget rather than a trigger: he runs for that long
--- and is stopped when he has spent it, or is left alone if he pulls up of his
--- own accord first.
---
--- `CatchYieldImmediately` stops him on the yield transition instead, and is
--- off. The stand-down hands him to the combat subbrain's wind-down whichever
--- way he is stopped, so catching him at once has him serve those twenty five
--- seconds standing beside the rider, where running first spends the same
--- pause out of sight. The stand-down is only sent to somebody actually
--- running, because it parks him for the combat subbrain's wind-down and a man
--- who has already settled does not need that.
+-- `combat:stimulus:standDownRequest` does stop that run, and is not sent.
+-- It hands him to `state_standDown`, which holds him through a hot entity
+-- cooldown for about twenty five seconds of standing still, which is a
+-- visible cost for a problem that resolves on its own.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
-	local ran = 0
-	local left = self.AftermathPollLimit
-	local last = nil
+	local replanned = self:ReplanVictim(npc)
 
-	local function where()
-		local p = nil
-
-		pcall(function()
-			local q = npc:GetWorldPos()
-
-			p = { x = q.x, y = q.y }
-		end)
-
-		return p
+	if self.Config.LogTelemetry then
+		self:Log("Aftermath " .. tostring(npc:GetName())
+				.. " replanned=" .. tostring(replanned))
 	end
 
-	local function finish(why, speed)
-		local replanned = self:ReplanVictim(npc)
-
-		if self.Config.LogTelemetry then
-			self:Log("Aftermath " .. tostring(npc:GetName())
-					.. " " .. why
-					.. " ran=" .. tostring(ran) .. "ms"
-					.. " speed=" .. string.format("%.1f", speed or 0)
-					.. " replanned=" .. tostring(replanned))
-		end
-
-		Script.SetTimer(self.AftermathSettleMs, function()
-			if generation ~= self.TimerTick then
-				return
-			end
-
-			self:RepairVictim(npc)
-			self.Baseline[tostring(npc.id)] = nil
-		end)
-	end
-
-	last = where()
-
-	local function poll()
+	Script.SetTimer(self.AftermathSettleMs, function()
 		if generation ~= self.TimerTick then
 			return
 		end
 
-		left = left - 1
-
-		local state = nil
-
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		local at = where()
-		local speed = 0
-
-		if at ~= nil and last ~= nil then
-			speed = self:VectorLength({
-				x = at.x - last.x,
-				y = at.y - last.y,
-				z = 0
-			}) / (self.AftermathPollMs / 1000)
-		end
-
-		last = at
-
-		-- Mid-yield. Nothing is sent into a surrender that is still playing,
-		-- but the fact of it is remembered, because leaving it is the moment
-		-- that matters.
-		if state ~= nil and string.find(state, "^Surrender") ~= nil then
-			if left > 0 then
-				Script.SetTimer(self.AftermathPollMs, poll)
-			else
-				finish("yield-timeout", speed)
-			end
-
-			return
-		end
-
-
-
-		if speed > self.AftermathFleeSpeed then
-			ran = ran + self.AftermathPollMs
-
-			if ran >= self.AftermathRunMs then
-				local stoodDown = false
-
-				if self.AftermathStandDown then
-					stoodDown = self:SendStandDown(npc)
-				end
-
-				finish("stopped stoodDown=" .. tostring(stoodDown), speed)
-
-				return
-			end
-		elseif ran > 0 then
-			-- He gave up running by himself, so there is no flee to cancel.
-			finish("halted", speed)
-
-			return
-		end
-
-		if left <= 0 then
-			finish("limit", speed)
-
-			return
-		end
-
-		Script.SetTimer(self.AftermathPollMs, poll)
-	end
-
-	Script.SetTimer(self.AftermathPollMs, poll)
+		self:RepairVictim(npc)
+		self.Baseline[tostring(npc.id)] = nil
+	end)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.

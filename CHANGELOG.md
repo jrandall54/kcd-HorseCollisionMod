@@ -29,6 +29,18 @@ number.
 
 ## [Unreleased]
 
+### Changed
+
+- A victim who runs after a brawl is left to run. The mod used to stop him
+  with a stand-down, on the understanding that the flee never ended; it ends
+  on its own after ten to fifteen seconds, and what made it look endless was
+  following him. Measured on one man, one build: left alone he stopped after
+  fourteen seconds, and chased he was still at full speed forty seconds
+  later. The engine's own flee ends at a set distance from whoever is being
+  fled from, so a rider in pursuit is why it never arrived. Stopping him was
+  also expensive, because it parked him standing still for around twenty five
+  seconds afterwards, and that is gone with it.
+
 ## [4.7.4] - 2026-09-03
 
 ### Fixed
