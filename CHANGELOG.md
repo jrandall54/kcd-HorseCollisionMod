@@ -29,6 +29,16 @@ number.
 
 ## [Unreleased]
 
+## [4.9.1] - 2026-09-04
+
+### Changed
+
+- A gallop hits harder. It stacks four different blunt impacts rather than
+  repeats of one, so it reads as a collision rather than as the same sample
+  flammed against itself, and the heavy thud underneath sits closer. All four
+  follow what the victim is wearing, so a mailed guard and a peasant in cloth
+  are told apart on every layer.
+
 ## [4.9.0] - 2026-09-04
 
 ### Added

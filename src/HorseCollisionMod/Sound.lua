@@ -35,20 +35,49 @@
 --
 -- @module HorseCollisionMod.Sound
 -- @author jrandall54
--- @release 4.9.0
+-- @release 4.9.1
 
---- Blunt body impacts, keyed by what the victim is wearing.
+--- The material a victim's armor sounds like, by engine armor type.
 --
--- The combat audio in `Libs/GameAudio/combat.xml` carries one of these per
--- armor material. `Armor.lua` already reports the heaviest type a victim is
--- wearing, so the layer that lands on the body can match it: cloth thuds,
--- mail rings, plate bangs.
+-- `Armor.lua` reports the heaviest type a victim is wearing, transcribed in
+-- `ArmorTypeNames`: 4 is chain and 5 is plate. Everything lighter, leather
+-- included, sounds like cloth, because the blunt impact families are only
+-- authored for three materials.
 --
--- @table BodyImpactSounds
-HorseCollisionMod.BodyImpactSounds = {
-	fabric = "blunt_unarmed_body_fabric",
-	chainmail = "blunt_unarmed_body_chainmail",
-	plate = "blunt_unarmed_body_plate"
+-- @tparam table armor the total from `ArmorOf`, or nil
+-- @treturn string "fabric", "chainmail" or "plate"
+function HorseCollisionMod:ArmorMaterial(armor)
+	local heaviest = armor and armor.heaviestType or 0
+
+	if heaviest == 5 then
+		return "plate"
+	end
+
+	if heaviest == 4 then
+		return "chainmail"
+	end
+
+	return "fabric"
+end
+
+--- Trigger name patterns for each token a layer may use.
+--
+-- A tier names a token rather than a trigger, and the material the victim is
+-- wearing is substituted at the moment of impact. Every family here is
+-- authored for all three materials, so a mailed guard and a peasant in cloth
+-- are told apart by ear on every layer rather than only on one.
+--
+-- `foley` is the odd one out: it is movement rustle rather than impact, and
+-- the game authors it for four materials under different short names, so it
+-- carries its own table.
+--
+-- @table ImpactTokens
+HorseCollisionMod.ImpactTokens = {
+	body = "blunt_unarmed_body_%s",
+	body_armed = "blunt_armed_body_%s",
+	face = "blunt_unarmed_face_%s",
+	face_armed = "blunt_armed_face_%s",
+	blunt = "c_mfx_%s_sword_blunt_stopped"
 }
 
 --- Movement foley, keyed by what the victim is wearing.
@@ -67,8 +96,8 @@ HorseCollisionMod.BodyFoleySounds = {
 
 --- Resolves the `foley` token to the movement foley for a victim's armor.
 --
--- The same `heaviestType` indices `BodyImpactSound` reads, transcribed in
--- `ArmorTypeNames`: 2 and 3 are leather, 4 is chain, 5 is plate.
+-- Leather has its own rustle here, unlike the impact families, so this reads
+-- the armor type directly rather than going through `ArmorMaterial`.
 --
 -- @tparam table armor the total from `ArmorOf`, or nil
 -- @treturn string a trigger name
@@ -90,26 +119,26 @@ function HorseCollisionMod:BodyFoleySound(armor)
 	return self.BodyFoleySounds.cloth
 end
 
---- Resolves the `body` token in a layer list to an armor-matched trigger.
+--- Resolves a layer's trigger, substituting the victim's armor into a token.
 --
--- `heaviestType` is the engine's armor type index, transcribed in
--- `ArmorTypeNames`: 4 is chain and 5 is plate. Everything else, including
--- leather and bare cloth, takes the fabric sample.
+-- A name that is not a token is returned untouched, so a tier may still name
+-- a specific trigger where matching the armor would be wrong.
 --
--- @tparam table armor the total from `ArmorOf`, or nil
--- @treturn string a trigger name
-function HorseCollisionMod:BodyImpactSound(armor)
-	local heaviest = armor and armor.heaviestType or 0
-
-	if heaviest == 5 then
-		return self.BodyImpactSounds.plate
+-- @tparam string trigger the name a layer carries
+-- @tparam[opt] table armor the victim's armor total
+-- @treturn string the trigger to play
+function HorseCollisionMod:ResolveTrigger(trigger, armor)
+	if trigger == "foley" then
+		return self:BodyFoleySound(armor)
 	end
 
-	if heaviest == 4 then
-		return self.BodyImpactSounds.chainmail
+	local pattern = self.ImpactTokens[trigger]
+
+	if pattern then
+		return string.format(pattern, self:ArmorMaterial(armor))
 	end
 
-	return self.BodyImpactSounds.fabric
+	return trigger
 end
 
 --- Plays the impact sound for one collision.
@@ -221,10 +250,8 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 			trigger = nil
 		end
 
-		if trigger == "body" then
-			trigger = self:BodyImpactSound(armor)
-		elseif trigger == "foley" then
-			trigger = self:BodyFoleySound(armor)
+		if type(trigger) == "string" then
+			trigger = self:ResolveTrigger(trigger, armor)
 		end
 
 		if type(trigger) == "string" and trigger ~= "" then
