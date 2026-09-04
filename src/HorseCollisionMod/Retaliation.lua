@@ -700,85 +700,7 @@ function HorseCollisionMod:WatchAftermath(npc)
 						.. "ms")
 			end
 
-			-- How long he stands about before his routine actually picks him
-			-- up. The replan reports sent and accepted either way, so this is
-			-- the only figure that says whether it did anything, and it is
-			-- the one a rider watching him is complaining about.
-			local since = nil
-			local atRest = 0
-			local mark = where()
-
-			local function watchResume(triesLeft)
-				if generation ~= self.TimerTick then
-					return
-				end
-
-				local at = where()
-				local moved = 0
-
-				if at ~= nil and mark ~= nil then
-					moved = self:VectorLength({
-						x = at.x - mark.x,
-						y = at.y - mark.y,
-						z = 0
-					})
-				end
-
-				mark = at
-
-				local speed = moved / (self.AftermathReplanMs / 1000)
-				local moving = speed > self.AftermathResumeSpeed
-
-				-- The idle does not start until he has actually come to rest.
-				-- He coasts out of a four second run for a moment, and timing
-				-- from the replan counted that as him getting on with his day
-				-- and reported a quarter second where a rider watched ten.
-				if since == nil then
-					if not moving then
-						atRest = atRest + 1
-
-						if atRest >= self.AftermathConfirmSamples then
-							since = self:TimeMs()
-						end
-					else
-						atRest = 0
-					end
-
-					if triesLeft > 0 then
-						Script.SetTimer(self.AftermathReplanMs, function()
-							watchResume(triesLeft - 1)
-						end)
-
-						return
-					end
-				end
-
-				if (since ~= nil and moving) or triesLeft <= 0 then
-					local st = nil
-
-					pcall(function()
-						st = tostring(npc.actor:GetCurrentAnimationState())
-					end)
-
-					if self.Config.LogTelemetry then
-						self:Log("Aftermath " .. tostring(npc:GetName())
-								.. " resumed=" .. tostring(moving)
-								.. " idle=" .. tostring(since
-										and (self:TimeMs() - since) or -1)
-								.. "ms state=" .. tostring(st))
-					end
-
-					return
-				end
-
-				Script.SetTimer(self.AftermathReplanMs, function()
-					watchResume(triesLeft - 1)
-				end)
-			end
-
-			Script.SetTimer(self.AftermathReplanMs, function()
-				watchResume(self.AftermathResumeTries)
-			end)
+			self:TraceAftermath(npc)
 
 			finish(why)
 		end
@@ -849,6 +771,101 @@ function HorseCollisionMod:WatchAftermath(npc)
 	end
 
 	Script.SetTimer(self.AftermathStopMs, sample)
+end
+
+--- Dense diagnostic trace of a victim from the stand-down onward.
+--
+-- The pause between a victim stopping and getting on with his day is the
+-- thing under investigation, and one-variable-at-a-time changes each cost a
+-- ride to learn one fact. This logs everything relevant at once, four times a
+-- second for twenty five seconds, and re-sends the replan at marked moments
+-- so the timeline says whether any of them is what moves him.
+--
+-- Each line carries the time since the stand-down, his animation state, his
+-- own speed, whether he still reads as fighting, and whether the context
+-- option this file sets is still on him. Read together they separate a
+-- stand-down that has to expire, a replan that is being rejected, a cleanup
+-- that has not happened, and an opponent left registered against him.
+--
+-- Diagnostic only. It is not part of the feature and comes out once the
+-- question is answered.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:TraceAftermath(npc)
+	local generation = self.TimerTick
+	local began = self:TimeMs()
+	local mark = nil
+	local left = 100
+	local nudged = {}
+
+	pcall(function()
+		local q = npc:GetWorldPos()
+
+		mark = { x = q.x, y = q.y }
+	end)
+
+	local function step()
+		if generation ~= self.TimerTick or left <= 0 then
+			return
+		end
+
+		left = left - 1
+
+		local t = self:TimeMs() - began
+		local at = nil
+		local speed = 0
+		local state = "?"
+		local option = "?"
+
+		pcall(function()
+			local q = npc:GetWorldPos()
+
+			at = { x = q.x, y = q.y }
+		end)
+
+		if at ~= nil and mark ~= nil then
+			speed = self:VectorLength({
+				x = at.x - mark.x,
+				y = at.y - mark.y,
+				z = 0
+			}) / 0.25
+		end
+
+		mark = at
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		pcall(function()
+			option = tostring(Contexts.CheckOption(npc,
+					self.RetaliationOption))
+		end)
+
+		-- Marked re-sends. If he moves right after one of these the replan is
+		-- the lever and the timing was wrong; if he ignores all of them it is
+		-- not what is holding him.
+		local nudge = ""
+
+		for _, when in ipairs({ 2000, 5000, 9000 }) do
+			if t >= when and not nudged[when] then
+				nudged[when] = true
+				self:ReplanVictim(npc)
+				nudge = " REPLAN-SENT"
+			end
+		end
+
+		self:Log("Trace t=" .. tostring(t)
+				.. " st=" .. state
+				.. " sp=" .. string.format("%.1f", speed)
+				.. " fighting=" .. tostring(self:IsStillFighting(state))
+				.. " opt=" .. option
+				.. nudge)
+
+		Script.SetTimer(250, step)
+	end
+
+	Script.SetTimer(250, step)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.
