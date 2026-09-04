@@ -143,6 +143,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			.. " armorStamina=" .. string.format("%.2f", armorStamina)
 			.. " " .. combatDetail)
 
+	-- Before the tier branches, so the request goes out ahead of the
+	-- reaction animation rather than behind it.
+	self:PlayImpactSound(npc, tierName, armor)
+
 	if tierName == "Walk" then
 		local suppressed = cfg.SuppressStaggerInCombat and combatScale > 1.0
 
@@ -407,7 +411,12 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	-- The next tick is booked before any work is done. If detection ever
 	-- throws in a way pcall cannot contain, the loop still survives; booking
 	-- afterwards would end the mod for the rest of the session.
-	Script.SetTimer(100, function()
+	--
+	-- The interval comes from `TickSeconds`, which the forward sweep is also
+	-- computed from. Those were separate figures until the impact sound made
+	-- the difference audible: the timer was a hardcoded 100 and the sweep
+	-- assumed whatever `TickSeconds` said, so the two agreed only by accident.
+	Script.SetTimer(self:TickMs(), function()
 		HorseCollisionMod:UpdateTimer(assignedTick)
 	end)
 

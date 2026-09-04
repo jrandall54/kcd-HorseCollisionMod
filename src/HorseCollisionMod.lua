@@ -168,6 +168,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
+-- @field ImpactSound whether a collision makes a noise
+-- @field ImpactSoundOnRider hang the sound on the rider rather than the victim
+-- @field ImpactSoundWalk layers played by a walk impact
+-- @field ImpactSoundTrot layers played by a trot impact
+-- @field ImpactSoundGallop layers played by a gallop impact
+-- @field ImpactSoundCrack the occasional bone crack layer
+-- @field ImpactSoundCrackChance how often a gallop adds it
 -- @field VictimMarks whether a collision leaves dirt and blood on the victim
 -- @field VictimDirtTrot dirt added by a trot impact, 0 to 1
 -- @field VictimDirtGallop dirt added by a gallop impact, 0 to 1
@@ -188,7 +195,14 @@ HorseCollisionMod.Config = {
 	HorseRearReach           = 0.20,
 	HorseHalfWidth           = 0.70,
 	HorseMaxVerticalDiff     = 2.35,
-	TickSeconds              = 0.1,
+	-- The detection interval, and the only figure the loop rate and the
+	-- forward sweep are both taken from. It was 0.1 while the timer itself was
+	-- hardcoded to 100 ms, which agreed by accident rather than by design.
+	--
+	-- A tenth of a second is a long time to wait for the noise of being hit by
+	-- a horse. The impact sound made that audible, and the rider heard it
+	-- arrive after the visual and the physical feedback at every speed.
+	TickSeconds              = 0.033,
 	SweepMultiplier          = 0.50,
 	MaxSweepExtra            = 0.35,
 	HitCooldownMs            = 3000,
@@ -197,7 +211,9 @@ HorseCollisionMod.Config = {
 	-- A collision is scored on the peak of the last ImpactSpeedSamples ticks,
 	-- not on the speed read when the victim is noticed. MaxImpactSpeed is the
 	-- ceiling on that value, a little above the top of the gallop plateau.
-	ImpactSpeedSamples       = 3,
+	-- Nine ticks rather than three, because the tick is a third as long. The
+	-- window a collision is scored over is what matters, and it is unchanged.
+	ImpactSpeedSamples       = 9,
 	MaxImpactSpeed           = 11.0,
 
 	-- Knockdown impulse. Trot and gallop only; the walk tier never ragdolls.
@@ -304,6 +320,26 @@ HorseCollisionMod.Config = {
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
 	RetaliationCeilingSec    = 120,
+
+	-- The noise a collision makes, played on the victim at the moment of
+	-- impact. The names are audio triggers from the game's own .animevents
+	-- vocabulary; a name outside it resolves to nothing. An empty string
+	-- silences one tier without touching the others.
+	ImpactSound              = true,
+	ImpactSoundOnRider       = false,
+
+	-- Each tier is a list of { trigger, delay in milliseconds }. The trigger
+	-- name "body" is replaced with the blunt impact matching what the victim
+	-- is wearing: cloth, mail or plate.
+	ImpactSoundWalk          = { { "f_body_tap", 0 } },
+	ImpactSoundTrot          = { { "a_o_jump_landing", 0 }, { "body", 10 } },
+	ImpactSoundGallop        = { { "a_o_jump_landing", 0 },
+	                             { "a_o_jump_landing", 25 },
+	                             { "body", 10 } },
+
+	-- An occasional bone crack, gallop only.
+	ImpactSoundCrack         = { "c_special_bone_crack1", 20 },
+	ImpactSoundCrackChance   = 0.3,
 
 	-- The dirt and blood a collision leaves on the victim, applied at trot
 	-- and gallop only. Deltas in the range 0 to 1, accumulating across
@@ -791,7 +827,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 				.. " initializing physics timer loop "
 				.. tostring(currentTick))
 
-		Script.SetTimer(100, function()
+		Script.SetTimer(self:TickMs(), function()
 			HorseCollisionMod:UpdateTimer(currentTick)
 		end)
 	end
@@ -822,6 +858,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Marks.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Sound.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")

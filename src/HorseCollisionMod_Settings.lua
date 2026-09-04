@@ -105,6 +105,36 @@ HorseCollisionModSettings = {
 	-- when the fight is over it puts him back the way it found him.
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 
+	-- The noise a collision makes, played as the horse hits them.
+	--
+	-- No single sound in the game is a horse striking a person, because
+	-- vanilla never makes that noise. These are layered instead: the horse's
+	-- own landing carries the weight, and a blunt impact ten milliseconds
+	-- later is the body it hit.
+	--
+	-- Any of the game's 1803 audio trigger names may be used, listed in
+	-- Libs/GameAudio/*.xml inside GameData.pak. A name that does not exist
+	-- plays nothing rather than breaking anything, and an empty list silences
+	-- that tier alone.
+	--
+	-- ImpactSoundOnRider hangs the sound on you rather than on the victim,
+	-- which is louder and less positional.
+	ImpactSound              = true,
+	ImpactSoundOnRider       = false,
+
+	-- Each tier is a list of { trigger, delay in milliseconds }. The trigger
+	-- name "body" is replaced with the blunt impact matching what the victim
+	-- is wearing: cloth, mail or plate.
+	ImpactSoundWalk          = { { "f_body_tap", 0 } },
+	ImpactSoundTrot          = { { "a_o_jump_landing", 0 }, { "body", 10 } },
+	ImpactSoundGallop        = { { "a_o_jump_landing", 0 },
+	                             { "a_o_jump_landing", 25 },
+	                             { "body", 10 } },
+
+	-- An occasional bone crack, gallop only.
+	ImpactSoundCrack         = { "c_special_bone_crack1", 20 },
+	ImpactSoundCrackChance   = 0.3,
+
 	-- What a victim looks like afterwards. Someone ridden down at a gallop
 	-- otherwise stands back up immaculate. Dirt covers everything they are
 	-- wearing; blood goes on the side of the body the horse struck. Both are

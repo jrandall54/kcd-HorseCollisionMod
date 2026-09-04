@@ -196,3 +196,20 @@ function HorseCollisionMod:GetSpeedTier(speed)
 
 	return "Idle"
 end
+
+--- The detection interval in milliseconds.
+--
+-- `TickSeconds` is the one figure the loop rate and the forward sweep are both
+-- derived from, so a change to it moves them together. Clamped at the bottom
+-- because a zero would book a timer that never rests.
+--
+-- @treturn number milliseconds between detection ticks
+function HorseCollisionMod:TickMs()
+	local seconds = self.Config.TickSeconds or 0.1
+
+	if seconds < 0.016 then
+		seconds = 0.016
+	end
+
+	return math.floor(seconds * 1000)
+end
