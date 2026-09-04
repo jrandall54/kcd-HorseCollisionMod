@@ -559,9 +559,13 @@ HorseCollisionMod.AftermathFleeSpeed = 2.5
 -- threshold in a stride and stops a second later, which reads as him thinking
 -- better of it. A man who has just been beaten should get properly clear.
 --
--- Four seconds is roughly twenty meters at a flee's pace, which leaves the
--- rider's immediate area without carrying him out of the district.
-HorseCollisionMod.AftermathRunMs = 4000
+-- Run length and the pause that follows are not independent. `combatUtils`
+-- counts panic run legs and only gives up after ten of them, then rallies and
+-- takes another eight seconds before the combat subbrain releases him, so a
+-- flee caught early winds down quickly and one left to establish does not. A
+-- stand-down about a second in was measured followed by a five second pause,
+-- and one four seconds in by twenty five.
+HorseCollisionMod.AftermathRunMs = 1500
 
 --- Whether a fleeing victim is stopped with a stand-down at all.
 --
