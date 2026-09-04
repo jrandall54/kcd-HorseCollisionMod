@@ -453,6 +453,19 @@ twice does not carry two identical marks.
 Nothing is applied at the walk tier: a stagger puts nobody on the ground, and
 dirt on a victim who never fell reads as a bug.
 
+The mod does not clean up after itself, because the game does. A victim keeps
+his marks until his own routine takes him home for the night and returns him
+the next day clean. That was measured rather than assumed, and it contradicts
+the script evidence: `CleanDirt` is documented as leaving blood alone, and
+`WashDirtAndBlood` is called on the player and nowhere else, yet an NPC who has
+been home comes back with no blood on him.
+
+Testing that depends on how the waiting is done. An NPC waited at is held in
+place and reloaded where he stands, and his daycycle never runs: forty eight
+in-game hours spent standing at a merchant's booth changed nothing about him.
+Waiting through a night with him asleep at home, then again until the
+afternoon, cleaned him completely.
+
 ## Collision damage
 
 The mod contains no damage code. Health lost to a knockdown is the engine's,

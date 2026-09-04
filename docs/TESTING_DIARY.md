@@ -14415,3 +14415,43 @@ blood on his leg without being told where to look; `so_back` carries
 visible on the body rather than only in the log.
 
 The walk tier is deliberately unmarked. A stagger puts nobody on the ground.
+
+## The marks clear when the victim actually lives a day, not when the clock does
+
+The concern was whether marking a victim leaves them permanently altered in a
+way vanilla would not. The script evidence said dirt clears and blood does not:
+NPCs call `actor:CleanDirt(1)` in `so_water_tube.xml`, `sa_home.xml` and
+`so_hostel.xml`, and the daycycle cleans them in rain, but `CleanDirt` is
+documented as leaving blood alone and the only bind that removes blood,
+`WashDirtAndBlood`, is called on the player and nowhere else.
+
+The game disagrees, and finding that out depended entirely on how the waiting
+was done.
+
+A merchant was ridden down twice at a gallop. He was visibly covered in dirt
+with blood on both arms. Waiting twenty four hours **standing at his booth**
+left him bloody and filthy. Waiting another twenty four the same way changed
+nothing either. Waiting until late night, when he was at home asleep and
+loaded somewhere else entirely, and then waiting again until the afternoon
+when he was back at his booth, produced a completely clean man.
+
+So an NPC waited at is not walked through their schedule. They are held where
+they are and reloaded in place, and the daycycle behaviors that would have
+changed them never run. Every future test of a routine-driven effect has to
+wait through a night with the target somewhere else.
+
+### What that means for the feature
+
+Nothing the mod applies is permanent. A victim carries their dirt and blood
+until their own routine takes them home, and comes back clean, which is the
+same treatment vanilla gives the dirt it adds to everyone every day. No
+cleanup code is needed on the mod's side.
+
+### A direct time jump is not a substitute and breaks the session
+
+`Calendar.SetWorldTime` moved the clock a day forward correctly, log confirmed,
+and the rider reported that "everything broke" and had to reload. The in-game
+wait is the only safe way to pass time here.
+`wh_pl_SkipTimeMaxWorldTimeRatio` defaults to 360 and takes 7200 without
+complaint, which turns a full day's wait into about twelve seconds and changes
+nothing about how the world simulates it.
