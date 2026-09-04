@@ -14330,3 +14330,56 @@ even permanent has not been measured under controlled conditions; the seven-day
 report was from ordinary play. Skipping days with `tools/dev_time.lua` against
 a deliberately broken victim would settle that, and it is the cheapest
 remaining question.
+
+## The permanent flee was the chase
+
+A victim who runs after a provoked fight was recorded across this project as
+fleeing indefinitely, and a stand-down was built to stop him. He does stop on
+his own. What kept him running was being followed.
+
+One beggar, one build, the only difference being what the rider did:
+
+| rider | outcome |
+| --- | --- |
+| stood still | `halted ran=14000ms speed=0.0` |
+| chased him | `stopped ran=40000ms speed=4.9` |
+
+Chased, he ran the whole forty second budget at full flee speed with no sign
+of slowing. Left alone, the same man stopped dead at fourteen seconds. A
+second victim stopped at 11.5 seconds under the same conditions.
+
+`fleeFromNPCParams` explains it: `distance` defaults to **150.0**, and
+`t_fleeParams.entityToFleeFrom` is set to `$realAttacker`, which is the
+player. The flee ends when he is that far from the man he is fleeing. Follow
+him and he never gets there.
+
+Every earlier observation of an endless flee was made while following the
+victim, which is also how the mod's own detector was blinded: it measured
+distance from the player, so a sprinting victim read as stationary while the
+rider kept pace, and one run logged `done=no-flee` about a man crossing a
+village.
+
+### What that costs
+
+`AftermathStandDown` exists to stop a flee that ends by itself, and the
+stand-down is what hands a victim to `state_standDown` and its wind-down,
+measured at about twenty five seconds of standing still. The pause was the
+price of solving a problem that was not there.
+
+The repair is the part that matters and is unaffected: below vanilla's 0.2
+threshold a victim decides to run again on every sighting, so without it the
+flee restarts forever whether or not any single one ends.
+
+### The yield menu is a message, and it carries an enum
+
+Choosing "continue combat" on a yielded victim made a beggar who would not
+throw a punch draw an axe and fight properly. That menu sends
+`combat:mercy:dialogResult` with an `enum:combatMercyOutcome`:
+
+    none, exitCombat, takeWeaponAndLeave, leaveWeaponAndLeave,
+    leaveValuablesAndLeave, fight
+
+`fight` is what produces the committed armed fight, and it overrides the
+timidity that `alwaysFightWhenHit` only partly removes. `exitCombat` is a
+sanctioned way out of combat, which is what a long search for one failed to
+find; it is not needed for the pause any more, and it is worth knowing.

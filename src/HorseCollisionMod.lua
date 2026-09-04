@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.7.4
+-- @release 4.7.5
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.7.4"
+HorseCollisionMod.Version = "4.7.5"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -536,60 +536,18 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
---- Whether a fleeing victim is stopped with a stand-down at all.
---
--- On, because the flee does not end without it: a victim repaired to 0.816 in
--- mid-flight held four and a half meters per second out to forty seven meters
--- and never slowed. The repair decides whether he runs again and does nothing
--- to a run already under way.
-HorseCollisionMod.AftermathStandDown = true
-
 --- Whether a yielding victim is stopped the instant the yield ends.
 --
--- Off, and kept because it works rather than because it might. On the first
--- read after a surrender ends, which is the earliest the run can be caught at
--- all, the stand-down goes out and he never gets going: measured as
+-- Off, and kept deliberately rather than because it is used. On the first
+-- read after a surrender ends, the earliest the run can be caught at all, the
+-- stand-down goes out and he never gets going: measured as
 -- `YieldCaught state=MotionIdle stoodDown=true` with no run after it.
 --
--- Stopping the flee is not the whole cost, which is why it is off. The
--- stand-down hands him to the combat subbrain's wind-down, about twenty five
--- seconds that nothing reachable from Lua shortens, so a victim caught at
--- once spends it standing vacant beside the rider. Letting him run first
--- spends the same pause where the rider is not, which reads better even
--- though the mechanism is cruder.
---
--- Turn it on if that wind-down is ever solved, because it is then strictly
--- the better of the two.
+-- It is off because the run it prevents ends by itself, and stopping it hands
+-- him to `state_standDown` and about twenty five seconds of standing still.
+-- Turn it on only if a victim is ever seen running who should not be, and
+-- expect that pause to come with it.
 HorseCollisionMod.CatchYieldImmediately = false
-
---- How long a fleeing victim is left to run before he is stopped.
---
--- The pause that follows a stand-down is the combat subbrain's own wind-down,
--- and nothing reachable from Lua shortens it, so this decides where he spends
--- it rather than whether he does. Fifteen seconds carries him well clear of
--- the rider and of wherever the fight happened, without taking him out of the
--- district.
-HorseCollisionMod.AftermathRunMs = 15000
-
---- How often the victim is read while the aftermath is open.
---
--- Long enough that a position difference is meaningful, short enough that the
--- moment he stops running is not missed by much.
-HorseCollisionMod.AftermathPollMs = 500
-
---- How many reads before the aftermath gives up on him.
---
--- A bound rather than a mechanism, so a victim who neither settles nor runs
--- cannot leave a poll going for the session. Ninety at half a second is
--- forty five, comfortably past a fifteen second run and the yield before it.
-HorseCollisionMod.AftermathPollLimit = 90
-
---- The victim's own speed, in meters per second, that counts as running.
---
--- His own movement, not his distance from the rider, which reads as standing
--- still when the rider follows him. A measured flee held four and a half;
--- somebody walking to a stall makes about one.
-HorseCollisionMod.AftermathFleeSpeed = 2.5
 
 --- How long after stopping him his standing is checked a second time.
 HorseCollisionMod.AftermathSettleMs = 8000
