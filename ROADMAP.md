@@ -259,18 +259,26 @@ and both axes of the footprint were each cleared against logged sessions.
       at the same magnitudes through `actor:Fall`, which plays no clip this mod
       ships. The get-up carries no weapon tag to vary, four options per
       direction and nothing else, so there is nothing here to change.
-- [ ] A polearm guard took no walk stagger at all, where every other NPC
-      staggers reliably at that tier. Observed once, in passing, and not
-      instrumented: no telemetry was being read for that impact, so whether
-      the footprint missed him, the tier scored below walk, or the reaction
-      was suppressed is all unknown.
+- [x] Fixed. A polearm guard took no walk stagger at all, where every other
+      NPC staggers reliably at that tier. The reaction was suppressed, and
+      `SuppressStaggerInCombat` was doing it.
 
-      This is the second thing polearm carriers do differently. The get-up
-      turn above was chased to vanilla and closed, but two unrelated
-      anomalies on the same class of NPC is a pattern worth one deliberate
-      look: ride the same guard several times at walk with `DiagnoseMisses`
-      on, which names the reason an impact produced nothing, and compare
-      against a swordsman standing beside him.
+      `IsCombatCollision` returns true if the player is in danger **or the
+      victim has a weapon drawn**, and the walk branch suppressed the stagger
+      whenever that combined signal was true. The drawn weapon half was written
+      believing townsfolk never walk around armed. A guard carrying a polearm
+      holds it on patrol all day, so he read as armed permanently and could
+      never be staggered.
+
+      Instrumented with `DiagnoseMisses` on: impacts on the polearm guard
+      logged `armed=true/true combatScale=2.2` and produced no stagger, against
+      `armed=false/true combatScale=1.0` and a stagger for a sword guard beside
+      him. The check now returns the danger signal separately and the walk tier
+      suppresses on that alone, so only a real fight skips the stagger.
+
+      The pattern that prompted the look was real but coincidental: the
+      get-up turn was vanilla's, and this one is the mod's own suppression.
+      What polearm carriers share is only that they hold their weapon.
 
 ## Phase 2: Mass, armor and momentum
 

@@ -29,6 +29,17 @@ number.
 
 ## [Unreleased]
 
+## [4.9.2] - 2026-09-04
+
+### Fixed
+
+- Guards carrying a polearm can be staggered at walking pace. They never
+  could: the stagger is skipped during combat, and the combat test counted a
+  victim holding a weapon as combat, so a guard who carries his polearm on
+  patrol read as fighting all day. Only an actual fight skips the stagger now.
+  Being staggerable also means they can now lose patience and fight back,
+  which they never had the chance to do.
+
 ## [4.9.1] - 2026-09-04
 
 ### Changed

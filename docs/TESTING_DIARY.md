@@ -14914,3 +14914,28 @@ because vanilla uses it. A bark then becomes an ordinary `ExecuteAudioTrigger`.
 
 It is unbuilt, not impossible. It needs FMOD Studio and a decision about
 redistributing Warhorse voice assets.
+
+## The polearm guard could never be staggered, and it was the mod
+
+Observed in passing long ago and never instrumented: a polearm guard takes no
+walk stagger where everyone else does. Ridden into repeatedly at walking pace
+with `DiagnoseMisses` on, the telemetry answered it immediately.
+
+    Impact tier=Walk combatScale=2.2 armed=true/true   -- polearm guard, no stagger
+    Impact tier=Walk combatScale=1.0 armed=false/true  -- sword guard, staggers
+
+`IsCombatCollision` returns true when the player is in danger **or the victim
+has a weapon drawn**, and the walk branch suppressed the stagger on that
+combined signal. The drawn weapon half carried a comment stating the
+assumption it rested on: townsfolk do not walk around armed. A guard carrying
+a polearm holds it on patrol, permanently, so he was classed as in combat at
+every impact and `SuppressStaggerInCombat` skipped him every time.
+
+The check now returns the danger signal as a third value and the walk tier
+suppresses on that alone. Confirmed in game: he staggers, and after a few
+shoves he turns and fights, which he could never do before because he never
+registered a reaction to accumulate.
+
+Worth remembering as a shape rather than a fact: two anomalies on the same
+class of NPC looked like one cause and were not. The get-up turn was vanilla's
+and this was the mod's own setting.
