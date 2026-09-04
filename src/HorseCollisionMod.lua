@@ -574,11 +574,12 @@ HorseCollisionMod.AftermathRunMs = 4000
 -- Before the stand-down was sent on every ending that pause was about five
 -- seconds.
 --
--- The repair is what actually cures him: below vanilla's threshold he decides
--- to run on sight every time, and above it he does not. A flee already
--- running should then end by itself with nothing to restart it, which is what
--- turning this off tests.
-HorseCollisionMod.AftermathStandDown = false
+-- It is sent anyway, because the flee does not end without it. A victim
+-- repaired to 0.816 in mid-flight held four and a half meters per second out
+-- to forty seven meters and never slowed: the repair decides whether he runs
+-- again, and does nothing to a run already under way. Off, he runs
+-- indefinitely, which is the defect this whole path exists to cure.
+HorseCollisionMod.AftermathStandDown = true
 
 --- How often the victim is sampled through the aftermath.
 --
