@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-09-04
+
 ### Added
 
 - A victim knocked to the ground now shows it. Dirt goes on everything they

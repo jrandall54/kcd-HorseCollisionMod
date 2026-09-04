@@ -14416,7 +14416,7 @@ visible on the body rather than only in the log.
 
 The walk tier is deliberately unmarked. A stagger puts nobody on the ground.
 
-## The marks clear when the victim actually lives a day, not when the clock does
+## The marks clear after a night, and standing there waiting does not do it
 
 The concern was whether marking a victim leaves them permanently altered in a
 way vanilla would not. The script evidence said dirt clears and blood does not:
@@ -14425,27 +14425,34 @@ NPCs call `actor:CleanDirt(1)` in `so_water_tube.xml`, `sa_home.xml` and
 documented as leaving blood alone and the only bind that removes blood,
 `WashDirtAndBlood`, is called on the player and nowhere else.
 
-The game disagrees, and finding that out depended entirely on how the waiting
-was done.
+The game disagrees, and what was done is worth recording exactly, because the
+result depended on it.
 
 A merchant was ridden down twice at a gallop. He was visibly covered in dirt
 with blood on both arms. Waiting twenty four hours **standing at his booth**
 left him bloody and filthy. Waiting another twenty four the same way changed
-nothing either. Waiting until late night, when he was at home asleep and
-loaded somewhere else entirely, and then waiting again until the afternoon
-when he was back at his booth, produced a completely clean man.
+nothing either. Waiting until late night, when he was away at home, and then
+waiting again until the afternoon when he was back at his booth, produced a
+completely clean man.
 
-So an NPC waited at is not walked through their schedule. They are held where
-they are and reloaded in place, and the daycycle behaviors that would have
-changed them never run. Every future test of a routine-driven effect has to
-wait through a night with the target somewhere else.
+**Why** is not established. The plausible reading is that an NPC waited at is
+held where they are and reloaded in place, so the daycycle behaviors that
+would have changed them never run, and only a night spent with the target
+somewhere else puts them through their routine. That is a hypothesis fitted to
+three observations, not a measurement: nothing here read the NPC's schedule or
+watched a wash behavior fire.
+
+What is established is the procedure. Any future test of a routine-driven
+effect should wait through a night with the target elsewhere, because that is
+the only form of waiting that has produced a change.
 
 ### What that means for the feature
 
-Nothing the mod applies is permanent. A victim carries their dirt and blood
-until their own routine takes them home, and comes back clean, which is the
-same treatment vanilla gives the dirt it adds to everyone every day. No
-cleanup code is needed on the mod's side.
+Nothing the mod applies is permanent. A victim was seen marked, and seen clean
+again a night later, without the mod doing anything to clean him. That is
+enough to close the question the feature raised, and no cleanup code is needed
+on the mod's side. What in the game removed the blood is unidentified, and it
+is not the two binds the scripts pointed at.
 
 ### A direct time jump is not a substitute and breaks the session
 

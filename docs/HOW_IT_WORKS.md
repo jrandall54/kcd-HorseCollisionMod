@@ -36,9 +36,8 @@ game uses for its own characters, so a victim gets up and carries on.
 A victim who hits the ground shows it afterwards. Their clothes pick up dirt,
 and a gallop draws blood on whichever side of them the horse struck. Both
 accumulate, so a man ridden down repeatedly gets steadily filthier. Neither is
-permanent: a victim carries the marks until his own routine takes him home for
-the night, and he is back at his post clean the next day, which is how the game
-already handles the dirt it puts on everybody. Nothing is marked at walking
+permanent: a man ridden down and left alone was found clean again after a night
+had passed, without the mod doing anything to clean him. Nothing is marked at walking
 pace, where nobody goes down.
 
 ### Losing patience

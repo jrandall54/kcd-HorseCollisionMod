@@ -453,18 +453,17 @@ twice does not carry two identical marks.
 Nothing is applied at the walk tier: a stagger puts nobody on the ground, and
 dirt on a victim who never fell reads as a bug.
 
-The mod does not clean up after itself, because the game does. A victim keeps
-his marks until his own routine takes him home for the night and returns him
-the next day clean. That was measured rather than assumed, and it contradicts
-the script evidence: `CleanDirt` is documented as leaving blood alone, and
-`WashDirtAndBlood` is called on the player and nowhere else, yet an NPC who has
-been home comes back with no blood on him.
+The mod does not clean up after itself, because something in the game already
+does. A merchant ridden down twice was seen covered in dirt with blood on both
+arms, and seen clean again after a night had passed with him away from his
+booth. That contradicts the script evidence, which had `CleanDirt` documented
+as leaving blood alone and `WashDirtAndBlood` called on the player and nowhere
+else. Whatever removes it has not been identified.
 
-Testing that depends on how the waiting is done. An NPC waited at is held in
-place and reloaded where he stands, and his daycycle never runs: forty eight
-in-game hours spent standing at a merchant's booth changed nothing about him.
-Waiting through a night with him asleep at home, then again until the
-afternoon, cleaned him completely.
+The form of the waiting mattered. Forty eight in-game hours spent standing at
+the merchant's booth changed nothing about him at all; the night that cleaned
+him was one he spent elsewhere. Why that is so is untested, so a routine-driven
+effect should be checked the way this one was rather than by waiting in place.
 
 ## Collision damage
 
