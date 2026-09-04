@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.7.3
+-- @release 4.7.4
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.7.3"
+HorseCollisionMod.Version = "4.7.4"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -166,13 +166,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RetaliationMaxChance ceiling on that chance
 -- @field RetaliationMemorySec how long a victim remembers being shoved, in
 --   seconds, before the count decays to nothing
--- @field RetaliationFleeSpeed meters per second above which a victim who has
---   left combat is running away rather than walking somewhere
--- @field RetaliationFleeIgnoreRange meters the rider must be clear by before
---   a running victim counts as a runaway rather than as someone sensibly
---   getting away from him
--- @field RetaliationFleeSamples consecutive samples of that before the mod
---   decides a flee has outlived its cause and intervenes
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
 -- @table Config
@@ -305,9 +298,6 @@ HorseCollisionMod.Config = {
 	RetaliationChanceStep    = 0.25,
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
-	RetaliationFleeSpeed     = 3.5,
-	RetaliationFleeIgnoreRange = 25.0,
-	RetaliationFleeSamples   = 8,
 	RetaliationCeilingSec    = 120,
 
 	-- Switches.
@@ -401,6 +391,17 @@ HorseCollisionMod.VictimActivity = {}
 -- @table Annoyance
 HorseCollisionMod.Annoyance = {}
 
+--- Each victim's regard for the rider before the fight, keyed by entity id.
+--
+-- Recorded at the moment of provocation, which is still clean: the shoves
+-- that lead up to it raise no crime and the provocation names the victim as
+-- his own attacker, so neither touches reputation. The repair afterwards
+-- restores this figure rather than a fixed amount, because a fixed amount
+-- calibrated for a ruined victim overshoots and leaves a man who was beaten
+-- thinking better of the rider than he did beforehand.
+-- @table Baseline
+HorseCollisionMod.Baseline = {}
+
 --- Last time each entity was reported as a miss, keyed by entity id.
 HorseCollisionMod.RecentRejections = {}
 
@@ -493,6 +494,110 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- fine for a state that changes on the scale of a scuffle, and it keeps the
 -- telemetry readable rather than a wall of lines.
 HorseCollisionMod.RetaliationPollMs = 1000
+
+--- Consecutive samples out of the fight before the incident is closed.
+--
+-- More than one, because a fighter between exchanges reads as finished for an
+-- instant and closing there would cut a live fight short.
+HorseCollisionMod.RetaliationSettledSamples = 3
+
+
+--- The lowest a repair will leave a victim, whatever the arithmetic says.
+--
+-- Vanilla stops an NPC dealing with the player below 0.2, and below that he
+-- decides to flee again every time he perceives the rider, which is what made
+-- the damage look permanent. This sits above that rather than on it, so a
+-- victim is never left balanced on the edge of it.
+HorseCollisionMod.RepairFloor = 0.35
+
+--- What losing the fight costs a victim permanently.
+--
+-- The repair deliberately does not restore a victim to exactly what he was.
+-- He was ridden down and then beaten, and remembering it is correct; what is
+-- not correct is being ruined for good. So the target is his own standing
+-- less this, held above the floor above, which leaves a man who thinks less
+-- of the rider than his neighbors do and still trades with him.
+HorseCollisionMod.RepairFightCost = 0.15
+
+--- How far one `surrender_step` moves a relationship.
+--
+-- Measured by applying it repeatedly from zero and reading between each: the
+-- move is exactly 0.1389 every time, and the second argument the bind accepts
+-- does not scale it. 0.1, 0.2 and no argument at all all produced the same
+-- figure, so the count of applications is the only control there is.
+--
+-- `surrender_step` also cannot carry anyone past 0.8430, which the same sweep
+-- reached and then stopped at.
+HorseCollisionMod.RepairStepValue = 0.1389
+
+--- A ceiling on the applications any single repair will make.
+--
+-- Nothing legitimate needs more: a victim at 0.0 restored to a townsman's
+-- 0.35 takes three. It bounds a victim whose relationship cannot be read.
+HorseCollisionMod.RepairMaxSteps = 5
+
+--- Whether a fleeing victim is stopped with a stand-down at all.
+--
+-- On, because the flee does not end without it: a victim repaired to 0.816 in
+-- mid-flight held four and a half meters per second out to forty seven meters
+-- and never slowed. The repair decides whether he runs again and does nothing
+-- to a run already under way.
+HorseCollisionMod.AftermathStandDown = true
+
+--- Whether a yielding victim is stopped the instant the yield ends.
+--
+-- Off, and kept because it works rather than because it might. On the first
+-- read after a surrender ends, which is the earliest the run can be caught at
+-- all, the stand-down goes out and he never gets going: measured as
+-- `YieldCaught state=MotionIdle stoodDown=true` with no run after it.
+--
+-- Stopping the flee is not the whole cost, which is why it is off. The
+-- stand-down hands him to the combat subbrain's wind-down, about twenty five
+-- seconds that nothing reachable from Lua shortens, so a victim caught at
+-- once spends it standing vacant beside the rider. Letting him run first
+-- spends the same pause where the rider is not, which reads better even
+-- though the mechanism is cruder.
+--
+-- Turn it on if that wind-down is ever solved, because it is then strictly
+-- the better of the two.
+HorseCollisionMod.CatchYieldImmediately = false
+
+--- How long a fleeing victim is left to run before he is stopped.
+--
+-- The pause that follows a stand-down is the combat subbrain's own wind-down,
+-- and nothing reachable from Lua shortens it, so this decides where he spends
+-- it rather than whether he does. Fifteen seconds carries him well clear of
+-- the rider and of wherever the fight happened, without taking him out of the
+-- district.
+HorseCollisionMod.AftermathRunMs = 15000
+
+--- How often the victim is read while the aftermath is open.
+--
+-- Long enough that a position difference is meaningful, short enough that the
+-- moment he stops running is not missed by much.
+HorseCollisionMod.AftermathPollMs = 500
+
+--- How many reads before the aftermath gives up on him.
+--
+-- A bound rather than a mechanism, so a victim who neither settles nor runs
+-- cannot leave a poll going for the session. Ninety at half a second is
+-- forty five, comfortably past a fifteen second run and the yield before it.
+HorseCollisionMod.AftermathPollLimit = 90
+
+--- The victim's own speed, in meters per second, that counts as running.
+--
+-- His own movement, not his distance from the rider, which reads as standing
+-- still when the rider follows him. A measured flee held four and a half;
+-- somebody walking to a stall makes about one.
+HorseCollisionMod.AftermathFleeSpeed = 2.5
+
+--- How long after stopping him his standing is checked a second time.
+HorseCollisionMod.AftermathSettleMs = 8000
+
+--- The standing assumed for a victim nothing was recorded for.
+--
+-- Untouched townsmen sampled across a village all read 0.50.
+HorseCollisionMod.RepairDefaultTarget = 0.50
 
 --- How often a provoked victim is checked for having entered the fight.
 --
@@ -692,6 +797,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		self.RecentHits = {}
 		self.VictimActivity = {}
 		self.Annoyance = {}
+		self.Baseline = {}
 
 		local applied, rejected = self:ApplySettings()
 

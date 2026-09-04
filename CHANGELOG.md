@@ -14,6 +14,12 @@ heading when the branch merges. An entry that breaks an existing install is
 marked **BREAKING**. `tools/version_check.py` derives the next version from
 these sections and refuses a build made at any other number.
 
+Removing a setting forces a major version, because a key a player has in their
+settings file disappearing is a broken install. An entry marked **NOT
+BREAKING** overrides that, and is only honest for a setting that no released
+version ever carried: the check compares against the last tag, so it cannot
+tell a key players have from one that only ever existed between releases.
+
 Every merge to `main` takes a version and a tag, whether or not that build is
 published, because `main` is always releasable and a merged version is
 therefore stable. A prerelease suffix belongs to a build still being tested on
@@ -22,6 +28,36 @@ against whatever version is current at the time, and it does not change the
 number.
 
 ## [Unreleased]
+
+## [4.7.4] - 2026-09-03
+
+### Fixed
+
+- A man you fought is no longer ruined for good. A victim came out of a brawl
+  at a relationship of 0.0, against roughly 0.5 for a healthy villager, and
+  below vanilla's 0.2 threshold he decided to run again every time he saw you
+  afterwards, across save loads and days of game time. Every provoked fight
+  now ends by restoring what he thought of you before you provoked him, so he
+  goes back to work and will talk and trade with you again. It restores rather
+  than rewards: he is put back to what he thought of you less a standing cost
+  for the fight, so beating a man cannot leave him thinking better of you than
+  his untouched neighbors do, and he is checked a second time once you have
+  finished with him in case he lost more on the way.
+
+### Changed
+
+- The retaliation watcher is simpler and closes an incident when the fight
+  actually ends. It used to sort a victim into fighting, running away or
+  settled, and treat running as a separate case needing its own rescue, but
+  the test for it required you to be 25 m clear before it counted, which never
+  happens while you are chasing him: it fired in none of six measured
+  incidents. Running is now simply the fight being over, which closes the
+  incident within three seconds and hands him to the same repair as any other
+  ending. `RetaliationFleeSpeed`, `RetaliationFleeIgnoreRange` and
+  `RetaliationFleeSamples` are gone with it. **NOT BREAKING**: they were added
+  in 4.6.0 and the newest published version is 4.2.2, so no player has ever
+  had them in a settings file and no existing configuration changes. An
+  unrecognized setting is ignored and named in `kcd.log` as always.
 
 ## [4.7.3] - 2026-09-03
 

@@ -17,7 +17,7 @@
 --
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
--- @release 4.7.3
+-- @release 4.7.4
 -- The engine's `combatAttackKind`, transcribed from
 -- `Libs/AI/TypeDefinitions.xml`. Sequential, and the type definition's own
 -- comment says the melee entries are ordered by increasing violence.
@@ -224,7 +224,7 @@ end
 -- horse impact is, is not one of the two types the condition accepts, so the
 -- horse's own contact can never release a fighter however hard it lands.
 --
--- ### The attacker named is the victim himself, and that is the whole trick
+-- ### The attacker named is the horse, and that is the whole trick
 --
 -- `sb_switch_hitreactions.xml` reads the `hitReaction` inbox as well, so this
 -- message reaches the assault broadcast described above `SendProvocationHit`,
@@ -234,12 +234,17 @@ end
 -- provocation quiet, sending the onward message directly, has no equivalent
 -- here.
 --
--- What the broadcast does key on is `hit.attacker`. Naming the victim as his
--- own attacker leaves an assault attributed to nobody the crime system cares
--- about, and measured against a null control it costs exactly nothing:
+-- What the broadcast does key on is `hit.attacker`. Naming anyone but the
+-- player leaves an assault attributed to nobody the crime system prosecutes,
+-- and measured against a null control it costs exactly nothing:
 --
 --     attacker = player   victim -0.31, every bystander -0.030
 --     attacker = victim   victim  0.00, every bystander  0.000
+--
+-- The horse is named rather than the victim, because the node that reads this
+-- also registers the attacker as an opponent, and a victim made his own
+-- opponent has himself to cool down from before `state_standDown` releases
+-- him. The horse is what struck him in the first place.
 --
 -- The flag is still set, because the condition that guards it tests only the
 -- strength and the type and never looks at who threw the blow. The opponent
@@ -256,19 +261,30 @@ function HorseCollisionMod:SendOffenseRelease(npc)
 		target = npc.this.id
 	end
 
-	local victimWuid = nil
+	-- The horse, which is what actually hit him. It is not the player, so the
+	-- assault broadcast has nobody to charge, and it is not the victim either,
+	-- so he is not left registered as his own opponent with himself to cool
+	-- down from afterwards. Falls back to the victim where there is no horse,
+	-- which keeps the send crime free either way.
+	local attacker = nil
 
 	pcall(function()
-		victimWuid = XGenAIModule.GetMyWUID(npc)
+		attacker = player.player:GetPlayerHorse()
 	end)
 
-	if not victimWuid then
+	if not attacker then
+		pcall(function()
+			attacker = XGenAIModule.GetMyWUID(npc)
+		end)
+	end
+
+	if not attacker then
 		return false
 	end
 
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("hitReaction", {
-			attacker = victimWuid,
+			attacker = attacker,
 			hitStrength = self.HitReactionStrength.Tickle,
 			hitType = self.HitReactionType.Melee
 		})

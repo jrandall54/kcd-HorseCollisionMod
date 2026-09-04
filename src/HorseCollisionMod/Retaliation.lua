@@ -60,7 +60,7 @@
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 4.7.3
+-- @release 4.7.4
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
@@ -287,87 +287,57 @@ function HorseCollisionMod:ReleaseWhenFighting(npc)
 	Script.SetTimer(interval, attempt)
 end
 
---- What a victim is doing right now, in the terms this file cares about.
+--- Whether the victim is still in the fight.
 --
 -- Reads `actor:GetCurrentAnimationState()`, the same call the reaction
--- recovery polls, and classifies it alongside how far the victim moved since
--- the previous sample.
+-- recovery polls. Two prefixes mean the incident is live:
 --
--- * `engaged` - the incident is still running. Two prefixes qualify.
---   `Combat` is the obvious one, and `CombatMovement` was observed on a guard
---   closing to two meters. `Surrender` is the one that was missed, and
---   missing it was a real fault: a victim who yields stands in `SurrenderIn`,
---   which carries neither prefix under the first version of this test and is
---   perfectly still, so three samples of it read as settled and the incident
---   was closed while the victim was in the middle of yielding. Both fights of
---   that build ended `why=natural state=SurrenderIn` and both victims were
---   left running afterwards. The engine's surrender states all share the
---   prefix: `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
+-- * `Combat` is the obvious one, and `CombatMovement` was observed on a guard
+--   closing to two meters.
+-- * `Surrender` is the one that is easy to miss, and missing it is a real
+--   fault: a victim who yields stands in `SurrenderIn`, which is perfectly
+--   still, so it reads as finished and the incident closes in the middle of
+--   the yield. The engine's surrender states all share the prefix:
+--   `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
 --   `SurrenderDialogToMove`, `SurrenderForcedWait` and `SurrenderToCombat`.
--- * `fleeing` - not engaged, covering ground faster than an errand, **and**
---   the rider is far enough away that the running is no longer about him. A
---   runaway was measured at 4.79 m/s sustained, against roughly a meter per
---   second for someone walking to a stall.
 --
---   The range test matters more than it looks. Every runaway observed while
---   developing this was observed by following the runaway, and a man who has
---   just been knocked down and is being pursued by the person who did it has
---   every reason to keep going. Fleeing with the rider on top of him is
---   counted as engaged instead: the incident is live, nothing is sent, and
---   the victim is left to do the sensible thing.
--- * `settled` - anything else, which includes every idle and every ordinary
---   working animation.
+-- Anything else is finished, and that deliberately includes a victim running
+-- away. Running is not a state this has to handle specially: a man sprinting
+-- from the rider has left the fight, so the incident should close and the
+-- aftermath should take him, which is exactly what treating it as finished
+-- does. An earlier design classified running separately and only counted it
+-- once the rider was 25 m clear, which never happens while the rider is
+-- following him; it fired in none of six incidents.
 --
 -- @tparam string state the animation state
--- @tparam number speed meters per second since the previous sample
--- @tparam number playerRange meters between the victim and the rider
--- @treturn string one of `engaged`, `fleeing` or `settled`
-function HorseCollisionMod:ClassifyVictim(state, speed, playerRange)
-	if state ~= nil then
-		if string.find(state, "^Combat") ~= nil then
-			return "engaged"
-		end
-
-		if string.find(state, "^Surrender") ~= nil then
-			return "engaged"
-		end
+-- @treturn boolean true while the fight is still running
+function HorseCollisionMod:IsStillFighting(state)
+	if state == nil then
+		return false
 	end
 
-	if speed >= (self.Config.RetaliationFleeSpeed or 3.5) then
-		-- Running away from someone standing over you is not a fault, and
-		-- interrupting it would be. Only a victim still running with the
-		-- rider well clear has a flee that has outlived its cause.
-		if playerRange >= (self.Config.RetaliationFleeIgnoreRange or 25) then
-			return "fleeing"
-		end
-
-		return "engaged"
-	end
-
-	return "settled"
+	return string.find(state, "^Combat") ~= nil
+			or string.find(state, "^Surrender") ~= nil
 end
 
---- Polls the victim and closes the incident out when their state says to.
+--- Polls the victim and closes the incident when the fight is over.
 --
--- Replaces a fixed hold. The question "is this over" has a readable answer,
--- and reading it is both more accurate and more honest than assuming a
--- duration: a fight that runs long is not interrupted, and one that ends in
--- four seconds is not left hanging for another forty.
+-- The question "is this over" has a readable answer, so it is read rather
+-- than waited out: a fight that runs long is not interrupted, and one that
+-- ends in four seconds is not left hanging for another forty.
 --
--- Three ways it finishes, and the telemetry names which:
+-- Finished has to hold for `RetaliationSettledSamples` rather than a single
+-- sample, because a fighter between exchanges reads as finished for an
+-- instant and closing there would cut a live fight short.
 --
--- * `natural` - the victim settled by themselves. Nothing is sent. This is
---   the outcome that proves the game resolves its own fights, and it is the
---   reason the poll exists rather than an unconditional stand-down: the
---   previous build could not tell a victim it had rescued from one that never
---   needed rescuing.
--- * `runaway` - the victim left combat but kept running, sustained across
---   `RetaliationFleeSamples` consecutive samples. This is the case that was
---   observed running out of town and not stopping, and it is the only one
---   that genuinely needs the stand-down.
--- * `ceiling` - a failsafe, not a mechanism. If neither of the above has
---   happened by `RetaliationCeilingSec`, the incident is closed anyway so a
---   poll cannot run for the rest of the session.
+-- The fight is waited for rather than assumed, but it always arrives:
+-- `alwaysFightWhenHit` skips the morale comparison that would otherwise let a
+-- timid victim decline, so courage decides how the fight goes and not whether
+-- there is one. A victim who yields to the first punch has still fought.
+--
+-- `RetaliationCeilingSec` bounds the poll so a victim who never resolves
+-- cannot leave it running for the session. It is a failsafe rather than a
+-- mechanism, and in six measured incidents it was never reached.
 --
 -- The poll is generation-guarded: a load screen moves `TimerTick`, and a
 -- sample scheduled before it would otherwise fire into a world that no longer
@@ -378,19 +348,12 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	local generation = self.TimerTick
 	local interval = self.RetaliationPollMs
 	local ceiling = (self.Config.RetaliationCeilingSec or 120) * 1000
-	local needed = self.Config.RetaliationFleeSamples or 8
 
 	local elapsed = 0
-	local fledFor = 0
-	local settledFor = 0
-	local sawEngaged = false
-	local last = nil
-
-	pcall(function()
-		local p = npc:GetWorldPos()
-
-		last = { x = p.x, y = p.y, z = p.z }
-	end)
+	local finishedFor = 0
+	local sawFight = false
+	local sawYield = false
+	local caught = false
 
 	local function sample()
 		if generation ~= self.TimerTick then
@@ -400,71 +363,48 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		elapsed = elapsed + interval
 
 		local state = nil
-		local moved = 0
 
 		pcall(function()
 			state = tostring(npc.actor:GetCurrentAnimationState())
 		end)
 
-		pcall(function()
-			local p = npc:GetWorldPos()
+		if self:IsStillFighting(state) then
+			sawFight = true
+			finishedFor = 0
 
-			if last then
-				moved = self:VectorLength({
-					x = p.x - last.x,
-					y = p.y - last.y,
-					z = p.z - last.z
-				})
+			if state ~= nil and string.find(state, "^Surrender") ~= nil then
+				sawYield = true
 			end
-
-			last = { x = p.x, y = p.y, z = p.z }
-		end)
-
-		local speed = moved / (interval / 1000)
-		local playerRange = 999
-
-		pcall(function()
-			local pp = player:GetWorldPos()
-			local p = npc:GetWorldPos()
-
-			playerRange = self:VectorLength({
-				x = p.x - pp.x,
-				y = p.y - pp.y,
-				z = p.z - pp.z
-			})
-		end)
-
-		local what = self:ClassifyVictim(state, speed, playerRange)
-
-		if what == "engaged" then
-			sawEngaged = true
-			fledFor = 0
-			settledFor = 0
-		elseif what == "fleeing" then
-			fledFor = fledFor + 1
-			settledFor = 0
 		else
-			fledFor = 0
-			settledFor = settledFor + 1
+			finishedFor = finishedFor + 1
+
+			-- Off by default. See `CatchYieldImmediately` for why something
+			-- that works is not the thing used.
+			if self.CatchYieldImmediately and sawYield and not caught then
+				caught = true
+
+				local stoodDown = false
+
+				if self.AftermathStandDown then
+					stoodDown = self:SendStandDown(npc)
+				end
+
+				if self.Config.LogTelemetry then
+					self:Log("YieldCaught " .. tostring(npc:GetName())
+							.. " state=" .. tostring(state)
+							.. " stoodDown=" .. tostring(stoodDown))
+				end
+			end
 		end
 
-		-- Settled has to hold for more than one sample. A fighter between
-		-- exchanges reads as settled for an instant, and closing the incident
-		-- there would end a fight still in progress.
-		if sawEngaged and settledFor >= 3 then
-			self:EndRetaliation(npc, "natural", false)
-
-			return
-		end
-
-		if fledFor >= needed then
-			self:EndRetaliation(npc, "runaway", true)
+		if sawFight and finishedFor >= self.RetaliationSettledSamples then
+			self:EndRetaliation(npc, "settled")
 
 			return
 		end
 
 		if elapsed >= ceiling then
-			self:EndRetaliation(npc, "ceiling", true)
+			self:EndRetaliation(npc, "ceiling")
 
 			return
 		end
@@ -508,35 +448,118 @@ function HorseCollisionMod:SendStandDown(npc)
 	return ok
 end
 
---- Closes the incident out: takes the option back and, if needed, intervenes.
+--- Puts a victim right once the fight is over.
 --
--- `why` names which of `WatchRetaliation`'s three endings applied, and it
--- goes straight into the telemetry, so a session can be read afterwards for
--- how often the game resolved its own fight against how often this mod had to
--- step in. That ratio is the thing worth knowing about this feature.
+-- A man the rider fought is left at a relationship of 0.0 against the 0.50 an
+-- untouched townsman reads, and below vanilla's 0.2 threshold he decides to
+-- run every time he perceives the rider. Riding past him a week later still
+-- sends him sprinting, which reads as a permanently ruined NPC rather than a
+-- man who lost a fight.
 --
--- `intervene` decides whether anything is sent at all. On a natural ending
--- the victim has already settled and the correct action is none: sending a
--- stand-down and a replan to someone who is fine interrupts whatever they
--- went back to.
+-- **Two things are needed and neither works alone**, which is what made this
+-- hard to see. Measured on a victim who had been fleeing on sight across a
+-- save reload and an in game wait:
 --
--- When intervention is warranted, both messages go out in order. The
--- stand-down ends the combat state, and it is the only message that reaches
--- someone mid-flight at all: `sb_combat.xml` rejects every stimulus arriving
--- during `fight` or `flee` except `standDownRequest` and
--- `customBehaviorRequest`, which are named exemptions in the condition.
--- Measured on a victim who would not stop, 16.95 m of travel per sample
--- became `MotionIdle` at 0.00 m within a second, and a daycycle idle ten
--- seconds later.
+-- * `combat:stimulus:standDownRequest` cancels the flee that is running. Sent
+--   by itself it bought five seconds, and then the next time he perceived the
+--   rider he decided to flee again.
+-- * Raising the relationship changes the decision but not the behavior
+--   already executing, so sent by itself while he is mid-flight it does
+--   nothing visible. That is why an earlier reading of this called reputation
+--   irrelevant; the measurement could not have shown an effect either way.
 --
--- The replan follows, and is the same `daycycle:restartRequest` the reaction
--- recovery uses. It covers a victim who has stopped but has nothing to return
--- to.
+-- Together they hold. The same victim stopped, stood at a meter and a half
+-- for twelve seconds, and afterwards would talk and trade.
+--
+-- ### It marks him down, it does not reward him
+--
+-- The target is the victim's own standing before he was provoked, less
+-- `RepairFightCost`, held above `RepairFloor`. He remembers the fight, which
+-- is right, and he is never left under the threshold that ruins him, which is
+-- the bug. The count is worked from his own figure rather than fixed, because
+-- a count calibrated for a victim at 0.0 carries one to 0.84 against the 0.50
+-- his untouched neighbors read, and a beating would pay the rider a bonus.
+--
+-- ### The step is a fixed quantum, so the count is arithmetic
+--
+-- `surrender_step` moves the relationship by `RepairStepValue` every time it
+-- is applied, whatever second argument it is given: 0.1, 0.2 and no argument
+-- at all each moved exactly 0.1389 in a measured sweep. The magnitude cannot
+-- be tuned, so the number of applications is what decides where a victim
+-- lands, and that is worked out once from the gap rather than approached by
+-- trial. They apply in one pass, because a change does not read back in the
+-- frame it is applied and re-reading between them would report stale values.
+--
+-- The quantum is also the precision: a victim lands within one step above his
+-- target and no closer, and `surrender_step` cannot take anyone past 0.8430
+-- however many are applied.
 --
 -- @tparam table npc victim entity
--- @tparam string why one of `natural`, `runaway` or `ceiling`
--- @tparam boolean intervene whether to send the stand-down and the replan
-function HorseCollisionMod:EndRetaliation(npc, why, intervene)
+-- @treturn boolean true when a repair was applied
+function HorseCollisionMod:RepairVictim(npc)
+	local id = tostring(npc.id)
+	local baseline = self.Baseline[id] or self.RepairDefaultTarget
+	local target = baseline - self.RepairFightCost
+
+	if target < self.RepairFloor then
+		target = self.RepairFloor
+	end
+
+	local before = nil
+
+	pcall(function()
+		before = npc.soul:GetRelationship(player.this.id)
+	end)
+
+	if before == nil or before >= target then
+		return false
+	end
+
+	local steps = math.ceil((target - before) / self.RepairStepValue)
+
+	if steps > self.RepairMaxSteps then
+		steps = self.RepairMaxSteps
+	end
+
+	for _ = 1, steps do
+		pcall(function()
+			npc.soul:ModifyPlayerReputation("surrender_step")
+		end)
+	end
+
+	if self.Config.LogTelemetry then
+		self:Log("RepairVictim " .. tostring(npc:GetName())
+				.. " from=" .. string.format("%.3f", before)
+				.. " target=" .. string.format("%.3f", target)
+				.. " steps=" .. tostring(steps))
+	end
+
+	return true
+end
+
+--- Closes the incident out and puts the victim back the way he was found.
+--
+-- `why` names which ending applied and goes into the telemetry, so a session
+-- can be read afterwards for how often a fight resolved itself against how
+-- often the failsafe had to close it.
+--
+-- Three things happen, and every one of them happens on every ending. None of
+-- them is conditional on how the fight finished, because a settled victim is
+-- not a safe victim: a man released through the yield menu settles first and
+-- only then walks away for good.
+--
+-- * The context option comes back. Left set, every NPC the rider had ever
+--   shoved would answer any hit from anyone with a fight for the rest of the
+--   session, which is a different mod.
+-- * His standing is repaired, because below vanilla's threshold he decides to
+--   run from the rider on sight, for good. See `RepairVictim`.
+-- * `WatchAftermath` takes him from here, because the fight can end with a
+--   flee already running that his standing does not explain and that nothing
+--   else stops.
+--
+-- @tparam table npc victim entity
+-- @tparam string why either `settled` or `ceiling`
+function HorseCollisionMod:EndRetaliation(npc, why)
 	local cleared = pcall(function()
 		Contexts.ClearOption(npc, self.RetaliationOption,
 				self.RetaliationHandle)
@@ -548,22 +571,179 @@ function HorseCollisionMod:EndRetaliation(npc, why, intervene)
 		state = tostring(npc.actor:GetCurrentAnimationState())
 	end)
 
-	local stoodDown = false
-	local replanned = false
+	-- Every ending, not only the ones that need a stand-down. However the
+	-- fight finished, whether he yielded, ran, or was knocked out and got up
+	-- again, he is left below the threshold that decides he should run from
+	-- the rider on sight, and that is what has to be undone.
+	local repaired = self:RepairVictim(npc)
 
-	if intervene then
-		stoodDown = self:SendStandDown(npc)
-		replanned = self:ReplanVictim(npc)
-	end
+	-- Sent on every ending, not only the runaway and ceiling ones. A victim
+	-- released through the yield menu walks away in a flee
+	-- his own standing does not explain: measured at 0.737, well clear of the
+	-- threshold that decides a man should run, and running anyway. Reputation
+	-- cannot reach that and only the stand-down ends it.
+	-- The stand-down is deliberately not sent here. A victim who runs should
+	-- be allowed to get away first, and the rider is not necessarily finished
+	-- with him either, so both are left to the aftermath.
+	self:WatchAftermath(npc)
 
 	if self.Config.LogTelemetry then
 		self:Log("RetaliationEnd " .. tostring(npc:GetName())
 				.. " why=" .. tostring(why)
 				.. " cleared=" .. tostring(cleared)
 				.. " state=" .. tostring(state)
-				.. " stoodDown=" .. tostring(stoodDown)
-				.. " replanned=" .. tostring(replanned))
+				.. " repaired=" .. tostring(repaired))
 	end
+end
+
+--- Watches a beaten victim and acts on what he is actually doing.
+--
+-- Driven by his state rather than by elapsed time. A timer alone gets this
+-- wrong: a victim who gives up running after eight seconds is still standing
+-- there when a fifteen second timer fires, and a stand-down aimed at a flee
+-- that already ended helps nobody.
+--
+-- Three things are read every `AftermathPollMs`, and each is a real signal
+-- rather than an inference:
+--
+-- * **Yielding.** Every surrender state carries the `Surrender` prefix:
+--   `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
+--   `SurrenderDialogToMove`, `SurrenderForcedWait`, `SurrenderToCombat`. A
+--   victim in one is mid-yield and is left alone until he is out of it.
+-- * **Fleeing.** His own speed. This is the one place a reading has to stand
+--   in for a state, because `GetCurrentAnimationState` reports
+--   `MotionMovement` both for a man fleeing at four and a half meters per
+--   second and for one walking to his stall at one, and the combat state that
+--   would say `flee` is subbrain local and reads nil.
+-- * **Settled.** Anything else, which is every idle and every ordinary
+--   working animation.
+--
+-- `AftermathRunMs` is a budget rather than a trigger: he runs for that long
+-- and is stopped when he has spent it, or is left alone if he pulls up of his
+-- own accord first.
+--
+-- `CatchYieldImmediately` stops him on the yield transition instead, and is
+-- off. The stand-down hands him to the combat subbrain's wind-down whichever
+-- way he is stopped, so catching him at once has him serve those twenty five
+-- seconds standing beside the rider, where running first spends the same
+-- pause out of sight. The stand-down is only sent to somebody actually
+-- running, because it parks him for the combat subbrain's wind-down and a man
+-- who has already settled does not need that.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:WatchAftermath(npc)
+	local generation = self.TimerTick
+	local ran = 0
+	local left = self.AftermathPollLimit
+	local last = nil
+
+	local function where()
+		local p = nil
+
+		pcall(function()
+			local q = npc:GetWorldPos()
+
+			p = { x = q.x, y = q.y }
+		end)
+
+		return p
+	end
+
+	local function finish(why, speed)
+		local replanned = self:ReplanVictim(npc)
+
+		if self.Config.LogTelemetry then
+			self:Log("Aftermath " .. tostring(npc:GetName())
+					.. " " .. why
+					.. " ran=" .. tostring(ran) .. "ms"
+					.. " speed=" .. string.format("%.1f", speed or 0)
+					.. " replanned=" .. tostring(replanned))
+		end
+
+		Script.SetTimer(self.AftermathSettleMs, function()
+			if generation ~= self.TimerTick then
+				return
+			end
+
+			self:RepairVictim(npc)
+			self.Baseline[tostring(npc.id)] = nil
+		end)
+	end
+
+	last = where()
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		left = left - 1
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local at = where()
+		local speed = 0
+
+		if at ~= nil and last ~= nil then
+			speed = self:VectorLength({
+				x = at.x - last.x,
+				y = at.y - last.y,
+				z = 0
+			}) / (self.AftermathPollMs / 1000)
+		end
+
+		last = at
+
+		-- Mid-yield. Nothing is sent into a surrender that is still playing,
+		-- but the fact of it is remembered, because leaving it is the moment
+		-- that matters.
+		if state ~= nil and string.find(state, "^Surrender") ~= nil then
+			if left > 0 then
+				Script.SetTimer(self.AftermathPollMs, poll)
+			else
+				finish("yield-timeout", speed)
+			end
+
+			return
+		end
+
+
+
+		if speed > self.AftermathFleeSpeed then
+			ran = ran + self.AftermathPollMs
+
+			if ran >= self.AftermathRunMs then
+				local stoodDown = false
+
+				if self.AftermathStandDown then
+					stoodDown = self:SendStandDown(npc)
+				end
+
+				finish("stopped stoodDown=" .. tostring(stoodDown), speed)
+
+				return
+			end
+		elseif ran > 0 then
+			-- He gave up running by himself, so there is no flee to cancel.
+			finish("halted", speed)
+
+			return
+		end
+
+		if left <= 0 then
+			finish("limit", speed)
+
+			return
+		end
+
+		Script.SetTimer(self.AftermathPollMs, poll)
+	end
+
+	Script.SetTimer(self.AftermathPollMs, poll)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.
@@ -597,6 +777,15 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 
 		return false
 	end
+
+	-- Taken before the fight rather than after it, so the repair has a figure
+	-- to restore rather than a guess. Nothing up to here has touched it: the
+	-- shoves raise no crime and the provocation names the victim as his own
+	-- attacker.
+	pcall(function()
+		self.Baseline[tostring(npc.id)] =
+				npc.soul:GetRelationship(player.this.id)
+	end)
 
 	local roll = math.random()
 	local provoked = roll < chance

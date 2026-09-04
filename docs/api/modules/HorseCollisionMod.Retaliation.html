@@ -119,7 +119,7 @@
  offered to her, and the reason is logged.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.7.3
+        <li><strong>Release</strong>:  4.7.4
  The context option that makes a victim answer a hit with a fight.</p>
 
 <p> From the game's own catalog. Named here rather than written inline at each
@@ -155,20 +155,28 @@
 	<td class="summary">Waits for a provoked victim to reach the fight, then lets him throw a punch.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ClassifyVictim">HorseCollisionMod:ClassifyVictim (state, speed, playerRange)</a></td>
-	<td class="summary">What a victim is doing right now, in the terms this file cares about.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsStillFighting">HorseCollisionMod:IsStillFighting (state)</a></td>
+	<td class="summary">Whether the victim is still in the fight.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:WatchRetaliation">HorseCollisionMod:WatchRetaliation (npc)</a></td>
-	<td class="summary">Polls the victim and closes the incident out when their state says to.</td>
+	<td class="summary">Polls the victim and closes the incident when the fight is over.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:SendStandDown">HorseCollisionMod:SendStandDown (npc)</a></td>
 	<td class="summary">Tells a victim the incident is over and they may stand down.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:EndRetaliation">HorseCollisionMod:EndRetaliation (npc, why, intervene)</a></td>
-	<td class="summary">Closes the incident out: takes the option back and, if needed, intervenes.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RepairVictim">HorseCollisionMod:RepairVictim (npc)</a></td>
+	<td class="summary">Puts a victim right once the fight is over.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:EndRetaliation">HorseCollisionMod:EndRetaliation (npc, why)</a></td>
+	<td class="summary">Closes the incident out and puts the victim back the way he was found.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:WatchAftermath">HorseCollisionMod:WatchAftermath (npc)</a></td>
+	<td class="summary">Watches a beaten victim and acts on what he is actually doing.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ProvokeIfAnnoyed">HorseCollisionMod:ProvokeIfAnnoyed (npc, playerEnt)</a></td>
@@ -407,42 +415,33 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:ClassifyVictim"></a>
-    <strong>HorseCollisionMod:ClassifyVictim (state, speed, playerRange)</strong>
+    <a name = "HorseCollisionMod:IsStillFighting"></a>
+    <strong>HorseCollisionMod:IsStillFighting (state)</strong>
     </dt>
     <dd>
-    What a victim is doing right now, in the terms this file cares about. </p>
+    Whether the victim is still in the fight. </p>
 
 <p> Reads <code>actor:GetCurrentAnimationState()</code>, the same call the reaction
- recovery polls, and classifies it alongside how far the victim moved since
- the previous sample.</p>
+ recovery polls. Two prefixes mean the incident is live:</p>
 
 <ul>
-    <li><code>engaged</code> - the incident is still running. Two prefixes qualify.
-    <code>Combat</code> is the obvious one, and <code>CombatMovement</code> was observed on a guard
-    closing to two meters. <code>Surrender</code> is the one that was missed, and
-    missing it was a real fault: a victim who yields stands in <code>SurrenderIn</code>,
-    which carries neither prefix under the first version of this test and is
-    perfectly still, so three samples of it read as settled and the incident
-    was closed while the victim was in the middle of yielding. Both fights of
-    that build ended <code>why=natural state=SurrenderIn</code> and both victims were
-    left running afterwards. The engine's surrender states all share the
-    prefix: <code>SurrenderIn</code>, <code>SurrenderDialog</code>, <code>SurrenderDialogToIdle</code>,
+    <li><code>Combat</code> is the obvious one, and <code>CombatMovement</code> was observed on a guard
+    closing to two meters.</li>
+    <li><code>Surrender</code> is the one that is easy to miss, and missing it is a real
+    fault: a victim who yields stands in <code>SurrenderIn</code>, which is perfectly
+    still, so it reads as finished and the incident closes in the middle of
+    the yield. The engine's surrender states all share the prefix:
+    <code>SurrenderIn</code>, <code>SurrenderDialog</code>, <code>SurrenderDialogToIdle</code>,
     <code>SurrenderDialogToMove</code>, <code>SurrenderForcedWait</code> and <code>SurrenderToCombat</code>.</li>
-    <li><code>fleeing</code> - not engaged, covering ground faster than an errand, <strong>and</strong>
-    the rider is far enough away that the running is no longer about him. A
-    runaway was measured at 4.79 m/s sustained, against roughly a meter per
-    second for someone walking to a stall.</li>
 </ul>
 
-<p>   The range test matters more than it looks. Every runaway observed while
-   developing this was observed by following the runaway, and a man who has
-   just been knocked down and is being pursued by the person who did it has
-   every reason to keep going. Fleeing with the rider on top of him is
-   counted as engaged instead: the incident is live, nothing is sent, and
-   the victim is left to do the sensible thing.
- * <code>settled</code> - anything else, which includes every idle and every ordinary
-   working animation.
+<p> Anything else is finished, and that deliberately includes a victim running
+ away. Running is not a state this has to handle specially: a man sprinting
+ from the rider has left the fight, so the incident should close and the
+ aftermath should take him, which is exactly what treating it as finished
+ does. An earlier design classified running separately and only counted it
+ once the rider was 25 m clear, which never happens while the rider is
+ following him; it fired in none of six incidents.
 
 
     <h3>Parameters:</h3>
@@ -451,21 +450,13 @@
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
          the animation state
         </li>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         meters per second since the previous sample
-        </li>
-        <li><span class="parameter">playerRange</span>
-            <span class="types"><span class="type">number</span></span>
-         meters between the victim and the rider
-        </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-        one of <code>engaged</code>, <code>fleeing</code> or <code>settled</code>
+           <span class="types"><span class="type">boolean</span></span>
+        true while the fight is still running
     </ol>
 
 
@@ -477,29 +468,24 @@
     <strong>HorseCollisionMod:WatchRetaliation (npc)</strong>
     </dt>
     <dd>
-    Polls the victim and closes the incident out when their state says to. </p>
+    Polls the victim and closes the incident when the fight is over. </p>
 
-<p> Replaces a fixed hold. The question "is this over" has a readable answer,
- and reading it is both more accurate and more honest than assuming a
- duration: a fight that runs long is not interrupted, and one that ends in
- four seconds is not left hanging for another forty.</p>
+<p> The question "is this over" has a readable answer, so it is read rather
+ than waited out: a fight that runs long is not interrupted, and one that
+ ends in four seconds is not left hanging for another forty.</p>
 
-<p> Three ways it finishes, and the telemetry names which:</p>
+<p> Finished has to hold for <code>RetaliationSettledSamples</code> rather than a single
+ sample, because a fighter between exchanges reads as finished for an
+ instant and closing there would cut a live fight short.</p>
 
-<ul>
-    <li><code>natural</code> - the victim settled by themselves. Nothing is sent. This is
-    the outcome that proves the game resolves its own fights, and it is the
-    reason the poll exists rather than an unconditional stand-down: the
-    previous build could not tell a victim it had rescued from one that never
-    needed rescuing.</li>
-    <li><code>runaway</code> - the victim left combat but kept running, sustained across
-    <code>RetaliationFleeSamples</code> consecutive samples. This is the case that was
-    observed running out of town and not stopping, and it is the only one
-    that genuinely needs the stand-down.</li>
-    <li><code>ceiling</code> - a failsafe, not a mechanism. If neither of the above has
-    happened by <code>RetaliationCeilingSec</code>, the incident is closed anyway so a
-    poll cannot run for the rest of the session.</li>
-</ul>
+<p> The fight is waited for rather than assumed, but it always arrives:
+ <code>alwaysFightWhenHit</code> skips the morale comparison that would otherwise let a
+ timid victim decline, so courage decides how the fight goes and not whether
+ there is one. A victim who yields to the first punch has still fought.</p>
+
+<p> <code>RetaliationCeilingSec</code> bounds the poll so a victim who never resolves
+ cannot leave it running for the session. It is a failsafe rather than a
+ mechanism, and in six measured incidents it was never reached.</p>
 
 <p> The poll is generation-guarded: a load screen moves <code>TimerTick</code>, and a
  sample scheduled before it would otherwise fire into a world that no longer
@@ -559,34 +545,107 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:EndRetaliation"></a>
-    <strong>HorseCollisionMod:EndRetaliation (npc, why, intervene)</strong>
+    <a name = "HorseCollisionMod:RepairVictim"></a>
+    <strong>HorseCollisionMod:RepairVictim (npc)</strong>
     </dt>
     <dd>
-    Closes the incident out: takes the option back and, if needed, intervenes. </p>
+    Puts a victim right once the fight is over. </p>
 
-<p> <code>why</code> names which of <a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:WatchRetaliation">WatchRetaliation</a>'s three endings applied, and it
- goes straight into the telemetry, so a session can be read afterwards for
- how often the game resolved its own fight against how often this mod had to
- step in. That ratio is the thing worth knowing about this feature.</p>
+<p> A man the rider fought is left at a relationship of 0.0 against the 0.50 an
+ untouched townsman reads, and below vanilla's 0.2 threshold he decides to
+ run every time he perceives the rider. Riding past him a week later still
+ sends him sprinting, which reads as a permanently ruined NPC rather than a
+ man who lost a fight.</p>
 
-<p> <code>intervene</code> decides whether anything is sent at all. On a natural ending
- the victim has already settled and the correct action is none: sending a
- stand-down and a replan to someone who is fine interrupts whatever they
- went back to.</p>
+<p> <strong>Two things are needed and neither works alone</strong>, which is what made this
+ hard to see. Measured on a victim who had been fleeing on sight across a
+ save reload and an in game wait:</p>
 
-<p> When intervention is warranted, both messages go out in order. The
- stand-down ends the combat state, and it is the only message that reaches
- someone mid-flight at all: <code>sb_combat.xml</code> rejects every stimulus arriving
- during <code>fight</code> or <code>flee</code> except <code>standDownRequest</code> and
- <code>customBehaviorRequest</code>, which are named exemptions in the condition.
- Measured on a victim who would not stop, 16.95 m of travel per sample
- became <code>MotionIdle</code> at 0.00 m within a second, and a daycycle idle ten
- seconds later.</p>
+<ul>
+    <li><code>combat:stimulus:standDownRequest</code> cancels the flee that is running. Sent
+    by itself it bought five seconds, and then the next time he perceived the
+    rider he decided to flee again.</li>
+    <li>Raising the relationship changes the decision but not the behavior
+    already executing, so sent by itself while he is mid-flight it does
+    nothing visible. That is why an earlier reading of this called reputation
+    irrelevant; the measurement could not have shown an effect either way.</li>
+</ul>
 
-<p> The replan follows, and is the same <code>daycycle:restartRequest</code> the reaction
- recovery uses. It covers a victim who has stopped but has nothing to return
- to.
+<p> Together they hold. The same victim stopped, stood at a meter and a half
+ for twelve seconds, and afterwards would talk and trade.</p>
+
+<p> ### It marks him down, it does not reward him</p>
+
+<p> The target is the victim's own standing before he was provoked, less
+ <code>RepairFightCost</code>, held above <code>RepairFloor</code>. He remembers the fight, which
+ is right, and he is never left under the threshold that ruins him, which is
+ the bug. The count is worked from his own figure rather than fixed, because
+ a count calibrated for a victim at 0.0 carries one to 0.84 against the 0.50
+ his untouched neighbors read, and a beating would pay the rider a bonus.</p>
+
+<p> ### The step is a fixed quantum, so the count is arithmetic</p>
+
+<p> <code>surrender_step</code> moves the relationship by <code>RepairStepValue</code> every time it
+ is applied, whatever second argument it is given: 0.1, 0.2 and no argument
+ at all each moved exactly 0.1389 in a measured sweep. The magnitude cannot
+ be tuned, so the number of applications is what decides where a victim
+ lands, and that is worked out once from the gap rather than approached by
+ trial. They apply in one pass, because a change does not read back in the
+ frame it is applied and re-reading between them would report stale values.</p>
+
+<p> The quantum is also the precision: a victim lands within one step above his
+ target and no closer, and <code>surrender_step</code> cannot take anyone past 0.8430
+ however many are applied.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a repair was applied
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:EndRetaliation"></a>
+    <strong>HorseCollisionMod:EndRetaliation (npc, why)</strong>
+    </dt>
+    <dd>
+
+<p>Closes the incident out and puts the victim back the way he was found. </p>
+
+<p> <code>why</code> names which ending applied and goes into the telemetry, so a session
+ can be read afterwards for how often a fight resolved itself against how
+ often the failsafe had to close it.</p>
+
+<p> Three things happen, and every one of them happens on every ending. None of
+ them is conditional on how the fight finished, because a settled victim is
+ not a safe victim: a man released through the yield menu settles first and
+ only then walks away for good.</p>
+
+<ul>
+    <li>The context option comes back. Left set, every NPC the rider had ever
+    shoved would answer any hit from anyone with a fight for the rest of the
+    session, which is a different mod.</li>
+    <li>His standing is repaired, because below vanilla's threshold he decides to
+    run from the rider on sight, for good. See <a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:RepairVictim">RepairVictim</a>.</li>
+    <li><a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:WatchAftermath">WatchAftermath</a> takes him from here, because the fight can end with a
+    flee already running that his standing does not explain and that nothing
+    else stops.</li>
+</ul>
+
+
 
 
     <h3>Parameters:</h3>
@@ -597,11 +656,62 @@
         </li>
         <li><span class="parameter">why</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         one of <code>natural</code>, <code>runaway</code> or <code>ceiling</code>
+         either <code>settled</code> or <code>ceiling</code>
         </li>
-        <li><span class="parameter">intervene</span>
-            <span class="types"><span class="type">boolean</span></span>
-         whether to send the stand-down and the replan
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:WatchAftermath"></a>
+    <strong>HorseCollisionMod:WatchAftermath (npc)</strong>
+    </dt>
+    <dd>
+    Watches a beaten victim and acts on what he is actually doing. </p>
+
+<p> Driven by his state rather than by elapsed time. A timer alone gets this
+ wrong: a victim who gives up running after eight seconds is still standing
+ there when a fifteen second timer fires, and a stand-down aimed at a flee
+ that already ended helps nobody.</p>
+
+<p> Three things are read every <code>AftermathPollMs</code>, and each is a real signal
+ rather than an inference:</p>
+
+<ul>
+    <li><strong>Yielding.</strong> Every surrender state carries the <code>Surrender</code> prefix:
+    <code>SurrenderIn</code>, <code>SurrenderDialog</code>, <code>SurrenderDialogToIdle</code>,
+    <code>SurrenderDialogToMove</code>, <code>SurrenderForcedWait</code>, <code>SurrenderToCombat</code>. A
+    victim in one is mid-yield and is left alone until he is out of it.</li>
+    <li><strong>Fleeing.</strong> His own speed. This is the one place a reading has to stand
+    in for a state, because <code>GetCurrentAnimationState</code> reports
+    <code>MotionMovement</code> both for a man fleeing at four and a half meters per
+    second and for one walking to his stall at one, and the combat state that
+    would say <code>flee</code> is subbrain local and reads nil.</li>
+    <li><strong>Settled.</strong> Anything else, which is every idle and every ordinary
+    working animation.</li>
+</ul>
+
+<p> <code>AftermathRunMs</code> is a budget rather than a trigger: he runs for that long
+ and is stopped when he has spent it, or is left alone if he pulls up of his
+ own accord first.</p>
+
+<p> <code>CatchYieldImmediately</code> stops him on the yield transition instead, and is
+ off. The stand-down hands him to the combat subbrain's wind-down whichever
+ way he is stopped, so catching him at once has him serve those twenty five
+ seconds standing beside the rider, where running first spends the same
+ pause out of sight. The stand-down is only sent to somebody actually
+ running, because it parks him for the combat subbrain's wind-down and a man
+ who has already settled does not need that.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
         </li>
     </ul>
 
@@ -691,7 +801,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-03 11:09:18 </i>
+<i style="float:right;">Last updated 2026-09-03 20:33:43 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
