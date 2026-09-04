@@ -656,7 +656,7 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 		local sent = false
 
-		if why == "ran" then
+		if why == "ran" and self.AftermathStandDown then
 			sent = self:SendStandDown(npc)
 		end
 

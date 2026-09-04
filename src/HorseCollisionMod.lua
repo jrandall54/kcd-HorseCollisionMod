@@ -563,6 +563,23 @@ HorseCollisionMod.AftermathFleeSpeed = 2.5
 -- rider's immediate area without carrying him out of the district.
 HorseCollisionMod.AftermathRunMs = 4000
 
+--- Whether a fleeing victim is stopped with a stand-down at all.
+--
+-- It works, and it costs more than it is worth. `standDownRequest` moves him
+-- into `state_standDown`, which sets `t_exitCombatSubbrain` and then holds him
+-- through a hot entity cooldown loop before it releases him. Traced at four
+-- samples a second he sat in `MotionIdle` at 0.00 m/s for the whole
+-- twenty five second window, out of combat animation, with the context option
+-- already cleared, ignoring three replans sent at two, five and nine seconds.
+-- Before the stand-down was sent on every ending that pause was about five
+-- seconds.
+--
+-- The repair is what actually cures him: below vanilla's threshold he decides
+-- to run on sight every time, and above it he does not. A flee already
+-- running should then end by itself with nothing to restart it, which is what
+-- turning this off tests.
+HorseCollisionMod.AftermathStandDown = false
+
 --- How often the victim is sampled through the aftermath.
 --
 -- Half a second rather than a full one for two reasons: a short burst of
