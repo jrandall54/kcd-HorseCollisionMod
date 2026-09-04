@@ -847,12 +847,34 @@ function HorseCollisionMod:TraceAftermath(npc)
 		-- not what is holding him.
 		local nudge = ""
 
-		for _, when in ipairs({ 2000, 5000, 9000 }) do
-			if t >= when and not nudged[when] then
-				nudged[when] = true
-				self:ReplanVictim(npc)
-				nudge = " REPLAN-SENT"
+		-- The combat subbrain holds him until `t_exitCombatSubbrain` is set,
+		-- and vanilla only sets it at the end of a fifteen second flee and an
+		-- eight second rally. If the flag can be written from here he should
+		-- move the moment it is, and if he does not the subbrain variable is
+		-- out of reach and the wait is not ours to shorten.
+		if t >= 3000 and not nudged[3000] then
+			nudged[3000] = true
+
+			local w = nil
+
+			pcall(function()
+				w = XGenAIModule.GetMyWUID(npc)
+			end)
+
+			for _, name in ipairs({ "t_exitCombatSubbrain",
+					"exitCombatSubbrain" }) do
+				pcall(function()
+					XGenAIModule.SetBrainVariable(w, name, true)
+				end)
 			end
+
+			nudge = " EXIT-FLAG-SET"
+		end
+
+		if t >= 9000 and not nudged[9000] then
+			nudged[9000] = true
+			self:ReplanVictim(npc)
+			nudge = " REPLAN-SENT"
 		end
 
 		self:Log("Trace t=" .. tostring(t)
