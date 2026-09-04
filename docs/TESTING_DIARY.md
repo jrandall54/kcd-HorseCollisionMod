@@ -14462,3 +14462,57 @@ wait is the only safe way to pass time here.
 `wh_pl_SkipTimeMaxWorldTimeRatio` defaults to 360 and takes 7200 without
 complaint, which turns a full day's wait into about twelve seconds and changes
 nothing about how the world simulates it.
+
+## Barks cannot be re-pointed from Lua, and the reason is where vanilla sends them
+
+The idea was to replace the collision bark, vanilla's "can't you ride a horse",
+with one of the lines an NPC uses when the player swings a fist near them.
+Those exist and are addressable by name: `sb_switch_hitreactions.xml` sends
+`ZASAH_ZBRANI_IGNOROVANY` on `$dotPlayerAttackNearMiss > -0.25` and again when
+the player is neither hostile nor in combat, and `RANENY_NA_ZEMI` for a melee
+victim who is on the ground.
+
+### How the vanilla collision bark actually fires
+
+Inside the victim's own hit reaction tree, not from anywhere a mod can call.
+When a `hitReaction` message lands and the victim is not in combat and does not
+carry the `suppressCollisionsBark` context option, the tree runs a `GraphSearch`
+over the attacker's entity links for a `rider`. If that rider is the player, the
+player is male and `hitStrength > Healing`, the tree sends **itself**
+`dialog:monologRequest` with `metarole('KOLIZE_S_HRACEM_NA_KONI')`. Two lesser
+branches send `KOLIZE_S_HRACEM` and `KOLIZE_S_HRACEM_LEHKA` when the player is
+the attacker directly.
+
+This mod already drives that path, because `SendHitReaction` posts the message
+the tree is waiting on.
+
+### Sending the request from Lua is accepted and produces no line
+
+`dialog:monologRequest` is a declared type carrying `metarole`, `alias`,
+`priority`, `lookAtId`, `forceSubtitles` and `overrideContextSuppress`, and
+vanilla's own `DialogUtils.RequestPlayerMonologByMetarole` sends it with
+`SendMessageToEntityData` and `Utils.makeTable`. Sent that way to a nearby NPC
+it is accepted every time, with no error, and no voice line ever plays. Tried
+with the near-miss role and with `KOLIZE_S_HRACEM_NA_KONI`, the role the target
+demonstrably speaks when ridden into; with and without `lookAtId`, priority and
+`overrideContextSuppress`; on a merchant and on a village guard.
+
+One attempt was not inert. The rider saw the target "go into slow motion around
+the 8 second mark for about the length of what would be the bark and then pop
+back into his normal walk". So the monolog machinery does run and does take the
+actor for the duration of a line, and the line itself never resolves. The
+receiving tree, `monologRequestRead` in `sb_dialog.xml`, reads from a dedicated
+`DialogMailbox` and captures a `common:senderInfo` that a Lua send does not
+supply, which is the most likely place the resolution fails.
+
+Calling this closed rather than firing more variants of the same call.
+
+### What that leaves
+
+Silencing the bark is free and already available: `suppressCollisionsBark` is a
+context option, set the same way the mod already sets `suppressAutoCure`.
+Substituting a different line is not, because the only send that works is the
+one inside `sb_switch_hitreactions.xml`. That file was overridden by this mod
+once and the override was removed in 2.0.0-rc1 to make the mod Lua-only and
+conflict-free; it is still preserved in `mod_xmls.disabled/`. Changing the bark
+means reopening that decision for a one-line change.
