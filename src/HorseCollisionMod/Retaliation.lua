@@ -594,8 +594,14 @@ end
 -- * **Settled.** Anything else, which is every idle and every ordinary
 --   working animation.
 --
--- `AftermathRunMs` is a budget rather than a trigger: he is allowed to run
--- for that long and stopped when he has spent it, or left alone if he stops
+-- **A victim who yielded is stopped the moment the yield ends**, on the state
+-- transition itself, before he has covered any ground. That is the earliest
+-- point the run can be caught at all, because waiting for his speed to
+-- confirm a flee means waiting for the flee to be under way.
+--
+-- `AftermathRunMs` covers the victim who never yielded and simply broke away.
+-- For him there is no transition to catch, so it is a budget: he runs for
+-- that long and is stopped when he has spent it, or left alone if he pulls up
 -- of his own accord first. The stand-down is only sent to somebody actually
 -- running, because it parks him for the combat subbrain's wind-down and a man
 -- who has already settled does not need that.
@@ -605,6 +611,7 @@ function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
 	local ran = 0
 	local left = self.AftermathPollLimit
+	local yielded = false
 	local last = nil
 
 	local function where()
@@ -668,13 +675,36 @@ function HorseCollisionMod:WatchAftermath(npc)
 
 		last = at
 
-		-- Mid-yield. Nothing is sent into a surrender that is still playing.
+		-- Mid-yield. Nothing is sent into a surrender that is still playing,
+		-- but the fact of it is remembered, because leaving it is the moment
+		-- that matters.
 		if state ~= nil and string.find(state, "^Surrender") ~= nil then
+			yielded = true
+
 			if left > 0 then
 				Script.SetTimer(self.AftermathPollMs, poll)
 			else
 				finish("yield-timeout", speed)
 			end
+
+			return
+		end
+
+		-- The first read after a yield ends. A victim who has just given up a
+		-- fight breaks into the run here, and this is the only moment it can
+		-- be stopped before he has covered any ground: waiting for his speed
+		-- to prove he is running means waiting for him to be running. The
+		-- stand-down goes out on the transition itself rather than on
+		-- evidence of its consequences.
+		if yielded then
+			local stoodDown = false
+
+			if self.AftermathStandDown then
+				stoodDown = self:SendStandDown(npc)
+				self:OfferYield(npc)
+			end
+
+			finish("left-yield stoodDown=" .. tostring(stoodDown), speed)
 
 			return
 		end
