@@ -545,11 +545,18 @@ HorseCollisionMod.RepairMaxSteps = 5
 -- district.
 HorseCollisionMod.AftermathRunMs = 15000
 
---- The gap over which the victim's speed is read, once, before stopping him.
+--- How often the victim is read while the aftermath is open.
 --
--- Long enough that a position difference is meaningful and short enough not
--- to delay the stand-down noticeably.
-HorseCollisionMod.AftermathSampleMs = 400
+-- Long enough that a position difference is meaningful, short enough that the
+-- moment he stops running is not missed by much.
+HorseCollisionMod.AftermathPollMs = 500
+
+--- How many reads before the aftermath gives up on him.
+--
+-- A bound rather than a mechanism, so a victim who neither settles nor runs
+-- cannot leave a poll going for the session. Ninety at half a second is
+-- forty five, comfortably past a fifteen second run and the yield before it.
+HorseCollisionMod.AftermathPollLimit = 90
 
 --- The victim's own speed, in meters per second, that counts as running.
 --

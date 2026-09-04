@@ -572,35 +572,40 @@ function HorseCollisionMod:EndRetaliation(npc, why)
 	end
 end
 
---- Lets a beaten victim run, then stops him and leaves him right.
+--- Watches a beaten victim and acts on what he is actually doing.
 --
--- The incident closing is the event everything here hangs off, so this is a
--- timer rather than a search. A victim released through the vanilla yield
--- menu settles first, which is what closes the incident, and only then walks
--- away in a flee that does not stop on its own.
+-- Driven by his state rather than by elapsed time. A timer alone gets this
+-- wrong: a victim who gives up running after eight seconds is still standing
+-- there when a fifteen second timer fires, and a stand-down aimed at a flee
+-- that already ended helps nobody.
 --
--- He is given `AftermathRunMs` to get clear, and then stopped. The pause that
--- follows a stand-down is the combat subbrain's own wind-down and nothing
--- reachable from Lua shortens it, so the run is what decides whether he does
--- his standing about near the rider or somewhere else.
+-- Three things are read every `AftermathPollMs`, and each is a real signal
+-- rather than an inference:
 --
--- Whether he is actually running is read once, at the moment of stopping him,
--- from his own speed. That is the only signal that separates the two cases:
--- `GetCurrentAnimationState` reports `MotionMovement` both for a man fleeing
--- at four and a half meters per second and for one walking to his stall at
--- one, and the combat state that would say `flee` is subbrain local and reads
--- nil. A victim who is not running is left alone, because a stand-down would
--- park him for the wind-down he did not need.
+-- * **Yielding.** Every surrender state carries the `Surrender` prefix:
+--   `SurrenderIn`, `SurrenderDialog`, `SurrenderDialogToIdle`,
+--   `SurrenderDialogToMove`, `SurrenderForcedWait`, `SurrenderToCombat`. A
+--   victim in one is mid-yield and is left alone until he is out of it.
+-- * **Fleeing.** His own speed. This is the one place a reading has to stand
+--   in for a state, because `GetCurrentAnimationState` reports
+--   `MotionMovement` both for a man fleeing at four and a half meters per
+--   second and for one walking to his stall at one, and the combat state that
+--   would say `flee` is subbrain local and reads nil.
+-- * **Settled.** Anything else, which is every idle and every ordinary
+--   working animation.
 --
--- His standing is then checked a second time. The repair at the end of the
--- incident runs before the rider is necessarily finished with him, and a
--- victim knocked down again loses more afterwards; one measured victim was
--- repaired at the close, dropped back to 0.0 by what followed, and restored
--- here.
+-- `AftermathRunMs` is a budget rather than a trigger: he is allowed to run
+-- for that long and stopped when he has spent it, or left alone if he stops
+-- of his own accord first. The stand-down is only sent to somebody actually
+-- running, because it parks him for the combat subbrain's wind-down and a man
+-- who has already settled does not need that.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchAftermath(npc)
 	local generation = self.TimerTick
+	local ran = 0
+	local left = self.AftermathPollLimit
+	local last = nil
 
 	local function where()
 		local p = nil
@@ -614,69 +619,98 @@ function HorseCollisionMod:WatchAftermath(npc)
 		return p
 	end
 
-	local function finish()
-		self:RepairVictim(npc)
-		self.Baseline[tostring(npc.id)] = nil
-	end
+	local function finish(why, speed)
+		local replanned = self:ReplanVictim(npc)
 
-	-- One reading, taken where the decision is made rather than tracked
-	-- throughout.
-	local function speedThen(after)
-		local first = where()
+		if self.Config.LogTelemetry then
+			self:Log("Aftermath " .. tostring(npc:GetName())
+					.. " " .. why
+					.. " ran=" .. tostring(ran) .. "ms"
+					.. " speed=" .. string.format("%.1f", speed or 0)
+					.. " replanned=" .. tostring(replanned))
+		end
 
-		Script.SetTimer(self.AftermathSampleMs, function()
+		Script.SetTimer(self.AftermathSettleMs, function()
 			if generation ~= self.TimerTick then
 				return
 			end
 
-			local second = where()
-			local speed = 0
-
-			if first ~= nil and second ~= nil then
-				speed = self:VectorLength({
-					x = second.x - first.x,
-					y = second.y - first.y,
-					z = 0
-				}) / (self.AftermathSampleMs / 1000)
-			end
-
-			after(speed)
+			self:RepairVictim(npc)
+			self.Baseline[tostring(npc.id)] = nil
 		end)
 	end
 
-	Script.SetTimer(self.AftermathRunMs, function()
+	last = where()
+
+	local function poll()
 		if generation ~= self.TimerTick then
 			return
 		end
 
-		speedThen(function(speed)
-			local running = speed > self.AftermathFleeSpeed
-			local stoodDown = false
+		left = left - 1
 
-			if running and self.AftermathStandDown then
-				stoodDown = self:SendStandDown(npc)
-				self:OfferYield(npc)
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local at = where()
+		local speed = 0
+
+		if at ~= nil and last ~= nil then
+			speed = self:VectorLength({
+				x = at.x - last.x,
+				y = at.y - last.y,
+				z = 0
+			}) / (self.AftermathPollMs / 1000)
+		end
+
+		last = at
+
+		-- Mid-yield. Nothing is sent into a surrender that is still playing.
+		if state ~= nil and string.find(state, "^Surrender") ~= nil then
+			if left > 0 then
+				Script.SetTimer(self.AftermathPollMs, poll)
+			else
+				finish("yield-timeout", speed)
 			end
 
-			local replanned = self:ReplanVictim(npc)
+			return
+		end
 
-			if self.Config.LogTelemetry then
-				self:Log("Aftermath " .. tostring(npc:GetName())
-						.. " speed=" .. string.format("%.1f", speed)
-						.. " running=" .. tostring(running)
-						.. " stoodDown=" .. tostring(stoodDown)
-						.. " replanned=" .. tostring(replanned))
-			end
+		if speed > self.AftermathFleeSpeed then
+			ran = ran + self.AftermathPollMs
 
-			Script.SetTimer(self.AftermathSettleMs, function()
-				if generation ~= self.TimerTick then
-					return
+			if ran >= self.AftermathRunMs then
+				local stoodDown = false
+
+				if self.AftermathStandDown then
+					stoodDown = self:SendStandDown(npc)
+					self:OfferYield(npc)
 				end
 
-				finish()
-			end)
-		end)
-	end)
+				finish("stopped stoodDown=" .. tostring(stoodDown), speed)
+
+				return
+			end
+		elseif ran > 0 then
+			-- He gave up running by himself, so there is no flee to cancel.
+			finish("halted", speed)
+
+			return
+		end
+
+		if left <= 0 then
+			finish("limit", speed)
+
+			return
+		end
+
+		Script.SetTimer(self.AftermathPollMs, poll)
+	end
+
+	Script.SetTimer(self.AftermathPollMs, poll)
 end
 
 --- Offers the yield behavior until the victim takes it.
