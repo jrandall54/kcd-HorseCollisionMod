@@ -585,6 +585,14 @@ HorseCollisionMod.AftermathRunMs = 1500
 -- indefinitely, which is the defect this whole path exists to cure.
 HorseCollisionMod.AftermathStandDown = true
 
+--- The vanilla behavior a beaten victim is handed once the fight is over.
+--
+-- From the catalog `customBehaviorRequest` sends are made with across the
+-- shipped trees. It is what the game runs for a man who has yielded, and
+-- handing it to him is what releases him from the combat subbrain's wind-down
+-- rather than leaving him standing for twenty five seconds.
+HorseCollisionMod.YieldBehaviorName = "combat_yield"
+
 --- How often the victim is sampled through the aftermath.
 --
 -- Half a second rather than a full one for two reasons: a short burst of

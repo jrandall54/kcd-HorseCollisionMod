@@ -660,6 +660,12 @@ function HorseCollisionMod:WatchAftermath(npc)
 			sent = self:SendStandDown(npc)
 		end
 
+		-- The stand-down stops him and then parks him for the combat
+		-- subbrain's wind-down. This is what lets him go: see
+		-- `SendYieldBehavior` for the twenty five seconds it saves and the
+		-- seven things that did not work.
+		self:SendYieldBehavior(npc)
+
 		if self.Config.LogTelemetry then
 			self:Log("Aftermath " .. tostring(npc:GetName())
 					.. " " .. why
@@ -699,8 +705,6 @@ function HorseCollisionMod:WatchAftermath(npc)
 						.. " waited=" .. tostring(self:TimeMs() - waitedFrom)
 						.. "ms")
 			end
-
-			self:TraceAftermath(npc)
 
 			finish(why)
 		end
@@ -771,132 +775,6 @@ function HorseCollisionMod:WatchAftermath(npc)
 	end
 
 	Script.SetTimer(self.AftermathStopMs, sample)
-end
-
---- Dense diagnostic trace of a victim from the stand-down onward.
---
--- The pause between a victim stopping and getting on with his day is the
--- thing under investigation, and one-variable-at-a-time changes each cost a
--- ride to learn one fact. This logs everything relevant at once, four times a
--- second for twenty five seconds, and re-sends the replan at marked moments
--- so the timeline says whether any of them is what moves him.
---
--- Each line carries the time since the stand-down, his animation state, his
--- own speed, whether he still reads as fighting, and whether the context
--- option this file sets is still on him. Read together they separate a
--- stand-down that has to expire, a replan that is being rejected, a cleanup
--- that has not happened, and an opponent left registered against him.
---
--- Diagnostic only. It is not part of the feature and comes out once the
--- question is answered.
---
--- @tparam table npc victim entity
-function HorseCollisionMod:TraceAftermath(npc)
-	local generation = self.TimerTick
-	local began = self:TimeMs()
-	local mark = nil
-	local left = 100
-	local nudged = {}
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
-
-	pcall(function()
-		local q = npc:GetWorldPos()
-
-		mark = { x = q.x, y = q.y }
-	end)
-
-	local function step()
-		if generation ~= self.TimerTick or left <= 0 then
-			return
-		end
-
-		left = left - 1
-
-		local t = self:TimeMs() - began
-		local at = nil
-		local speed = 0
-		local state = "?"
-		local option = "?"
-
-		pcall(function()
-			local q = npc:GetWorldPos()
-
-			at = { x = q.x, y = q.y }
-		end)
-
-		if at ~= nil and mark ~= nil then
-			speed = self:VectorLength({
-				x = at.x - mark.x,
-				y = at.y - mark.y,
-				z = 0
-			}) / 0.25
-		end
-
-		mark = at
-
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		pcall(function()
-			option = tostring(Contexts.CheckOption(npc,
-					self.RetaliationOption))
-		end)
-
-		-- Marked re-sends. If he moves right after one of these the replan is
-		-- the lever and the timing was wrong; if he ignores all of them it is
-		-- not what is holding him.
-		local nudge = ""
-
-		-- `combat:stimulus:customBehaviorRequest` is the second of the two
-		-- stimuli `sb_combat.xml` accepts during `fight` or `flee`, the
-		-- stand-down being the first, and unlike an order it names a behavior
-		-- to run rather than asking the tree to change its own mind. Three
-		-- candidates from vanilla's own catalog are tried in turn, because a
-		-- behavior the NPC cannot resolve costs nothing but a log line.
-		local behaviors = { [3000] = "combat_yield", [8000] = "leave",
-				[14000] = "battle_lost" }
-
-		for when, name in pairs(behaviors) do
-			if t >= when and not nudged[when] then
-				nudged[when] = true
-
-				local w = nil
-
-				pcall(function()
-					w = XGenAIModule.GetMyWUID(npc)
-				end)
-
-				pcall(function()
-					XGenAIModule.SendMessageToEntityData(target,
-							"combat:stimulus:customBehaviorRequest",
-							Utils.makeTable(
-									"combat:stimulus:customBehaviorRequest", {
-								behaviorName = name,
-								behaviorSource = w,
-								suppressStimuli = false
-							}))
-				end)
-
-				nudge = " BEHAVIOR-" .. name
-			end
-		end
-
-		self:Log("Trace t=" .. tostring(t)
-				.. " st=" .. state
-				.. " sp=" .. string.format("%.1f", speed)
-				.. " fighting=" .. tostring(self:IsStillFighting(state))
-				.. " opt=" .. option
-				.. nudge)
-
-		Script.SetTimer(250, step)
-	end
-
-	Script.SetTimer(250, step)
 end
 
 --- Decides whether this walk impact provokes a fight, and starts one if so.

@@ -300,3 +300,67 @@ function HorseCollisionMod:SendOffenseRelease(npc)
 
 	return ok
 end
+
+--- Releases a victim from the combat subbrain's wind-down.
+--
+-- A stand-down ends the flee and then parks him. `state_flee` waits fifteen
+-- seconds, hands to `state_rally`, which waits another eight, and only then
+-- sets `t_exitCombatSubbrain`. Until that flag flips he has no daycycle, so he
+-- stands still with no combat animation and nothing to do. Traced four times a
+-- second he held `MotionIdle` at 0.00 m/s for twenty five seconds.
+--
+-- Nothing reachable from Lua interrupts those waits. A replan is discarded,
+-- three of them at two, five and nine seconds moved him not at all;
+-- `combat:order:rally` and `combat:order:win` construct, address and do
+-- nothing; `Contexts.ResetEntity` does nothing; writing
+-- `t_exitCombatSubbrain` through `SetBrainVariable` reports success and reads
+-- back nil, because the bind reaches the context brain and not subbrain
+-- locals; and `combat:subbrain:stop` is refused by `Utils.makeTable` as a type
+-- that does not exist.
+--
+-- What works is not asking the tree to change its mind but giving it
+-- something else to do. `customBehaviorRequest` is one of only two stimuli
+-- `sb_combat.xml` accepts during `fight` or `flee`, and `combat_yield` is
+-- vanilla's own behavior for a man who has given a fight up, which is exactly
+-- this victim's situation. Measured against the twenty five second stare, he
+-- was walking **1.25 seconds** after it arrived.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true when the request was sent
+function HorseCollisionMod:SendYieldBehavior(npc)
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
+
+	local source = nil
+
+	pcall(function()
+		source = XGenAIModule.GetMyWUID(npc)
+	end)
+
+	if not source then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		local message = Utils.makeTable(
+				"combat:stimulus:customBehaviorRequest", {
+			behaviorName = self.YieldBehaviorName,
+			behaviorSource = source,
+			suppressStimuli = false
+		})
+
+		XGenAIModule.SendMessageToEntityData(target,
+				"combat:stimulus:customBehaviorRequest", message)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("YieldBehavior " .. tostring(npc:GetName())
+				.. " ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
+end
