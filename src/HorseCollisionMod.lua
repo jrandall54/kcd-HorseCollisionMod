@@ -536,6 +536,15 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
+--- How long a fleeing victim is left to run before he is stopped.
+--
+-- The pause that follows a stand-down is the combat subbrain's own wind-down,
+-- and nothing reachable from Lua shortens it, so this decides where he spends
+-- it rather than whether he does. Fifteen seconds carries him well clear of
+-- the rider and of wherever the fight happened, without taking him out of the
+-- district.
+HorseCollisionMod.AftermathRunMs = 15000
+
 --- The gap over which the victim's speed is read, once, before stopping him.
 --
 -- Long enough that a position difference is meaningful and short enough not
