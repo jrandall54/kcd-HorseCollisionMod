@@ -797,6 +797,11 @@ function HorseCollisionMod:TraceAftermath(npc)
 	local mark = nil
 	local left = 100
 	local nudged = {}
+	local target = npc.id
+
+	if npc.this and npc.this.id then
+		target = npc.this.id
+	end
 
 	pcall(function()
 		local q = npc:GetWorldPos()
@@ -847,34 +852,34 @@ function HorseCollisionMod:TraceAftermath(npc)
 		-- not what is holding him.
 		local nudge = ""
 
-		-- The combat subbrain holds him until `t_exitCombatSubbrain` is set,
-		-- and vanilla only sets it at the end of a fifteen second flee and an
-		-- eight second rally. If the flag can be written from here he should
-		-- move the moment it is; if he does not, the subbrain variable is out
-		-- of reach and the wait cannot be shortened from Lua at all.
+		-- `combat:order:rally` and `combat:order:win` are both declared under
+		-- `combat:order` and both construct and address without error, where
+		-- `combat:subbrain:stop` is refused by `makeTable` outright. Rally is
+		-- the state vanilla itself enters after a flee, and it is the one that
+		-- sets `t_exitCombatSubbrain` when it finishes, so ordering it should
+		-- cut the wait short if anything can.
 		if t >= 3000 and not nudged[3000] then
 			nudged[3000] = true
 
-			local w = nil
-
 			pcall(function()
-				w = XGenAIModule.GetMyWUID(npc)
+				XGenAIModule.SendMessageToEntityData(target,
+						"combat:order:rally",
+						Utils.makeTable("combat:order:rally", {}))
 			end)
 
-			for _, name in ipairs({ "t_exitCombatSubbrain",
-					"exitCombatSubbrain" }) do
-				pcall(function()
-					XGenAIModule.SetBrainVariable(w, name, true)
-				end)
-			end
-
-			nudge = " EXIT-FLAG-SET"
+			nudge = " RALLY-ORDERED"
 		end
 
 		if t >= 9000 and not nudged[9000] then
 			nudged[9000] = true
-			self:ReplanVictim(npc)
-			nudge = " REPLAN-SENT"
+
+			pcall(function()
+				XGenAIModule.SendMessageToEntityData(target,
+						"combat:order:win",
+						Utils.makeTable("combat:order:win", {}))
+			end)
+
+			nudge = " WIN-ORDERED"
 		end
 
 		self:Log("Trace t=" .. tostring(t)
