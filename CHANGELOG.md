@@ -29,6 +29,21 @@ number.
 
 ## [Unreleased]
 
+## [4.10.0] - 2026-09-04
+
+### Added
+
+- Shove a woman at walking pace once too often and she now answers it. Where a
+  man turns and fights, she breaks off, goes to find a guard and reports you.
+  She raises no alarm at the moment of the shove: the report is something she
+  carries and has to deliver, so getting clear of her before she reaches anyone
+  is the difference between a fine and nothing at all. A guard who sees it
+  himself still needs no telling.
+
+  Both answers run off the same count and the same roll, so `Retaliation`,
+  `RetaliationFreeBumps`, `RetaliationChanceStep` and `RetaliationMaxChance`
+  govern the two alike. `WomenRaiseAlarm` turns the new half off on its own.
+
 ## [4.9.3] - 2026-09-04
 
 ### Changed
