@@ -170,6 +170,14 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   incident is closed however it looks
 -- @field WomenRaiseAlarm whether a woman shoved once too often runs to fetch
 --   a guard, where a man turns and fights
+-- @field ImpactDamage whether the mod charges the victim for the impact on
+--   top of what the engine charges for the collision
+-- @field ImpactDamageArmorScale the `smash_def` past the ignored figure at
+--   which a victim takes half the tier's damage; higher means armor matters less
+-- @field ImpactDamageIgnoredArmor `smash_def` that does not count as armor,
+--   covering the shoes and shirt every villager wears
+-- @field ImpactDamageVariance how far either side of the tier figure a single
+--   impact can land, as a fraction
 -- @field ImpactSound whether a collision makes a noise
 -- @field ImpactSoundWalk layers played by a walk impact
 -- @field ImpactSoundTrot layers played by a trot impact
@@ -322,6 +330,13 @@ HorseCollisionMod.Config = {
 	RetaliationMemorySec     = 45,
 	RetaliationCeilingSec    = 120,
 	WomenRaiseAlarm          = true,
+
+	-- What being ridden down costs the victim, over and above what the
+	-- engine charges for the collision itself.
+	ImpactDamage             = true,
+	ImpactDamageArmorScale   = 0.6,
+	ImpactDamageIgnoredArmor = 0.5,
+	ImpactDamageVariance     = 0.15,
 
 	-- The noise a collision makes, played on the victim at the moment of
 	-- impact. The names are audio triggers from the game's own .animevents
@@ -658,6 +673,26 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- fight has ended, never how long the fight is allowed to last. One second is
 -- fine for a state that changes on the scale of a scuffle, and it keeps the
 -- telemetry readable rather than a wall of lines.
+-- What a tier costs an unarmored victim before armor scales it down, in
+-- health. A gallop into someone in a shirt usually kills and sometimes does
+-- not, which is the outcome asked for rather than a certainty either way.
+--
+-- The gallop figure is set from measurement rather than picked. At 90 the
+-- soft end killed six of eight, and both survivors finished on 3.5 and 0.5
+-- health, having been dealt 81.0 and 80.6 against a villager's 100. The
+-- engine's own trample adds a further 15 to 20 on top in most impacts but
+-- varies from nothing to 28, and that variation is what leaves any survivors
+-- at all. 95 carries those two over and lands the rate near the nine in ten
+-- asked for.
+--
+-- Documented as an ordinary comment rather than an LDoc block: LDoc reads an
+-- annotated table as a set of named fields and refuses one holding an array.
+HorseCollisionMod.ImpactDamageByTier = {
+	Walk = 0,
+	Trot = 25,
+	Gallop = 95,
+}
+
 HorseCollisionMod.RetaliationPollMs = 1000
 
 --- Consecutive samples out of the fight before the incident is closed.

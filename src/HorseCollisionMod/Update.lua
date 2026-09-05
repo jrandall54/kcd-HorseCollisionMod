@@ -191,6 +191,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:MarkVictim(npc, "Trot", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
+
+		-- After the native hit, so the engine's own charge for the collision
+		-- lands first and the log reads in the order the victim experiences it.
+		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
 		return
@@ -205,6 +209,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:MarkVictim(npc, "Gallop", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
+
+		-- After the native hit, so the engine's own charge for the collision
+		-- lands first and the log reads in the order the victim experiences it.
+		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina)
 		return

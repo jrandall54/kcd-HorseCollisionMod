@@ -15052,3 +15052,60 @@ needs no telling.
 
 `Game.SetWantedLevel` is exposed to Lua and there is no getter, so the wanted
 level cannot be read from the console. This was settled by observation instead.
+
+## The damage curve: armor decides the outcome, and the engine still sets a floor
+
+The mod applied no damage of its own. The engine charged for the trample and
+nothing else did, which is why an armored target and an unarmored one cost
+about the same: measured across matched impacts, armor took 87 per cent of the
+unarmored figure with an error bar that included no difference at all.
+
+`ApplyImpactDamage` now charges the victim on top of that, scaled by the summed
+`smash_def` of what they are wearing. `smash_def` rather than weight, because it
+is the game's own blunt resistance and a mail hauberk and a padded gambeson
+weigh alike while stopping a horse very differently. No kill roll: lethality
+falls out of damage against health, so "nine times in ten" is arithmetic and
+`ImpactDamageVariance` is what makes it a chance at all.
+
+### The first curve was wrong, and the reason is worth keeping
+
+`1 / (1 + smashDef / scale)` counted a villager's shoes and shirt as armor.
+Those are in the game's `armor` table and sum to 0.30 to 0.50, so a villager
+was already taking 17 per cent off for being dressed, and the curve could not
+be made steep enough to spare a knight without also sparing her. Subtracting
+`ImpactDamageIgnoredArmor` first fixes it: everyone in ordinary clothes reads
+1.00, and the falloff past that point can be as sharp as it needs to be.
+
+    villager    smashDef 0.30   1.00      mail        smashDef 4.99   0.12
+    light       smashDef 1.50   0.37      plate       smashDef 12.0   0.05
+
+### Measured at base 90
+
+Eight unarmored gallop impacts, six fatal. Both survivors finished on 3.5 and
+0.5 health, dealt 81.0 and 80.6 against 100. That is 75 per cent, and it misses
+the target by two impacts that came within a point of it rather than by a wide
+margin, so the base moves to 95 rather than the curve changing again.
+
+Armored, the same run:
+
+    rat_guardJanik   smashDef 7.16   mod  7.5   engine  7.5   total -15.0
+    rat_guard18                      mod  9.7   engine  9.6   total -19.3
+    villageGuard     smashDef 4.99   mod  9.3   engine 18.5   total -27.8
+    rat_guard25                      mod 11.8   engine 16.3   total -28.1
+    rat_guard3                       mod 15.3   engine 28.3   total -43.6
+
+Guards finish between 54 and 85 health and the mod's share is 7 to 17, which is
+the light touch that was wanted.
+
+### The engine's trample is the floor, and it is armor blind
+
+The engine's contribution above runs from nothing to 28.3 in the same session
+against similar targets, and it does not track armor: `rat_guardJanik` in the
+heaviest mail of the group was charged 7.5 while `rat_guard3` was charged 28.3.
+
+So a knight in plate cannot be brought below roughly 15 to 20 a gallop however
+far the mod's own figure falls, because that part is not the mod's to give. The
+mod's share at plate is already 4. `rpg_param.xml` is one global value read by
+everything that resolves a physical collision, the player's own included, and
+is not being overridden. `perk_rpg_param_override.xml` resolves parameters per
+character against the perks they hold and is the remaining unexplored lever.
