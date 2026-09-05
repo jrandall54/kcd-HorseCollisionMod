@@ -147,7 +147,7 @@ prints each entry name so the separators are visible.
 
 `Scripts/Startup/HorseCollisionMod.lua` is the entry point. It creates the
 table, holds `Config`, the state tables and the timing constants, and applies
-the settings file; the behavior lives in twelve part files under
+the settings file; the behavior lives in thirteen part files under
 `Scripts/HorseCollisionMod/`, named at the foot of the entry point in the order
 they are wanted:
 
@@ -159,6 +159,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Marks.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Sound.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
@@ -169,12 +170,13 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 | File | What it holds |
 |---|---|
 | `Enums.lua` | the two engine enums, transcribed from `TypeDefinitions.xml` |
-| `Log.lua` | logging, the engine clock, vector length, speed history and tier |
+| `Log.lua` | logging, entity names, the engine clock, vector length, speed history and tier |
 | `Armor.lua` | what a victim is wearing, and both curves derived from it |
 | `Detection.lua` | the horse footprint test and the impact direction |
 | `Health.lua` | what an impact cost, and the auto-cure suppression |
 | `Reaction.lua` | the brain message, the reaction clip, the physics ragdoll |
 | `Marks.lua` | the dirt and blood a knockdown leaves on the victim |
+| `Sound.lua` | the layered noise an impact makes, matched to the victim's armor |
 | `Recovery.lua` | the waits, the rebuild and the replan that follow |
 | `Crime.lua` | the combat hit that makes riding someone down an offence |
 | `Retaliation.lua` | a victim losing patience at a walk, and the brawl that follows |
@@ -282,9 +284,16 @@ The mod increments a counter on each load screen and passes that value into the
 timer closure. Any loop whose value no longer matches the current one stops on
 its next iteration, so at most one loop is live.
 
-Detection runs at 100 ms. Each tick checks that the player is mounted and moving
-at least at walking pace before doing anything else, so the cost while on foot
-is negligible.
+Detection runs at `TickSeconds`, which is 0.033. That figure is the loop rate
+and the distance the footprint sweeps forward, so the two cannot disagree; they
+were separate numbers until the impact sound made the lag between a contact and
+the reaction audible.
+
+Each tick checks that the player is mounted and moving at least at walking pace
+before doing anything else, so the cost while on foot is negligible. Thirty
+passes a second over every entity near the horse is also why the loop's
+diagnostics are built only when something will read them: see `IsInHorseFootprint`,
+which formats its measurements only on request.
 
 ## Detection
 

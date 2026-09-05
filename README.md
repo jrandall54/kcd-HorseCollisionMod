@@ -155,6 +155,9 @@ tools/
                           item class GUIDs to readable names
   probe_tables.lua        dumps a game table's columns and rows through
                           the Database bind
+  probe_health.lua        logs one entity's health whenever it changes, for
+                          the case where health moves with no impact to
+                          account for it
   dev_survival.lua        holds the player's nourishment and energy at 100,
                           so a test needing game time is not also a test of
                           finding food in hardcore
