@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.10.0
+-- @release 4.11.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -178,7 +178,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury, armor)
 
 		-- An animated knockdown never makes the victim a physics object, so
-		-- the horse cannot strike them and the engine charges nothing. The
+		-- the horse cannot strike them the way it does at a gallop. It does
+		-- not follow that the tier is free: measured, the engine still takes
+		-- 6 to 8 from an unarmored victim here and up to 12 from a guard, so
+		-- something other than the trample is charging for it. The
 		-- ragdoll is kept because it is what shipped, and because an
 		-- animation does not carry the impact's momentum.
 		if cfg.TrotReaction == "knockdown" then
@@ -191,6 +194,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:MarkVictim(npc, "Trot", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
+
+		-- After the native hit, so the engine's own charge for the collision
+		-- lands first and the log reads in the order the victim experiences it.
+		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
 		return
@@ -205,6 +212,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:MarkVictim(npc, "Gallop", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
+
+		-- After the native hit, so the engine's own charge for the collision
+		-- lands first and the log reads in the order the victim experiences it.
+		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina)
 		return

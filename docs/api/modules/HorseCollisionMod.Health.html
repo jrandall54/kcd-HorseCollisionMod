@@ -74,7 +74,7 @@
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.10.0
+        <li><strong>Release</strong>:  4.11.0
  When the impact probe samples, in milliseconds after the hit.</p>
 
 <p> 500 catches what the impact cost, since the engine applies damage after the
@@ -97,6 +97,14 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ProbeImpactCost">HorseCollisionMod:ProbeImpactCost (npc, tierName, strength[, armor])</a></td>
 	<td class="summary">Samples the victim's health across an impact.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ImpactDamageScale">HorseCollisionMod:ImpactDamageScale (armor)</a></td>
+	<td class="summary">How much of the tier's damage a target in this armor takes.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ApplyImpactDamage">HorseCollisionMod:ApplyImpactDamage (npc, tierName, armor[, playerEnt])</a></td>
+	<td class="summary">Charges a victim for being ridden down, on top of what the engine charged.</td>
 	</tr>
 </table>
 
@@ -195,6 +203,136 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod:ImpactDamageScale"></a>
+    <strong>HorseCollisionMod:ImpactDamageScale (armor)</strong>
+    </dt>
+    <dd>
+
+<p>How much of the tier's damage a target in this armor takes. </p>
+
+<p> One falling curve against the summed <code>smash_def</code> of what the victim is
+ wearing, past the part of it that is not armor:
+ <code>1 / (1 + max(0, smashDef - ImpactDamageIgnoredArmor) / ImpactDamageArmorScale)</code>.
+ It reaches 1.0 on anyone in ordinary clothes and never reaches 0, so plate
+ is a very bad day rather than immunity.</p>
+
+<p> The subtraction is what makes the curve work at all. Shoes, a shirt and a
+ hood are in the <code>armor</code> table and sum to 0.30 to 0.50 on a villager wearing
+ nothing anyone would call armor. Measured against the raw figure, a villager
+ was already taking 17 per cent off for being dressed, which meant the curve
+ could not be made steep enough to spare a knight without also sparing her.</p>
+
+<p> <code>smash_def</code> is the game's own blunt resistance and is the right column for a
+ horse: it is what the engine consults for a mace or a hammer, and a horse's
+ chest is the same kind of problem for a breastplate. Weight is deliberately
+ not used, though <code>ArmorOf</code> returns it, because a heavy mail hauberk and a
+ heavy padded gambeson weigh alike and stop a blunt impact very differently.</p>
+
+<p> The scale is a half-life rather than a ceiling: at
+ <code>ImpactDamageArmorScale</code> past the ignored figure the target takes half, at
+ twice it a third. With the shipped 0.6 that reads across the range actually
+ worn in game as</p>
+
+<pre><code> villager    smashDef 0.30   1.00
+ light       smashDef 1.50   0.37
+ mail        smashDef 4.99   0.12
+ heavy mail  smashDef 7.16   0.08
+ plate       smashDef 12.0   0.05
+</code></pre>
+
+
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         totals from <code>ArmorOf</code>
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        multiplier on the tier's damage, in (0, 1]
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ApplyImpactDamage"></a>
+    <strong>HorseCollisionMod:ApplyImpactDamage (npc, tierName, armor[, playerEnt])</strong>
+    </dt>
+    <dd>
+    Charges a victim for being ridden down, on top of what the engine charged. </p>
+
+<p> The engine already takes something. A ragdoll under a moving horse is a
+ physics object and the velocity delta is charged at
+ <code>CollisionVelocityDeltaToDmgR</code>, which is a global this mod will not
+ override. That cost is real but it is nearly flat against armor: measured
+ across matched impacts an armored target took 87 per cent of what an
+ unarmored one did, with an error bar that includes no difference at all.
+ Being ridden down at a gallop in a shirt and being ridden down in plate
+ therefore cost about the same, which is the thing this function exists to
+ fix.</p>
+
+<p> So the mod adds its own charge, scaled by <a href="../modules/HorseCollisionMod.Health.html#HorseCollisionMod:ImpactDamageScale">ImpactDamageScale</a>, and the
+ outcome is left to arithmetic rather than decided by a kill roll. A villager
+ dies at a gallop because the damage usually exceeds what a villager has, and
+ occasionally does not; a knight survives because it usually does not come
+ close. <code>ImpactDamageVariance</code> is what makes "usually" mean anything, and a
+ roll that decides death directly would be a different and much cruder thing.</p>
+
+<p> Applied through <code>soul:DealDamage(stamina, health, attacker, ...)</code>, which is
+ vanilla's own call: <code>deadBody.xml</code> and <code>questUtils.xml</code> use it to kill an
+ entity outright and <code>npc_roebuck.xml</code> to wound one. Stamina is left at zero
+ because the horse's side of the impact already debits the rider and the
+ victim's stamina is not what this models.</p>
+
+<p> **Attribution follows <code>CollisionIsCrime</code>.** Named as the player's doing, a
+ death is the player's murder, which is what riding someone down at a gallop
+ ought to be. With the crime switch off the damage lands unattributed, so a
+ collision test is not interrupted by guards. This does not make a trampling
+ death crime free on its own: the engine attributes the trample itself, and
+ that is not reachable from here.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the tier the impact scored
+        </li>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         totals from <code>ArmorOf</code>
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player, named as the attacker when crime is on
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        the damage dealt, or 0 when nothing was
+    </ol>
+
+
+
+
+</dd>
 </dl>
 
 
@@ -202,7 +340,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-04 22:57:26 </i>
+<i style="float:right;">Last updated 2026-09-04 23:40:09 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

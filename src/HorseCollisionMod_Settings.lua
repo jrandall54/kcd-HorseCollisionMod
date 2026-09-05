@@ -110,6 +110,20 @@ HorseCollisionModSettings = {
 	-- instead, on the same count and the same roll.
 	WomenRaiseAlarm          = true,  -- women raise the alarm rather than fight
 
+	-- What being ridden down costs, over and above the engine's own charge for
+	-- the collision. The engine's charge barely notices armor, so this is what
+	-- makes a knight in plate different from a villager in a shirt.
+	--
+	-- Ordinary clothes are in the game's armor table and sum to about 0.4, so
+	-- that much is ignored before anything counts as armor. Past it a victim
+	-- takes half the tier's damage at ImpactDamageArmorScale, a third at twice
+	-- it, and so on down. Worn totals run about 0.3 in clothes, 5 in mail and
+	-- 12 or more in plate.
+	ImpactDamage             = true,  -- charge the victim for the impact
+	ImpactDamageArmorScale   = 0.6,   -- smash_def past the ignored figure that halves damage
+	ImpactDamageIgnoredArmor = 0.5,   -- smash_def that is clothing, not armor
+	ImpactDamageVariance     = 0.15,  -- spread either side of the tier figure
+
 	-- The noise a collision makes, played as the horse hits them.
 	--
 	-- No single sound in the game is a horse striking a person, because
