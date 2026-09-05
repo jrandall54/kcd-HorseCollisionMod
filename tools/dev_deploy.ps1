@@ -9,6 +9,7 @@
 #   .\tools\dev_deploy.ps1 -Reload              push what changed into the running game
 #   .\tools\dev_deploy.ps1 -Launch              build, deploy, start the game
 #   .\tools\dev_deploy.ps1 -NoBuild -Launch     deploy what was built last, start the game
+#   .\tools\dev_deploy.ps1 -Crime               keep riding people down a crime
 #   .\tools\dev_deploy.ps1 -ParkVortexMod       move the Vortex-installed copy aside first
 #   .\tools\dev_deploy.ps1 -GameRoot "D:\..."   use an install somewhere else
 #   .\tools\dev_deploy.ps1 -SetDevEnvironment    switch system.cfg to development values
@@ -34,6 +35,7 @@ param (
 	[switch]$Reload,
 	[switch]$ScriptOnly,
 	[switch]$AnimOnly,
+	[switch]$Crime,
 	[switch]$SetDevEnvironment,
 	[switch]$SetPlayEnvironment,
 	[switch]$PrepareShippingTest,
@@ -552,7 +554,65 @@ function Sync-LooseFiles {
 		$changed[$file.Half] = $true
 	}
 
+	# A development deploy leaves riding someone down legal, because almost
+	# every collision test is about the collision and not about the crime, and
+	# guards arriving mid-test end the test. -Crime keeps the shipping value.
+	#
+	# This has to happen here, between the copy and the reload the caller runs
+	# next. src\HorseCollisionMod_Settings.lua cannot carry the change, because
+	# build.ps1 rejects a release that ships CollisionIsCrime = false, and
+	# patching the installed file after the reload is too late: the value the
+	# engine already read is the one a later save load keeps.
+	if ($changed.Script) {
+		Set-DeployedCrime -Root $Root -Enabled:$Crime
+	}
+
 	return $changed
+}
+
+# Rewrites CollisionIsCrime in the installed settings file, and reports what it
+# left behind rather than assuming the edit took. The value is written as bytes
+# with no byte order mark: Set-Content -Encoding utf8 on Windows PowerShell
+# writes one, and a BOM on the first line makes Lua reject the entire settings
+# file, at which point the mod silently keeps every compiled-in default and the
+# setting appears not to work at all.
+function Set-DeployedCrime {
+	param (
+		[string]$Root,
+		[switch]$Enabled
+	)
+
+	$path = Join-Path $Root "Data\Scripts\Startup\HorseCollisionMod_Settings.lua"
+
+	if (-not (Test-Path $path)) {
+		return
+	}
+
+	$want = if ($Enabled) { "true" } else { "false" }
+	$text = [System.IO.File]::ReadAllText($path)
+	$patched = [regex]::Replace($text,
+		'(CollisionIsCrime\s*=\s*)(true|false)', "`${1}$want")
+
+	if ($patched -ne $text) {
+		$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+		[System.IO.File]::WriteAllText($path, $patched, $utf8NoBom)
+	}
+
+	# Read it back off disk. A regex that matched nothing looks exactly like a
+	# successful patch from here, and the cost of the difference is the rider
+	# fending off guards through a test that then has to be run again.
+	$now = [regex]::Match([System.IO.File]::ReadAllText($path),
+		'CollisionIsCrime\s*=\s*(true|false)')
+
+	if (-not $now.Success) {
+		Write-Host "[DEPLOY] CollisionIsCrime not found in the installed settings." -ForegroundColor Yellow
+	}
+	elseif ($now.Groups[1].Value -ne $want) {
+		Write-Host "[DEPLOY] CollisionIsCrime is $($now.Groups[1].Value), wanted $want." -ForegroundColor Red
+	}
+	else {
+		Write-Host "[DEPLOY] CollisionIsCrime = $want (installed settings)"
+	}
 }
 
 # Reloads the halves that were written. The console commands are known here, so

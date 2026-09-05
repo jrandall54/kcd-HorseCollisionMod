@@ -105,6 +105,11 @@ HorseCollisionModSettings = {
 	-- when the fight is over it puts him back the way it found him.
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 
+	-- A woman answers the same shove differently, because the game's combat
+	-- tree lets only men into the fight branch. She runs and fetches a guard
+	-- instead, on the same count and the same roll.
+	WomenRaiseAlarm          = true,  -- women raise the alarm rather than fight
+
 	-- The noise a collision makes, played as the horse hits them.
 	--
 	-- No single sound in the game is a horse striking a person, because

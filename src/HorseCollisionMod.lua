@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.9.3
+-- @release 4.10.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.9.3"
+HorseCollisionMod.Version = "4.10.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -168,6 +168,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
+-- @field WomenRaiseAlarm whether a woman shoved once too often runs to fetch
+--   a guard, where a man turns and fights
 -- @field ImpactSound whether a collision makes a noise
 -- @field ImpactSoundWalk layers played by a walk impact
 -- @field ImpactSoundTrot layers played by a trot impact
@@ -319,6 +321,7 @@ HorseCollisionMod.Config = {
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
 	RetaliationCeilingSec    = 120,
+	WomenRaiseAlarm          = true,
 
 	-- The noise a collision makes, played on the victim at the moment of
 	-- impact. The names are audio triggers from the game's own .animevents

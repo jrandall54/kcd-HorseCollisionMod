@@ -48,19 +48,33 @@
 -- the attacker is the player. That is a guard using the authority a guard
 -- has, and the crime-free brawl here is for the people who lack it.
 --
--- ### Women do not fight
+-- ### Women raise the alarm instead of fighting
 --
 -- `sb_combat.xml` tests `b_soul.gender == male` **after** the context option
 -- is consulted, and fails everyone else outright. `alwaysFightWhenHit`
 -- removes the morale comparison and nothing more, so a woman carrying it
--- still falls through to the report or flee branches. Provoking her would
--- send her walking off to fetch a guard over an incident that raised no
--- crime, which reads as a bug rather than a character. So the roll is not
--- offered to her, and the reason is logged.
+-- still falls through to the report or flee branches of the same handler.
+--
+-- That fall-through is the feature rather than an obstacle. A woman shoved
+-- once too often runs and fetches a guard, which is a response to being
+-- ridden down rather than an absence of one, and it is the tree's own
+-- behavior: the same provocation is sent, and the branch she lands in is
+-- chosen by the game.
+--
+-- She is given neither the context option nor the offense release. Both exist
+-- to push a victim through a fight subtree she cannot enter, so setting them
+-- would only leave an option to clear afterwards for no effect.
+--
+-- Morale is not what separates her from a man, and it was measured rather
+-- than assumed. Across twenty one NPCs in Rattay the women read 0.15 to 0.22
+-- and the male civilians read 0.16 to 0.52 against guards at 0.54 to 0.79, so
+-- the morale comparison tells a guard from a townsman and says nothing about
+-- sex. Routing on the gender the combat tree itself tests is therefore the
+-- honest implementation, not a shortcut around a stat that would have done it.
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 4.9.3
+-- @release 4.10.0
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
@@ -81,6 +95,11 @@ HorseCollisionMod.RetaliationHandle = "horseCollisionMod"
 -- `gender=1` for men and `gender=2` for women.
 HorseCollisionMod.GenderMale = 1
 
+--- The soul gender that falls through to the report and flee branches.
+--
+-- Same source as `GenderMale`: logged reactions report `gender=2` for women.
+HorseCollisionMod.GenderFemale = 2
+
 --- Whether the context system is available.
 --
 -- `Contexts` is a vanilla global from `Scripts/Script/Context.lua`. Every use
@@ -94,14 +113,18 @@ function HorseCollisionMod:HasContexts()
 			and type(contexts.SetNonpersistentOption) == "function"
 end
 
---- Whether this victim is one the game would let fight back at all.
+--- How this victim answers a shove too many.
 --
--- **Gender** is the only real gate, and it is the game's rather than this
--- mod's. `sb_combat.xml` tests `b_soul.gender == male` after the context
--- option is consulted and fails everyone else outright.
--- `alwaysFightWhenHit` removes the morale comparison and nothing more, so a
--- provoked woman falls through to the report or flee branches and would walk
--- off to fetch a guard over an incident that raised no crime.
+-- **Gender** decides which of two answers is available, and it is the game's
+-- decision rather than this mod's. `sb_combat.xml` tests
+-- `b_soul.gender == male` after the context option is consulted and fails
+-- everyone else outright, so a man reaches the fight branch and a woman falls
+-- through to the report or flee branches of the same handler.
+--
+-- Both are answers, so both are offered: `"fight"` for a man and `"alarm"`
+-- for a woman, with `"none"` for anyone the game would let do neither. The
+-- caller sends the same provocation either way and does the extra work that
+-- only a fight needs.
 --
 -- **Guards are deliberately not excluded.** They behave differently, and the
 -- difference is correct: the soldier branch of the hit handler calls
@@ -118,8 +141,8 @@ end
 -- log can be read afterwards for who was provoked.
 --
 -- @tparam table npc victim entity
--- @treturn boolean true when a provoked fight is possible
--- @treturn string why not, when it is not, or the role when it is
+-- @treturn string `"fight"`, `"alarm"` or `"none"`
+-- @treturn string the victim's social class, or why the answer is `"none"`
 function HorseCollisionMod:CanRetaliate(npc)
 	local gender = nil
 
@@ -127,21 +150,31 @@ function HorseCollisionMod:CanRetaliate(npc)
 		gender = npc.soul:GetGender()
 	end)
 
-	if gender ~= self.GenderMale then
-		return false, "gender=" .. tostring(gender)
-	end
-
-	if not self:HasContexts() then
-		return false, "no-contexts"
-	end
-
 	local roleName = "?"
 
 	pcall(function()
 		roleName = tostring(npc.soul:GetSocialClass().Name)
 	end)
 
-	return true, roleName
+	if gender == self.GenderFemale then
+		if not self.Config.WomenRaiseAlarm then
+			return "none", "alarm-off"
+		end
+
+		return "alarm", roleName
+	end
+
+	if gender ~= self.GenderMale then
+		return "none", "gender=" .. tostring(gender)
+	end
+
+	-- Only the fight needs a context option, so a missing context system
+	-- rules out the fight and leaves the alarm above untouched.
+	if not self:HasContexts() then
+		return "none", "no-contexts"
+	end
+
+	return "fight", roleName
 end
 
 --- Counts a shove against a victim and returns how many they have taken.
@@ -653,9 +686,9 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 		return false
 	end
 
-	local able, note = self:CanRetaliate(npc)
+	local answer, note = self:CanRetaliate(npc)
 
-	if not able then
+	if answer == "none" then
 		if self.Config.LogTelemetry then
 			self:Log("Retaliation " .. self:NameOf(npc)
 					.. " count=" .. tostring(count)
@@ -680,6 +713,7 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	if self.Config.LogTelemetry then
 		self:Log("Retaliation " .. self:NameOf(npc)
 				.. " role=" .. note
+				.. " answer=" .. answer
 				.. " count=" .. tostring(count)
 				.. " chance=" .. string.format("%.2f", chance)
 				.. " roll=" .. string.format("%.2f", roll)
@@ -688,6 +722,23 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 
 	if not provoked then
 		return false
+	end
+
+	-- A woman takes the same provocation and none of the fight scaffolding.
+	-- The context option and the offense release both act on a fight subtree
+	-- she cannot enter, so setting them would leave an option to clear
+	-- afterwards and change nothing about what she does.
+	if answer == "alarm" then
+		self:SendProvocationHit(npc, playerEnt)
+		self.Annoyance[tostring(npc.id)] = nil
+
+		-- Nothing repairs her afterwards, so the baseline taken above would
+		-- sit in the table for the rest of the session. The hit carries
+		-- `real = false` and the reputation system never sees it, so there
+		-- is nothing for a repair to put back.
+		self.Baseline[tostring(npc.id)] = nil
+
+		return true
 	end
 
 	if not self:HoldRetaliation(npc) then

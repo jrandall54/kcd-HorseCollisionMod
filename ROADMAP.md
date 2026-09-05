@@ -115,8 +115,43 @@ costs nothing, and neither the impulse nor armor affects it.
       happen. `TrotReaction` selects it and it is the default.
 - [ ] Gallop still ragdolls, and still takes the trample. That is where the
       damage is, 20 to 25 an impact against 3 to 5 at trot, and it is untouched.
-      Whether an animated knockdown suits a full gallop is a design question
-      rather than a technical one: a rider at speed should arguably throw a body.
+      The ragdoll at a gallop is settled design and is not up for replacement.
+
+- [ ] **Active, and the largest item on this list.** Damage the mod applies itself, on top
+      of whatever the physical collision already costs, chosen by what the target is and
+      what they are wearing.
+
+      The target the rider set, in their words: "a villager with no armor should have about
+      a 90% chance of dying on impact where as someone in plate probably would only take a
+      little bit of damage and have a very very small chance of dying on impacts."
+
+      Where it stands today, measured on one gallop run through Rattay:
+
+          rat_bailiff_wife  no armor, smashDef 0.40   93.5 -> 62.4   -31.2, stood up
+          villageGuard      chain,    smashDef 4.99   38.3 -> 22.5   -15.8
+
+      So the armored end is already near where it should be and the unarmored end is not
+      close: a third of a health bar is not a nine-in-ten death. The gap is at the soft
+      end, which means the work is adding damage against unprotected targets rather than
+      subtracting it from armored ones.
+
+      Everything needed is already computed per impact. `ArmorOf` walks the target's worn
+      pieces through the game's own `armor` and `pickable_item` tables and yields weight,
+      `smash_def`, piece count and the heaviest material, all of which are logged on every
+      collision. `ProbeImpactCost` samples a named victim's health at 500, 3000, 6000 and
+      10000 ms, so the outcome side is instrumented too.
+
+      Scope note against the boundary at the head of Phase 2. That boundary says the engine
+      owns armor against damage and the mod owns the impulse. This item deliberately
+      crosses it, because the engine's own mitigation was measured at 87 per cent of the
+      unarmored figure with an error bar that includes zero, which is not the difference
+      between a peasant and a knight by any reading. What the mod adds must therefore be
+      shaped so that it does not double count where the engine does act.
+
+      `rpg_param.xml` stays off limits: one global value read by everything that resolves a
+      physical collision, the player's own included. `perk_rpg_param_override.xml` resolves
+      parameters per character against the perks they hold and remains the unexplored
+      route.
 
 Overriding `rpg_param.xml` is rejected: one global value read by everything that
 resolves a physical collision, including the player's own, and shipping a
@@ -233,7 +268,7 @@ and both axes of the footprint were each cleared against logged sessions.
       `build_item_weights.py`, its build step and the shipped Startup script
       are removed.
 
-- [ ] Shorten the wait between a trot victim going limp and standing up.
+- [ ] Not being pursued. Shorten the wait between a trot victim going limp and standing up.
       Nothing settable reaches it. Measured from the handover rather than
       from the end of the clip it is a consistent 1,457 ms, the same for
       both character sets, and unmoved by `ExitTime`, `Sleep`, `Stiffness`,
@@ -382,7 +417,7 @@ armor.
       expressible as one too. `Entity.GetMass` is there for the cases where an
       impulse is genuinely wanted, and vanilla's own code applies impulses as
       `mass * force` for exactly this reason.
-- [ ] Striking a heavy target shows on the horse. The momentum half is not reachable
+- [ ] Not being pursued. Striking a heavy target shows on the horse. The momentum half is not reachable
       for the same reason the knockback items above are closed, so what is left here is
       the visible half: rearing or checking the horse on a heavy impact.
 
@@ -396,11 +431,14 @@ armor.
       `riderGuardMovement`, `riderGuardJump` and the rest, so a rear while
       mounted is something the game already does rather than something to
       invent.
-- [ ] Shake the rider's camera on a heavy impact. `actor:CameraShake` and
+- [ ] **Active.** Shake the rider's camera on a gallop impact. `actor:CameraShake` and
       `actor:SetViewShake` both exist and neither has been tried. A collision
       currently costs the rider a number they cannot see; this is the cheapest
-      way to make weight felt from the saddle, and it composes with the rear
-      above.
+      way to make weight felt from the saddle.
+
+      Scoped to gallop by the rider. The rear above is stood down, so this
+      carries the whole of the horse's side of an impact on its own, and it
+      should read as the horse being checked rather than as a screen effect.
 - [ ] An NPC pulls the rider off the horse. `CanHorsePullDown` and
       `RequestHorsePullDown` are a vanilla interactor action, offered beside
       knockout and hunt attack, with `wh_cs_HorsePullDownAngle` and two
@@ -427,11 +465,26 @@ armor.
       same, does not hold: with an exponent of 0.4 against a reference weight of 8 the 3.0
       ceiling is not reached until weight 125, and mail reads 2.01 against plate at 2.51.
       No clamp needed changing.
-- [ ] Skip or soften an impact against a target that has not recovered from the last one.
-      `HitCooldownMs` is 3000, which is shorter than the time a victim spends on the ground,
-      so a second impact lands on someone already prone: no reaction plays, because they are
-      not standing, and a third of those impacts cost no health. Controlled rides with twelve
-      seconds between impacts produce neither symptom.
+- [ ] **Active.** Decide a victim is hittable again by reading their state, not by waiting
+      out a timer. Half of this was done and the wrong half is remembered as done. The
+      *aftermath* is state driven: a brawl ends by reading the victim rather than by timing
+      it, and `ReplanIfStranded` tells a stranded victim in `MotionIdle` from a recovered
+      one in `MotionMovement` through `actor:GetCurrentAnimationState()`. The *hit cooldown*
+      is still a fixed timer, stamped in `TriggerCollision`: `HitCooldownMs` at 3000 for a
+      walk stagger, `KnockdownRecoveryMs` for the two knockdown tiers.
+
+      The comment there states that nothing in the engine reports whether an actor is on the
+      ground, which was true of the reads tried at the time, since entity angles stay
+      upright through a ragdoll. It predates `GetCurrentAnimationState` being used anywhere
+      in this mod, and that call demonstrably reports a legible state on a victim the mod
+      knocked down. Whether it separates down, getting up and upright sharply enough to gate
+      an impact is one instrumented ride: log the state every 250 ms through a full
+      knockdown at each tier and read the transitions.
+
+      Why it matters, unchanged: the timer is shorter than the time a victim spends on the
+      ground, so a second impact lands on someone already prone, no reaction plays because
+      every reaction is a standing animation, and a third of those impacts cost no health.
+      Controlled rides with twelve seconds between impacts produce neither symptom.
 
 Data located. Armor weight is on `Libs/Tables/item/pickable_item.xml`, joined by `item_id`,
 not on `armor.xml`. Target body mass is `normal_body_weight` on `soul_archetype.xml`: 160
@@ -636,7 +689,31 @@ rather than missing.
       happens from the crime hit alone, so sending this at every impact would
       change civilian behavior from walking to a guard into running away,
       which is a different game.
-- [ ] Parked, not closed. The collision bark fires while the victim is
+
+- [ ] **Active.** Women run and fetch a guard rather than fighting. Set by the rider as
+      the first concrete use of the item above: where a man may turn on the rider, a woman
+      should break, run, and raise the alarm.
+
+      The mechanism is likely already there and needs confirming rather than building. The
+      `combat:stimulus:hostilePerception` split is the behavior tree's own and is decided
+      by morale, not by anything this mod picks: a civilian must clear a `MoraleCheck` at
+      0.550000 against a soldier's 0.400000, and in the one probe run seven of eight NPCs
+      fled while a guard at morale 0.668 closed and attacked. If female civilians sit below
+      that threshold as a population, sending the same message to everyone already produces
+      "men may fight, women run" without a sex check anywhere in the mod, which is the
+      better implementation by some distance.
+
+      So the first step is a reading, not a change: sample `GetDerivedStat('mor')` across a
+      market's worth of NPCs and see whether the female distribution actually sits under
+      the civilian check. Only if it does not does an explicit branch on the `NPC_Female`
+      class become the fallback.
+
+      The "call for the guards" half may need nothing at all. Three non-guards ridden down
+      at trot each registered the attack and ran for a guard to report it, so reporting is
+      the crime system's and is already working; what is unverified is whether a victim who
+      is fleeing under `hostilePerception` still reports, or whether the flee replaces the
+      report.
+- [ ] Not being pursued. The collision bark fires while the victim is
       still falling or lying as a ragdoll, which is nobody's idea of speaking,
       and it cannot be moved: see the evidence under the item below.
 
@@ -650,7 +727,7 @@ rather than missing.
       calls can silence the request at the impact and send one deliberately
       once the victim is upright.
 
-- [ ] Parked, not closed. Give each tier its own voice. `dialog:monologRequest` is how the game
+- [ ] Not being pursued. Give each tier its own voice. `dialog:monologRequest` is how the game
       raises spoken reactions and vanilla sends it 958 times across its AI,
       selecting a line by metarole. Eighty metaroles are in use and several
       suit a trampled victim better than the collision bark does:
