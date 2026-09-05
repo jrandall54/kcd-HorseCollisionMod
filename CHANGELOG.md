@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.11.0] - 2026-09-04
+
 ### Added
 
 - What a collision costs now depends on what the victim is wearing. Ride an
