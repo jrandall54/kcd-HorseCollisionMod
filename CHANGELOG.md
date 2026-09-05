@@ -29,6 +29,22 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- What a collision costs now depends on what the victim is wearing. Ride an
+  unarmored villager down at a gallop and they will usually not get up; do the
+  same to a knight in plate and he loses about a quarter of his health and
+  keeps coming. A trot knockdown costs a villager roughly a quarter either way,
+  so it takes four. Nothing decides this by a dice roll: the damage is scaled
+  by the blunt resistance of what they wear and the outcome follows from it.
+
+### Fixed
+
+- Turning `CollisionIsCrime` off now actually stops a trampling death being
+  charged to you. It never did before, because the mod had no damage of its own
+  and the engine's trample was the only thing that could kill anyone, and a
+  kill the engine resolves always belongs to the rider.
+
 ## [4.10.0] - 2026-09-04
 
 ### Added

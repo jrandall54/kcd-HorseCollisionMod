@@ -803,6 +803,17 @@ rather than missing.
       vanilla uses it for `cin_test.bank`. Then a bark is an
       `ExecuteAudioTrigger` call like any other sound. It needs FMOD Studio and
       a decision about redistributing Warhorse voice assets.
+- [x] **A trampling death can now be suppressed**, which every earlier entry
+      here treated as out of reach. `CollisionIsCrime` gates `SendCombatHit`,
+      so it always stopped the mod reporting a collision, but a victim
+      trampled to death still brought the guards down because the engine
+      resolves the trample and a kill the engine resolves belongs to the
+      rider. `ApplyImpactDamage` passes no attacker when the switch is off and
+      now kills an unarmored victim outright at a gallop, so the trample never
+      gets to be the cause. Measured, one variable changed: damage off, four
+      passes, trample kills, crime flag; damage on, one pass, no flag.
+      Suppression follows the killing blow rather than the setting, so an
+      armored victim finished by repeated trampling still flags.
 - [x] Trampling triggers the crime system. A fatal outcome is what turns it on: knocking
       a guard down registers no bounty, but trampling a villager to death brought the
       guards down on the rider and carried a jail sentence, with no crime code in the mod.

@@ -15129,3 +15129,41 @@ nothing, because no physics body is created for the horse to strike, is wrong.
 The engine still took 6 to 8 from the unarmored targets and up to 12 from a
 guard. Whatever charges for a trot impact is not the trample, and it has not
 been identified.
+
+## A trampling death is attributable, and the killing blow decides to whom
+
+`CollisionIsCrime` never suppressed a *death*. It gates `SendCombatHit`, so
+with it off the mod reports no collision, but a victim trampled to death still
+brought the guards down on the rider. That was recorded as unsolved and out of
+reach: the engine resolves the trample itself and attributes it.
+
+It is solved, and by accident. `ApplyImpactDamage` passes no attacker when
+`CollisionIsCrime` is off, and the mod's damage is now large enough at a gallop
+to kill an unarmored victim outright. The engine's trample never gets to be
+what killed them.
+
+Two runs, same guard, same place, same settings, one variable:
+
+    ImpactDamage = false   four gallop passes, engine trample kills   crime flag
+    ImpactDamage = true    one gallop pass, mod's damage kills        no flag
+
+So the death belongs to whoever landed the killing blow, and an unattributed
+blow leaves it belonging to nobody. This is why the suppression could never be
+made to work before: the mod had no damage of its own, so the only thing that
+could kill a victim was the engine, and the engine's kill is always the
+rider's.
+
+### What it means for a shipped build
+
+`CollisionIsCrime` defaults to true and passes the player's WUID, so a player
+who rides someone down at a gallop is charged with the kill, which is correct
+and is now attributed through the mod's own damage rather than only through the
+trample.
+
+With the switch off the suppression is finally complete rather than partial,
+which is what a collision test has always needed.
+
+The control case is worth keeping in mind as a limit: an armored victim killed
+by repeated trampling, where the mod's small contribution is not what finishes
+them, will still raise a flag with the switch off. Suppression follows the
+killing blow, not the setting.
