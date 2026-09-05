@@ -15027,3 +15027,28 @@ So shoving a man at a walk still costs nothing legally and shoving a woman can
 now cost a fine. That is what was asked for and it reads correctly, but it is a
 real difference in consequence between two victims of the same shove, and
 `WomenRaiseAlarm` is the switch if it ever wants to be off.
+
+### The report is delivered, not registered at the shove
+
+Asked whether the alarm could be made to raise no immediate crime flag unless a
+guard witnesses the shove directly, with the victim having to physically carry
+the report the way she does when the player punches someone on foot. It already
+works that way, and the ride confirmed it rather than the tree only implying it.
+
+The civilian branch of the hit handler in `sb_combat.xml` does not raise a
+bounty. It runs a `Report` sequence: `CreateInformation`, then `t_state`
+becomes `report` and `t_reportParams` carries the information. An information
+is an object the witness holds and has to deliver.
+
+Ridden away from any settlement, a woman was shoved to the alarm threshold with
+no guard in sight. Nothing happened at the shove, no guard appeared, and the
+crime flag went up some time later, followed by a guard arriving. The gap is
+the witness walking to town.
+
+The directly-witnessed case is the soldier branch and is separate: it calls
+`CreateInformation label='assault'` whenever the attacker is the player, with
+no `real` check and no context option in front of it, so a guard who sees it
+needs no telling.
+
+`Game.SetWantedLevel` is exposed to Lua and there is no getter, so the wanted
+level cannot be read from the console. This was settled by observation instead.
