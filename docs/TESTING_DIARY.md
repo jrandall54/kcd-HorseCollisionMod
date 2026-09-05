@@ -14939,3 +14939,91 @@ registered a reaction to accumulate.
 Worth remembering as a shape rather than a fact: two anomalies on the same
 class of NPC looked like one cause and were not. The get-up turn was vanilla's
 and this was the mod's own setting.
+
+## The broad phase cache holds at every tier
+
+`EntitiesNearHorse` reuses the previous `System.GetEntitiesInSphere` result
+until the horse has traveled `SphereCacheTravel` (0.8 m) or the result has aged
+past `SphereCacheMaxAgeMs` (150 ms). That is the whole cost of the mod, so the
+saving is real, but it trades a query for a stale answer and had never been
+ridden.
+
+One session through a crowd at all three tiers, glancing hits and people
+walking head-on into the horse: 127 impacts registered, 26 at walk, 56 at trot
+and 45 at gallop, with no Lua errors and no reaction that failed to start.
+
+Walk is where the cache bites hardest, because a slow horse rarely crosses
+0.8 m inside a tick and the answer comes from the age cap instead. Twenty six
+walk impacts through it is the useful part of the result. The margin argues the
+rest: the sphere reaches `HitRadius` 2.5 while the footprint can never reach
+past `HorseFrontReach` plus `MaxSweepExtra`, 1.4, so anyone the query missed
+is 1.1 m from being hit, and 150 ms of walking closes about 0.2 m of that.
+
+A log cannot show a collision that was never detected, so this is evidence of
+absence only as far as the rider noticed nothing missing. `SphereCacheTravel`
+= 0 restores a query every tick if a miss ever turns up.
+
+### What the same run says about the damage curve
+
+Incidental, but it is the measurement the next piece of work needs:
+
+    rat_bailiff_wife  no armor, smashDef 0.40   93.5 -> 62.4   -31.2
+    villageGuard      chain,    smashDef 4.99   38.3 -> 22.5   -15.8
+
+An unarmored villager taking a gallop head on lost a third of her health and
+stood up. The rider's target is a villager dying on impact about nine times in
+ten. The armored end is closer to right than the unarmored end is.
+
+## Women raise the alarm, and the report is not suppressed
+
+The walk-tier retaliation gated women out entirely, on the reasoning that
+`sb_combat.xml` tests `b_soul.gender == male` after the context option is read,
+so a provoked woman falls through to the report or flee branches instead of
+fighting. That fall-through was described in the code as a bug to avoid. It is
+the behavior the rider wants: a woman shoved once too often runs and fetches a
+guard.
+
+The gate is now a dispatch. `CanRetaliate` returns `"fight"`, `"alarm"` or
+`"none"`, and a woman gets the same provocation hit on the same count and the
+same roll, with neither the `alwaysFightWhenHit` context option nor the offense
+release, both of which act on a fight subtree she cannot enter.
+
+Confirmed in one ride:
+
+    Retaliation rat_bailiff_wife count=2 skipped=gender=2      -- before
+    ...
+    Retaliation rat_karolina role=townsman answer=alarm count=2 chance=0.25
+        roll=0.18 provoked=true                                -- after
+    ProvocationHit rat_karolina ok=true err=nil
+
+She broke off, went to a guard, and the rider surrendered.
+
+### Morale does not separate the sexes
+
+Checked first, because if female civilians sat below the civilian
+`MoraleCheck` of 0.550000 as a population, sending
+`combat:stimulus:hostilePerception` to everyone would have produced "men fight,
+women run" with no sex check anywhere in the mod. Twenty one NPCs sampled
+within 30 m in Rattay market:
+
+    women         0.150  0.168  0.171  0.171  0.210  0.214  0.215
+    merchants     0.216  0.269  0.305  0.516
+    beggars       0.161  0.310  0.557
+    guards        0.539  0.608  0.671  0.707  0.708  0.745  0.786
+
+Morale tells a guard from a townsman and says nothing about sex: a grocer at
+0.269 sits inside the female band. `RPG.MoraleForCombat` reads 0.2 in game, and
+two of the seven women sit under even that. So routing on the gender the combat
+tree itself tests is the honest implementation rather than a shortcut.
+
+### The asymmetry this introduces
+
+The provoked brawl is crime free because the hit carries `real = false`, and it
+was an open question whether that flag also suppressed a woman's report. It
+does not. She reported it, guards responded, and the encounter had to be
+surrendered to.
+
+So shoving a man at a walk still costs nothing legally and shoving a woman can
+now cost a fine. That is what was asked for and it reads correctly, but it is a
+real difference in consequence between two victims of the same shove, and
+`WomenRaiseAlarm` is the switch if it ever wants to be off.
