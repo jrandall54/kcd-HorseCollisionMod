@@ -117,14 +117,14 @@ end
 --
 -- `System.GetEntitiesInSphere` is the most expensive call the mod makes and
 -- the only one with a real budget at thirty ticks a second. The result is
--- reused until the horse has travelled `SphereCacheTravel`, or the result is
+-- reused until the horse has traveled `SphereCacheTravel`, or the result is
 -- older than `SphereCacheMaxAgeMs`, whichever comes first.
 --
 -- That is safe rather than merely cheap. The sphere reaches `HitRadius` and
 -- the footprint can never reach beyond `HorseFrontReach` plus `MaxSweepExtra`,
 -- so anyone the query did not return is at least the difference away from
 -- being hit. Both thresholds are set inside that difference, and keying the
--- refresh on distance travelled rather than on elapsed ticks means the
+-- refresh on distance traveled rather than on elapsed ticks means the
 -- guarantee does not depend on how fast the horse is going.
 --
 -- A cached entity may have been unstreamed since. Every use of one is already

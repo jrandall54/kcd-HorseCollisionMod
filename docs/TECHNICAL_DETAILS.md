@@ -314,11 +314,11 @@ It does not have to run every tick. The sphere reaches `HitRadius` and the
 footprint can never reach past `HorseFrontReach` plus `MaxSweepExtra`, so
 anyone the query did not return is at least the difference between those, 1.1
 meters, from being hit. `EntitiesNearHorse` reuses the last result until the
-horse has travelled `SphereCacheTravel`, 0.8 of that margin, or the result has
+horse has traveled `SphereCacheTravel`, 0.8 of that margin, or the result has
 aged past `SphereCacheMaxAgeMs`. The remaining 0.3 meters covers a victim
 walking toward a horse that is barely moving.
 
-Keying the refresh on distance travelled rather than on a tick count is what
+Keying the refresh on distance traveled rather than on a tick count is what
 makes the guarantee independent of speed: a gallop re-queries every second or
 third tick and a trot rarely, which is the right way round. Measured against a
 stationary horse the call drops from 0.19 ms to 0.0055 ms.
