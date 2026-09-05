@@ -362,7 +362,7 @@ function HorseCollisionMod:SafeUpdate()
 					-- logging these buried the human misses entirely and a
 					-- distance gate did not help: the holster is on the
 					-- player.
-				elseif not ent.actor then
+				elseif not ent.actor and self.Config.DiagnoseMisses then
 					self:LogRejection(ent, "no-actor",
 							"class=" .. tostring(ent.class))
 				end
@@ -381,15 +381,27 @@ function HorseCollisionMod:SafeUpdate()
 					local inFootprint = self:IsInHorseFootprint(ent, horsePos,
 							horseForward, speed)
 
-					if isDead then
-						self:LogRejection(ent, "dead", "")
-					elseif not inFootprint then
-						self:LogRejection(ent, "outside-footprint",
-								self:FootprintDetail(ent, horsePos, horseForward, speed))
-					elseif impactSpeed < self.Config.SpeedWalk then
-						self:LogRejection(ent, "below-walk-speed",
-								"impact=" .. string.format("%.2f", impactSpeed)
-								.. " sampled=" .. string.format("%.2f", speed))
+					-- The diagnostic branches are guarded rather than relying
+					-- on `LogRejection` returning early, because their
+					-- arguments are built before the call: the footprint
+					-- detail re-runs the whole geometry a second time, and
+					-- this loop sees every nearby entity thirty times a
+					-- second.
+					if isDead or not inFootprint
+							or impactSpeed < self.Config.SpeedWalk then
+						if self.Config.DiagnoseMisses then
+							if isDead then
+								self:LogRejection(ent, "dead", "")
+							elseif not inFootprint then
+								self:LogRejection(ent, "outside-footprint",
+										self:FootprintDetail(ent, horsePos,
+												horseForward, speed))
+							else
+								self:LogRejection(ent, "below-walk-speed",
+										string.format("impact=%.2f sampled=%.2f",
+												impactSpeed, speed))
+							end
+						end
 					else
 						self:TriggerCollision(ent, velocity, impactSpeed, horseEnt,
 								player, horseWuid, speed)

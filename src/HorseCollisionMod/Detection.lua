@@ -26,12 +26,21 @@
 -- horse travels in one tick so that fast victims are not missed between
 -- frames.
 --
+-- The measurements are only formatted when somebody asks for them. This runs
+-- for every entity near the horse on every tick, thirty times a second, and
+-- building a diagnostic string that is then discarded is the most expensive
+-- thing in the loop.
+--
 -- @tparam table npc victim entity
 -- @tparam table horsePos world position of the horse
 -- @tparam table horseForward horse facing, unit vector
 -- @tparam number speed horse speed in meters per second
+-- @tparam[opt] boolean wantDetail build the measurement string, which only
+--   the diagnostics need
 -- @treturn boolean true when the victim is inside the footprint
-function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed)
+-- @treturn string the measurements, or nil when they were not asked for
+function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed,
+		wantDetail)
 	local cfg = self.Config
 	local npcPos = nil
 
@@ -69,15 +78,21 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 			and forwardDistance <= (cfg.HorseFrontReach + sweepExtra)
 			and lateralDistance <= cfg.HorseHalfWidth
 
-	local detail = "fwd=" .. string.format("%.2f", forwardDistance)
-			.. " lat=" .. string.format("%.2f", lateralDistance)
-			.. " dz=" .. string.format("%.2f", dz)
-			.. " sweep=" .. string.format("%.2f", sweepExtra)
-			.. " limits=" .. string.format("%.2f/%.2f/%.2f",
-					cfg.HorseFrontReach + sweepExtra, cfg.HorseHalfWidth,
-					cfg.HorseMaxVerticalDiff)
+	-- Formatted only when it will be read. `DiagnoseMisses` is the switch that
+	-- turns the loop's diagnostics on, and the footprint line is one of them:
+	-- gating it on `LogTelemetry` instead wrote a line for every tick a victim
+	-- stood in range, which is thirty a second in ordinary play.
+	if not wantDetail and not cfg.DiagnoseMisses then
+		return inside, nil
+	end
 
-	if inside then
+	local detail = string.format(
+			"fwd=%.2f lat=%.2f dz=%.2f sweep=%.2f limits=%.2f/%.2f/%.2f",
+			forwardDistance, lateralDistance, dz, sweepExtra,
+			cfg.HorseFrontReach + sweepExtra, cfg.HorseHalfWidth,
+			cfg.HorseMaxVerticalDiff)
+
+	if inside and cfg.DiagnoseMisses then
 		self:Log("Footprint " .. detail)
 	end
 
@@ -92,7 +107,8 @@ end
 --
 -- @treturn string the distances and the limits they were checked against
 function HorseCollisionMod:FootprintDetail(npc, horsePos, horseForward, speed)
-	local _, detail = self:IsInHorseFootprint(npc, horsePos, horseForward, speed)
+	local _, detail = self:IsInHorseFootprint(npc, horsePos, horseForward,
+			speed, true)
 
 	return detail or "unmeasurable"
 end
