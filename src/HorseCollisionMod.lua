@@ -677,6 +677,11 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- health. A gallop into someone in a shirt usually kills and sometimes does
 -- not, which is the outcome asked for rather than a certainty either way.
 --
+-- The trot figure is set the same way. At 25 an unarmored villager lost about
+-- a third of their health to a knockdown, 31 and 32 across two impacts, which
+-- kills in three. 18 makes it about a quarter and four impacts, which is the
+-- weight the rider wanted a trotting horse to carry.
+--
 -- The gallop figure is set from measurement rather than picked. At 90 the
 -- soft end killed six of eight, and both survivors finished on 3.5 and 0.5
 -- health, having been dealt 81.0 and 80.6 against a villager's 100. The
@@ -689,7 +694,7 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- annotated table as a set of named fields and refuses one holding an array.
 HorseCollisionMod.ImpactDamageByTier = {
 	Walk = 0,
-	Trot = 25,
+	Trot = 18,
 	Gallop = 95,
 }
 

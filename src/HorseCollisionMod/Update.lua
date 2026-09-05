@@ -178,7 +178,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury, armor)
 
 		-- An animated knockdown never makes the victim a physics object, so
-		-- the horse cannot strike them and the engine charges nothing. The
+		-- the horse cannot strike them the way it does at a gallop. It does
+		-- not follow that the tier is free: measured, the engine still takes
+		-- 6 to 8 from an unarmored victim here and up to 12 from a guard, so
+		-- something other than the trample is charging for it. The
 		-- ragdoll is kept because it is what shipped, and because an
 		-- animation does not carry the impact's momentum.
 		if cfg.TrotReaction == "knockdown" then

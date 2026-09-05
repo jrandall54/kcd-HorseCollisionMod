@@ -15109,3 +15109,23 @@ mod's share at plate is already 4. `rpg_param.xml` is one global value read by
 everything that resolves a physical collision, the player's own included, and
 is not being overridden. `perk_rpg_param_override.xml` resolves parameters per
 character against the perks they hold and is the remaining unexplored lever.
+
+### Trot, and a comment the measurement disproved
+
+The trot tier was set to 18 after measuring it at 25.
+
+    rat_man97           unarmored   mod 24.8   engine  6.3   total -31.1
+    rat_swordsmiths_wife unarmored  mod 24.4   engine  7.9   total -32.3
+    rat_guard22                     mod  3.2   engine 11.7   total -14.9
+    rat_guard10                     mod  2.4   engine  5.1   total  -7.5
+    villageGuard                    mod  2.3 to 4.0          total  -3.1 to -9.1
+
+At 25 an unarmored villager lost about a third of their health, which kills in
+three impacts. 18 makes it a quarter and four, which is the weight a trotting
+horse was wanted to carry.
+
+The `Update.lua` comment asserting that an animated knockdown costs the victim
+nothing, because no physics body is created for the horse to strike, is wrong.
+The engine still took 6 to 8 from the unarmored targets and up to 12 from a
+guard. Whatever charges for a trot impact is not the trample, and it has not
+been identified.
