@@ -532,6 +532,39 @@ HorseCollisionMod.Annoyance = {}
 HorseCollisionMod.Baseline = {}
 
 --- Last time each entity was reported as a miss, keyed by entity id.
+--- The broad phase result, reused until the horse has moved far enough to
+-- need a fresh one.
+--
+-- `System.GetEntitiesInSphere` is the whole cost of the detection loop.
+-- Measured in game it takes 0.10 ms for one entity inside a one meter sphere
+-- and 0.43 ms for eight inside the shipped 2.5, while the footprint test and
+-- everything else in the tick are too cheap to measure. Running it thirty
+-- times a second is therefore the only part of this mod with a real budget.
+--
+-- It does not have to run every tick. The sphere reaches `HitRadius`, 2.5
+-- meters, and the footprint can only ever reach `HorseFrontReach` plus
+-- `MaxSweepExtra`, 1.4. Anyone outside the sphere is at least 1.1 meters from
+-- the furthest the footprint reaches, so they cannot be hit until something
+-- closes that gap. Re-querying when the horse has moved most of it, rather
+-- than on a tick count, makes the saving independent of speed: a gallop
+-- refreshes often and a trot rarely, which is the right way round.
+--
+-- @table SphereCache
+HorseCollisionMod.SphereCache = { pos = nil, ents = nil, at = 0 }
+
+--- How much of that margin the horse may use before the broad phase is redone.
+--
+-- The remaining 0.3 meters of the 1.1 covers the victim walking toward the
+-- horse while the cache stands.
+HorseCollisionMod.SphereCacheTravel = 0.8
+
+--- The longest a broad phase result is trusted, in milliseconds.
+--
+-- A horse barely moving still lets people walk up to it. At a walking pace of
+-- 1.5 meters a second a victim covers 0.22 meters in this time, inside the
+-- allowance above.
+HorseCollisionMod.SphereCacheMaxAgeMs = 150
+
 HorseCollisionMod.RecentRejections = {}
 
 --- Recent horse speeds, newest last, for spotting deceleration on impact.
@@ -891,6 +924,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- carried into a world it no longer describes.
 		self.RecentHits = {}
 		self.RecentRejections = {}
+		self.SphereCache = { pos = nil, ents = nil, at = 0 }
 		self.VictimActivity = {}
 		self.Annoyance = {}
 		self.Baseline = {}

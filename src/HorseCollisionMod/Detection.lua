@@ -113,6 +113,60 @@ function HorseCollisionMod:FootprintDetail(npc, horsePos, horseForward, speed)
 	return detail or "unmeasurable"
 end
 
+--- The entities near the horse, from a cached broad phase where possible.
+--
+-- `System.GetEntitiesInSphere` is the most expensive call the mod makes and
+-- the only one with a real budget at thirty ticks a second. The result is
+-- reused until the horse has travelled `SphereCacheTravel`, or the result is
+-- older than `SphereCacheMaxAgeMs`, whichever comes first.
+--
+-- That is safe rather than merely cheap. The sphere reaches `HitRadius` and
+-- the footprint can never reach beyond `HorseFrontReach` plus `MaxSweepExtra`,
+-- so anyone the query did not return is at least the difference away from
+-- being hit. Both thresholds are set inside that difference, and keying the
+-- refresh on distance travelled rather than on elapsed ticks means the
+-- guarantee does not depend on how fast the horse is going.
+--
+-- A cached entity may have been unstreamed since. Every use of one is already
+-- wrapped, and its position is read fresh each tick, so a stale list costs a
+-- rejected candidate rather than an error.
+--
+-- @tparam table horsePos world position of the horse
+-- @tparam number now engine clock in milliseconds
+-- @treturn table the entities near the horse, possibly from the last tick
+-- @treturn boolean true when the query actually ran
+function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
+	local cache = self.SphereCache
+
+	if cache.ents and cache.pos then
+		local dx = horsePos.x - cache.pos.x
+		local dy = horsePos.y - cache.pos.y
+		local dz = horsePos.z - cache.pos.z
+		local moved = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+
+		if moved < self.SphereCacheTravel
+				and (now - cache.at) < self.SphereCacheMaxAgeMs then
+			return cache.ents, false
+		end
+	end
+
+	local found = nil
+
+	pcall(function()
+		found = System.GetEntitiesInSphere(horsePos, self.Config.HitRadius)
+	end)
+
+	if type(found) ~= "table" then
+		return nil, true
+	end
+
+	cache.ents = found
+	cache.pos = { x = horsePos.x, y = horsePos.y, z = horsePos.z }
+	cache.at = now
+
+	return found, true
+end
+
 --- Works out which side of the victim the impact lands on.
 --
 -- The stagger clips are authored relative to the NPC's facing, so the impact

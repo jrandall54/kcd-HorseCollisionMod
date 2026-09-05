@@ -302,6 +302,31 @@ humans, then an oriented-box test against the horse's footprint. The sphere is a
 broad phase only, so `HitRadius` can stay generous without NPCs reacting from an
 unnatural distance.
 
+### The broad phase is the whole cost, and it is cached
+
+Measured in the running game, `System.GetEntitiesInSphere` takes 0.10 ms for
+one entity inside a one meter sphere and 0.43 ms for eight inside the shipped
+2.5. Everything else in a tick, the footprint test included, is below the
+resolution of the clock. At thirty ticks a second that single call is the only
+part of this mod with a budget worth managing.
+
+It does not have to run every tick. The sphere reaches `HitRadius` and the
+footprint can never reach past `HorseFrontReach` plus `MaxSweepExtra`, so
+anyone the query did not return is at least the difference between those, 1.1
+meters, from being hit. `EntitiesNearHorse` reuses the last result until the
+horse has travelled `SphereCacheTravel`, 0.8 of that margin, or the result has
+aged past `SphereCacheMaxAgeMs`. The remaining 0.3 meters covers a victim
+walking toward a horse that is barely moving.
+
+Keying the refresh on distance travelled rather than on a tick count is what
+makes the guarantee independent of speed: a gallop re-queries every second or
+third tick and a trot rarely, which is the right way round. Measured against a
+stationary horse the call drops from 0.19 ms to 0.0055 ms.
+
+A cached entity may have been unstreamed since it was returned. Every use of
+one is wrapped and its position is read fresh each tick, so a stale list costs
+a rejected candidate rather than an error.
+
 ### Speed tiers
 
 Horse speed occupies three plateaus: 2.05 to 3.74, 6.38 to 7.03, and 9.18 to

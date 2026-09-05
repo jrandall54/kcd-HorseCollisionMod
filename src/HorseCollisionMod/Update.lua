@@ -299,11 +299,10 @@ function HorseCollisionMod:SafeUpdate()
 		return
 	end
 
-	local hitEnts = nil
-
-	pcall(function()
-		hitEnts = System.GetEntitiesInSphere(horsePos, self.Config.HitRadius)
-	end)
+	-- The broad phase, which is the only expensive call in this loop and is
+	-- reused between ticks while the horse has not moved far enough for the
+	-- answer to have changed. `EntitiesNearHorse` documents why that is safe.
+	local hitEnts = self:EntitiesNearHorse(horsePos, self:TimeMs())
 
 	if type(hitEnts) ~= "table" then
 		return
