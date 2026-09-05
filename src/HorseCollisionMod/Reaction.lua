@@ -292,7 +292,7 @@ function HorseCollisionMod:MassVictim(npc, armorScale)
 			end)
 
 			if self.Config.LogTelemetry then
-				self:Log("Mass " .. tostring(npc:GetName())
+				self:Log("Mass " .. self:NameOf(npc)
 						.. " scale=" .. string.format("%.2f", scale)
 						.. " wanted=" .. string.format("%.0f", wanted)
 						.. " took=" .. string.format("%.0f", reading)
@@ -304,7 +304,7 @@ function HorseCollisionMod:MassVictim(npc, armorScale)
 		end
 
 		if index == #attempts and self.Config.LogTelemetry then
-			self:Log("Mass " .. tostring(npc:GetName())
+			self:Log("Mass " .. self:NameOf(npc)
 					.. " never took, last read " .. string.format("%.0f", reading))
 		end
 
@@ -370,7 +370,7 @@ function HorseCollisionMod:DampVictim(npc)
 		end)
 
 		if self.Config.LogTelemetry then
-			self:Log("Damped " .. tostring(npc:GetName())
+			self:Log("Damped " .. self:NameOf(npc)
 					.. " damping=" .. tostring(damping)
 					.. " minEnergy=" .. tostring(minEnergy)
 					.. " ok=" .. tostring(ok)
@@ -517,7 +517,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 		-- report of armored targets moving further at trot than at gallop
 		-- with nothing to check it against.
 		if self.Config.LogTelemetry then
-			self:Log("Impulse " .. tostring(npc:GetName())
+			self:Log("Impulse " .. self:NameOf(npc)
 					.. " scale=" .. string.format("%.2f", impulseScale)
 					.. " magnitude=" .. string.format("%.1f", impulseMag))
 		end
@@ -563,7 +563,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 					end
 
 					if self.Config.LogTelemetry then
-						self:Log("ImpulseApplied " .. tostring(npc:GetName())
+						self:Log("ImpulseApplied " .. self:NameOf(npc)
 								.. " ok=" .. tostring(ok)
 								.. " err=" .. tostring(err)
 								.. " movedIn300ms=" .. string.format("%.2f", moved) .. "m")

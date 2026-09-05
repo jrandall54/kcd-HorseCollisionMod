@@ -890,6 +890,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- survives the transition, so the table is dropped rather than
 		-- carried into a world it no longer describes.
 		self.RecentHits = {}
+		self.RecentRejections = {}
 		self.VictimActivity = {}
 		self.Annoyance = {}
 		self.Baseline = {}

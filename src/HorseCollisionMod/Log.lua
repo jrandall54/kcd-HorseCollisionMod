@@ -153,19 +153,33 @@ function HorseCollisionMod:LogRejection(npc, reason, detail)
 
 	self.RecentRejections[id] = now
 
-	local name = "?"
-
-	pcall(function()
-		name = npc:GetName() or "?"
-	end)
-
-	self:Log("Miss " .. reason .. " name=" .. tostring(name)
+	self:Log("Miss " .. reason .. " name=" .. self:NameOf(npc)
 			.. " " .. tostring(detail))
 end
 
 
 --- Current time in milliseconds.
 -- @treturn number milliseconds since the game session started
+--- An entity's name, or "?" when it cannot be read.
+--
+-- Reading a name is not safe. An entity can be unstreamed between the moment
+-- something is scheduled and the moment it runs, and `GetName` throws on one
+-- that has gone. Almost every use of a name here is for a log line, and most
+-- of those sit inside timer callbacks, so an unprotected lookup could kill the
+-- callback and silently stop a watcher for the sake of a diagnostic.
+--
+-- @tparam table npc any entity, or nil
+-- @treturn string the entity's name, or "?"
+function HorseCollisionMod:NameOf(npc)
+	local name = "?"
+
+	pcall(function()
+		name = npc:GetName() or "?"
+	end)
+
+	return name
+end
+
 --- Writes a prefixed line to kcd.log when telemetry is enabled.
 -- @tparam string message text to log
 function HorseCollisionMod:Log(message)

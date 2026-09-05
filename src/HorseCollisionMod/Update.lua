@@ -94,7 +94,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- than the thousands that diagnostic writes, and it is the only
 		-- evidence that the wait is doing anything.
 		if self.Config.LogTelemetry then
-			self:Log("Recovering " .. tostring(npc:GetName())
+			self:Log("Recovering " .. self:NameOf(npc)
 					.. " for=" .. tostring(readyAt - now) .. "ms")
 		end
 

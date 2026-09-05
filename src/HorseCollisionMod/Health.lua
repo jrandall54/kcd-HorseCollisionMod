@@ -81,9 +81,8 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 	end)
 
 	if self.Config.LogTelemetry then
-		local name = "?"
-		pcall(function() name = npc:GetName() or "?" end)
-		self:Log("SuppressAutoCure " .. name .. " for=" .. tostring(seconds)
+		self:Log("SuppressAutoCure " .. self:NameOf(npc)
+				.. " for=" .. tostring(seconds)
 				.. "s set=" .. tostring(held))
 	end
 
@@ -195,10 +194,7 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 		return
 	end
 
-	local name = "?"
-	pcall(function()
-		name = npc:GetName() or "?"
-	end)
+	local name = self:NameOf(npc)
 
 	local function height()
 		local okPos, pos = pcall(function()

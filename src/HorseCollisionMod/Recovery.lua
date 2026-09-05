@@ -197,7 +197,7 @@ function HorseCollisionMod:TraceRecovery(npc, action)
 		seen[#seen + 1] = tostring(current)
 				.. "=" .. string.format("%.0f", now - since) .. "ms"
 
-		self:Log("RecoveryTrace " .. tostring(npc:GetName())
+		self:Log("RecoveryTrace " .. self:NameOf(npc)
 				.. " action=" .. tostring(action)
 				.. " " .. table.concat(seen, " "))
 	end
@@ -315,7 +315,7 @@ function HorseCollisionMod:WatchTurn(npc, action)
 			dot = -1
 		end
 
-		self:Log("Turn " .. tostring(npc:GetName())
+		self:Log("Turn " .. self:NameOf(npc)
 				.. " action=" .. tostring(action)
 				.. " at=" .. tostring(at) .. "ms"
 				.. " turned=" .. string.format("%.0f", math.deg(math.acos(dot)))
@@ -376,7 +376,7 @@ function HorseCollisionMod:ReplanIfStranded(npc)
 	local resumed = (was ~= nil and state == was) or not idle
 
 	if self.Config.LogTelemetry then
-		self:Log("Stranded " .. tostring(npc:GetName())
+		self:Log("Stranded " .. self:NameOf(npc)
 				.. " was=" .. tostring(was)
 				.. " now=" .. tostring(state)
 				.. " resumed=" .. tostring(resumed))
