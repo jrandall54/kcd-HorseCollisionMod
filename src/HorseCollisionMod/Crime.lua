@@ -17,7 +17,7 @@
 --
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
--- @release 4.9.2
+-- @release 4.9.3
 -- The engine's `combatAttackKind`, transcribed from
 -- `Libs/AI/TypeDefinitions.xml`. Sequential, and the type definition's own
 -- comment says the melee entries are ordered by increasing violence.
@@ -196,7 +196,7 @@ function HorseCollisionMod:SendProvocationHit(npc, playerEnt)
 	end)
 
 	if self.Config.LogTelemetry then
-		self:Log("ProvocationHit " .. tostring(npc:GetName())
+		self:Log("ProvocationHit " .. self:NameOf(npc)
 				.. " ok=" .. tostring(ok)
 				.. " err=" .. tostring(err))
 	end
@@ -293,7 +293,7 @@ function HorseCollisionMod:SendOffenseRelease(npc)
 	end)
 
 	if self.Config.LogTelemetry then
-		self:Log("OffenseRelease " .. tostring(npc:GetName())
+		self:Log("OffenseRelease " .. self:NameOf(npc)
 				.. " ok=" .. tostring(ok)
 				.. " err=" .. tostring(err))
 	end

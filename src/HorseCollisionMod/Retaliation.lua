@@ -60,7 +60,7 @@
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 4.9.2
+-- @release 4.9.3
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
@@ -279,7 +279,7 @@ function HorseCollisionMod:ReleaseWhenFighting(npc)
 		end
 
 		if self.Config.LogTelemetry then
-			self:Log("OffenseRelease " .. tostring(npc:GetName())
+			self:Log("OffenseRelease " .. self:NameOf(npc)
 					.. " never reached the fight, state=" .. tostring(state))
 		end
 	end
@@ -385,7 +385,7 @@ function HorseCollisionMod:WatchRetaliation(npc)
 				local stoodDown = self:SendStandDown(npc)
 
 				if self.Config.LogTelemetry then
-					self:Log("YieldCaught " .. tostring(npc:GetName())
+					self:Log("YieldCaught " .. self:NameOf(npc)
 							.. " state=" .. tostring(state)
 							.. " stoodDown=" .. tostring(stoodDown))
 				end
@@ -523,7 +523,7 @@ function HorseCollisionMod:RepairVictim(npc)
 	end
 
 	if self.Config.LogTelemetry then
-		self:Log("RepairVictim " .. tostring(npc:GetName())
+		self:Log("RepairVictim " .. self:NameOf(npc)
 				.. " from=" .. string.format("%.3f", before)
 				.. " target=" .. string.format("%.3f", target)
 				.. " steps=" .. tostring(steps))
@@ -583,7 +583,7 @@ function HorseCollisionMod:EndRetaliation(npc, why)
 	self:WatchAftermath(npc)
 
 	if self.Config.LogTelemetry then
-		self:Log("RetaliationEnd " .. tostring(npc:GetName())
+		self:Log("RetaliationEnd " .. self:NameOf(npc)
 				.. " why=" .. tostring(why)
 				.. " cleared=" .. tostring(cleared)
 				.. " state=" .. tostring(state)
@@ -619,7 +619,7 @@ function HorseCollisionMod:WatchAftermath(npc)
 	local replanned = self:ReplanVictim(npc)
 
 	if self.Config.LogTelemetry then
-		self:Log("Aftermath " .. tostring(npc:GetName())
+		self:Log("Aftermath " .. self:NameOf(npc)
 				.. " replanned=" .. tostring(replanned))
 	end
 
@@ -657,7 +657,7 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 
 	if not able then
 		if self.Config.LogTelemetry then
-			self:Log("Retaliation " .. tostring(npc:GetName())
+			self:Log("Retaliation " .. self:NameOf(npc)
 					.. " count=" .. tostring(count)
 					.. " skipped=" .. note)
 		end
@@ -678,7 +678,7 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	local provoked = roll < chance
 
 	if self.Config.LogTelemetry then
-		self:Log("Retaliation " .. tostring(npc:GetName())
+		self:Log("Retaliation " .. self:NameOf(npc)
 				.. " role=" .. note
 				.. " count=" .. tostring(count)
 				.. " chance=" .. string.format("%.2f", chance)
@@ -691,7 +691,7 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	end
 
 	if not self:HoldRetaliation(npc) then
-		self:Log("Retaliation " .. tostring(npc:GetName())
+		self:Log("Retaliation " .. self:NameOf(npc)
 				.. " could not take the context option")
 
 		return false

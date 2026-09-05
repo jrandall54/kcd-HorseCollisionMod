@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.9.2
+-- @release 4.9.3
 --- Stops the animation driving a victim's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -197,7 +197,7 @@ function HorseCollisionMod:TraceRecovery(npc, action)
 		seen[#seen + 1] = tostring(current)
 				.. "=" .. string.format("%.0f", now - since) .. "ms"
 
-		self:Log("RecoveryTrace " .. tostring(npc:GetName())
+		self:Log("RecoveryTrace " .. self:NameOf(npc)
 				.. " action=" .. tostring(action)
 				.. " " .. table.concat(seen, " "))
 	end
@@ -315,7 +315,7 @@ function HorseCollisionMod:WatchTurn(npc, action)
 			dot = -1
 		end
 
-		self:Log("Turn " .. tostring(npc:GetName())
+		self:Log("Turn " .. self:NameOf(npc)
 				.. " action=" .. tostring(action)
 				.. " at=" .. tostring(at) .. "ms"
 				.. " turned=" .. string.format("%.0f", math.deg(math.acos(dot)))
@@ -376,7 +376,7 @@ function HorseCollisionMod:ReplanIfStranded(npc)
 	local resumed = (was ~= nil and state == was) or not idle
 
 	if self.Config.LogTelemetry then
-		self:Log("Stranded " .. tostring(npc:GetName())
+		self:Log("Stranded " .. self:NameOf(npc)
 				.. " was=" .. tostring(was)
 				.. " now=" .. tostring(state)
 				.. " resumed=" .. tostring(resumed))
@@ -460,64 +460,6 @@ function HorseCollisionMod:ReplanVictim(npc)
 	end
 
 	return ok
-end
-
---- Runs something once a victim's reaction animation has finished.
---
--- Polls `actor:GetCurrentAnimationState()`, which reports
--- `AnimationControlled` for as long as an interactive action owns the actor.
--- Leaving that value is the reaction ending, which makes the wait an
--- observation instead of a guess at how long a particular clip runs.
---
--- The state must have been seen at least once before leaving it counts. A poll
--- landing in the gap before the action takes hold would otherwise read an
--- ordinary locomotion state and report a reaction that has not started yet as
--- already over.
---
--- @tparam table npc victim entity
--- @tparam function fn called with the reason (`state`, `ceiling` or
---   `unreadable`) and how long the wait took in milliseconds
-function HorseCollisionMod:WhenReactionEnds(npc, fn)
-	-- Entity ids are reused across a save load, so a wait booked before one
-	-- and finishing after it would act on whichever NPC inherited the id,
-	-- having been aimed at a victim from a world that no longer exists. The
-	-- detection loop and the health watch carry the same guard.
-	local generation = self.TimerTick
-	local startedAt = self:TimeMs()
-	local deadline = startedAt + self.ReactionEndCeilingMs
-	local seen = false
-
-	local function poll()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local state = nil
-
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		local elapsed = self:TimeMs() - startedAt
-
-		if state == self.ReactionAnimationState then
-			seen = true
-		elseif seen then
-			fn("state", elapsed)
-
-			return
-		end
-
-		if self:TimeMs() >= deadline then
-			fn(seen and "ceiling" or "unreadable", elapsed)
-
-			return
-		end
-
-		Script.SetTimer(self.ReactionPollMs, poll)
-	end
-
-	Script.SetTimer(self.ReactionPollMs, poll)
 end
 
 --- Rebuilds a victim so their own behavior reattaches to their body.

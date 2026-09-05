@@ -198,7 +198,7 @@ Neither survives a save load. Re-run both after one.
 
 The version lives in fourteen places: `src/mod.manifest`, the
 `HorseCollisionMod.Version` assignment, and an `@release` tag in the entry
-point and each of the eleven part files. `build.ps1` refuses a release if any
+point and each of the thirteen part files. `build.ps1` refuses a release if any
 of them disagrees.
 
 One command writes all of them, and dates the changelog section at the same

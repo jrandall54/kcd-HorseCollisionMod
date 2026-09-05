@@ -72,7 +72,7 @@
  runs.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.9.2
+        <li><strong>Release</strong>:  4.9.3
  Tests whether a victim is actually under the horse.</p>
 
 <p> The sphere search is a broad-phase cull and nothing more. A horse is about
@@ -84,7 +84,12 @@
  horse's width laterally, between its rear and front reach along its facing,
  and at a comparable height. The front reach is extended by the distance the
  horse travels in one tick so that fast victims are not missed between
- frames.</li>
+ frames.</p>
+
+<p> The measurements are only formatted when somebody asks for them. This runs
+ for every entity near the horse on every tick, thirty times a second, and
+ building a diagnostic string that is then discarded is the most expensive
+ thing in the loop.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -92,7 +97,7 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#returns...">returns... (npc, horsePos, horseForward, speed)</a></td>
+	<td class="name" nowrap><a href="#returns...">returns... (npc, horsePos, horseForward, speed[, wantDetail])</a></td>
 	<td class="summary">
 
 </td>
@@ -100,6 +105,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:FootprintDetail">HorseCollisionMod:FootprintDetail (npc, horsePos, horseForward, speed)</a></td>
 	<td class="summary">Measurements for a candidate the footprint test rejected.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:EntitiesNearHorse">HorseCollisionMod:EntitiesNearHorse (horsePos, now)</a></td>
+	<td class="summary">The entities near the horse, from a cached broad phase where possible.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:GetImpactDir">HorseCollisionMod:GetImpactDir (npc, velocity, speed)</a></td>
@@ -116,7 +125,7 @@
     <dl class="function">
     <dt>
     <a name = "returns..."></a>
-    <strong>returns... (npc, horsePos, horseForward, speed)</strong>
+    <strong>returns... (npc, horsePos, horseForward, speed[, wantDetail])</strong>
     </dt>
     <dd>
 
@@ -142,13 +151,22 @@
             <span class="types"><span class="type">number</span></span>
          horse speed in meters per second
         </li>
+        <li><span class="parameter">wantDetail</span>
+            <span class="types"><span class="type">boolean</span></span>
+         build the measurement string, which only
+   the diagnostics need
+         (<em>optional</em>)
+        </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
-
+        <li>
            <span class="types"><span class="type">boolean</span></span>
-        true when the victim is inside the footprint
+        true when the victim is inside the footprint</li>
+        <li>
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the measurements, or nil when they were not asked for</li>
     </ol>
 
 
@@ -195,6 +213,56 @@
 
            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
         the distances and the limits they were checked against
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:EntitiesNearHorse"></a>
+    <strong>HorseCollisionMod:EntitiesNearHorse (horsePos, now)</strong>
+    </dt>
+    <dd>
+    The entities near the horse, from a cached broad phase where possible. </p>
+
+<p> <code>System.GetEntitiesInSphere</code> is the most expensive call the mod makes and
+ the only one with a real budget at thirty ticks a second. The result is
+ reused until the horse has travelled <code>SphereCacheTravel</code>, or the result is
+ older than <code>SphereCacheMaxAgeMs</code>, whichever comes first.</p>
+
+<p> That is safe rather than merely cheap. The sphere reaches <code>HitRadius</code> and
+ the footprint can never reach beyond <code>HorseFrontReach</code> plus <code>MaxSweepExtra</code>,
+ so anyone the query did not return is at least the difference away from
+ being hit. Both thresholds are set inside that difference, and keying the
+ refresh on distance travelled rather than on elapsed ticks means the
+ guarantee does not depend on how fast the horse is going.</p>
+
+<p> A cached entity may have been unstreamed since. Every use of one is already
+ wrapped, and its position is read fresh each tick, so a stale list costs a
+ rejected candidate rather than an error.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horsePos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         world position of the horse
+        </li>
+        <li><span class="parameter">now</span>
+            <span class="types"><span class="type">number</span></span>
+         engine clock in milliseconds
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        the entities near the horse, possibly from the last tick</li>
+        <li>
+           <span class="types"><span class="type">boolean</span></span>
+        true when the query actually ran</li>
     </ol>
 
 
@@ -254,7 +322,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-04 16:45:20 </i>
+<i style="float:right;">Last updated 2026-09-04 17:11:46 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

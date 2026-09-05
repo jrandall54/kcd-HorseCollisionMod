@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Detection
 -- @author jrandall54
--- @release 4.9.2
+-- @release 4.9.3
 --- Tests whether a victim is actually under the horse.
 --
 -- The sphere search is a broad-phase cull and nothing more. A horse is about
@@ -26,12 +26,21 @@
 -- horse travels in one tick so that fast victims are not missed between
 -- frames.
 --
+-- The measurements are only formatted when somebody asks for them. This runs
+-- for every entity near the horse on every tick, thirty times a second, and
+-- building a diagnostic string that is then discarded is the most expensive
+-- thing in the loop.
+--
 -- @tparam table npc victim entity
 -- @tparam table horsePos world position of the horse
 -- @tparam table horseForward horse facing, unit vector
 -- @tparam number speed horse speed in meters per second
+-- @tparam[opt] boolean wantDetail build the measurement string, which only
+--   the diagnostics need
 -- @treturn boolean true when the victim is inside the footprint
-function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed)
+-- @treturn string the measurements, or nil when they were not asked for
+function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed,
+		wantDetail)
 	local cfg = self.Config
 	local npcPos = nil
 
@@ -69,15 +78,21 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 			and forwardDistance <= (cfg.HorseFrontReach + sweepExtra)
 			and lateralDistance <= cfg.HorseHalfWidth
 
-	local detail = "fwd=" .. string.format("%.2f", forwardDistance)
-			.. " lat=" .. string.format("%.2f", lateralDistance)
-			.. " dz=" .. string.format("%.2f", dz)
-			.. " sweep=" .. string.format("%.2f", sweepExtra)
-			.. " limits=" .. string.format("%.2f/%.2f/%.2f",
-					cfg.HorseFrontReach + sweepExtra, cfg.HorseHalfWidth,
-					cfg.HorseMaxVerticalDiff)
+	-- Formatted only when it will be read. `DiagnoseMisses` is the switch that
+	-- turns the loop's diagnostics on, and the footprint line is one of them:
+	-- gating it on `LogTelemetry` instead wrote a line for every tick a victim
+	-- stood in range, which is thirty a second in ordinary play.
+	if not wantDetail and not cfg.DiagnoseMisses then
+		return inside, nil
+	end
 
-	if inside then
+	local detail = string.format(
+			"fwd=%.2f lat=%.2f dz=%.2f sweep=%.2f limits=%.2f/%.2f/%.2f",
+			forwardDistance, lateralDistance, dz, sweepExtra,
+			cfg.HorseFrontReach + sweepExtra, cfg.HorseHalfWidth,
+			cfg.HorseMaxVerticalDiff)
+
+	if inside and cfg.DiagnoseMisses then
 		self:Log("Footprint " .. detail)
 	end
 
@@ -92,9 +107,64 @@ end
 --
 -- @treturn string the distances and the limits they were checked against
 function HorseCollisionMod:FootprintDetail(npc, horsePos, horseForward, speed)
-	local _, detail = self:IsInHorseFootprint(npc, horsePos, horseForward, speed)
+	local _, detail = self:IsInHorseFootprint(npc, horsePos, horseForward,
+			speed, true)
 
 	return detail or "unmeasurable"
+end
+
+--- The entities near the horse, from a cached broad phase where possible.
+--
+-- `System.GetEntitiesInSphere` is the most expensive call the mod makes and
+-- the only one with a real budget at thirty ticks a second. The result is
+-- reused until the horse has travelled `SphereCacheTravel`, or the result is
+-- older than `SphereCacheMaxAgeMs`, whichever comes first.
+--
+-- That is safe rather than merely cheap. The sphere reaches `HitRadius` and
+-- the footprint can never reach beyond `HorseFrontReach` plus `MaxSweepExtra`,
+-- so anyone the query did not return is at least the difference away from
+-- being hit. Both thresholds are set inside that difference, and keying the
+-- refresh on distance travelled rather than on elapsed ticks means the
+-- guarantee does not depend on how fast the horse is going.
+--
+-- A cached entity may have been unstreamed since. Every use of one is already
+-- wrapped, and its position is read fresh each tick, so a stale list costs a
+-- rejected candidate rather than an error.
+--
+-- @tparam table horsePos world position of the horse
+-- @tparam number now engine clock in milliseconds
+-- @treturn table the entities near the horse, possibly from the last tick
+-- @treturn boolean true when the query actually ran
+function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
+	local cache = self.SphereCache
+
+	if cache.ents and cache.pos then
+		local dx = horsePos.x - cache.pos.x
+		local dy = horsePos.y - cache.pos.y
+		local dz = horsePos.z - cache.pos.z
+		local moved = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+
+		if moved < self.SphereCacheTravel
+				and (now - cache.at) < self.SphereCacheMaxAgeMs then
+			return cache.ents, false
+		end
+	end
+
+	local found = nil
+
+	pcall(function()
+		found = System.GetEntitiesInSphere(horsePos, self.Config.HitRadius)
+	end)
+
+	if type(found) ~= "table" then
+		return nil, true
+	end
+
+	cache.ents = found
+	cache.pos = { x = horsePos.x, y = horsePos.y, z = horsePos.z }
+	cache.at = now
+
+	return found, true
 end
 
 --- Works out which side of the victim the impact lands on.

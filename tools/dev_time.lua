@@ -11,6 +11,14 @@
 -- the follow-up message is vanilla's own way of telling the world to catch up
 -- after a jump.
 --
+-- WARNING. Setting HOURS jumps the world clock, and doing so broke a running
+-- session: the rider reported that "everything broke" after a 24 hour jump and
+-- had to reload. It also does not run NPCs through their day, so anything that
+-- depends on a routine will not have happened. For those, raise
+-- `wh_pl_SkipTimeMaxWorldTimeRatio` from its default of 360 to something like
+-- 7200 and use the game's own wait, which takes about twelve seconds a day and
+-- simulates the world properly.
+--
 -- Edit HOURS and run:
 --
 --     python tools/dev_console.py --file tools/dev_time.lua

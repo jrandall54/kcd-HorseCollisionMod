@@ -29,6 +29,23 @@ number.
 
 ## [Unreleased]
 
+## [4.9.3] - 2026-09-04
+
+### Changed
+
+- The mod does noticeably less work while you ride. Finding the people near
+  the horse was the only expensive thing it did, and it now happens when the
+  horse has actually moved rather than thirty times a second regardless.
+  Nothing about what counts as a collision changed.
+
+### Fixed
+
+- A diagnostic that could not read a victim's name no longer risks stopping
+  that victim being watched.
+- `kcd.log` is quieter during ordinary play. A per-tick line about anyone
+  standing near the horse was being written with normal telemetry on; it
+  belongs with the rest of the diagnostics behind `DiagnoseMisses`.
+
 ## [4.9.2] - 2026-09-04
 
 ### Fixed
