@@ -475,7 +475,7 @@ HorseCollisionMod.Config = {
 	-- The listener follows the camera, so first person hears the mix from on
 	-- top of the victim and a third-person camera hears the same mix from
 	-- several meters back. Tuned in first person, the loudest case.
-	ImpactSoundDistance      = 3.0,
+	ImpactSoundDistance      = 2.0,
 
 	-- A shove disturbs someone's clothing rather than striking them, so the
 	-- walk tier carries no impact at all: two cloth foleys and a body
@@ -491,9 +491,9 @@ HorseCollisionMod.Config = {
 
 	-- A trot puts someone on the ground, so the blunt impact leads, doubled
 	-- with the second copy taken back a fraction to shade it down.
-	ImpactSoundTrot          = { { "body", 0, 1.0 },
-	                             { "body", 0, 1.35 },
-	                             { "f_bodyfall1", 0, 1.2 } },
+	ImpactSoundTrot          = { { "body", 0, 1.3 },
+	                             { "body", 0, 1.65 },
+	                             { "f_bodyfall1", 0, 1.5 } },
 
 	-- A gallop stacks four different blunt impacts rather than repeats of one,
 	-- so it reads as a collision instead of a flam, with the body settling
@@ -503,11 +503,12 @@ HorseCollisionMod.Config = {
 	-- No hoofstep. `hs_hp_soil` is `hoofsteps_player`, the same family as
 	-- `a_o_jump_landing`, and those events ignore position: it played at a
 	-- fixed full level under every other layer with no way down.
-	ImpactSoundGallop        = { { "body", 0, 0.9 },
-	                             { "body_armed", 0, 1.25 },
-	                             { "blunt", 0, 1.4 },
-	                             { "face_armed", 0, 1.3 },
-	                             { "f_bodyfall1", 0, 1.1 } },
+	ImpactSoundGallop        = { { "body", 0, 0.5 },
+	                             { "n_lu_log_ground", 0, 1.0 },
+	                             { "body_armed", 0, 0.85 },
+	                             { "blunt", 0, 1.0 },
+	                             { "face_armed", 0, 0.9 },
+	                             { "f_bodyfall1", 0, 0.7 } },
 
 	-- The occasional injury, gallop only. A foley event, so unlike
 	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out

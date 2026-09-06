@@ -43,6 +43,13 @@ number.
   almost none of the dust; this is their share of it. Off in third person,
   which can already see the whole thing. `RiderBlur`.
 
+### Changed
+
+- Impact sounds are louder again, tuned in first person alongside the camera
+  effects rather than on their own. A gallop is noticeably heavier than a trot
+  now, and the dull thud under a gallop impact is back after being dropped for
+  being inaudible where it sat.
+
 ## [4.12.0] - 2026-09-05
 
 ### Added

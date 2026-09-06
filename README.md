@@ -103,7 +103,7 @@ breaking the mod. Deleting a line restores its default.
 | `ImpactDustScaleGallop` | 0.15 | Size of it at a gallop. |
 | `ImpactDustScaleTrot` | 0.11 | Size of it at a trot. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
-| `ImpactSoundDistance` | 3.0 | Master level for trot and gallop, in meters. Higher is quieter. The listener follows the camera, so a third-person camera mod hears the mix from further away and will want this lower. |
+| `ImpactSoundDistance` | 2.0 | Master level for trot and gallop, in meters. Higher is quieter. The listener follows the camera, so a third-person camera mod hears the mix from further away and will want this lower. |
 | `ImpactSoundWalk` | layered | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
 | `ImpactSoundTrot` | layered | The same for a trot. |
 | `ImpactSoundGallop` | layered | The same for a gallop. |

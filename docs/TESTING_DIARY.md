@@ -15366,3 +15366,19 @@ distance: the view camera sits on the player in first person and was measured
 7.7 m behind and 4.6 m above with the rider's third-person camera mod running.
 A trot takes 0.7 of the strength and 0.3 of the length, which came apart into
 two settings because a trot wanted the strength kept and the length cut.
+
+### The master distance is the term that matters
+
+Tuning the levels again alongside the camera effects, several bumps to the
+per-layer distances produced no audible change. The arithmetic says why: a
+layer is heard at its own distance **plus** `ImpactSoundDistance`, so moving a
+gallop layer from 0.9 to 0.5 takes the total from 3.9 to 3.5, about a tenth.
+Dropping the master from 3.0 to 2.0 moves every layer of both tiers by a full
+meter and is several times the size of any per-layer step.
+
+**Per-layer numbers set the balance. The master is the only thing that moves
+the level.** Reach for it first when a tier needs to move as a whole.
+
+Final levels, judged in first person: master 2.0, the gallop's five impact
+layers between 0.5 and 1.0 with `n_lu_log_ground` restored at 1.0 for weight
+underneath, and the trot's three between 1.3 and 1.65.
