@@ -400,10 +400,10 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos)
 		end
 	end)
 
-	-- `actor:RagDollize` was tried here and must not be tried again. It does
-	-- ask for the physics profile directly rather than telling the actor to
-	-- fall, which is why it looked like the answer for re-hitting a victim who
-	-- is already down, and in game it snapped the victim upright into a T-pose
+	-- `actor:RagDollize` does not belong here and must not be added back. It
+	-- asks for the physics profile directly rather than telling the actor to
+	-- fall, which is why it looks like the answer for re-hitting a victim who
+	-- is already down, and in game it snaps the victim upright into a T-pose
 	-- on every gallop impact.
 
 	self:MassVictim(npc, impulseScale)

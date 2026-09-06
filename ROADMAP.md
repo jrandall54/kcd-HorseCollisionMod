@@ -462,10 +462,10 @@ armor.
       animation in it, so "no reaction plays" was never true of it.
 
       What is true is that the victim does not move, because **an NPC standing up cannot
-      be ragdolled by anything reachable from Lua**. Eight calls were tried across the
-      actor and entity binds and two separate runs landed at 2532 ms, the same figure to
-      the millisecond, which means the request is held until the get-up animation
-      completes rather than processed late. Vanilla does the same thing to itself:
+      be ragdolled by anything reachable from Lua**. Eight calls across the actor and
+      entity binds all fail to reach the body, and two separate runs landed at 2532 ms,
+      the same figure to the millisecond, which means the request is held until the
+      get-up animation completes rather than processed late. Vanilla does the same thing to itself:
       `DEADANIM_TIMER` waits for the death animation before ragdolling.
 
       So the wait exists to prevent damage with no visible reaction, and to stop a trot
