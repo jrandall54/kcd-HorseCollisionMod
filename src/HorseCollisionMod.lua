@@ -459,8 +459,8 @@ HorseCollisionMod.Config = {
 	-- weight, which is the reference: at or under it nothing changes.
 	BardingImpulse           = true,
 	BardingReferenceWeight   = 10.0,
-	BardingWeightScale       = 30.0,  -- weight over the reference that adds 100 per cent
-	MaxBardingImpulse        = 1.6,
+	BardingWeightScale       = 117.0, -- weight over the reference that adds 100 per cent
+	MaxBardingImpulse        = 1.15,
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and

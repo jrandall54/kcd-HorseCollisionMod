@@ -73,7 +73,7 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownMs` | 3000 | Milliseconds before the same NPC can react again. Stops one person reacting repeatedly. |
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
 | `Uplift` | 30.0 | Vertical knockdown force, trot and gallop only. Higher throws them upward rather than along the ground. |
-| `StaminaDrainTrot` | 18.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
+| `StaminaDrainTrot` | 14.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
 | `StaminaDrainGallop` | 22.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
 | `StaminaDrainWalk` | 0.0 | Stamina removed per NPC at walking pace. |
 | `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
@@ -93,7 +93,7 @@ breaking the mod. Deleting a line restores its default.
 | `HorsemanshipStaminaBest` | 1.2 | And at skill 20. |
 | `HorsemanshipSeatChance` | 0.6 | Chance of keeping the saddle when the horse is spent, at skill 20. |
 | `BardingImpulse` | true | Whether the horse's own barding adds to the impulse. |
-| `MaxBardingImpulse` | 1.6 | The most it can add. |
+| `MaxBardingImpulse` | 1.15 | The most it can add. |
 | `HorseBoltsWhenSpent` | true | Whether a horse that has thrown a spent rider may leave rather than wait. |
 | `HorseBoltChance` | 0.4 | How often it does. |
 | `CameraShake` | true | Whether an impact kicks the rider's camera. |
@@ -195,6 +195,10 @@ tools/
                           finding food in hardcore
   dev_time.lua            moves game time forward without the wait dialog,
                           through the Calendar global
+  dev_horse.lua           hands the player a rideable horse, taken from the
+                          horse traders' stable data
+  dev_barding.lua         puts a set of barding on the player's horse, so the
+                          barding impulse multiplier can be judged
   dev_watchfight.lua      samples everyone near the player once a second, with
                           the player alongside them, so a fight reads as one
                           timeline rather than an impression
