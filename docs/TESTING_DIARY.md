@@ -16081,3 +16081,58 @@ The velocity is up 9.7 per cent by construction. The distance is up 3 per cent
 on the median and 20 per cent on the mean, the mean carrying one 14.13 m
 outlier, so the figure sits around the ten per cent the rider asked for.
 `BardingForceSteps` stays at +5 knockback and +3 uplift at a full set.
+
+### Armor scales the mass, not the impulse, and what that is worth
+
+`armorImpulse` was scaling the force down and the mass up at the same time, so
+armor was counted twice and the net went as the armor scale to the 4.7th power.
+With the impulse landing properly that put a mailed guard at 4030 kg taking
+0.01 m/s, which is not harder to move but immovable. The rider's position, and
+it matches what the code already intended:
+
+> "as far as I know, impulse shouldn't be used to calculate anything for the
+> armor as I thought we figured out how to scale mass itself to get the desired
+> spread between naked vs full plate"
+
+`Ragdoll` now takes the tier scalar and the armor scale separately. The impulse
+carries the tier scalar only; `MassVictim` keeps the armor scale.
+
+#### What armor is worth once it is counted once
+
+Thirty-six gallop impacts, base 100, exponent 3.7:
+
+    mass band        n     dv    mean  median
+      0-60 kg       11   1.24    4.03    2.88
+     60-200 kg       7   0.56    4.31    3.88
+    200-900 kg       1   0.28    3.91    3.91
+    900-4900 kg     17   0.02    2.91    2.99
+
+    ratio armored to unarmored 0.72x, 1.5 sigma, not significant
+
+The heavy end is saturated. A 4864 kg victim already receives dv 0.02, so the
+impulse contributes nothing and further mass cannot take anything away. What
+they still travel, about 2.9 m, is the horse's own collision. That is a floor
+this mod cannot push anyone below.
+
+#### The light end does not respond either
+
+Halving `RagdollMass` to 50 put villagers near 21 kg and doubled their launch
+velocity, dv 0.97 to 1.64. The mean throw **fell**, 4.14 m to 3.42 m, and the
+ratio barely moved, 0.72x to 0.65x.
+
+So the throw responds to whether the impulse arrives at all, which the ragdoll
+timing fix established and which is worth 43 per cent, and not to how large it
+is. Three separate attempts to scale the magnitude, upward through the force
+and downward through the mass, produced no increase and twice produced a
+decrease.
+
+**No mechanism is offered for that.** Within a single mass band the throws run
+0.1 m to 8.7 m, so contact geometry and ground dominate everything a setting
+does, and rides of ten to twenty impacts cannot see through it. Tuning the
+throw distance by measurement is not viable at this sample size, and further
+theories about which lever drives it should not be written here without a
+measurement that separates contact geometry first.
+
+What is established and should not be re-derived: the impulse must land after
+the body is a ragdoll, armor belongs on the mass alone, and armor separation
+with that in place is about 0.7x.

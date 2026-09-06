@@ -390,10 +390,13 @@ end
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
--- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam number tierScale the tier's share of the configured impulse, 0 to 1
+-- @tparam number armorScale the victim's armor scale, which sets their ragdoll
+--   mass and nothing else
 -- @tparam table horsePos horse world position, the origin a push points away
 --   from, so a victim is never thrown back under the rider
-function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos, horseEnt)
+-- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
+function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale, horsePos, horseEnt)
 	pcall(function()
 		if npc.actor then
 			npc.actor:Fall({x=0, y=0, z=0}, true)
@@ -432,8 +435,17 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos,
 		end)
 
 		if state == self.RagdollAnimationState or self:TimeMs() >= deadline then
-			self:MassVictim(npc, impulseScale)
-			self:ImpulseVictim(npc, velocity, impulseScale, horsePos, horseEnt)
+			-- Armor decides the mass and nothing else. Scaling the impulse by
+			-- it as well counted armor twice: the force came down and the mass
+			-- went up together, so the net went as the armor scale to the
+			-- 4.7th power. Measured, that put a mailed guard at 4030 kg taking
+			-- 0.01 m/s, which is not harder to move, it is immovable.
+			--
+			-- Mass is the physically correct lever on its own, and the spread
+			-- it needs was measured and tuned in its own right. The impulse
+			-- carries the tier scalar only.
+			self:MassVictim(npc, armorScale)
+			self:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt)
 			self:DampVictim(npc)
 
 			return
@@ -465,10 +477,11 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam number tierScale the tier's share of the configured impulse, 0 to 1
+-- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
 -- @tparam table horsePos horse world position, the origin the push points away
 --   from, so a victim is never thrown back under the rider
-function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos, horseEnt)
+function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt)
 	-- Barding is a flat addition to the two force figures rather than a factor
 	-- on the result, so a barded horse adds the same absolute push whoever it
 	-- hits, and the victim's own armor still scales the whole thing.
@@ -477,8 +490,8 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos, 
 	-- the table in the settings file rather than out of a curve.
 	local bonus = self:BardingForceBonus(horseEnt)
 
-	local k_back = (self.Config.Knockback + bonus.knockback) * impulseScale
-	local k_up = (self.Config.Uplift + bonus.uplift) * impulseScale
+	local k_back = (self.Config.Knockback + bonus.knockback) * tierScale
+	local k_up = (self.Config.Uplift + bonus.uplift) * tierScale
 
 	if k_back <= 0 and k_up <= 0 then
 		return
@@ -578,7 +591,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos, 
 			end)
 
 			self:Log("Impulse " .. self:NameOf(npc)
-					.. " scale=" .. string.format("%.2f", impulseScale)
+					.. " tier=" .. string.format("%.2f", tierScale)
 					.. " magnitude=" .. string.format("%.1f", impulseMag)
 					.. " mass=" .. string.format("%.1f", mass)
 					.. " dv=" .. string.format("%.2f",
