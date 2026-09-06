@@ -436,11 +436,12 @@ end
 --
 -- ### How, and why not by message
 --
--- `combat:stimulus:hostilePerception` was tried first, because the horse's own
--- combat subbrain declares `t_fleeParams` as `wherever(true)` and would flee
--- from anything it perceived. It produced no flee on the horse, whatever the
--- payload, and the known trap applies: a `ProcessMessage` only receives while
--- its subtree is running, and the player horse's combat brain is a bare wait.
+-- `combat:stimulus:hostilePerception` does not work here, despite the horse's
+-- own combat subbrain declaring `t_fleeParams` as `wherever(true)`, which
+-- would make it flee from anything it perceived. The known trap applies: a
+-- `ProcessMessage` only receives while its subtree is running, and
+-- `sb_combat_playerHorse.xml` is a bare `Wait` with no behavior in it, so the
+-- player's horse has no combat brain to receive anything.
 --
 -- What is used instead is the behavior already observed in game. Emptying the
 -- horse's health throws the rider and sends the horse off, which is how the

@@ -513,17 +513,17 @@ rather than missing.
       buried the emitter on every collision.
 - [x] The horse pays for a trampling spree. Not with health, which was built and
       removed: it worked and it was legible in the log, but from the saddle it was a
-      second invisible stat racing stamina to the same outcome, and the rider could not
-      tell what it was contributing. In their words, "I'm not understanding exactly what
-      health is providing to the feature".
+      second invisible stat racing stamina to the same outcome, and what it contributed
+      was not legible from the saddle.
 
       What was wanted from it was one moment, so that moment is the feature.
       `HorseBoltsWhenSpent` gives a spent horse a `HorseBoltChance` of wanting nothing
       more to do with the rider: it empties the horse's health, which throws the rider
       and sends the horse off, and hands the health back three seconds later once it has
       gone. Emptying the health is used because it is the behavior observed in game,
-      including accidentally in 2.0.0-dev1; `combat:stimulus:hostilePerception` was tried
-      first and does not reach a player horse, whose combat brain is a bare wait.
+      including accidentally in 2.0.0-dev1. `combat:stimulus:hostilePerception` does not
+      reach a player horse, whose combat brain is a bare wait with no subtree to receive
+      it.
 
 - [ ] A victim shows the injury afterwards. A collision can take ninety per cent of
       someone's health and they stand up and walk off with dirt and blood on their
