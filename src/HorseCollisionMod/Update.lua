@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.15.0
+-- @release 4.16.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -228,8 +228,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
 
-		-- After the native hit, so the engine's own charge for the collision
-		-- lands first and the log reads in the order the victim experiences it.
+		-- Called after the native hit, but calling order is not resolution
+		-- order: `SendCombatHit` returns at once and the engine settles its
+		-- own trample damage around half a second later. The wait that makes
+		-- this mod's damage land last, and so own the killing blow and the
+		-- crime attribution with it, is inside `ApplyImpactDamage`.
 		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina)
@@ -246,8 +249,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
 
-		-- After the native hit, so the engine's own charge for the collision
-		-- lands first and the log reads in the order the victim experiences it.
+		-- Called after the native hit, but calling order is not resolution
+		-- order: `SendCombatHit` returns at once and the engine settles its
+		-- own trample damage around half a second later. The wait that makes
+		-- this mod's damage land last, and so own the killing blow and the
+		-- crime attribution with it, is inside `ApplyImpactDamage`.
 		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina)

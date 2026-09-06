@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 4.15.0
+-- @release 4.16.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -416,30 +416,92 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt)
 		end)
 	end
 
-	local before = nil
+	-- Deferred rather than dealt here, and this is the whole of the crime fix.
+	--
+	-- The engine applies its own trample damage for a horse collision. The mod
+	-- neither sees it nor can gate it, and the engine attributes it to the
+	-- rider. Measured on a full-health guard with `CollisionIsCrime` off, so
+	-- the mod had sent no hit of its own, it was 22.7.
+	--
+	-- That much cannot kill a healthy villager on its own. It only ever gets
+	-- the kill because this damage lands first and leaves a sliver: the tier
+	-- figure is 95 against a villager's 100, so it falls a little short about
+	-- two times in three, and the trample finishes what is left.
+	--
+	-- It matters who finishes them. `sb_switch_awareness.xml` raises the
+	-- `murder` stimulus from a hit event that names an attacker and finds the
+	-- target dead. A death with no attributed hit behind it is discovered
+	-- later as a `corpse`, which `Scripts/Script/Crime.lua` marks
+	-- `isCrime = false`. So the killing blow decides whether guards know who
+	-- did it, and until now a coin toss decided the killing blow. That is why
+	-- riding someone down was sometimes ignored and sometimes an instant
+	-- hanging offence, with `CollisionIsCrime` powerless over either.
+	--
+	-- Waiting puts this damage last. The trample lands on a victim at full
+	-- health and cannot kill them, and whatever it leaves is finished here,
+	-- under this mod's attribution. `CollisionIsCrime` then decides the
+	-- outcome in both directions rather than in neither.
+	--
+	-- A fixed wait, not a poll, and deliberately so: what is being waited for
+	-- is damage that frequently never arrives at all, so there is no state
+	-- that says "the trample has resolved" to read. The figure comes from the
+	-- impact probe, whose first sample at 500 ms already shows the trample
+	-- settled.
+	local delay = self.Config.ImpactDamageDelayMs or 0
 
-	pcall(function()
-		before = npc.soul:GetState("health")
-	end)
+	local function deal()
+		local before = nil
 
-	local ok, err = pcall(function()
-		npc.soul:DealDamage(0, damage, attacker, false)
-	end)
+		pcall(function()
+			before = npc.soul:GetState("health")
+		end)
 
-	if self.Config.LogTelemetry then
-		self:Log("ImpactDamage " .. self:NameOf(npc)
-				.. " tier=" .. tostring(tierName)
-				.. " base=" .. string.format("%.1f", base)
-				.. " armorScale=" .. string.format("%.2f", scale)
-				.. " dealt=" .. string.format("%.1f", damage)
-				.. " health=" .. string.format("%.1f", before or -1)
-				.. " attributed=" .. tostring(attacker ~= nil)
-				.. " ok=" .. tostring(ok)
-				.. " err=" .. tostring(err))
+		-- The engine got there first. This happens when the trample lands on
+		-- someone already hurt, and nothing here can take the death back, so
+		-- it is logged rather than worked around.
+		if type(before) == "number" and before <= 0 then
+			if self.Config.LogTelemetry then
+				self:Log("ImpactDamage " .. self:NameOf(npc)
+						.. " tier=" .. tostring(tierName)
+						.. " preempted=true")
+			end
+
+			return
+		end
+
+		local ok, err = pcall(function()
+			npc.soul:DealDamage(0, damage, attacker, false)
+		end)
+
+		-- Read back rather than subtracted, because whether this call emptied
+		-- the victim is the question the whole deferral exists to answer.
+		local after = nil
+
+		pcall(function()
+			after = npc.soul:GetState("health")
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("ImpactDamage " .. self:NameOf(npc)
+					.. " tier=" .. tostring(tierName)
+					.. " base=" .. string.format("%.1f", base)
+					.. " armorScale=" .. string.format("%.2f", scale)
+					.. " dealt=" .. string.format("%.1f", damage)
+					.. " health=" .. string.format("%.1f", before or -1)
+					.. " after=" .. string.format("%.1f", after or -1)
+					.. " fatal=" .. tostring(after ~= nil and after <= 0
+							and (before == nil or before > 0))
+					.. " attributed=" .. tostring(attacker ~= nil)
+					.. " delayed=" .. tostring(delay)
+					.. " ok=" .. tostring(ok)
+					.. " err=" .. tostring(err))
+		end
 	end
 
-	if not ok then
-		return 0
+	if delay > 0 then
+		Script.SetTimer(delay, deal)
+	else
+		deal()
 	end
 
 	return damage

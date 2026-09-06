@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.15.0
+-- @release 4.16.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.15.0"
+HorseCollisionMod.Version = "4.16.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -184,6 +184,10 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   covering the shoes and shirt every villager wears
 -- @field ImpactDamageVariance how far either side of the tier figure a single
 --   impact can land, as a fraction
+-- @field ImpactDamageDelayMs how long to wait before charging the victim, so
+--   that the engine's own trample damage lands first and this mod delivers
+--   the killing blow; 0 charges immediately, which lets the engine decide
+--   whether a collision death is attributed to the rider
 -- @field ImpactDust whether an impact throws dust off the ground
 -- @field ImpactDustEffect the particle library node to spawn
 -- @field ImpactDustScaleTrot size of the effect at a trot, 0 is off
@@ -375,6 +379,7 @@ HorseCollisionMod.Config = {
 	ImpactDamageArmorScale   = 0.6,
 	ImpactDamageIgnoredArmor = 0.5,
 	ImpactDamageVariance     = 0.15,
+	ImpactDamageDelayMs      = 600,
 
 	-- The rider's own half of a gallop impact. A collision costs stamina and
 	-- costs the victim health, and in hardcore mode neither is visible from
