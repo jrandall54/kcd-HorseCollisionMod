@@ -35,7 +35,7 @@
 --
 -- @module HorseCollisionMod.Sound
 -- @author jrandall54
--- @release 4.11.0
+-- @release 4.12.0
 
 --- The material a victim's armor sounds like, by engine armor type.
 --
@@ -185,6 +185,13 @@ end
 -- hoofbeats at speed, so a mix that sounds correct while parked is not the
 -- mix that will be heard.
 --
+-- And they can only be judged from the camera the player uses.
+-- `ImpactSoundDistance` is added to every layer for exactly that reason: the
+-- listener follows the camera, so a third-person view starts several meters
+-- further from the victim than a first-person one and hears the whole mix
+-- quieter. The per-layer distances set the balance between the layers; the
+-- master sets where that balance sits.
+--
 -- @tparam table npc victim entity
 -- @tparam string tierName "Walk", "Trot" or "Gallop"
 -- @tparam[opt] table armor the victim's armor total, for the body layer
@@ -198,10 +205,21 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 
 	local layers = cfg.ImpactSoundWalk
 
+	-- The master level control, added to every layer of the tier so the mix
+	-- comes down as a whole and the balance between the layers is left alone.
+	--
+	-- The walk tier does not take it. Walk is movement foley rather than an
+	-- impact, its samples are the quietest in use and are already doubled to
+	-- be audible at all, so there is no headroom in them to give away; taking
+	-- three meters off a shove leaves nothing behind.
+	local master = 0
+
 	if tierName == "Trot" then
 		layers = cfg.ImpactSoundTrot
+		master = cfg.ImpactSoundDistance or 0
 	elseif tierName == "Gallop" then
 		layers = cfg.ImpactSoundGallop
+		master = cfg.ImpactSoundDistance or 0
 	end
 
 	if type(layers) ~= "table" then
@@ -239,7 +257,7 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	for _, layer in ipairs(plan) do
 		local trigger = layer[1]
 		local delay = layer[2] or 0
-		local distance = layer[3] or 0
+		local distance = (layer[3] or 0) + master
 		local chance = layer[4] or 1
 
 		-- A layer may fire only some of the time. It is the only control over
@@ -395,3 +413,4 @@ function HorseCollisionMod:AwayFromListener(entity, distance)
 		z = (vx * az.x) + (vy * az.y) + (vz * az.z)
 	}
 end
+

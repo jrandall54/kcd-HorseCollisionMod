@@ -15167,3 +15167,84 @@ The control case is worth keeping in mind as a limit: an armored victim killed
 by repeated trampling, where the mod's small contribution is not what finishes
 them, will still raise a flag with the switch off. Suppression follows the
 killing blow, not the setting.
+
+## Impact sound levels, and the camera the mix was tuned through
+
+The 4.9 layer balancing was done from a third-person camera mod. Riding in
+first person, trot and gallop were far too loud. The two views are not
+comparable, and the reason is that the audio listener follows the camera: a
+third-person camera starts several meters behind the rider, so the whole mix
+arrives from further away and quieter. First person is the loud case, and is
+now the view the mix is tuned in.
+
+### The diary's own attenuation figures were third-person figures
+
+"A layer at distance 1 is quiet and at 1.5 it is gone" was measured through
+that camera. From first person the listener is on top of the victim, so the
+same offsets barely move down the curve: raising every layer by 0.4 m produced
+no useful reduction at all. The usable range is not a property of the sample,
+it is a property of where the ear is.
+
+### One knob, because the balance was already right
+
+Fifteen per-layer distances were the wrong control. The relative balance
+between the layers was correct and only the level was wrong, so
+`ImpactSoundDistance` is added to every layer of a tier: the per-layer numbers
+set the balance, the master sets where that balance sits. It is in meters and
+higher is quieter.
+
+Shipped at 3.0. Trot and gallop take it; walk does not, because walk is
+movement foley rather than an impact, its samples are the quietest in use and
+are already doubled to be audible at all, and taking three meters off a shove
+left nothing behind.
+
+### Two layers removed from gallop
+
+`hs_hp_soil` is `event:/animals/horse/hoofsteps_player/soil_wr`, the same
+`hoofsteps_player` family as `a_o_jump_landing`, which was proven to ignore
+position, obstruction and every parameter tried. It was playing at a fixed full
+level under every other layer with no way down, and was the loudest thing in
+the mix. The horse already makes that noise at a gallop on its own.
+
+`n_lu_log_ground` sat at distance 5, well past the point where a 3D event has
+gone silent, so it was contributing nothing.
+
+### The layers now fire together
+
+Every gallop and trot layer was staggered by 4 to 24 ms. From the saddle that
+read as phasing rather than as thickness. All delays are zero: the layers land
+as one hit and the phasing is gone. The delay field is still there and still
+works, it is simply not used by trot or gallop.
+
+## The panning is not the proxy, and is unexplained
+
+On headphones a collision arrives majority-left, majority-right or centered,
+worst at a gallop. Two explanations were built and both were wrong.
+
+**Reasoning that did not survive contact.** A victim is struck by one shoulder
+of the horse or the other, so a proxy at their position should arrive from that
+side; and `SetAudioProxyOffset` takes an entity-local vector, so a galloped
+victim who is thrown and tumbles should carry the proxy around with them,
+sweeping the source across the stereo field for the length of the sample. That
+second one even explained why gallop was worse than trot, which barely moves
+anyone.
+
+**What was measured.** Neither change made any difference the rider could hear:
+
+    offset along the listener-to-victim line   pans
+    offset straight up, proxy on the victim    pans, unchanged
+    offset straight up, proxy on the player    pans, unchanged
+    one single gallop layer, proxy on player   pans, unchanged
+
+The last case is the decisive one. A single layer, hosted on the player
+entity, offset only on the vertical axis, has no left-right component anywhere
+in it and still pans. Whatever positions these events is not the aux proxy
+offset, and three placements that should sound different sound identical.
+
+Levels responded to distance throughout, so the proxy is being used for
+attenuation. It is only the direction that is not answering.
+
+All of it was reverted: the proxy is back on the victim, offset along the line
+from the listener, which is where the levels were judged good. The panning is
+open, and the next attempt should start by establishing what the offset
+actually does to a position rather than by reasoning about what it ought to do.

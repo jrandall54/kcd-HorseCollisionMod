@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.11.0
+-- @release 4.12.0
 --- Whether this collision should count as a combat one.
 --
 -- Two independent signals, because neither alone is reliable:
