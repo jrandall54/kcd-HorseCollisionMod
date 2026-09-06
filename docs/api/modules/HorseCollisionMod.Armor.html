@@ -72,12 +72,19 @@
  file runs.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.16.0
+        <li><strong>Release</strong>:  4.17.0
  The <code>armor_type_id</code> values worn by a horse rather than a person.</p>
 
 <p> A sum over a person has to exclude them and a sum over a horse has to be
  only them, because a saddle sits in the horse's inventory and a rider's
- armor does not.</li>
+ armor does not.
+ Only the saddle and the horseshoes. <code>armor_type_id</code> 12 is named
+ <code>horse_bridle</code> in <code>armor_type.xml</code> and looks like tack, but the game files
+ every <code>horse_armor_head_neck_*</code> piece under it, and those carry a
+ <code>smash_def</code> of 0.80 to 1.40 against the trappings' 0.06. Excluding the id
+ threw away all the real barding and left only cloth, which is why the
+ barding multiplier had to be cranked before it did anything. Genuine
+ bridles share the id and carry 0.00, so counting it costs nothing.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -107,6 +114,22 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ArmorStaminaScale">HorseCollisionMod:ArmorStaminaScale (armor)</a></td>
 	<td class="summary">The stamina multiplier for a target's armor.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BardingCoverage">HorseCollisionMod:BardingCoverage (horseEnt)</a></td>
+	<td class="summary">How heavily barded the horse is, from nothing to a full set.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BardingForceBonus">HorseCollisionMod:BardingForceBonus (horseEnt)</a></td>
+	<td class="summary">What barding adds to the two knockdown force figures.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BardingDamageScale">HorseCollisionMod:BardingDamageScale (horseEnt)</a></td>
+	<td class="summary">What barding adds to the damage an impact does.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BardingStaminaScale">HorseCollisionMod:BardingStaminaScale (horseEnt)</a></td>
+	<td class="summary">What barding saves the horse in stamina.</td>
 	</tr>
 </table>
 
@@ -345,6 +368,148 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod:BardingCoverage"></a>
+    <strong>HorseCollisionMod:BardingCoverage (horseEnt)</strong>
+    </dt>
+    <dd>
+    How heavily barded the horse is, from nothing to a full set. </p>
+
+<p> Barding is the horse's armor, and it is distinct from its tack. The game
+ files it in two places: the body trappings sit under <code>armor_type_id</code> 1 with
+ a <code>smash_def</code> of 0.05 to 0.06, and the head and neck piece, which is the
+ only substantial protection a horse can wear, runs 0.80 to 1.40.</p>
+
+<p> Read from <code>smash_def</code> rather than from weight, because that is the figure
+ that separates a cloth caparison from a plated head, and it is the same
+ figure the victim's side of the collision is scored on.</p>
+
+<p> Returned as a coverage fraction from 0 to 1 rather than as a multiplier,
+ because barding's three effects are flat additions and reductions rather
+ than a chain of multipliers. An impulse multiplier was tried and measured:
+ the usable band between invisible and comic does not exist, so what is
+ shipped is a small addition instead. See <code>docs/TESTING_DIARY.md</code>.</p>
+
+<p> Nothing about the rider enters this. Barding is what the horse is wearing,
+ so it does not scale with Horsemanship and must not be made to.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        coverage from 0 on a bare horse to 1 on a full set
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BardingForceBonus"></a>
+    <strong>HorseCollisionMod:BardingForceBonus (horseEnt)</strong>
+    </dt>
+    <dd>
+    What barding adds to the two knockdown force figures. </p>
+
+<p> A flat addition to <code>Knockback</code> and <code>Uplift</code>, in five steps. No barding adds
+ nothing, a fifth of a full set adds a fifth of the bonus, and so on to a
+ full set adding all of it. Steps rather than a smooth curve so that the
+ table in the settings file is the whole rule and a player can read what
+ their own horse is getting.</p>
+
+<p> The rows are <code>{ coverage at or above, knockback added, uplift added }</code>, and
+ the highest row the horse qualifies for wins.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        <code>knockback</code> and <code>uplift</code> additions, both 0 on a bare horse
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BardingDamageScale"></a>
+    <strong>HorseCollisionMod:BardingDamageScale (horseEnt)</strong>
+    </dt>
+    <dd>
+    What barding adds to the damage an impact does. </p>
+
+<p> An armored horse hits harder. Damage is a number rather than a picture, so
+ a subtle change here is actually achievable, unlike knockback.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        a multiplier on impact damage, 1 on a bare horse
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BardingStaminaScale"></a>
+    <strong>HorseCollisionMod:BardingStaminaScale (horseEnt)</strong>
+    </dt>
+    <dd>
+    What barding saves the horse in stamina. </p>
+
+<p> Barding is protection, so an impact tires the horse less. This is the half
+ of barding a player actually feels: one more guard ridden down before the
+ horse is spent and throws them.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        a multiplier on the stamina cost, 1 on a bare horse
+    </ol>
+
+
+
+
+</dd>
 </dl>
 
 
@@ -352,7 +517,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-06 14:36:01 </i>
+<i style="float:right;">Last updated 2026-09-06 16:02:24 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

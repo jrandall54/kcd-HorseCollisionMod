@@ -73,7 +73,7 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownMs` | 3000 | Milliseconds before the same NPC can react again. Stops one person reacting repeatedly. |
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
 | `Uplift` | 30.0 | Vertical knockdown force, trot and gallop only. Higher throws them upward rather than along the ground. |
-| `StaminaDrainTrot` | 18.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
+| `StaminaDrainTrot` | 14.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
 | `StaminaDrainGallop` | 22.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
 | `StaminaDrainWalk` | 0.0 | Stamina removed per NPC at walking pace. |
 | `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
@@ -88,6 +88,15 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownStateDriven` | true | Whether the wait after a knockdown reads the victim's own animation state instead of counting. A victim standing up cannot be knocked down again by anything, so hitting them costs health with no visible reaction. |
 | `HitReadySettleMs` | 2000 | How long a victim must be neither animation-driven nor ragdolling before another impact counts. |
 | `HitReadyCeilingMs` | 12000 | Failsafe, for a victim never seen busy at all. |
+| `Horsemanship` | true | Whether the rider's `horse_riding` skill changes what a collision costs. A novice is thrown by a single gallop impact; a master rides through four or five guards. |
+| `HorsemanshipStaminaWorst` | 10.0 | The horse's stamina cost multiplier at skill 0. |
+| `HorsemanshipStaminaBest` | 1.2 | And at skill 20. |
+| `HorsemanshipSeatChance` | 0.6 | Chance of keeping the saddle when the horse is spent, at skill 20. |
+| `Barding` | true | Whether the horse's own barding changes what a collision does. Barding is the horse's armour, not its tack: a saddle, bridle and shoes count for nothing. |
+| `BardingFullSmashDef` | 1.45 | The total `smash_def` treated as a full set of barding. Everything below scales from nothing on a bare horse to its figure here. |
+| `BardingStaminaRelief` | 0.25 | How much less stamina an impact costs a fully barded horse. The half of barding you actually feel: one more guard ridden down before the horse is spent. |
+| `BardingDamageBonus` | 0.15 | How much harder a fully barded horse hits. |
+| `BardingForceSteps` | five steps | What barding adds to the knockdown force, as a list of `{ coverage, added to Knockback, added to Uplift }`. No barding adds nothing, a fifth of a full set adds a fifth of the bonus, and a full set adds all of it. At the top that is 5.0 on a `Knockback` of 50 and 3.0 on an `Uplift` of 30. |
 | `HorseBoltsWhenSpent` | true | Whether a horse that has thrown a spent rider may leave rather than wait. |
 | `HorseBoltChance` | 0.4 | How often it does. |
 | `CameraShake` | true | Whether an impact kicks the rider's camera. |
@@ -189,6 +198,10 @@ tools/
                           finding food in hardcore
   dev_time.lua            moves game time forward without the wait dialog,
                           through the Calendar global
+  dev_horse.lua           hands the player a rideable horse, taken from the
+                          horse traders' stable data
+  dev_barding.lua         puts a set of barding on the player's horse, so the
+                          barding impulse multiplier can be judged
   dev_watchfight.lua      samples everyone near the player once a second, with
                           the player alongside them, so a fight reads as one
                           timeline rather than an impression

@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.16.0
+-- @release 4.17.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -393,7 +393,7 @@ end
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
 -- @tparam table horsePos horse world position, the origin a push points away
 --   from, so a victim is never thrown back under the rider
-function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos)
+function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos, horseEnt)
 	pcall(function()
 		if npc.actor then
 			npc.actor:Fall({x=0, y=0, z=0}, true)
@@ -406,10 +406,43 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos)
 	-- is already down, and in game it snaps the victim upright into a T-pose
 	-- on every gallop impact.
 
-	self:MassVictim(npc, impulseScale)
+	-- Held until the body is genuinely a ragdoll before the mass and the
+	-- impulse are applied to it.
+	--
+	-- `actor:Fall` requests the fall, it does not perform it. Measured, the
+	-- victim is still the animated character for a short while afterwards, and
+	-- anything applied in that window is discarded: the mass write did not
+	-- take, so the impulse read a mass of 80 rather than the figure this mod
+	-- had just written, and raising the impulse four fold moved nobody further.
+	--
+	-- Waiting for `BlendRagdoll` is what makes both land. `MassVictim` has its
+	-- own retry list for the same reason, which now has nothing left to retry.
+	local generation = self.TimerTick
+	local deadline = self:TimeMs() + self.RagdollReadyCeilingMs
 
-	self:ImpulseVictim(npc, velocity, impulseScale, horsePos)
-	self:DampVictim(npc)
+	local function whenPhysical()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		if state == self.RagdollAnimationState or self:TimeMs() >= deadline then
+			self:MassVictim(npc, impulseScale)
+			self:ImpulseVictim(npc, velocity, impulseScale, horsePos, horseEnt)
+			self:DampVictim(npc)
+
+			return
+		end
+
+		Script.SetTimer(self.RagdollReadyPollMs, whenPhysical)
+	end
+
+	whenPhysical()
 
 	-- The control for the same reading taken on the fall path. This tier uses
 	-- actor:Fall and touches no animation data of this mod's, so a turn seen
@@ -435,9 +468,17 @@ end
 -- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
 -- @tparam table horsePos horse world position, the origin the push points away
 --   from, so a victim is never thrown back under the rider
-function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos)
-	local k_back = self.Config.Knockback * impulseScale
-	local k_up = self.Config.Uplift * impulseScale
+function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos, horseEnt)
+	-- Barding is a flat addition to the two force figures rather than a factor
+	-- on the result, so a barded horse adds the same absolute push whoever it
+	-- hits, and the victim's own armor still scales the whole thing.
+	--
+	-- Added in five steps, so what a given horse gets is readable straight off
+	-- the table in the settings file rather than out of a curve.
+	local bonus = self:BardingForceBonus(horseEnt)
+
+	local k_back = (self.Config.Knockback + bonus.knockback) * impulseScale
+	local k_up = (self.Config.Uplift + bonus.uplift) * impulseScale
 
 	if k_back <= 0 and k_up <= 0 then
 		return
@@ -521,9 +562,27 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos)
 		-- report of armored targets moving further at trot than at gallop
 		-- with nothing to check it against.
 		if self.Config.LogTelemetry then
+			-- The mass is read here rather than assumed, because the throw is
+			-- a velocity and the velocity is the magnitude over the mass. The
+			-- mod writes a ragdoll mass of its own, inverted against this same
+			-- scale, so the figure the impulse actually meets is the one thing
+			-- that decides whether changing the force does anything at all.
+			local mass = -1
+
+			pcall(function()
+				local stats = npc:GetPhysicalStats()
+
+				if stats and stats.mass then
+					mass = stats.mass
+				end
+			end)
+
 			self:Log("Impulse " .. self:NameOf(npc)
 					.. " scale=" .. string.format("%.2f", impulseScale)
-					.. " magnitude=" .. string.format("%.1f", impulseMag))
+					.. " magnitude=" .. string.format("%.1f", impulseMag)
+					.. " mass=" .. string.format("%.1f", mass)
+					.. " dv=" .. string.format("%.2f",
+							mass > 0 and (impulseMag / mass) or -1))
 		end
 
 		if npc.AddImpulse and impulseMag > 0 then

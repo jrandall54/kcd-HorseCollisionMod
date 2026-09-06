@@ -29,6 +29,44 @@ number.
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-09-06
+
+### Added
+
+- Your Horsemanship now decides what riding someone down costs. Early in the
+  game a single gallop impact empties the horse and puts you on the ground; at
+  skill 20 you can ride through four or five armoured guards and will usually
+  keep your seat when the horse finally stops. This is what the skill already
+  governs in vanilla, so it compounds with the game's own reduction.
+  `Horsemanship`. **NOT BREAKING**, no released version carried it.
+- Barding on your horse now changes what a collision does. It is read off the
+  horse's armour rather than its tack, and scales with how much of it the
+  horse is wearing rather than with your Horsemanship. A full set costs the
+  horse a quarter less stamina per impact, hits fifteen per cent harder and
+  throws someone about ten per cent further. `Barding`, `BardingFullSmashDef`,
+  `BardingStaminaRelief`, `BardingDamageBonus` and `BardingForceSteps`.
+  **NOT BREAKING**, no released version carried them.
+
+### Fixed
+
+- Riding someone down throws them properly. The mod applied its knockback and
+  the victim's ragdoll weight the instant it asked them to fall, before the
+  body had actually become a ragdoll, and the game discarded both. Victims are
+  thrown about forty per cent further as a result, far more consistently, and
+  armour finally makes a difference to how far someone is carried: a man in
+  mail now weighs three times what a villager does instead of both weighing
+  the same.
+
+- The head and neck armour a horse wears is counted as barding. The game files
+  it under an `armor_type_id` named `horse_bridle`, which the mod was
+  discarding as tack, so the only substantial protection a horse can wear was
+  being ignored and barding was scored on cloth trappings alone.
+
+### Changed
+
+- A trot impact costs the horse less stamina than it did, so a trot goes
+  meaningfully further than a gallop rather than marginally.
+
 ## [4.16.0] - 2026-09-06
 
 ### Fixed

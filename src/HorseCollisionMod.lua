@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.16.0
+-- @release 4.17.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.16.0"
+HorseCollisionMod.Version = "4.17.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -216,6 +216,18 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field CameraShakeFrequency oscillations per second
 -- @field CameraShakeTrotScale the fraction of the kick a trot gets, 0 is off
 -- @field CameraShakeRandomness how much each shake varies from the last
+-- @field Horsemanship whether the rider's horse_riding skill counts
+-- @field HorsemanshipSkill the skill name read for it
+-- @field HorsemanshipMaxLevel the level the figures below are worth at
+-- @field HorsemanshipStaminaWorst the stamina cost multiplier at level 0
+-- @field HorsemanshipStaminaBest the multiplier at HorsemanshipMaxLevel
+-- @field HorsemanshipSeatChance chance of keeping the saddle at the top
+-- @field Barding whether the horse's own barding changes what a collision does
+-- @field BardingFullSmashDef the total `smash_def` counted as a full set
+-- @field BardingStaminaRelief how much less stamina an impact costs at a full set
+-- @field BardingDamageBonus how much harder a fully barded horse hits
+-- @field BardingForceSteps rows of `{ coverage, knockback added, uplift added }`,
+--   the flat force a barded horse adds, in five steps from bare to a full set
 -- @field HorseBoltsWhenSpent whether a spent horse may leave after throwing
 -- @field HorseBoltChance how often it does
 -- @field HorseBoltRestoreMs how long until its health is given back
@@ -300,7 +312,7 @@ HorseCollisionMod.Config = {
 
 	-- Horse stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 18.0,
+	StaminaDrainTrot         = 14.0,
 	StaminaDrainGallop       = 22.0,
 	ThrowRiderOnStaminaEmpty = true,
 
@@ -420,6 +432,46 @@ HorseCollisionMod.Config = {
 	RiderBlurSteps           = 7,
 	RiderBlurFirstPersonOnly = true,
 	RiderBlurFirstPersonRange = 1.5,
+
+	-- What the rider's own Horsemanship is worth. The game's `horse_riding`
+	-- skill runs 0 to 20; a rider at 0 is unaffected and the figures below are
+	-- what the skill is worth at the top of that scale.
+	--
+	-- The stamina cost is multiplied, not discounted, and the range is wide on
+	-- purpose. At level 0 a single gallop impact very nearly empties the
+	-- horse; at 20 it takes four or five armored guards, or about nine
+	-- villagers. The ceiling is set against guards rather than villagers
+	-- because guards are what the figure was judged on, and it stays low
+	-- enough that a rider never becomes a cartoon. It runs linearly between
+	-- the two, so every level is worth the same.
+	--
+	-- Seat is the chance of staying mounted when the horse is finally spent.
+	-- The horse still stops either way; a rider who can ride does not always
+	-- come off with it.
+	Horsemanship             = true,
+	HorsemanshipSkill        = "horse_riding",
+	HorsemanshipMaxLevel     = 20,
+	HorsemanshipStaminaWorst = 10.0,  -- the cost multiplier at level 0
+	HorsemanshipStaminaBest  = 1.2,   -- and at HorsemanshipMaxLevel
+	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
+
+	-- What the horse's own barding is worth. Barding is the horse's armor and
+	-- is separate from its tack, read from the total `smash_def` of what it is
+	-- wearing. Three flat effects rather than one multiplier, each scaling from
+	-- nothing on a bare horse to its figure here on a full set. Nothing about
+	-- the rider enters this: barding does not scale with Horsemanship.
+	Barding                  = true,
+	BardingFullSmashDef      = 1.45,
+	BardingStaminaRelief     = 0.25,
+	BardingDamageBonus       = 0.15,
+	BardingForceSteps        = {
+		{ 0.0, 0.0, 0.0 },
+		{ 0.2, 1.0, 0.6 },
+		{ 0.4, 2.0, 1.2 },
+		{ 0.6, 3.0, 1.8 },
+		{ 0.8, 4.0, 2.4 },
+		{ 1.0, 5.0, 3.0 }
+	},
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and
@@ -937,6 +989,13 @@ HorseCollisionMod.RetaliationReleaseTries = 20
 HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
+
+-- How often to look for the victim to become a ragdoll, and how long to wait
+-- before applying the mass and the impulse anyway. `actor:Fall` only requests
+-- the fall, so both are discarded if they are applied before the body is
+-- physicalized.
+HorseCollisionMod.RagdollReadyPollMs = 16
+HorseCollisionMod.RagdollReadyCeilingMs = 600
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
 -- The state an actor reports while one of this mod's reaction clips owns the

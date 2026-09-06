@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.16.0
+-- @release 4.17.0
 --- Whether this collision should count as a combat one.
 --
 -- Two independent signals, because neither alone is reliable:
@@ -160,6 +160,26 @@ function HorseCollisionMod:DrainHorseStamina(horseEnt, playerEnt, staminaDrain)
 		end
 
 		if target <= 0 and playerEnt.actor then
+			-- A rider who can ride keeps their seat some of the time. The
+			-- horse is still spent and still stops; the skill decides whether
+			-- they come off with it.
+			local _, seat = self:HorsemanshipScale(playerEnt)
+
+			-- Only on the impact that empties the horse. Rolled on every
+			-- impact it lets a rider keep their seat on a horse already at
+			-- zero and go on hitting people indefinitely, which was measured:
+			-- two saves in a row at 0.0 stamina with the streak continuing.
+			if before <= 0 then
+				seat = 0
+			end
+
+			if seat > 0 and math.random() < seat then
+				self:Log("Horse spent - rider kept their seat, chance="
+						.. string.format("%.2f", seat))
+
+				return
+			end
+
 			self:Log("Horse spent - throwing rider.")
 			self:ThrowRider(horseEnt, playerEnt)
 
@@ -502,4 +522,64 @@ function HorseCollisionMod:BoltHorse(horseEnt, playerEnt)
 	end
 
 	return ok
+end
+
+--- What the rider's horsemanship is worth against a collision.
+--
+-- `player.soul:GetSkillLevel("horse_riding")` is the skill, on the game's own
+-- 0 to 20 scale, and it is the stat the game itself calls Horsemanship. A
+-- rider who can actually ride keeps their seat through a collision that would
+-- put a novice on the ground, and spends less of the horse under them doing
+-- it.
+--
+-- Returns two numbers rather than one, because the skill should not be a
+-- single blunt discount: a stamina multiplier, which is what makes a long ride
+-- possible at all, and the chance of keeping the saddle when the horse is
+-- spent, which is what makes the skill felt at the moment it matters.
+--
+-- Both run linearly from level 0 to `HorsemanshipMaxLevel`. The range is what
+-- carries the difference rather than any curve: a novice is thrown by a single
+-- gallop impact and a rider at 20 rides through four or five armored guards.
+--
+-- @tparam table playerEnt the player entity
+-- @treturn number a multiplier on the horse's stamina cost
+-- @treturn number the chance of keeping the saddle, 0 to 1
+function HorseCollisionMod:HorsemanshipScale(playerEnt)
+	local cfg = self.Config
+
+	if not cfg.Horsemanship or not playerEnt or not playerEnt.soul then
+		return 1.0, 0.0
+	end
+
+	local level = nil
+
+	pcall(function()
+		level = playerEnt.soul:GetSkillLevel(cfg.HorsemanshipSkill)
+	end)
+
+	if type(level) ~= "number" or level <= 0 then
+		return 1.0, 0.0
+	end
+
+	local top = cfg.HorsemanshipMaxLevel or 20
+	local fraction = level / top
+
+	if fraction > 1 then
+		fraction = 1
+	end
+
+	-- Linear across the whole scale. Two curved shapes were tried and rejected
+	-- in game: one spending the benefit in the first few levels, which left 13
+	-- riding like 20, and one withholding it until the last quarter, which
+	-- made every level below 16 feel identical. A straight line spreads the
+	-- difference evenly, so each level is worth the same and the ends are
+	-- still far apart.
+	local remaining = 1.0 - fraction
+	local worst = cfg.HorsemanshipStaminaWorst or 1.0
+	local best = cfg.HorsemanshipStaminaBest or 1.0
+
+	local stamina = best + ((worst - best) * remaining)
+	local seat = (cfg.HorsemanshipSeatChance or 0) * (1.0 - remaining)
+
+	return stamina, seat
 end

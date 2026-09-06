@@ -51,7 +51,7 @@ HorseCollisionModSettings = {
 
 	-- Stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 18.0,
+	StaminaDrainTrot         = 14.0,
 	StaminaDrainGallop       = 22.0,
 	CombatStaminaMultiplier  = 2.2,   -- 1.0 removes the combat penalty
 	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
@@ -164,6 +164,58 @@ HorseCollisionModSettings = {
 	RiderBlurSteps           = 7,
 	RiderBlurFirstPersonOnly = true,
 	RiderBlurFirstPersonRange = 1.5,
+
+	-- What the rider's own Horsemanship is worth. The game's `horse_riding`
+	-- skill runs 0 to 20; a rider at 0 is unaffected and the figures below are
+	-- what the skill is worth at the top of that scale.
+	--
+	-- The stamina cost is multiplied, not discounted, and the range is wide on
+	-- purpose. At level 0 a single gallop impact very nearly empties the
+	-- horse; at 20 it takes four or five armored guards, or about nine
+	-- villagers. The ceiling is set against guards rather than villagers
+	-- because guards are what the figure was judged on, and it stays low
+	-- enough that a rider never becomes a cartoon. It runs linearly between
+	-- the two, so every level is worth the same.
+	--
+	-- Seat is the chance of staying mounted when the horse is finally spent.
+	-- The horse still stops either way; a rider who can ride does not always
+	-- come off with it.
+	Horsemanship             = true,
+	HorsemanshipSkill        = "horse_riding",
+	HorsemanshipMaxLevel     = 20,
+	HorsemanshipStaminaWorst = 10.0,  -- the cost multiplier at level 0
+	HorsemanshipStaminaBest  = 1.2,   -- and at HorsemanshipMaxLevel
+	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
+
+	-- What the horse's own barding is worth. Barding is the horse's armor and
+	-- is separate from its tack, so a saddle and shoes count for nothing here.
+	-- Read from the total smash_def of what the horse is wearing, which is what
+	-- separates a cloth caparison from a plated head and neck.
+	--
+	-- Three flat effects rather than one multiplier, each scaling from nothing
+	-- on a bare horse to its figure below on a full set. Nothing about the
+	-- rider enters this: barding does not scale with Horsemanship.
+	Barding                  = true,
+	BardingFullSmashDef      = 1.45,  -- smash_def counted as a full set, measured
+	BardingStaminaRelief     = 0.25,  -- how much less stamina an impact costs
+	BardingDamageBonus       = 0.15,  -- how much harder a barded horse hits
+	-- What barding adds to the knockdown force, in five steps. No barding adds
+	-- nothing, a fifth of a full set adds a fifth of the bonus, up to a full
+	-- set adding all of it. Each row is
+	--
+	--     { coverage at or above, added to Knockback, added to Uplift }
+	--
+	-- and the highest row the horse qualifies for wins. At the top that is 5.0
+	-- on a Knockback of 50 and 3.0 on an Uplift of 30, so ten per cent more of
+	-- both.
+	BardingForceSteps        = {
+		{ 0.0, 0.0, 0.0 },
+		{ 0.2, 1.0, 0.6 },
+		{ 0.4, 2.0, 1.2 },
+		{ 0.6, 3.0, 1.8 },
+		{ 0.8, 4.0, 2.4 },
+		{ 1.0, 5.0, 3.0 }
+	},
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and

@@ -533,8 +533,38 @@ rather than missing.
       or exhausted movement states can be set on an NPC and held, rather than authoring
       any animation.
 
-- [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
-- [ ] Horse barding increases impact force and reduces momentum loss.
+- [x] Horsemanship level reduces stamina cost and the chance of being thrown. The skill
+      is `horse_riding`, read with `soul:GetSkillLevel`, and it runs 0 to 20.
+
+      Vanilla's own Horsemanship already governs how quickly a horse tires, so the mod's
+      multiplier is faithful to the skill rather than inventing a use for it, and it
+      compounds with vanilla's reduction.
+
+      Linear across the scale, from ten times the stamina cost at 0 to 1.2 at 20. Two
+      curved shapes do not work in game: one spends the benefit in the first few levels
+      and leaves 13 riding like 20, and one withholding it to the last quarter makes
+      every level under 16 identical. The brief it has to meet is that a novice cannot
+      stay on the horse through an impact and a master can use the horse offensively.
+
+          level   gallops  trots  guards
+              0       1.2    1.8     0.6
+             10       2.1    3.3     1.0
+             20       9.7   15.2     4.8
+
+      `HorsemanshipSeatChance` is the second half: up to a 60 per cent chance of keeping
+      the saddle when the horse is finally spent, rolled only on the impact that empties
+      it. Rolled on every impact it lets a rider stay on a horse already at zero and go
+      on hitting people, which the log caught.
+- [x] Horse barding increases impact force. Barding sits in the horse's inventory as
+      ordinary equipment, so `ArmorOf` reads it unchanged: an unbarded mount reports one
+      piece and about 8 weight, which is its tack, and that is the reference, so a player
+      who never armors their horse sees no change.
+
+      **Built and wired but not confirmed in game**, because no barded horse was
+      available while it was being tested. The multiplier reads 1.00 on an unbarded
+      horse, which is the only half that has been observed.
+
+      Momentum loss is not implemented separately: the stamina cost already carries it.
 
 ## Phase 4: AI reaction
 

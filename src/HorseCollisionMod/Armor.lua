@@ -12,16 +12,22 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 4.16.0
+-- @release 4.17.0
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
 -- A sum over a person has to exclude them and a sum over a horse has to be
 -- only them, because a saddle sits in the horse's inventory and a rider's
 -- armor does not.
+-- Only the saddle and the horseshoes. `armor_type_id` 12 is named
+-- `horse_bridle` in `armor_type.xml` and looks like tack, but the game files
+-- every `horse_armor_head_neck_*` piece under it, and those carry a
+-- `smash_def` of 0.80 to 1.40 against the trappings' 0.06. Excluding the id
+-- threw away all the real barding and left only cloth, which is why the
+-- barding multiplier had to be cranked before it did anything. Genuine
+-- bridles share the id and carry 0.00, so counting it costs nothing.
 HorseCollisionMod.TackTypes = {
 	[10] = true,
-	[11] = true,
-	[12] = true
+	[11] = true
 }
 
 -- `armor_type_id` as a readable name, for telemetry only. Nothing branches on
@@ -307,4 +313,116 @@ function HorseCollisionMod:ArmorStaminaScale(armor)
 	return self:ArmorCurve(armor.weight, cfg.ArmorReferenceWeight,
 			cfg.ArmorStaminaExponent, false,
 			cfg.MinArmorStamina, cfg.MaxArmorStamina)
+end
+
+--- How heavily barded the horse is, from nothing to a full set.
+--
+-- Barding is the horse's armor, and it is distinct from its tack. The game
+-- files it in two places: the body trappings sit under `armor_type_id` 1 with
+-- a `smash_def` of 0.05 to 0.06, and the head and neck piece, which is the
+-- only substantial protection a horse can wear, runs 0.80 to 1.40.
+--
+-- Read from `smash_def` rather than from weight, because that is the figure
+-- that separates a cloth caparison from a plated head, and it is the same
+-- figure the victim's side of the collision is scored on.
+--
+-- Returned as a coverage fraction from 0 to 1 rather than as a multiplier,
+-- because barding's three effects are flat additions and reductions rather
+-- than a chain of multipliers. An impulse multiplier was tried and measured:
+-- the usable band between invisible and comic does not exist, so what is
+-- shipped is a small addition instead. See `docs/TESTING_DIARY.md`.
+--
+-- Nothing about the rider enters this. Barding is what the horse is wearing,
+-- so it does not scale with Horsemanship and must not be made to.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @treturn number coverage from 0 on a bare horse to 1 on a full set
+function HorseCollisionMod:BardingCoverage(horseEnt)
+	local cfg = self.Config
+
+	if not cfg.Barding or not horseEnt then
+		return 0
+	end
+
+	local barding = self:ArmorOf(horseEnt)
+
+	if not barding then
+		return 0
+	end
+
+	local full = cfg.BardingFullSmashDef or 1.5
+
+	if full <= 0 then
+		return 0
+	end
+
+	local coverage = barding.smashDef / full
+
+	if coverage < 0 then
+		return 0
+	end
+
+	if coverage > 1 then
+		return 1
+	end
+
+	return coverage
+end
+
+--- What barding adds to the two knockdown force figures.
+--
+-- A flat addition to `Knockback` and `Uplift`, in five steps. No barding adds
+-- nothing, a fifth of a full set adds a fifth of the bonus, and so on to a
+-- full set adding all of it. Steps rather than a smooth curve so that the
+-- table in the settings file is the whole rule and a player can read what
+-- their own horse is getting.
+--
+-- The rows are `{ coverage at or above, knockback added, uplift added }`, and
+-- the highest row the horse qualifies for wins.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @treturn table `knockback` and `uplift` additions, both 0 on a bare horse
+function HorseCollisionMod:BardingForceBonus(horseEnt)
+	local steps = self.Config.BardingForceSteps
+	local bonus = { knockback = 0, uplift = 0 }
+
+	if type(steps) ~= "table" then
+		return bonus
+	end
+
+	local coverage = self:BardingCoverage(horseEnt)
+
+	for _, step in ipairs(steps) do
+		if coverage >= step[1] then
+			bonus.knockback = step[2]
+			bonus.uplift = step[3]
+		end
+	end
+
+	return bonus
+end
+
+--- What barding adds to the damage an impact does.
+--
+-- An armored horse hits harder. Damage is a number rather than a picture, so
+-- a subtle change here is actually achievable, unlike knockback.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @treturn number a multiplier on impact damage, 1 on a bare horse
+function HorseCollisionMod:BardingDamageScale(horseEnt)
+	return 1.0 + (self:BardingCoverage(horseEnt)
+			* (self.Config.BardingDamageBonus or 0))
+end
+
+--- What barding saves the horse in stamina.
+--
+-- Barding is protection, so an impact tires the horse less. This is the half
+-- of barding a player actually feels: one more guard ridden down before the
+-- horse is spent and throws them.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @treturn number a multiplier on the stamina cost, 1 on a bare horse
+function HorseCollisionMod:BardingStaminaScale(horseEnt)
+	return 1.0 - (self:BardingCoverage(horseEnt)
+			* (self.Config.BardingStaminaRelief or 0))
 end
