@@ -276,11 +276,11 @@ end
 -- nothing else. Radial is the variant that does not work from here, so this
 -- uses the one that does.
 --
--- Putting a particle effect in front of the camera instead was tried first and
--- abandoned. At a gallop the rider covers the meter in front of them in a
--- tenth of a second, so a puff placed there is behind their head before it
--- draws, and moving it far enough ahead to be ridden into read as a cloud
--- hanging in the road rather than as an impact.
+-- A particle effect in front of the camera does not work in its place. At a
+-- gallop the rider covers the meter in front of them in a tenth of a second,
+-- so a puff placed there is behind their head before it draws, and one far
+-- enough ahead to be ridden into reads as a cloud hanging in the road rather
+-- than as an impact.
 --
 -- ### Telling the views apart
 --
