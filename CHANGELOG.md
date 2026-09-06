@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.14.0] - 2026-09-05
+
 ### Changed
 
 - A victim who has been knocked down is left alone until they are actually back
