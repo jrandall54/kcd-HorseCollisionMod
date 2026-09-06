@@ -31,6 +31,12 @@ number.
 
 ## [4.14.0] - 2026-09-05
 
+### Added
+
+- `HitCooldownStateDriven`, `HitReadySettleMs`, `HitReadyPollMs` and
+  `HitReadyCeilingMs`, which control how long a knocked-down victim is left
+  alone. **NOT BREAKING**, no released version carried them.
+
 ### Changed
 
 - A victim who has been knocked down is left alone until they are actually back
