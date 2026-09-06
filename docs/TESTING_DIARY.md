@@ -15245,6 +15245,10 @@ Levels responded to distance throughout, so the proxy is being used for
 attenuation. It is only the direction that is not answering.
 
 All of it was reverted: the proxy is back on the victim, offset along the line
-from the listener, which is where the levels were judged good. The panning is
-open, and the next attempt should start by establishing what the offset
-actually does to a position rather than by reasoning about what it ought to do.
+from the listener, which is where the levels were judged good.
+
+**Panning is closed.** The rider ruled it out after the single-layer test:
+"we will not be revisting panning". It is not an open question to pick up, and
+no further placement of the proxy is to be proposed. Levels still respond to
+distance normally, so volume work is unaffected; direction alone is off the
+table.
