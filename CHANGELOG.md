@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-09-05
+
 ### Added
 
 - A gallop impact now kicks the rider's camera. Riding someone down costs
