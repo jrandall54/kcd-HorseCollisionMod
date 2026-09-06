@@ -418,10 +418,17 @@ armor.
       `riderGuardMovement`, `riderGuardJump` and the rest, so a rear while
       mounted is something the game already does rather than something to
       invent.
-- [ ] **Active.** Shake the rider's camera on a gallop impact. `actor:CameraShake` and
-      `actor:SetViewShake` both exist and neither has been tried. A collision
-      currently costs the rider a number they cannot see; this is the cheapest
-      way to make weight felt from the saddle.
+- [x] Shake the rider's camera on a gallop impact. Shipped in 4.13.0 through
+      `actor:SetViewShake`, with a trot taking a fraction of it. Its frequency
+      argument is a period rather than a rate: vanilla passes 1/20 and a first
+      build passing 14 produced nothing at any amplitude. `actor:CameraShake`
+      is not used, having no positional component.
+
+      The rider also gets a blur pulse in first person, where the collision
+      happens below the field of view and none of the ground effects are
+      visible. `System.SetScreenFx` is the only Lua route to the post effects
+      and `FilterBlurring_Amount` is clamped near 1.0, so the weight comes from
+      the hold and a chroma shift rather than the number.
 
       Scoped to gallop by the rider. The rear above is stood down, so this
       carries the whole of the horse's side of an impact on its own, and it
@@ -521,15 +528,17 @@ rather than missing.
       apart by the feedback rather than only by the tier they fell into.
       Raised by the rider while tuning the impact sound.
 
-- [ ] An impact throws up dust. `ParticleEffect` is a procedural clip taking
-      an `EffectName`, an `AttachmentName` for the joint to hang it on,
-      position and rotation offsets, and `KillOnExit`. Dust off the ground
-      where a body lands, authored per fragment rather than needing anything
-      in Lua. Unlike the sound, this has no timing problem to solve: the dust
-      belongs to the landing, which is where the fragment already is.
+- [x] An impact throws up dust. Shipped in 4.13.0, from Lua through
+      `Particle.SpawnEffect` rather than as a procedural layer in the animation
+      data: a gallop impact plays no fragment at all, so authoring it per
+      fragment would have reached only the trot tier.
 
-      Both ride along in animation data already generated, which makes them
-      the cheapest immersion on this list. Neither has been tried.
+      Two things were needed beyond the call. The spawn waits for the victim's
+      vertical velocity to cross back up, which is the ground contact, because
+      how far a body travels first depends on the angle it was struck at. And
+      the position comes from a downward raycast rather than the body's own
+      origin, which sits 0.65 to 0.77 m below the surface it rests on and
+      buried the emitter on every collision.
 - [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
 - [ ] Horse barding increases impact force and reduces momentum loss.
 - [ ] A braced polearm hit head-on acts as a wall: heavy stamina cost, near-certain dismount.
@@ -680,9 +689,13 @@ rather than missing.
       change civilian behavior from walking to a guard into running away,
       which is a different game.
 
-- [ ] **Active.** Women run and fetch a guard rather than fighting. Set by the rider as
-      the first concrete use of the item above: where a man may turn on the rider, a woman
-      should break, run, and raise the alarm.
+- [x] Women run and fetch a guard rather than fighting. Shipped in 4.10.0.
+      `sb_combat.xml` tests `b_soul.gender == male` after the context option is read, so a
+      woman falls through to the report and flee branches; that fall-through is the
+      feature. `CanRetaliate` returns "fight", "alarm" or "none", and a woman gets neither
+      the `alwaysFightWhenHit` option nor the offense release, both of which act on a
+      fight subtree she cannot enter. Morale does not separate the sexes, measured across
+      twenty one NPCs, so the sex check is honest rather than a shortcut.
 
       The mechanism is likely already there and needs confirming rather than building. The
       `combat:stimulus:hostilePerception` split is the behavior tree's own and is decided
