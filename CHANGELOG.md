@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.15.0] - 2026-09-05
+
 ### Added
 
 - A horse that throws a spent rider now sometimes leaves rather than waiting to
