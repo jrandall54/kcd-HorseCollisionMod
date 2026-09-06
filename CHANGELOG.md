@@ -29,6 +29,27 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- `ImpactSoundDistance`, a single control over how loud trot and gallop
+  impacts are, in meters. Higher is quieter. The game's audio has no volume
+  anywhere, so distance is the substitute, and this is added to every layer of
+  a tier so the mix comes down as a whole and the balance between the layers is
+  left alone. A third-person camera mod hears every impact from further away
+  and will want it lower. **NOT BREAKING**, no released version carried it.
+
+### Changed
+
+- Impact sounds are quieter, and are now tuned in first person. The previous
+  balance was judged through a third-person camera, which puts the listener
+  several meters further from the victim and made the whole mix sound quieter
+  than a normal player hears it.
+- A gallop impact no longer plays a hoofstep. It could not be quietened, sat at
+  a fixed full level under everything else, and the horse is already making
+  that noise.
+- The layers of a trot or gallop impact now land together instead of a few
+  milliseconds apart, which removes a phasing sound on headphones.
+
 ## [4.11.0] - 2026-09-04
 
 ### Added

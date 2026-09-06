@@ -193,6 +193,17 @@ HorseCollisionModSettings = {
 	-- victim is wearing: `body` is the blunt impact against that material and
 	-- `foley` is the movement rustle it makes.
 
+	-- The master level control, in meters, added to every layer of every
+	-- tier. Higher is quieter. The per-layer distances below set the balance
+	-- between the layers; this sets how loud that balance is as a whole.
+	--
+	-- It exists because the listener follows the camera. In first person the
+	-- ear is on top of the victim and hears the mix at close to full level; a
+	-- third-person camera starts several meters further back and hears the
+	-- same mix much quieter, which is why a mix tuned in one view is wrong in
+	-- the other. The tuning here is done in first person, the loudest case.
+	ImpactSoundDistance      = 3.0,
+
 	-- A shove disturbs someone's clothing rather than striking them, so the
 	-- walk tier carries no impact at all: two cloth foleys and a body
 	-- settling, each doubled because those samples are very quiet, over a
@@ -206,23 +217,28 @@ HorseCollisionModSettings = {
 	                             { "f_bodyfall1", 18 } },
 
 	-- A trot puts someone on the ground, so the blunt impact leads, doubled
-	-- with the second copy taken back a fraction to shade it down.
-	ImpactSoundTrot          = { { "body", 0 },
-	                             { "body", 8, 0.9 },
-	                             { "f_bodyfall1", 14 } },
+	-- with the second copy taken back a fraction to shade it down. Both
+	-- copies sit back from the ear: at zero distance the lead impact is
+	-- louder from the saddle than a trot deserves.
+	ImpactSoundTrot          = { { "body", 0, 1.0 },
+	                             { "body", 0, 1.35 },
+	                             { "f_bodyfall1", 0, 1.2 } },
 
 	-- A gallop stacks four different blunt impacts rather than repeats of one,
-	-- so it reads as a collision instead of a flam, over a dull heavy thud
-	-- held back to sit underneath, a hoofstep, and the body settling. Every
-	-- impact layer is a token, so a mailed guard and a peasant in cloth sound
-	-- different on all four.
-	ImpactSoundGallop        = { { "body", 0 },
-	                             { "n_lu_log_ground", 4, 5 },
-	                             { "body_armed", 6 },
-	                             { "blunt", 9, 1 },
-	                             { "hs_hp_soil", 10 },
-	                             { "face_armed", 18 },
-	                             { "f_bodyfall1", 24 } },
+	-- so it reads as a collision instead of a flam, with the body settling
+	-- underneath. Every impact layer is a token, so a mailed guard and a
+	-- peasant in cloth sound different on all four.
+	--
+	-- No hoofstep. `hs_hp_soil` is `hoofsteps_player`, the same family as
+	-- `a_o_jump_landing`, and those events ignore position: it played at a
+	-- fixed full level under every other layer and was the loudest thing in
+	-- the mix with no way down. The horse is already making that noise at a
+	-- gallop on its own.
+	ImpactSoundGallop        = { { "body", 0, 0.9 },
+	                             { "body_armed", 0, 1.25 },
+	                             { "blunt", 0, 1.4 },
+	                             { "face_armed", 0, 1.3 },
+	                             { "f_bodyfall1", 0, 1.1 } },
 
 	-- The occasional injury, gallop only. A foley event, so unlike
 	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out

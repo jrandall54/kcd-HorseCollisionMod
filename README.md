@@ -86,6 +86,7 @@ breaking the mod. Deleting a line restores its default.
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
+| `ImpactSoundDistance` | 3.0 | Master level for trot and gallop, in meters. Higher is quieter. The listener follows the camera, so a third-person camera mod hears the mix from further away and will want this lower. |
 | `ImpactSoundWalk` | layered | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
 | `ImpactSoundTrot` | layered | The same for a trot. |
 | `ImpactSoundGallop` | layered | The same for a gallop. |
