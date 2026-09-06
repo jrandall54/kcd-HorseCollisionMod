@@ -28,6 +28,15 @@ the game charges for a horse striking one at speed. A bump costs nothing and a
 full gallop costs a great deal. Because the game attributes a rider's collision
 to the rider, it is a crime like any other, and guards respond to it.
 
+Which is only true if the mod is the one that kills them. The game applies
+trample damage of its own for a collision, the mod can neither see nor stop it,
+and guards blame whoever lands the killing blow. So the mod waits for the
+trample to settle before charging the victim: the trample hits someone at full
+health, where it cannot kill, and the mod finishes them. Without that wait the
+mod charged first, fell a little short about two times in three, and let the
+game's trample decide. The same collision was then ignored on one villager and
+an instant hanging offence on the next, whatever `CollisionIsCrime` was set to.
+
 A badly hurt NPC left in the street would otherwise be taken over by the game's
 own behavior for the wounded, which stands them still until they slowly heal.
 The mod exempts anyone it knocks down from that, using the same mechanism the

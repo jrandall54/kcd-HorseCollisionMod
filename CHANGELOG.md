@@ -29,6 +29,27 @@ number.
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-09-06
+
+### Fixed
+
+- Riding someone down is now consistently a crime, or consistently not one,
+  according to `CollisionIsCrime`. Previously it was neither: the game applies
+  trample damage of its own for a horse collision and attributes it to the
+  rider, and because the mod charged the victim first, its own damage fell a
+  little short about two times in three and the game's trample delivered the
+  killing blow. Guards blame whoever lands that blow, so the same collision was
+  ignored on one villager and an instant hanging offence on the next. The mod
+  now waits for the trample to resolve before charging the victim, so it lands
+  the killing blow itself. A gallop is slightly more lethal to an unarmored
+  villager as a result.
+
+### Added
+
+- `ImpactDamageDelayMs`, how long the mod waits before charging a victim, so
+  the game's own trample damage lands first. **NOT BREAKING**, no released
+  version carried it.
+
 ## [4.15.0] - 2026-09-05
 
 ### Added

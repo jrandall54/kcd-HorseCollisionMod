@@ -123,6 +123,7 @@ HorseCollisionModSettings = {
 	ImpactDamageArmorScale   = 0.6,   -- smash_def past the ignored figure that halves damage
 	ImpactDamageIgnoredArmor = 0.5,   -- smash_def that is clothing, not armor
 	ImpactDamageVariance     = 0.15,  -- spread either side of the tier figure
+	ImpactDamageDelayMs      = 600,   -- wait, so the mod lands the killing blow
 
 	-- The rider's own half of a gallop impact. A collision costs stamina and
 	-- costs the victim health, and in hardcore mode neither is visible from

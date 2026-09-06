@@ -103,6 +103,7 @@ breaking the mod. Deleting a line restores its default.
 | `RiderBlurMs` | 480 | How long the decay takes. |
 | `RiderBlurTrotScale` | 0.7 | The fraction of the strength a trot gets. |
 | `RiderBlurTrotLength` | 0.3 | The fraction of the timing a trot gets. |
+| `ImpactDamageDelayMs` | 600 | How long the mod waits, in milliseconds, before charging the victim for the impact. The engine applies trample damage of its own for a collision and attributes it to you; waiting lets that land first so the mod delivers the killing blow. That decides whether guards treat a death as murder or as a corpse nobody is blamed for, and so it is what makes `CollisionIsCrime` mean anything. Set to 0 to charge immediately. |
 | `ImpactDust` | true | Whether a collision throws dust off the ground where the victim lands. |
 | `ImpactDustEffect` | "WH_Particels.other.explosion_dust" | The particle library node to spawn. |
 | `ImpactDustScaleGallop` | 0.15 | Size of it at a gallop. |
@@ -181,6 +182,8 @@ tools/
   probe_health.lua        logs one entity's health whenever it changes, for
                           the case where health moves with no impact to
                           account for it
+  dev_peace.lua           stops the world reacting to the player, so a test
+                          that kills someone is not also a test of a fight
   dev_survival.lua        holds the player's nourishment and energy at 100,
                           so a test needing game time is not also a test of
                           finding food in hardcore

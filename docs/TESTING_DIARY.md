@@ -15522,3 +15522,305 @@ Stamina is the whole budget and it is harsher than it looks: `StaminaDrainGallop
 is 22, multiplied by up to 2.2 in combat and up to 3.0 by the victim's armor,
 so riding down guards costs 48 to 54 of a 210 pool and four impacts empties it.
 That figure is unchanged by any of this and is what ends a spree.
+
+## Horsemanship, and testing a skill that cannot be lowered
+
+`horse_riding` is the skill, read with `soul:GetSkillLevel`, on the game's 0 to
+20 scale. Vanilla already uses it for how quickly a horse tires, its speed, and
+how much it shies, so a stamina multiplier is faithful to the skill rather than
+an invented use for it, and it compounds with vanilla's own reduction.
+
+### Testing it needed a horse and a fresh character
+
+`soul:SetSkillLevel` does not exist. `AdvanceToSkillLevel` does and only ever
+goes up, so a level cannot be lowered on a live character: the way down is to
+reload, which resets it to 0, and then advance to whatever level is wanted.
+
+The oldest save on hand was already at 5, and a new game does not reach a horse
+for hours. `tools/dev_horse.lua` closes that gap. Nothing is spawned, because
+every horse in the level already exists:
+
+    player.player:SetPlayerHorse(horse.id)
+    horse:SetWorldPos(...)
+
+**The horse has to come from `Horsetraders.__data__.stables`.** A loose horse
+standing in the world is an entity like any other, and `SetPlayerHorse` accepts
+it and reports success, but it cannot be mounted. The 25 registered stable
+horses can. Taking one is theft as far as the game is concerned, which has
+nothing to do with `CollisionIsCrime`, so ride out of town before testing.
+
+### The shape, after three attempts
+
+The range does the work: ten times the stamina cost at 0, 1.2 at 20. How it
+gets between them is what needed the rides, and two curves were rejected:
+
+    (1 - f)^n   spends the benefit in the first few levels; 13 rides like 20
+    1 - f^n     withholds it to the last quarter; every level under 16 is alike
+    1 - f       linear, every level worth the same
+
+Measured against a pool of 230, which is what a horse actually carries rather
+than the 210 assumed in earlier entries:
+
+    level   scale  gallops  trots  guards
+        0   10.00      1.2    1.8     0.6
+       10    5.60      2.1    3.3     1.0
+       20    1.20      9.7   15.2     4.8
+
+The brief, in the rider's words: at a low skill you lack the ability to stay on
+your horse from impacts, and by the last level you can hang on and use the
+horse offensively.
+
+### Two things the log corrected
+
+**The seat roll must be conditional on the impact that empties the horse.**
+Rolled on every impact it let a rider keep their seat on a horse already at 0.0
+stamina and carry on hitting people: two saves in a row at zero, with the streak
+continuing.
+
+**Stamina regenerates between passes.** A report of five trots at level 5 looked
+like a tuning error and was not. Each trot drained about 86 of 230, so 2.5 per
+full horse, and the rest was the horse refilling while the rider lined up the
+next one. The count depends on how fast impacts are chained, not only on the
+figures.
+
+### Barding is unconfirmed
+
+`ArmorOf` reads the horse's own inventory unchanged, because barding is
+ordinary equipment: an unbarded mount reports one piece and about 8 weight,
+which is its tack and is the reference. That half is observed. No barded horse
+was available during testing, so the multiplier has never been seen above 1.00
+in game.
+
+## Session: measuring what the barding impulse actually does
+
+The barding multiplier had been judged by eye four times without converging, so
+this session measured it instead, using the `travel=` figure `ProbeImpactCost`
+already writes at `t+3000ms`.
+
+The design was changed from the A/B in the handoff. Rather than barded against
+unbarded across two reloads, barding was equipped once and the multiplier moved
+from the console between passes, since `BardingImpulseScale` reads
+`self.Config` live. With a single set on the horse the weight over the
+reference is 14, so `BardingWeightScale` alone sets the multiplier: 1e9 gives
+1.00, 56 gives 1.25, 28 gives 1.50, 14 gives 2.00. Same horse, same ride, one
+variable.
+
+Note that the `armorImpulse=` figure on the `Impact` line is already the
+product of the victim's armor and the barding, because `Update.lua` multiplies
+them before logging. Comparing like with like means matching on the quotient,
+not on the logged number.
+
+### Baseline, multiplier 1.00
+
+Five unarmored women, base armor scale 1.26, flat ground, `dz` within 0.6 of
+where they were struck:
+
+    travel = 3.87  3.89  3.94  4.84  5.55     median 3.94
+
+The spread at a fixed multiplier is the finding that matters here. It runs
+about plus or minus twenty per cent, which is wider than the step the tuning
+question is about.
+
+### Multiplier 1.25, discarded
+
+Unusable, and worth recording so the conditions are not repeated. The first
+pass had killed six villagers, so the town was hostile and every impact logged
+`combatScale=2.2`. The victims available were a mixed set with base armor from
+0.94 to 1.26, and several were struck near a slope and finished a metre below
+where they started, which makes a horizontal distance meaningless.
+
+Two samples did match the baseline armor class, and both came in under it:
+
+    rat_woman12   travel 3.76   dz -1.01
+    rat_woman34   travel 2.56   dz -0.76
+
+Not evidence of anything on its own, but it is not the direction a 25 per cent
+impulse increase predicts.
+
+### Consequence for the design
+
+A 25 per cent step cannot be resolved against a 20 per cent spread without far
+more samples than a ride affords. The next pass goes straight to 2.00. If
+doubling the impulse does not move the median clear of the 3.87 to 5.55
+baseline band, then the impulse lever does not decide how far a body travels
+and the barding multiplier is cosmetic at any value worth shipping.
+
+### The barding multiplier measured against travel
+
+Twenty-four gallop impacts with a `t+3000ms` sample, bucketed by the total
+impulse multiplier the `Impact` line reports, which is the victim's armor scale
+already multiplied by the barding:
+
+    total   n   travel median   range           max |dz|
+     1.25  10        4.36       0.91 -  7.97      3.04
+     1.50   3        2.56       1.83 -  3.76      1.01
+     2.25   4       12.61       4.13 - 32.24      1.47
+     2.50   2       37.05      28.26 - 45.84     15.01
+
+The rider's description of the top of that range was "they are fucking FLYING
+to outer space now", and the `dz` column is why: at 2.50 a villager finishes
+fifteen metres above where she was struck.
+
+Two conclusions, and they settle the barding question.
+
+**The lever is real but violently non-linear.** It does almost nothing across
+the bottom of its range and then goes to orbit. Between 1.25 and 1.50 the
+median does not move at all, and the 1.50 bucket in fact reads lower than the
+baseline; between 2.25 and 2.50 it triples.
+
+**The shipping value cannot be seen, and this is why four rounds of judging it
+by eye never converged.** A light villager already sits at 1.26 from her own
+armor, so a barding multiplier of 1.12 puts the total near 1.41. That is a
+twelve per cent step against a baseline whose own spread at a fixed multiplier
+runs 0.91 to 7.97. The signal is an order of magnitude under the noise. No
+amount of careful watching was ever going to resolve it, and the four
+contradictory judgements were reading variance.
+
+There is no value that is both noticeable and not absurd. The band from 1.5 to
+2.25 is the whole transition from invisible to comic.
+
+### The crime and hostility switch
+
+The rider has raised for the length of the project that a test which kills
+anyone becomes a test of a fight instead, and that `CollisionIsCrime` never
+addressed it, because it gates only the mod's own `SendCombatHit` while the
+engine attributes the death and the witnesses do the rest. A run of barding
+samples was lost to this in the same session, every impact logged under
+`combatScale=2.2`.
+
+`tools/dev_peace.lua` now does it, in one shot with no loop:
+
+- `CrimeUtils.CanDetectCrime` stubbed to return false. This is the game's own
+  gate on whether a witness registers a crime, and it is the lever that
+  actually stops crime. Found by scanning `_G` in the running game.
+- `ai_IgnorePlayer 1`, a stock CryEngine cvar, so AI stops treating the player
+  as a perceivable target. Confirmed to survive a save load, unlike everything
+  else here.
+- `Game.SetWantedLevel(0)` for crime already on the books.
+- `AI.ResetPersonallyHostiles(id)` on the player and every actor within 80 m,
+  which clears the per-NPC grudge list that keeps someone hostile after the
+  wanted level is gone. These live on the `AI` global, not `XGenAIModule`.
+
+Re-run the file after every save load; only the cvar persists.
+
+## Session: what actually decides whether a collision kill is a crime
+
+The rider's standing complaint, unresolved for the length of the project:
+
+> "sometimes I gallop someone to death in front of a guard and he will be
+> oblivious to 'who did this' and others its instant aggression. Makes me think
+> that sometimes they die to the damage caused by mod and others caused by the
+> games natural physics."
+
+That is exactly right, and it is now measured rather than inferred.
+
+### The game's side
+
+`Scripts/Script/Crime.lua` in the shipping game defines the crime labels. Three
+matter here:
+
+    murder       isCrime = true          importance 100, guards confront
+    corpse       isCrime = false         a body is found, nobody is blamed
+    unattributedAssault
+                 isUnattributedCrime = true
+
+`sb_switch_awareness.xml` raises `murder` from a **hit event that names an
+attacker and finds the target dead**, not from the body. Its own comment says
+so: "For murders, ignore the corpse (react to the murder, not the corpse)." So
+a death with no attributed hit behind it can only ever be discovered later as a
+`corpse`, and `corpse` is not a crime. That is the "oblivious" case, and it is
+working as the game intends.
+
+### The measurement
+
+`ApplyImpactDamage` now reads health back after its own `DealDamage` and logs
+`after=` and `fatal=`, which is the only place the killing blow is visible.
+
+Run C, `CollisionIsCrime = false`, gallop damage at the shipping 95, six
+impacts:
+
+    victim              dealt   left at   finished by
+    refugee_beggar      100.8       0.0   the mod, fatal=true
+    refugee_tonka        86.4      13.6   the engine, dead within 500 ms
+    man97               101.2       0.0   the mod, fatal=true
+    guard26              25.8      74.2   the engine, a further 22.7, survived
+    refugee_beranMrs     99.4       0.6   the engine, dead within 500 ms
+    butchers_wife        83.1      16.9   nobody, survived
+
+`rat_guard26` is the line that settles it. Crime was off, so the mod sent no
+`SendCombatHit` at all, and he still lost 22.7 health that the mod did not
+deal. **The engine applies its own trample damage on a gallop collision. The
+mod cannot see it, cannot gate it, and the engine attributes it to the rider.**
+
+Run B, the same but with the mod's gallop damage forced to 250 so it always
+lands the killing blow, gave five kills at `fatal=true attributed=false` and no
+crime on any of them. Run A, crime on and damage normal, gave two kills at
+`fatal=false` and crime on both.
+
+### The conclusion
+
+Whoever lands the killing blow owns the death.
+
+- The mod's blow kills, with no attacker passed: the corpse is found later and
+  nothing is attributed. No crime.
+- The mod's blow falls short and the engine's trample finishes them: a hit
+  event naming the rider finds a dead target, and that is `murder`.
+
+Gallop damage is 95 with a 0.15 spread, so against a villager's 100 health it
+clears the line roughly a third of the time. Two of five unarmored victims here.
+That coin flip is the entire inconsistency, and `CollisionIsCrime` never had any
+influence over it, because it gates only the mod's own report.
+
+An older note in this diary said suppression follows the killing blow. That was
+correct but was recorded as a limit on an armored victim. It is not a corner
+case; it decides the common case, on every unarmored villager, two times in
+three.
+
+### The fix: let the engine hit first
+
+Three approaches were weighed. Preventing the engine's trample damage has no
+lever to pull: the only collision-damage cvar in the binary is
+`g_debugCollisionDamage`, which logs it and nothing else, and a global switch
+would take falling damage with it. Healing the trample damage back and
+re-dealing it cannot work either, because `murder` is raised by the hit event
+at the instant it finds a dead target, and healing afterwards does not retract
+a stimulus already sent.
+
+Ordering is the whole fix, and the numbers say why. The trample is a small
+source, 22.7 measured on a full-health guard. It cannot kill a healthy villager
+on its own. It only ever won because the mod's 95 landed first and left a
+sliver for it to finish.
+
+`ImpactDamageDelayMs`, default 600, defers `ApplyImpactDamage` so the trample
+resolves against a victim at full health and this mod's damage lands last. A
+fixed wait rather than a poll, because what is being waited for often never
+arrives at all, so there is no state that reports the trample as settled; 600
+comes from the impact probe, whose first sample at 500 ms already shows it
+finished. A victim found already dead is logged `preempted=true` rather than
+worked around, since nothing can take that death back.
+
+Run D, `CollisionIsCrime = false`, damage at the shipping 95, AI perception
+normal, the exact configuration that produced one crime in six before:
+
+    victim                dealt   health at our blow   after
+    rat_woman44            81.5                 78.6     0.0  fatal
+    rat_man95              84.4                 82.6     0.0  fatal
+    rat_woman12           108.2                 71.9     0.0  fatal
+    rat_ruch               93.2                 63.5     0.0  fatal
+    rat_woman10           105.7                 74.1     0.0  fatal
+    rat_swordsmiths_wife   92.6                 81.1     0.0  fatal
+
+Seven unarmored kills, every one `fatal=true attributed=false`, no
+`preempted=true`, and the rider reported no crime on any of them. The `health`
+column is the mechanism visible in one place: the victims are at 63 to 83 when
+this mod charges them, because the trample already took its share and could not
+finish from full.
+
+Armored victims are unchanged. Guards at an armor scale of 0.08 to 0.21 took 7
+to 22 and walked away.
+
+One side effect worth knowing. A gallop is now marginally more lethal to an
+unarmored villager, because a low damage roll that previously left someone
+alive at 17 health now lands on someone the trample has already taken to 80.
+The tier figures were not changed to compensate, since the practical outcome
+before was death by trample anyway.
