@@ -452,21 +452,24 @@ armor.
       same, does not hold: with an exponent of 0.4 against a reference weight of 8 the 3.0
       ceiling is not reached until weight 125, and mail reads 2.01 against plate at 2.51.
       No clamp needed changing.
-- [ ] **Active.** Decide a victim is hittable again by reading their state, not by waiting
-      out a timer. Half of this was done and the wrong half is remembered as done. The
-      *aftermath* is state driven: a brawl ends by reading the victim rather than by timing
-      it, and `ReplanIfStranded` tells a stranded victim in `MotionIdle` from a recovered
-      one in `MotionMovement` through `actor:GetCurrentAnimationState()`. The *hit cooldown*
-      is still a fixed timer, stamped in `TriggerCollision`: `HitCooldownMs` at 3000 for a
-      walk stagger, `KnockdownRecoveryMs` for the two knockdown tiers.
+- [x] Decide a victim is hittable again by reading their state, not by waiting out a
+      timer. `HitCooldownStateDriven` does it, on `actor:GetCurrentAnimationState`.
 
-      The comment there states that nothing in the engine reports whether an actor is on the
-      ground, which was true of the reads tried at the time, since entity angles stay
-      upright through a ragdoll. It predates `GetCurrentAnimationState` being used anywhere
-      in this mod, and that call demonstrably reports a legible state on a victim the mod
-      knocked down. Whether it separates down, getting up and upright sharply enough to gate
-      an impact is one instrumented ride: log the state every 250 ms through a full
-      knockdown at each tier and read the transitions.
+      The justification in this item was wrong and the measurement is worth keeping. It
+      said an impact inside the recovery plays no reaction and often costs no health. In
+      fact a second gallop impact on a victim face down in `BlendRagdoll` registers and
+      costs a full 26 health; the gallop tier calls `Ragdoll` directly and has no
+      animation in it, so "no reaction plays" was never true of it.
+
+      What is true is that the victim does not move, because **an NPC standing up cannot
+      be ragdolled by anything reachable from Lua**. Eight calls were tried across the
+      actor and entity binds and two separate runs landed at 2532 ms, the same figure to
+      the millisecond, which means the request is held until the get-up animation
+      completes rather than processed late. Vanilla does the same thing to itself:
+      `DEADANIM_TIMER` waits for the death animation before ragdolling.
+
+      So the wait exists to prevent damage with no visible reaction, and to stop a trot
+      restarting the fall clip from a pose the victim is not in.
 
       Why it matters, unchanged: the timer is shorter than the time a victim spends on the
       ground, so a second impact lands on someone already prone, no reaction plays because

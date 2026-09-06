@@ -15382,3 +15382,102 @@ the level.** Reach for it first when a tier needs to move as a whole.
 Final levels, judged in first person: master 2.0, the gallop's five impact
 layers between 0.5 and 1.0 with `n_lu_log_ground` restored at 1.0 for weight
 underneath, and the trot's three between 1.3 and 1.65.
+
+## A victim standing up cannot be ragdolled, and asking harder does not help
+
+The hit cooldown was going to be state driven so a victim was left alone until
+they were back on their feet. The premise in the roadmap was that an impact
+inside the recovery does nothing anyway. **That premise is false**, and the
+truth is more useful.
+
+### A second impact lands and costs full damage
+
+Measured with the cooldown dropped to 1000 ms, on a guard hit twice at a
+gallop:
+
+    ImpactCost villageGuard tier=Gallop state=BlendRagdoll health=70.67
+    ImpactCost villageGuard t+500ms from=70.67 health=44.65 delta=-26.02
+
+The second impact landed while he was face down in `BlendRagdoll` and cost a
+full 26 health, the same as a clean hit. The gallop tier calls `Ragdoll`
+directly and plays no animation at all, so "no reaction plays" could never have
+been true of it.
+
+What is true is that **the body does not move**, which reads to a player as the
+hit not happening. That is the real defect, and it is worse than a wasted hit:
+it is damage with no feedback.
+
+### Five ways to ragdoll a victim who is getting up, and none of them work
+
+    Fall                                  accepted, body limp ~2.5 s later
+    SetPhysicalizationProfile("ragdoll")  profile flips at once, limp ~2.25 s later
+    RagDollize                            instant, and T-poses the victim
+    RagDollize then Fall                  falls, then T-poses
+    RequestKnockOut                       wrong outcome, and no faster
+
+The T-pose is not a probe artifact. It appeared identically when `RagDollize`
+was wired into the mod's own reaction path, which does run the recovery
+afterwards.
+
+### The mechanism, from 77 calls in a row
+
+The explanation carried through most of this was a two second physics blend
+that needed time to engage. It is wrong. Firing `actor:Fall` every 33 ms from
+the first frame of the get-up:
+
+    0:MotionIdle 32:MotionIdle ... 2500:MotionIdle 2532:BlendRagdoll
+    THROUGH at 2532ms calls=77
+
+Seventy-six calls did nothing and the seventy-seventh worked, at the moment the
+get-up finished and the victim returned to their routine. **The get-up
+animation owns the body and a ragdoll request only lands when it releases.**
+Repetition does not shorten that window by a frame, and the timing matches the
+state trace exactly: the ragdoll ended at 4.3 s, the get-up ran to about 6.8 s.
+
+### What follows
+
+A victim who is standing up is immune, so an impact during that window can only
+ever be damage without a visible reaction. The hit cooldown therefore has a
+real job, which is not the one the roadmap gave it: it exists to prevent ghost
+damage and the awkward restart of a fall clip on a victim who is not standing,
+rather than to prevent wasted hits.
+
+Do not attempt an instant ragdoll again. Five calls were tried and the two
+outcomes available are a two and a half second wait or a T-pose.
+
+### Taking the body from the animation: six mechanisms, one answer
+
+The question was whether ownership of the body can be stolen from the get-up
+animation rather than waited out. Every Lua lever that exists was tried, found
+by dumping the entity and actor script bind tables rather than by guessing:
+
+    actor:Fall                             lands at the end of the get-up
+    actor:SetPhysicalizationProfile        profile flips at once, body does not
+    actor:RagDollize                       instant, T-pose
+    actor:RagDollize then Fall             falls, then T-pose
+    actor:RequestKnockOut                  no faster, and the wrong outcome
+    entity:EnableBoneAnimation(0,0,false)  no effect at all
+    entity:StopAnimation(0,-1)             no effect at all
+    entity:RagDollize(0)                   no effect at all
+
+The decisive measurement is that **two different runs landed at 2532 ms, the
+same figure to the millisecond**: one firing `Fall` 77 times at 33 ms
+intervals, the other firing `StopAnimation`, the entity `RagDollize` and `Fall`
+once each. A latency would vary with what was asked. An identical figure across
+unrelated calls means the request is not being processed late, it is being held
+until the get-up animation completes and then released.
+
+`EnableBoneAnimation`, `StopAnimation` and the entity-level `RagDollize` are
+all real and all returned true. None of them touched the window.
+
+The references agree. **Nowhere in the vanilla scripts is a body taken off an
+animation mid-play.** The game's own death path is `DEADANIM_TIMER` in
+`BasicActor.lua`: it plays the death animation, sets a timer, and calls
+`SetPhysicalizationProfile("ragdoll")` only once the animation has finished.
+The engine's answer to this problem is to wait, which is why nothing exposes a
+way not to.
+
+One further cost, seen in game: a victim ragdolled at the instant the get-up
+completes loses their ground placement and sinks waist-deep into the terrain.
+
+**A victim standing up is immune, and this is settled. Do not test it again.**

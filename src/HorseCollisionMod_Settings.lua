@@ -287,6 +287,24 @@ HorseCollisionModSettings = {
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
 
+	-- How long a victim is left alone after being hit. The knockdown tiers
+	-- read the victim's own state rather than counting: a fall, the ragdoll
+	-- that follows it and the get-up run about seven seconds together, and a
+	-- second impact inside that plays no reaction and usually costs no health.
+	--
+	-- The victim is busy while an animation the mod started or a ragdoll owns
+	-- their body, and hittable again once HitReadySettleMs has passed with
+	-- neither. Any busy state restarts that window, because a trot victim is
+	-- briefly idle between the fall clip ending and the ragdoll taking over.
+	-- HitReadyCeilingMs releases a victim who is never seen busy at all.
+	--
+	-- Setting HitCooldownStateDriven false goes back to counting, on
+	-- HitCooldownMs and KnockdownRecoveryMs alone.
+	HitCooldownStateDriven   = true,
+	HitReadySettleMs         = 2000,
+	HitReadyPollMs           = 250,
+	HitReadyCeilingMs        = 12000,
+
 	-- The dust a body throws up where it lands. Nothing at a walk, where
 	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
 	-- more than a trot; 0 switches a tier off.

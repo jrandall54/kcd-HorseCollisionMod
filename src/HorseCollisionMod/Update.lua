@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.13.0
+-- @release 4.14.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -61,10 +61,12 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- while they are down plays no reaction, because every reaction is a
 	-- standing animation, and usually costs them no health either.
 	--
-	-- Nothing in the engine reports whether an actor is on the ground. The
-	-- entity's angles stay upright through a ragdoll and no ScriptBind
-	-- exposes the state, so the recovery is timed rather than observed, and
-	-- it is timed from the impulse the mod applied itself.
+	-- The wait is observed rather than timed. `WatchHitReady` polls the
+	-- victim's own animation state and clears the deadline when they are back
+	-- on their feet, so what is stamped here is a failsafe rather than the
+	-- duration. The comment this replaced said nothing in the engine reports
+	-- whether an actor is on the ground, which was true of the reads tried at
+	-- the time and is not true of `GetCurrentAnimationState`.
 	local readyAt = self.RecentHits[npcId]
 
 	-- A deadline further away than the longest cooldown that can be written
@@ -81,6 +83,14 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	if readyAt then
 		local longest = math.max(self.Config.HitCooldownMs,
 				self.Config.KnockdownRecoveryMs)
+
+		-- The state-driven wait stamps its ceiling rather than a duration, so
+		-- the sanity bound has to admit it. Without this every deadline looks
+		-- like one written against a different clock and is thrown away, which
+		-- removes the cooldown entirely.
+		if self.Config.HitCooldownStateDriven then
+			longest = math.max(longest, self.Config.HitReadyCeilingMs or 0)
+		end
 
 		if readyAt - now > longest then
 			self.RecentHits[npcId] = nil
@@ -115,7 +125,14 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		recovery = cfg.KnockdownRecoveryMs
 	end
 
-	self.RecentHits[npcId] = now + recovery
+	-- What is stamped depends on which wait is running. Counting stamps the
+	-- duration; observing stamps the ceiling and lets the watcher clear it
+	-- early, which is almost always what happens.
+	if cfg.HitCooldownStateDriven then
+		self.RecentHits[npcId] = now + (cfg.HitReadyCeilingMs or recovery)
+	else
+		self.RecentHits[npcId] = now + recovery
+	end
 
 	-- What actually prevents the lockup. A victim under 40 health carrying a
 	-- bleeding buff is otherwise taken over by vanilla's auto-cure daycycle,
@@ -157,6 +174,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- rather than where they land, because a gallop throws them several
 	-- meters and dust that follows the body reads as smoke.
 	self:ImpactDust(npc, tierName)
+
+	-- Started after the deadline is stamped, because it clears that deadline.
+	if cfg.HitCooldownStateDriven then
+		self:WatchHitReady(npc, npcId, tierName)
+	end
 
 	if tierName == "Walk" then
 		-- Only a real fight suppresses the stagger. The combat test is also

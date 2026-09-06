@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.13.0
+-- @release 4.14.0
 --- Stops the animation driving a victim's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -496,4 +496,103 @@ function HorseCollisionMod:RebuildVictim(npc)
 	end
 
 	return ok
+end
+
+--- Clears a victim's hit cooldown when they are back on their feet.
+--
+-- `HitCooldownMs` and `KnockdownRecoveryMs` are fixed durations standing in
+-- for a question the mod can now ask directly: is this victim in a state where
+-- another impact would do anything. A knockdown at 6000 ms was short. Measured
+-- on a `villageGuard` sampled every 250 ms, the whole arc runs about seven
+-- seconds at both tiers:
+--
+--     gallop   MotionIdle 0-1.8   BlendRagdoll 2.0-4.3   MotionIdle 4.6-5.3
+--              IdleToMove 5.6-6.8   MotionMovement 7.1+
+--     trot     AnimationControlled 0.2-3.0   MotionIdle 3.3-3.8
+--              BlendRagdoll 4.0-6.4          MotionMovement 6.6+
+--
+-- An impact landing inside that arc plays no reaction, because every reaction
+-- is a standing animation, and usually costs no health either.
+--
+-- ### Two traps the trace exposes
+--
+-- **`MotionIdle` appears in the middle of both arcs**, so leaving the busy
+-- state is not the same as being recovered. A trot victim is idle for three
+-- quarters of a second between the fall clip ending and the ragdoll taking the
+-- body, and a gate that fired there would be worse than the timer. The wait
+-- therefore requires the settle window to pass with no busy state in it, and
+-- any busy state seen restarts it.
+--
+-- **A gallop victim is not busy for the first two seconds.** The impulse takes
+-- that long to physicalize, and until it does they read `MotionIdle`, which is
+-- indistinguishable from having recovered. So the settle window does not begin
+-- counting until a busy state has actually been seen. Without that the
+-- cooldown would clear before the victim had even fallen over.
+--
+-- The ceiling is what makes it safe. A victim who is never seen busy, because
+-- the reaction was suppressed or they were already dead, is released on the
+-- ceiling rather than left permanently immune.
+--
+-- @tparam table npc victim entity
+-- @tparam string npcId the key this victim's deadline is stored under
+-- @tparam string tierName the tier that hit them, for the telemetry line
+function HorseCollisionMod:WatchHitReady(npc, npcId, tierName)
+	local cfg = self.Config
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local settle = cfg.HitReadySettleMs or 2000
+	local ceiling = cfg.HitReadyCeilingMs or 12000
+	local seenBusy = false
+	local freeSince = nil
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		-- Someone hit again while still down restarts the whole wait, and this
+		-- watcher is replaced by the one that impact starts.
+		if self.RecentHits[npcId] == nil then
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local busy = state == self.RagdollAnimationState
+				or state == self.ReactionAnimationState
+		local now = self:TimeMs()
+		local elapsed = now - startedAt
+
+		if busy then
+			seenBusy = true
+			freeSince = nil
+		elseif seenBusy and freeSince == nil then
+			freeSince = now
+		end
+
+		local settled = freeSince ~= nil and (now - freeSince) >= settle
+		local expired = elapsed >= ceiling
+
+		if settled or expired then
+			self.RecentHits[npcId] = nil
+
+			if cfg.LogTelemetry then
+				self:Log("HitReady " .. self:NameOf(npc)
+						.. " tier=" .. tostring(tierName)
+						.. " after=" .. tostring(elapsed) .. "ms"
+						.. " state=" .. tostring(state)
+						.. " on=" .. (settled and "settled" or "ceiling"))
+			end
+
+			return
+		end
+
+		Script.SetTimer(cfg.HitReadyPollMs or 250, poll)
+	end
+
+	Script.SetTimer(cfg.HitReadyPollMs or 250, poll)
 end
