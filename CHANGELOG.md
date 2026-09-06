@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.12.0] - 2026-09-05
+
 ### Added
 
 - `ImpactSoundDistance`, a single control over how loud trot and gallop
