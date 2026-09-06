@@ -212,6 +212,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field CameraShakeFrequency oscillations per second
 -- @field CameraShakeTrotScale the fraction of the kick a trot gets, 0 is off
 -- @field CameraShakeRandomness how much each shake varies from the last
+-- @field HorseBoltsWhenSpent whether a spent horse may leave after throwing
+-- @field HorseBoltChance how often it does
+-- @field HorseBoltRestoreMs how long until its health is given back
 -- @field ImpactSound whether a collision makes a noise
 -- @field ImpactSoundDistance meters added to every layer, the master level
 -- @field ImpactSoundWalk layers played by a walk impact
@@ -412,6 +415,17 @@ HorseCollisionMod.Config = {
 	RiderBlurSteps           = 7,
 	RiderBlurFirstPersonOnly = true,
 	RiderBlurFirstPersonRange = 1.5,
+
+	-- What happens to the horse after it dumps a rider who rode it into people
+	-- until it was spent. Sometimes it wants nothing more to do with them and
+	-- leaves, using its own AI: its combat subbrain flees wherever, so it only
+	-- has to be given something to flee from.
+	--
+	-- A chance rather than a certainty. A horse that always bolts is a
+	-- punishment; one that sometimes bolts is a horse.
+	HorseBoltsWhenSpent      = true,
+	HorseBoltChance          = 0.4,
+	HorseBoltRestoreMs       = 3000,  -- health is given back this long after
 
 	-- The noise a collision makes, played on the victim at the moment of
 	-- impact. The names are audio triggers from the game's own .animevents

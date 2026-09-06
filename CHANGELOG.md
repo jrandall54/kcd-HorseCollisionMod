@@ -29,6 +29,14 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- A horse that throws a spent rider now sometimes leaves rather than waiting to
+  be remounted. Ride it into enough people that its stamina runs out and there
+  is a fair chance it wants nothing more to do with you, and you walk.
+  `HorseBoltsWhenSpent` and `HorseBoltChance`. **NOT BREAKING**, no released
+  version carried them.
+
 ## [4.14.0] - 2026-09-05
 
 ### Added

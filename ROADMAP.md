@@ -511,13 +511,19 @@ rather than missing.
       the position comes from a downward raycast rather than the body's own
       origin, which sits 0.65 to 0.77 m below the surface it rests on and
       buried the emitter on every collision.
-- [ ] The horse takes damage from an impact, not only stamina. Riding a man down at a
-      gallop costs the horse a number the player never sees and nothing else, so there is
-      no reason to avoid doing it repeatedly beyond the stamina budget. The victim's
-      damage already goes through `soul:DealDamage`, and the horse is a soul with health
-      like any other, so the same call reaches it. What needs deciding is how much, and
-      whether armor on the victim raises it: riding into a man in plate should cost the
-      horse more than riding into a villager in a shirt.
+- [x] The horse pays for a trampling spree. Not with health, which was built and
+      removed: it worked and it was legible in the log, but from the saddle it was a
+      second invisible stat racing stamina to the same outcome, and the rider could not
+      tell what it was contributing. In their words, "I'm not understanding exactly what
+      health is providing to the feature".
+
+      What was wanted from it was one moment, so that moment is the feature.
+      `HorseBoltsWhenSpent` gives a spent horse a `HorseBoltChance` of wanting nothing
+      more to do with the rider: it empties the horse's health, which throws the rider
+      and sends the horse off, and hands the health back three seconds later once it has
+      gone. Emptying the health is used because it is the behavior observed in game,
+      including accidentally in 2.0.0-dev1; `combat:stimulus:hostilePerception` was tried
+      first and does not reach a player horse, whose combat brain is a bare wait.
 
 - [ ] A victim shows the injury afterwards. A collision can take ninety per cent of
       someone's health and they stand up and walk off with dirt and blood on their
