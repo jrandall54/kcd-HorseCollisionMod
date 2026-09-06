@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.12.0
+-- @release 4.13.0
 --- Whether this collision should count as a combat one.
 --
 -- Two independent signals, because neither alone is reliable:
@@ -164,4 +164,253 @@ function HorseCollisionMod:DrainHorseStamina(horseEnt, playerEnt, staminaDrain)
 			self:ThrowRider(horseEnt, playerEnt)
 		end
 	end)
+end
+
+--- Shakes the rider's camera on a gallop impact.
+--
+-- A collision costs the rider stamina and costs the victim health, and neither
+-- is visible from the saddle: hardcore mode hides the bars, and the horse's
+-- own gait does not change. Half a ton of horse hitting a person should be
+-- felt by the person riding it, and this is the only part of an impact that
+-- reaches the player directly.
+--
+-- A trot gets a fraction of it through `CameraShakeTrotScale`, which scales
+-- the angle, the shift and the duration together. A trot knockdown should
+-- still read as a shove that happens to put someone down rather than as half a
+-- ton of horse at speed, so the difference between the tiers is kept as a
+-- difference of degree.
+--
+-- ### The call
+--
+-- `actor:SetViewShake` is what vanilla's own explosion shake uses, in
+-- `SinglePlayer:ViewShake`:
+--
+--     player.actor:SetViewShake({ x = 2 * g_Deg2Rad * amt, ... },
+--             { x = 0.02 * amt, ... }, duration, 1 / 20, rnd)
+--
+-- The first vector is an angular shake in radians and the second a positional
+-- one in meters, so the degrees are converted rather than passed raw. The
+-- frequency is oscillations per second and vanilla's 1/20 is a slow roll
+-- suited to a distant blast; an impact wants a fast one that is over before
+-- the victim has landed. Randomness breaks the regularity so repeated
+-- collisions do not shake identically.
+--
+-- `actor:CameraShake` exists too and is what `BasicActor` calls when the
+-- player is hit. It is not used here: it takes its own amount and frequency
+-- with no positional component, so the shake it produces is a rotation only.
+--
+-- @tparam table playerEnt the player entity
+-- @tparam string tierName "Walk", "Trot" or "Gallop"; a walk never pulses
+-- @treturn boolean true when a shake was requested
+function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
+	local cfg = self.Config
+
+	if not cfg.CameraShake or not playerEnt or not playerEnt.actor then
+		return false
+	end
+
+	-- A trot is the same kick at a fraction of it, on one number rather than a
+	-- second set of values, for the same reason `BlurRiderView` scales: the
+	-- shape is right and only the weight should differ between the tiers.
+	local tier = 0
+
+	if tierName == "Gallop" then
+		tier = 1
+	elseif tierName == "Trot" then
+		tier = cfg.CameraShakeTrotScale or 0
+	end
+
+	if tier <= 0 then
+		return false
+	end
+
+	local angle = (cfg.CameraShakeAngle or 0) * tier
+			* (g_Deg2Rad or 0.0174532925)
+	local shift = (cfg.CameraShakeShift or 0) * tier
+
+	local ok = pcall(function()
+		playerEnt.actor:SetViewShake(
+				{ x = angle, y = angle, z = angle },
+				{ x = shift, y = shift, z = shift },
+				(cfg.CameraShakeDurationSec or 0.2) * tier,
+				cfg.CameraShakeFrequency or 12,
+				cfg.CameraShakeRandomness or 0.5)
+	end)
+
+	if cfg.LogTelemetry then
+		self:Log("CameraShake tier=" .. tostring(tierName)
+				.. " angle=" .. string.format("%.3f", angle)
+				.. " shift=" .. string.format("%.3f", shift)
+				.. " ok=" .. tostring(ok))
+	end
+
+	return ok
+end
+
+--- Blurs the rider's view for a moment on an impact.
+--
+-- The dust the collision throws up is on the ground behind the horse's neck,
+-- and from the saddle in first person it is very nearly never seen: the impact
+-- happens below the field of view at ten meters a second. Third person gets
+-- the whole thing and first person gets none of it, so first person needs
+-- something of its own, and it has to be on the camera rather than in the
+-- world.
+--
+-- ### What the engine actually offers
+--
+-- `System.SetScreenFx(param, value)` is the only Lua surface onto the
+-- renderer's post effects. No script bind exposes the material effect or HUD
+-- systems at all, so the flowgraphs the game drives its own screen effects
+-- through are out of reach. What was confirmed working in game, by setting
+-- each and looking:
+--
+--     ScreenFrost_Amount          frosts the screen
+--     WaterDroplets_Amount        droplets on the lens
+--     FilterBlurring_Amount       blurs the screen
+--     FilterRadialBlurring_*      nothing, at any amount
+--
+-- There is no dust or dirt lens overlay. Frost and water droplets are the only
+-- two, and neither is a horse hitting somebody. A plain blur pulse is what is
+-- left, and it is the same language the game itself uses for taking a hit:
+-- `Libs/MaterialEffects/Flowgraphs/player_damage.xml` is a radial blur and
+-- nothing else. Radial is the variant that does not work from here, so this
+-- uses the one that does.
+--
+-- Putting a particle effect in front of the camera instead was tried first and
+-- abandoned. At a gallop the rider covers the meter in front of them in a
+-- tenth of a second, so a puff placed there is behind their head before it
+-- draws, and moving it far enough ahead to be ridden into read as a cloud
+-- hanging in the road rather than as an impact.
+--
+-- ### Telling the views apart
+--
+-- `System.GetViewCameraPos` sits on the player in first person and meters away
+-- in third: measured at 7.7 m behind and 4.6 m above with a third-person
+-- camera mod running. Comparing it against the player's own position separates
+-- them, which is what `RiderBlurFirstPersonOnly` uses, so a third-person
+-- player does not get their screen blurred over an impact they can already
+-- see.
+--
+-- **The blur amount is clamped.** Raising it from 0.9 to 1.3 to 2.0 produced
+-- the same picture three times, so anything past about 1.0 is thrown away and
+-- weight has to come from how long it is held and from what is layered under
+-- it. `RiderBlurChroma` adds a chromatic shift on the same envelope, which is
+-- a different distortion rather than more of the same one.
+--
+-- The blur is held at full for `RiderBlurHoldMs` before the decay starts. A
+-- pulse that begins decaying on its first step never reaches the eye during a
+-- gallop: it is competing with the camera shake and with the horse's own
+-- motion, and raising the amount alone stopped helping well before it read.
+--
+-- The pulse always ends by writing zero. This parameter is global renderer
+-- state rather than anything owned by the mod, so a decay that stopped partway
+-- would leave the player's screen blurred for the rest of the session.
+--
+-- @tparam table playerEnt the player entity
+-- @tparam string tierName "Walk", "Trot" or "Gallop"; a walk never pulses
+-- @treturn boolean true when a pulse was started
+function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
+	local cfg = self.Config
+
+	if not cfg.RiderBlur or not playerEnt then
+		return false
+	end
+
+	-- A trot is the same pulse at a fraction of it, on two numbers rather than
+	-- a second set of five: one for how heavy it is and one for how long it
+	-- lasts. They came apart in tuning, because a trot wanted the strength
+	-- kept and the length cut, and a single scale could not do both.
+	local tier, length = 0, 1
+
+	if tierName == "Gallop" then
+		tier = 1
+	elseif tierName == "Trot" then
+		tier = cfg.RiderBlurTrotScale or 0
+		length = cfg.RiderBlurTrotLength or tier
+	end
+
+	if tier <= 0 then
+		return false
+	end
+
+	local amount = (cfg.RiderBlurAmount or 0) * tier
+
+	if amount <= 0 then
+		return false
+	end
+
+	if cfg.RiderBlurFirstPersonOnly and not self:CameraIsFirstPerson(playerEnt) then
+		return false
+	end
+
+	local steps = cfg.RiderBlurSteps or 5
+	local hold = math.floor((cfg.RiderBlurHoldMs or 0) * length)
+	local every = math.floor(((cfg.RiderBlurMs or 220) * length) / steps)
+
+	local chroma = (cfg.RiderBlurChroma or 0) * tier
+
+	pcall(function()
+		System.SetScreenFx("FilterBlurring_Type", 0)
+		System.SetScreenFx("FilterBlurring_Amount", amount)
+
+		if chroma > 0 then
+			System.SetScreenFx("FilterChromaShift_User_Amount", chroma)
+		end
+	end)
+
+	-- Every step is booked up front rather than each one booking the next, so
+	-- the write that clears it cannot be lost by a step failing partway.
+	for step = 1, steps do
+		local left = amount * (1 - (step / steps))
+
+		local leftChroma = chroma * (1 - (step / steps))
+
+		Script.SetTimer(hold + (step * every), function()
+			pcall(function()
+				System.SetScreenFx("FilterBlurring_Amount", left)
+
+				if chroma > 0 then
+					System.SetScreenFx("FilterChromaShift_User_Amount", leftChroma)
+				end
+			end)
+		end)
+	end
+
+	if cfg.LogTelemetry then
+		self:Log("RiderBlur tier=" .. tostring(tierName)
+				.. " amount=" .. string.format("%.2f", amount)
+				.. " hold=" .. tostring(hold) .. "ms"
+				.. " over=" .. tostring(steps * every) .. "ms")
+	end
+
+	return true
+end
+
+--- Whether the camera is on the player rather than behind them.
+--
+-- The view camera is the eye and the listener both. In first person it sits on
+-- the player; in third it is meters away, measured at 7.7 m behind and 4.6 m
+-- above with a third-person camera mod running. Anything closer than
+-- `RiderBlurFirstPersonRange` counts as first person.
+--
+-- @tparam table playerEnt the player entity
+-- @treturn boolean true when the camera is on the player
+function HorseCollisionMod:CameraIsFirstPerson(playerEnt)
+	local cam, pos = nil, nil
+
+	pcall(function()
+		cam = System.GetViewCameraPos()
+		pos = playerEnt:GetWorldPos()
+	end)
+
+	if not cam or not pos then
+		return false
+	end
+
+	local dx = cam.x - pos.x
+	local dy = cam.y - pos.y
+	local dz = cam.z - pos.z
+	local away = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
+
+	return away <= (self.Config.RiderBlurFirstPersonRange or 1.5)
 end

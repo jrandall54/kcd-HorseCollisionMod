@@ -15252,3 +15252,133 @@ from the listener, which is where the levels were judged good.
 no further placement of the proxy is to be proposed. Levels still respond to
 distance normally, so volume work is unaffected; direction alone is off the
 table.
+
+## What a gallop impact does to the rider and the ground
+
+Three things were added in one branch: a camera shake, dust off the ground
+where the victim lands, and a blur pulse across the rider's view. All three are
+gallop-first with a scaled-down trot, and none of them touches the walk tier.
+
+### Camera shake
+
+`actor:SetViewShake(angleVec, shiftVec, duration, frequency, randomness)` is
+what vanilla's own `SinglePlayer:ViewShake` calls, and it works from the
+saddle. `actor:CameraShake` exists too and was not used: it takes no positional
+component, so it can only rotate.
+
+The frequency argument is the trap. Vanilla passes `1/20` and the CameraShake
+entity defaults to `0.5`, so the useful values are small. The first build
+passed 14, reading it as oscillations per second, and produced nothing at any
+amplitude. At 0.05 the same call is unmistakable.
+
+Shipped at 4 degrees, 0.08 m, half a second, frequency 0.05, and a trot takes
+0.6 of the angle, shift and duration together.
+
+### Dust, and four wrong answers about when a body lands
+
+`Particle.SpawnEffect(name, pos, dir, scale)` is the call, the same one
+`BasicActor.lua` uses for a bullet hitting flesh. It is used rather than a
+`ParticleEffect` procedural layer in the animation data, because a gallop
+impact plays no fragment at all: that tier is a physics ragdoll, so there is
+nothing to hang a layer on, and authoring dust per fragment would have given it
+to the trot tier only.
+
+**The dust belongs to the landing, and finding the landing took four tries.**
+The victim is thrown several meters and how far depends on the angle they were
+struck at, so it cannot be predicted:
+
+    height stops falling      fires 100 ms after contact, at the collision
+    total movement stops      fires ~1 s after contact, reads as a delay
+    actor:IsFlying()          false on the first sample, nil on every one after
+    vertical velocity crossing   fires on the ground contact
+
+A ragdolled victim has left actor movement, which is why `IsFlying` is useless
+the moment it matters. What does survive is the entity: its transform follows
+the body and `GetVelocity` reports real physics. One instrumented ride settled
+it, sampling every 50 ms:
+
+    n=0   z 80.774   vz  0.000
+    n=2   z 80.779   vz -0.505     falling
+    n=6   z 80.550   vz -2.094
+    n=8   z 80.393   vz -0.291
+    n=9   z 80.396   vz +0.157     ground, 450 ms after contact
+    n=14  z 80.309   vz  0.027     at rest, 700 ms
+
+**Anything asking a question about a thrown victim should start at the entity,
+not the actor.**
+
+### The emitter was underground the whole time
+
+The dust appeared on some collisions and not others, and looked enormous when
+it did, with the spawn reporting success every time. The cause is that a
+ragdoll's entity origin sits inside the mesh and below the surface it is
+resting on. Measured across twelve consecutive gallops, the ground was **0.65
+to 0.77 m above the body's own origin, every single time**.
+
+An emitter placed there is buried and renders the top of itself or nothing at
+all, depending on how the body settled. Every size judgement made before this
+was made against a partly buried effect, which is why the usable scale looked
+like a narrow band between "bomb" and "invisible".
+
+The fix is vanilla's own pattern for putting a blood splat on the ground in
+`BasicActor.lua`: cast a ray from a meter above the body straight down against
+terrain and static geometry and use the hit position.
+`System.GetTerrainElevation` is not a substitute, and read 0.7 m out under a
+victim lying on a road, because a road is geometry rather than terrain.
+
+`collisions.destructibles.arrow_soil` was the first effect and is too small to
+see at any distance; `WH_Particels.other.explosion_dust` at 0.15 is what
+shipped.
+
+### The rider's own view, and what the engine offers
+
+First person sees essentially none of this. The impact happens below the field
+of view at ten meters a second, and the rider's verdict was that there is "like
+a 1% chance anyone playing (1st person) would even be able to see this effect".
+
+A particle effect placed in front of the camera does not solve it. At a gallop
+the rider covers the meter in front of them in a tenth of a second, so a puff
+there is behind their head before it draws, and moving it far enough ahead to
+be ridden into reads as a cloud hanging in the road.
+
+**`System.SetScreenFx(param, value)` is the only Lua surface onto the
+renderer's post effects.** No script bind exposes the material effect or HUD
+systems, so the flowgraphs the game drives its own screen effects through are
+out of reach. What was confirmed by setting each one and looking:
+
+    ScreenFrost_Amount             frosts the screen
+    WaterDroplets_Amount           droplets on the lens
+    FilterBlurring_Amount          blurs the screen
+    FilterChromaShift_User_Amount  chromatic shift, and a red cast past ~0.5
+    FilterRadialBlurring_*         nothing, at any amount
+
+There is no dust or dirt lens overlay; frost and water droplets are the only
+two. Radial blur is the one the game itself uses for taking a hit, in
+`player_damage.xml`, and it is the one that does not answer from Lua.
+
+**`FilterBlurring_Amount` is clamped.** Raising it 0.9, 1.3, 2.0 produced the
+same picture three times. Weight has to come from how long it is held and from
+the chroma layered under it, not from the number.
+
+Shipped as blur 1.0 held 260 ms then decayed over 480 ms with a 0.2 chroma
+shift on the same envelope, first person only. The view is told apart by camera
+distance: the view camera sits on the player in first person and was measured
+7.7 m behind and 4.6 m above with the rider's third-person camera mod running.
+A trot takes 0.7 of the strength and 0.3 of the length, which came apart into
+two settings because a trot wanted the strength kept and the length cut.
+
+### The master distance is the term that matters
+
+Tuning the levels again alongside the camera effects, several bumps to the
+per-layer distances produced no audible change. The arithmetic says why: a
+layer is heard at its own distance **plus** `ImpactSoundDistance`, so moving a
+gallop layer from 0.9 to 0.5 takes the total from 3.9 to 3.5, about a tenth.
+Dropping the master from 3.0 to 2.0 moves every layer of both tiers by a full
+meter and is several times the size of any per-layer step.
+
+**Per-layer numbers set the balance. The master is the only thing that moves
+the level.** Reach for it first when a tier needs to move as a whole.
+
+Final levels, judged in first person: master 2.0, the gallop's five impact
+layers between 0.5 and 1.0 with `n_lu_log_ground` restored at 1.0 for weight
+underneath, and the trot's three between 1.3 and 1.65.

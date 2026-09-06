@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Detection
 -- @author jrandall54
--- @release 4.12.0
+-- @release 4.13.0
 --- Tests whether a victim is actually under the horse.
 --
 -- The sphere search is a broad-phase cull and nothing more. A horse is about

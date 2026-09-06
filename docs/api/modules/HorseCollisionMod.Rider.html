@@ -76,7 +76,7 @@
  multiplier is read from <code>Config</code> at call time.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.12.0
+        <li><strong>Release</strong>:  4.13.0
  Whether this collision should count as a combat one.</p>
 
 <p> Two independent signals, because neither alone is reliable:</p>
@@ -118,6 +118,18 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:DrainHorseStamina">HorseCollisionMod:DrainHorseStamina (horseEnt, playerEnt, staminaDrain)</a></td>
 	<td class="summary">Charges the horse for an impact and dismounts Henry when it is spent.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ShakeRiderCamera">HorseCollisionMod:ShakeRiderCamera (playerEnt, tierName)</a></td>
+	<td class="summary">Shakes the rider's camera on a gallop impact.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BlurRiderView">HorseCollisionMod:BlurRiderView (playerEnt, tierName)</a></td>
+	<td class="summary">Blurs the rider's view for a moment on an impact.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:CameraIsFirstPerson">HorseCollisionMod:CameraIsFirstPerson (playerEnt)</a></td>
+	<td class="summary">Whether the camera is on the player rather than behind them.</td>
 	</tr>
 </table>
 
@@ -231,6 +243,190 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod:ShakeRiderCamera"></a>
+    <strong>HorseCollisionMod:ShakeRiderCamera (playerEnt, tierName)</strong>
+    </dt>
+    <dd>
+    Shakes the rider's camera on a gallop impact. </p>
+
+<p> A collision costs the rider stamina and costs the victim health, and neither
+ is visible from the saddle: hardcore mode hides the bars, and the horse's
+ own gait does not change. Half a ton of horse hitting a person should be
+ felt by the person riding it, and this is the only part of an impact that
+ reaches the player directly.</p>
+
+<p> A trot gets a fraction of it through <code>CameraShakeTrotScale</code>, which scales
+ the angle, the shift and the duration together. A trot knockdown should
+ still read as a shove that happens to put someone down rather than as half a
+ ton of horse at speed, so the difference between the tiers is kept as a
+ difference of degree.</p>
+
+<p> ### The call</p>
+
+<p> <code>actor:SetViewShake</code> is what vanilla's own explosion shake uses, in
+ <code>SinglePlayer:ViewShake</code>:</p>
+
+<pre><code> player.actor:SetViewShake({ x = 2 * g_Deg2Rad * amt, ... },
+         { x = 0.02 * amt, ... }, duration, 1 / 20, rnd)
+</code></pre>
+
+<p> The first vector is an angular shake in radians and the second a positional
+ one in meters, so the degrees are converted rather than passed raw. The
+ frequency is oscillations per second and vanilla's 1/20 is a slow roll
+ suited to a distant blast; an impact wants a fast one that is over before
+ the victim has landed. Randomness breaks the regularity so repeated
+ collisions do not shake identically.</p>
+
+<p> <code>actor:CameraShake</code> exists too and is what <code>BasicActor</code> calls when the
+ player is hit. It is not used here: it takes its own amount and frequency
+ with no positional component, so the shake it produces is a rotation only.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot" or "Gallop"; a walk never pulses
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a shake was requested
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BlurRiderView"></a>
+    <strong>HorseCollisionMod:BlurRiderView (playerEnt, tierName)</strong>
+    </dt>
+    <dd>
+    Blurs the rider's view for a moment on an impact. </p>
+
+<p> The dust the collision throws up is on the ground behind the horse's neck,
+ and from the saddle in first person it is very nearly never seen: the impact
+ happens below the field of view at ten meters a second. Third person gets
+ the whole thing and first person gets none of it, so first person needs
+ something of its own, and it has to be on the camera rather than in the
+ world.</p>
+
+<p> ### What the engine actually offers</p>
+
+<p> <code>System.SetScreenFx(param, value)</code> is the only Lua surface onto the
+ renderer's post effects. No script bind exposes the material effect or HUD
+ systems at all, so the flowgraphs the game drives its own screen effects
+ through are out of reach. What was confirmed working in game, by setting
+ each and looking:</p>
+
+<pre><code> ScreenFrost_Amount          frosts the screen
+ WaterDroplets_Amount        droplets on the lens
+ FilterBlurring_Amount       blurs the screen
+ FilterRadialBlurring_*      nothing, at any amount
+</code></pre>
+
+<p> There is no dust or dirt lens overlay. Frost and water droplets are the only
+ two, and neither is a horse hitting somebody. A plain blur pulse is what is
+ left, and it is the same language the game itself uses for taking a hit:
+ <code>Libs/MaterialEffects/Flowgraphs/player_damage.xml</code> is a radial blur and
+ nothing else. Radial is the variant that does not work from here, so this
+ uses the one that does.</p>
+
+<p> Putting a particle effect in front of the camera instead was tried first and
+ abandoned. At a gallop the rider covers the meter in front of them in a
+ tenth of a second, so a puff placed there is behind their head before it
+ draws, and moving it far enough ahead to be ridden into read as a cloud
+ hanging in the road rather than as an impact.</p>
+
+<p> ### Telling the views apart</p>
+
+<p> <code>System.GetViewCameraPos</code> sits on the player in first person and meters away
+ in third: measured at 7.7 m behind and 4.6 m above with a third-person
+ camera mod running. Comparing it against the player's own position separates
+ them, which is what <code>RiderBlurFirstPersonOnly</code> uses, so a third-person
+ player does not get their screen blurred over an impact they can already
+ see.</p>
+
+<p> <strong>The blur amount is clamped.</strong> Raising it from 0.9 to 1.3 to 2.0 produced
+ the same picture three times, so anything past about 1.0 is thrown away and
+ weight has to come from how long it is held and from what is layered under
+ it. <code>RiderBlurChroma</code> adds a chromatic shift on the same envelope, which is
+ a different distortion rather than more of the same one.</p>
+
+<p> The blur is held at full for <code>RiderBlurHoldMs</code> before the decay starts. A
+ pulse that begins decaying on its first step never reaches the eye during a
+ gallop: it is competing with the camera shake and with the horse's own
+ motion, and raising the amount alone stopped helping well before it read.</p>
+
+<p> The pulse always ends by writing zero. This parameter is global renderer
+ state rather than anything owned by the mod, so a decay that stopped partway
+ would leave the player's screen blurred for the rest of the session.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot" or "Gallop"; a walk never pulses
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a pulse was started
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:CameraIsFirstPerson"></a>
+    <strong>HorseCollisionMod:CameraIsFirstPerson (playerEnt)</strong>
+    </dt>
+    <dd>
+    Whether the camera is on the player rather than behind them. </p>
+
+<p> The view camera is the eye and the listener both. In first person it sits on
+ the player; in third it is meters away, measured at 7.7 m behind and 4.6 m
+ above with a third-person camera mod running. Anything closer than
+ <code>RiderBlurFirstPersonRange</code> counts as first person.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the camera is on the player
+    </ol>
+
+
+
+
+</dd>
 </dl>
 
 
@@ -238,7 +434,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-05 17:06:13 </i>
+<i style="float:right;">Last updated 2026-09-05 20:25:10 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

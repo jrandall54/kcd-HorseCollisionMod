@@ -29,6 +29,29 @@ number.
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-09-05
+
+### Added
+
+- A gallop impact now kicks the rider's camera. Riding someone down costs
+  stamina and costs them health, and in hardcore mode neither is visible from
+  the saddle; this is the part of it the player feels. A trot gets a smaller
+  version of the same kick. `CameraShake` and `CameraShakeTrotScale`.
+- An impact throws dust off the ground where the victim lands, rather than
+  where they were struck, so it appears with the body however far it was
+  thrown. `ImpactDust`.
+- In first person the rider's view blurs briefly on an impact. The collision
+  happens below the field of view at a gallop, so a first-person rider sees
+  almost none of the dust; this is their share of it. Off in third person,
+  which can already see the whole thing. `RiderBlur`.
+
+### Changed
+
+- Impact sounds are louder again, tuned in first person alongside the camera
+  effects rather than on their own. A gallop is noticeably heavier than a trot
+  now, and the dull thud under a gallop impact is back after being dropped for
+  being inaudible where it sat.
+
 ## [4.12.0] - 2026-09-05
 
 ### Added

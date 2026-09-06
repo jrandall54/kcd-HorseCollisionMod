@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.12.0
+-- @release 4.13.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -146,6 +146,17 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- Before the tier branches, so the request goes out ahead of the
 	-- reaction animation rather than behind it.
 	self:PlayImpactSound(npc, tierName, armor)
+
+	-- The rider's own half of the impact, and gallop only. Sent here for the
+	-- same reason as the sound: it belongs to the moment of contact, not to
+	-- whatever the victim does afterwards.
+	self:ShakeRiderCamera(playerEnt, tierName)
+	self:BlurRiderView(playerEnt, tierName)
+
+	-- The ground's half. Spawned at the victim's feet, where they are struck
+	-- rather than where they land, because a gallop throws them several
+	-- meters and dust that follows the body reads as smoke.
+	self:ImpactDust(npc, tierName)
 
 	if tierName == "Walk" then
 		-- Only a real fight suppresses the stagger. The combat test is also

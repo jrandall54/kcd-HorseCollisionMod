@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.12.0
+-- @release 4.13.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.12.0"
+HorseCollisionMod.Version = "4.13.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -178,6 +178,34 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   covering the shoes and shirt every villager wears
 -- @field ImpactDamageVariance how far either side of the tier figure a single
 --   impact can land, as a fraction
+-- @field ImpactDust whether an impact throws dust off the ground
+-- @field ImpactDustEffect the particle library node to spawn
+-- @field ImpactDustScaleTrot size of the effect at a trot, 0 is off
+-- @field ImpactDustScaleGallop size of the effect at a gallop, 0 is off
+-- @field ImpactDustHeight meters above the victim's origin to spawn it
+-- @field ImpactDustSampleMs how often the victim's velocity is sampled
+-- @field ImpactDustFallVz vertical velocity below which they are falling
+-- @field ImpactDustLandVz vertical velocity above which they have landed
+-- @field ImpactDustFallWaitSamples samples to wait for a fall to start
+-- @field ImpactDustMaxSamples samples after which the dust is spawned anyway
+-- @field RiderBlur whether a gallop blurs the rider's view in first person
+-- @field RiderBlurAmount how heavy the blur starts
+-- @field RiderBlurHoldMs how long it is held at full before decaying
+-- @field RiderBlurChroma chromatic shift layered on the same envelope
+-- @field RiderBlurTrotScale the fraction of the strength a trot gets, 0 is off
+-- @field RiderBlurTrotLength the fraction of the hold and decay a trot gets
+-- @field RiderBlurMs how long it takes to decay to nothing
+-- @field RiderBlurSteps how many writes the decay is made of
+-- @field RiderBlurFirstPersonOnly skip it when the camera is not on the player
+-- @field RiderBlurFirstPersonRange camera distance that still counts as first
+--   person, in meters
+-- @field CameraShake whether a gallop impact kicks the rider's camera
+-- @field CameraShakeAngle degrees of angular shake, on all three axes
+-- @field CameraShakeShift meters of positional shake, on all three axes
+-- @field CameraShakeDurationSec how long the shake lasts
+-- @field CameraShakeFrequency oscillations per second
+-- @field CameraShakeTrotScale the fraction of the kick a trot gets, 0 is off
+-- @field CameraShakeRandomness how much each shake varies from the last
 -- @field ImpactSound whether a collision makes a noise
 -- @field ImpactSoundDistance meters added to every layer, the master level
 -- @field ImpactSoundWalk layers played by a walk impact
@@ -339,6 +367,46 @@ HorseCollisionMod.Config = {
 	ImpactDamageIgnoredArmor = 0.5,
 	ImpactDamageVariance     = 0.15,
 
+	-- The rider's own half of a gallop impact. A collision costs stamina and
+	-- costs the victim health, and in hardcore mode neither is visible from
+	-- the saddle, so a kick to the camera is the only part of it the player
+	-- feels. Gallop only: a trot knockdown should stay a shove.
+	--
+	-- Angle is degrees of rotation and shift is meters of displacement, both
+	-- applied on all three axes. Frequency is the period vanilla's own shakes
+	-- pass, which is a small number: `SinglePlayer:ViewShake` uses 1/20 and
+	-- the CameraShake entity defaults to 0.5. Randomness varies each shake so
+	-- repeated collisions do not feel canned.
+	CameraShake              = true,
+	CameraShakeAngle         = 4.0,
+	CameraShakeShift         = 0.08,
+	CameraShakeDurationSec   = 0.5,
+	CameraShakeFrequency     = 0.05,
+	CameraShakeTrotScale     = 0.6,
+	CameraShakeRandomness    = 0.5,
+
+	-- What a gallop impact does to the rider's own view in first person. The
+	-- dust the collision throws up is on the ground below the field of view at
+	-- speed, so a first person rider sees none of it; this is their share.
+	--
+	-- A blur pulse, because the engine has no dust or dirt lens overlay and
+	-- this is the same cue the game uses for taking a hit. Amount is how heavy
+	-- the blur starts, and it decays to nothing over RiderBlurMs.
+	--
+	-- Off in third person by default, where the real effect is already
+	-- visible. The views are told apart by how far the camera sits from the
+	-- player, which is under a meter in first person and several in third.
+	RiderBlur                = true,
+	RiderBlurAmount          = 1.0,
+	RiderBlurHoldMs          = 260,
+	RiderBlurChroma          = 0.2,
+	RiderBlurMs              = 480,
+	RiderBlurTrotScale       = 0.7,
+	RiderBlurTrotLength      = 0.3,
+	RiderBlurSteps           = 7,
+	RiderBlurFirstPersonOnly = true,
+	RiderBlurFirstPersonRange = 1.5,
+
 	-- The noise a collision makes, played on the victim at the moment of
 	-- impact. The names are audio triggers from the game's own .animevents
 	-- vocabulary; a name outside it resolves to nothing. An empty string
@@ -407,7 +475,7 @@ HorseCollisionMod.Config = {
 	-- The listener follows the camera, so first person hears the mix from on
 	-- top of the victim and a third-person camera hears the same mix from
 	-- several meters back. Tuned in first person, the loudest case.
-	ImpactSoundDistance      = 3.0,
+	ImpactSoundDistance      = 2.0,
 
 	-- A shove disturbs someone's clothing rather than striking them, so the
 	-- walk tier carries no impact at all: two cloth foleys and a body
@@ -423,9 +491,9 @@ HorseCollisionMod.Config = {
 
 	-- A trot puts someone on the ground, so the blunt impact leads, doubled
 	-- with the second copy taken back a fraction to shade it down.
-	ImpactSoundTrot          = { { "body", 0, 1.0 },
-	                             { "body", 0, 1.35 },
-	                             { "f_bodyfall1", 0, 1.2 } },
+	ImpactSoundTrot          = { { "body", 0, 1.3 },
+	                             { "body", 0, 1.65 },
+	                             { "f_bodyfall1", 0, 1.5 } },
 
 	-- A gallop stacks four different blunt impacts rather than repeats of one,
 	-- so it reads as a collision instead of a flam, with the body settling
@@ -435,17 +503,38 @@ HorseCollisionMod.Config = {
 	-- No hoofstep. `hs_hp_soil` is `hoofsteps_player`, the same family as
 	-- `a_o_jump_landing`, and those events ignore position: it played at a
 	-- fixed full level under every other layer with no way down.
-	ImpactSoundGallop        = { { "body", 0, 0.9 },
-	                             { "body_armed", 0, 1.25 },
-	                             { "blunt", 0, 1.4 },
-	                             { "face_armed", 0, 1.3 },
-	                             { "f_bodyfall1", 0, 1.1 } },
+	ImpactSoundGallop        = { { "body", 0, 0.5 },
+	                             { "n_lu_log_ground", 0, 1.0 },
+	                             { "body_armed", 0, 0.85 },
+	                             { "blunt", 0, 1.0 },
+	                             { "face_armed", 0, 0.9 },
+	                             { "f_bodyfall1", 0, 0.7 } },
 
 	-- The occasional injury, gallop only. A foley event, so unlike
 	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out
 	-- at cartoon volume whatever was done to it.
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
+
+	-- The dust a body throws up where it lands. Nothing at a walk, where
+	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
+	-- more than a trot; 0 switches a tier off.
+	--
+	-- The effect name is a particle library node, from the game's own
+	-- Libs/Particles. `collisions.destructibles.arrow_soil` is the soil an
+	-- arrow kicks out of the ground and is the closest thing the game has to
+	-- a body landing on dirt. `WH_Particels.other.gravel` and
+	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
+	ImpactDust               = true,
+	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
+	ImpactDustScaleTrot      = 0.11,
+	ImpactDustScaleGallop    = 0.15,
+	ImpactDustHeight         = 0.15,
+	ImpactDustSampleMs       = 50,
+	ImpactDustFallVz         = -0.5,
+	ImpactDustLandVz         = -0.15,
+	ImpactDustFallWaitSamples = 8,
+	ImpactDustMaxSamples     = 30,
 
 	-- The dirt and blood a collision leaves on the victim, applied at trot
 	-- and gallop only. Deltas in the range 0 to 1, accumulating across
