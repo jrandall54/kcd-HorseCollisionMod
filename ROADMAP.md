@@ -20,15 +20,6 @@ Known gaps carried into later phases:
 - [x] Female NPCs stagger too. `wh_female_fragmentids.xml` had no `AnimationControlled`
       fragment at all, so it is declared and the block added to their database.
 - [x] Detection reach narrowed from a sphere to a horse-shaped footprint.
-- [ ] NPCs carrying something keep hold of it through the stagger, but the clip is authored
-      for empty hands, so the arms swing through a pose the item was never meant to follow.
-      A controlled A/B showed the `ColliderMode` layer was never the cause of anything: the
-      item stays in hand with and without it. The goal is now the vanilla behavior instead,
-      drop the item, react, pick it back up. `sb_combat.xml` has a `dropItems` tree that tags
-      the dropped item `panicDrop`, and `so_slot.xml` recovers it. Cost is shipping a 133 KB
-      behavior tree, which has no additive path, so it reintroduces the whole-file conflict
-      surface 3.0.0 removed in exchange for a cosmetic fix. Parked unless an additive
-      approach to behavior trees appears.
 - [x] Reactions carried their victim into walls and buildings, and sometimes left them
       standing inside one. An interactive action is root-motion driven, so the animation
       moves the body and nothing constrains where it ends up.
@@ -62,8 +53,6 @@ Known gaps carried into later phases:
       under the horse. Adding an impulse is not small: an animation-driven
       actor ignores them, which is why this tier is an animation rather than
       a physics knockdown. Closed as understood rather than as fixed.
-- [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
-      physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
 - [x] **Not an exploit.** An entry here described repeated impacts driving victims to an
       exhaustion ceiling, on readings of `exhaust=100`. The stat named `exhaust` is the
       **Energy** stat the game's own UI shows, and it runs the other way: 100 is fully
@@ -327,13 +316,6 @@ armor.
       cent. The difference is 0.59 against a standard error of 0.41, so at this sample size it
       cannot be separated from zero. Whatever the engine applies for armor against a collision
       hit, it is small.
-- [ ] Account for health lost between impacts. Five rides, three explanations tried and
-      discarded: fall damage at the get-up, a contact the footprint rejects, and a probe that
-      read health after the impulse. Reversing that call order changed neither the rate, still
-      2 of 11 intervals, nor the per-impact cost, which fell slightly rather than rising. The
-      rate holds near one interval in five across every ride. The watch now records the rider's
-      distance and speed at the moment health moves, which distinguishes a contact from
-      anything that happens while the horse is elsewhere.
 - [ ] Decide where fall damage sits in the Phase 2 scope boundary. If the impulse causes damage
       by throwing the target, then scaling `impulseScale` by armor and mass also scales damage,
       and the split between what the engine owns and what the mod owns does not hold as written
@@ -433,16 +415,6 @@ armor.
       Scoped to gallop by the rider. The rear above is stood down, so this
       carries the whole of the horse's side of an impact on its own, and it
       should read as the horse being checked rather than as a screen effect.
-- [ ] An NPC pulls the rider off the horse. `CanHorsePullDown` and
-      `RequestHorsePullDown` are a vanilla interactor action, offered beside
-      knockout and hunt attack, with `wh_cs_HorsePullDownAngle` and two
-      companions governing the geometry. In vanilla the player is the one
-      pulling a mounted NPC down.
-
-      Whether an NPC can be the actor and the player the target is untested.
-      If it can, the braced-polearm dismount below and the most dramatic form
-      of a victim fighting back are both native mechanics rather than
-      something to build.
 - [x] Stamina cost scales against armor weight, so a knight costs far more than a peasant.
       A multiplier on the existing per-tier cost, 0.79 for a villager against 2.00 for a
       target in mail, multiplying with the combat multiplier already applied and with the
@@ -539,9 +511,24 @@ rather than missing.
       the position comes from a downward raycast rather than the body's own
       origin, which sits 0.65 to 0.77 m below the surface it rests on and
       buried the emitter on every collision.
+- [ ] The horse takes damage from an impact, not only stamina. Riding a man down at a
+      gallop costs the horse a number the player never sees and nothing else, so there is
+      no reason to avoid doing it repeatedly beyond the stamina budget. The victim's
+      damage already goes through `soul:DealDamage`, and the horse is a soul with health
+      like any other, so the same call reaches it. What needs deciding is how much, and
+      whether armor on the victim raises it: riding into a man in plate should cost the
+      horse more than riding into a villager in a shirt.
+
+- [ ] A victim shows the injury afterwards. A collision can take ninety per cent of
+      someone's health and they stand up and walk off with dirt and blood on their
+      clothes and nothing in how they move. Vanilla has states for this, and the mod
+      already knows the victim's health at the moment of impact and already exempts them
+      from the auto-cure daycycle. The route to find is which of the game's own injured
+      or exhausted movement states can be set on an NPC and held, rather than authoring
+      any animation.
+
 - [ ] Horsemanship level reduces stamina cost and the chance of being thrown.
 - [ ] Horse barding increases impact force and reduces momentum loss.
-- [ ] A braced polearm hit head-on acts as a wall: heavy stamina cost, near-certain dismount.
 
 ## Phase 4: AI reaction
 
@@ -599,96 +586,6 @@ rather than missing.
       `wh::xgenaimodule::BehaviorTree::C_SurrenderActionHint`,
       `S_SurrenderActionHintContext` and a `SurrenderActionHint` string, so
       the hint is a behavior tree node. Whether Lua can raise it is unknown.
-- [ ] Decide what to do about the yield dialog as an income. A victim who
-      yields offers the vanilla options, payment among them, and a provoked
-      brawl is not a crime unless witnessed. That is repeatable money with no
-      legal consequence and a plausible early-game exploit. The dialog is
-      vanilla's, but the fight reaching it is this mod's, so the mod is at
-      least adjacent to it. Not investigated.
-
-- [ ] Riding through a packed group inflicts a morale shock, so lightly armored enemies
-      break and flee using native AI.
-
-
-- [ ] Some victims come after the rider instead of recovering and moving on.
-      The combat subbrain already handles `combat:fightParams`,
-      `confrontParams`, `fleeParams` and `rallyParams`, and this mod already
-      sends `combat:hit`, which is what brings guards down on a rider, so the
-      machinery is connected rather than absent.
-
-      The thief a townsman chases was proposed as the model and does not
-      serve as one. It is `EventSystem`, scheduled in C++ and spawned by
-      `Scripts/Script/Events_chase.lua` through `System.SpawnEntity` with a
-      shared soul and a behavior patch, `man_flee` for the thief and
-      `man_chase` for his pursuer.
-
-      Half of it already works. Three non-guards ridden down at trot outside
-      a town each registered the attack and ran for a guard to report the
-      crime, Miller Peshek at a sustained 4.95 m/s. **Flight is the crime
-      system's and needs nothing built.** None of the three fought back, so
-      an NPC that comes after the rider has to be made hostile deliberately.
-
-      No shipped script makes an NPC hostile: the only hostility call in the
-      whole vanilla tree is the read `soul:IsInCombatDanger()`. That says
-      what vanilla does, not what the engine exposes, and `references/libKCD1`
-      shows the engine exposes a good deal more. The Lua `RPG` table
-      registers `GetFactions()`, `GetFactionById(id)` and `IsPublicEnemy()`,
-      and the faction objects they return register `GetAngriness()`,
-      `SetAngriness(float)`, `AddAngriness(float)` and
-      `AddReputation(sEnumName)`. `C_ScriptBindXGenAIModule` registers
-      `SetBrainVariable`, which is how the chase tree's own
-      `event_chase_state` would be driven without the patch nodes. All of it
-      is reverse engineered and none of it is confirmed in game.
-
-      **Angriness is not the dial.** The faction bind is entirely real:
-      `RPG.GetFactions()` returns 98, `SetAngriness` takes a float and clamps
-      at 1.0. But every faction in the game set to maximum produced no
-      hostility whatsoever. NPCs behaved normally. Angriness is a number the
-      crime system reads when it decides something, not a switch.
-
-      **`combat:stimulus:hostilePerception` is the dial.** `sb_combat.xml`
-      handles it, and that one message carrying a `perceptible` is where
-      fight, flee and report are chosen. A civilian, renegade or soldier
-      reaches a fight branch that sets `t_state = fight`,
-      `t_fightParams.opponent = perceptible` and barks
-      `SPATRENI_NEPRITELE_-_UTOK`; a circator or monk flees from the player
-      or reports a `threat`. The fight branch is gated on
-      `b_context['fightAllHostilePerceptibles']`, or failing that on
-      `entity.soul:GetDerivedStat('mor') > RPG.MoraleForCombat`, which reads
-      `0.2` in game, followed by a `MoraleCheck` at threat level 0.400000
-      for a soldier and 0.550000 for a civilian, or a `CompareMorale` against
-      the rider.
-
-      That gate is the feature. Courage decides who turns on the rider, using
-      the game's own morale stat, so no invented probability constant is
-      needed. Delivery is `XGenAIModule.SendMessageToEntityData`, the call
-      `Crime.lua` already makes to send `combat:hit` and the one vanilla's own
-      `Crime.lua` uses for `combat:confrontationFeedback`.
-
-      **Confirmed in game.** The message sent to eight NPCs at once produced
-      one attacker and seven runaways. `rat_guard23`, morale 0.668, closed
-      from 11.71 m to 2.02 m and entered `CombatMovement`; the other seven ran
-      25 to 50 m the other way. Nothing in the mod was changed to get it.
-
-      The split is the tree's own, and it lands where it should. The `0.2`
-      constant is not the whole gate: a merchant at 0.269 clears it and still
-      fled, because the `MoraleCheck` behind it asks 0.550000 of a civilian
-      and 0.400000 of a soldier. **Guards fight, civilians run**, decided by
-      the game's morale stat rather than by anything this mod picks.
-
-      Two things the implementation has to respect. The message goes to
-      `npc.this.id`, the WUID, not `npc.id`: sent to the entity id it is
-      accepted and discarded in silence. And `soul:IsInCombatDanger()` is not
-      a hostility read: it stayed `false` for the guard at two meters in
-      `CombatMovement`, so retaliation cannot be detected with it.
-
-      What remains is design, not discovery: which tiers send it, whether a
-      chance gate sits in front of it, and whether a fleeing civilian is
-      wanted at every trot impact or only some. Note that flight already
-      happens from the crime hit alone, so sending this at every impact would
-      change civilian behavior from walking to a guard into running away,
-      which is a different game.
-
 - [x] Women run and fetch a guard rather than fighting. Shipped in 4.10.0.
       `sb_combat.xml` tests `b_soul.gender == male` after the context option is read, so a
       woman falls through to the report and flee branches; that fall-through is the
