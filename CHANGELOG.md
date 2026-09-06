@@ -29,6 +29,22 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- Your Horsemanship now decides what riding someone down costs. Early in the
+  game a single gallop impact empties the horse and puts you on the ground; at
+  skill 20 you can ride through four or five armoured guards and will usually
+  keep your seat when the horse finally stops. This is what the skill already
+  governs in vanilla, so it compounds with the game's own reduction.
+  `Horsemanship`. **NOT BREAKING**, no released version carried it.
+- A horse in barding hits harder, up to 1.6 times. `BardingImpulse`.
+  **NOT BREAKING**, no released version carried it.
+
+### Changed
+
+- A trot impact costs the horse less stamina than it did, so a trot goes
+  meaningfully further than a gallop rather than marginally.
+
 ## [4.16.0] - 2026-09-06
 
 ### Fixed

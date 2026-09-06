@@ -216,6 +216,16 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field CameraShakeFrequency oscillations per second
 -- @field CameraShakeTrotScale the fraction of the kick a trot gets, 0 is off
 -- @field CameraShakeRandomness how much each shake varies from the last
+-- @field Horsemanship whether the rider's horse_riding skill counts
+-- @field HorsemanshipSkill the skill name read for it
+-- @field HorsemanshipMaxLevel the level the figures below are worth at
+-- @field HorsemanshipStaminaWorst the stamina cost multiplier at level 0
+-- @field HorsemanshipStaminaBest the multiplier at HorsemanshipMaxLevel
+-- @field HorsemanshipSeatChance chance of keeping the saddle at the top
+-- @field BardingImpulse whether the horse's barding adds to the impulse
+-- @field BardingReferenceWeight barding weight that changes nothing
+-- @field BardingWeightScale weight over that reference which doubles it
+-- @field MaxBardingImpulse ceiling on the barding multiplier
 -- @field HorseBoltsWhenSpent whether a spent horse may leave after throwing
 -- @field HorseBoltChance how often it does
 -- @field HorseBoltRestoreMs how long until its health is given back
@@ -300,7 +310,7 @@ HorseCollisionMod.Config = {
 
 	-- Horse stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 18.0,
+	StaminaDrainTrot         = 14.0,
 	StaminaDrainGallop       = 22.0,
 	ThrowRiderOnStaminaEmpty = true,
 
@@ -420,6 +430,37 @@ HorseCollisionMod.Config = {
 	RiderBlurSteps           = 7,
 	RiderBlurFirstPersonOnly = true,
 	RiderBlurFirstPersonRange = 1.5,
+
+	-- What the rider's own Horsemanship is worth. The game's `horse_riding`
+	-- skill runs 0 to 20; a rider at 0 is unaffected and the figures below are
+	-- what the skill is worth at the top of that scale.
+	--
+	-- The stamina cost is multiplied, not discounted, and the range is wide on
+	-- purpose. At level 0 a single gallop impact very nearly empties the
+	-- horse; at 20 it takes four or five armored guards, or about nine
+	-- villagers. The ceiling is set against guards rather than villagers
+	-- because guards are what the figure was judged on, and it stays low
+	-- enough that a rider never becomes a cartoon. It runs linearly between
+	-- the two, so every level is worth the same.
+	--
+	-- Seat is the chance of staying mounted when the horse is finally spent.
+	-- The horse still stops either way; a rider who can ride does not always
+	-- come off with it.
+	Horsemanship             = true,
+	HorsemanshipSkill        = "horse_riding",
+	HorsemanshipMaxLevel     = 20,
+	HorsemanshipStaminaWorst = 10.0,  -- the cost multiplier at level 0
+	HorsemanshipStaminaBest  = 1.2,   -- and at HorsemanshipMaxLevel
+	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
+
+	-- What the horse's own barding is worth. Barding sits in the horse's
+	-- inventory as ordinary equipment, so the same walk that reads a victim's
+	-- armor reads it. An unbarded horse still carries its tack, about 8
+	-- weight, which is the reference: at or under it nothing changes.
+	BardingImpulse           = true,
+	BardingReferenceWeight   = 10.0,
+	BardingWeightScale       = 30.0,  -- weight over the reference that adds 100 per cent
+	MaxBardingImpulse        = 1.6,
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and

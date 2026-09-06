@@ -88,6 +88,12 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownStateDriven` | true | Whether the wait after a knockdown reads the victim's own animation state instead of counting. A victim standing up cannot be knocked down again by anything, so hitting them costs health with no visible reaction. |
 | `HitReadySettleMs` | 2000 | How long a victim must be neither animation-driven nor ragdolling before another impact counts. |
 | `HitReadyCeilingMs` | 12000 | Failsafe, for a victim never seen busy at all. |
+| `Horsemanship` | true | Whether the rider's `horse_riding` skill changes what a collision costs. A novice is thrown by a single gallop impact; a master rides through four or five guards. |
+| `HorsemanshipStaminaWorst` | 10.0 | The horse's stamina cost multiplier at skill 0. |
+| `HorsemanshipStaminaBest` | 1.2 | And at skill 20. |
+| `HorsemanshipSeatChance` | 0.6 | Chance of keeping the saddle when the horse is spent, at skill 20. |
+| `BardingImpulse` | true | Whether the horse's own barding adds to the impulse. |
+| `MaxBardingImpulse` | 1.6 | The most it can add. |
 | `HorseBoltsWhenSpent` | true | Whether a horse that has thrown a spent rider may leave rather than wait. |
 | `HorseBoltChance` | 0.4 | How often it does. |
 | `CameraShake` | true | Whether an impact kicks the rider's camera. |

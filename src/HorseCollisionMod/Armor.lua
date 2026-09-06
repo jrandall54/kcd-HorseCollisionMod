@@ -308,3 +308,50 @@ function HorseCollisionMod:ArmorStaminaScale(armor)
 			cfg.ArmorStaminaExponent, false,
 			cfg.MinArmorStamina, cfg.MaxArmorStamina)
 end
+
+--- The impulse multiplier for the horse's own barding.
+--
+-- An armored horse hits harder. The same walk that reads what a victim is
+-- wearing works on the horse, because barding sits in its inventory as
+-- ordinary equipment: an unbarded mount reads one piece and about 8 weight,
+-- which is its tack, and a barded one reads considerably more.
+--
+-- Referenced against that bare tack rather than against zero, so a horse with
+-- no barding scales by exactly one and nothing changes for a player who never
+-- armors their mount.
+--
+-- The same curve shape the victim's armor uses, so the two multiply rather
+-- than each becoming its own rule: a barded horse hitting an unarmored
+-- villager and a bare horse hitting a knight are the same arithmetic read from
+-- opposite ends.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @treturn number a multiplier on the impulse, at least 1
+function HorseCollisionMod:BardingImpulseScale(horseEnt)
+	local cfg = self.Config
+
+	if not cfg.BardingImpulse or not horseEnt then
+		return 1.0
+	end
+
+	local barding = self:ArmorOf(horseEnt)
+
+	if not barding then
+		return 1.0
+	end
+
+	local over = barding.weight - (cfg.BardingReferenceWeight or 0)
+
+	if over <= 0 then
+		return 1.0
+	end
+
+	local scale = 1.0 + (over / (cfg.BardingWeightScale or 30.0))
+	local ceiling = cfg.MaxBardingImpulse or 1.6
+
+	if scale > ceiling then
+		scale = ceiling
+	end
+
+	return scale
+end

@@ -145,6 +145,13 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	local armorImpulse = self:ArmorImpulseScale(armor)
 	local armorStamina = self:ArmorStaminaScale(armor)
 
+	-- The horse's own contribution, read once per impact for the same reason
+	-- the victim's is: both multiply into the same figures below.
+	local barding = self:BardingImpulseScale(horseEnt)
+	local horsemanship = self:HorsemanshipScale(playerEnt)
+
+	armorImpulse = armorImpulse * barding
+
 	if isCombat then
 		combatScale = cfg.CombatStaminaMultiplier
 	end
@@ -158,6 +165,8 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			.. " combatScale=" .. string.format("%.1f", combatScale)
 			.. " armorImpulse=" .. string.format("%.2f", armorImpulse)
 			.. " armorStamina=" .. string.format("%.2f", armorStamina)
+			.. " barding=" .. string.format("%.2f", barding)
+			.. " horsemanship=" .. string.format("%.2f", horsemanship)
 			.. " " .. combatDetail)
 
 	-- Before the tier branches, so the request goes out ahead of the
@@ -200,7 +209,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self:ProvokeIfAnnoyed(npc, playerEnt)
 
 		self:DrainHorseStamina(horseEnt, playerEnt,
-				cfg.StaminaDrainWalk * combatScale * armorStamina)
+				cfg.StaminaDrainWalk * combatScale * armorStamina * horsemanship)
 		return
 	end
 
@@ -235,7 +244,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- crime attribution with it, is inside `ApplyImpactDamage`.
 		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
-				cfg.StaminaDrainTrot * combatScale * armorStamina)
+				cfg.StaminaDrainTrot * combatScale * armorStamina * horsemanship)
 		return
 	end
 
@@ -256,7 +265,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- crime attribution with it, is inside `ApplyImpactDamage`.
 		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
-				cfg.StaminaDrainGallop * combatScale * armorStamina)
+				cfg.StaminaDrainGallop * combatScale * armorStamina * horsemanship)
 		return
 	end
 end
