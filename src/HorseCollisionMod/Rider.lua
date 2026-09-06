@@ -568,11 +568,11 @@ function HorseCollisionMod:HorsemanshipScale(playerEnt)
 		fraction = 1
 	end
 
-	-- Linear across the whole scale. Two curved shapes were tried and rejected
-	-- in game: one spending the benefit in the first few levels, which left 13
-	-- riding like 20, and one withholding it until the last quarter, which
-	-- made every level below 16 feel identical. A straight line spreads the
-	-- difference evenly, so each level is worth the same and the ends are
+	-- Linear across the whole scale. Two curved shapes do not work, both
+	-- measured in game: one spends the benefit in the first few levels, which
+	-- leaves 13 riding like 20, and one withholds it until the last quarter,
+	-- which makes every level below 16 feel identical. A straight line spreads
+	-- the difference evenly, so each level is worth the same and the ends are
 	-- still far apart.
 	local remaining = 1.0 - fraction
 	local worst = cfg.HorsemanshipStaminaWorst or 1.0

@@ -328,9 +328,10 @@ end
 --
 -- Returned as a coverage fraction from 0 to 1 rather than as a multiplier,
 -- because barding's three effects are flat additions and reductions rather
--- than a chain of multipliers. An impulse multiplier was tried and measured:
--- the usable band between invisible and comic does not exist, so what is
--- shipped is a small addition instead. See `docs/TESTING_DIARY.md`.
+-- than a chain of multipliers. A multiplier on the impulse compounds with the
+-- victim's own armor scale, so the same barding moves an unarmored villager
+-- far more than an armored one, which is backwards for a property of the
+-- horse. A flat addition contributes the same push whoever is hit.
 --
 -- Nothing about the rider enters this. Barding is what the horse is wearing,
 -- so it does not scale with Horsemanship and must not be made to.
