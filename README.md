@@ -88,6 +88,8 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownStateDriven` | true | Whether the wait after a knockdown reads the victim's own animation state instead of counting. A victim standing up cannot be knocked down again by anything, so hitting them costs health with no visible reaction. |
 | `HitReadySettleMs` | 2000 | How long a victim must be neither animation-driven nor ragdolling before another impact counts. |
 | `HitReadyCeilingMs` | 12000 | Failsafe, for a victim never seen busy at all. |
+| `HorseBoltsWhenSpent` | true | Whether a horse that has thrown a spent rider may leave rather than wait. |
+| `HorseBoltChance` | 0.4 | How often it does. |
 | `CameraShake` | true | Whether an impact kicks the rider's camera. |
 | `CameraShakeAngle` | 4.0 | Degrees of shake at a gallop. |
 | `CameraShakeShift` | 0.08 | Meters of shake at a gallop. |

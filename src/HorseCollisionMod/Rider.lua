@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.14.0
+-- @release 4.15.0
 --- Whether this collision should count as a combat one.
 --
 -- Two independent signals, because neither alone is reliable:
@@ -162,6 +162,10 @@ function HorseCollisionMod:DrainHorseStamina(horseEnt, playerEnt, staminaDrain)
 		if target <= 0 and playerEnt.actor then
 			self:Log("Horse spent - throwing rider.")
 			self:ThrowRider(horseEnt, playerEnt)
+
+			-- After the throw, so the horse is rid of the rider before it is
+			-- given a reason to leave.
+			self:BoltHorse(horseEnt, playerEnt)
 		end
 	end)
 end
@@ -413,4 +417,88 @@ function HorseCollisionMod:CameraIsFirstPerson(playerEnt)
 	local away = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
 
 	return away <= (self.Config.RiderBlurFirstPersonRange or 1.5)
+end
+
+--- Sends the horse off after it has thrown its rider.
+--
+-- A horse that has just dumped its rider because it was ridden into people
+-- until it was spent should sometimes want nothing more to do with them. Not
+-- every time: a horse that always bolts is a punishment, and one that
+-- sometimes bolts is a horse.
+--
+-- ### Why this is a chance and not a health system
+--
+-- The horse taking health damage from impacts was built and removed. It worked
+-- and it was legible in the log, but from the saddle it was a second invisible
+-- stat racing the first to the same outcome, and the rider could not tell what
+-- it was contributing. What was actually wanted from it was this one moment,
+-- so this is the moment on its own.
+--
+-- ### How, and why not by message
+--
+-- `combat:stimulus:hostilePerception` was tried first, because the horse's own
+-- combat subbrain declares `t_fleeParams` as `wherever(true)` and would flee
+-- from anything it perceived. It produced no flee on the horse, whatever the
+-- payload, and the known trap applies: a `ProcessMessage` only receives while
+-- its subtree is running, and the player horse's combat brain is a bare wait.
+--
+-- What is used instead is the behavior already observed in game. Emptying the
+-- horse's health throws the rider and sends the horse off, which is how the
+-- 2.0.0-dev1 bug behaved when it charged 25 health an impact by mistake, and
+-- how this reads when a horse is attacked. So the roll takes the health rather
+-- than asking the AI for anything.
+--
+-- The health is restored a moment later, once the horse has already left. The
+-- point is the bolt, not a crippled horse the rider has to nurse: nothing here
+-- is a fight they chose, and a permanent cost for running out of stamina is
+-- not what was wanted.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @tparam table playerEnt the player entity
+-- @treturn boolean true when the horse was sent off
+function HorseCollisionMod:BoltHorse(horseEnt, playerEnt)
+	local cfg = self.Config
+
+	if not cfg.HorseBoltsWhenSpent or not horseEnt or not playerEnt then
+		return false
+	end
+
+	local chance = cfg.HorseBoltChance or 0
+
+	if chance <= 0 or math.random() >= chance then
+		return false
+	end
+
+	local before = nil
+
+	pcall(function()
+		before = horseEnt.soul:GetState("health")
+	end)
+
+	if not before or before <= 0 then
+		return false
+	end
+
+	local ok, err = pcall(function()
+		horseEnt.soul:DealDamage(0, before, nil, true)
+	end)
+
+	-- Given back once it has gone. The bolt is the whole point and a horse
+	-- left on nothing would be a lasting penalty for an ordinary spree.
+	if ok then
+		Script.SetTimer(cfg.HorseBoltRestoreMs or 3000, function()
+			pcall(function()
+				horseEnt.soul:SetState("health", before)
+			end)
+		end)
+	end
+
+	if cfg.LogTelemetry then
+		self:Log("HorseBolt chance=" .. string.format("%.2f", chance)
+				.. " took=" .. string.format("%.1f", before)
+				.. " ok=" .. tostring(ok)
+				.. " err=" .. tostring(err))
+	end
+
+	return ok
 end

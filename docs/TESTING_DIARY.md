@@ -15481,3 +15481,44 @@ One further cost, seen in game: a victim ragdolled at the instant the get-up
 completes loses their ground placement and sinks waist-deep into the terrain.
 
 **A victim standing up is immune, and this is settled. Do not test it again.**
+
+## What a trampling spree costs the horse
+
+Health damage on impact was built and removed in the same session, and the
+removal is the interesting part.
+
+It worked. `soul:DealDamage(0, damage, nil, true)` charges the horse, scaled by
+the victim's summed `smash_def` so a mailed guard costs about twice a villager:
+measured at -4.6 against a villager and -8.6 against mail at a gallop. Two
+things had to be right. The argument order is stamina first and health second,
+settled in the diary at 2.1.0-dev2. And **the fourth argument must be `true`**:
+with `false` the engine dismounts the rider on the first impact, at four health
+and still at a tenth of one, so the magnitude was never what threw them.
+
+It was removed anyway, because it did not read from the saddle. Hardcore hides
+the bar, the horse's gait does not change, and it was a second invisible stat
+racing stamina to the same outcome. The rider: "I'm not understanding exactly
+what health is providing to the feature."
+
+### The bolt is the part that was wanted
+
+Emptying the horse's health throws the rider and sends the horse off, which is
+what 2.0.0-dev1 did by accident when it charged 25 health an impact believing
+it was stamina. So that moment is now the whole feature: a stamina throw rolls
+`HorseBoltChance`, and on a hit the horse's health is emptied and handed back
+three seconds later once it has already gone. Confirmed in game on the first
+attempt.
+
+`combat:stimulus:hostilePerception` was the first attempt and produced no flee,
+despite the horse's combat subbrain declaring `t_fleeParams` as
+`wherever(true)`. The reason is the known one: a `ProcessMessage` only receives
+while its subtree is running, and `sb_combat_playerHorse.xml` is a bare
+`Wait` with no behavior at all. **The player's horse has no combat brain to
+send anything to.**
+
+### The two horizons, for the record
+
+Stamina is the whole budget and it is harsher than it looks: `StaminaDrainGallop`
+is 22, multiplied by up to 2.2 in combat and up to 3.0 by the victim's armor,
+so riding down guards costs 48 to 54 of a 210 pool and four impacts empties it.
+That figure is unchanged by any of this and is what ends a spree.

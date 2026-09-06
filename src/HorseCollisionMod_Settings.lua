@@ -164,6 +164,17 @@ HorseCollisionModSettings = {
 	RiderBlurFirstPersonOnly = true,
 	RiderBlurFirstPersonRange = 1.5,
 
+	-- What happens to the horse after it dumps a rider who rode it into people
+	-- until it was spent. Sometimes it wants nothing more to do with them and
+	-- leaves, using its own AI: its combat subbrain flees wherever, so it only
+	-- has to be given something to flee from.
+	--
+	-- A chance rather than a certainty. A horse that always bolts is a
+	-- punishment; one that sometimes bolts is a horse.
+	HorseBoltsWhenSpent      = true,
+	HorseBoltChance          = 0.4,
+	HorseBoltRestoreMs       = 3000,  -- health is given back this long after
+
 	-- The noise a collision makes, played as the horse hits them.
 	--
 	-- No single sound in the game is a horse striking a person, because
