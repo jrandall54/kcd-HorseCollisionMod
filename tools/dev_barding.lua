@@ -33,13 +33,13 @@ end
 
 local function report(label)
 	local armor = HorseCollisionMod:ArmorOf(horse)
-	local scale = HorseCollisionMod:BardingImpulseScale(horse)
+	local coverage = HorseCollisionMod:BardingCoverage(horse)
 
 	System.LogAlways("[BARDING] " .. label
 			.. " pieces=" .. tostring(armor and armor.pieces)
 			.. " weight=" .. string.format("%.2f", (armor and armor.weight) or 0)
 			.. " smashDef=" .. string.format("%.2f", (armor and armor.smashDef) or 0)
-			.. " scale=" .. string.format("%.2f", scale))
+			.. " coverage=" .. string.format("%.2f", coverage))
 end
 
 report("before, " .. tostring(horse:GetName()))

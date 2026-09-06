@@ -369,17 +369,37 @@ function HorseCollisionMod:BardingCoverage(horseEnt)
 	return coverage
 end
 
---- What barding adds to the impulse.
+--- What barding adds to the two knockdown force figures.
 --
--- Deliberately small and additive. The impulse curve is steep enough that a
--- multiplier is either below the noise or launches bodies, so this is a few
--- per cent on top rather than a factor.
+-- A flat addition to `Knockback` and `Uplift`, in five steps. No barding adds
+-- nothing, a fifth of a full set adds a fifth of the bonus, and so on to a
+-- full set adding all of it. Steps rather than a smooth curve so that the
+-- table in the settings file is the whole rule and a player can read what
+-- their own horse is getting.
+--
+-- The rows are `{ coverage at or above, knockback added, uplift added }`, and
+-- the highest row the horse qualifies for wins.
 --
 -- @tparam table horseEnt the player's horse entity
--- @treturn number a multiplier on the impulse, 1 on a bare horse
-function HorseCollisionMod:BardingImpulseScale(horseEnt)
-	return 1.0 + (self:BardingCoverage(horseEnt)
-			* (self.Config.BardingImpulseBonus or 0))
+-- @treturn table `knockback` and `uplift` additions, both 0 on a bare horse
+function HorseCollisionMod:BardingForceBonus(horseEnt)
+	local steps = self.Config.BardingForceSteps
+	local bonus = { knockback = 0, uplift = 0 }
+
+	if type(steps) ~= "table" then
+		return bonus
+	end
+
+	local coverage = self:BardingCoverage(horseEnt)
+
+	for _, step in ipairs(steps) do
+		if coverage >= step[1] then
+			bonus.knockback = step[2]
+			bonus.uplift = step[3]
+		end
+	end
+
+	return bonus
 end
 
 --- What barding adds to the damage an impact does.

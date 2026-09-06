@@ -196,10 +196,26 @@ HorseCollisionModSettings = {
 	-- on a bare horse to its figure below on a full set. Nothing about the
 	-- rider enters this: barding does not scale with Horsemanship.
 	Barding                  = true,
-	BardingFullSmashDef      = 1.5,   -- smash_def counted as a full set
+	BardingFullSmashDef      = 1.45,  -- smash_def counted as a full set, measured
 	BardingStaminaRelief     = 0.25,  -- how much less stamina an impact costs
 	BardingDamageBonus       = 0.15,  -- how much harder a barded horse hits
-	BardingImpulseBonus      = 0.08,  -- how much further it throws someone
+	-- What barding adds to the knockdown force, in five steps. No barding adds
+	-- nothing, a fifth of a full set adds a fifth of the bonus, up to a full
+	-- set adding all of it. Each row is
+	--
+	--     { coverage at or above, added to Knockback, added to Uplift }
+	--
+	-- and the highest row the horse qualifies for wins. At the top that is 5.0
+	-- on a Knockback of 50 and 3.0 on an Uplift of 30, so ten per cent more of
+	-- both.
+	BardingForceSteps        = {
+		{ 0.0, 0.0, 0.0 },
+		{ 0.2, 1.0, 0.6 },
+		{ 0.4, 2.0, 1.2 },
+		{ 0.6, 3.0, 1.8 },
+		{ 0.8, 4.0, 2.4 },
+		{ 1.0, 5.0, 3.0 }
+	},
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and

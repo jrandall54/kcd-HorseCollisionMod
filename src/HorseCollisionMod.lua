@@ -226,7 +226,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field BardingFullSmashDef the total `smash_def` counted as a full set
 -- @field BardingStaminaRelief how much less stamina an impact costs at a full set
 -- @field BardingDamageBonus how much harder a fully barded horse hits
--- @field BardingImpulseBonus how much further a fully barded horse throws someone
+-- @field BardingForceSteps rows of `{ coverage, knockback added, uplift added }`,
+--   the flat force a barded horse adds, in five steps from bare to a full set
 -- @field HorseBoltsWhenSpent whether a spent horse may leave after throwing
 -- @field HorseBoltChance how often it does
 -- @field HorseBoltRestoreMs how long until its health is given back
@@ -460,10 +461,17 @@ HorseCollisionMod.Config = {
 	-- nothing on a bare horse to its figure here on a full set. Nothing about
 	-- the rider enters this: barding does not scale with Horsemanship.
 	Barding                  = true,
-	BardingFullSmashDef      = 1.5,
+	BardingFullSmashDef      = 1.45,
 	BardingStaminaRelief     = 0.25,
 	BardingDamageBonus       = 0.15,
-	BardingImpulseBonus      = 0.08,
+	BardingForceSteps        = {
+		{ 0.0, 0.0, 0.0 },
+		{ 0.2, 1.0, 0.6 },
+		{ 0.4, 2.0, 1.2 },
+		{ 0.6, 3.0, 1.8 },
+		{ 0.8, 4.0, 2.4 },
+		{ 1.0, 5.0, 3.0 }
+	},
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and
@@ -981,6 +989,13 @@ HorseCollisionMod.RetaliationReleaseTries = 20
 HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
+
+-- How often to look for the victim to become a ragdoll, and how long to wait
+-- before applying the mass and the impulse anyway. `actor:Fall` only requests
+-- the fall, so both are discarded if they are applied before the body is
+-- physicalized.
+HorseCollisionMod.RagdollReadyPollMs = 16
+HorseCollisionMod.RagdollReadyCeilingMs = 600
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
 -- The state an actor reports while one of this mod's reaction clips owns the

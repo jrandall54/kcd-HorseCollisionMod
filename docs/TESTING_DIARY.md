@@ -15907,3 +15907,177 @@ The damage and impulse bonuses are not separately verifiable in game and were
 not tested by eye. At 15 and 8 per cent they sit far under the natural variance
 of both figures, which is the point: they are meant to be felt as a tendency
 rather than seen in any one impact.
+
+### Travel is not monotonic in the impulse, and is the wrong thing to tune against
+
+The barding force addition was to be tuned so a full set threw a victim no more
+than ten per cent further. It cannot be, and the reason is worth keeping.
+
+A prediction was made from the earlier curve, that travel rises as about the
+1.8th power of the impulse, so five per cent more force would be ten per cent
+more distance. It is wrong. Tested directly by setting the flat addition to
+fifty per cent, which is large enough to resolve against the noise:
+
+    n=8 light unarmored, mean travel 2.23, against an unbarded baseline of 4.36
+    a 48.8 per cent reduction, sem 0.54, about four sigma
+
+The force was applied as asked. At the same `scale=1.26` the logged `Impulse`
+magnitude went from 73.5 to 109.7, a 49 per cent increase. Half again as much
+push produced half as much distance.
+
+That re-reads the original curve, which was never monotonic and was described
+as though it were:
+
+    total   travel median
+     1.25         4.36
+     1.50         2.56     <- dismissed as noise at the time
+     2.25        12.61
+     2.50        37.05
+
+The dip at 1.50 is the same effect, reproduced deliberately.
+
+The explanation that fits both: most of the distance in this band is not the
+victim being thrown, it is the victim being carried by a horse still moving
+through them. A larger push clears them out of the horse's path sooner, so they
+stop travelling. Only once the impulse is large enough to launch them outright
+does distance start climbing again, which is the 2.25 and 2.50 buckets and the
+range the rider called a cartoon.
+
+**Do not tune the impulse against `travel=`.** It measures how long the horse
+kept pushing the body as much as it measures the throw, and over the usable
+band it moves in the wrong direction.
+
+### Measuring the throw properly, and what it can and cannot settle
+
+The `travel=` figure sampled at a fixed 3000 ms was the wrong instrument, for
+two reasons found by the rider. It samples long after the body has stopped, so
+it partly measures how far the horse kept pushing, and it says nothing about
+whether the body had come to rest at all.
+
+`ImpactThrow` replaces it. It polls the victim's world position every 200 ms
+and reports the distance from where they were struck as soon as the body stops
+moving, under 5 cm between two polls, with an 8 s ceiling.
+
+A first version keyed on the animation state instead, firing when the victim
+left `BlendRagdoll`. That failed on exactly the impacts worth measuring: six of
+fourteen reported `neverRagdolled` and sat out a 15 s ceiling, because a victim
+the impact killed never enters `BlendRagdoll` at all. Reading rest from the
+position covers dead and living alike.
+
+Bodies come to rest between 1.0 and 2.2 seconds after the impact, which is why
+the 3000 ms sample was measuring something else.
+
+#### Full barding against none
+
+Villagers only, `armorImpulse` at or above 1.10, distance at rest:
+
+    unbarded       n=9  median 4.83  mean 4.76  sd 2.26
+    barded +5/+3   n=8  median 4.76  mean 4.72  sd 1.13
+
+    difference in mean -0.9 per cent, 0.05 sigma
+
+No detectable difference, which is the expected result rather than a verdict on
+the feature. The addition is ten per cent of the force, and the standard error
+on nine samples is eighteen per cent, so this experiment could only have caught
+something three times larger. Resolving ten per cent against a spread of this
+width needs on the order of two hundred impacts a side.
+
+**So a ten per cent force change is not measurable by riding, and no ride of a
+reasonable length will settle it.** Either the effect is made large enough to
+see, or it is accepted as unverifiable and judged by eye. What the tooling can
+do is confirm the force is applied: the `Impulse` line reports the magnitude
+actually delivered, and it moves by exactly the amount the step table adds.
+
+### The impulse meets a body of 80 kg, not the mass the mod writes
+
+Two null results on the barding force addition led here. At +5 knockback and +3
+uplift the throw changed by -0.9 per cent, and at +15 and +9, three times as
+much, by +0.1 per cent. Tripling the force did nothing, so the arithmetic
+behind the figure was wrong somewhere.
+
+The `Impulse` line now reports the victim's mass and the velocity the impulse
+actually imparts. Three consecutive villagers:
+
+    magnitude 95.8  mass 80.0  dv 1.20  ->  thrown 1.50
+    magnitude 95.9  mass 80.0  dv 1.20  ->  thrown 3.44
+    magnitude 95.9  mass 80.0  dv 1.20  ->  thrown 8.00
+
+Two findings, and the second is larger than the feature that uncovered it.
+
+**The mass is 80, the engine's default.** `MassVictim` computes `base /
+scale^3.7`, which for a villager at an armor scale of 1.26 is 42.5 kg, and it
+is called before `ImpulseVictim` in `Ragdoll`. The write has not landed by the
+time the impulse is applied, which is why `MassVictim` carries a retry list at
+all: the body is not physicalized as a ragdoll yet at that instant. So the
+impulse meets 80 kg every time, whoever the victim is, and half the intended
+velocity is discarded.
+
+This is very likely the explanation for the long-standing item in this diary
+that armor does not separate in the knockback. Armor has been scaling a mass
+the impulse never saw. If the write landed, a villager would take 2.25 m/s
+rather than 1.20, and an armored victim would finally be the heavier thing to
+move.
+
+It also re-reads the earlier impulse sweep. `armorImpulse` feeds both the
+impulse magnitude and, inverted, the ragdoll mass, so a sweep of that figure
+was never a clean test of force.
+
+**The throw cannot be tuned to a ten per cent target.** The three impacts above
+carry an identical 1.20 m/s and land at 1.50, 3.44 and 8.00 metres. A five fold
+spread from the same impulse means the horse's own collision, its angle and the
+ground decide the distance, and a ten per cent change to a contribution this
+small is not going to be visible in any figure. The force addition is worth
+keeping only if the rider can see it; it is not worth measuring further.
+
+### The impulse was landing on a body that was not a ragdoll yet
+
+This is the finding the barding work uncovered, and it is larger than barding.
+
+`actor:Fall` requests the fall, it does not perform it. `Ragdoll` then wrote the
+victim's mass and applied the impulse in the same instant, while the victim was
+still the animated character, and the engine discarded both. The evidence was
+sitting in the telemetry once the mass was logged:
+
+    before   magnitude 73.5  mass 80.0  dv 1.20
+    after    magnitude 73.5  mass 41.9  dv 1.76
+
+80 is the engine's default for a human. The mass this mod computes for a
+villager at an armor scale of 1.26 is 41.9, and `MassVictim` had a retry list
+for exactly this reason, which is now never needed.
+
+The fix is to hold both until the victim reports `BlendRagdoll`, polling every
+16 ms with a 600 ms ceiling.
+
+#### What it changes
+
+    unbarded before   mean 4.76  sd 2.26   throws 1.60 to 8.65
+    unbarded after    mean 6.82  sd 0.75   throws 5.77 to 7.48
+
+Three things at once, with no setting altered.
+
+**Throws are about forty per cent longer**, because the impulse now arrives.
+
+**The five fold scatter is gone.** The old spread was not the horse's collision
+being unpredictable, it was the impulse landing on some impacts and being
+thrown away on others. Standard deviation fell from 2.26 to 0.75.
+
+**Armor separates for the first time.** `rat_ruch` at an armor scale of 0.94
+came out at 124.3 kg against a villager's 41.9, and took dv 0.44 against 1.76.
+The long-standing item in this diary that armor does not change the knockback
+was never a design problem; the written mass was being discarded, so armor was
+scaling a figure the impulse never saw.
+
+It also explains why two earlier attempts to tune the barding force read as
+nothing. At +5 and +15 the change was -0.9 and +0.1 per cent, and even at +200
+knockback, with dv at 4.61 against a baseline of 1.20, the mean throw fell to
+3.65. None of it was arriving.
+
+#### Barding, measured against a lever that now works
+
+    unbarded       dv 1.76  median 7.01  mean 6.82  n=4
+    barding +5/+3  dv 1.93  median 7.23  mean 8.15  n=5
+
+The velocity is up 9.7 per cent by construction. The distance is up 3 per cent
+on the median and 20 per cent on the mean, the mean carrying one 14.13 m
+outlier, so the figure sits around the ten per cent the rider asked for.
+`BardingForceSteps` stays at +5 knockback and +3 uplift at a full set.

@@ -292,6 +292,60 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 			sample("t+" .. at .. "ms")
 		end)
 	end
+
+	-- The throw distance, sampled when the throw is actually over rather than
+	-- at a fixed time. A clock sample catches the body mid-flight on one impact
+	-- and long after it stopped on another, and worse, while the horse is still
+	-- pushing it along, so the figure mixes the throw with how long the horse
+	-- kept shoving.
+	--
+	-- Rest is read from the body's own position rather than from its animation
+	-- state. `BlendRagdoll` never appears on a victim the impact killed, so a
+	-- state test reports `neverRagdolled` on exactly the impacts that threw
+	-- someone hardest and waits out its ceiling instead of measuring them.
+	local restPoll = 200
+	local restStill = 0.05
+	local restCeiling = 8000
+	local restStart = self:TimeMs()
+	local restLast = nil
+
+	local function atRest()
+		local here = nil
+
+		pcall(function()
+			here = npc:GetWorldPos()
+		end)
+
+		local elapsed = self:TimeMs() - restStart
+
+		if here and restLast then
+			local moved = math.sqrt((here.x - restLast.x) ^ 2
+					+ (here.y - restLast.y) ^ 2
+					+ (here.z - restLast.z) ^ 2)
+
+			if moved < restStill or elapsed >= restCeiling then
+				local thrown = "?"
+
+				if origin then
+					thrown = string.format("%.2f",
+							math.sqrt((here.x - origin.x) ^ 2
+									+ (here.y - origin.y) ^ 2))
+				end
+
+				self:Log("ImpactThrow " .. name
+						.. " why=" .. (moved < restStill and "still" or "ceiling")
+						.. " atMs=" .. string.format("%.0f", elapsed)
+						.. " thrown=" .. thrown)
+
+				return
+			end
+		end
+
+		restLast = here
+		Script.SetTimer(restPoll, atRest)
+	end
+
+	Script.SetTimer(restPoll, atRest)
 end
 
 --- How much of the tier's damage a target in this armor takes.

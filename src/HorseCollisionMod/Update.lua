@@ -152,11 +152,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- the half a player feels. Coverage is logged because it is what the three
 	-- are derived from, and nothing about the rider enters it.
 	local bardingCover = self:BardingCoverage(horseEnt)
-	local bardingImpulse = self:BardingImpulseScale(horseEnt)
+	local bardingForce = self:BardingForceBonus(horseEnt)
 	local bardingStamina = self:BardingStaminaScale(horseEnt)
 	local horsemanship = self:HorsemanshipScale(playerEnt)
 
-	armorImpulse = armorImpulse * bardingImpulse
 	armorStamina = armorStamina * bardingStamina
 
 	if isCombat then
@@ -173,7 +172,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			.. " armorImpulse=" .. string.format("%.2f", armorImpulse)
 			.. " armorStamina=" .. string.format("%.2f", armorStamina)
 			.. " bardingCover=" .. string.format("%.2f", bardingCover)
-			.. " bardingImpulse=" .. string.format("%.2f", bardingImpulse)
+			.. " bardingForce=" .. string.format("%.2f", bardingForce.knockback)
 			.. " bardingStamina=" .. string.format("%.2f", bardingStamina)
 			.. " horsemanship=" .. string.format("%.2f", horsemanship)
 			.. " " .. combatDetail)
@@ -240,7 +239,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		elseif cfg.TrotReaction == "fall" then
 			self:PlayReaction(npc, velocity, speed, "hcm_fall_")
 		else
-			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse, horsePos)
+			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse, horsePos, horseEnt)
 		end
 		self:MarkVictim(npc, "Trot", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
@@ -262,7 +261,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- victim health of its own, and a probe that reads afterwards
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
-		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse, horsePos)
+		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse, horsePos, horseEnt)
 		self:MarkVictim(npc, "Gallop", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)

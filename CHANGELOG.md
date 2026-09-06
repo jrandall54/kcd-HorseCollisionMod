@@ -43,11 +43,19 @@ number.
   horse's armour rather than its tack, and scales with how much of it the
   horse is wearing rather than with your Horsemanship. A full set costs the
   horse a quarter less stamina per impact, hits fifteen per cent harder and
-  throws someone eight per cent further. `Barding`, `BardingFullSmashDef`,
-  `BardingStaminaRelief`, `BardingDamageBonus` and `BardingImpulseBonus`.
+  throws someone about ten per cent further. `Barding`, `BardingFullSmashDef`,
+  `BardingStaminaRelief`, `BardingDamageBonus` and `BardingForceSteps`.
   **NOT BREAKING**, no released version carried them.
 
 ### Fixed
+
+- Riding someone down throws them properly. The mod applied its knockback and
+  the victim's ragdoll weight the instant it asked them to fall, before the
+  body had actually become a ragdoll, and the game discarded both. Victims are
+  thrown about forty per cent further as a result, far more consistently, and
+  armour finally makes a difference to how far someone is carried: a man in
+  mail now weighs three times what a villager does instead of both weighing
+  the same.
 
 - The head and neck armour a horse wears is counted as barding. The game files
   it under an `armor_type_id` named `horse_bridle`, which the mod was
