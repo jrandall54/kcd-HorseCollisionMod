@@ -29,6 +29,15 @@ number.
 
 ## [Unreleased]
 
+### Changed
+
+- A victim who has been knocked down is left alone until they are actually back
+  on their feet, rather than for a fixed six seconds. An NPC standing up cannot
+  be knocked down again by anything the engine offers, so an impact landing
+  there took their health with no reaction at all, and a trot restarted the
+  fall animation from a standing pose they were not in. `HitCooldownStateDriven`
+  turns it off. **NOT BREAKING**, no released version carried the setting.
+
 ## [4.13.0] - 2026-09-05
 
 ### Added

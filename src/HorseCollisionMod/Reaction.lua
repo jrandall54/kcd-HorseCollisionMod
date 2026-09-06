@@ -400,8 +400,12 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos)
 		end
 	end)
 
-	-- Before the impulse and the damping, because it is the only one of the
-	-- three that has to beat the horse's own collision rather than follow it.
+	-- `actor:RagDollize` was tried here and must not be tried again. It does
+	-- ask for the physics profile directly rather than telling the actor to
+	-- fall, which is why it looked like the answer for re-hitting a victim who
+	-- is already down, and in game it snapped the victim upright into a T-pose
+	-- on every gallop impact.
+
 	self:MassVictim(npc, impulseScale)
 
 	self:ImpulseVictim(npc, velocity, impulseScale, horsePos)

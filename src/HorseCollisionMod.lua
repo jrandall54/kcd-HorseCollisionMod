@@ -103,6 +103,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field TickSeconds detection interval, used to sweep the footprint forward
 -- @field SweepMultiplier how far ahead to sweep, per meter per second
 -- @field MaxSweepExtra cap on the forward sweep, in meters
+-- @field HitCooldownStateDriven whether the knockdown wait reads the victim's
+--   animation state instead of counting
+-- @field HitReadySettleMs how long a victim must be neither animation-driven
+--   nor ragdolling before another impact counts
+-- @field HitReadyPollMs how often that state is sampled
+-- @field HitReadyCeilingMs the wait's failsafe, for a victim never seen busy
 -- @field HitCooldownMs minimum gap between reactions on the same victim
 -- @field KnockdownRecoveryMs how long a knocked-down victim is left alone,
 --   which is longer than the walk cooldown because they are still on the ground
@@ -516,6 +522,24 @@ HorseCollisionMod.Config = {
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
 
+	-- How long a victim is left alone after being hit. The knockdown tiers
+	-- read the victim's own state rather than counting: a fall, the ragdoll
+	-- that follows it and the get-up run about seven seconds together, and a
+	-- second impact inside that plays no reaction and usually costs no health.
+	--
+	-- The victim is busy while an animation the mod started or a ragdoll owns
+	-- their body, and hittable again once HitReadySettleMs has passed with
+	-- neither. Any busy state restarts that window, because a trot victim is
+	-- briefly idle between the fall clip ending and the ragdoll taking over.
+	-- HitReadyCeilingMs releases a victim who is never seen busy at all.
+	--
+	-- Setting HitCooldownStateDriven false goes back to counting, on
+	-- HitCooldownMs and KnockdownRecoveryMs alone.
+	HitCooldownStateDriven   = true,
+	HitReadySettleMs         = 2000,
+	HitReadyPollMs           = 250,
+	HitReadyCeilingMs        = 12000,
+
 	-- The dust a body throws up where it lands. Nothing at a walk, where
 	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
 	-- more than a trot; 0 switches a tier off.
@@ -895,6 +919,11 @@ HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
+
+-- The state an actor reports while one of this mod's reaction clips owns the
+-- body. `WatchHitReady` treats it and the ragdoll state as the two ways a
+-- victim can be busy; everything else is a victim on their feet.
+HorseCollisionMod.ReactionAnimationState = "AnimationControlled"
 
 
 --- Applies HorseCollisionMod_Settings.lua over the defaults above.

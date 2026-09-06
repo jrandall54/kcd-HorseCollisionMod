@@ -85,6 +85,9 @@ breaking the mod. Deleting a line restores its default.
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
+| `HitCooldownStateDriven` | true | Whether the wait after a knockdown reads the victim's own animation state instead of counting. A victim standing up cannot be knocked down again by anything, so hitting them costs health with no visible reaction. |
+| `HitReadySettleMs` | 2000 | How long a victim must be neither animation-driven nor ragdolling before another impact counts. |
+| `HitReadyCeilingMs` | 12000 | Failsafe, for a victim never seen busy at all. |
 | `CameraShake` | true | Whether an impact kicks the rider's camera. |
 | `CameraShakeAngle` | 4.0 | Degrees of shake at a gallop. |
 | `CameraShakeShift` | 0.08 | Meters of shake at a gallop. |
