@@ -579,6 +579,17 @@ rather than missing.
       Whether the mod should offer any of this is a design question, but it
       is no longer an open mechanical one, and it means a victim ruined by
       testing can be restored rather than left.
+- [ ] A provoked victim pulls the rider off the horse before fighting. Retaliation
+      currently has them throwing punches at the horse, which is brave but reads as
+      confusion. Pulling the rider down first and then fighting is what the vanilla
+      action is for: `CanHorsePullDown` and `RequestHorsePullDown` are an interactor
+      action offered beside knockout and hunt attack, with `wh_cs_HorsePullDownAngle`
+      and two companions governing the geometry.
+
+      Scoped to retaliation rather than to impacts. Nothing about the action works
+      against a horse at speed; it belongs at the walk tier, where a victim who has run
+      out of patience is standing next to a rider who is barely moving.
+
 - [ ] Show the surrender prompt during a provoked brawl. Surrendering to a
       victim resolves the encounter cleanly, but the on-screen input hint
       that appears when guards attack does not, so nothing tells a player
