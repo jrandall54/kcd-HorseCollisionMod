@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 4.16.0
+-- @release 4.17.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -387,8 +387,9 @@ end
 -- @tparam string tierName the tier the impact scored
 -- @tparam table armor totals from `ArmorOf`
 -- @tparam[opt] table playerEnt the player, named as the attacker when crime is on
+-- @tparam[opt] table horseEnt the player's horse, for the barding bonus
 -- @treturn number the damage dealt, or 0 when nothing was
-function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt)
+function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt)
 	if not self.Config.ImpactDamage or not npc or not npc.soul then
 		return 0
 	end
@@ -406,7 +407,12 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt)
 	-- usually costs".
 	local variance = self.Config.ImpactDamageVariance or 0
 	local spread = 1.0 + ((math.random() * 2.0) - 1.0) * variance
-	local damage = base * scale * spread
+
+	-- An armored horse hits harder. Small, because this is the one barding
+	-- effect the player cannot see happening and can only infer from how often
+	-- someone gets up again.
+	local bardingDamage = self:BardingDamageScale(horseEnt)
+	local damage = base * scale * spread * bardingDamage
 
 	local attacker = nil
 
@@ -486,6 +492,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt)
 					.. " tier=" .. tostring(tierName)
 					.. " base=" .. string.format("%.1f", base)
 					.. " armorScale=" .. string.format("%.2f", scale)
+					.. " barding=" .. string.format("%.2f", bardingDamage)
 					.. " dealt=" .. string.format("%.1f", damage)
 					.. " health=" .. string.format("%.1f", before or -1)
 					.. " after=" .. string.format("%.1f", after or -1)

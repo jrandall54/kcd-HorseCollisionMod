@@ -15824,3 +15824,86 @@ unarmored villager, because a low damage roll that previously left someone
 alive at 17 health now lands on someone the trample has already taken to 80.
 The tier figures were not changed to compensate, since the practical outcome
 before was death by trample anyway.
+
+### Parked: an NPC with a weapon drawn is treated as combat
+
+Found while measuring barding's stamina relief, and not fixed here because it
+belongs to its own branch.
+
+`IsCombatCollision` in `Rider.lua` ends:
+
+    return (danger == true or armed == true), detail, danger == true
+
+`danger` is `player.soul:IsInCombatDanger()`, which is the real signal.
+`armed` is `npc.human:IsWeaponDrawn()` on the victim. Either one alone makes
+the impact count as combat and applies `CombatStaminaMultiplier`, 2.2.
+
+A guard on patrol carries a drawn weapon without a fight existing, so riding
+one down out of combat is charged as combat. Measured: with the rider not in
+combat and the log reading `danger=false/true armed=true/true`, a single gallop
+into an armored guard cost 103.2 stamina against a horse pool of about 210, and
+about 21 is what that impact should cost. The rider's own account was "I was
+never in combat btw".
+
+This is also what made a count-the-impacts test of barding useless. Four
+impacts emptied the horse, but one of the four was this, so the count was
+measuring the false positive rather than the barding.
+
+### Barding rebuilt as three flat effects, and verified
+
+The impulse multiplier is gone. It was measured earlier in this session and has
+no usable band: nothing below a doubling can be seen, and a doubling launches
+bodies thirty metres. What replaces it is three flat effects, each scaling from
+nothing on a bare horse to its figure on a full set, and none of them touching
+Horsemanship, which is a separate system read off the rider rather than the
+horse.
+
+    BardingStaminaRelief  0.25   a quarter less stamina per impact
+    BardingDamageBonus    0.15   a barded horse hits harder
+    BardingImpulseBonus   0.08   and throws someone a little further
+
+Coverage is read from the total `smash_def` of what the horse wears, against
+`BardingFullSmashDef` of 1.5, rather than from weight. `smash_def` is what
+separates a cloth caparison from a plated head, and it is the figure the
+victim's side of the collision already uses.
+
+#### The classification bug this uncovered
+
+`armor_type_id` 12 is named `horse_bridle` in `armor_type.xml`, and the mod
+excluded it as tack. The game files every `horse_armor_head_neck_*` piece under
+that same id:
+
+    smash 1.40  horse_armor_head_neck_002
+    smash 1.20  horse_armor_head_neck_004
+    smash 0.80  horse_armor_head_neck_003
+    smash 0.00  horse_bridle_001 through _005
+
+So the only substantial protection a horse can wear was being discarded, and
+barding was scored on cloth trappings worth 0.05 each. That is why the
+multiplier had to be cranked to absurd figures before anything happened. Real
+bridles share the id and carry 0.00, so counting the whole id costs nothing.
+
+Measured on the same horse before and after the change: a full set read
+`pieces=3 weight=24 smashDef=0.27`, and now reads `pieces=5 weight=46
+smashDef=1.47`.
+
+#### Verification
+
+Counting impacts until the horse is spent turned out to be useless, for the
+same reason watching the impulse was: the per-impact cost varies about six
+fold with the victim, so a four-impact ride measures which victims were
+available rather than the barding.
+
+Two single impacts, normalised against the victim's own armor and the rider's
+Horsemanship, settle it in two lines:
+
+    unbarded  drain 26.9  / (22 x 1.02 x 1.2) = 0.999
+    barded    drain 16.5  / (22 x 0.83 x 1.2) = 0.753
+
+against configured factors of 0.974 and 0.755. In play that is roughly ten
+villager impacts per charge barded against eight unbarded.
+
+The damage and impulse bonuses are not separately verifiable in game and were
+not tested by eye. At 15 and 8 per cent they sit far under the natural variance
+of both figures, which is the point: they are meant to be felt as a tendency
+rather than seen in any one impact.

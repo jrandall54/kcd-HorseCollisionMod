@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.16.0
+-- @release 4.17.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.16.0"
+HorseCollisionMod.Version = "4.17.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -222,10 +222,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field HorsemanshipStaminaWorst the stamina cost multiplier at level 0
 -- @field HorsemanshipStaminaBest the multiplier at HorsemanshipMaxLevel
 -- @field HorsemanshipSeatChance chance of keeping the saddle at the top
--- @field BardingImpulse whether the horse's barding adds to the impulse
--- @field BardingReferenceWeight barding weight that changes nothing
--- @field BardingWeightScale weight over that reference which doubles it
--- @field MaxBardingImpulse ceiling on the barding multiplier
+-- @field Barding whether the horse's own barding changes what a collision does
+-- @field BardingFullSmashDef the total `smash_def` counted as a full set
+-- @field BardingStaminaRelief how much less stamina an impact costs at a full set
+-- @field BardingDamageBonus how much harder a fully barded horse hits
+-- @field BardingImpulseBonus how much further a fully barded horse throws someone
 -- @field HorseBoltsWhenSpent whether a spent horse may leave after throwing
 -- @field HorseBoltChance how often it does
 -- @field HorseBoltRestoreMs how long until its health is given back
@@ -453,14 +454,16 @@ HorseCollisionMod.Config = {
 	HorsemanshipStaminaBest  = 1.2,   -- and at HorsemanshipMaxLevel
 	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
 
-	-- What the horse's own barding is worth. Barding sits in the horse's
-	-- inventory as ordinary equipment, so the same walk that reads a victim's
-	-- armor reads it. An unbarded horse still carries its tack, about 8
-	-- weight, which is the reference: at or under it nothing changes.
-	BardingImpulse           = true,
-	BardingReferenceWeight   = 10.0,
-	BardingWeightScale       = 117.0, -- weight over the reference that adds 100 per cent
-	MaxBardingImpulse        = 1.15,
+	-- What the horse's own barding is worth. Barding is the horse's armor and
+	-- is separate from its tack, read from the total `smash_def` of what it is
+	-- wearing. Three flat effects rather than one multiplier, each scaling from
+	-- nothing on a bare horse to its figure here on a full set. Nothing about
+	-- the rider enters this: barding does not scale with Horsemanship.
+	Barding                  = true,
+	BardingFullSmashDef      = 1.5,
+	BardingStaminaRelief     = 0.25,
+	BardingDamageBonus       = 0.15,
+	BardingImpulseBonus      = 0.08,
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and

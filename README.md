@@ -92,8 +92,11 @@ breaking the mod. Deleting a line restores its default.
 | `HorsemanshipStaminaWorst` | 10.0 | The horse's stamina cost multiplier at skill 0. |
 | `HorsemanshipStaminaBest` | 1.2 | And at skill 20. |
 | `HorsemanshipSeatChance` | 0.6 | Chance of keeping the saddle when the horse is spent, at skill 20. |
-| `BardingImpulse` | true | Whether the horse's own barding adds to the impulse. |
-| `MaxBardingImpulse` | 1.15 | The most it can add. |
+| `Barding` | true | Whether the horse's own barding changes what a collision does. Barding is the horse's armour, not its tack: a saddle, bridle and shoes count for nothing. |
+| `BardingFullSmashDef` | 1.5 | The total `smash_def` treated as a full set of barding. Everything below scales from nothing on a bare horse to its figure here. |
+| `BardingStaminaRelief` | 0.25 | How much less stamina an impact costs a fully barded horse. The half of barding you actually feel: one more guard ridden down before the horse is spent. |
+| `BardingDamageBonus` | 0.15 | How much harder a fully barded horse hits. |
+| `BardingImpulseBonus` | 0.08 | How much further a fully barded horse throws someone. Deliberately small; knockback is steep enough that anything larger looks absurd. |
 | `HorseBoltsWhenSpent` | true | Whether a horse that has thrown a spent rider may leave rather than wait. |
 | `HorseBoltChance` | 0.4 | How often it does. |
 | `CameraShake` | true | Whether an impact kicks the rider's camera. |

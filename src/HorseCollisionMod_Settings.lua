@@ -187,14 +187,19 @@ HorseCollisionModSettings = {
 	HorsemanshipStaminaBest  = 1.2,   -- and at HorsemanshipMaxLevel
 	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
 
-	-- What the horse's own barding is worth. Barding sits in the horse's
-	-- inventory as ordinary equipment, so the same walk that reads a victim's
-	-- armor reads it. An unbarded horse still carries its tack, about 8
-	-- weight, which is the reference: at or under it nothing changes.
-	BardingImpulse           = true,
-	BardingReferenceWeight   = 10.0,
-	BardingWeightScale       = 117.0, -- weight over the reference that adds 100 per cent
-	MaxBardingImpulse        = 1.15,
+	-- What the horse's own barding is worth. Barding is the horse's armor and
+	-- is separate from its tack, so a saddle and shoes count for nothing here.
+	-- Read from the total smash_def of what the horse is wearing, which is what
+	-- separates a cloth caparison from a plated head and neck.
+	--
+	-- Three flat effects rather than one multiplier, each scaling from nothing
+	-- on a bare horse to its figure below on a full set. Nothing about the
+	-- rider enters this: barding does not scale with Horsemanship.
+	Barding                  = true,
+	BardingFullSmashDef      = 1.5,   -- smash_def counted as a full set
+	BardingStaminaRelief     = 0.25,  -- how much less stamina an impact costs
+	BardingDamageBonus       = 0.15,  -- how much harder a barded horse hits
+	BardingImpulseBonus      = 0.08,  -- how much further it throws someone
 
 	-- What happens to the horse after it dumps a rider who rode it into people
 	-- until it was spent. Sometimes it wants nothing more to do with them and

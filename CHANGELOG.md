@@ -29,6 +29,8 @@ number.
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-09-06
+
 ### Added
 
 - Your Horsemanship now decides what riding someone down costs. Early in the
@@ -37,8 +39,20 @@ number.
   keep your seat when the horse finally stops. This is what the skill already
   governs in vanilla, so it compounds with the game's own reduction.
   `Horsemanship`. **NOT BREAKING**, no released version carried it.
-- A horse in barding hits harder, up to 1.6 times. `BardingImpulse`.
-  **NOT BREAKING**, no released version carried it.
+- Barding on your horse now changes what a collision does. It is read off the
+  horse's armour rather than its tack, and scales with how much of it the
+  horse is wearing rather than with your Horsemanship. A full set costs the
+  horse a quarter less stamina per impact, hits fifteen per cent harder and
+  throws someone eight per cent further. `Barding`, `BardingFullSmashDef`,
+  `BardingStaminaRelief`, `BardingDamageBonus` and `BardingImpulseBonus`.
+  **NOT BREAKING**, no released version carried them.
+
+### Fixed
+
+- The head and neck armour a horse wears is counted as barding. The game files
+  it under an `armor_type_id` named `horse_bridle`, which the mod was
+  discarding as tack, so the only substantial protection a horse can wear was
+  being ignored and barding was scored on cloth trappings alone.
 
 ### Changed
 

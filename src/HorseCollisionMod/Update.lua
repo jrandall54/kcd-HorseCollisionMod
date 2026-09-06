@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.16.0
+-- @release 4.17.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -146,11 +146,18 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	local armorStamina = self:ArmorStaminaScale(armor)
 
 	-- The horse's own contribution, read once per impact for the same reason
-	-- the victim's is: both multiply into the same figures below.
-	local barding = self:BardingImpulseScale(horseEnt)
+	-- the victim's is. Barding is three separate flat effects rather than one
+	-- multiplier, and each lands on a different figure: a little more throw, a
+	-- little more damage, and a real saving in the horse's stamina, which is
+	-- the half a player feels. Coverage is logged because it is what the three
+	-- are derived from, and nothing about the rider enters it.
+	local bardingCover = self:BardingCoverage(horseEnt)
+	local bardingImpulse = self:BardingImpulseScale(horseEnt)
+	local bardingStamina = self:BardingStaminaScale(horseEnt)
 	local horsemanship = self:HorsemanshipScale(playerEnt)
 
-	armorImpulse = armorImpulse * barding
+	armorImpulse = armorImpulse * bardingImpulse
+	armorStamina = armorStamina * bardingStamina
 
 	if isCombat then
 		combatScale = cfg.CombatStaminaMultiplier
@@ -165,7 +172,9 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			.. " combatScale=" .. string.format("%.1f", combatScale)
 			.. " armorImpulse=" .. string.format("%.2f", armorImpulse)
 			.. " armorStamina=" .. string.format("%.2f", armorStamina)
-			.. " barding=" .. string.format("%.2f", barding)
+			.. " bardingCover=" .. string.format("%.2f", bardingCover)
+			.. " bardingImpulse=" .. string.format("%.2f", bardingImpulse)
+			.. " bardingStamina=" .. string.format("%.2f", bardingStamina)
 			.. " horsemanship=" .. string.format("%.2f", horsemanship)
 			.. " " .. combatDetail)
 
@@ -242,7 +251,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- own trample damage around half a second later. The wait that makes
 		-- this mod's damage land last, and so own the killing blow and the
 		-- crime attribution with it, is inside `ApplyImpactDamage`.
-		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt)
+		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt, horseEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainTrot * combatScale * armorStamina * horsemanship)
 		return
@@ -263,7 +272,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- own trample damage around half a second later. The wait that makes
 		-- this mod's damage land last, and so own the killing blow and the
 		-- crime attribution with it, is inside `ApplyImpactDamage`.
-		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt)
+		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt, horseEnt)
 		self:DrainHorseStamina(horseEnt, playerEnt,
 				cfg.StaminaDrainGallop * combatScale * armorStamina * horsemanship)
 		return
