@@ -64,12 +64,6 @@ Known gaps carried into later phases:
       a physics knockdown. Closed as understood rather than as fixed.
 - [ ] Carried items are dropped when an NPC is knocked down at trot or gallop. That is the
       physics ragdoll path, separate from the walk-tier stagger, and predates 2.0.0.
-- [ ] A one-frame animation fires as an NPC stands up from a trot ragdoll. It does not
-      interrupt the recovery, which completes normally. Seen on both a female villager and a
-      male guard, so it is not the female Mannequin data. A single frame is the documented
-      signature of `StartInteractiveActionByName` accepting a name that resolves to no
-      fragment. It coincides with the get-up, which is also when delayed health loss appears.
-      Cosmetic.
 - [x] **Not an exploit.** An entry here described repeated impacts driving victims to an
       exhaustion ceiling, on readings of `exhaust=100`. The stat named `exhaust` is the
       **Energy** stat the game's own UI shows, and it runs the other way: 100 is fully
@@ -117,41 +111,34 @@ costs nothing, and neither the impulse nor armor affects it.
       damage is, 20 to 25 an impact against 3 to 5 at trot, and it is untouched.
       The ragdoll at a gallop is settled design and is not up for replacement.
 
-- [ ] **Active, and the largest item on this list.** Damage the mod applies itself, on top
-      of whatever the physical collision already costs, chosen by what the target is and
-      what they are wearing.
+- [x] Damage the mod applies itself, on top of whatever the physical collision already
+      costs, chosen by what the target is wearing. Shipped in 4.11.0.
 
       The target the rider set, in their words: "a villager with no armor should have about
       a 90% chance of dying on impact where as someone in plate probably would only take a
       little bit of damage and have a very very small chance of dying on impacts."
 
-      Where it stands today, measured on one gallop run through Rattay:
+      `ApplyImpactDamage` charges the victim through vanilla's own
+      `soul:DealDamage(stamina, health, attacker, false)`, scaled by the summed `smash_def`
+      of what they wear:
+      `1 / (1 + max(0, smashDef - ImpactDamageIgnoredArmor) / ImpactDamageArmorScale)`.
+      The subtraction is what makes it work, because a villager's shoes and shirt are in the
+      game's own `armor` table and would otherwise count as protection. There is no kill
+      roll: lethality falls out of damage against health and `ImpactDamageVariance` is what
+      makes it a chance.
 
-          rat_bailiff_wife  no armor, smashDef 0.40   93.5 -> 62.4   -31.2, stood up
-          villageGuard      chain,    smashDef 4.99   38.3 -> 22.5   -15.8
+      Measured across two rides at the shipped figures:
 
-      So the armored end is already near where it should be and the unarmored end is not
-      close: a third of a health bar is not a nine-in-ten death. The gap is at the soft
-      end, which means the work is adding damage against unprotected targets rather than
-      subtracting it from armored ones.
+          unarmored gallop   12 of 14 fatal, 86 per cent
+          plate gallop       mod 8.5 to 9.4, engine ~15, total -23 to -24
+          mail gallop        mod 8 to 12, engine 15 to 19, total -25 to -28
+          unarmored trot     -19.5 to -24.4, about a fifth to a quarter
 
-      Everything needed is already computed per impact. `ArmorOf` walks the target's worn
-      pieces through the game's own `armor` and `pickable_item` tables and yields weight,
-      `smash_def`, piece count and the heaviest material, all of which are logged on every
-      collision. `ProbeImpactCost` samples a named victim's health at 500, 3000, 6000 and
-      10000 ms, so the outcome side is instrumented too.
-
-      Scope note against the boundary at the head of Phase 2. That boundary says the engine
-      owns armor against damage and the mod owns the impulse. This item deliberately
-      crosses it, because the engine's own mitigation was measured at 87 per cent of the
-      unarmored figure with an error bar that includes zero, which is not the difference
-      between a peasant and a knight by any reading. What the mod adds must therefore be
-      shaped so that it does not double count where the engine does act.
-
-      `rpg_param.xml` stays off limits: one global value read by everything that resolves a
-      physical collision, the player's own included. `perk_rpg_param_override.xml` resolves
-      parameters per character against the perks they hold and remains the unexplored
-      route.
+      One limit carried forward: the engine's trample is an armor-blind floor of roughly 15
+      to 20 at a gallop that the mod cannot lower. `rpg_param.xml` stays off limits, one
+      global value read by everything that resolves a physical collision including the
+      player's own. `perk_rpg_param_override.xml` resolves parameters per character against
+      the perks they hold and remains the unexplored route.
 
 Overriding `rpg_param.xml` is rejected: one global value read by everything that
 resolves a physical collision, including the player's own, and shipping a
