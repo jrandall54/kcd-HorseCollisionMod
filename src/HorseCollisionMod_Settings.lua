@@ -124,6 +124,46 @@ HorseCollisionModSettings = {
 	ImpactDamageIgnoredArmor = 0.5,   -- smash_def that is clothing, not armor
 	ImpactDamageVariance     = 0.15,  -- spread either side of the tier figure
 
+	-- The rider's own half of a gallop impact. A collision costs stamina and
+	-- costs the victim health, and in hardcore mode neither is visible from
+	-- the saddle, so a kick to the camera is the only part of it the player
+	-- feels. Gallop only: a trot knockdown should stay a shove.
+	--
+	-- Angle is degrees of rotation and shift is meters of displacement, both
+	-- applied on all three axes. Frequency is the period vanilla's own shakes
+	-- pass, which is a small number: `SinglePlayer:ViewShake` uses 1/20 and
+	-- the CameraShake entity defaults to 0.5. Randomness varies each shake so
+	-- repeated collisions do not feel canned.
+	CameraShake              = true,
+	CameraShakeAngle         = 4.0,
+	CameraShakeShift         = 0.08,
+	CameraShakeDurationSec   = 0.5,
+	CameraShakeFrequency     = 0.05,
+	CameraShakeTrotScale     = 0.6,
+	CameraShakeRandomness    = 0.5,
+
+	-- What a gallop impact does to the rider's own view in first person. The
+	-- dust the collision throws up is on the ground below the field of view at
+	-- speed, so a first person rider sees none of it; this is their share.
+	--
+	-- A blur pulse, because the engine has no dust or dirt lens overlay and
+	-- this is the same cue the game uses for taking a hit. Amount is how heavy
+	-- the blur starts, and it decays to nothing over RiderBlurMs.
+	--
+	-- Off in third person by default, where the real effect is already
+	-- visible. The views are told apart by how far the camera sits from the
+	-- player, which is under a meter in first person and several in third.
+	RiderBlur                = true,
+	RiderBlurAmount          = 1.0,
+	RiderBlurHoldMs          = 260,
+	RiderBlurChroma          = 0.2,
+	RiderBlurMs              = 480,
+	RiderBlurTrotScale       = 0.7,
+	RiderBlurTrotLength      = 0.3,
+	RiderBlurSteps           = 7,
+	RiderBlurFirstPersonOnly = true,
+	RiderBlurFirstPersonRange = 1.5,
+
 	-- The noise a collision makes, played as the horse hits them.
 	--
 	-- No single sound in the game is a horse striking a person, because
@@ -245,6 +285,35 @@ HorseCollisionModSettings = {
 	-- at cartoon volume whatever was done to it.
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
+
+	-- The dust a body throws up where it lands. Nothing at a walk, where
+	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
+	-- more than a trot; 0 switches a tier off.
+	--
+	-- The dust waits for the victim to land rather than firing on contact,
+	-- because at a gallop the two are several meters apart and the point of
+	-- contact is behind the rider before it renders. The victim's height is
+	-- position is sampled every ImpactDustSampleMs and the dust goes out on
+	-- the first sample they have moved less than ImpactDustSettleDistance
+	-- meters between, giving up after ImpactDustMaxSamples and spawning it
+	-- anyway. Distance rather than height: a galloped victim is thrown almost
+	-- flat, so watching height alone fires at the point of collision.
+	--
+	-- The effect name is a particle library node, from the game's own
+	-- Libs/Particles. `collisions.destructibles.arrow_soil` is the soil an
+	-- arrow kicks out of the ground and is the closest thing the game has to
+	-- a body landing on dirt. `WH_Particels.other.gravel` and
+	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
+	ImpactDust               = true,
+	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
+	ImpactDustScaleTrot      = 0.11,
+	ImpactDustScaleGallop    = 0.15,
+	ImpactDustHeight         = 0.15,
+	ImpactDustSampleMs       = 50,
+	ImpactDustFallVz         = -0.5,
+	ImpactDustLandVz         = -0.15,
+	ImpactDustFallWaitSamples = 8,
+	ImpactDustMaxSamples     = 30,
 
 	-- What a victim looks like afterwards. Someone ridden down at a gallop
 	-- otherwise stands back up immaculate. Dirt covers everything they are

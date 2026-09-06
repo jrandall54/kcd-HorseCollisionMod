@@ -178,6 +178,34 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   covering the shoes and shirt every villager wears
 -- @field ImpactDamageVariance how far either side of the tier figure a single
 --   impact can land, as a fraction
+-- @field ImpactDust whether an impact throws dust off the ground
+-- @field ImpactDustEffect the particle library node to spawn
+-- @field ImpactDustScaleTrot size of the effect at a trot, 0 is off
+-- @field ImpactDustScaleGallop size of the effect at a gallop, 0 is off
+-- @field ImpactDustHeight meters above the victim's origin to spawn it
+-- @field ImpactDustSampleMs how often the victim's velocity is sampled
+-- @field ImpactDustFallVz vertical velocity below which they are falling
+-- @field ImpactDustLandVz vertical velocity above which they have landed
+-- @field ImpactDustFallWaitSamples samples to wait for a fall to start
+-- @field ImpactDustMaxSamples samples after which the dust is spawned anyway
+-- @field RiderBlur whether a gallop blurs the rider's view in first person
+-- @field RiderBlurAmount how heavy the blur starts
+-- @field RiderBlurHoldMs how long it is held at full before decaying
+-- @field RiderBlurChroma chromatic shift layered on the same envelope
+-- @field RiderBlurTrotScale the fraction of the strength a trot gets, 0 is off
+-- @field RiderBlurTrotLength the fraction of the hold and decay a trot gets
+-- @field RiderBlurMs how long it takes to decay to nothing
+-- @field RiderBlurSteps how many writes the decay is made of
+-- @field RiderBlurFirstPersonOnly skip it when the camera is not on the player
+-- @field RiderBlurFirstPersonRange camera distance that still counts as first
+--   person, in meters
+-- @field CameraShake whether a gallop impact kicks the rider's camera
+-- @field CameraShakeAngle degrees of angular shake, on all three axes
+-- @field CameraShakeShift meters of positional shake, on all three axes
+-- @field CameraShakeDurationSec how long the shake lasts
+-- @field CameraShakeFrequency oscillations per second
+-- @field CameraShakeTrotScale the fraction of the kick a trot gets, 0 is off
+-- @field CameraShakeRandomness how much each shake varies from the last
 -- @field ImpactSound whether a collision makes a noise
 -- @field ImpactSoundDistance meters added to every layer, the master level
 -- @field ImpactSoundWalk layers played by a walk impact
@@ -339,6 +367,46 @@ HorseCollisionMod.Config = {
 	ImpactDamageIgnoredArmor = 0.5,
 	ImpactDamageVariance     = 0.15,
 
+	-- The rider's own half of a gallop impact. A collision costs stamina and
+	-- costs the victim health, and in hardcore mode neither is visible from
+	-- the saddle, so a kick to the camera is the only part of it the player
+	-- feels. Gallop only: a trot knockdown should stay a shove.
+	--
+	-- Angle is degrees of rotation and shift is meters of displacement, both
+	-- applied on all three axes. Frequency is the period vanilla's own shakes
+	-- pass, which is a small number: `SinglePlayer:ViewShake` uses 1/20 and
+	-- the CameraShake entity defaults to 0.5. Randomness varies each shake so
+	-- repeated collisions do not feel canned.
+	CameraShake              = true,
+	CameraShakeAngle         = 4.0,
+	CameraShakeShift         = 0.08,
+	CameraShakeDurationSec   = 0.5,
+	CameraShakeFrequency     = 0.05,
+	CameraShakeTrotScale     = 0.6,
+	CameraShakeRandomness    = 0.5,
+
+	-- What a gallop impact does to the rider's own view in first person. The
+	-- dust the collision throws up is on the ground below the field of view at
+	-- speed, so a first person rider sees none of it; this is their share.
+	--
+	-- A blur pulse, because the engine has no dust or dirt lens overlay and
+	-- this is the same cue the game uses for taking a hit. Amount is how heavy
+	-- the blur starts, and it decays to nothing over RiderBlurMs.
+	--
+	-- Off in third person by default, where the real effect is already
+	-- visible. The views are told apart by how far the camera sits from the
+	-- player, which is under a meter in first person and several in third.
+	RiderBlur                = true,
+	RiderBlurAmount          = 1.0,
+	RiderBlurHoldMs          = 260,
+	RiderBlurChroma          = 0.2,
+	RiderBlurMs              = 480,
+	RiderBlurTrotScale       = 0.7,
+	RiderBlurTrotLength      = 0.3,
+	RiderBlurSteps           = 7,
+	RiderBlurFirstPersonOnly = true,
+	RiderBlurFirstPersonRange = 1.5,
+
 	-- The noise a collision makes, played on the victim at the moment of
 	-- impact. The names are audio triggers from the game's own .animevents
 	-- vocabulary; a name outside it resolves to nothing. An empty string
@@ -446,6 +514,26 @@ HorseCollisionMod.Config = {
 	-- at cartoon volume whatever was done to it.
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
+
+	-- The dust a body throws up where it lands. Nothing at a walk, where
+	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
+	-- more than a trot; 0 switches a tier off.
+	--
+	-- The effect name is a particle library node, from the game's own
+	-- Libs/Particles. `collisions.destructibles.arrow_soil` is the soil an
+	-- arrow kicks out of the ground and is the closest thing the game has to
+	-- a body landing on dirt. `WH_Particels.other.gravel` and
+	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
+	ImpactDust               = true,
+	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
+	ImpactDustScaleTrot      = 0.11,
+	ImpactDustScaleGallop    = 0.15,
+	ImpactDustHeight         = 0.15,
+	ImpactDustSampleMs       = 50,
+	ImpactDustFallVz         = -0.5,
+	ImpactDustLandVz         = -0.15,
+	ImpactDustFallWaitSamples = 8,
+	ImpactDustMaxSamples     = 30,
 
 	-- The dirt and blood a collision leaves on the victim, applied at trot
 	-- and gallop only. Deltas in the range 0 to 1, accumulating across

@@ -101,6 +101,18 @@
 	<td class="name" nowrap><a href="#HorseCollisionMod:MarkVictim">HorseCollisionMod:MarkVictim (npc, tierName, velocity, speed)</a></td>
 	<td class="summary">Marks a victim with the dirt and blood their impact earned.</td>
 	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ImpactDust">HorseCollisionMod:ImpactDust (npc, tierName)</a></td>
+	<td class="summary">Throws up dust where a body hits the ground.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:DustWhenLanded">HorseCollisionMod:DustWhenLanded (npc, tierName, scale, samples[, falling])</a></td>
+	<td class="summary">Waits until a thrown victim meets the ground, then throws up the dust.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:GroundUnder">HorseCollisionMod:GroundUnder (pos)</a></td>
+	<td class="summary">The ground surface underneath a point, by raycast.</td>
+	</tr>
 </table>
 <h2><a href="#Tables">Tables</a></h2>
 <table class="function_list">
@@ -161,6 +173,197 @@
 
            <span class="types"><span class="type">boolean</span></span>
         true when something was applied
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ImpactDust"></a>
+    <strong>HorseCollisionMod:ImpactDust (npc, tierName)</strong>
+    </dt>
+    <dd>
+    Throws up dust where a body hits the ground. </p>
+
+<p> A collision moves a person several meters and drops them, and the ground
+ they land on does not react at all. Dust is the cheapest thing that says
+ the impact happened somewhere rather than only to somebody.</p>
+
+<p> ### Why this is not in the animation data</p>
+
+<p> The animation databases can carry a <code>ParticleEffect</code> procedural layer, and
+ vanilla uses seven of them, all pouring something out of a hand. It is the
+ wrong route here for one reason: a gallop impact plays no fragment at all.
+ That tier is a physics ragdoll, so there is nothing to hang a layer on, and
+ authoring dust per fragment would give it to the trot tier only, which is
+ the tier that needs it least.</p>
+
+<p> <code>Particle.SpawnEffect(name, pos, dir, scale)</code> is the same call vanilla uses
+ for a bullet hitting flesh in <code>BasicActor.lua</code> and for a fish breaking the
+ surface in <code>Fish.lua</code>. It takes a world position, so it is indifferent to
+ what the victim's body is doing, and one call covers all three tiers.</p>
+
+<p> The effect is spawned at the victim's feet rather than at their center,
+ because the dust belongs to the ground and an emitter at chest height puts
+ it in the air. The direction is straight up, which is the way loose soil
+ leaves the ground when something lands on it.</p>
+
+<p> It is spawned where and when the victim lands rather than where they were
+ struck. See <a href="../modules/HorseCollisionMod.Marks.html#HorseCollisionMod:DustWhenLanded">DustWhenLanded</a>: at a gallop those are several meters apart,
+ and the point of contact is underneath the horse and behind the rider
+ before the effect has finished rendering.</p>
+
+<p> The walk tier gets none. Nobody falls at a walk, so there is nothing for
+ the ground to do.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot" or "Gallop"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when an effect was spawned
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:DustWhenLanded"></a>
+    <strong>HorseCollisionMod:DustWhenLanded (npc, tierName, scale, samples[, falling])</strong>
+    </dt>
+    <dd>
+    Waits until a thrown victim meets the ground, then throws up the dust. </p>
+
+<p> Spawning at the moment of contact puts the dust where the victim was
+ standing, which at a gallop is underneath the horse and several meters
+ behind the rider before it has finished rendering. The dust belongs to the
+ landing, and how far a body travels first depends on the angle it was struck
+ at, so the landing has to be detected rather than predicted.</p>
+
+<p> ### The signal is vertical velocity</p>
+
+<p> The victim's velocity is polled on an interval. They are falling once it
+ passes <code>ImpactDustFallVz</code>, and they have met the ground on the first sample
+ after that which is back above <code>ImpactDustLandVz</code>. A victim who never starts
+ falling, because they went down where they stood, gets their dust when the
+ grace window runs out.</p>
+
+<p> Measured on one gallop throw, sampled every 50 ms:</p>
+
+<pre><code> n=0   z 80.774   vz  0.000
+ n=2   z 80.779   vz -0.505     falling
+ n=6   z 80.550   vz -2.094
+ n=8   z 80.393   vz -0.291
+ n=9   z 80.396   vz +0.157     ground, 450 ms after contact
+ n=14  z 80.309   vz  0.027     at rest, 700 ms
+</code></pre>
+
+<p> ### Three signals that do not report it</p>
+
+<p> All three look reasonable and all three were wrong in game:</p>
+
+<ul>
+    <li><strong>Height falling.</strong> A galloped victim is thrown almost flat, so their
+    height barely changes for the first tenth of a second and the test passed
+    immediately, putting the dust back at the collision. Frame-by-frame
+    footage caught it.</li>
+    <li><strong>Total distance moved.</strong> That is a body at rest, which the same trace
+    puts 250 ms after the ground contact, and it read as a visible delay.</li>
+    <li>**<code>actor:IsFlying()</code>.** It reads false on the first sample and nil on
+    every one after, because a ragdolled victim has left actor movement
+    entirely. Actor state stops describing them the moment they are thrown.</li>
+</ul>
+
+<p> What does survive the ragdoll is the entity itself: its transform follows
+ the body and <code>GetVelocity</code> reports real physics. Anything asking this
+ question again should start there rather than from the actor.</p>
+
+<p> Terrain height is not usable either. <code>System.GetTerrainElevation</code> under the
+ same victim read 0.7 m above the body they were lying on, because the road
+ surface they landed on is geometry rather than terrain.</p>
+
+<p> The sample count is capped so a victim who never lands, because they were
+ thrown into water or off a ledge, does not leave a poll running.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the tier, for the telemetry line
+        </li>
+        <li><span class="parameter">scale</span>
+            <span class="types"><span class="type">number</span></span>
+         the size of the effect
+        </li>
+        <li><span class="parameter">samples</span>
+            <span class="types"><span class="type">number</span></span>
+         how many samples have already been taken
+        </li>
+        <li><span class="parameter">falling</span>
+            <span class="types"><span class="type">boolean</span></span>
+         whether they have been seen falling
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:GroundUnder"></a>
+    <strong>HorseCollisionMod:GroundUnder (pos)</strong>
+    </dt>
+    <dd>
+    The ground surface underneath a point, by raycast. </p>
+
+<p> The dust has to come off the surface the body is lying on, and the body's
+ own origin is not that surface. A ragdoll's origin sits inside the mesh and
+ can end up well under the ground it is resting on: measured on one victim it
+ read 0.70 m below the terrain sample at the same spot. An emitter placed
+ there is buried and renders nothing, which is why the dust appeared on some
+ collisions and not others with the spawn reporting success every time.</p>
+
+<p> Cast from a meter above the body straight down, against terrain and static
+ geometry, which is vanilla's own pattern for placing a blood splat on the
+ ground in <code>BasicActor.lua</code>. Terrain elevation alone is not enough: a victim
+ who lands on a road or a bridge is on geometry, and the terrain underneath
+ it read 0.7 m out on the same measurement.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">pos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a world position
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        the surface point below it, or nil when nothing was hit
     </ol>
 
 
@@ -234,7 +437,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-05 17:06:13 </i>
+<i style="float:right;">Last updated 2026-09-05 20:11:22 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

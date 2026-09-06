@@ -85,6 +85,23 @@ breaking the mod. Deleting a line restores its default.
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
+| `CameraShake` | true | Whether an impact kicks the rider's camera. |
+| `CameraShakeAngle` | 4.0 | Degrees of shake at a gallop. |
+| `CameraShakeShift` | 0.08 | Meters of shake at a gallop. |
+| `CameraShakeDurationSec` | 0.5 | How long it lasts at a gallop. |
+| `CameraShakeFrequency` | 0.05 | Shake period. Vanilla's own shakes use 1/20 to 0.5; large values do nothing. |
+| `CameraShakeTrotScale` | 0.6 | The fraction of all of that a trot gets. 0 turns the trot shake off. |
+| `RiderBlur` | true | Whether an impact blurs the rider's view. First person only, because third person can already see the collision. |
+| `RiderBlurAmount` | 1.0 | How heavy the blur is. Values above about 1.0 are discarded by the engine. |
+| `RiderBlurHoldMs` | 260 | How long it holds before decaying. |
+| `RiderBlurChroma` | 0.2 | A chromatic shift on the same envelope. Past about 0.5 it tints the screen red. |
+| `RiderBlurMs` | 480 | How long the decay takes. |
+| `RiderBlurTrotScale` | 0.7 | The fraction of the strength a trot gets. |
+| `RiderBlurTrotLength` | 0.3 | The fraction of the timing a trot gets. |
+| `ImpactDust` | true | Whether a collision throws dust off the ground where the victim lands. |
+| `ImpactDustEffect` | explosion_dust | The particle library node to spawn. |
+| `ImpactDustScaleGallop` | 0.15 | Size of it at a gallop. |
+| `ImpactDustScaleTrot` | 0.11 | Size of it at a trot. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
 | `ImpactSoundDistance` | 3.0 | Master level for trot and gallop, in meters. Higher is quieter. The listener follows the camera, so a third-person camera mod hears the mix from further away and will want this lower. |
 | `ImpactSoundWalk` | layered | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
