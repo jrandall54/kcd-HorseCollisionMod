@@ -99,7 +99,7 @@ breaking the mod. Deleting a line restores its default.
 | `RiderBlurTrotScale` | 0.7 | The fraction of the strength a trot gets. |
 | `RiderBlurTrotLength` | 0.3 | The fraction of the timing a trot gets. |
 | `ImpactDust` | true | Whether a collision throws dust off the ground where the victim lands. |
-| `ImpactDustEffect` | explosion_dust | The particle library node to spawn. |
+| `ImpactDustEffect` | `WH_Particels.other.explosion_dust` | The particle library node to spawn. |
 | `ImpactDustScaleGallop` | 0.15 | Size of it at a gallop. |
 | `ImpactDustScaleTrot` | 0.11 | Size of it at a trot. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
