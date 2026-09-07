@@ -33,13 +33,13 @@ number.
 
 ### Fixed
 
-- Armour decides how far someone is carried by making them heavier, and only
-  that. It was also being used to weaken the knockback, so armour counted
+- Armor decides how far someone is carried by making them heavier, and only
+  that. It was also being used to weaken the knockback, so armor counted
   twice and a man in mail became too heavy for any impact to move at all.
 - Riding someone down throws them consistently. The mod settled a knocked-down
   body 150 milliseconds after the impact, before a thrown victim had even
   reached top speed, which arrested them wherever it happened to catch them: at
-  an identical impact some victims travelled 3 metres and others 50. It now
+  an identical impact some victims traveled 3 meters and others 50. It now
   waits until the body has actually slowed before settling it, so the throw
   finishes first and bodies still come to rest rather than sliding.
 - Someone already lying on the ground is thrown by a gallop like anyone else.
@@ -52,12 +52,12 @@ number.
 
 - Your Horsemanship now decides what riding someone down costs. Early in the
   game a single gallop impact empties the horse and puts you on the ground; at
-  skill 20 you can ride through four or five armoured guards and will usually
+  skill 20 you can ride through four or five armored guards and will usually
   keep your seat when the horse finally stops. This is what the skill already
   governs in vanilla, so it compounds with the game's own reduction.
   `Horsemanship`. **NOT BREAKING**, no released version carried it.
 - Barding on your horse now changes what a collision does. It is read off the
-  horse's armour rather than its tack, and scales with how much of it the
+  horse's armor rather than its tack, and scales with how much of it the
   horse is wearing rather than with your Horsemanship. A full set costs the
   horse a quarter less stamina per impact, hits fifteen per cent harder and
   throws someone about ten per cent further. `Barding`, `BardingFullSmashDef`,
@@ -70,11 +70,11 @@ number.
   the victim's ragdoll weight the instant it asked them to fall, before the
   body had actually become a ragdoll, and the game discarded both. Victims are
   thrown about forty per cent further as a result, far more consistently, and
-  armour finally makes a difference to how far someone is carried: a man in
+  armor finally makes a difference to how far someone is carried: a man in
   mail now weighs three times what a villager does instead of both weighing
   the same.
 
-- The head and neck armour a horse wears is counted as barding. The game files
+- The head and neck armor a horse wears is counted as barding. The game files
   it under an `armor_type_id` named `horse_bridle`, which the mod was
   discarding as tack, so the only substantial protection a horse can wear was
   being ignored and barding was scored on cloth trappings alone.

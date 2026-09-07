@@ -15659,7 +15659,7 @@ already multiplied by the barding:
 
 The rider's description of the top of that range was "they are fucking FLYING
 to outer space now", and the `dz` column is why: at 2.50 a villager finishes
-fifteen metres above where she was struck.
+fifteen meters above where she was struck.
 
 Two conclusions, and they settle the barding question.
 
@@ -15853,7 +15853,7 @@ measuring the false positive rather than the barding.
 
 The impulse multiplier is gone. It was measured earlier in this session and has
 no usable band: nothing below a doubling can be seen, and a doubling launches
-bodies thirty metres. What replaces it is three flat effects, each scaling from
+bodies thirty meters. What replaces it is three flat effects, each scaling from
 nothing on a bare horse to its figure on a full set, and none of them touching
 Horsemanship, which is a separate system read off the rider rather than the
 horse.
@@ -15939,7 +15939,7 @@ The dip at 1.50 is the same effect, reproduced deliberately.
 The explanation that fits both: most of the distance in this band is not the
 victim being thrown, it is the victim being carried by a horse still moving
 through them. A larger push clears them out of the horse's path sooner, so they
-stop travelling. Only once the impulse is large enough to launch them outright
+stop traveling. Only once the impulse is large enough to launch them outright
 does distance start climbing again, which is the 2.25 and 2.50 buckets and the
 range the rider called a cartoon.
 
@@ -16023,7 +16023,7 @@ impulse magnitude and, inverted, the ragdoll mass, so a sweep of that figure
 was never a clean test of force.
 
 **The throw cannot be tuned to a ten per cent target.** The three impacts above
-carry an identical 1.20 m/s and land at 1.50, 3.44 and 8.00 metres. A five fold
+carry an identical 1.20 m/s and land at 1.50, 3.44 and 8.00 meters. A five fold
 spread from the same impulse means the horse's own collision, its angle and the
 ground decide the distance, and a ten per cent change to a contribution this
 small is not going to be visible in any figure. The force addition is worth
@@ -16147,7 +16147,7 @@ figure rather than a fixed clock sample:
     impulse on  (50/30)   n=14   mean 3.68  median 2.84
 
 Identical within the noise. Victims do **not** drop where they stand with the
-impulse off; they still travel about three metres, and that distance is the
+impulse off; they still travel about three meters, and that distance is the
 horse arriving.
 
 This confirms what the rider has said repeatedly and corrects a line in this
@@ -16214,7 +16214,7 @@ throw under 7.5 m and the spread fell from 86 per cent to 55:
 
 The rider's own observation explains itself with this: a victim already lying
 on the ground is slow at 150 ms whatever was done to them, so they were damped
-immediately and never travelled. That is why beggars sitting down were never
+immediately and never traveled. That is why beggars sitting down were never
 thrown by a gallop.
 
 #### The fix
@@ -16226,7 +16226,7 @@ dropped below `RagdollDampSettleSpeed`, with `RagdollDampFloorMs` so it cannot
 fire during the launch and `RagdollDampCeilingMs` so it always fires eventually.
 
 The threshold matters. At 2.0 m/s it still fired at 544 to 1360 ms and cut the
-mean throw from 25.35 to 13.92, because 2 m/s is still travelling. At 0.5 m/s,
+mean throw from 25.35 to 13.92, because 2 m/s is still traveling. At 0.5 m/s,
 with an 800 ms floor, the rider judged the anti-slide behaviour to be back with
 at most a slight residual glide, and further tuning of `RagdollMinEnergy` was
 not distinguishable by eye. Those are the shipped values.

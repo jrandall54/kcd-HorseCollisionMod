@@ -357,7 +357,7 @@ function HorseCollisionMod:DampVictim(npc)
 		return
 	end
 
-	-- Applied when the body has finished travelling, not on a stopwatch.
+	-- Applied when the body has finished traveling, not on a stopwatch.
 	--
 	-- This used to fire 150 ms after the impact, which is before a thrown body
 	-- has reached its top speed. Measured, it arrested victims wherever it
@@ -369,7 +369,7 @@ function HorseCollisionMod:DampVictim(npc)
 	--
 	-- It is also why a victim already lying on the ground barely moved. They
 	-- are slow at 150 ms whatever was done to them, so they were damped
-	-- immediately and never travelled.
+	-- immediately and never traveled.
 	--
 	-- The damping itself is not the problem and must stay. Without it a ragdoll
 	-- slides a long way and the ground reads as ice.
@@ -462,7 +462,7 @@ function HorseCollisionMod:DampVictim(npc)
 
 		-- The floor covers the case where the impulse has not taken effect by
 		-- the first poll, so the body reads slow before it has been thrown.
-		-- Grounded and still travelling is a slide, and that is the moment to
+		-- Grounded and still traveling is a slide, and that is the moment to
 		-- damp: the throw is over and what remains is the body skating.
 		if moving and elapsed >= floorMs and vertical
 				and vertical < (self.Config.RagdollDampGroundedSpeed or 0.3) then
