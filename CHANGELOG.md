@@ -52,10 +52,12 @@ number.
 
 ### Fixed
 
-- A fight you started with one person no longer drags everyone nearby into it.
+- The mod no longer provokes new victims once you are already in a fight.
   Someone running into your stationary horse mid-brawl counted as you riding
-  them down, so each guard who closed on you became another attacker.
-  `ProvokeDuringCombat`. **NOT BREAKING**, no released version carried it.
+  them down, so anyone who closed on you was provoked into a second brawl of
+  their own. Guards still respond to a fight they witness, as they always did;
+  this only stops the mod from adding to it. `ProvokeDuringCombat`.
+  **NOT BREAKING**, no released version carried it.
 
 ## [4.17.2] - 2026-09-06
 
