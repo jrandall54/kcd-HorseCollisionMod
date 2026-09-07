@@ -1272,6 +1272,20 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		self.RecentHits = {}
 		self.RecentRejections = {}
 		self.SphereCache = { pos = nil, ents = nil, at = 0 }
+
+		-- The rear's cooldown is stamped the same way and was missed, which is
+		-- the whole of why the rear keys were dead for an unpredictable stretch
+		-- after a load. `System.GetCurrTime` is level time, and loading a save
+		-- winds it back to the moment the save was written, so a deadline set
+		-- before the save is still in the future in the world that comes back.
+		-- Measured: presses reached the hook at +112 ms and were refused for
+		-- cooldown 56 times before one was taken at +14.3 s.
+		--
+		-- The range of the symptom falls straight out of it. Rear, then save
+		-- and load, and the wait is however far the clock moved; load without
+		-- having reared and there is no deadline to wait for and the keys work
+		-- at once.
+		self.RearNextAt = nil
 		self.VictimActivity = {}
 		self.Annoyance = {}
 

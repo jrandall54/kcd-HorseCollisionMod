@@ -16625,3 +16625,34 @@ on every load because it is the player, whose entity the world reload replaces.
 so a hot reload left a wrapper from an older copy of the file in place, closed
 over an older original, with the hook still reporting itself installed. The
 original is now kept on the mod table and restored before wrapping again.
+
+### The rear keys after a load: it was the mod's own cooldown
+
+The keys were dead for an unpredictable stretch after a save load, from
+instantly to never. Every previous attempt read the mod's setup lines out of
+kcd.log and inferred from them. This one logged the presses.
+
+**The presses arrive at `Player.OnAction` from +112 ms after the load screen
+ends.** The action map, the listener and the hook were all working the entire
+time, and nothing about them was ever the problem.
+
+Every press for the next fourteen seconds was refused by `RearRequested`, at
+its cooldown gate: 56 refusals, six more refused on speed, and one accepted at
++14256 ms.
+
+`RearNextAt` is stamped from `System.GetCurrTime()`, which is level time.
+Loading a save winds that clock back to the moment the save was written, so a
+deadline set before the save is still in the future in the world that comes
+back. The load screen handler already drops `RecentHits`, `RecentRejections`
+and `VictimActivity` for exactly this reason, with a comment saying so.
+`RearNextAt` was not in the list.
+
+The range of the symptom follows from that without anything else. Rear, then
+save and load, and the wait is however far the clock moved. Load without having
+reared and there is no deadline at all, and the keys work immediately.
+
+The six speed refusals are a separate thing, and are the settling-fall reading
+already noted against `TrackSpeed`: a stationary horse reports 1.05 to 2.31 m/s
+because `GetVelocity` carries the vertical fall while it settles against the
+ground, and `RearMaxSpeed` is 1.0. Not the cause of the dead period, but it can
+refuse a rear on a horse that is standing still.
