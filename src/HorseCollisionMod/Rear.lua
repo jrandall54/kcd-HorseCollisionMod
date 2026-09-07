@@ -45,22 +45,6 @@ function HorseCollisionMod:RearActionFor(key, onlyRear)
 	return prefix .. lower
 end
 
---- How long ago this world finished loading, as a log fragment.
---
--- The rear keys are dead for an unpredictable stretch after a save load, and
--- every attempt at that so far has read log lines from the mod's own setup and
--- inferred. This is the number that was never measured: when the rider pressed,
--- counted from the end of the load screen that preceded it.
---
--- @treturn string a millisecond offset, or "?" before any load screen
-function HorseCollisionMod:RearSinceLoad()
-	if not self.RearLoadAt then
-		return "?"
-	end
-
-	return string.format("%.0f", self:TimeMs() - self.RearLoadAt)
-end
-
 --- Says so when the configured keys cannot work.
 --
 -- Both failures are silent otherwise, and a feature that does nothing with no
@@ -134,7 +118,6 @@ function HorseCollisionMod:HookRearKey()
 	end
 
 	self.RearOriginalOnAction = original
-	self.RearHooked = true
 
 	Player.OnAction = function(playerSelf, action, activation, value)
 		local consumed = false
@@ -148,16 +131,6 @@ function HorseCollisionMod:HookRearKey()
 		pcall(function()
 			local mod = HorseCollisionMod
 			local cfg = mod.Config
-
-			-- Every press, not only the mod's own. The question this answers
-			-- is whether the rear keys reach here at all during the stretch
-			-- after a load when they do nothing: if other keys arrive and
-			-- ours does not, the action map binding is what is broken, and if
-			-- nothing arrives the hook is.
-			if cfg.RearLogInput and activation == "press" then
-				mod:Log("RearInput " .. tostring(action)
-						.. " +" .. mod:RearSinceLoad() .. "ms")
-			end
 
 			if action == mod:RearActionFor(cfg.RearChargeKey) then
 				consumed = true
@@ -193,15 +166,13 @@ end
 function HorseCollisionMod:RearRequested(fragTag)
 	local cfg = self.Config
 
-	-- Every way out of this function says which one it took. A press that
-	-- arrives and is then dropped for one of these reasons is indistinguishable,
-	-- from outside the game, from a press that never arrived, and the two have
-	-- opposite answers.
+	-- Every way out of this function says which one it took. These gates all
+	-- returned silently, and a press that arrives and is then dropped by one of
+	-- them looks, from outside the game, exactly like a press that never
+	-- arrived. Telling those two apart is what found the cooldown surviving a
+	-- save load, after seven attempts at the action map had not.
 	local function refuse(why)
-		if cfg.RearLogInput then
-			self:Log("RearRefused " .. why
-					.. " +" .. self:RearSinceLoad() .. "ms")
-		end
+		self:Log("Rear refused, " .. why)
 
 		return false
 	end
@@ -262,10 +233,7 @@ function HorseCollisionMod:RearRequested(fragTag)
 	-- and Rotate at 0 the horse drifts under its own physics, measured at
 	-- 0.80 m and described as a metre to the right.
 	if speed > (cfg.RearMaxSpeed or 1.0) then
-		self:Log("Rear refused, speed " .. string.format("%.2f", speed)
-				.. " +" .. self:RearSinceLoad() .. "ms")
-
-		return false
+		return refuse("speed " .. string.format("%.2f", speed))
 	end
 
 	local now = self:TimeMs()
@@ -275,11 +243,6 @@ function HorseCollisionMod:RearRequested(fragTag)
 	end
 
 	self.RearNextAt = now + (cfg.RearCooldownMs or 2500)
-
-	if cfg.RearLogInput then
-		self:Log("RearAccepted " .. tostring(fragTag)
-				.. " +" .. self:RearSinceLoad() .. "ms")
-	end
 
 	self:RearHorse(horseEnt, fragTag)
 
@@ -576,17 +539,23 @@ function HorseCollisionMod:LoadRearActionMap()
 	end
 
 	-- The file is read once for the session and the listener re-pointed on
-	-- every load screen. Those are two different needs and getting either
-	-- wrong kills the keys silently.
+	-- every load screen. Those are two different needs.
 	--
-	-- Reading the file again when the map is already registered breaks it:
-	-- after a save load the keys stopped firing entirely, and re-pointing the
-	-- listener without touching the file brought them straight back. Earlier
-	-- it registered the action a second and third time instead, and one press
-	-- arrived three times over.
+	-- Reading the file again once the map is registered registers the actions a
+	-- second and third time, and one press then arrives three times over. That
+	-- is what the guard below is for, and it is the only thing established about
+	-- re-reading the file.
 	--
-	-- Re-pointing every load is needed because the listener is the player,
-	-- whose entity the world reload replaces.
+	-- Re-pointing every load is because the listener is the player, whose entity
+	-- the world reload replaces.
+	--
+	-- Nothing here was ever the cause of the rear keys being dead after a load,
+	-- though several rides were spent on the assumption that it was. Logging the
+	-- presses showed them reaching the hook at +112 ms with the map reporting
+	-- itself listening and enabled, while the mod's own cooldown, stamped on a
+	-- clock the load winds back, refused all of them. Do not read a dead key as
+	-- evidence about this function without checking the gates in
+	-- `RearRequested` first: they say which one refused.
 	local loaded = self.RearActionMapLoaded
 
 	if not loaded then
@@ -605,13 +574,8 @@ function HorseCollisionMod:LoadRearActionMap()
 		ActionMapManager.EnableActionMap(map, true)
 	end)
 
-	-- The generation and the offset are here because the load screen's OnEnd
-	-- fires more than once for one save load, so this runs more than once, and
-	-- how many times and how far apart has only ever been guessed at.
 	self:Log("Rear action map " .. map
 			.. " loaded=" .. tostring(loaded)
 			.. " listening=" .. tostring(listening)
-			.. " enabled=" .. tostring(enabled)
-			.. " gen=" .. tostring(self.TimerTick)
-			.. " +" .. self:RearSinceLoad() .. "ms")
+			.. " enabled=" .. tostring(enabled))
 end

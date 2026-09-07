@@ -173,10 +173,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
 -- @field RearStaminaCost what a landed rear costs the horse
--- @field RearLogInput report every key press the player receives, and every
---   reason a rear request was refused, with a time since the load screen.
---   A diagnostic for the rear keys being dead after a load, and off by
---   default because it writes a line for every press
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
 -- @field ReplanAfterReaction ask a victim to re-plan their activity once the
@@ -448,7 +444,6 @@ HorseCollisionMod.Config = {
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,
 	RearStaminaCost          = 12.0,
-	RearLogInput             = false,
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,
@@ -1259,11 +1254,6 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		local currentTick = HorseCollisionModGeneration
 
 		self.TimerTick = currentTick
-
-		-- When this load finished, so a rear key press can be reported as a
-		-- time since it. The rear keys are dead for an unpredictable stretch
-		-- after a load and nothing has ever measured that stretch directly.
-		self.RearLoadAt = self:TimeMs()
 
 		-- Cooldown deadlines are stamped against a clock the save restores,
 		-- and the entity ids keying them are reused across a load. Neither

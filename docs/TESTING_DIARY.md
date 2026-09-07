@@ -16614,12 +16614,18 @@ offered.
 
 #### Two ways the keys die silently, both fixed
 
-**The map must be read once and the listener re-pointed every load.** Reading
-the file again when the map is already registered breaks it: after a save load
-the keys stopped firing entirely, and re-pointing the listener without touching
-the file brought them straight back. Registering repeatedly within one session
-instead delivers one press three times over. The listener has to be re-pointed
-on every load because it is the player, whose entity the world reload replaces.
+**The map must be read once and the listener re-pointed every load.**
+Registering repeatedly within one session delivers one press three times over,
+which is why the file is read once. The listener is re-pointed on every load
+because it is the player, whose entity the world reload replaces.
+
+> Corrected later in this diary. This entry also claimed that re-reading the
+> file made the keys stop firing after a save load, and that re-pointing the
+> listener brought them back. That was wrong. The keys were being refused by
+> the mod's own cooldown, which is stamped on a clock the load winds back, and
+> re-pointing the listener only appeared to help because time passed while it
+> happened. Nothing about the action map was ever involved. See "The rear keys
+> after a load: it was the mod's own cooldown".
 
 **The hook must reinstall itself.** `HookRearKey` refused to run once hooked,
 so a hot reload left a wrapper from an older copy of the file in place, closed
