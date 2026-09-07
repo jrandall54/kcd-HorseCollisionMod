@@ -46,8 +46,13 @@ HorseCollisionModSettings = {
 	RagdollMass              = 100.0,
 	RagdollMassArmorScaled   = true,
 	RagdollMassArmorExponent = 3.7,
-	RagdollDamping           = 3.0,   -- higher stops a thrown body sooner
-	RagdollMinEnergy         = 0.5,   -- higher puts it to rest sooner
+	RagdollDamping           = 5.0,   -- higher stops a thrown body sooner
+	RagdollMinEnergy         = 1.0,   -- higher puts it to rest sooner
+	RagdollDampPollMs        = 100,   -- how often to look at a thrown body
+	RagdollDampSettleSpeed   = 0.5,   -- speed it must fall under before damping
+	RagdollDampGroundedSpeed = 0.3,   -- vertical speed under which it is sliding, not flying
+	RagdollDampFloorMs       = 200,   -- never damp before this, mid-launch
+	RagdollDampCeilingMs     = 6000,  -- damp regardless by this point
 
 	-- Stamina, against a full pool of roughly 210.
 	StaminaDrainWalk         = 0.0,

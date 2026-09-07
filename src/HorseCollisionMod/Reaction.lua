@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.17.0
+-- @release 4.17.1
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -211,7 +211,7 @@ end
 -- @tparam table npc victim entity
 -- @tparam number armorScale the tier's armor multiplier, high for an
 --   unarmored target and low for one in mail
-function HorseCollisionMod:MassVictim(npc, armorScale)
+function HorseCollisionMod:MassVictim(npc, armorScale, onTook)
 	local base = self.Config.RagdollMass or 0
 
 	if base <= 0 then
@@ -300,12 +300,24 @@ function HorseCollisionMod:MassVictim(npc, armorScale)
 						.. " movedBy=" .. string.format("%.2f", moved) .. "m")
 			end
 
+			if onTook then
+				onTook(attempts[index])
+			end
+
 			return
 		end
 
-		if index == #attempts and self.Config.LogTelemetry then
-			self:Log("Mass " .. self:NameOf(npc)
-					.. " never took, last read " .. string.format("%.0f", reading))
+		if index == #attempts then
+			if self.Config.LogTelemetry then
+				self:Log("Mass " .. self:NameOf(npc)
+						.. " never took, last read " .. string.format("%.0f", reading))
+			end
+
+			-- The impulse still has to go out, on a body of whatever mass the
+			-- engine kept, rather than being dropped with the mass write.
+			if onTook then
+				onTook(attempts[index])
+			end
 		end
 
 		Script.SetTimer(attempts[index + 1] and
@@ -345,16 +357,38 @@ function HorseCollisionMod:DampVictim(npc)
 		return
 	end
 
-	-- After the impulse has been applied rather than alongside it, since the
-	-- impulse itself is deferred until the body has physicalized.
-	local delay = (self.Config.ImpulseDelayMs or 50) + 100
+	-- Applied when the body has finished travelling, not on a stopwatch.
+	--
+	-- This used to fire 150 ms after the impact, which is before a thrown body
+	-- has reached its top speed. Measured, it arrested victims wherever it
+	-- happened to catch them: at an identical launch velocity the throws ran
+	-- 2.9 m to 71.8 m, and every short one came to rest around 1000 ms while
+	-- the long ones stayed in motion for two to four seconds. With the damping
+	-- off, the same ride had no throw under 7.5 m. It was eating the mod's own
+	-- impulse on roughly a quarter of impacts.
+	--
+	-- It is also why a victim already lying on the ground barely moved. They
+	-- are slow at 150 ms whatever was done to them, so they were damped
+	-- immediately and never travelled.
+	--
+	-- The damping itself is not the problem and must stay. Without it a ragdoll
+	-- slides a long way and the ground reads as ice.
+	--
+	-- So the body is watched instead. Speed is taken from how far it moved
+	-- between two polls, which works on a ragdoll where a velocity read may
+	-- not. Damping waits until the body has been seen moving and has since
+	-- dropped below the settling speed, with a floor so it cannot fire during
+	-- the launch and a ceiling so it always fires eventually.
+	local pollMs = self.Config.RagdollDampPollMs or 100
+	local settleAt = self.Config.RagdollDampSettleSpeed or 0.5
+	local floorMs = self.Config.RagdollDampFloorMs or 200
+	local ceilingMs = self.Config.RagdollDampCeilingMs or 6000
 	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local last = nil
+	local moving = false
 
-	Script.SetTimer(delay, function()
-		if generation ~= self.TimerTick then
-			return
-		end
-
+	local function apply(why, elapsed, speed, vertical)
 		local params = {}
 
 		if damping > 0 then
@@ -371,12 +405,82 @@ function HorseCollisionMod:DampVictim(npc)
 
 		if self.Config.LogTelemetry then
 			self:Log("Damped " .. self:NameOf(npc)
+					.. " why=" .. why
+					.. " atMs=" .. string.format("%.0f", elapsed)
+					.. " speed=" .. string.format("%.2f", speed or -1)
+					.. " vertical=" .. string.format("%.2f", vertical or -1)
 					.. " damping=" .. tostring(damping)
 					.. " minEnergy=" .. tostring(minEnergy)
 					.. " ok=" .. tostring(ok)
 					.. " err=" .. tostring(err))
 		end
-	end)
+	end
+
+	local function watch()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local here = nil
+
+		pcall(function()
+			here = npc:GetWorldPos()
+		end)
+
+		local elapsed = self:TimeMs() - startedAt
+		local speed = nil
+
+		local vertical = nil
+
+		if here and last then
+			local seconds = pollMs / 1000
+
+			speed = self:VectorLength({
+				x = here.x - last.x,
+				y = here.y - last.y,
+				z = here.z - last.z
+			}) / seconds
+
+			-- Vertical speed on its own is what separates a body still being
+			-- thrown from one sliding along the ground. Both are moving, and a
+			-- speed threshold cannot tell them apart, which is why damping on
+			-- speed alone either fires mid-flight or waits out the whole slide.
+			vertical = math.abs(here.z - last.z) / seconds
+
+			if speed >= settleAt then
+				moving = true
+			end
+		end
+
+		last = here
+
+		if elapsed >= ceilingMs then
+			apply("ceiling", elapsed, speed, vertical)
+
+			return
+		end
+
+		-- The floor covers the case where the impulse has not taken effect by
+		-- the first poll, so the body reads slow before it has been thrown.
+		-- Grounded and still travelling is a slide, and that is the moment to
+		-- damp: the throw is over and what remains is the body skating.
+		if moving and elapsed >= floorMs and vertical
+				and vertical < (self.Config.RagdollDampGroundedSpeed or 0.3) then
+			apply("grounded", elapsed, speed, vertical)
+
+			return
+		end
+
+		if moving and elapsed >= floorMs and speed and speed < settleAt then
+			apply("settled", elapsed, speed, vertical)
+
+			return
+		end
+
+		Script.SetTimer(pollMs, watch)
+	end
+
+	Script.SetTimer(pollMs, watch)
 end
 
 
@@ -390,10 +494,14 @@ end
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
--- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam number tierScale the tier's share of the configured impulse, 0 to 1
+-- @tparam number armorScale the victim's armor scale, which sets their ragdoll
+--   mass and nothing else
 -- @tparam table horsePos horse world position, the origin a push points away
 --   from, so a victim is never thrown back under the rider
-function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos, horseEnt)
+-- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
+function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
+		horsePos, horseEnt)
 	pcall(function()
 		if npc.actor then
 			npc.actor:Fall({x=0, y=0, z=0}, true)
@@ -406,43 +514,23 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, impulseScale, horsePos,
 	-- is already down, and in game it snaps the victim upright into a T-pose
 	-- on every gallop impact.
 
-	-- Held until the body is genuinely a ragdoll before the mass and the
-	-- impulse are applied to it.
+	-- The impulse goes out the moment the mass write takes, and not before.
 	--
-	-- `actor:Fall` requests the fall, it does not perform it. Measured, the
-	-- victim is still the animated character for a short while afterwards, and
-	-- anything applied in that window is discarded: the mass write did not
-	-- take, so the impulse read a mass of 80 rather than the figure this mod
-	-- had just written, and raising the impulse four fold moved nobody further.
+	-- `actor:Fall` requests the fall, it does not perform it. Applied in the
+	-- same instant, the mass write is rejected and the impulse meets the
+	-- animated character rather than a ragdoll, which is why a victim used to
+	-- read 80 kg, the engine's default, when this mod had just written 42.
 	--
-	-- Waiting for `BlendRagdoll` is what makes both land. `MassVictim` has its
-	-- own retry list for the same reason, which now has nothing left to retry.
-	local generation = self.TimerTick
-	local deadline = self:TimeMs() + self.RagdollReadyCeilingMs
-
-	local function whenPhysical()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local state = nil
-
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		if state == self.RagdollAnimationState or self:TimeMs() >= deadline then
-			self:MassVictim(npc, impulseScale)
-			self:ImpulseVictim(npc, velocity, impulseScale, horsePos, horseEnt)
-			self:DampVictim(npc)
-
-			return
-		end
-
-		Script.SetTimer(self.RagdollReadyPollMs, whenPhysical)
-	end
-
-	whenPhysical()
+	-- Waiting on the `BlendRagdoll` animation state is the wrong signal and was
+	-- tried: that state does not appear until about two seconds after a gallop
+	-- impact, so the wait always ran to its ceiling and the throw visibly fired
+	-- half a second after the victim had already fallen. The mass write is the
+	-- right signal, because it succeeds exactly when the body is physicalized,
+	-- and its own ladder reports that at 0 to 120 ms.
+	self:MassVictim(npc, armorScale, function()
+		self:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt)
+		self:DampVictim(npc)
+	end)
 
 	-- The control for the same reading taken on the fall path. This tier uses
 	-- actor:Fall and touches no animation data of this mod's, so a turn seen
@@ -465,10 +553,11 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number impulseScale multiplier on the configured impulse, 0 to 1
+-- @tparam number tierScale the tier's share of the configured impulse, 0 to 1
+-- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
 -- @tparam table horsePos horse world position, the origin the push points away
 --   from, so a victim is never thrown back under the rider
-function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos, horseEnt)
+function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt)
 	-- Barding is a flat addition to the two force figures rather than a factor
 	-- on the result, so a barded horse adds the same absolute push whoever it
 	-- hits, and the victim's own armor still scales the whole thing.
@@ -477,8 +566,8 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos, 
 	-- the table in the settings file rather than out of a curve.
 	local bonus = self:BardingForceBonus(horseEnt)
 
-	local k_back = (self.Config.Knockback + bonus.knockback) * impulseScale
-	local k_up = (self.Config.Uplift + bonus.uplift) * impulseScale
+	local k_back = (self.Config.Knockback + bonus.knockback) * tierScale
+	local k_up = (self.Config.Uplift + bonus.uplift) * tierScale
 
 	if k_back <= 0 and k_up <= 0 then
 		return
@@ -578,7 +667,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, impulseScale, horsePos, 
 			end)
 
 			self:Log("Impulse " .. self:NameOf(npc)
-					.. " scale=" .. string.format("%.2f", impulseScale)
+					.. " tier=" .. string.format("%.2f", tierScale)
 					.. " magnitude=" .. string.format("%.1f", impulseMag)
 					.. " mass=" .. string.format("%.1f", mass)
 					.. " dv=" .. string.format("%.2f",

@@ -29,6 +29,23 @@ number.
 
 ## [Unreleased]
 
+## [4.17.1] - 2026-09-06
+
+### Fixed
+
+- Armour decides how far someone is carried by making them heavier, and only
+  that. It was also being used to weaken the knockback, so armour counted
+  twice and a man in mail became too heavy for any impact to move at all.
+- Riding someone down throws them consistently. The mod settled a knocked-down
+  body 150 milliseconds after the impact, before a thrown victim had even
+  reached top speed, which arrested them wherever it happened to catch them: at
+  an identical impact some victims travelled 3 metres and others 50. It now
+  waits until the body has actually slowed before settling it, so the throw
+  finishes first and bodies still come to rest rather than sliding.
+- Someone already lying on the ground is thrown by a gallop like anyone else.
+  They were being settled immediately, because a body on the ground is already
+  slow at the moment the old fixed timer fired.
+
 ## [4.17.0] - 2026-09-06
 
 ### Added

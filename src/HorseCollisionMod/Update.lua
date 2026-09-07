@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.17.0
+-- @release 4.17.1
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -239,7 +239,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		elseif cfg.TrotReaction == "fall" then
 			self:PlayReaction(npc, velocity, speed, "hcm_fall_")
 		else
-			self:Ragdoll(npc, velocity, speed, 0.6 * armorImpulse, horsePos, horseEnt)
+			self:Ragdoll(npc, velocity, speed, 0.6, armorImpulse, horsePos, horseEnt)
 		end
 		self:MarkVictim(npc, "Trot", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
@@ -261,7 +261,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- victim health of its own, and a probe that reads afterwards
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
-		self:Ragdoll(npc, velocity, speed, 1.0 * armorImpulse, horsePos, horseEnt)
+		self:Ragdoll(npc, velocity, speed, 1.0, armorImpulse, horsePos, horseEnt)
 		self:MarkVictim(npc, "Gallop", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)

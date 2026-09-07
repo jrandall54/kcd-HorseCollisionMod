@@ -16081,3 +16081,166 @@ The velocity is up 9.7 per cent by construction. The distance is up 3 per cent
 on the median and 20 per cent on the mean, the mean carrying one 14.13 m
 outlier, so the figure sits around the ten per cent the rider asked for.
 `BardingForceSteps` stays at +5 knockback and +3 uplift at a full set.
+
+### Armor scales the mass, not the impulse, and what that is worth
+
+`armorImpulse` was scaling the force down and the mass up at the same time, so
+armor was counted twice and the net went as the armor scale to the 4.7th power.
+With the impulse landing properly that put a mailed guard at 4030 kg taking
+0.01 m/s, which is not harder to move but immovable. The rider's position, and
+it matches what the code already intended:
+
+> "as far as I know, impulse shouldn't be used to calculate anything for the
+> armor as I thought we figured out how to scale mass itself to get the desired
+> spread between naked vs full plate"
+
+`Ragdoll` now takes the tier scalar and the armor scale separately. The impulse
+carries the tier scalar only; `MassVictim` keeps the armor scale.
+
+#### What armor is worth once it is counted once
+
+Thirty-six gallop impacts, base 100, exponent 3.7:
+
+    mass band        n     dv    mean  median
+      0-60 kg       11   1.24    4.03    2.88
+     60-200 kg       7   0.56    4.31    3.88
+    200-900 kg       1   0.28    3.91    3.91
+    900-4900 kg     17   0.02    2.91    2.99
+
+    ratio armored to unarmored 0.72x, 1.5 sigma, not significant
+
+The heavy end is saturated. A 4864 kg victim already receives dv 0.02, so the
+impulse contributes nothing and further mass cannot take anything away. What
+they still travel, about 2.9 m, is the horse's own collision. That is a floor
+this mod cannot push anyone below.
+
+#### The light end does not respond either
+
+Halving `RagdollMass` to 50 put villagers near 21 kg and doubled their launch
+velocity, dv 0.97 to 1.64. The mean throw **fell**, 4.14 m to 3.42 m, and the
+ratio barely moved, 0.72x to 0.65x.
+
+So the throw responds to whether the impulse arrives at all, which the ragdoll
+timing fix established and which is worth 43 per cent, and not to how large it
+is. Three separate attempts to scale the magnitude, upward through the force
+and downward through the mass, produced no increase and twice produced a
+decrease.
+
+**No mechanism is offered for that.** Within a single mass band the throws run
+0.1 m to 8.7 m, so contact geometry and ground dominate everything a setting
+does, and rides of ten to twenty impacts cannot see through it. Tuning the
+throw distance by measurement is not viable at this sample size, and further
+theories about which lever drives it should not be written here without a
+measurement that separates contact geometry first.
+
+What is established and should not be re-derived: the impulse must land after
+the body is a ragdoll, armor belongs on the mass alone, and armor separation
+with that in place is about 0.7x.
+
+### Settled: the horse's collision throws the body, the mod's impulse does not
+
+Measured with `Knockback`, `Uplift` and `LateralImpulse` all at zero, against
+the same configuration with the impulse on, using the rest-based `ImpactThrow`
+figure rather than a fixed clock sample:
+
+    impulse off (0/0/0)    n=5   mean 3.18  median 3.31
+    impulse on  (50/30)   n=14   mean 3.68  median 2.84
+
+Identical within the noise. Victims do **not** drop where they stand with the
+impulse off; they still travel about three metres, and that distance is the
+horse arriving.
+
+This confirms what the rider has said repeatedly and corrects a line in this
+diary that contradicted it. An earlier zero-impulse session described its own
+method as leaving victims "drop where they stand with no throw at all". That
+was never measured, it was an assumption written into a method description, and
+reading it as a finding is what sent a later session hunting for a force lever
+that does not exist.
+
+#### What this rules out
+
+- **`Knockback` and `Uplift` are inert** at any value worth shipping, and so is
+  the barding force addition built on top of them. Raising knockback from 50 to
+  700 changed nothing measurable; zeroing it entirely changed nothing either.
+- **The horse's own mass is not the transfer term.** Writable through
+  `PHYSICPARAM_PLAYERDYN`, confirmed by readback at 3000 against a default of
+  480, and six times the mass moved unarmored victims from a mean of 4.14 m to
+  4.29 m.
+- **The victim's mass barely matters.** Across a 174-fold mass range the throw
+  falls only to 0.73x, and halving the base to make villagers lighter lowered
+  the mean rather than raising it.
+
+The throw distance is not controllable by any lever found. It is the engine
+resolving a horse against a body, and the mod's contribution to it is noise.
+
+#### What the ragdoll timing work is actually worth
+
+The claim that holding the impulse until the mass write lands raised the mean
+throw from 4.76 to 6.82 m rests on four samples and should not be relied on. A
+later run in the same configuration gave 3.68.
+
+What is solid from that work, and is worth keeping, is that the mass write now
+lands: victims read the mass this mod computes rather than the engine's default
+80, and armored victims differentiate from 124 kg up to 4000 kg where before
+every victim read 80. Whether that changes the throw is not established.
+
+### The ragdoll damping was eating the mod's own impulse
+
+The rider reported the impulse appeared not to fire on every impact: some
+victims flew and others barely moved. It fires on every one. Across 23 gallop
+impacts the mass write took 23 times and the impulse went out 23 times, and the
+input was identical within a victim class, dv 31.5 to 31.8 for every 70 kg
+villager.
+
+The variation was downstream. At an identical launch velocity:
+
+    rat_woman4              atMs 4064   thrown 49.29
+    rat_pickpocket_woman1   atMs 2032   thrown 38.77
+    rat_refugee_Radan       atMs 1408   thrown 23.25
+    rat_woman25             atMs 1008   thrown  4.19
+    rat_woman23             atMs 1056   thrown  2.91
+
+Every short throw came to rest around 1000 ms; every long one stayed in motion
+for two to four seconds. `DampVictim` applied `damping` and `min_energy` on a
+fixed timer of `ImpulseDelayMs + 100`, so 150 ms after the impact, which is
+before a thrown body has reached its top speed. It arrested victims wherever it
+happened to catch them.
+
+Confirmed by removing it. With damping off, the same configuration produced no
+throw under 7.5 m and the spread fell from 86 per cent to 55:
+
+    damping at fixed 150 ms   n=9  min 2.9  mean 26.59  spread 86%
+    damping off               n=7  min 7.5  mean 25.35  spread 55%
+
+The rider's own observation explains itself with this: a victim already lying
+on the ground is slow at 150 ms whatever was done to them, so they were damped
+immediately and never travelled. That is why beggars sitting down were never
+thrown by a gallop.
+
+#### The fix
+
+`DampVictim` now watches the body rather than a clock. Speed is taken from how
+far it moved between two polls, since that reads on a ragdoll where a velocity
+query may not. Damping waits until the body has been seen moving and has since
+dropped below `RagdollDampSettleSpeed`, with `RagdollDampFloorMs` so it cannot
+fire during the launch and `RagdollDampCeilingMs` so it always fires eventually.
+
+The threshold matters. At 2.0 m/s it still fired at 544 to 1360 ms and cut the
+mean throw from 25.35 to 13.92, because 2 m/s is still travelling. At 0.5 m/s,
+with an 800 ms floor, the rider judged the anti-slide behaviour to be back with
+at most a slight residual glide, and further tuning of `RagdollMinEnergy` was
+not distinguishable by eye. Those are the shipped values.
+
+### Two other things established in the same session
+
+**`Knockback` and `Uplift` are additive on top of the horse's collision and are
+not inert.** At 2000 and 1000 an unarmored victim was thrown up to 46 m. An
+earlier note here that called them inert at any value was wrong, and was drawn
+from rides made while the damping was cutting the throws.
+
+**The mass exponent decides who the additive force can reach.** At
+`RagdollMassArmorExponent` 3.7 an armored victim weighs up to 4864 kg, so the
+same 2230 impulse gives a villager 80 m/s and a guard 0.46, and no knockback
+value can move them. At 1.5 the spread falls from 114x to about 7x, guards read
+5 to 8.5 m/s, and they visibly respond. That is a tuning decision, not a bug,
+and it is left at 3.7 pending the rider's judgement.
