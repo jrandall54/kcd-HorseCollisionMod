@@ -45,6 +45,22 @@ function HorseCollisionMod:RearActionFor(key, onlyRear)
 	return prefix .. lower
 end
 
+--- How long ago this world finished loading, as a log fragment.
+--
+-- The rear keys are dead for an unpredictable stretch after a save load, and
+-- every attempt at that so far has read log lines from the mod's own setup and
+-- inferred. This is the number that was never measured: when the rider pressed,
+-- counted from the end of the load screen that preceded it.
+--
+-- @treturn string a millisecond offset, or "?" before any load screen
+function HorseCollisionMod:RearSinceLoad()
+	if not self.RearLoadAt then
+		return "?"
+	end
+
+	return string.format("%.0f", self:TimeMs() - self.RearLoadAt)
+end
+
 --- Says so when the configured keys cannot work.
 --
 -- Both failures are silent otherwise, and a feature that does nothing with no
@@ -133,6 +149,16 @@ function HorseCollisionMod:HookRearKey()
 			local mod = HorseCollisionMod
 			local cfg = mod.Config
 
+			-- Every press, not only the mod's own. The question this answers
+			-- is whether the rear keys reach here at all during the stretch
+			-- after a load when they do nothing: if other keys arrive and
+			-- ours does not, the action map binding is what is broken, and if
+			-- nothing arrives the hook is.
+			if cfg.RearLogInput and activation == "press" then
+				mod:Log("RearInput " .. tostring(action)
+						.. " +" .. mod:RearSinceLoad() .. "ms")
+			end
+
 			if action == mod:RearActionFor(cfg.RearChargeKey) then
 				consumed = true
 
@@ -167,8 +193,21 @@ end
 function HorseCollisionMod:RearRequested(fragTag)
 	local cfg = self.Config
 
-	if not cfg.Rear then
+	-- Every way out of this function says which one it took. A press that
+	-- arrives and is then dropped for one of these reasons is indistinguishable,
+	-- from outside the game, from a press that never arrived, and the two have
+	-- opposite answers.
+	local function refuse(why)
+		if cfg.RearLogInput then
+			self:Log("RearRefused " .. why
+					.. " +" .. self:RearSinceLoad() .. "ms")
+		end
+
 		return false
+	end
+
+	if not cfg.Rear then
+		return refuse("off")
 	end
 
 	local mounted = false
@@ -178,7 +217,7 @@ function HorseCollisionMod:RearRequested(fragTag)
 	end)
 
 	if not mounted then
-		return false
+		return refuse("not mounted")
 	end
 
 	local horseEnt = nil
@@ -188,7 +227,7 @@ function HorseCollisionMod:RearRequested(fragTag)
 	end)
 
 	if not horseEnt then
-		return false
+		return refuse("no horse")
 	end
 
 	-- The horse first and the player second, the same chain the detection loop
@@ -208,7 +247,7 @@ function HorseCollisionMod:RearRequested(fragTag)
 	end)
 
 	if not velocity then
-		return false
+		return refuse("no velocity")
 	end
 
 	local speed = self:VectorLength(velocity)
@@ -223,10 +262,8 @@ function HorseCollisionMod:RearRequested(fragTag)
 	-- and Rotate at 0 the horse drifts under its own physics, measured at
 	-- 0.80 m and described as a metre to the right.
 	if speed > (cfg.RearMaxSpeed or 1.0) then
-		if cfg.LogTelemetry then
-			self:Log("Rear refused, speed "
-					.. string.format("%.2f", speed))
-		end
+		self:Log("Rear refused, speed " .. string.format("%.2f", speed)
+				.. " +" .. self:RearSinceLoad() .. "ms")
 
 		return false
 	end
@@ -234,10 +271,15 @@ function HorseCollisionMod:RearRequested(fragTag)
 	local now = self:TimeMs()
 
 	if self.RearNextAt and now < self.RearNextAt then
-		return true
+		return refuse("cooldown")
 	end
 
 	self.RearNextAt = now + (cfg.RearCooldownMs or 2500)
+
+	if cfg.RearLogInput then
+		self:Log("RearAccepted " .. tostring(fragTag)
+				.. " +" .. self:RearSinceLoad() .. "ms")
+	end
 
 	self:RearHorse(horseEnt, fragTag)
 
@@ -563,10 +605,13 @@ function HorseCollisionMod:LoadRearActionMap()
 		ActionMapManager.EnableActionMap(map, true)
 	end)
 
-	if self.Config.LogTelemetry then
-		self:Log("Rear action map " .. map
-				.. " loaded=" .. tostring(loaded)
-				.. " listening=" .. tostring(listening)
-				.. " enabled=" .. tostring(enabled))
-	end
+	-- The generation and the offset are here because the load screen's OnEnd
+	-- fires more than once for one save load, so this runs more than once, and
+	-- how many times and how far apart has only ever been guessed at.
+	self:Log("Rear action map " .. map
+			.. " loaded=" .. tostring(loaded)
+			.. " listening=" .. tostring(listening)
+			.. " enabled=" .. tostring(enabled)
+			.. " gen=" .. tostring(self.TimerTick)
+			.. " +" .. self:RearSinceLoad() .. "ms")
 end

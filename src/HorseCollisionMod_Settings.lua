@@ -120,6 +120,7 @@ HorseCollisionModSettings = {
 	RearReach                = 2.0,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse
+	RearLogInput             = false, -- log every press and every refusal
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance
