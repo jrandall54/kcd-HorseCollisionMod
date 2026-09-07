@@ -1139,7 +1139,7 @@ function HorseCollisionMod:PullRiderDown(npc)
 		-- `CanHorsePullDown` returns an HPS status, 2 enabled and 1 disabled,
 		-- and some victims answer 0, meaning the engine does not consider the
 		-- action applicable to them at all. Measured on one merchant across
-		-- 32 polls at every angle from 1 to 117 degrees and under two metres,
+		-- 32 polls at every angle from 1 to 117 degrees and under two meters,
 		-- while another merchant answers 2 within a second. Whether the
 		-- request is honoured anyway is a separate question from whether the
 		-- check advertises it.
