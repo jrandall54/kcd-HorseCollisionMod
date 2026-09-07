@@ -16348,3 +16348,44 @@ started swinging for the fences."
 
 `RetaliationPullsRiderDown` switches it off. The repeat request is kept as a
 safety net at `PullDownRepeatMs`, not as the mechanism.
+
+### Some NPCs can never be made to pull the rider down, and it is the engine's decision
+
+`CanHorsePullDown(victimEntityId)` returns an `HPS` status, not a boolean:
+`HPS_Enabled` is 2 and `HPS_Disabled` is 1, read from the running game. The
+game's own use is in `Scripts/Entities/AI/Shared/BasicAIActions.lua`, which
+offers the interactor action when the answer is either of those.
+
+Some NPCs answer **0**, which is neither, and 0 means the engine does not
+consider the action applicable at all.
+
+`rat_berthold` answers 2 within a second of being provoked and pulls the rider
+down reliably. `rat_ruch` answers 0 and never does. Ruled out across five
+rides, all with the rider mounted and the victim provoked and attacking:
+
+    the entity id      both `player.id` and the horse's id return 0
+    combat state       0 while in `CombatMovement` and in `CombatAttack`
+    distance           0 at 1.56 m, 1.74 m, 1.78 m, 1.96 m
+    angle              0 across `angles=1-117`, the whole arc including the
+                       flank, over 32 polls in one provocation
+    the check itself   `RequestHorsePullDown` called regardless of the status,
+                       through `PullDownForce`, changes nothing
+
+So the engine refuses, and what makes one NPC eligible and another not is
+unknown. It is not something this mod can set.
+
+The feature ships as it is. Where the engine allows it the victim drags the
+rider out of the saddle before fighting, and where it does not the brawl falls
+back to exactly the behavior that existed before, so nothing is worse than it
+was.
+
+`PullDownForce` is left in, defaulting off, because it costs nothing and a
+future session with a new idea about eligibility will want it.
+
+Two things not to repeat. Guards attacking during a provoked brawl are not
+witnesses reacting: they are victims the mod provoked itself, because detection
+cannot tell a rider steering into someone from someone charging a nearly
+stationary horse. That is fixed by `ProvokeDuringCombat`, off by default.
+And the surrender prompt disappearing when the rider is unhorsed is vanilla's
+own behavior, confirmed with this mod's hint disabled: the HUD drops action
+hints when the action map changes from `horse` to `player`.

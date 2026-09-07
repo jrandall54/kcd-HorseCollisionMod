@@ -182,9 +182,20 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
+-- @field SurrenderHintCalmPasses how many quiet passes before the surrender
+--   prompt is taken down, so it does not blink with the combat reading
+-- @field SurrenderHintHoldMs how often to put the surrender prompt back, since
+--   the HUD drops it when the action map changes
+-- @field ProvokeDuringCombat whether a new victim can be provoked while the
+--   rider is already in a fight, which turns bystanders into attackers
+-- @field RetaliationSurrenderHint whether the on-screen surrender prompt is
+--   shown while a provoked victim is fighting
 -- @field RetaliationPullsRiderDown whether a provoked victim drags the rider
 --   out of the saddle before fighting, rather than punching the horse
 -- @field PullDownPollMs how often to look for the chance to do it
+-- @field PullDownForce ask for the pull-down even when the game reports the
+--   victim cannot perform it; some NPCs are never eligible and this does not
+--   change that, it exists for future investigation
 -- @field PullDownRepeatMs how often to ask again once it has been requested,
 --   since a single request is queued behind whatever the brain is doing
 -- @field PullDownCeilingMs how long to keep looking before giving up
@@ -398,7 +409,12 @@ HorseCollisionMod.Config = {
 	RetaliationMemorySec     = 45,
 	RetaliationCeilingSec    = 120,
 	RetaliationPullsRiderDown = true,
+	RetaliationSurrenderHint = true,
+	ProvokeDuringCombat      = false,
+	SurrenderHintHoldMs      = 1000,
+	SurrenderHintCalmPasses  = 6,
 	PullDownPollMs           = 250,
+	PullDownForce            = false,
 	PullDownRepeatMs         = 1500,
 	PullDownCeilingMs        = 8000,
 	WomenRaiseAlarm          = true,
@@ -1013,6 +1029,10 @@ HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 
+-- The action hint slot the surrender prompt uses. An arbitrary id, chosen high
+-- enough to stay clear of the ones vanilla raises for its own hints.
+HorseCollisionMod.SurrenderHintId = 4771
+
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
 -- The state an actor reports while one of this mod's reaction clips owns the
@@ -1194,6 +1214,11 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		self.SphereCache = { pos = nil, ents = nil, at = 0 }
 		self.VictimActivity = {}
 		self.Annoyance = {}
+
+		-- A hint showing when the game was saved would come back with the
+		-- save and never be taken down, since the fight that raised it is
+		-- gone.
+		self:HideSurrenderHint(true)
 		self.Baseline = {}
 
 		local applied, rejected = self:ApplySettings()

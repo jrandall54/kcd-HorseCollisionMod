@@ -587,6 +587,157 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam string why either `settled` or `ceiling`
+--- Shows the on-screen prompt telling the player they can surrender.
+--
+-- Surrendering already works during a provoked brawl and resolves it cleanly.
+-- Nothing told the player so: the hint that appears when guards attack is
+-- raised from the AI's own behavior tree and a mod-provoked fight never
+-- triggers it, so the option existed and was invisible.
+--
+-- The HUD element declares `ShowActionHint(ActionId, Control, Text, Type,
+-- Name)` in `Libs/UI/UIElements/HUD.xml`, reachable through
+-- `UIAction.CallFunction`. `Control` is not the action name but a localized
+-- control token, which `Game.GetActionControl` resolves from the action map
+-- and the action: `player` and `surrender` give `@ui_control_uc_33`. Resolved
+-- each time rather than stored, so a player who rebinds the key sees their own
+-- binding rather than the default.
+--
+-- `Type` 0 is a press and 1 is a hold. Surrender is a press.
+--
+-- One hint for any number of provoked victims, counted rather than shown per
+-- fight, so a brawl with three of them does not stack three copies and does
+-- not disappear when the first one yields.
+function HorseCollisionMod:ShowSurrenderHint()
+	if not self.Config.RetaliationSurrenderHint then
+		return
+	end
+
+	self.SurrenderHintCount = (self.SurrenderHintCount or 0) + 1
+	self.SurrenderHintCalm = 0
+
+	if self.SurrenderHintCount > 1 then
+		return
+	end
+
+	local control = nil
+
+	pcall(function()
+		control = Game.GetActionControl("player", "surrender")
+	end)
+
+	if not control then
+		return
+	end
+
+	local ok = pcall(function()
+		UIAction.CallFunction("hud", -1, "ShowActionHint",
+				self.SurrenderHintId, control, "@ui_hint_surrender", 0, "")
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("SurrenderHint shown control=" .. tostring(control)
+				.. " ok=" .. tostring(ok))
+	end
+
+	-- Put back on an interval for as long as a fight is running, because the
+	-- HUD drops it on its own. Being pulled off the horse swaps the action map
+	-- from `horse` to `player`, the hints are rebuilt for the new map, and a
+	-- hint this mod raised is not among them: measured as the prompt appearing
+	-- correctly, then disappearing at the moment of the unhorsing and staying
+	-- gone for the rest of the brawl.
+	--
+	-- The control is resolved again on each pass rather than reused, since the
+	-- map it belongs to is exactly what changed.
+	local generation = self.TimerTick
+
+	local function hold()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		if (self.SurrenderHintCount or 0) <= 0 then
+			return
+		end
+
+		-- The prompt lives as long as a surrender is actually possible, which
+		-- is not the same as the mod's own idea of when the brawl ended.
+		-- `EndRetaliation` fires the moment the rider is pulled off the horse,
+		-- because the victim stops reading as fighting during the pull, and
+		-- the fight then carries on for another half minute. Hanging the
+		-- prompt on that took it down a second after it appeared.
+		--
+		-- `IsInCombatDanger` is the same read the collision code uses for
+		-- whether the player is in a fight, and it is the honest condition
+		-- here: while it holds, pressing the key does something.
+		local danger = false
+
+		pcall(function()
+			danger = player.soul:IsInCombatDanger()
+		end)
+
+		if danger then
+			self.SurrenderHintCalm = 0
+		else
+			-- Not taken down on the first quiet pass. The reading drops out
+			-- briefly during a fight, and a prompt that blinks with it would
+			-- be worse than one that lingers a moment.
+			self.SurrenderHintCalm = (self.SurrenderHintCalm or 0) + 1
+
+			if self.SurrenderHintCalm
+					>= (self.Config.SurrenderHintCalmPasses or 6) then
+				self:HideSurrenderHint(true)
+
+				return
+			end
+		end
+
+		pcall(function()
+			local again = Game.GetActionControl("player", "surrender")
+
+			if again then
+				-- Taken down and put back rather than simply shown again.
+				-- Re-showing an id the HUD still believes it is displaying
+				-- is a no-op, so after the action map change wiped the hint
+				-- from the screen the re-assert changed nothing and the
+				-- prompt stayed gone for the rest of the fight.
+				UIAction.CallFunction("hud", -1, "HideActionHint",
+						self.SurrenderHintId)
+				UIAction.CallFunction("hud", -1, "ShowActionHint",
+						self.SurrenderHintId, again, "@ui_hint_surrender", 0, "")
+			end
+		end)
+
+		Script.SetTimer(self.Config.SurrenderHintHoldMs or 1000, hold)
+	end
+
+	Script.SetTimer(self.Config.SurrenderHintHoldMs or 1000, hold)
+end
+
+--- Takes the surrender prompt down when the last provoked fight ends.
+--
+-- @tparam[opt] boolean all clear the count outright, for a load or a reset
+function HorseCollisionMod:HideSurrenderHint(all)
+	local count = self.SurrenderHintCount or 0
+
+	if count <= 0 then
+		return
+	end
+
+	self.SurrenderHintCount = all and 0 or (count - 1)
+
+	if self.SurrenderHintCount > 0 then
+		return
+	end
+
+	local ok = pcall(function()
+		UIAction.CallFunction("hud", -1, "HideActionHint", self.SurrenderHintId)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("SurrenderHint hidden ok=" .. tostring(ok))
+	end
+end
+
 function HorseCollisionMod:EndRetaliation(npc, why)
 	local cleared = pcall(function()
 		Contexts.ClearOption(npc, self.RetaliationOption,
@@ -679,6 +830,31 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 		return false
 	end
 
+	-- Nobody new is provoked while the rider is already in a fight.
+	--
+	-- Detection cannot tell a rider steering into someone from someone running
+	-- into a nearly stationary horse, because it reads the horse's speed and
+	-- who is close, not who closed the distance. During a brawl that is exactly
+	-- what happens: guards charge the horse, each contact scores as a walk
+	-- impact, and each one provokes another attacker. Measured at 1.93 m/s
+	-- against a threshold of 1.8, with `danger=true` on the same line, on a
+	-- rider who had shoved one merchant and touched no guard at all.
+	--
+	-- The impact still lands and still costs the victim. Only the provocation
+	-- is withheld, so a fight grows from what the rider did before it started
+	-- rather than from the fight itself.
+	if not self.Config.ProvokeDuringCombat then
+		local danger = false
+
+		pcall(function()
+			danger = player.soul:IsInCombatDanger()
+		end)
+
+		if danger then
+			return false
+		end
+	end
+
 	local count = self:NoteAnnoyance(npc)
 	local chance = self:RetaliationChance(count)
 
@@ -764,6 +940,8 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	-- pull-down request then queues behind the swing. A man who wants to
 	-- fight someone on a horse takes them off it first, so the order here is
 	-- pull, then fight.
+	self:ShowSurrenderHint()
+
 	if self:PullRiderDown(npc) then
 		return true
 	end
@@ -820,6 +998,13 @@ function HorseCollisionMod:PullRiderDown(npc)
 	local ceilingMs = self.Config.PullDownCeilingMs or 8000
 	local generation = self.TimerTick
 	local startedAt = self:TimeMs()
+	local polls = 0
+	local bestCan = 0
+	local bestCanHorse = 0
+	local bestAngle = 999
+	local widestAngle = -1
+	local angleWhenEnabled = -1
+	local pullTarget = "player"
 
 	local function attempt()
 		if generation ~= self.TimerTick then
@@ -836,9 +1021,35 @@ function HorseCollisionMod:PullRiderDown(npc)
 
 		if not mounted or elapsed >= ceilingMs then
 			if self.Config.LogTelemetry then
+				-- What the victim looked like when it never became available,
+				-- since one merchant gets the pull within a second and
+				-- another never gets it at all across the whole ceiling.
+				local state, dist, hostile = "?", -1, "?"
+
+				pcall(function()
+					state = tostring(npc.actor:GetCurrentAnimationState())
+				end)
+
+				pcall(function()
+					dist = npc:GetDistance(player.id)
+				end)
+
+				pcall(function()
+					hostile = tostring(npc.soul:IsInCombatDanger())
+				end)
+
 				self:Log("PullDown " .. self:NameOf(npc)
 						.. " done why=" .. (mounted and "ceiling" or "dismounted")
-						.. " atMs=" .. string.format("%.0f", elapsed))
+						.. " atMs=" .. string.format("%.0f", elapsed)
+						.. " polls=" .. tostring(polls)
+						.. " bestCan=" .. tostring(bestCan)
+						.. " bestCanHorse=" .. tostring(bestCanHorse)
+						.. " angles=" .. string.format("%.0f", bestAngle)
+						.. "-" .. string.format("%.0f", widestAngle)
+						.. " enabledAt=" .. string.format("%.0f", angleWhenEnabled)
+						.. " state=" .. state
+						.. " dist=" .. string.format("%.2f", dist)
+						.. " hostile=" .. hostile)
 			end
 
 			-- Now he may swing. Held until here so the pull is the opening
@@ -851,14 +1062,98 @@ function HorseCollisionMod:PullRiderDown(npc)
 		end
 
 		local can = 0
+		local canHorse = 0
 
 		pcall(function()
 			can = npc.actor:CanHorsePullDown(player.id) or 0
 		end)
 
-		if can ~= 0 then
+		-- The rider is pulled off a horse, so the id the action wants may be
+		-- the horse rather than the person. Both are asked until one of them
+		-- is shown to be the right one.
+		pcall(function()
+			local h = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
+
+			if h then
+				canHorse = npc.actor:CanHorsePullDown(h.id) or 0
+			end
+		end)
+
+		polls = polls + 1
+
+		-- The angle between where the horse is pointing and where the victim
+		-- is standing. `wh_cs_HorsePullDownAngle` is 55 degrees, so a victim
+		-- who only ever approaches from the flank may never qualify.
+		pcall(function()
+			local h = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
+			local hp = h and h:GetWorldPos()
+			local np = npc:GetWorldPos()
+			local dir = h and h:GetDirectionVector(1)
+
+			if hp and np and dir then
+				local dx, dy = np.x - hp.x, np.y - hp.y
+				local len = math.sqrt(dx * dx + dy * dy)
+
+				if len > 0 then
+					local dot = ((dx / len) * dir.x) + ((dy / len) * dir.y)
+
+					if dot > 1 then
+						dot = 1
+					end
+
+					if dot < -1 then
+						dot = -1
+					end
+
+					local deg = math.acos(dot) * 180 / math.pi
+
+					if deg < bestAngle then
+						bestAngle = deg
+					end
+
+					if deg > widestAngle then
+						widestAngle = deg
+					end
+
+					if can ~= 0 and angleWhenEnabled < 0 then
+						angleWhenEnabled = deg
+					end
+				end
+			end
+		end)
+
+		if can > bestCan then
+			bestCan = can
+		end
+
+		if canHorse > bestCanHorse then
+			bestCanHorse = canHorse
+		end
+
+		if can == 0 and canHorse ~= 0 then
+			can = canHorse
+			pullTarget = "horse"
+		end
+
+		-- Asked regardless of what the check says when `PullDownForce` is on.
+		-- `CanHorsePullDown` returns an HPS status, 2 enabled and 1 disabled,
+		-- and some victims answer 0, meaning the engine does not consider the
+		-- action applicable to them at all. Measured on one merchant across
+		-- 32 polls at every angle from 1 to 117 degrees and under two metres,
+		-- while another merchant answers 2 within a second. Whether the
+		-- request is honoured anyway is a separate question from whether the
+		-- check advertises it.
+		if can ~= 0 or self.Config.PullDownForce then
 			local ok = pcall(function()
-				npc.actor:RequestHorsePullDown(player.id)
+				local id = player.id
+
+				if pullTarget == "horse" then
+					local h = XGenAIModule.GetEntityByWUID(
+							player.player:GetPlayerHorse())
+					id = h and h.id or player.id
+				end
+
+				npc.actor:RequestHorsePullDown(id)
 			end)
 
 			if self.Config.LogTelemetry then

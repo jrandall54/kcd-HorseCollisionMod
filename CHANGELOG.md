@@ -33,6 +33,10 @@ number.
 
 ### Added
 
+- The surrender prompt now appears during a brawl you provoked. Surrendering
+  always worked and resolved the fight cleanly; nothing on screen told you so.
+  `RetaliationSurrenderHint`. **NOT BREAKING**, no released version carried it.
+
 - `RetaliationPullsRiderDown`, `PullDownPollMs`, `PullDownRepeatMs` and
   `PullDownCeilingMs`, which control a provoked victim dragging you off the
   horse. **NOT BREAKING**, no released version carried them.
@@ -45,6 +49,13 @@ number.
   before asking for it, so he hit whatever was in front of him.
   `RetaliationPullsRiderDown`. **NOT BREAKING**, no released version carried
   it.
+
+### Fixed
+
+- A fight you started with one person no longer drags everyone nearby into it.
+  Someone running into your stationary horse mid-brawl counted as you riding
+  them down, so each guard who closed on you became another attacker.
+  `ProvokeDuringCombat`. **NOT BREAKING**, no released version carried it.
 
 ## [4.17.2] - 2026-09-06
 
