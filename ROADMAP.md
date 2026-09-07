@@ -798,3 +798,76 @@ rather than missing.
 The `hitReaction` message the mod already sends is the hook for both, and vanilla
 distinguishes light from normal collisions through the `KOLIZE_S_HRACEM` and
 `KOLIZE_S_HRACEM_LEHKA` dialog metaroles.
+
+## Phase 5: Tuning the rear
+
+Five items raised after 4.19.0 shipped the feature. Where a note below says
+something is established, it was checked against the code or a measurement; the
+rest are open questions.
+
+### 1. The lunge passes through buildings
+
+The rear-and-charge drives the horse into geometry it should be stopped by, and
+the rider can aim it straight at a wall.
+
+The obvious lever is probably not the answer, so it is worth saying why before
+anyone spends a ride on it. Victims stopped being carried into walls because
+`SetMovementControlledByAnimation(false)` hands them back to entity-driven
+movement a tick into the reaction. The lunge's second half already runs that
+way: at `ExitTime` 0.8 the fragment's MovementControlMethod drops `Horizontal`,
+`XyMove`, `ZMove` and `Rotate` to 0 and sets `Inertia` to 1, so the horse is
+traveling under its own momentum, not being carried by the clip, and it clips
+anyway.
+
+The nearer suspect is the `Jump` procedural the same fragment applies at
+`ExitTime` 1.05. Whether that is what lets the horse through a wall has not
+been tested, and no fix should be designed until it has been.
+
+### 2. The lunge threads between people
+
+Riders can pass between two NPCs standing close together without touching
+either, which a charging horse should not manage. The lunge is scored by the
+ordinary detection loop, so this is the horse footprint, `HorseFrontReach`
+1.05, `HorseHalfWidth` 0.70 and `HorseRearReach` 0.20, and not any of the
+`Rear*` settings.
+
+Worth doing after item 1, not before: if the fix for the clipping changes how
+far or how fast the lunge travels, the footprint would have to be tuned twice.
+
+### 3. Rearing has no sound of its own
+
+Both moves borrow an existing tier's sound. The rear on the spot plays
+`ImpactSoundTrot`, and the lunge is forced to gallop for its duration so it
+plays `ImpactSoundGallop`. Neither reads as hooves coming down.
+
+Wanted: a sound built for the rear, with hoof layers, and for the lunge
+specifically the `n_lu_log_ground` layer dropped from what it plays now.
+
+Two things constrain this. The log layer belongs to `ImpactSoundGallop`, which
+every ordinary gallop collision uses, so it cannot simply be deleted: the rear
+needs its own layer set rather than an edit to a shared one. And the hoofstep
+event has been rejected here once already, on the gallop tier, for a reason
+that would apply again: `hs_hp_soil` is `hoofsteps_player`, which ignores
+position, played at fixed full level under every other layer, and could not be
+brought down. `ImpactSoundWalk` still uses it, so it is not unusable, but any
+hoof layer needs its level checked from the saddle before it is kept.
+
+Also unresolved: the report is that the rear has no impact sound at all. The
+code does call `PlayImpactSound` on the rear strike path. Whether that means it
+plays and does not read as a rear, or does not play, is one log line away and
+should be settled before any samples are chosen.
+
+### 4. Fear and morale around a rear
+
+Today a rear either hits someone or does nothing to them. The idea is three
+bands rather than one.
+
+- The hooves land, as now, inside `RearReach` and `RearArc`.
+- A wider and longer band where nobody is touched but the horse is frightening:
+  they break and flee.
+- Some of those instead stand and turn on the rider, decided by a morale check,
+  feeding the existing retaliation system rather than a second one beside it.
+
+The largest item of the five and the only one that is a feature rather than a
+defect. It should go last, because the first two change what the lunge does to
+the people around it and this is built on top of that.
