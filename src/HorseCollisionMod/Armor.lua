@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 4.17.2
+-- @release 4.18.0
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
 -- A sum over a person has to exclude them and a sum over a horse has to be

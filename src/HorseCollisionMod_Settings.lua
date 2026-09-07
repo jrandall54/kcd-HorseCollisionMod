@@ -109,6 +109,15 @@ HorseCollisionModSettings = {
 	-- The brawl is not timed. The mod watches the victim's own state, and
 	-- when the fight is over it puts him back the way it found him.
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
+	RetaliationPullsRiderDown = true, -- drag the rider down before fighting
+	RetaliationSurrenderHint = true,  -- show the surrender prompt during the brawl
+	ProvokeDuringCombat      = false, -- provoke new victims while already fighting
+	SurrenderHintHoldMs      = 1000,  -- the HUD drops it, so put it back this often
+	SurrenderHintCalmPasses  = 6,     -- quiet passes before the prompt goes away
+	PullDownPollMs           = 250,   -- how often to look for the chance
+	PullDownForce            = false, -- ask even when the engine says it cannot
+	PullDownRepeatMs         = 1500,  -- ask again this often until it happens
+	PullDownCeilingMs        = 8000,  -- stop looking after this
 
 	-- A woman answers the same shove differently, because the game's combat
 	-- tree lets only men into the fight branch. She runs and fetches a guard

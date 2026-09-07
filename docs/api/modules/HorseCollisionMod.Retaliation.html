@@ -135,7 +135,7 @@
  honest implementation, not a shortcut around a stat that would have done it.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.17.2
+        <li><strong>Release</strong>:  4.18.0
  The context option that makes a victim answer a hit with a fight.</p>
 
 <p> From the game's own catalog. Named here rather than written inline at each
@@ -187,8 +187,12 @@
 	<td class="summary">Puts a victim right once the fight is over.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:EndRetaliation">HorseCollisionMod:EndRetaliation (npc, why)</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ShowSurrenderHint">HorseCollisionMod:ShowSurrenderHint (npc, why)</a></td>
 	<td class="summary">Closes the incident out and puts the victim back the way he was found.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HideSurrenderHint">HorseCollisionMod:HideSurrenderHint ([all])</a></td>
+	<td class="summary">Takes the surrender prompt down when the last provoked fight ends.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:WatchAftermath">HorseCollisionMod:WatchAftermath (npc)</a></td>
@@ -197,6 +201,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ProvokeIfAnnoyed">HorseCollisionMod:ProvokeIfAnnoyed (npc, playerEnt)</a></td>
 	<td class="summary">Decides whether this walk impact provokes a fight, and starts one if so.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PullRiderDown">HorseCollisionMod:PullRiderDown (npc)</a></td>
+	<td class="summary">Has a provoked victim drag the rider out of the saddle.</td>
 	</tr>
 </table>
 <h2><a href="#Fields">Fields</a></h2>
@@ -642,8 +650,8 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:EndRetaliation"></a>
-    <strong>HorseCollisionMod:EndRetaliation (npc, why)</strong>
+    <a name = "HorseCollisionMod:ShowSurrenderHint"></a>
+    <strong>HorseCollisionMod:ShowSurrenderHint (npc, why)</strong>
     </dt>
     <dd>
 
@@ -681,6 +689,48 @@
         <li><span class="parameter">why</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
          either <code>settled</code> or <code>ceiling</code>
+ Shows the on-screen prompt telling the player they can surrender.</p>
+
+<p> Surrendering already works during a provoked brawl and resolves it cleanly.
+ Nothing told the player so: the hint that appears when guards attack is
+ raised from the AI's own behavior tree and a mod-provoked fight never
+ triggers it, so the option existed and was invisible.</p>
+
+<p> The HUD element declares <code>ShowActionHint(ActionId, Control, Text, Type,
+ Name)</code> in <code>Libs/UI/UIElements/HUD.xml</code>, reachable through
+ <code>UIAction.CallFunction</code>. <code>Control</code> is not the action name but a localized
+ control token, which <code>Game.GetActionControl</code> resolves from the action map
+ and the action: <code>player</code> and <code>surrender</code> give <code>@ui_control_uc_33</code>. Resolved
+ each time rather than stored, so a player who rebinds the key sees their own
+ binding rather than the default.</p>
+
+<p> <code>Type</code> 0 is a press and 1 is a hold. Surrender is a press.</p>
+
+<p> One hint for any number of provoked victims, counted rather than shown per
+ fight, so a brawl with three of them does not stack three copies and does
+ not disappear when the first one yields.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:HideSurrenderHint"></a>
+    <strong>HorseCollisionMod:HideSurrenderHint ([all])</strong>
+    </dt>
+    <dd>
+    Takes the surrender prompt down when the last provoked fight ends.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">all</span>
+            <span class="types"><span class="type">boolean</span></span>
+         clear the count outright, for a load or a reset
+         (<em>optional</em>)
         </li>
     </ul>
 
@@ -764,6 +814,57 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod:PullRiderDown"></a>
+    <strong>HorseCollisionMod:PullRiderDown (npc)</strong>
+    </dt>
+    <dd>
+    Has a provoked victim drag the rider out of the saddle. </p>
+
+<p> A man who has run out of patience with someone riding into him goes for the
+ rider, not the animal. Left to itself the AI gets there eventually, but it
+ fights the horse first while it works into position, and a person throwing
+ punches at a horse does not read as anything a person would do.</p>
+
+<p> <code>RequestHorsePullDown</code> is the vanilla action, the same one guards use when
+ they unhorse the player, and it takes the victim's entity id, meaning the
+ person being pulled down. It is offered by the AI's own behavior tree as
+ <code>HorsePullDownAction</code>, governed by <code>wh_cs_HorsePullDownAngle</code> at 55 degrees
+ with a Z angle and a zero angle alongside it, so it is not available until
+ the NPC has the geometry. <code>CanHorsePullDown</code> returns 0 until then.</p>
+
+<p> So this asks repeatedly rather than once, from the moment the fight starts,
+ until the rider is down. Nothing is forced: if the geometry never
+ comes the request is simply never made and the brawl proceeds as it did
+ before.</p>
+
+<p> A rider already on the ground is the other reason to stop, and it is the
+ common one, since the whole point is that this happens early.</p>
+
+<p> Returns whether it has taken responsibility for starting the fight. When it
+ has, the caller must not release the offense: this does it once the rider is
+ down, or on the ceiling if the pull never comes.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the provoked victim
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the offense release has been deferred to this
+    </ol>
+
+
+
+
+</dd>
 </dl>
     <h2 class="section-header "><a name="Fields"></a>Fields</h2>
 
@@ -827,7 +928,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-06 17:54:57 </i>
+<i style="float:right;">Last updated 2026-09-06 19:33:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

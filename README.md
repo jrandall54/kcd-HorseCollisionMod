@@ -141,6 +141,15 @@ breaking the mod. Deleting a line restores its default.
 | `RetaliationMaxChance` | 0.85 | The ceiling on that chance. |
 | `RetaliationMemorySec` | 45 | How long a victim stays annoyed. Leave them alone for longer and the count resets. |
 | `RetaliationCeilingSec` | 120 | Failsafe. Stop watching an incident after this. |
+| `RetaliationPullsRiderDown` | true | Whether a victim who has run out of patience drags you out of the saddle before fighting, rather than swinging at the horse. |
+| `PullDownPollMs` | 250 | How often he looks for the chance to do it. |
+| `PullDownRepeatMs` | 1500 | How often he asks again once he has, until you are down. |
+| `PullDownCeilingMs` | 8000 | How long he tries before giving up and simply fighting. |
+| `PullDownForce` | false | Ask for the pull-down even when the game says the victim cannot do it. Some NPCs are simply not eligible and this does not change that; it exists for future investigation. |
+| `RetaliationSurrenderHint` | true | Whether the on-screen surrender prompt is shown while a provoked victim is fighting you. Surrendering already worked; nothing told you so. |
+| `SurrenderHintHoldMs` | 1000 | How often the prompt is put back, since the HUD drops it when you are pulled off the horse. |
+| `SurrenderHintCalmPasses` | 6 | How many quiet passes before it is taken down, so it does not blink during a fight. |
+| `ProvokeDuringCombat` | false | Whether someone can be newly provoked while you are already in a fight. Off, because a person running into your stationary horse mid-brawl otherwise becomes another attacker. |
 
 A few detection internals are omitted here and commented in place in the file.
 
