@@ -141,6 +141,10 @@ breaking the mod. Deleting a line restores its default.
 | `RetaliationMaxChance` | 0.85 | The ceiling on that chance. |
 | `RetaliationMemorySec` | 45 | How long a victim stays annoyed. Leave them alone for longer and the count resets. |
 | `RetaliationCeilingSec` | 120 | Failsafe. Stop watching an incident after this. |
+| `RetaliationPullsRiderDown` | true | Whether a victim who has run out of patience drags you out of the saddle before fighting, rather than swinging at the horse. |
+| `PullDownPollMs` | 250 | How often he looks for the chance to do it. |
+| `PullDownRepeatMs` | 1500 | How often he asks again once he has, until you are down. |
+| `PullDownCeilingMs` | 8000 | How long he tries before giving up and simply fighting. |
 
 A few detection internals are omitted here and commented in place in the file.
 

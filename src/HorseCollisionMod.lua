@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.17.2
+-- @release 4.18.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.17.2"
+HorseCollisionMod.Version = "4.18.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -182,6 +182,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
+-- @field RetaliationPullsRiderDown whether a provoked victim drags the rider
+--   out of the saddle before fighting, rather than punching the horse
+-- @field PullDownPollMs how often to look for the chance to do it
+-- @field PullDownRepeatMs how often to ask again once it has been requested,
+--   since a single request is queued behind whatever the brain is doing
+-- @field PullDownCeilingMs how long to keep looking before giving up
 -- @field WomenRaiseAlarm whether a woman shoved once too often runs to fetch
 --   a guard, where a man turns and fights
 -- @field ImpactDamage whether the mod charges the victim for the impact on
@@ -391,6 +397,10 @@ HorseCollisionMod.Config = {
 	RetaliationMaxChance     = 0.85,
 	RetaliationMemorySec     = 45,
 	RetaliationCeilingSec    = 120,
+	RetaliationPullsRiderDown = true,
+	PullDownPollMs           = 250,
+	PullDownRepeatMs         = 1500,
+	PullDownCeilingMs        = 8000,
 	WomenRaiseAlarm          = true,
 
 	-- What being ridden down costs the victim, over and above what the

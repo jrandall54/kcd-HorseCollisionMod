@@ -74,7 +74,7 @@
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 4.17.2
+-- @release 4.18.0
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
@@ -753,10 +753,21 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	-- way and the provocation is wasted.
 	self:SendProvocationHit(npc, playerEnt)
 
-	-- The provocation decides that he fights; this decides that he attacks.
-	-- Without it he enters the fight in defense only and holds a guard until
-	-- something else closes the incident, which is the whole of what a
-	-- provoked victim did before it existed.
+	-- The provocation decides that he fights; releasing the offense decides
+	-- that he attacks. Without it he enters the fight in defense only and
+	-- holds a guard until something else closes the incident, which is the
+	-- whole of what a provoked victim did before it existed.
+	--
+	-- Against a mounted rider that release is held back until the rider is on
+	-- the ground. Handing him the offense first is what made him punch the
+	-- horse: told to attack, he attacks the thing in front of him, and the
+	-- pull-down request then queues behind the swing. A man who wants to
+	-- fight someone on a horse takes them off it first, so the order here is
+	-- pull, then fight.
+	if self:PullRiderDown(npc) then
+		return true
+	end
+
 	self:ReleaseWhenFighting(npc)
 
 	-- The count is spent. Without this a victim already fighting keeps
@@ -764,4 +775,111 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	self.Annoyance[tostring(npc.id)] = nil
 
 	return true
+end
+
+--- Has a provoked victim drag the rider out of the saddle.
+--
+-- A man who has run out of patience with someone riding into him goes for the
+-- rider, not the animal. Left to itself the AI gets there eventually, but it
+-- fights the horse first while it works into position, and a person throwing
+-- punches at a horse does not read as anything a person would do.
+--
+-- `RequestHorsePullDown` is the vanilla action, the same one guards use when
+-- they unhorse the player, and it takes the victim's entity id, meaning the
+-- person being pulled down. It is offered by the AI's own behavior tree as
+-- `HorsePullDownAction`, governed by `wh_cs_HorsePullDownAngle` at 55 degrees
+-- with a Z angle and a zero angle alongside it, so it is not available until
+-- the NPC has the geometry. `CanHorsePullDown` returns 0 until then.
+--
+-- So this asks repeatedly rather than once, from the moment the fight starts,
+-- until the rider is down. Nothing is forced: if the geometry never
+-- comes the request is simply never made and the brawl proceeds as it did
+-- before.
+--
+-- A rider already on the ground is the other reason to stop, and it is the
+-- common one, since the whole point is that this happens early.
+--
+-- Returns whether it has taken responsibility for starting the fight. When it
+-- has, the caller must not release the offense: this does it once the rider is
+-- down, or on the ceiling if the pull never comes.
+--
+-- @tparam table npc the provoked victim
+-- @treturn boolean true when the offense release has been deferred to this
+function HorseCollisionMod:PullRiderDown(npc)
+	local mounted = false
+
+	pcall(function()
+		mounted = player.human:IsMounted()
+	end)
+
+	if not self.Config.RetaliationPullsRiderDown or not mounted then
+		return false
+	end
+
+	local pollMs = self.Config.PullDownPollMs or 250
+	local ceilingMs = self.Config.PullDownCeilingMs or 8000
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+
+	local function attempt()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local mounted = false
+
+		pcall(function()
+			mounted = player.human:IsMounted()
+		end)
+
+		local elapsed = self:TimeMs() - startedAt
+
+		if not mounted or elapsed >= ceilingMs then
+			if self.Config.LogTelemetry then
+				self:Log("PullDown " .. self:NameOf(npc)
+						.. " done why=" .. (mounted and "ceiling" or "dismounted")
+						.. " atMs=" .. string.format("%.0f", elapsed))
+			end
+
+			-- Now he may swing. Held until here so the pull is the opening
+			-- move rather than something queued behind a punch, and released
+			-- on the ceiling too so a victim who never gets the geometry is
+			-- not left standing with his guard up forever.
+			self:ReleaseWhenFighting(npc)
+
+			return
+		end
+
+		local can = 0
+
+		pcall(function()
+			can = npc.actor:CanHorsePullDown(player.id) or 0
+		end)
+
+		if can ~= 0 then
+			local ok = pcall(function()
+				npc.actor:RequestHorsePullDown(player.id)
+			end)
+
+			if self.Config.LogTelemetry then
+				self:Log("PullDown " .. self:NameOf(npc)
+						.. " requested can=" .. tostring(can)
+						.. " ok=" .. tostring(ok)
+						.. " atMs=" .. string.format("%.0f", elapsed))
+			end
+
+			-- Asked again on a slow cadence until the rider is actually
+			-- down. The request is accepted immediately but the brain runs
+			-- it when it is ready, and without the offense released there is
+			-- little for it to be busy with, so this is a safety net rather
+			-- than the mechanism.
+			Script.SetTimer(self.Config.PullDownRepeatMs or 1500, attempt)
+
+			return
+		end
+
+		Script.SetTimer(pollMs, attempt)
+	end
+
+	attempt()
 end

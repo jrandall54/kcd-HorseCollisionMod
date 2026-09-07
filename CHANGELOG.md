@@ -29,6 +29,23 @@ number.
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-09-06
+
+### Added
+
+- `RetaliationPullsRiderDown`, `PullDownPollMs`, `PullDownRepeatMs` and
+  `PullDownCeilingMs`, which control a provoked victim dragging you off the
+  horse. **NOT BREAKING**, no released version carried them.
+
+### Changed
+
+- A villager who has had enough of being ridden into now drags you out of the
+  saddle first and fights you on the ground, instead of throwing punches at
+  your horse. The game already had the move; the mod was telling him to attack
+  before asking for it, so he hit whatever was in front of him.
+  `RetaliationPullsRiderDown`. **NOT BREAKING**, no released version carried
+  it.
+
 ## [4.17.2] - 2026-09-06
 
 ### Fixed
