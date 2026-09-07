@@ -805,7 +805,7 @@ Five items raised after 4.19.0 shipped the feature. Where a note below says
 something is established, it was checked against the code or a measurement; the
 rest are open questions.
 
-### 1. The lunge passes through buildings
+### 1. The lunge passes through buildings. Fixed in 4.19.1.
 
 The rear-and-charge drives the horse into geometry it should be stopped by, and
 the rider can aim it straight at a wall.
@@ -819,9 +819,12 @@ way: at `ExitTime` 0.8 the fragment's MovementControlMethod drops `Horizontal`,
 traveling under its own momentum, not being carried by the clip, and it clips
 anyway.
 
-The nearer suspect is the `Jump` procedural the same fragment applies at
-`ExitTime` 1.05. Whether that is what lets the horse through a wall has not
-been tested, and no fix should be designed until it has been.
+Neither guess above was right. `Horizontal` in the fragment is CryEngine's
+`EMovementControlMethod`, and it shipped as `2`, `eMCM_Animation`: the
+animation moves the horse and collision is off. The `Jump` procedural was not
+involved. Since the 5.4 m of root motion cannot be shortened, and neither of
+the other movement control methods works, the horse is stopped short of
+anything solid instead. See the diary and TECHNICAL_DETAILS.
 
 ### 2. The lunge threads between people
 
