@@ -901,7 +901,52 @@ doing nothing while still holding the horse, releasing at 2064 ms when the rear
 is visually over at around 1400.
 
 The charge covers about 5.4 m in a second, which the detection loop would score
-as a trot, so `RearCharging` forces it to a gallop for the duration. The rear
+as a trot, so `RearCharging` forces it to a gallop for the duration.
+
+### The charge is stopped before it reaches anything solid
+
+An interactive action moves the actor by root motion, and the fragment's
+`MovementControlMethod` decides whether that motion collides. `Horizontal` is
+CryEngine's `EMovementControlMethod`: `1` is `eMCM_Entity`, `2` is
+`eMCM_Animation`, `6` is `eMCM_AnimationHCollision`. The charge uses `2`, where
+the animation moves the horse and collision is off, so nothing stops it riding
+through a wall.
+
+The other two values do not solve it. At `6` the fence blocks the horse while
+the animation keeps demanding a position collision refuses; the gap accumulates
+for the length of the lunge and is discharged when the action ends, throwing
+horse and rider backwards at over 20 m/s. At `1` physics drives and no
+divergence is possible, but entity-driven means the movement controller drives,
+and a standing horse's desired velocity is zero: an impulse of 10000 produced
+20.54 m/s, the horse traveled 0.67 m, and the controller zeroed it on the next
+frame. There is no travel to be had that way.
+
+Since the travel is a fixed 5.4 m that cannot be shortened, the mod stops the
+horse instead of trying to make the contact work. Three rays are cast forward
+at `RearChargeCheckZ` above the horse's origin, the center reaching
+`RearChargeStopDistance` and the sides `RearChargeSideDistance` at the horse's
+half width. On a hit, `SetMovementControlledByAnimation(false)` hands the horse
+back to entity-driven movement and it stops.
+
+Two details make the check correct rather than merely tuned.
+
+**Steepness decides what is an obstacle, not entity class.** The rays are
+horizontal, so facing uphill they run into rising ground. Excluding terrain
+does not help, because hillsides are static meshes reported as world geometry
+with no entity, the same class as a wall. The surface normal separates them:
+ground a horse climbs has a normal pointing mostly up, a wall's points
+sideways, and only a normal flatter than `RearChargeWallNormal` blocks.
+
+**The side rays are short.** Three parallel rays at the horse's full width
+describe a corridor 1.4 m across, and at six meters that catches anything
+running alongside. The center ray looks the distance the horse will cover; the
+sides look only as far as the rider cannot steer around.
+
+The braking distance is a trade. Refusing at the lunge's own length never
+glitches and leaves the horse standing six meters short of a wall. Braking
+close lets the horse cover the ground and stop against the wall, at the cost of
+the release landing while the horse is airborne, which drops it. Close is what
+ships: a meter from a wall the stop reads as an impact. The rear
 on the spot travels 0.00 m, so the detection loop can never see anyone and the
 move carries its own strike instead, fired on a delay because the strike is the
 hooves landing rather than the horse going up.

@@ -120,6 +120,17 @@ HorseCollisionModSettings = {
 	RearReach                = 2.0,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse
+	-- The charge is an animation, and an animation does not collide, so the
+	-- horse is stopped before it reaches anything solid. Without this it rides
+	-- through walls. 0 switches the whole check off.
+	RearChargeStopDistance   = 1.2,   -- how close to a wall the charge stops
+	RearChargeSideDistance   = 1.0,   -- how far the two outer rays look
+	RearChargeCheckZ         = 0.45,  -- how high above the hooves they look
+	RearChargeWallNormal     = 0.5,   -- flatter than this is a wall, more
+	                                  -- upright is ground the horse runs over
+	RearChargeWatchWhileMoving = true, -- keep looking during the lunge
+	RearChargePollMs         = 50,    -- how often it looks
+	RearChargeWatchMs        = 2000,  -- how long it keeps looking
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance

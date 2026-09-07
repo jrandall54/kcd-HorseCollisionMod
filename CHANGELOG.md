@@ -29,6 +29,20 @@ number.
 
 ## [Unreleased]
 
+## [4.19.1] - 2026-09-07
+
+### Fixed
+
+- The rear and charge no longer rides through walls, fences and carts. The
+  charge is an animation, and an animation does not collide, so the horse now
+  watches ahead and pulls up short of anything solid instead of passing into
+  it. Rising ground is not treated as an obstacle: the horse still charges up
+  a hill.
+
+  This also removes the launches that came with it, where a charge that ended
+  inside geometry threw horse and rider backwards, sometimes further than the
+  lunge had traveled.
+
 ## [4.19.0] - 2026-09-06
 
 ### Added

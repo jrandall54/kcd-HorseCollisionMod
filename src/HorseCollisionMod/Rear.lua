@@ -249,6 +249,203 @@ function HorseCollisionMod:RearRequested(fragTag)
 	return true
 end
 
+
+
+
+
+
+
+--- Stops the charge at a wall without stopping the charge.
+--
+-- An interactive action passes through geometry, and handing the actor back to
+-- entity-driven movement with `SetMovementControlledByAnimation(false)` is
+-- what makes it respect the world. On the horse that works, and applied at a
+-- fixed moment it also ends the lunge: the travel is the animation's own root
+-- motion, not momentum the horse carries, so releasing is a brake rather than
+-- a handover.
+--
+-- A brake is exactly what is wanted, provided it is only pulled when there is
+-- something to stop for. So the path ahead is watched while the lunge runs and
+-- the release happens on the tick a wall comes inside stopping distance. Every
+-- charge with open ground in front of it never reaches that branch and is
+-- untouched.
+--
+-- Checked ahead rather than on contact because the release takes a moment to
+-- take hold, and by then a horse covering five and a half meters in a second
+-- is already inside the wall.
+--
+-- Three rays, not one. A single ray has no width and so represents none of the
+-- horse: it threads the gap between a shed's posts, and it fits through an
+-- open doorway that a horse cannot. The rays are spread across the horse's own
+-- width, `HorseHalfWidth` to either side of center, which is the cheapest
+-- shape that answers "would the horse fit through this".
+--
+-- All three sit at one height, and the height is the whole of what the check
+-- means. The second half of the charge is `relaxed_gallop_jump`, so low
+-- obstacles are not obstacles: the horse is supposed to clear a fence, and a
+-- ray low enough to see the fence stops the lunge that would have jumped it.
+-- `RearChargeCheckZ` is therefore set above what the horse can jump, and the
+-- check reads as "is there something here too tall to get over", which is the
+-- only question worth braking for.
+--
+-- Rigid bodies are included in what counts. Carts and wagons are rigid, not
+-- static, so a mask of terrain and static geometry could never have stopped a
+-- charge at one however the rays were arranged.
+--
+-- Nothing is cast from the horse's origin height. That sits at its feet and
+-- would hit the ground on any upward slope.
+--
+-- @tparam table horseEnt the player's horse
+function HorseCollisionMod:WatchChargeForWalls(horseEnt)
+	local cfg = self.Config
+	local stopAt = cfg.RearChargeStopDistance or 0
+
+	if stopAt <= 0 then
+		return
+	end
+
+	local generation = self.TimerTick
+	local poll = cfg.RearChargePollMs or 50
+	local deadline = self:TimeMs() + (cfg.RearChargeWatchMs or 2000)
+
+	local function look()
+		if generation ~= self.TimerTick or self:TimeMs() > deadline then
+			return
+		end
+
+		local blocked = false
+
+		pcall(function()
+			local pos = horseEnt:GetWorldPos()
+			local heading = horseEnt:GetDirectionVector(1)
+			local flat = math.sqrt((heading.x * heading.x)
+					+ (heading.y * heading.y))
+
+			if flat <= 0 then
+				return
+			end
+
+			local fx, fy = heading.x / flat, heading.y / flat
+			-- Perpendicular in the ground plane, to spread the rays across the
+			-- horse rather than stack them all on its centerline.
+			local rx, ry = -fy, fx
+			local half = cfg.HorseHalfWidth or 0.70
+			local types = ent_terrain + ent_static + ent_rigid
+					+ ent_sleeping_rigid
+
+			local height = cfg.RearChargeCheckZ or 1.4
+			local near = cfg.RearChargeSideDistance or 2.0
+
+			-- The center ray looks the whole length of the lunge; the side rays
+			-- look only a short way. Three parallel rays at the horse's full
+			-- width make a corridor 1.4 m across, and over six meters anything
+			-- running alongside clips an outer one: measured, a charge refused
+			-- repeatedly on world geometry 5.11 m away on the left, with the
+			-- center clear and nothing in front of the horse at all.
+			--
+			-- Far ahead only what is directly in front matters, because the rider
+			-- steers. The horse's width matters near, where it cannot be steered
+			-- around.
+			for _, side in ipairs({ -half, 0, half }) do
+				if not blocked then
+					local reach = (side == 0) and stopAt or near
+					local along = {
+						x = fx * reach, y = fy * reach, z = 0
+					}
+					local from = {
+						x = pos.x + (rx * side),
+						y = pos.y + (ry * side),
+						z = pos.z + height
+					}
+					local found = {}
+					local hits = Physics.RayWorldIntersection(from, along, 1,
+							types, horseEnt.id, player.id, found)
+
+					-- Steepness, not class, decides whether this stops a charge.
+					--
+					-- The rays are horizontal, so facing uphill they run into the
+					-- rising ground and the charge refuses with nothing in front of
+					-- the horse. Excluding terrain did not help: hillsides here are
+					-- static meshes, reported as world geometry with no entity, the
+					-- same class as a wall.
+					--
+					-- What separates them is the surface normal the ray already
+					-- returns. Ground a horse can climb has a normal pointing
+					-- mostly up; a wall's points mostly sideways. So a hit only
+					-- blocks when its normal is flat enough to be something the
+					-- horse would hit rather than run over.
+					if (hits or 0) > 0 then
+						local upright = 0
+
+						pcall(function()
+							local n = found[1] and found[1].normal
+
+							if n and n.z then
+								upright = math.abs(n.z)
+							end
+						end)
+
+						blocked = upright < (cfg.RearChargeWallNormal or 0.5)
+					end
+
+					if blocked then
+						-- Name what stopped the charge. A refusal that cannot
+						-- say what it saw is indistinguishable from a bug, and
+						-- the rider has hit spots where the charge refuses with
+						-- nothing visible in front of the horse.
+						local hit = found[1]
+						local what, dist = "?", -1
+
+						pcall(function()
+							if hit.entity then
+								what = tostring(hit.entity:GetName())
+										.. "/" .. tostring(hit.entity.class)
+							else
+								what = "no entity, world geometry"
+							end
+
+							if hit.pos then
+								local ax = hit.pos.x - from.x
+								local ay = hit.pos.y - from.y
+								local az = hit.pos.z - from.z
+								dist = math.sqrt((ax * ax) + (ay * ay)
+										+ (az * az))
+							end
+						end)
+
+						self:Log(string.format(
+								"ChargeBlockedBy %s at %.2f m, side %.2f,"
+										.. " normal %.2f",
+								what, dist, side, upright))
+					end
+				end
+			end
+		end)
+
+		if blocked then
+			self:Log("Rear charge stopping, wall within "
+					.. tostring(stopAt) .. " m")
+			self:ReleaseActorMovement(horseEnt, "charge")
+
+			return
+		end
+
+		if cfg.RearChargeWatchWhileMoving then
+			Script.SetTimer(poll, look)
+		end
+	end
+
+	-- Decided once, before the horse leaves the ground, and then committed.
+	--
+	-- Polling through the lunge means the brake can fire while the horse is
+	-- airborne, which takes movement control away mid-flight and drops it
+	-- straight down: the rider described it as hitting an invisible barrier.
+	-- Deciding at the start avoids that by construction, and costs nothing,
+	-- because the check already looks the whole length of the lunge. Anything
+	-- that could be reached is seen before the first step.
+	Script.SetTimer(poll, look)
+end
+
 --- Rears the horse.
 --
 -- The horse plays its own `relaxed_rearing` clip and the rider stays in the
@@ -291,6 +488,8 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 				self.RearCharging = false
 			end
 		end)
+
+		self:WatchChargeForWalls(horseEnt)
 	end
 
 	local ok = pcall(function()
