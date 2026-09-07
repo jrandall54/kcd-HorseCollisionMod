@@ -73,6 +73,11 @@ breaking the mod. Deleting a line restores its default.
 | `HitCooldownMs` | 3000 | Milliseconds before the same NPC can react again. Stops one person reacting repeatedly. |
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
 | `Uplift` | 30.0 | Vertical knockdown force, trot and gallop only. Higher throws them upward rather than along the ground. |
+| `RagdollDampSettleSpeed` | 0.5 | The speed a thrown body must drop under, in metres per second, before the mod settles it so it stops sliding. Settling it while it is still travelling cuts the throw short. |
+| `RagdollDampGroundedSpeed` | 0.3 | The vertical speed below which a body counts as sliding on the ground rather than still being thrown. This is what tells a slide apart from a throw, since both are movement. |
+| `RagdollDampFloorMs` | 200 | The earliest a body may be settled, in milliseconds, so it cannot happen mid-launch. |
+| `RagdollDampCeilingMs` | 6000 | The latest, applied whatever the body is doing. |
+| `RagdollDampPollMs` | 100 | How often a thrown body is looked at. |
 | `StaminaDrainTrot` | 14.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
 | `StaminaDrainGallop` | 22.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
 | `StaminaDrainWalk` | 0.0 | Stamina removed per NPC at walking pace. |

@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.17.0
+-- @release 4.17.1
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.17.0"
+HorseCollisionMod.Version = "4.17.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -162,6 +162,14 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
+-- @field RagdollDampPollMs how often a thrown body is looked at, milliseconds
+-- @field RagdollDampSettleSpeed the speed it must fall under before the
+--   damping is applied, meters per second
+-- @field RagdollDampGroundedSpeed the vertical speed below which a body
+--   counts as sliding on the ground rather than still being thrown
+-- @field RagdollDampFloorMs the earliest the damping may be applied, so it
+--   cannot fire while the body is still being launched
+-- @field RagdollDampCeilingMs the latest, applied regardless of speed
 --   0 for the engine's own value
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @field Retaliation whether a victim shoved repeatedly at a walk can lose
@@ -692,8 +700,13 @@ HorseCollisionMod.Config = {
 	-- body and `min_energy` is the threshold below which physics puts it to
 	-- rest, both fields of `pe_simulation_params`, reached through
 	-- `entity:SetPhysicParams(PHYSICPARAM_SIMULATION, ...)`.
-	RagdollDamping           = 3.0,
-	RagdollMinEnergy         = 0.5
+	RagdollDamping           = 5.0,
+	RagdollMinEnergy         = 1.0,
+	RagdollDampPollMs        = 100,
+	RagdollDampSettleSpeed   = 0.5,
+	RagdollDampGroundedSpeed = 0.3,
+	RagdollDampFloorMs       = 200,
+	RagdollDampCeilingMs     = 6000,
 }
 
 
@@ -990,12 +1003,6 @@ HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 
--- How often to look for the victim to become a ragdoll, and how long to wait
--- before applying the mass and the impulse anyway. `actor:Fall` only requests
--- the fall, so both are discarded if they are applied before the body is
--- physicalized.
-HorseCollisionMod.RagdollReadyPollMs = 16
-HorseCollisionMod.RagdollReadyCeilingMs = 600
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
 
 -- The state an actor reports while one of this mod's reaction clips owns the
