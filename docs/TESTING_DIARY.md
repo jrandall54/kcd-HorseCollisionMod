@@ -16382,10 +16382,17 @@ was.
 `PullDownForce` is left in, defaulting off, because it costs nothing and a
 future session with a new idea about eligibility will want it.
 
-Two things not to repeat. Guards attacking during a provoked brawl are not
-witnesses reacting: they are victims the mod provoked itself, because detection
-cannot tell a rider steering into someone from someone charging a nearly
-stationary horse. That is fixed by `ProvokeDuringCombat`, off by default.
+Two things not to repeat. Guards during a provoked brawl were being provoked
+by the mod as well as reacting to it, because detection cannot tell a rider
+steering into someone from someone charging a nearly stationary horse, so
+every guard who closed on the rider scored an impact and was started on a
+brawl of his own. `ProvokeDuringCombat`, off by default, stops that.
+
+**It does not stop bystanders joining a fight**, and an earlier draft of this
+entry claimed it did. Guards still respond to the assault they witness, which
+is vanilla. Confirmed after the fix: no `Retaliation` line for the guard, and
+he ran over and attacked anyway.
+
 And the surrender prompt disappearing when the rider is unhorsed is vanilla's
 own behavior, confirmed with this mod's hint disabled: the HUD drops action
 hints when the action map changes from `horse` to `player`.
