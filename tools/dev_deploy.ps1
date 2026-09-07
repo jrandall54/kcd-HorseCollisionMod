@@ -1,4 +1,4 @@
-﻿# Builds the mod and installs it straight into the game, skipping Vortex.
+# Builds the mod and installs it straight into the game, skipping Vortex.
 #
 # Vortex's deploy step does one thing that matters here: it copies a pak and a
 # manifest into Mods\<name>\ and lists that folder in Mods\mod_order.txt. None
@@ -461,15 +461,20 @@ Write-Host "[DEPLOY] game: $gameRoot"
 #
 # Returns which halves were written, as @{ Script = $bool; Anim = $bool }, so
 # the caller reloads only the subsystem that needs it.
-function Sync-LooseFiles {
+# Every loose file the mod owns, as repo source paired with installed target.
+#
+# Split out of Sync-LooseFiles so the verification below can ask for both
+# halves whatever a given deploy copied. That distinction is the whole point:
+# the failure this guards against is a -ScriptOnly deploy leaving the animation
+# databases stale, which is silent, survives a reload, and makes the running
+# game disagree with the repository while every message says success.
+function Get-LooseFileMap {
 	param (
 		[string]$Root,
 		[switch]$Script,
-		[switch]$Anim,
-		[switch]$ChangedOnly
+		[switch]$Anim
 	)
 
-	$changed = @{ Script = $false; Anim = $false }
 	$files = @()
 
 	# The settings file belongs here as much as the mod script does. It is a
@@ -545,6 +550,96 @@ function Sync-LooseFiles {
 			}
 		}
 	}
+
+	return $files
+}
+
+# Reports any installed loose file whose bytes differ from the repository.
+#
+# This exists because a deploy can succeed, print nothing but success, reload
+# the running game, and still leave it executing something the repository no
+# longer contains. That happened with -ScriptOnly after an animation database
+# was reverted: the revert never reached the install, two test rides were spent
+# against a fragment believed to be gone, and the symptom was read as new
+# behavior rather than as stale data.
+#
+# Both halves are always checked, whatever the deploy copied, since the whole
+# failure is a half that was not copied. Hashes rather than timestamps, because
+# a copy can be newer and still be the wrong bytes.
+#
+# @return the number of files that do not match
+function Test-InstalledFiles {
+	param ([string]$Root)
+
+	$stale = 0
+	$missing = 0
+
+	foreach ($file in (Get-LooseFileMap -Root $Root -Script -Anim)) {
+		if (-not (Test-Path $file.From)) {
+			continue
+		}
+
+		if (-not (Test-Path $file.To)) {
+			Write-Host "[VERIFY] missing  $(Split-Path -Leaf $file.To)" -ForegroundColor Red
+			$missing++
+			continue
+		}
+
+		# The settings file is deliberately different: Set-DeployedCrime
+		# rewrites CollisionIsCrime in the installed copy on every deploy. A
+		# raw hash would report it stale every single run, and a check that is
+		# always wrong is one everybody learns to ignore. So that one value is
+		# normalized out of both sides and everything else still has to match.
+		if ((Split-Path -Leaf $file.To) -eq "HorseCollisionMod_Settings.lua") {
+			$pattern = '(CollisionIsCrime\s*=\s*)(true|false)'
+			$a = [regex]::Replace([System.IO.File]::ReadAllText($file.From),
+					$pattern, '${1}X')
+			$b = [regex]::Replace([System.IO.File]::ReadAllText($file.To),
+					$pattern, '${1}X')
+
+			if ($a -ne $b) {
+				Write-Host "[VERIFY] STALE    $(Split-Path -Leaf $file.To)" -ForegroundColor Red
+				Write-Host "         installed does not match $($file.From)" -ForegroundColor Red
+				$stale++
+			}
+
+			continue
+		}
+
+		$from = (Get-FileHash $file.From -Algorithm SHA256).Hash
+		$to = (Get-FileHash $file.To -Algorithm SHA256).Hash
+
+		if ($from -ne $to) {
+			Write-Host "[VERIFY] STALE    $(Split-Path -Leaf $file.To)" -ForegroundColor Red
+			Write-Host "         installed does not match $($file.From)" -ForegroundColor Red
+			$stale++
+		}
+	}
+
+	$bad = $stale + $missing
+
+	if ($bad -eq 0) {
+		Write-Host "[VERIFY] installed files match the repository."
+	}
+	else {
+		Write-Host "[VERIFY] $bad file(s) do not match. The running game is not" -ForegroundColor Red
+		Write-Host "         what the repository says. Re-run without -ScriptOnly" -ForegroundColor Red
+		Write-Host "         or -AnimOnly to sync every half." -ForegroundColor Red
+	}
+
+	return $bad
+}
+
+function Sync-LooseFiles {
+	param (
+		[string]$Root,
+		[switch]$Script,
+		[switch]$Anim,
+		[switch]$ChangedOnly
+	)
+
+	$changed = @{ Script = $false; Anim = $false }
+	$files = Get-LooseFileMap -Root $Root -Script:$Script -Anim:$Anim
 
 	foreach ($file in $files) {
 		if (-not (Test-Path $file.From)) {
@@ -684,12 +779,22 @@ if ($Reload -or $ScriptOnly -or $AnimOnly) {
 		-Anim:($AnimOnly -or -not $named) `
 		-ChangedOnly:(-not $named)
 
+	# Verified before the reload, not after, so a stale half is named while
+	# there is still a chance to act on it rather than after the game has been
+	# told to reload something that did not move.
+	$bad = Test-InstalledFiles -Root $gameRoot
+
 	if (-not ($changed.Script -or $changed.Anim)) {
 		Write-Host "[DEPLOY] nothing changed since the last deploy."
-		exit 0
+		exit ($(if ($bad -gt 0) { 1 } else { 0 }))
 	}
 
 	Invoke-LiveReload -Changed $changed
+
+	if ($bad -gt 0) {
+		exit 1
+	}
+
 	exit 0
 }
 
@@ -822,6 +927,13 @@ Write-Host "[DEPLOY] load order: $($order -join ' -> ')"
 # no-op to be discovered later.
 if (-not $NoLooseScript) {
 	Sync-LooseFiles -Root $gameRoot -Script -Anim | Out-Null
+
+	# The same guard the reload path gets. A full deploy is the path least
+	# likely to leave a half behind, which is exactly why a silent mismatch
+	# here would go unnoticed longest.
+	if ((Test-InstalledFiles -Root $gameRoot) -gt 0) {
+		exit 1
+	}
 }
 
 if ($Launch) {

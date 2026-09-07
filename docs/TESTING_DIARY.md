@@ -16662,3 +16662,330 @@ already noted against `TrackSpeed`: a stationary horse reports 1.05 to 2.31 m/s
 because `GetVelocity` carries the vertical fall while it settles against the
 ground, and `RearMaxSpeed` is 1.0. Not the cause of the dead period, but it can
 refuse a rear on a horse that is standing still.
+
+### The rear charge cannot both travel and collide
+
+The charge drives the horse through buildings, unrestricted, from the first
+frame rather than only once the jump procedural comes in at 1.05 s.
+
+The cause is the one already written up for victims: an interactive action
+passes through geometry, and `SetMovementControlledByAnimation(false)` is what
+hands an actor back to entity-driven movement and makes it respect the world.
+The charge is an interactive action on the horse and inherits it. The
+fragment's own MovementControlMethod releasing at 0.8 s is a different layer
+from the actor flag the interactive action sets, and does not do this.
+
+Calling it on the horse at 800 ms works, and costs the move. The horse now
+stops at a wall and the lunge barely moves.
+
+So the travel is the animation's root motion, not momentum the horse carries.
+`Inertia = 1` in the fragment at 0.8 s does not produce travel on its own,
+because the animation's velocity never becomes entity velocity. Animation
+driven, the horse covers 5.4 m and ignores the world; entity driven, it
+respects the world and goes nowhere. There is no release time that gives both,
+because the release is what ends the travel, and a release late enough to keep
+the distance is a release after the horse is already inside the building.
+
+Not attempted, and recorded so it is not mistaken for untried ground: driving
+the lunge with a real impulse instead of the animation. It would need the
+horse to carry momentum an interactive action has just demonstrated it does not
+carry, and this project's own measurements on impulse magnitude are not
+reproducible enough to tune a move by.
+
+### The rubberband measured: the lunge desyncs the horse from its own physics
+
+Sampled every 48 ms through three charges over a fence, with the wall brake
+switched off, so none of this is the mod braking.
+
+**The lunge itself is clean and repeatable.** Travel begins at t+864 ms and
+ends at t+1500, covering 5.31 m and 5.41 m on two runs, at a steady 0.48 m per
+sample, about 10 m/s. It then holds position exactly.
+
+**`GetVelocity` reads 0.00 for every sample of it.** The horse crosses five and
+a half meters and the engine's velocity is zero throughout. Animation-driven
+movement does not update the entity's velocity state at all, which is the
+desync in one number.
+
+**The rubberband fires on the first movement input, not on landing.** The horse
+sat at travel 5.41 with speed 0.00 for nine hundred milliseconds. Then:
+
+    t+2416ms travel=5.41 step=0.00  dz=0.53 speed=0.97
+    t+2448ms travel=5.08 step=-0.33 dz=0.50 speed=21.78
+    t+2496ms travel=3.97 step=-1.13 dz=0.65 speed=20.57
+    t+2544ms travel=2.90 step=-1.09 dz=0.73 speed=19.63
+    t+2592ms travel=1.90 step=-1.04 dz=0.71 speed=18.95
+    t+2640ms travel=1.03 step=-1.00 dz=0.62 speed=18.47
+
+**It is not a teleport and not a snap to a remembered position.** It is
+continuous motion at 19 to 21 m/s for about 460 ms, following a ballistic arc:
+`dz` rises then falls a meter and a half. It passes straight through the lunge
+origin and keeps going, ending 3.84 m on the far side. A position correction
+would have stopped at the origin. This overshoots it by four meters, so what is
+being applied is a velocity, not a position.
+
+**The magnitude is the lunge's own displacement.** 5.41 m over 0.25 s is
+21.6 m/s against the 21.78 measured. The engine appears to convert the
+positional error the animation accumulated into a velocity over a quarter
+second, and applies it the moment the horse is asked to move. For scale, a
+gallop is 8.5 m/s, so this is two and a half times the horse's top speed.
+
+What the rider sees as a teleport and as a smooth bounce are the same event
+seen at different frame timings, which is why both descriptions came from the
+same three runs.
+
+The brake was off for all of this. `SetMovementControlledByAnimation` is not
+the cause of the rubberband and never was; the earlier appearance of the two
+together was that the brake made lunges end near geometry, where the rider was
+more likely to press a movement key straight away.
+
+### The lunge never enters the engine's jump, which is the whole bug
+
+One trace, one instrument, a vanilla fence jump and a rear charge in the same
+run, with the horse's animation state and physicalization profile sampled
+alongside its position.
+
+**A vanilla jump, walk through gallop:**
+
+    state=MotionMovement  speed=3.04
+    state=MotionJump      speed=12.03, 7.55, 6.80, 7.66, 9.07
+    state=MotionLand      speed=2.77
+    state=MotionMovement  speed=2.92 ... 0.22
+    state=MotionIdle      speed=0.05
+
+Real velocity on every sample, a takeoff state, a landing state, and a clean
+return to idle. Standing four seconds and then riding off produced an ordinary
+acceleration ramp and no correction of any kind.
+
+**A rear charge over the same fence:**
+
+    state=AnimationControlled  speed=0.00  (the entire 5.34 m of travel)
+    state=MotionIdle           speed=0.00
+    ... eight seconds, nothing moves ...
+    state=MotionMovement       speed=21.57  (the rider presses forward)
+
+**The lunge never enters `MotionJump` and never enters `MotionLand`.** It goes
+from `AnimationControlled` straight to `MotionIdle`. The horse is never told it
+left the ground, so it is never told it landed, and the engine's landing
+reconciliation, which is what settles position against velocity after airborne
+travel, does not run. The displacement the animation accumulated is then
+discharged on the next movement input at 21.57 to 22.66 m/s.
+
+`prof` reads `alive` on every sample of both, so the physicalization profile
+was never involved. `ChargeProfile set alive ok=true` changed nothing because
+the horse was already alive.
+
+This accounts for every failed attempt. The position write did nothing because
+the transform was never wrong. Releasing movement control did nothing because
+the flag was never what held it. Waiting did nothing because there is no
+process running to decay. And the `Jump` procedural the fragment applies at
+`ExitTime` 1.05 does not put the actor into `MotionJump`, so it is not the
+engine's jump under another name.
+
+The engine's own jump is correct, and the mod's lunge is an interactive action
+flying past the state machine that makes it correct.
+
+### The lunge's rubberband is a vertical one, and the ground is the fix
+
+The rider's own scoping is what solved this, after several fixes aimed at the
+wrong layer. A charge across flat ground lands normally and always has. The
+fault appears only when the horse clears something, and the fence used for
+testing sits on a hill, so every failing run was a jump from lower ground onto
+higher ground.
+
+The travel is the animation's root motion, on a path authored for flat ground.
+Jump uphill and the terrain rises under that path, so the horse finishes below
+the surface. Measured with a ray cast straight down from above the horse at the
+end of the travel, where a negative figure means the horse is under what the
+ray found:
+
+    over the fence, uphill    -0.39  -0.66  -0.39  -0.36
+    on flat ground            -0.02  -0.05  -0.08  -0.13
+
+So the horse is embedded, not floating, and the engine discharges the
+disagreement as a 21 m/s correction the moment the rider next asks it to move.
+
+Placing the horse on whatever the ray finds, when the gap exceeds 0.15 m,
+removes the symptom: `drop=-0.36 placed=true` over the fence with no bounce and
+no rubberband, and `drop=-0.13 placed=false` on the flat, untouched and normal.
+
+#### What this replaced, and why each of those failed
+
+Every earlier attempt treated the problem as horizontal or as state.
+
+- Releasing movement control mid-lunge braked the horse, because the travel is
+  root motion and there is no momentum to hand to physics.
+- Refusing the charge near geometry changed what the button does and was
+  rejected outright.
+- Writing the horse's own position back was measurably a no-op. The transform
+  was never wrong in itself, only wrong about the ground.
+- `SetPhysicalizationProfile` changed nothing: `prof` reads `alive` on every
+  sample of both a vanilla jump and a charge.
+- Adding vanilla's looping fall clip let the rider walk in mid-air
+  indefinitely, because that loop is terminated by `MotionLand`, which the
+  interactive action never reaches.
+- Adding vanilla's landing clip made the clipping worse.
+
+`SimulateOnAction` was also ruled out as a way to reach the engine's own jump.
+It accepts any action name and any mode, returns true, and does nothing:
+proven with `horse_accelerate`, `horse_sprint` and `horse_dismount` as
+controls, none of which moved the horse or dismounted the rider. The Lua
+surface of `ActionMapManager` has no trigger either, so no action can be raised
+from script at a chosen moment.
+
+#### Still untested
+
+Jumping downhill, where the same reasoning predicts the horse finishes *above*
+the ground and `drop` reads positive. The placement closes the gap in both
+directions but that half has not been seen. A level obstacle on flat ground is
+the other untested case.
+
+### The charge and the short fence: one bug, severity set by overlap
+
+The rider's ordered runs are what characterize this, and they are the first
+data on the branch taken with the approach distance varied deliberately.
+
+Uphill, close to the fence: teleport on the next input, five times, varying in
+size. Farther back: an immediate bounce, ending on the starting side. Farther
+still: an immediate bounce ending on top of the fence.
+
+Downhill, touching the fence and slightly back: bounce, ending on top of the
+fence. Farther back: cleared it, landed, walked away normally. Much farther
+back: landed on top of the fence and walked off it normally.
+
+So the outcome is set by where the fence falls in the lunge's arc, which is
+fixed root motion. Where the rider starts varies that continuously, which is
+why the results read as random.
+
+**The fence is static geometry and under 0.8 m tall.** Rays cast forward from
+the horse at three heights:
+
+    z+0.3   terrain=2.90  static=1.62  rigid=-  sleeping=-
+    z+0.8   terrain=4.84  static=-     rigid=-  sleeping=-
+    z+1.4   nothing
+
+That kills the theory that the bounce is a rigid-body interaction. A fence and
+a building are the same class to the engine. The difference is size: a building
+is deep enough for the horse to pass through and out, and the branch's original
+complaint is exactly that. A short fence leaves the horse partly inside a thin
+obstacle, and the engine extrudes it, as a bounce, as a landing on top, or as a
+stored correction discharged on the next input.
+
+It also explains why the wall brake never fired on any of these runs.
+`RearChargeCheckZ` is 1.4 m, set above jump height on purpose so the lunge
+still clears low fences. This fence is under 0.8 m, so the brake cannot see it,
+which is correct by that rule and useless here.
+
+#### Ruled out on measurement, not argument
+
+Ordered as they were tried, so none is proposed again:
+
+- The horse's height after the lunge. Runs measured at `drop=0.00`, correctly
+  on the ground, still threw the rider backwards.
+- Geometric overlap at the moment it fires. Six rays out from the horse read
+  the full 2 m reach in every direction, with the horse seated exactly on the
+  ground for 3.3 s, and it still fired.
+- The physicalization profile. `prof` reads `alive` on every sample of both a
+  vanilla jump and a charge.
+- `SetMovementControlledByAnimation`. Released after the travel, `ok=true`,
+  no change.
+- Time. The state survives at least 15.6 s with no decay.
+- `PostPhysicalize`. Fired, `ok=true`, nothing moved.
+- Holding the movement key through the lunge. It looked decisive for one run
+  and the next run contradicted it.
+
+Dismounting and remounting does clear it. That is the only thing that has.
+
+### What actually governs the charge: two separate locks
+
+Two findings, both measured, that together explain every failed fix on this
+branch.
+
+**1. `Horizontal` in the fragment is CryEngine's `EMovementControlMethod`.**
+
+    eMCM_Undefined = 0   eMCM_Entity = 1   eMCM_Animation = 2
+    eMCM_DecoupledCatchUp = 3   eMCM_ClampedEntity = 4
+    eMCM_SmoothedEntity = 5   eMCM_AnimationHCollision = 6
+
+The charge fragment shipped with `Horizontal = 2` on the rear phase and `0`,
+meaning inherit, on the travel phase. So the entire lunge ran as
+`eMCM_Animation`: animation-driven movement with collision switched off. Not a
+side effect of the interactive action, not a quirk. The literal meaning of the
+number, present since the feature was written.
+
+That is the whole of the clipping. Setting the travel phase to `eMCM_Entity`
+stops it: with `Horizontal = 1` the rider could no longer ride into buildings,
+confirmed in game. Vanilla's own `MotionJump` uses `0` and works because it is
+entered from `MotionMovement`, where the horse is already entity-driven, so
+inherit means physics. Ours inherited "no collision" from the rear.
+
+**2. The interactive action pins the horse until it ends, and MCM cannot
+override that.**
+
+With `Horizontal = 1` and an impulse of 20000 applied at 848 ms, `GetVelocity`
+read 41.67 m/s from t+848 and `travel` stayed at 0.00 until t+1520, when the
+horse finally moved. The velocity sat unused for 700 ms. A second run at force
+4300 began moving at t+1552. The moment does not shift when the procedural
+blend is moved from `ExitTime` 0.8 to 0.4, nor with the movement control method
+set to entity.
+
+So there are two locks, not one. MCM decides whether the animation's root
+motion collides. The action decides whether anything at all may move the horse.
+Only the first is reachable from the fragment.
+
+This is why five different configurations produced identical behavior, and why
+the delay between the rear finishing and the horse moving is exactly the tail
+of `relaxed_gallop_jump` playing in place while the horse is pinned.
+
+**Ruled out as causes of the delay**, each measured rather than argued: the
+impulse timing, the impulse magnitude, the movement control method, the
+procedural blend time, `SetMovementControlledByAnimation`, and waiting for the
+animation state versus firing on a timer.
+
+### The charge: what actually works, and why the alternatives do not
+
+The lunge is root motion of a fixed 5.4 m, and the engine offers no way to
+shorten it. Every option therefore reduces to one of three, all measured:
+
+- **`Horizontal = 2`, `eMCM_Animation`.** The animation moves the horse and
+  collision is off. Smooth, travels correctly, passes through everything.
+- **`Horizontal = 6`, `eMCM_AnimationHCollision`.** The animation moves the
+  horse and collision is on, so the fence blocks it while the animation keeps
+  demanding a position collision refuses. The gap accumulates for the length of
+  the lunge and discharges when the action ends. This is the rubberband, and
+  the value makes it worse rather than better, because the block is total.
+- **`Horizontal = 1`, `eMCM_Entity`.** Physics drives, so no divergence is
+  possible. But entity-driven means the movement controller drives, and a
+  standing horse's desired velocity is zero: an impulse of 10000 produced
+  20.54 m/s, the horse traveled 0.67 m, and the controller zeroed it on the
+  next frame. There is no travel to be had this way.
+
+So the conflict cannot be resolved inside the fragment. What ships avoids
+creating it: keep `2`, and refuse to run the animation into anything solid.
+
+**The check.** Three rays at 0.45 m above the horse's origin, the center
+looking 1.2 m and the sides 1.0 m at the horse's half width. On a hit,
+movement control is released and the horse stops.
+
+Two things make it correct rather than merely tuned, and both came from the
+rider noticing a false refusal.
+
+*Steepness, not class.* The rays are horizontal, so facing uphill they run into
+rising ground. Excluding terrain did not help, because hillsides here are
+static meshes reported as world geometry with no entity, the same class as a
+wall. The surface normal separates them: ground a horse climbs has a normal
+pointing mostly up, a wall's points sideways, and only a normal flatter than
+0.5 blocks.
+
+*Asymmetric reach.* Three parallel rays at the horse's full width describe a
+corridor 1.4 m across. At six meters that caught anything running alongside: a
+charge refused repeatedly on geometry 5.11 m away on the left with the center
+ray clear and nothing in front of the horse. The center ray looks far because
+that is what the horse will hit; the sides look near, because at range the
+rider steers.
+
+**Braking distance is a trade with no correct answer.** Refusing early, at the
+lunge's own length, never glitches and leaves the horse standing six meters off
+a wall, which reads as wrong. Braking close lets the horse cover the ground and
+stop against the wall, at the cost of the release landing while the horse is
+airborne. Close won on inspection: a metre from a wall the stop reads as an
+impact, whereas the same stop 2.4 m from a low fence read as hitting nothing.

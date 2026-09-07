@@ -12,7 +12,7 @@
 -- observed at all, and a wait that never ends would strand the victim
 -- permanently.
 --
--- `ReleaseVictimMovement` is here rather than with the reaction that needs it
+-- `ReleaseActorMovement` is here rather than with the reaction that needs it
 -- because its ordering belongs to the recovery: it must run on the tick after
 -- the action starts, never before, or the fragment's own movement control
 -- overwrites it and the call does nothing.
@@ -22,12 +22,12 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.19.0
---- Stops the animation driving a victim's own movement.
+-- @release 4.19.1
+--- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
 -- fragment's `MovementControlMethod` layer, and it is the only lever that
--- applies to one victim rather than to every option in the database. Turning
+-- applies to one actor rather than to every option in the database. Turning
 -- it off leaves the actor on entity-driven movement, which is the state
 -- vanilla's own hit reactions play in and the reason they respect geometry an
 -- interactive action passes through.
@@ -37,22 +37,24 @@
 -- made ahead of it is overwritten and does nothing at all: victims clipped
 -- into walls exactly as they did without it.
 --
--- @tparam table npc victim entity
+-- Written for victims and used by the rear charge as well, where the actor is
+-- the horse. The two want it at different moments, so the caller decides when.
+--
+-- @tparam table ent the actor entity
+-- @tparam[opt] string what a name for the log line
 -- @treturn boolean true when the call was accepted without error
-function HorseCollisionMod:ReleaseVictimMovement(npc)
-	if not npc.actor
-			or type(npc.actor.SetMovementControlledByAnimation) ~= "function" then
+function HorseCollisionMod:ReleaseActorMovement(ent, what)
+	if not ent or not ent.actor
+			or type(ent.actor.SetMovementControlledByAnimation) ~= "function" then
 		return false
 	end
 
 	local ok, err = pcall(function()
-		npc.actor:SetMovementControlledByAnimation(false)
+		ent.actor:SetMovementControlledByAnimation(false)
 	end)
 
-	if self.Config.LogTelemetry then
-		self:Log("MovementControl released ok=" .. tostring(ok)
-				.. " err=" .. tostring(err))
-	end
+	self:Log("MovementControl released on " .. tostring(what or "victim")
+			.. " ok=" .. tostring(ok) .. " err=" .. tostring(err))
 
 	return ok
 end

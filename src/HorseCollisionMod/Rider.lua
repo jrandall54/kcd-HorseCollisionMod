@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.19.0
+-- @release 4.19.1
 --- Whether this collision should count as a combat one.
 --
 -- `player.soul:IsInCombatDanger()` decides it, and only that. It is what

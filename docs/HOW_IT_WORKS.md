@@ -97,6 +97,11 @@ is the move that earns a gallop's treatment: the horse rears and then covers
 several meters, and anyone in the way is ridden down as though it had galloped
 into them, which it effectively has.
 
+The charge stops short of walls, fences and carts rather than riding through
+them. It is an animation, and an animation does not collide, so the horse
+watches ahead and pulls up when something solid is in its path. Rising ground
+is not an obstacle: the horse charges up a hill.
+
 Both refuse from anything faster than a standstill. The animation owns the
 horse's position while it plays, so speed the horse already had fights it and
 drags the horse visibly sideways.

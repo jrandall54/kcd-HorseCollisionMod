@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.19.0
+-- @release 4.19.1
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -121,7 +121,7 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- action has to have started before anything it sets can be overridden.
 	if self.Config.ReleaseAnimationMovement then
 		Script.SetTimer(50, function()
-			self:ReleaseVictimMovement(npc)
+			self:ReleaseActorMovement(npc, "victim")
 		end)
 	end
 
