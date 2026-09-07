@@ -176,6 +176,32 @@ its source.
 hook. A settings file still naming the removed keys keeps working, since an
 unknown setting is ignored and named in `kcd.log`.
 
+## Parked curiosity: riding and walking at the same time
+
+Not a feature and not a defect to fix, kept because the rider wants to come back
+to it.
+
+    player.actor:StartInteractiveActionByName("hcm_rear", horseId, false, 1.0)
+
+Called on the player while mounted, this leaves them in two states at once. The
+tag resolves, because `kcd_animationControlledTags.xml` is shared with the human
+databases, but no human option carries it, so the engine acquires the player's
+body and camera scope and abandons the action within a frame with nothing
+handing either back.
+
+They remain the horse's rider and can steer it, while their character runs the
+on-foot locomotion state machine, so they walk and run on top of the horse. The
+object id aligns them to the saddle. The camera stays pinned looking up. Drawing
+a weapon drops them into the horse, dismounting pops them back on top and leaves
+them unable to ride or remount, guards cannot reach them, and surrendering
+resolves it by forcing a proper dismount.
+
+`actor:Fall` on the player in that state ragdolls them while they stay standing
+on the horse. On foot the call does nothing at all: the acquisition needs the
+contradiction with being mounted.
+
+The mechanism is written up in `docs/TESTING_DIARY.md`.
+
 ## Development tooling
 
 Complete, merged after 2.0.0. Not a gameplay phase, but it changes how every phase below

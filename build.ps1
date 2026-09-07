@@ -447,7 +447,10 @@ $required = @(
     "$adb\hcm_male_database.adb",
     "$adb\hcm_female_database.adb",
     "$adb\kcd_animationControlledTags.xml",
-    "$adb\wh_female_fragmentids.xml"
+    "$adb\wh_female_fragmentids.xml",
+    "$adb\hcm_horse_database.adb",
+    "$adb\kcd_horse_fragmentids.xml",
+    "$adb\kcd_horse_controllerdefs.xml"
 )
 
 # Nothing beyond that set may ship. A stale file left in mod_assets is still an

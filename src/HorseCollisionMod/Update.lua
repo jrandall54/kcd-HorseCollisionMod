@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.18.0
+-- @release 4.19.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -112,6 +112,15 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	end
 
 	local tierName = self:GetSpeedTier(speed)
+
+	-- A charge is always a gallop impact, whatever the horse's speed reads.
+	-- The lunge covers about five and a half meters in a second, which scores
+	-- as a trot, so a deliberate charge was producing the animated knockdown
+	-- rather than the ragdoll it should. The rider decides to do this; it is
+	-- not something the horse wandered into.
+	if self.RearCharging then
+		tierName = "Gallop"
+	end
 	local strength = self.HitReactionStrength
 	local cfg = self.Config
 	local combatScale = 1.0

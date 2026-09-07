@@ -324,7 +324,9 @@ if ($PrepareShippingTest) {
 		@{ Dir = "Data\Scripts\HorseCollisionMod"; Filter = "*" },
 		@{ Dir = "Data\Animations\Mannequin\ADB"; Filter = "hcm_*" },
 		@{ Dir = "Data\Animations\Mannequin\ADB"
-		   Names = @("kcd_animationControlledTags.xml", "wh_female_fragmentids.xml") }
+		   Names = @("kcd_animationControlledTags.xml", "wh_female_fragmentids.xml",
+		             "kcd_horse_fragmentids.xml", "kcd_horse_controllerdefs.xml") },
+		@{ Dir = "Data\Libs\Config"; Filter = "hcm_*" }
 	)
 
 	$found = @()
@@ -520,6 +522,25 @@ function Sync-LooseFiles {
 					Half = "Anim"
 					From = $file.FullName
 					To   = Join-Path $adbDir $file.Name
+				}
+			}
+		}
+	}
+
+	# The action map the rear key needs. It lives outside the ADB folder, so
+	# would otherwise never reach a loose install and the key would silently
+	# keep whatever the pak was built with.
+	if ($Anim) {
+		$cfgSrc = Join-Path $repoRoot "mod_assets\Libs\Config"
+
+		if (Test-Path $cfgSrc) {
+			$cfgDest = Join-Path $Root "Data\Libs\Config"
+
+			foreach ($file in Get-ChildItem -Path $cfgSrc -File) {
+				$files += @{
+					Half = "Anim"
+					From = $file.FullName
+					To   = Join-Path $cfgDest $file.Name
 				}
 			}
 		}

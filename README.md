@@ -26,6 +26,10 @@ in vanilla.
   people you can put down depends on your horse and how fast you string hits together.
 - In combat, stamina costs 2.5x and the walk-speed stagger is disabled. Knockdowns are
   unchanged.
+- From a standstill you can rear the horse. One key rears on the spot and brings
+  the hooves down on anyone right in front; the other rears and drives forward,
+  riding down whoever is in the way. Both use the horse's own animations and you
+  stay in the saddle.
 
 ## Requirements
 
@@ -135,6 +139,14 @@ breaking the mod. Deleting a line restores its default.
 | `VictimBloodTrot` | 0.15 | Blood added to the side of the body a trot impact struck, 0 to 1. 0 switches it off. |
 | `VictimBloodGallop` | 0.45 | The same at a gallop. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
+| `Rear` | true | Whether your horse can be reared on command. Only from a standstill. |
+| `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, y, u, o, h. |
+| `RearOnlyKey` | "q" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
+| `RearMaxSpeed` | 1.0 | The speed above which a rear is refused. The animation owns the horse's position while it plays, so any momentum drags the horse sideways. |
+| `RearCooldownMs` | 2500 | How long before another rear is accepted. |
+| `RearReach` | 2.0 | How far in front the hooves reach, for the rear on the spot. |
+| `RearArc` | 70 | The arc in front that counts, in degrees. |
+| `RearStaminaCost` | 12.0 | What a landed rear costs the horse. |
 | `Retaliation` | true | Whether a man shoved repeatedly at walking pace can lose patience and fight back. |
 | `RetaliationFreeBumps` | 1 | How many walk impacts a victim tolerates before any chance of a fight begins. The first is always free. |
 | `RetaliationChanceStep` | 0.25 | How much each further shove adds to the chance. |

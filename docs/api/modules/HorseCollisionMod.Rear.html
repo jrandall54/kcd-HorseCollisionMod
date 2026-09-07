@@ -1,0 +1,482 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+<li><a href="#Tables">Tables</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Marks.html">HorseCollisionMod.Marks</a></li>
+  <li><a href="../modules/HorseCollisionMod.Sound.html">HorseCollisionMod.Sound</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Retaliation.html">HorseCollisionMod.Retaliation</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><strong>HorseCollisionMod.Rear</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Rear</code></h1>
+<p>Rearing the horse on command.</p>
+<p> Everything else this mod does needs speed. A rear is what a rider has at a
+ standstill: the horse goes up on its hind legs and comes down on whoever is
+ in front.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearActionFor">HorseCollisionMod:RearActionFor (key[, onlyRear])</a></td>
+	<td class="summary">The action name a configured key maps to.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:CheckRearKeys">HorseCollisionMod:CheckRearKeys ()</a></td>
+	<td class="summary">Says so when the configured keys cannot work.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HookRearKey">HorseCollisionMod:HookRearKey ()</a></td>
+	<td class="summary">Routes the mod's own key to the rear.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearRequested">HorseCollisionMod:RearRequested (fragTag)</a></td>
+	<td class="summary">Decides whether a press should rear.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearHorse">HorseCollisionMod:RearHorse (horseEnt)</a></td>
+	<td class="summary">Rears the horse.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearCanHit">HorseCollisionMod:RearCanHit (npc)</a></td>
+	<td class="summary">Whether a rear may land on this entity.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearStrike">HorseCollisionMod:RearStrike (horseEnt)</a></td>
+	<td class="summary">Brings the hooves down on whoever is in front.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearHit">HorseCollisionMod:RearHit (npc, horseEnt, playerEnt, heading)</a></td>
+	<td class="summary">What a hoof landing on someone does.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:LoadRearActionMap">HorseCollisionMod:LoadRearActionMap ()</a></td>
+	<td class="summary">Loads the mod's action map and points it at the player.</td>
+	</tr>
+</table>
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.RearKeys">HorseCollisionMod.RearKeys</a></td>
+	<td class="summary">The keys the mod's action map declares, and so the only ones selectable.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:RearActionFor"></a>
+    <strong>HorseCollisionMod:RearActionFor (key[, onlyRear])</strong>
+    </dt>
+    <dd>
+    The action name a configured key maps to. </p>
+
+<p> The mod cannot rebind a key at runtime, because Lua cannot write files and
+ <code>LoadFromXML</code> only reads one. So <code>hcm_actionmaps.xml</code> declares each feature
+ once per candidate key and the settings file picks which by naming the key.
+ An action nobody listens for costs nothing.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">key</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the key named in the settings, such as "r"
+        </li>
+        <li><span class="parameter">onlyRear</span>
+            <span class="types"><span class="type">boolean</span></span>
+         true for the rear on the spot
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the action name, or "" when the key is not one offered
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:CheckRearKeys"></a>
+    <strong>HorseCollisionMod:CheckRearKeys ()</strong>
+    </dt>
+    <dd>
+    Says so when the configured keys cannot work. </p>
+
+<p> Both failures are silent otherwise, and a feature that does nothing with no
+ explanation is worse than one that is off: a key the action map does not
+ declare names an action nobody raises, and two features on one key leave the
+ second unreachable because the first match wins.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:HookRearKey"></a>
+    <strong>HorseCollisionMod:HookRearKey ()</strong>
+    </dt>
+    <dd>
+    Routes the mod's own key to the rear. </p>
+
+<p> <code>Player:OnAction(action, activation, value)</code> is an ordinary Lua method on the
+ <code>Player</code> entity class table, and the engine calls it for actions delivered to
+ the player. That is what makes input reachable at all: the UI action listener
+ this mod already uses for the load screen never sees a key, only interface
+ events.</p>
+
+<p> Wrapped rather than replaced, and the original is always called, so every
+ other action behaves exactly as it did.</p>
+
+<p> The action itself is the mod's own, loaded from <code>Libs/Config/
+ hcm_actionmaps.xml</code> through <code>ActionMapManager.LoadFromXML</code>, because a
+ vanilla key cannot be borrowed. Consuming a press here does not stop the
+ game acting on it: bound to <code>jump</code>, this reared the horse and then jumped
+ anyway. Nor is there a hold to distinguish one use from another, since a two
+ second hold and a tap both deliver a single <code>press</code> and no <code>release</code>.</p>
+
+<p> So the mod brings its own action on its own key and disturbs no existing
+ control.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:RearRequested"></a>
+    <strong>HorseCollisionMod:RearRequested (fragTag)</strong>
+    </dt>
+    <dd>
+    Decides whether a press should rear.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">fragTag</span>
+
+
+
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the press was taken
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:RearHorse"></a>
+    <strong>HorseCollisionMod:RearHorse (horseEnt)</strong>
+    </dt>
+    <dd>
+    Rears the horse. </p>
+
+<p> The horse plays its own <code>relaxed_rearing</code> clip and the rider stays in the
+ saddle, because nothing is dismounted: this is the animation, not a throw
+ caught in mid-air.</p>
+
+<p> Reaching it took the whole chain. The horse has a <a href="../modules/HorseCollisionMod.Rear.html">Rear</a> fragment in
+ <code>kcd_horse_database.adb</code>, but a fragment is not something Lua can ask for.
+ <code>StartInteractiveActionByName</code> resolves its argument against the FragTags of
+ one fragment, <code>AnimationControlled</code>, which the horse does not have, so the
+ mod ships four files: a parent database defining that fragment with an
+ <code>hcm_rear</code> option carrying vanilla's <a href="../modules/HorseCollisionMod.Rear.html">Rear</a> contents, the horse fragment ids
+ with <code>AnimationControlled</code> declared, the tag itself, and the horse
+ controller definition giving the fragment a <code>FullBody</code> scope. A fragment
+ with no scope can never play whatever the database says, and humans needed
+ no equivalent only because vanilla already declares the fragment for them.</p>
+
+<p> The last piece is the call itself. The bind takes
+ <code>ActionName, ObjectId, UpdateVisibility, AnimSpeed</code>, and with the name
+ alone it does nothing at all and still returns true: the horse must be given
+ as its own object. Every earlier attempt passed the name only, which is why
+ correct data looked like broken data.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:RearCanHit"></a>
+    <strong>HorseCollisionMod:RearCanHit (npc)</strong>
+    </dt>
+    <dd>
+    Whether a rear may land on this entity. </p>
+
+<p> The same three tests the detection loop applies, for the same reasons. The
+ sphere returns crates, doors and dropped weapons as readily as people;
+ humans are named by class, because a faction test gave dogs a human
+ fragment on a dog skeleton and reached women only by a fallback. Corpses are
+ already ragdolls and reacting to them twitches bodies around. And Henry's
+ dog follows close enough to be caught constantly, so he is excluded by name,
+ dogs sharing the generic NPC class.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the candidate
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the hooves may land on them
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:RearStrike"></a>
+    <strong>HorseCollisionMod:RearStrike (horseEnt)</strong>
+    </dt>
+    <dd>
+    Brings the hooves down on whoever is in front. </p>
+
+<p> The rear is the only thing this mod does that does not need speed. Every
+ other reaction is scored from how fast the horse was going, which is why a
+ stationary rider has never had anything to do but shove people at a walk.</p>
+
+<p> Fired on a delay rather than with the request, because the strike is the
+ hooves landing and not the horse going up. <code>RearStrikeMs</code> is when that
+ happens in <code>relaxed_rearing</code>.</p>
+
+<p> Only what is in front is hit, inside <code>RearArc</code> degrees of where the horse is
+ pointing and within <code>RearReach</code>. A rear that knocked down someone standing
+ behind the horse would be nonsense.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:RearHit"></a>
+    <strong>HorseCollisionMod:RearHit (npc, horseEnt, playerEnt, heading)</strong>
+    </dt>
+    <dd>
+    What a hoof landing on someone does. </p>
+
+<p> The trot treatment, not the gallop one. A horse coming down on its front
+ hooves from a standstill is a real blow but it is not a charge, and the
+ charge is the move that earns the ragdoll.</p>
+
+<p> Scored at a fixed speed rather than the horse's own, which is zero here:
+ what matters is the hooves, not ground the horse covered.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim
+        </li>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player
+        </li>
+        <li><span class="parameter">heading</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the horse's facing, which the victim is thrown along
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:LoadRearActionMap"></a>
+    <strong>HorseCollisionMod:LoadRearActionMap ()</strong>
+    </dt>
+    <dd>
+    Loads the mod's action map and points it at the player. </p>
+
+<p> Repeated on every load screen because the action map manager is reset with
+ the world. Loading an already loaded map is harmless.
+
+
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod.RearKeys"></a>
+    <strong>HorseCollisionMod.RearKeys</strong>
+    </dt>
+    <dd>
+    The keys the mod's action map declares, and so the only ones selectable. </p>
+
+<p> Kept beside the reader that uses it, because the two have to agree with
+ <code>Libs/Config/hcm_actionmaps.xml</code> and a key added there and not here is
+ unusable, while one here and not there names an action that does not exist.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">r</span>
+
+
+
+        </li>
+        <li><span class="parameter">q</span>
+
+
+
+        </li>
+        <li><span class="parameter">y</span>
+
+
+
+        </li>
+        <li><span class="parameter">u</span>
+
+
+
+        </li>
+        <li><span class="parameter">o</span>
+
+
+
+        </li>
+        <li><span class="parameter">h</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-06 22:58:22 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

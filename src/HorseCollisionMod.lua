@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.18.0
+-- @release 4.19.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.18.0"
+HorseCollisionMod.Version = "4.19.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -150,6 +150,29 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   is dropped, matching vanilla's own limit
 -- @field CollisionIsCrime whether riding someone down is reported to the
 --   game as a crime, at trot and gallop
+-- @field Rear whether the mod's own key rears the horse at a standstill
+-- @field RearActionMap the name of that action map
+-- @field RearActionMapFile where the mod ships it, loaded with
+--   `ActionMapManager.LoadFromXML` so no vanilla input file is overridden
+-- @field RearMaxSpeed the speed above which a rear request is ignored, in
+--   meters per second, since a rear is a standstill move
+-- @field RearCooldownMs how long before another rear is accepted
+-- @field RearChargeKey which key rears and charges. One of r, q, y, u, o, h,
+--   the keys the mod's action map declares
+-- @field RearOnlyKey which key rears on the spot, from the same list
+-- @field RearOnlyFragTag the FragTag that rears on the spot
+-- @field RearChargeWindowMs how long after a charge starts that impacts are
+--   scored as a gallop rather than by the horse's speed
+-- @field RearFragTag the FragTag of the rear option in the mod's horse
+--   animation database
+-- @field RearAnimSpeed how fast the rear plays
+-- @field RearStrikes whether the hooves coming down hit anyone in front
+-- @field RearStrikeMs when in the animation the hooves land
+-- @field RearReach how far in front the hooves reach, in meters
+-- @field RearArc the arc in front that counts, in degrees
+-- @field RearImpactSpeed the speed a rear is scored at, since the horse's
+--   own speed is zero and what matters is the hooves
+-- @field RearStaminaCost what a landed rear costs the horse
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
 -- @field ReplanAfterReaction ask a victim to re-plan their activity once the
@@ -402,6 +425,26 @@ HorseCollisionMod.Config = {
 	-- decision without reaching the reputation system, so no fine is levied
 	-- and no guard is summoned. Guards who witness the brawl still join in,
 	-- because they witnessed it.
+	-- Rearing on command. Everything else this mod does needs speed; a rear is
+	-- what a rider has at a standstill.
+	Rear                     = true,
+	RearChargeKey            = "r",
+	RearActionMap            = "hcm_rear",
+	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
+	RearMaxSpeed             = 1.0,
+	RearCooldownMs           = 2500,
+	RearFragTag              = "hcm_rear_charge",
+	RearOnlyKey              = "q",
+	RearOnlyFragTag          = "hcm_rear",
+	RearChargeWindowMs       = 2600,
+	RearAnimSpeed            = 1.0,
+	RearStrikes              = true,
+	RearStrikeMs             = 700,
+	RearReach                = 2.0,
+	RearArc                  = 70,
+	RearImpactSpeed          = 6.0,
+	RearStaminaCost          = 12.0,
+
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,
 	RetaliationChanceStep    = 0.25,
@@ -930,6 +973,7 @@ HorseCollisionMod.ImpactDamageByTier = {
 	Walk = 0,
 	Trot = 18,
 	Gallop = 95,
+	Rear = 60,
 }
 
 HorseCollisionMod.RetaliationPollMs = 1000
@@ -1136,7 +1180,12 @@ HorseCollisionMod.AnimationDatabases = {
 	NPC_NAI_x     = "male",
 	NullAI_x      = "male",
 	DummyTarget_x = "male",
-	NPC_Female_x  = "female"
+	NPC_Female_x  = "female",
+
+	-- The horse, so a rear can be asked for. Its vanilla database has no
+	-- `AnimationControlled` fragment at all, which is the only fragment
+	-- `StartInteractiveActionByName` can reach.
+	Horse         = "horse"
 }
 --- The parent database each character set uses.
 --
@@ -1155,10 +1204,11 @@ HorseCollisionMod.AnimationDatabases = {
 -- @table AnimationSets
 HorseCollisionMod.AnimationSets = {
 	male   = "Animations/Mannequin/ADB/hcm_male_database.adb",
-	female = "Animations/Mannequin/ADB/hcm_female_database.adb"
+	female = "Animations/Mannequin/ADB/hcm_female_database.adb",
+	horse  = "Animations/Mannequin/ADB/hcm_horse_database.adb"
 }
 
---- Points the human entity classes at this mod's parent databases.
+--- Points the redirected entity classes at this mod's parent databases.
 --
 -- AnimDatabase3P is read when an actor spawns, so this has to happen before the
 -- world is populated. A Startup script runs early enough, but the entity class
@@ -1228,6 +1278,9 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 					.. tostring(rejected) .. " ignored")
 		end
 
+		self:HookRearKey()
+		self:LoadRearActionMap()
+
 		local again = self:RedirectAnimationDatabases()
 
 		if again > 0 then
@@ -1275,6 +1328,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Rear.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 
 -- Runs at file scope rather than from the load screen, because
