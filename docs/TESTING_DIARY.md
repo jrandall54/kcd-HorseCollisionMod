@@ -16244,3 +16244,35 @@ same 2230 impulse gives a villager 80 m/s and a guard 0.46, and no knockback
 value can move them. At 1.5 the spread falls from 114x to about 7x, guards read
 5 to 8.5 m/s, and they visibly respond. That is a tuning decision, not a bug,
 and it is left at 3.7 pending the rider's judgement.
+
+### An NPC with a weapon drawn is no longer treated as combat
+
+`IsCombatCollision` returned true if the player was in combat danger **or** the
+victim had a weapon drawn. The second half was added in 2.0.0-rc.8 on the
+reasoning that townsfolk do not walk around armed, so a drawn weapon meant a
+fight the player's own check had missed.
+
+Guards carry weapons on patrol, so it read as combat permanently. Measured with
+the rider out of combat and the log reading `danger=false armed=true`, a single
+gallop into an armored guard cost 103.2 stamina against a horse pool of about
+210, where about 21 was correct. It is also why polearm guards took no stagger
+at walking pace while every other NPC did: the walk stagger is suppressed in
+combat, and they were permanently in it.
+
+The signal never rescued a case either. The session that introduced it recorded
+`IsInCombatDanger` true for all ten combat impacts, with the weapon check
+corroborating eight of them and adding none. The doc block above the function
+had already been corrected to say a drawn weapon does not mean a fight; the
+return statement was left ORing them.
+
+`danger` alone now decides it. `armed` is still read and logged, because a
+disagreement between the two is worth seeing.
+
+Verified in game, both directions:
+
+    danger=false armed=true   Gallop   combatScale=1.0   209.1 -> 169.5, 39.6
+    danger=false armed=true   Walk     combatScale=1.0   hcm_stagger_back played
+    danger=true  armed=false  Trot     combatScale=2.2   197.9 -> 122.7, 75.2
+    danger=true  armed=true   Gallop   combatScale=2.2   147.4 ->  12.4, 135.0
+
+An armed guard staggering at a walk is the first time that has happened.
