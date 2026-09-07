@@ -16396,3 +16396,269 @@ he ran over and attacked anyway.
 And the surrender prompt disappearing when the rider is unhorsed is vanilla's
 own behavior, confirmed with this mod's hint disabled: the HUD drops action
 hints when the action map changes from `horse` to `player`.
+
+### Rearing on command: the input is solved, the rear itself is a workaround
+
+#### Input, and this part is settled
+
+A mod can read the player's keys. `Player:OnAction(action, activation, value)` is
+an ordinary Lua method on the `Player` entity class table, and the engine calls
+it for actions delivered to the player, so wrapping it the way this mod already
+writes to entity class tables gives every key press. The `UIAction` listener the
+mod uses for the load screen never sees input, only interface events, which is
+what made this look unreachable.
+
+A vanilla key cannot be borrowed, twice over. `OnAction` is a notification and
+not the handler, so consuming a press there does not stop the game acting on it:
+bound to `jump`, this reared the horse and then jumped anyway. And there is no
+usable hold, because `jump` delivers a single `press` and no `release` whether
+it is tapped or held for two seconds.
+
+So the mod ships its own action map. `ActionMapManager.LoadFromXML` accepts a
+file the mod ships, `SetActionListener` points it at the player and
+`EnableActionMap` turns it on, and the action then arrives at the wrapped
+`OnAction` like any other. `Libs/Config/hcm_actionmaps.xml` defines
+`hcm_rear_action` on R, and no vanilla input file is touched.
+
+Two mistakes worth not repeating. Loading the map on every load screen registers
+it again each time, and one key press then arrives three times over. And an
+action of the mod's own must always be consumed, never passed through: handing
+an unknown action name to vanilla's `OnAction` puts it into
+`g_gameRules.Client.OnActorAction` before anything else looks at it, and the
+rider died instantly and repeatedly while that was happening.
+
+#### The rear is a throw caught in mid-air
+
+There is no rear this mod can play. The horse extension exposes exactly
+`HasRider`, `IsMountable` and `RearAndThrowDown`. `HorseRear` exists as a
+Mannequin fragment, named in the binary beside `HorseFastStop`, but it is not an
+interactive action: `StartInteractiveActionByName` returns true for any string
+at all, including `rear`, and plays nothing.
+
+So the mod calls `RearAndThrowDown` and catches the rider. The dismount lands at
+a consistent 592 to 608 ms, and a single `ForceMount` inside one 16 ms poll of
+that reads as a rear rather than a fall. Later catches let the game begin its
+dismount, which turns the camera to third person and leaves the rider facing off
+to one side. The remount is asked for once: repeated calls retrigger the
+mounting sound, which at 33 ms was described as the horse sound multiplying
+fifty times over.
+
+Health is not affected. Across every rear once the action was consumed properly,
+`health=100.0->100.0 delta=+0.0`.
+
+#### What blocks it
+
+`ForceMount` leaves the first-person camera sitting slightly back, so the rider
+can see inside their own model when looking left or right. It is this mod's
+doing and not the rider's camera plugin: reproduced with `KCD1_TPVCamera.asi`
+renamed aside.
+
+A normal dismount and remount by the player repairs it. Lua has no camera
+setter to do the same: `System` exposes `GetViewCameraPos`, `GetViewCameraDir`,
+`GetViewCameraAngles` and `SetViewCameraFov`, and nothing that sets a position
+or angle. `player.human:Mount` is not a re-seat either; called while mounted it
+performs a proper dismount.
+
+A forced dismount and remount cycle does repair the camera, but it is plainly
+visible, and masking it inside the rear left the rider mounted by the game's
+flags while displaced in the world, where trotting killed them instantly. That
+is a mechanism that can kill a player through no action of their own and it does
+not ship.
+
+**The route that avoids all of it is the animation.** Ship a database exposing
+`HorseRear` as an interactive action, the same technique that produced
+`hcm_stagger_*` and `hcm_fall_*`. The horse rears, the rider never leaves the
+saddle, and there is no camera to repair.
+
+### The horse rear animation is authored correctly and still cannot be played
+
+The throw-and-catch rear has an unfixable camera side effect, so the animation
+route was built properly: expose the horse's own `Rear` fragment as something
+Lua can ask for, the same way `hcm_stagger_*` and `hcm_fall_*` were exposed for
+humans.
+
+The horse's fragment is called `Rear`, not `HorseRear`. `HorseRear` is the name
+in the binary; `Animations/Mannequin/ADB/kcd_horse_fragmentids.xml` calls it
+`Rear`, and `kcd_horse_database.adb` plays `relaxed_rearing` for it with a
+`MovementControlMethod` of Horizontal 2, XyMove 1, ZMove 1, Rotate 1.
+
+Everything the human work needed was done, and one thing more:
+
+- `hcm_horse_database.adb`, a parent defining `AnimationControlled` with an
+  `hcm_rear` option carrying vanilla's `Rear` contents verbatim, and
+  referencing `kcd_horse_database.adb` as a SubADB.
+- `kcd_horse_fragmentids.xml`, vanilla's list plus `AnimationControlled` with
+  the mod's existing `kcd_animationControlledTags.xml` as its subTagDef.
+- `hcm_rear` added to that tag file.
+- `Horse.AnimDatabase3P` redirected, read back in game as the mod's parent.
+
+And one the human side never needed: **`kcd_horse_controllerdefs.xml` with
+`<AnimationControlled scopes="FullBody" />` added.** A fragment with no scope in
+the controller definition can never play whatever the database says, and the
+horse's controller lists a scope for every fragment it has. Humans needed no
+equivalent because vanilla already declares `AnimationControlled` for them, for
+doors and cabinets.
+
+With all of that live and verified on disk and in the entity class table,
+`horse.actor:StartInteractiveActionByName("hcm_rear")` still does nothing, and
+`mn_debug` set to the horse's name logs no Mannequin activity at all.
+
+**The conclusion is that interactive actions are a human actor path the horse
+does not take.** The horse's actor lists the method, but the method returns true
+for any string at all, including `rear`, so its return has never meant anything.
+The horse entity exposes no other way in: `AnimationEvent`, `OnActionStart` and
+`OnActionEnd` are notifications, and there is no fragment request anywhere on
+the entity or its extensions.
+
+The data is kept rather than reverted. It is correct, it costs nothing, and if a
+way to drive a horse fragment is ever found the animation is already exposed.
+
+### The rear works, and the call needed its object
+
+The animation route is not blocked after all. The data described in the entry
+above is correct and complete; what was wrong was the call.
+
+`StartInteractiveActionByName` takes `ActionName, ObjectId, UpdateVisibility,
+AnimSpeed`, read from the bind registration in the binary. Given the name alone
+it does nothing whatever and still returns true, which is what made correct data
+look like broken data across several attempts.
+
+With the horse passed as its own object it works:
+
+    horse.actor:StartInteractiveActionByName("hcm_rear", horse.id, false, 1.0)
+
+    t+600ms horse=AnimationControlled mounted=true
+
+The rider's verdict: "my horse reared perfectly, my camera isn't messed up".
+
+So `RearAndThrowDown`, the remount catch, and everything built to repair the
+camera it broke are all deleted. The horse plays `relaxed_rearing`, the rider
+never leaves the saddle, there is no camera to fix and no health cost.
+
+Passing the player as the object instead of the horse also rears, and was judged
+identical.
+
+**A lesson about how this was nearly missed.** Three variants were fired in one
+burst, the rider could not tell which did what, reported that nothing happened,
+and the route was written off as closed. It had worked. Fire one thing at a
+time when the only instrument is what the rider can see.
+
+### Never call an interactive action on the player
+
+`player.actor:StartInteractiveActionByName("hcm_rear", horse.id, false, 1.0)`
+puts the player into a state worth knowing about, because it is the same failure
+`build_adb.py` documents for NPCs and it is far more visible on the player.
+
+The tag resolves, because `kcd_animationControlledTags.xml` is shared with the
+human databases, but no human option carries it. So the engine acquires the
+player's body and camera scope and then abandons the action within a frame,
+with nothing handing either back.
+
+The result is two states at once. The player is still the horse's rider and can
+steer it, while their character runs the on-foot locomotion state machine, so
+they walk and run on top of the horse. The object id is used for alignment, so
+they stay glued to the saddle. The camera stays pinned looking up. Drawing a
+weapon drops them into the horse, dismounting pops them back on top of it and
+leaves them unable to ride or remount, and guards cannot reach them because the
+collision capsule is not where a person on the ground should be. Surrendering
+resolves it, because that path forces a proper dismount.
+
+Amusing, and entirely useless: it is an engine state mismatch, not a feature.
+
+### Rearing on command, finished
+
+Two moves on two keys, both playing real horse animations with the rider in the
+saddle throughout.
+
+**Rear on the spot.** `relaxed_rearing`, which does not travel: measured at
+0.00 m across the whole clip. So the ordinary detection loop, which is driven
+by the horse's speed, can never see anyone, and the move carries its own strike
+instead. It reaches 2 m in a 70 degree arc in front, hits everyone in that arc
+rather than a capped number, and applies the trot treatment with the same
+sound, camera shake, view blur and ground dust the trot path uses. Reaching the
+reaction without those read as the animation glitching rather than a blow
+landing.
+
+**Rear and charge.** One fragment, not two. `relaxed_rearing` is cut at 0.8 s by
+a second Blend in the same AnimLayer and hands straight to
+`relaxed_gallop_jump`, with the MovementControlMethod switching at the same
+moment: the rear needs the animation to own position or momentum drags the
+horse sideways, and the jump needs it free with inertia on or it cannot travel.
+The horse covers about 5.4 m, so the ordinary detection loop scores the
+collision, and `RearCharging` forces it to a gallop for the duration because
+5.4 m in a second reads as a trot.
+
+Chaining two fragments instead was tried at 700, 1400 and 1900 ms and always
+showed a gap. The cause is that `relaxed_rearing` spends its last third back on
+all fours doing nothing while still holding the horse, releasing at 2064 ms
+when the rear is visually over around 1400.
+
+**Speed gate.** A rear is refused above 1.0 m/s. The clip owns the horse's
+position, so any momentum fights it and drags the horse sideways over the
+closing frames, clearly visible at a walk and absent from a dead stop. Freeing
+that ownership is worse: with XyMove and Rotate at 0 the horse drifts under its
+own physics, measured at 0.80 m.
+
+#### Input
+
+The keys are named in the settings file, `RearChargeKey` and `RearOnlyKey`,
+from r, q, y, u, o and h. The mod cannot rebind at runtime, because Lua cannot
+write files and `LoadFromXML` only reads one, so the action map declares each
+feature once per candidate key and the settings choose which the mod listens
+for. An action nobody listens for does nothing. A key outside that set, or both
+features on one key, is reported in the log rather than failing silently.
+
+Vanilla binds r and q only in its minigame maps, which never run while riding,
+and leaves y, u, o and h unbound. `t` is skip time and is deliberately not
+offered.
+
+#### Two ways the keys die silently, both fixed
+
+**The map must be read once and the listener re-pointed every load.**
+Registering repeatedly within one session delivers one press three times over,
+which is why the file is read once. The listener is re-pointed on every load
+because it is the player, whose entity the world reload replaces.
+
+> Corrected later in this diary. This entry also claimed that re-reading the
+> file made the keys stop firing after a save load, and that re-pointing the
+> listener brought them back. That was wrong. The keys were being refused by
+> the mod's own cooldown, which is stamped on a clock the load winds back, and
+> re-pointing the listener only appeared to help because time passed while it
+> happened. Nothing about the action map was ever involved. See "The rear keys
+> after a load: it was the mod's own cooldown".
+
+**The hook must reinstall itself.** `HookRearKey` refused to run once hooked,
+so a hot reload left a wrapper from an older copy of the file in place, closed
+over an older original, with the hook still reporting itself installed. The
+original is now kept on the mod table and restored before wrapping again.
+
+### The rear keys after a load: it was the mod's own cooldown
+
+The keys were dead for an unpredictable stretch after a save load, from
+instantly to never. Every previous attempt read the mod's setup lines out of
+kcd.log and inferred from them. This one logged the presses.
+
+**The presses arrive at `Player.OnAction` from +112 ms after the load screen
+ends.** The action map, the listener and the hook were all working the entire
+time, and nothing about them was ever the problem.
+
+Every press for the next fourteen seconds was refused by `RearRequested`, at
+its cooldown gate: 56 refusals, six more refused on speed, and one accepted at
++14256 ms.
+
+`RearNextAt` is stamped from `System.GetCurrTime()`, which is level time.
+Loading a save winds that clock back to the moment the save was written, so a
+deadline set before the save is still in the future in the world that comes
+back. The load screen handler already drops `RecentHits`, `RecentRejections`
+and `VictimActivity` for exactly this reason, with a comment saying so.
+`RearNextAt` was not in the list.
+
+The range of the symptom follows from that without anything else. Rear, then
+save and load, and the wait is however far the clock moved. Load without having
+reared and there is no deadline at all, and the keys work immediately.
+
+The six speed refusals are a separate thing, and are the settling-fall reading
+already noted against `TrackSpeed`: a stationary horse reports 1.05 to 2.31 m/s
+because `GetVelocity` carries the vertical fall while it settles against the
+ground, and `RearMaxSpeed` is 1.0. Not the cause of the dead period, but it can
+refuse a rear on a horse that is standing still.

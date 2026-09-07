@@ -82,6 +82,31 @@ all; only a victim who leaves the fight and keeps running with the rider well
 clear is left to run, because that flee ends by itself in ten to fifteen
 seconds unless the rider follows him.
 
+### Rearing on command
+
+Everything else the mod does needs speed. A rear is what a rider has at a
+standstill, and it is on the mod's own keys: R rears and drives forward, Q
+rears on the spot. Both are the horse's own animations and you stay in the
+saddle throughout.
+
+The rear on the spot brings the hooves down on whoever is directly in front,
+inside an arc rather than on everyone nearby, and it hits everybody standing in
+that arc rather than a capped number. It is scored as a trot, because a horse
+coming down from a standstill is a real blow but it is not a charge. The charge
+is the move that earns a gallop's treatment: the horse rears and then covers
+several meters, and anyone in the way is ridden down as though it had galloped
+into them, which it effectively has.
+
+Both refuse from anything faster than a standstill. The animation owns the
+horse's position while it plays, so speed the horse already had fights it and
+drags the horse visibly sideways.
+
+The keys are chosen in the settings file, from R, Q, Y, U, O and H. That list
+is fixed, and it is short for a reason: the mod cannot rebind a key while the
+game is running, so it declares every key it might be asked for in advance and
+the settings pick which of them it listens to. A key outside the list, or both
+moves put on one key, is reported in the log rather than quietly doing nothing.
+
 ## The approach
 
 The first version was a physics hack: every impact applied a raw impulse and

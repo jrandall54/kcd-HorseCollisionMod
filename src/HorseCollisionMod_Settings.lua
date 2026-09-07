@@ -101,6 +101,26 @@ HorseCollisionModSettings = {
 	--
 	-- Only men fight back. The game itself refuses the fight branch to
 	-- women, and nothing this mod sets changes that.
+	-- Rearing on command, on the mod's own key. Default R, changed in
+	-- Libs/Config/hcm_actionmaps.xml inside the mod's pak.
+	-- Which key does what. Only these six are offered, because the mod cannot
+	-- rebind a key at runtime and its action map has to declare each one in
+	-- advance: r, q, y, u, o, h. Vanilla leaves y, u, o and h unbound, and
+	-- uses r and q only in minigame maps that never run while riding.
+	RearChargeKey            = "r",   -- rear, then drive forward
+	RearOnlyKey              = "q",   -- rear on the spot
+	Rear                     = true,
+	RearMaxSpeed             = 1.0,   -- from a stop only; a walk drags it sideways
+	RearCooldownMs           = 2500,  -- before another rear is accepted
+	RearFragTag              = "hcm_rear_charge", -- rear, then drive forward
+	RearOnlyFragTag          = "hcm_rear",       -- the second key rears on the spot
+	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop
+	RearStrikes              = true,  -- the rear on the spot hits who is in front
+	RearStrikeMs             = 700,   -- when in the animation they land
+	RearReach                = 2.0,   -- how far in front they reach
+	RearArc                  = 70,    -- the arc in front that counts
+	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse
+
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance
 	RetaliationChanceStep    = 0.25,  -- added per shove beyond that

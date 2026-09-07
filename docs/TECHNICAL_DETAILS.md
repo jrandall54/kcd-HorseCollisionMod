@@ -867,3 +867,89 @@ is vanilla's: a fist fight started on foot with none of this mod running
 produces the same, measured against untouched controls. Read the gap against
 a neighbor rather than the absolute value, which tracks a town-wide standing
 and shifts for everyone at once.
+
+## Rearing on command
+
+### Reaching the fragment at all
+
+The horse has a `Rear` fragment in `kcd_horse_database.adb`, and a fragment is
+not something Lua can ask for. `StartInteractiveActionByName` resolves its
+argument against the FragTags of one fragment, `AnimationControlled`, which the
+horse does not have. So the mod ships four files: a parent database defining
+that fragment with an option carrying vanilla's `Rear` contents, the horse
+fragment ids with `AnimationControlled` declared, the tag itself, and the horse
+controller definition giving the fragment a `FullBody` scope. A fragment with
+no scope can never play, whatever the database says. Humans needed no
+equivalent only because vanilla already declares the fragment for them.
+
+The call itself takes `ActionName, ObjectId, UpdateVisibility, AnimSpeed`, and
+the horse must be passed as its own object. With the name alone it does nothing
+and still returns true, which is why correct data looked like broken data for
+some time.
+
+### The charge is one fragment, not two
+
+`relaxed_rearing` is cut at 0.8 s by a second Blend in the same AnimLayer and
+hands straight to `relaxed_gallop_jump`, with the MovementControlMethod
+switching at the same moment: the rear needs the animation to own position, or
+momentum drags the horse sideways, and the jump needs it free with inertia on,
+or it cannot travel.
+
+Chaining two fragments from Lua instead was tried at 700, 1400 and 1900 ms and
+always showed a gap. `relaxed_rearing` spends its last third back on all fours
+doing nothing while still holding the horse, releasing at 2064 ms when the rear
+is visually over at around 1400.
+
+The charge covers about 5.4 m in a second, which the detection loop would score
+as a trot, so `RearCharging` forces it to a gallop for the duration. The rear
+on the spot travels 0.00 m, so the detection loop can never see anyone and the
+move carries its own strike instead, fired on a delay because the strike is the
+hooves landing rather than the horse going up.
+
+### Input
+
+`Player:OnAction` is an ordinary Lua method on the `Player` entity class table
+and the engine calls it for actions delivered to the player. That is what makes
+input reachable: the UI action listener the mod uses for the load screen never
+sees a key, only interface events. The method is wrapped rather than replaced
+and the original is always called, so every other action behaves as it did.
+
+A vanilla key cannot be borrowed. Consuming a press does not stop the game
+acting on it — bound to `jump`, this reared the horse and then jumped anyway —
+and there is no hold to distinguish one use from another, since a two second
+hold and a tap both deliver a single `press` and no `release`. So the mod
+brings its own action map, `Libs/Config/hcm_actionmaps.xml`, declaring each
+move once per candidate key. An action nobody listens for costs nothing.
+
+The file is read once per session. Reading it again once the map is registered
+registers the actions a second and third time and one press then arrives three
+times over. The listener is re-pointed on every load screen, because the
+listener is the player and the world reload replaces that entity.
+
+`HookRearKey` reinstalls itself rather than refusing once hooked. Refusing left
+a wrapper from an older copy of the file in place after a hot reload, closed
+over an older original, with the hook still reporting itself installed.
+
+### The cooldown must not survive a load
+
+`RearNextAt` is stamped from `System.GetCurrTime`, which is level time. Loading
+a save winds that clock backwards, and the deadline lives on the mod table,
+which the load does not touch. The mod therefore came back holding a time that
+had not happened yet and refused every press until the clock climbed past it.
+
+This presented as the rear keys being dead for an unpredictable stretch after a
+load, from instantly to never, and it cost seven attempts aimed at the action
+map, the listener and the hook, none of which were ever involved. Logging every
+press settled it in one ride: presses reached `Player.OnAction` at +112 ms with
+the map reporting itself listening and enabled, 56 consecutive presses were
+refused at the cooldown gate, and the 57th was accepted at +14256 ms. The range
+of the symptom is just the arithmetic — the wait is how far the clock moved, and
+a player who had not reared before loading had no deadline and saw no problem.
+
+The load screen handler drops it with `RecentHits`, `RecentRejections` and
+`VictimActivity`, which were already dropped there for exactly this reason.
+
+The general lesson is in `RearRequested`: every gate that refuses a press says
+which one it was. A press that arrives and is dropped silently looks, from
+outside the game, exactly like a press that never arrived, and those two have
+opposite answers.

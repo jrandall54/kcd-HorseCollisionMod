@@ -29,6 +29,17 @@ number.
 
 ## [Unreleased]
 
+## [4.19.0] - 2026-09-06
+
+### Added
+
+- Rear your horse on command. Two moves on two keys: one rears on the spot and
+  brings the hooves down on anyone right in front, and one rears and drives
+  forward, riding down whoever is in the way. Both are the horse's own
+  animations and you stay in the saddle. Only from a standstill.
+  `RearChargeKey` and `RearOnlyKey` choose the keys, defaulting to R and Q.
+  **NOT BREAKING**, no released version carried them.
+
 ## [4.18.0] - 2026-09-06
 
 ### Added
