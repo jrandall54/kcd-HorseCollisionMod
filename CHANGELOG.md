@@ -29,6 +29,17 @@ number.
 
 ## [Unreleased]
 
+## [4.17.2] - 2026-09-06
+
+### Fixed
+
+- Riding down a guard who happens to have his weapon drawn is no longer
+  treated as fighting. Anyone carrying a weapon counted as combat, so a
+  patrolling guard cost the horse more than five times the stamina he should
+  have, and guards with polearms were never staggered at walking pace because
+  the walk stagger is disabled in combat. Whether you are in a fight now
+  decides it.
+
 ## [4.17.1] - 2026-09-06
 
 ### Fixed
