@@ -895,8 +895,8 @@ switching at the same moment: the rear needs the animation to own position, or
 momentum drags the horse sideways, and the jump needs it free with inertia on,
 or it cannot travel.
 
-Chaining two fragments from Lua instead was tried at 700, 1400 and 1900 ms and
-always showed a gap. `relaxed_rearing` spends its last third back on all fours
+Chaining two fragments from Lua instead shows a gap at 700, 1400 and 1900 ms
+alike. `relaxed_rearing` spends its last third back on all fours
 doing nothing while still holding the horse, releasing at 2064 ms when the rear
 is visually over at around 1400.
 
@@ -915,8 +915,8 @@ sees a key, only interface events. The method is wrapped rather than replaced
 and the original is always called, so every other action behaves as it did.
 
 A vanilla key cannot be borrowed. Consuming a press does not stop the game
-acting on it — bound to `jump`, this reared the horse and then jumped anyway —
-and there is no hold to distinguish one use from another, since a two second
+acting on it: bound to `jump`, this reared the horse and then jumped anyway.
+Nor is there a hold to distinguish one use from another, since a two second
 hold and a tap both deliver a single `press` and no `release`. So the mod
 brings its own action map, `Libs/Config/hcm_actionmaps.xml`, declaring each
 move once per candidate key. An action nobody listens for costs nothing.
@@ -943,7 +943,7 @@ map, the listener and the hook, none of which were ever involved. Logging every
 press settled it in one ride: presses reached `Player.OnAction` at +112 ms with
 the map reporting itself listening and enabled, 56 consecutive presses were
 refused at the cooldown gate, and the 57th was accepted at +14256 ms. The range
-of the symptom is just the arithmetic — the wait is how far the clock moved, and
+of the symptom is just the arithmetic: the wait is how far the clock moved, and
 a player who had not reared before loading had no deadline and saw no problem.
 
 The load screen handler drops it with `RecentHits`, `RecentRejections` and

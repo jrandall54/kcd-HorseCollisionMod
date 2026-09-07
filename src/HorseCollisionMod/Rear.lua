@@ -124,10 +124,10 @@ function HorseCollisionMod:HookRearKey()
 
 		-- The hook is wrapped whole. An error in here would otherwise take
 		-- the player's entire action handling with it, which is every key.
-		-- Our own action is always consumed, whether or not it rears. It is
-		-- not a vanilla action and the game's handler has no branch for it;
-		-- passing it through hands an unknown name to `OnActorAction` on the
-		-- game rules before anything else looks at it.
+		-- The mod's own action is always consumed, whether or not it rears.
+		-- It is not a vanilla action and the game's handler has no branch for
+		-- it; passing it through hands an unknown name to `OnActorAction` on
+		-- the game rules before anything else looks at it.
 		pcall(function()
 			local mod = HorseCollisionMod
 			local cfg = mod.Config
@@ -226,12 +226,12 @@ function HorseCollisionMod:RearRequested(fragTag)
 	-- A rear is a standstill move, and the figure is low on purpose. The clip
 	-- owns the horse's position while it plays, so momentum the horse already
 	-- had fights it and drags the horse sideways over the closing frames:
-	-- clearly visible at a walk, absent from a dead stop, where the horse holds
+	-- visible at a walk, absent from a dead stop, where the horse holds
 	-- position to 0.00 m for the whole animation.
 	--
 	-- Freeing that ownership instead is worse rather than better. With XyMove
 	-- and Rotate at 0 the horse drifts under its own physics, measured at
-	-- 0.80 m and described as a metre to the right.
+	-- 0.80 m and described as a meter to the right.
 	if speed > (cfg.RearMaxSpeed or 1.0) then
 		return refuse("speed " .. string.format("%.2f", speed))
 	end
