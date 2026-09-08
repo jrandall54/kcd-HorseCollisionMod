@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.19.2
+-- @release 4.19.3
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.19.2"
+HorseCollisionMod.Version = "4.19.3"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -173,6 +173,16 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeStrikeMs how long the strike sweeps for
 -- @field RearChargeStrikePollMs how often it sweeps
 -- @field RearChargeImpactSpeed the speed a charge is scored at
+-- @field ImpactSoundRear the layers the rear on the spot plays. Hooves coming
+--   down on someone, not a horse riding into them
+-- @field ImpactDustScaleRear how much dust a rear raises
+-- @field CameraShakeRearScale how hard a rear shakes the rider's camera
+-- @field RiderBlurRearScale how much a rear blurs the rider's view
+-- @field RiderBlurRearLength how long that blur lasts
+-- @field RearReaction what a rear does to its victim: "fall", "knockdown"
+--   or a ragdoll, the same choices the trot tier offers. Only "fall" carries
+--   the recovery that restores a victim's facing and re-plans their activity,
+--   which is why both tiers default to it
 -- @field ImpactSoundCharge the layers a charge plays. Its own set, so the
 --   charge can be tuned without touching an ordinary gallop collision
 -- @field ImpactDustScaleCharge how much dust a charge raises
@@ -199,6 +209,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
 -- @field RearStaminaCost what a landed rear costs the horse
+-- @field ReleaseMovementAttempts how many times that release is repeated, in
+--   case the fragment re-applies its movement layer as it blends
+-- @field ReleaseMovementGapMs how far apart those attempts are
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
 -- @field ReplanAfterReaction ask a victim to re-plan their activity once the
@@ -424,6 +437,8 @@ HorseCollisionMod.Config = {
 	-- stops being carried through walls. False restores the behavior before
 	-- this, where a stagger beside a building could end inside it.
 	ReleaseAnimationMovement = true,
+	ReleaseMovementAttempts  = 4,
+	ReleaseMovementGapMs     = 80,
 
 	-- Sends a victim back to their activity once their reaction is over, so
 	-- they walk to whatever they were using and are aligned to it on the way
@@ -462,6 +477,17 @@ HorseCollisionMod.Config = {
 	RearFragTag              = "hcm_rear_charge",
 	RearOnlyKey              = "q",
 	RearOnlyFragTag          = "hcm_rear",
+	-- Hooves coming down, not a horse riding into someone. Lighter than a
+	-- charge and led by the hoof rather than by the body.
+	ImpactSoundRear          = { { "hs_hp_soil", 2, 0.9 },
+	                             { "body", 0, 1.2 },
+	                             { "blunt", 0, 1.4 },
+	                             { "f_bodyfall1", 0, 1.3 } },
+	ImpactDustScaleRear      = 0.12,
+	CameraShakeRearScale     = 0.8,
+	RiderBlurRearScale       = 0.6,
+	RiderBlurRearLength      = 0.4,
+	RearReaction             = "fall",
 	ImpactSoundCharge        = { { "body", 0, 0.6 },
 	                             { "hs_hp_soil", 3, 0.8 },
 	                             { "body_armed", 0, 0.9 },
@@ -469,7 +495,7 @@ HorseCollisionMod.Config = {
 	                             { "hs_hp_soil", 6, 0.7 },
 	                             { "face_armed", 0, 0.9 },
 	                             { "f_bodyfall1", 0, 0.7 } },
-	ImpactDustScaleCharge    = 1.2,
+	ImpactDustScaleCharge    = 0.17,
 	CameraShakeChargeScale   = 1.2,
 	RiderBlurChargeScale     = 1.1,
 	RiderBlurChargeLength    = 1.1,

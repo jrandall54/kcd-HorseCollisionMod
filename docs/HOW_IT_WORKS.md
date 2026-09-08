@@ -89,6 +89,11 @@ standstill, and it is on the mod's own keys: R rears and drives forward, Q
 rears on the spot. Both are the horse's own animations and you stay in the
 saddle throughout.
 
+A rear is its own kind of blow rather than a slow collision. It hurts more than
+being shoved at a trot, sounds like hooves rather than a body, and leaves its
+victim to get up and go back to what they were doing. Rearing again on someone
+already down hits them again without restarting their fall.
+
 The rear on the spot brings the hooves down on whoever is directly in front,
 inside an arc rather than on everyone nearby, and it hits everybody standing in
 that arc rather than a capped number. It is scored as a trot, because a horse

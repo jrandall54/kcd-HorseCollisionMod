@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.19.2
+-- @release 4.19.3
 --- Stops the dog colliding with horses, so it cannot carry one.
 --
 -- Henry's dog walks under the horse and the horse ends up standing on his
@@ -311,7 +311,9 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 	-- shape is right and only the weight should differ between the tiers.
 	local tier = 0
 
-	if tierName == "Charge" then
+	if tierName == "Rear" then
+		tier = cfg.CameraShakeRearScale or cfg.CameraShakeTrotScale or 0
+	elseif tierName == "Charge" then
 		tier = cfg.CameraShakeChargeScale or cfg.CameraShakeGallopScale or 0
 	elseif tierName == "Gallop" then
 		tier = 1
@@ -421,7 +423,10 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 	-- kept and the length cut, and a single scale could not do both.
 	local tier, length = 0, 1
 
-	if tierName == "Charge" then
+	if tierName == "Rear" then
+		tier = cfg.RiderBlurRearScale or cfg.RiderBlurTrotScale or 0
+		length = cfg.RiderBlurRearLength or tier
+	elseif tierName == "Charge" then
 		tier = cfg.RiderBlurChargeScale or cfg.RiderBlurGallopScale or 0
 		length = cfg.RiderBlurChargeLength or tier
 	elseif tierName == "Gallop" then

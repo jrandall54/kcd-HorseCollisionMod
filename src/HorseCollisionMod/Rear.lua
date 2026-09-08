@@ -646,7 +646,7 @@ function HorseCollisionMod:RearStrike(horseEnt)
 
 			if ok and forward and forward >= arc then
 				hit = hit + 1
-				self:RearHit(npc, horseEnt, playerEnt, heading)
+				self:RearHit(npc, horseEnt, playerEnt, heading, "Rear")
 			end
 		end
 	end
@@ -680,7 +680,7 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	local cfg = self.Config
 	local armor = self:ArmorOf(npc)
 	local armorImpulse = self:ArmorImpulseScale(armor)
-	tier = tier or "Trot"
+	tier = tier or "Rear"
 	local speed = hitSpeed or cfg.RearImpactSpeed or 6.0
 	local velocity = { x = heading.x * speed, y = heading.y * speed, z = 0 }
 	local horsePos = nil
@@ -709,19 +709,42 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	self:BlurRiderView(playerEnt, tier)
 	self:ImpactDust(npc, tier)
 
-	-- A charge always ragdolls, because it is the gallop treatment and the
-	-- gallop tier is where the ragdoll belongs. The rear on the spot follows
-	-- `TrotReaction`, so the two tiers stay consistent with the rest of the mod.
-	if tier == "Charge" then
+	-- A victim already inside a reaction is not given another one.
+	--
+	-- Rearing on someone still down from the last rear started a second
+	-- interactive action on top of the first. The new one interrupts the
+	-- running one mid-blend and the body ends up in a broken pose, face down
+	-- and slowly rotating.
+	--
+	-- The hit itself still lands. A previous session built a cooldown that
+	-- refused the whole impact on the premise that a second blow on a downed
+	-- victim does nothing, and testing disproved it: a second impact on a
+	-- victim in `BlendRagdoll` registers and costs full health. So the damage,
+	-- the sound, the dust and the rest all happen. Only the animation is
+	-- skipped, and the victim stays down under the reaction already playing,
+	-- which is what should happen to someone being trampled where they lie.
+	local busy = false
+
+	pcall(function()
+		local state = tostring(npc.actor:GetCurrentAnimationState())
+
+		busy = state == self.ReactionAnimationState
+				or state == self.RagdollAnimationState
+	end)
+
+	if busy then
+		self:Log("RearHit " .. self:NameOf(npc)
+				.. " already reacting, damage only")
+	elseif tier == "Charge" then
 		-- The throw is its own figure rather than a full gallop's. A charge
 		-- was launching people cartoonishly far at 1.0: the horse is also
 		-- moving under physics by then, so its collider shoves the ragdoll on
 		-- top of whatever this applies.
 		self:Ragdoll(npc, velocity, speed, cfg.RearChargeThrow or 0.7,
 				armorImpulse, horsePos, horseEnt)
-	elseif cfg.TrotReaction == "knockdown" then
+	elseif (cfg.RearReaction or cfg.TrotReaction) == "knockdown" then
 		self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
-	elseif cfg.TrotReaction == "fall" then
+	elseif (cfg.RearReaction or cfg.TrotReaction) == "fall" then
 		self:PlayReaction(npc, velocity, speed, "hcm_fall_")
 	else
 		self:Ragdoll(npc, velocity, speed, 0.6, armorImpulse, horsePos, horseEnt)

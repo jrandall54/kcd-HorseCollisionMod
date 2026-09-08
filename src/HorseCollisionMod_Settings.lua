@@ -116,6 +116,24 @@ HorseCollisionModSettings = {
 	RearOnlyFragTag          = "hcm_rear",       -- the second key rears on the spot
 	-- The charge rears in place and is then pushed forward physically, so the
 	-- horse collides with the world like any moving horse.
+	-- The rear on the spot is its own tier too. Hooves coming down on someone
+	-- is not a horse riding into them, so it has its own sound, dust, shake,
+	-- blur and reaction rather than borrowing the trot's.
+	ImpactSoundRear          = { { "hs_hp_soil", 2, 0.9 },
+	                             { "body", 0, 1.2 },
+	                             { "blunt", 0, 1.4 },
+	                             { "f_bodyfall1", 0, 1.3 } },
+	ImpactDustScaleRear      = 0.12,   -- how much dust it raises
+	CameraShakeRearScale     = 0.8,   -- how hard it shakes the camera
+	RiderBlurRearScale       = 0.6,   -- how much it blurs the view
+	RiderBlurRearLength      = 0.4,   -- how long that lasts
+	RearReaction             = "fall",
+	         -- "fall" is an animated fall the game recovers from,
+	         -- "knockdown" adds an animated get-up, "ragdoll" is physics.
+	         -- Only "fall" restores a victim's facing and gives them their
+	         -- activity back afterwards; the others leave them standing where
+	         -- they landed, facing wherever they finished
+
 	-- The charge is its own tier, not a gallop. It has its own damage, sound,
 	-- dust, camera shake and view blur, so it can be tuned without touching
 	-- what an ordinary collision does. It knocks down everyone in a corridor in
@@ -133,7 +151,7 @@ HorseCollisionModSettings = {
 	                             { "hs_hp_soil", 6, 0.7 },
 	                             { "face_armed", 0, 0.9 },
 	                             { "f_bodyfall1", 0, 0.7 } },
-	ImpactDustScaleCharge    = 1.2,   -- how much dust it raises
+	ImpactDustScaleCharge    = 0.17,   -- how much dust it raises
 	CameraShakeChargeScale   = 1.2,   -- how hard it shakes the camera
 	RiderBlurChargeScale     = 1.1,   -- how much it blurs the view
 	RiderBlurChargeLength    = 1.1,   -- how long that lasts
@@ -478,6 +496,8 @@ HorseCollisionModSettings = {
 	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
 	                                  -- and gallop; never at a walk
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
+	ReleaseMovementAttempts  = 4,     -- repeated, since a blend can undo it
+	ReleaseMovementGapMs     = 80,    -- how far apart the attempts are
 	ReplanAfterReaction      = true,  -- sends them back to their stall or
 	                                  -- whatever they were leaning on
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight

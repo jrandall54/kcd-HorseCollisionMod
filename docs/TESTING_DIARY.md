@@ -17041,3 +17041,58 @@ separately: `sideways` read 0.00 at the moment of the push.
 Aiming was moved to the push rather than the key press. The horse's rotation is
 the rider's during a rear in place, so a heading captured 1.4 s earlier ignored
 their correction.
+
+### The rear is its own tier, and splitting it out found three faults
+
+The rear on the spot was passing `"Trot"` into the shared hit path, so it
+borrowed a trot's damage, sound, dust, camera shake, view blur and reaction.
+Giving it `"Rear"` exposed three things that had been hidden by the borrowing.
+
+**Its damage was never connected.** `ImpactDamageByTier` has carried a
+`Rear = 60` entry since an earlier session and nothing ever read it: the rear
+took the trot's 18. It now lands about 67 after variance and a barding scale of
+1.016, which kills a full-health beggar in two hits.
+
+**A victim killed mid-animation became a broken corpse.** The game marked them
+dead, so bystanders mourned them and the world treated them as a body, while
+the interactive action still owned them: standing in an idle pose, no
+collision, walking through walls. Measured on a beggar reared twice, with
+`travel=2.05` on the rows after death.
+
+This was latent for as long as animated reactions have existed. The gallop tier
+ragdolls, so a death there lands on a body physics already owns, and the tiers
+that play animated reactions did too little damage to kill. Raising the rear's
+damage made it routine. `ApplyImpactDamage` already reads health back after
+dealing it, so the death was detected and simply not acted on; it now calls
+`RagDollize` when the victim died and is still in `AnimationControlled`.
+
+**The recovery never ran.** `WatchTurn`, `RebuildVictim` and `ReplanIfStranded`
+are attached to the `hcm_fall_` prefix only, and `RearReaction` defaulted to
+`"knockdown"`, so rear victims stood up with no plan and no restored facing.
+The innkeeper leaning on nothing facing the wrong way is what that looks like.
+Both tiers that knock someone down now default to `"fall"`, and the limitation
+is recorded on the setting rather than left as a trap.
+
+#### Two more, from the same testing
+
+Victims were still occasionally carried through walls by a live knockdown with
+`ReleaseAnimationMovement` reporting success. A fragment can re-apply its
+movement layer as it blends, undoing a single release, so the call is now
+repeated four times across the first 290 ms. No clipping in five kills against
+walls afterwards.
+
+Rearing on a victim already down started a second interactive action on top of
+the first, and the two blending produced a face-down pose that slowly rotated.
+The reaction is now skipped for a victim already in `AnimationControlled` or
+`BlendRagdoll`, while the damage, sound and everything else still land. A
+cooldown would have been wrong: this project already built one on the premise
+that a second blow on a downed victim does nothing, and testing disproved it.
+
+#### Left open
+
+The surrender prompt persists for five to six seconds after the last hostile
+dies. It is held by `player.soul:IsInCombatDanger()` and needs six consecutive
+quiet passes at `SurrenderHintHoldMs` to hide, and nothing checks whether there
+is anyone left to surrender to. Newly reachable because the rear now kills the
+victims it provokes. The duplicate-prompt report is separate and unexplained:
+`ShowSurrenderHint` already returns early when its count is above one.

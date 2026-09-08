@@ -29,6 +29,31 @@ number.
 
 ## [Unreleased]
 
+## [4.19.3] - 2026-09-07
+
+### Changed
+
+- A rear on the spot is its own kind of blow rather than being scored as a
+  trot. It hurts considerably more, sounds like hooves coming down rather than
+  a body being shoved, and raises its own dust and camera shake. All of it is
+  tuned separately from riding someone down.
+
+### Fixed
+
+- Someone killed while still falling from a collision no longer stands up dead.
+  The game marked them dead, so bystanders treated them as a corpse, while
+  their body stayed locked in the animation with no collision and could be
+  walked through walls. Their body now drops properly.
+
+- Victims are no longer occasionally carried through walls by the fall they are
+  knocked into.
+
+- A victim of a rear gets back up facing the right way and returns to what they
+  were doing, instead of standing wherever they landed with nothing to do.
+
+- Rearing on someone already on the ground no longer twists their body into a
+  broken pose. The blow still lands; they simply stay down.
+
 ## [4.19.2] - 2026-09-07
 
 ### Changed

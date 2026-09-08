@@ -937,6 +937,46 @@ rear has already done. Measured, the action ended at 1856 ms played whole and
 Raising `RearAnimSpeed` is not an alternative. It compresses the useful part
 and the dead part alike, so the move looks wrong and the delay barely moves.
 
+### The rear is a tier, not a trot
+
+The rear on the spot has its own damage, sound, dust, camera shake, view blur
+and reaction, keyed on `"Rear"`. It borrowed the trot's until 4.19.2, which hid
+three faults.
+
+`ImpactDamageByTier` carried a `Rear` entry that nothing read, so the move did
+a trot's 18 rather than the 60 the table said. Connecting it made the rear able
+to kill, which exposed the other two.
+
+**A death during an animated reaction leaves a broken corpse.** The game marks
+the victim dead while the interactive action still owns the body: it holds an
+idle pose, has no collision, and passes through walls. The gallop tier never
+showed this because it ragdolls, and a death on a body physics already owns
+resolves normally. `ApplyImpactDamage` reads health back after dealing it, so
+the death is already detected there, and a victim who died while still in
+`AnimationControlled` is handed to `RagDollize`. Deaths outside an action are
+left alone, since the game's own handling works and forcing a ragdoll would
+override it.
+
+**The recovery is attached to the fall prefix.** `WatchTurn`, `RebuildVictim`
+and `ReplanIfStranded` run only for `hcm_fall_`, so a victim of a knockdown or
+a stagger stands up facing wherever the clip left them with no activity to
+return to. Both tiers that can knock someone down therefore default to
+`"fall"`. Extending the recovery to the other prefixes needs a different
+completion signal, because it waits on a ragdoll resolving and only the fall
+fragments carry a `Ragdoll` ProcLayer.
+
+**Reactions do not stack.** A victim already in `AnimationControlled` or
+`BlendRagdoll` is not given a second interactive action, because the two
+blending produce a face-down pose that rotates. The hit still lands in full:
+refusing it would be wrong, since a second impact on a downed victim
+demonstrably registers and costs health.
+
+**The movement release repeats.** A fragment can re-apply its movement layer as
+it blends, undoing a single `SetMovementControlledByAnimation(false)`, so the
+call is made `ReleaseMovementAttempts` times `ReleaseMovementGapMs` apart. It
+is idempotent, and victims were otherwise still carried through walls
+occasionally with the call reporting success.
+
 ### The charge has its own detection and its own tier
 
 The charge does not use the mod's collision loop. That loop is driven by the
