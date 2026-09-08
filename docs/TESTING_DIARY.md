@@ -17170,6 +17170,24 @@ Verification mattered here more than usual. An unrecognised wildcard would name
 a version matching nothing and disable the mod for everyone, which is worse
 than the fault being fixed.
 
+All four cases were then tested in game, on a 1.9.7 install with the loose
+development files parked so nothing could load outside the mod folder:
+
+    manifest 1.9.8            does not load
+    manifest 1.9.7            loads
+    manifest 1.9.*            loads
+    no supports block         loads
+
+The first row reproduces the reported fault exactly, so the gate is real and
+hard rather than advisory.
+
+Worth recording separately: an earlier attempt to test this appeared to show
+the mod loading with a deliberately wrong version. It did not. The development
+deploy writes loose scripts into `Data/Scripts` and animation data into
+`Data/Animations`, outside the mod folder, and those load whatever the manifest
+says. Only the pak was being disabled. Any test of the manifest has to park the
+loose files first, which `dev_deploy.ps1 -PrepareShippingTest` does.
+
 `pre_release_check.py` now refuses an exact version, and the check was proven
 to fire by reverting the manifest and watching it fail. Declaring one exact
 patch is never right for this mod: it overrides animation databases and depends
