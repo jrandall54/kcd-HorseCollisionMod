@@ -501,7 +501,7 @@ function HorseCollisionMod:LogActionEnd(horseEnt, tag)
 	--
 	-- Every measurement so far has been of the horse, and the horse does not
 	-- move: thirty samples through a whole fragment read 0.00 without
-	-- exception. The complaint is "I was clearly moved to the right", and the
+	-- exception. The rider reports being clearly moved to the right, and the
 	-- rider is a different entity sitting on the horse. Whether the two stay
 	-- together through a rear has never been checked, and if they do not, the
 	-- displacement is in the mount rather than anywhere it has been looked for.
@@ -650,7 +650,7 @@ function HorseCollisionMod:LogActionEnd(horseEnt, tag)
 					--
 					-- Every earlier measurement was how far each of the two
 					-- moved from where it started, which cannot see a rider
-					-- who was already sitting off centre when the rear began.
+					-- who was already sitting off center when the rear began.
 					-- This is where the rider actually sits on the horse, in
 					-- the horse's own frame, so a rear that leaves Henry
 					-- displaced shows up and a rear that leaves him where it

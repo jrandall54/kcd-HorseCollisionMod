@@ -101,12 +101,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	if readyAt and now < readyAt then
 		-- Once per victim per wait, not once per pass.
 		--
-		-- The note that used to be here said this fired only when a victim was
-		-- hit again while still down, "a handful of lines". It fires on every
-		-- pass of the detection loop for as long as the victim is down and in
-		-- range, which is a line every thirty milliseconds or so for up to
-		-- twelve seconds: 404 of them in one session, and a burst of several
-		-- hundred immediately after any landed hit.
+		-- This fires on every pass of the detection loop for as long as the
+		-- victim is down and in range, not only when one is hit again while
+		-- still down. That is a line every thirty milliseconds or so for up
+		-- to twelve seconds: 404 of them in one session, and a burst of
+		-- several hundred immediately after any landed hit.
 		--
 		-- That is not merely noise. Logging is a synchronous write, and a few
 		-- hundred of them spread across the seconds after an impact costs

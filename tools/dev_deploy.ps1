@@ -433,7 +433,7 @@ if ($RestoreDevEnvironment) {
 		Write-Host "[DEPLOY] restored $rel"
 	}
 
-	# Only the manifest and what it listed are ours to delete. The park is a
+	# Only the manifest and what it listed may be deleted. The park is a
 	# plain folder inside the game install and things get put there by hand:
 	# a restore that removed the whole tree destroyed a folder of parked
 	# scripts that no manifest ever mentioned, and said nothing about it.
