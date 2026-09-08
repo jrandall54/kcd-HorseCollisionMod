@@ -160,6 +160,50 @@ function HorseCollisionMod:HookRearKey()
 			.. " rear=" .. tostring(self.Config.RearOnlyKey))
 end
 
+--- Keeps a real speed for the player's horse, derived from where it has been.
+--
+-- `GetVelocity` cannot be trusted for this. At the moment a rear was requested
+-- it read 0.24 m/s; the horse then covered 0.12 m in the next 128 ms, which is
+-- 0.94 m/s. That is the same unreliability this project already documented on
+-- the vertical axis, where a stationary horse reports 1 to 2 m/s because the
+-- reading carries its settling fall.
+--
+-- It matters because the standstill gate is built on that number, and a gate
+-- reading a quarter of the true speed lets through exactly the rears that
+-- slide. The slide is the whole defect: the horse travels about 0.12 m in the
+-- first 128 ms of a rear and is then frozen by the fragment for the rest of
+-- the animation.
+--
+-- Two positions and the time between them cannot be wrong in that way.
+--
+-- @tparam table horseEnt the player's horse
+function HorseCollisionMod:TrackHorseSpeed(horseEnt)
+	if not horseEnt then
+		return
+	end
+
+	local now = self:TimeMs()
+
+	pcall(function()
+		local p = horseEnt:GetWorldPos()
+		local last = self.HorseTrack
+
+		if last and last.id == tostring(horseEnt.id) and now > last.t then
+			local dx = p.x - last.x
+			local dy = p.y - last.y
+			local dt = (now - last.t) / 1000
+
+			if dt > 0 then
+				self.HorseSpeed = math.sqrt((dx * dx) + (dy * dy)) / dt
+			end
+		end
+
+		self.HorseTrack = {
+			id = tostring(horseEnt.id), x = p.x, y = p.y, t = now
+		}
+	end)
+end
+
 --- Decides whether a press should rear.
 --
 -- @treturn boolean true when the press was taken
@@ -221,19 +265,68 @@ function HorseCollisionMod:RearRequested(fragTag)
 		return refuse("no velocity")
 	end
 
-	local speed = self:VectorLength(velocity)
-
-	-- A rear is a standstill move, and the figure is low on purpose. The clip
-	-- owns the horse's position while it plays, so momentum the horse already
-	-- had fights it and drags the horse sideways over the closing frames:
-	-- visible at a walk, absent from a dead stop, where the horse holds
-	-- position to 0.00 m for the whole animation.
+	-- Horizontal speed, not the length of the whole vector.
 	--
-	-- Freeing that ownership instead is worse rather than better. With XyMove
-	-- and Rotate at 0 the horse drifts under its own physics, measured at
-	-- 0.80 m and described as a meter to the right.
+	-- Whether this gate has anything to do with the sideways push is not
+	-- established. What is established is that it was measuring the wrong
+	-- quantity. `GetVelocity` on a horse standing perfectly
+	-- still reports 1 to 2 m/s, because it carries the vertical settling fall,
+	-- so a three dimensional length is mostly that noise: it refuses rears from
+	-- a dead stop, which is a known fault, and passes a horse genuinely walking
+	-- sideways because the horizontal part of the number was never isolated.
+	--
+	-- The ceiling itself is unchanged. Entry speed was briefly thought to
+	-- predict how far the horse ends up displaced, and it does not: a rear
+	-- entered at 0.09 m/s measured 1.76 m ahead and 0.97 m to the side a
+	-- second later. That reading was the rider riding away after the rear, not
+	-- the rear, which is why the sample window is now short enough that it
+	-- cannot contain a decision to move off.
+	local speed = 0
+
+	if velocity then
+		speed = math.sqrt((velocity.x * velocity.x)
+				+ (velocity.y * velocity.y))
+	end
+
+	-- The derived figure wins where it exists, because the engine's is wrong
+	-- in the direction that matters: it under-reports, so it passes rears the
+	-- gate exists to refuse.
+	local tracked = self.HorseSpeed
+
+	if tracked and tracked > speed then
+		speed = tracked
+	end
+
 	if speed > (cfg.RearMaxSpeed or 1.0) then
 		return refuse("speed " .. string.format("%.2f", speed))
+	end
+
+	-- The horse's own locomotion state, which is the only reliable answer to
+	-- "is this horse moving".
+	--
+	-- Neither velocity source can be trusted here. A rear entered with
+	-- `GetVelocity` reading 0.24 m/s, and a second with a position-derived
+	-- 0.11 m/s, both slid 0.12 m in the opening 128 ms; 0.11 m/s over that
+	-- window is 1.4 cm, so the horse accelerates once the rear begins and no
+	-- reading taken beforehand predicts it. A rear entered from a genuine stop
+	-- slides nothing at all, measured flat at 0.00 for the whole animation.
+	--
+	-- `MotionIdle` against `MotionMovement` is a state rather than an estimate,
+	-- and it is the difference between those two cases.
+	if cfg.RearIdleOnly then
+		local state = "?"
+
+		pcall(function()
+			state = tostring(horseEnt.actor:GetCurrentAnimationState())
+		end)
+
+		if state ~= "MotionIdle" then
+			return refuse("state " .. state)
+		end
+	end
+
+	if cfg.LogTelemetry then
+		self:Log(string.format("Rear entry speed=%.2f (horizontal)", speed))
 	end
 
 	local now = self:TimeMs()
@@ -378,13 +471,111 @@ end
 -- @tparam table horseEnt the player's horse
 -- @tparam string tag the fragment tag that was started, for the log line
 function HorseCollisionMod:LogActionEnd(horseEnt, tag)
-	if not self.Config.LogTelemetry then
+	if not self.Config.LogTelemetry and not self.Config.RearTrace then
 		return
 	end
 
 	local generation = self.TimerTick
 	local started = self:TimeMs()
 	local deadline = started + (self.Config.RearChargeWaitCeilingMs or 3000)
+
+	-- Where the horse was and which way it faced when the rear began, so the
+	-- displacement can be split into forward and sideways. "Pushed sideways"
+	-- is the whole complaint, and a raw distance cannot tell sideways from
+	-- the horse simply walking on.
+	local origin, forward, riderOrigin = nil, nil, nil
+
+	pcall(function()
+		local p = horseEnt:GetWorldPos()
+		local d = horseEnt:GetDirectionVector(1)
+		local flat = math.sqrt((d.x * d.x) + (d.y * d.y))
+
+		origin = { x = p.x, y = p.y, z = p.z }
+
+		if flat > 0 then
+			forward = { x = d.x / flat, y = d.y / flat }
+		end
+	end)
+
+	-- The rider, measured separately and in the same frame.
+	--
+	-- Every measurement so far has been of the horse, and the horse does not
+	-- move: thirty samples through a whole fragment read 0.00 without
+	-- exception. The complaint is "I was clearly moved to the right", and the
+	-- rider is a different entity sitting on the horse. Whether the two stay
+	-- together through a rear has never been checked, and if they do not, the
+	-- displacement is in the mount rather than anywhere it has been looked for.
+	pcall(function()
+		local q = player:GetWorldPos()
+
+		riderOrigin = { x = q.x, y = q.y, z = q.z }
+	end)
+
+	-- The rider's offset from where the horse started, so a rider that stays
+	-- put on a horse that stays put reads flat, and any separation shows.
+	local function riderOffset()
+		local out = { ahead = 0, side = 0, up = 0 }
+
+		if not riderOrigin or not origin then
+			return out
+		end
+
+		pcall(function()
+			local q = player:GetWorldPos()
+			local dx = q.x - riderOrigin.x
+			local dy = q.y - riderOrigin.y
+
+			out.up = q.z - riderOrigin.z
+
+			if forward then
+				out.ahead = (dx * forward.x) + (dy * forward.y)
+				out.side = (dx * forward.y) - (dy * forward.x)
+			end
+		end)
+
+		return out
+	end
+
+	-- Offset from the start, in the horse's own frame. Right is the forward
+	-- vector turned ninety degrees, so a positive `side` is a push to the
+	-- horse's right.
+	local function offset()
+		local out = { ahead = 0, side = 0, up = 0 }
+
+		if not origin then
+			return out
+		end
+
+		pcall(function()
+			local p = horseEnt:GetWorldPos()
+			local dx = p.x - origin.x
+			local dy = p.y - origin.y
+
+			out.up = p.z - origin.z
+
+			if forward then
+				out.ahead = (dx * forward.x) + (dy * forward.y)
+				out.side = (dx * forward.y) - (dy * forward.x)
+			end
+		end)
+
+		return out
+	end
+
+	-- The shape of the movement inside the fragment, kept in memory and written
+	-- once when it ends.
+	--
+	-- The distinction it exists to draw: a horse that creeps forward a little
+	-- on every frame is being carried by root motion in the clip, and a horse
+	-- that sits still and then jumps in a single frame is the handover at the
+	-- release. Both land as the same ten to fifteen centimetres in a
+	-- before-and-after reading, and they need opposite fixes.
+	--
+	-- Nothing is logged while the animation is playing. A previous version of
+	-- this wrote a line per sample, about eighty synchronous writes across the
+	-- two and a half seconds being judged, and it cost frames in exactly the
+	-- window under examination.
+	local track = {}
 
 	local function poll()
 		if generation ~= self.TimerTick then
@@ -398,11 +589,181 @@ function HorseCollisionMod:LogActionEnd(horseEnt, tag)
 		end)
 
 		if state ~= "AnimationControlled" or self:TimeMs() > deadline then
-			self:Log(string.format("ActionEnd %s held=%.0fms state=%s",
-					tostring(tag), self:TimeMs() - started, state))
+			local held = self:TimeMs() - started
+
+					local during = offset()
+
+			-- Biggest single-frame step, and when it happened. A ramp puts this
+			-- near the average; a snap puts it far above.
+			local jump, jumpAt, prev = 0, 0, nil
+
+			for _, row in ipairs(track) do
+				if prev then
+					local dx = row.ahead - prev.ahead
+					local dy = row.side - prev.side
+					local step = math.sqrt((dx * dx) + (dy * dy))
+
+					if step > jump then
+						jump, jumpAt = step, row.t
+					end
+				end
+
+				prev = row
+			end
+
+			-- The whole point of the measurement. If the horse is already
+			-- displaced by the time the action ends, the fragment did it. If
+			-- it is not, and it has moved a second later, then whatever
+			-- resumes when the fragment lets go did it, and no value inside
+			-- the animation data can be the cause.
+			-- Keep sampling past the release.
+			--
+			-- Both traces are still moving on their last sample, the rider
+			-- trending back toward the horse rather than sitting anywhere, so
+			-- cutting the measurement at the action end says nothing about
+			-- where the rider actually ends up. This runs on until the rider
+			-- has stopped, and reports whether the seat is recovered.
+			if self.Config.RearTrace then
+				local tail = {}
+				local tailStart = self:TimeMs()
+
+				local function settle()
+					if generation ~= self.TimerTick then
+						return
+					end
+
+					local r = riderOffset()
+					local h = offset()
+
+					-- Heading too. A horse that turns swings the rider
+					-- sideways without moving its own origin, which looks
+					-- identical to the rider being left behind.
+					local yaw = 0
+
+					pcall(function()
+						local d = horseEnt:GetDirectionVector(1)
+
+						yaw = math.deg(math.atan2(d.y, d.x))
+					end)
+
+					-- Absolute seat, not a delta.
+					--
+					-- Every earlier measurement was how far each of the two
+					-- moved from where it started, which cannot see a rider
+					-- who was already sitting off centre when the rear began.
+					-- This is where the rider actually sits on the horse, in
+					-- the horse's own frame, so a rear that leaves Henry
+					-- displaced shows up and a rear that leaves him where it
+					-- found him reads the same before and after.
+					local seatAhead, seatSide = 0, 0
+
+					pcall(function()
+						local q = player:GetWorldPos()
+						local hp = horseEnt:GetWorldPos()
+						local d = horseEnt:GetDirectionVector(1)
+						local flat = math.sqrt((d.x * d.x) + (d.y * d.y))
+						local dx, dy = q.x - hp.x, q.y - hp.y
+
+						if flat > 0 then
+							local fx, fy = d.x / flat, d.y / flat
+
+							seatAhead = (dx * fx) + (dy * fy)
+							seatSide = (dx * fy) - (dy * fx)
+						end
+					end)
+
+					tail[#tail + 1] = string.format("%.2f/%.2f", seatAhead,
+							seatSide)
+
+					if self:TimeMs() - tailStart < 800 then
+						Script.SetTimer(32, settle)
+					else
+						-- Rider minus horse, so a rider back in the saddle
+						-- reads flat and a rider left behind does not.
+						self:Log("RearSeat " .. tostring(tag)
+								.. " seatAhead/seatSide[" .. table.concat(tail, " ")
+								.. "]")
+					end
+				end
+
+				settle()
+			end
+
+			if not self.Config.LogTelemetry then
+				return
+			end
+
+			Script.SetTimer(self.Config.RearSettleMs or 1000, function()
+				if generation ~= self.TimerTick then
+					return
+				end
+
+				local after = offset()
+
+				-- The profile itself, as the forward offset every sample,
+				-- so the shape can be read rather than inferred from two
+				-- endpoints. One line, written after the animation is over.
+				local shape = {}
+
+				for _, row in ipairs(track) do
+					shape[#shape + 1] = string.format("%.2f", row.ahead)
+				end
+
+				local rAhead, rSide, hSide = {}, {}, {}
+
+				for _, row in ipairs(track) do
+					rAhead[#rAhead + 1] = string.format("%.2f", row.rAhead or 0)
+					rSide[#rSide + 1] = string.format("%.2f", row.rSide or 0)
+					hSide[#hSide + 1] = string.format("%.2f", row.side or 0)
+				end
+
+				-- Behind its own switch, off by default. Three lines a rear
+				-- is not much, but this is a diagnostic and the session it
+				-- came from is the one that established what stray logging
+				-- does to an animation being judged by eye.
+				if self.Config.RearTrace then
+					self:Log(string.format(
+							"RearShape %s samples=%d biggestStep=%.3f "
+							.. "at=%.0fms horseAhead[%s]",
+							tostring(tag), #track, jump, jumpAt,
+							table.concat(shape, " ")))
+
+					self:Log(string.format("RearShape %s riderAhead[%s]",
+							tostring(tag), table.concat(rAhead, " ")))
+
+					self:Log(string.format("RearShape %s riderSide[%s]",
+							tostring(tag), table.concat(rSide, " ")))
+
+					self:Log(string.format("RearShape %s horseSide[%s]",
+							tostring(tag), table.concat(hSide, " ")))
+				end
+
+				self:Log(string.format(
+						"ActionEnd %s held=%.0fms state=%s "
+						.. "during(ahead=%+.3f side=%+.3f up=%+.3f) "
+						.. "settled(ahead=%+.3f side=%+.3f up=%+.3f)",
+						tostring(tag), held, state,
+						during.ahead, during.side, during.up,
+						after.ahead, after.side, after.up))
+			end)
 
 			return
 		end
+
+		local here = offset()
+
+		local rider = riderOffset()
+
+		track[#track + 1] = {
+			t = self:TimeMs() - started, ahead = here.ahead, side = here.side,
+			rAhead = rider.ahead, rSide = rider.side, rUp = rider.up
+		}
+
+		-- The horse's sideways offset is the number that decides whether the
+		-- rider is being left behind or is simply sitting on a horse that
+		-- moved. Forward resolves to zero for the rider and does not for the
+		-- horse; sideways resolves for neither, and only one of them can be
+		-- the cause.
 
 		Script.SetTimer(self.Config.RearChargeWaitPollMs or 30, poll)
 	end
@@ -412,69 +773,37 @@ function HorseCollisionMod:LogActionEnd(horseEnt, tag)
 	-- poll that begins too early ends immediately with a length of nothing.
 	Script.SetTimer(self.Config.RearChargeWaitMs or 400, poll)
 
-	self:TraceRearMotion(horseEnt)
-end
+	-- The first 400 ms, which the poll above cannot see.
+	--
+	-- After turning and then rearing, the horse reads 0.15 m out at the poll's
+	-- very first sample and then sits flat for the rest of the animation. So
+	-- the displacement happens in the gap between the key press and the
+	-- fragment taking hold, not at the end where every fix so far was aimed.
+	-- This samples that gap and nothing else.
+	if self.Config.RearTrace then
+		local early = {}
 
---- Samples where the horse actually is, right through the end of a rear.
---
--- A jerk shortly after the hooves come down is not something a log line saying
--- when the action ended can explain, and it is not the animation crossfade:
--- lengthening that from 0.2 s to 0.6 s changed neither the look nor `held=`.
---
--- The remaining candidate is the handover. `MovementControlMethod` gives the
--- animation ownership of the horse's position for the length of the fragment,
--- and when the fragment ends the horse goes back to its own movement
--- controller. That boundary is a discontinuity, and whether it is the one
--- being seen is answerable by watching the position across it rather than by
--- trying values.
---
--- Vertical and horizontal are kept apart deliberately. A settling drop and a
--- positional snap look alike at speed and mean different things: the first is
--- the horse falling the small distance the animation was holding it above the
--- ground, the second is the engine reconciling a position physics disagreed
--- with.
---
--- @tparam table horseEnt the player's horse
-function HorseCollisionMod:TraceRearMotion(horseEnt)
-	if not self.Config.RearTrace then
-		return
-	end
-
-	local generation = self.TimerTick
-	local started = self:TimeMs()
-	local stop = started + (self.Config.RearTraceMs or 2600)
-	local last = nil
-
-	local function sample()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local now = self:TimeMs()
-
-		pcall(function()
-			local p = horseEnt:GetWorldPos()
-			local state = tostring(horseEnt.actor:GetCurrentAnimationState())
-
-			if last then
-				local dx = p.x - last.x
-				local dy = p.y - last.y
-
-				self:Log(string.format(
-						"RearTrace t=%.0f dz=%+.4f dxy=%.4f z=%.3f state=%s",
-						now - started, p.z - last.z,
-						math.sqrt((dx * dx) + (dy * dy)), p.z, state))
+		local function sampleEarly()
+			if generation ~= self.TimerTick then
+				return
 			end
 
-			last = { x = p.x, y = p.y, z = p.z }
-		end)
+			local here = offset()
+			local t = self:TimeMs() - started
 
-		if now < stop then
-			Script.SetTimer(self.Config.RearTracePollMs or 32, sample)
+			early[#early + 1] = string.format("%.0f:%.2f", t, here.ahead)
+
+			if t < (self.Config.RearChargeWaitMs or 400) then
+				Script.SetTimer(16, sampleEarly)
+			else
+				self:Log("RearOpening " .. tostring(tag) .. " ahead["
+						.. table.concat(early, " ") .. "]")
+			end
 		end
+
+		sampleEarly()
 	end
 
-	sample()
 end
 
 --- Rears the horse.

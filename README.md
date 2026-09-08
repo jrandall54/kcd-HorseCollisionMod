@@ -142,7 +142,8 @@ breaking the mod. Deleting a line restores its default.
 | `Rear` | true | Whether your horse can be reared on command. Only from a standstill. |
 | `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, y, u, o, h. |
 | `RearOnlyKey` | "q" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
-| `RearMaxSpeed` | 1.0 | The speed above which a rear is refused. The animation owns the horse's position while it plays, so any momentum drags the horse sideways. |
+| `RearMaxSpeed` | 0.15 | Horizontal speed above which a rear is refused. A rear is a standing attack: a horse still moving when it starts slides about 0.12 m before the animation takes hold. |
+| `RearIdleOnly` | true | Also require the horse's own locomotion state to be idle, which catches slow drift a speed reading misses. |
 | `RearCooldownMs` | 2500 | How long before another rear is accepted. |
 | `RearReach` | 2.0 | How far in front the hooves reach, for the rear on the spot. |
 | `RearArc` | 70 | The arc in front that counts, in degrees. |

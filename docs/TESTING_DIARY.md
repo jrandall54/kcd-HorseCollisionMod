@@ -17303,3 +17303,126 @@ while, which is worth knowing before judging a blend value on two attempts.
 the boundary, splitting vertical from horizontal, and was not needed. It stays
 off by default, alongside `DiagnoseMisses`, because the next question at this
 boundary will want it.
+
+### The dog fix does not work, measured while the bug was happening
+
+The horse being carried around on Mutt recurred, and was caught live rather
+than reconstructed. With the rider sitting on a horse that was resting on the
+dog:
+
+    dog   = (2515.49, 570.68, 76.94)
+    horse = (2515.45, 570.57, 77.54)
+    dz    = +0.600 m      horizontal distance = 0.12 m
+
+The horse is 60 cm above the dog and 12 cm off centre. It is standing on him.
+
+`DogIgnoresHorses` had already logged `ok=true` many times before this, so the
+mod's `collisionClassIgnore = gcc_horse` write had been applied and the horse
+climbed on anyway. Re-applying it live, with the horse still up there, moved
+the horse 1.8 cm in 700 ms — noise:
+
+    DOGFIX reapplied=true  horseZ_before=77.495
+    DOGFIX after 700ms     horseZ=77.478  dz=+0.580  drop=-0.018
+
+So collision class is not the mechanism by which a horse comes to rest on the
+dog, and the fix shipped for it does not do what it claims. The handoff called
+it "not confirmed, but promising"; it is now confirmed as not working, which is
+worth more than the guess was. `gcc_horse` reads back as 65536 and
+`SetPhysicParams` is present, so the call is real and lands.
+
+The next place to look is the horse's side: what a living entity's ground
+support actually queries, since that is evidently not filtered by the target's
+collision class. The rider can reproduce this on demand, which is the most
+valuable thing about the whole episode.
+
+### What the rear displacement is not
+
+Recorded because the negatives cost the session a lot of rides and should not
+be paid for twice.
+
+The rear pushes the horse sideways, worst when the horse is turned first and
+then reared. None of the following changes it, each tried in both directions
+and judged from the saddle:
+
+    ExitTime      1.4 and 1.75
+    Duration      0.2 and 0.6
+    Horizontal    2 (eMCM_Animation) and 1 (eMCM_Entity)
+    XyMove        1 and 0
+    Rotate        1 and 0
+
+Freeing `XyMove` also reproduces the 0.80 m of drift that parameter is on
+record for, so that half of the old note is confirmed and the parameter stays
+at 1. Zeroing the horse's linear and angular velocity with `SetVelocityEx` does
+not change it either, tried at the start of the rear and again at the release:
+the horse's movement controller re-issues velocity on the next frame.
+
+Two measurement mistakes are worth more than the negatives.
+
+The first probe wrote a log line per sample, about eighty synchronous writes
+spread across the animation being judged, and it stayed armed across several
+rounds of visual judgement. Values the rider had called smooth stopped looking
+smooth while it ran. Any probe used while something is judged by eye has to
+accumulate and write once at the end.
+
+The second was a window that was too long. Sampling the offset a full second
+after the fragment released produced readings up to 1.76 m ahead and 0.97 m to
+the side, which looked like a large push and was the rider riding away; one of
+them logged `state=MotionMovement`. It also produced a false correlation
+between entry speed and displacement that briefly justified tightening
+`RearMaxSpeed`, on a sample that entered at 0.09 m/s. The window is now 250 ms.
+
+The figure that has held steady through every one of the above is the offset
+while the fragment owns the horse: **0.06 to 0.15 m ahead and up to 0.16 m to
+the side.** That is the real signal and nothing has moved it yet.
+
+`RearMaxSpeed` now measures horizontal speed rather than the length of the full
+velocity vector. That is unrelated to the push and correct on its own account:
+`GetVelocity` on a stationary horse carries the vertical settling fall and
+reports 1 to 2 m/s, so a three dimensional length is mostly that noise and the
+gate was refusing rears from a dead stop.
+
+### The rear displacement was the opening 128 ms
+
+The horse being shifted sideways out of a rear was chased through the animation
+data for most of a session and was never there. Measured every 16 ms from the
+key press:
+
+    before    0:0.00  64:0.08  128:0.12  then flat 0.12 for the whole animation
+    after     0:0.00  64:0.01  128:0.01  and another reading -0.00 throughout
+
+The horse slides in the first 128 ms and is then frozen by the fragment for the
+remaining 1.3 seconds. Everything tried before this aimed at the end of the
+animation, which is why none of it moved the number: `ExitTime` at 1.4 and 1.75,
+`Duration` at 0.2 and 0.6, `Horizontal` at 1 and 2, `XyMove` at 0 and 1,
+`Rotate` at 0 and 1, and `SetVelocityEx` at the start, at the release, and held
+down every 16 ms across the opening window. None of them changed it.
+
+The rider is not displaced at all, which took separating the two entities to
+establish. The absolute seat offset, rider minus horse in the horse's frame,
+reads the same on four consecutive rears and returns to it every time:
+
+    seatAhead 0.04 -> -0.03      seatSide -0.00 -> 0.01
+
+An earlier reading that appeared to show the rider ending 0.16 m to the side
+was an artifact of comparing two displacements rather than measuring the seat.
+
+What fixes it is the standstill gate that already existed, set to a figure that
+means standstill. Entry speed separates the two cases exactly: every clean rear
+all session entered at 0.00, and 0.09, 0.11, 0.13 and 0.24 all slid. So
+`RearMaxSpeed` is 0.05 rather than 1.0.
+
+Two things had to be corrected to get there. The gate measured the length of
+the whole velocity vector, and `GetVelocity` on a stationary horse carries its
+settling fall and reports 1 to 2 m/s, so the reading was mostly vertical noise;
+it now measures horizontal speed only. And neither velocity source predicts the
+slide on its own: a rear entered at 0.11 m/s covered 0.12 m in 128 ms, which is
+0.94 m/s, so the horse accelerates once the rear begins. A position-derived
+speed was added for the gate to take the higher of the two, and the horse's
+`MotionIdle` state was added as a further condition, though on its own the state
+is not sufficient: a horse reporting `MotionIdle` still slid 0.08 m.
+
+The rider's verdict on the cost is that there is none, because the move is a
+standing attack:
+
+> "The point of a rear hitting someone is that you are standing still, it
+> doesn't even really make sense to do a rear on a horse that's turning."

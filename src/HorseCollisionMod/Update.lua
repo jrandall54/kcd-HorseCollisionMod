@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.19.5
+-- @release 4.20.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -99,13 +99,34 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	end
 
 	if readyAt and now < readyAt then
-		-- Logged outside the miss diagnostic. It fires only when a victim
-		-- is hit again while still down, which is a handful of lines rather
-		-- than the thousands that diagnostic writes, and it is the only
-		-- evidence that the wait is doing anything.
+		-- Once per victim per wait, not once per pass.
+		--
+		-- The note that used to be here said this fired only when a victim was
+		-- hit again while still down, "a handful of lines". It fires on every
+		-- pass of the detection loop for as long as the victim is down and in
+		-- range, which is a line every thirty milliseconds or so for up to
+		-- twelve seconds: 404 of them in one session, and a burst of several
+		-- hundred immediately after any landed hit.
+		--
+		-- That is not merely noise. Logging is a synchronous write, and a few
+		-- hundred of them spread across the seconds after an impact costs
+		-- frames in exactly the window the rider is watching an animation
+		-- play. It was reported as the rear animation being "off" with "a
+		-- slight jerk" after hitting someone, and the same mechanism was
+		-- demonstrated earlier in the same session by a diagnostic probe that
+		-- sampled per frame and made a smooth animation look rough.
+		--
+		-- The line is still worth having; it is the only evidence the wait is
+		-- doing anything. It just needs to say so once.
 		if self.Config.LogTelemetry then
-			self:Log("Recovering " .. self:NameOf(npc)
-					.. " for=" .. tostring(readyAt - now) .. "ms")
+			self.RecoveryLogged = self.RecoveryLogged or {}
+
+			if self.RecoveryLogged[npcId] ~= readyAt then
+				self.RecoveryLogged[npcId] = readyAt
+
+				self:Log("Recovering " .. self:NameOf(npc)
+						.. " for=" .. tostring(readyAt - now) .. "ms")
+			end
 		end
 
 		return
@@ -520,6 +541,15 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	-- assumed whatever `TickSeconds` said, so the two agreed only by accident.
 	Script.SetTimer(self:TickMs(), function()
 		HorseCollisionMod:UpdateTimer(assignedTick)
+	end)
+
+	-- The horse's real speed, derived from where it has been rather than asked
+	-- for, because the rear's standstill gate cannot trust `GetVelocity`.
+	pcall(function()
+		local horseEnt = XGenAIModule.GetEntityByWUID(
+				player.player:GetPlayerHorse())
+
+		self:TrackHorseSpeed(horseEnt)
 	end)
 
 	local success, err = pcall(function()
