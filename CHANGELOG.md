@@ -45,7 +45,7 @@ number.
   bottom, so heavy armor drove an impact arbitrarily close to nothing: a charge
   landed about ten damage on an ordinary town guard. The floor is the least
   armor is allowed to refuse, on the grounds that no plate makes a man weigh
-  less than the horse standing on him. Both default to the previous behaviour
+  less than the horse standing on him. Both default to the previous behavior
   exactly.
 
 ### Changed
