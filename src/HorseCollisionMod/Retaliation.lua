@@ -74,7 +74,7 @@
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 4.19.3
+-- @release 4.19.4
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
@@ -607,13 +607,22 @@ end
 -- One hint for any number of provoked victims, counted rather than shown per
 -- fight, so a brawl with three of them does not stack three copies and does
 -- not disappear when the first one yields.
-function HorseCollisionMod:ShowSurrenderHint()
+function HorseCollisionMod:ShowSurrenderHint(npc)
 	if not self.Config.RetaliationSurrenderHint then
 		return
 	end
 
 	self.SurrenderHintCount = (self.SurrenderHintCount or 0) + 1
 	self.SurrenderHintCalm = 0
+
+	-- Who the prompt is for. Surrendering is something offered to a person,
+	-- and once every person it was raised for is dead there is nobody to
+	-- offer it to, however long the engine keeps reporting danger.
+	self.SurrenderHintFor = self.SurrenderHintFor or {}
+
+	if npc and npc.id then
+		self.SurrenderHintFor[tostring(npc.id)] = npc
+	end
 
 	if self.SurrenderHintCount > 1 then
 		return
@@ -650,8 +659,23 @@ function HorseCollisionMod:ShowSurrenderHint()
 	-- map it belongs to is exactly what changed.
 	local generation = self.TimerTick
 
+	-- Exactly one of these loops, ever.
+	--
+	-- The guard above starts a loop only for the first fight, and the loop
+	-- ends by noticing the count has reached zero. But it only notices on its
+	-- next pass, up to a second later, so a fight ending and another starting
+	-- inside that second leaves the old loop scheduled while the guard lets a
+	-- new one through. Two loops then assert the same hint on their own
+	-- timers, each taking it down and putting it back, and they interleave.
+	--
+	-- A token settles it: starting a loop claims the token, and any loop
+	-- holding a stale one retires on its next pass.
+	self.SurrenderHintLoop = (self.SurrenderHintLoop or 0) + 1
+
+	local token = self.SurrenderHintLoop
+
 	local function hold()
-		if generation ~= self.TimerTick then
+		if generation ~= self.TimerTick or token ~= self.SurrenderHintLoop then
 			return
 		end
 
@@ -674,6 +698,46 @@ function HorseCollisionMod:ShowSurrenderHint()
 		pcall(function()
 			danger = player.soul:IsInCombatDanger()
 		end)
+
+		-- Nobody left to surrender to.
+		--
+		-- The table holds the victims this prompt was raised for. They are
+		-- removed as they die and as their fights end, so an empty table means
+		-- there is nobody who could accept a surrender, whatever the engine
+		-- still reports about danger.
+		--
+		-- The prompt is held by the danger reading alone, which lingers after
+		-- a fight ends and needs six quiet passes to clear, so killing the
+		-- last person offering to fight left the prompt up for five or six
+		-- seconds with nobody to accept it. Measured after a beggar was
+		-- reared to death, and newly reachable because the rear can now kill
+		-- the victims it provokes.
+		--
+		-- Checked before the danger reading rather than after, because this is
+		-- the stronger condition: a live opponent may briefly read as no
+		-- danger, but a dead one is never going to accept a surrender.
+		local anyoneLeft = false
+
+		for id, victim in pairs(self.SurrenderHintFor or {}) do
+			local dead = true
+
+			pcall(function()
+				dead = victim:IsDead()
+			end)
+
+			if dead then
+				self.SurrenderHintFor[id] = nil
+			else
+				anyoneLeft = true
+			end
+		end
+
+		if not anyoneLeft then
+			self:Log("SurrenderHint nobody left to surrender to")
+			self:HideSurrenderHint(true)
+
+			return
+		end
 
 		if danger then
 			self.SurrenderHintCalm = 0
@@ -713,6 +777,31 @@ function HorseCollisionMod:ShowSurrenderHint()
 	Script.SetTimer(self.Config.SurrenderHintHoldMs or 1000, hold)
 end
 
+--- Whether the game will raise its own surrender prompt for this victim.
+--
+-- Guards arrest rather than brawl, and an arrest is where vanilla shows its
+-- own prompt. Raising one alongside it puts two on screen offering the same
+-- key, which is reproducible by provoking a guard in sight of another guard.
+--
+-- Read from the victim's social class, the same source the retaliation answer
+-- uses, so the two cannot disagree about who is a soldier.
+--
+-- @tparam table npc the provoked victim
+-- @treturn boolean true when the prompt belongs to the game
+function HorseCollisionMod:SurrenderIsTheGames(npc)
+	if not self.Config.SurrenderHintYieldsToGame then
+		return false
+	end
+
+	local role = nil
+
+	pcall(function()
+		role = tostring(npc.soul:GetSocialClass().Name)
+	end)
+
+	return role == "soldier"
+end
+
 --- Takes the surrender prompt down when the last provoked fight ends.
 --
 -- @tparam[opt] boolean all clear the count outright, for a load or a reset
@@ -724,6 +813,10 @@ function HorseCollisionMod:HideSurrenderHint(all)
 	end
 
 	self.SurrenderHintCount = all and 0 or (count - 1)
+
+	if all then
+		self.SurrenderHintFor = {}
+	end
 
 	if self.SurrenderHintCount > 0 then
 		return
@@ -739,6 +832,19 @@ function HorseCollisionMod:HideSurrenderHint(all)
 end
 
 function HorseCollisionMod:EndRetaliation(npc, why)
+	-- The prompt is for people who might accept a surrender, and this victim
+	-- no longer will: the fight is over however it ended. Removing him here
+	-- is what takes the prompt down promptly, rather than waiting for the
+	-- danger reading to go quiet and stay quiet.
+	--
+	-- Safe to hang on this ending where it was not safe to hang the whole
+	-- prompt on it. The watcher requires having seen him fight before it
+	-- counts settled samples, so being pulled off the horse no longer reads
+	-- as the fight finishing a second after it started.
+	if self.SurrenderHintFor and npc and npc.id then
+		self.SurrenderHintFor[tostring(npc.id)] = nil
+	end
+
 	local cleared = pcall(function()
 		Contexts.ClearOption(npc, self.RetaliationOption,
 				self.RetaliationHandle)
@@ -940,7 +1046,20 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	-- pull-down request then queues behind the swing. A man who wants to
 	-- fight someone on a horse takes them off it first, so the order here is
 	-- pull, then fight.
-	self:ShowSurrenderHint()
+	-- Not for a soldier. The game raises its own surrender prompt when it
+	-- arrests you, and a guard provoked in front of a witness is an arrest, so
+	-- this one would sit beside it: two prompts on screen offering the same
+	-- thing. Reproducible every time by provoking a guard another guard can
+	-- see, and never with a villager, who cannot arrest anyone.
+	--
+	-- The mod's own documentation already records that a shoved guard arrests
+	-- rather than brawls, and that the game's rule for soldiers is left alone.
+	-- Its prompt should be left alone with it.
+	if self:SurrenderIsTheGames(npc) then
+		self:Log("SurrenderHint left to the game for " .. self:NameOf(npc))
+	else
+		self:ShowSurrenderHint(npc)
+	end
 
 	if self:PullRiderDown(npc) then
 		return true

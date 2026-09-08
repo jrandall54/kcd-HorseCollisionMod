@@ -29,6 +29,18 @@ number.
 
 ## [Unreleased]
 
+## [4.19.4] - 2026-09-07
+
+### Fixed
+
+- The surrender prompt no longer lingers after a fight is over. It used to stay
+  up for five or six seconds after the last person willing to fight you had
+  died or walked away, offering a surrender to nobody.
+
+- Provoking a guard in sight of another guard no longer shows two surrender
+  prompts. That is an arrest, and the game raises its own prompt for it, so the
+  mod now leaves guards to it. Villagers still get the mod's prompt.
+
 ## [4.19.3] - 2026-09-07
 
 ### Changed

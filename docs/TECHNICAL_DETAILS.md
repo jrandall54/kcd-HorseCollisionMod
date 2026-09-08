@@ -855,6 +855,30 @@ except it and `customBehaviorRequest`, which are named exemptions. Its payload
 is empty; the declared member `_` is a placeholder and passing it is rejected
 by the type check.
 
+### The surrender prompt
+
+It is raised per provoked victim and reference counted, so several fights share
+one prompt and the last to end takes it down.
+
+What decides "the last to end" is the set of victims it was raised for, not the
+combat reading. Each is dropped on death and when `EndRetaliation` fires for
+their fight, and an empty set hides the prompt at once. Hanging on that ending
+is safe because the watcher requires having seen the victim fight before
+counting settled samples, so being pulled off the horse no longer reads as the
+fight finishing. `SurrenderHintCalmPasses` remains as a fallback against the
+danger reading blinking out mid-fight, which is all it was ever for.
+
+Exactly one re-assert loop runs, enforced by a token. The loop ends by noticing
+the count has reached zero, which it can only do on its next pass, so a fight
+ending and another starting inside that second would otherwise leave two loops
+asserting the same hint on independent timers.
+
+**Guards get no prompt from the mod.** A provoked guard in front of a witness
+is an arrest, and the game raises its own surrender prompt for that. A second one
+beside it is the doubled prompt, reproducible every time with two guards and
+never with a villager. The victim's social class decides it, read from the same
+source the retaliation answer uses so the two cannot disagree.
+
 ### Measured costs
 
 A provoked brawl moves no faction reputation. Five Rataje factions read
