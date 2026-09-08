@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.20.0
+-- @release 4.20.1
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -434,7 +434,6 @@ function HorseCollisionMod:SafeUpdate()
 			-- keeps him from being trampled. It runs once per dog per
 			-- generation and does nothing on any later pass.
 			if isMutt then
-				self:KeepDogOffHorses(ent)
 			end
 
 			local isProtected = (self.Config.ProtectMutt and isMutt)

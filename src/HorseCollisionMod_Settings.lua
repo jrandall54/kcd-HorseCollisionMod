@@ -506,7 +506,6 @@ HorseCollisionModSettings = {
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
-	DogIgnoresHorses         = true,  -- stop your dog carrying your horse
 	                                  -- around on his back
 	LogTelemetry             = true,  -- diagnostics in kcd.log
 

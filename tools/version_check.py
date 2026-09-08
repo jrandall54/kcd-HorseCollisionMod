@@ -140,7 +140,16 @@ def implied_bump(body, dropped=None):
     if dropped and NOT_BREAKING not in body:
         return "major"
 
-    if BREAKING in body or "Removed" in parts:
+    if BREAKING in body:
+        return "major"
+
+    # A Removed section is a major by default, on the assumption that whatever
+    # went was something a player had. `NOT_BREAKING` is the same escape hatch
+    # the dropped-setting rule above uses, and for the same reason: a thing
+    # added and removed between two releases was only ever visible to whoever
+    # built them, and calling that a major overstates what changed for anyone
+    # who has the mod installed.
+    if "Removed" in parts and NOT_BREAKING not in body:
         return "major"
 
     if "Added" in parts:

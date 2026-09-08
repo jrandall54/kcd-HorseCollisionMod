@@ -15,10 +15,11 @@ marked **BREAKING**. `tools/version_check.py` derives the next version from
 these sections and refuses a build made at any other number.
 
 Removing a setting forces a major version, because a key a player has in their
-settings file disappearing is a broken install. An entry marked **NOT
-BREAKING** overrides that, and is only honest for a setting that no released
-version ever carried: the check compares against the last tag, so it cannot
-tell a key players have from one that only ever existed between releases.
+settings file disappearing is a broken install, and so does a `Removed`
+section on its own. An entry marked **NOT BREAKING** overrides both, and is
+only honest for something no released version ever carried: the check compares
+against the last tag, so it cannot tell a key players have from one that only
+ever existed between releases.
 
 Every merge to `main` takes a version and a tag, whether or not that build is
 published, because `main` is always releasable and a merged version is
@@ -28,6 +29,32 @@ against whatever version is current at the time, and it does not change the
 number.
 
 ## [Unreleased]
+
+## [4.20.1] - 2026-09-08
+
+### Removed
+
+- `DogIgnoresHorses`, and the code behind it. **NOT BREAKING**: the setting
+  landed after the last published release, so no player's settings file
+  carries it.
+
+  It never worked. Measured with a horse actually standing on the dog,
+  re-applying the ignore moved the horse 1.8 cm, and widening the mask to
+  `gcc_all`, with nothing left to overwrite it, moved it not at all. A dog
+  ignoring every collision class in the game still carried a horse, and the
+  horse climbed back on afterwards.
+
+  The reason is that it is not a collision. A horse is a living entity and
+  stands wherever a downward ground query finds a surface, with no rigid body
+  balance to lose, so it does not need a surface broad enough to hold it: of
+  81 rays cast over a 1.35 m grid, the dog's collider answers one. The horse
+  balances on a column about fifteen centimetres across, and collision class
+  masks do not reach the code path that put it there.
+
+  A correction that moved the horse back to the ground was built and rejected.
+  Dropping it straight down lands it on the dog again, and moving it clear
+  first reads as teleporting the player. The bug stays.
+
 
 ## [4.20.0] - 2026-09-08
 

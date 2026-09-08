@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.20.0
+-- @release 4.20.1
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.20.0"
+HorseCollisionMod.Version = "4.20.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -133,9 +133,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field MinArmorStamina floor on the armor stamina multiplier
 -- @field MaxArmorStamina ceiling on the armor stamina multiplier
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
--- @field DogIgnoresHorses stop Henry's dog colliding with horses, which is
---   how he ends up carrying one around on his back. Scoped to him and to
---   horses, and to nothing else
 -- @field StaminaDrainWalk horse stamina cost per victim at walk
 -- @field StaminaDrainTrot horse stamina cost per victim at trot
 -- @field StaminaDrainGallop horse stamina cost per victim at gallop
@@ -806,7 +803,6 @@ HorseCollisionMod.Config = {
 
 	-- Switches.
 	ProtectMutt              = true,
-	DogIgnoresHorses         = true,
 	WalkStagger              = true,
 	SendHitReaction          = true,
 	LogTelemetry             = true,
