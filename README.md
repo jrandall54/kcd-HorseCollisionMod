@@ -160,7 +160,8 @@ breaking the mod. Deleting a line restores its default.
 | `PullDownForce` | false | Ask for the pull-down even when the game says the victim cannot do it. Some NPCs are simply not eligible and this does not change that; it exists for future investigation. |
 | `RetaliationSurrenderHint` | true | Whether the on-screen surrender prompt is shown while a provoked victim is fighting you. Surrendering already worked; nothing told you so. |
 | `SurrenderHintHoldMs` | 1000 | How often the prompt is put back, since the HUD drops it when you are pulled off the horse. |
-| `SurrenderHintCalmPasses` | 6 | How many quiet passes before it is taken down, so it does not blink during a fight. |
+| `SurrenderHintCalmPasses` | 3 | Quiet passes before the prompt gives up, a fallback against the combat reading blinking mid-fight. It normally goes when the last provoked fight ends. |
+| `SurrenderHintYieldsToGame` | true | Guards get the game's own surrender prompt for an arrest, so the mod raises none for them. |
 | `ProvokeDuringCombat` | false | Whether someone can be newly provoked while you are already in a fight. Off, because a person running into your stationary horse mid-brawl otherwise becomes another attacker. |
 
 A few detection internals are omitted here and commented in place in the file.

@@ -17096,3 +17096,49 @@ quiet passes at `SurrenderHintHoldMs` to hide, and nothing checks whether there
 is anyone left to surrender to. Newly reachable because the rear now kills the
 victims it provokes. The duplicate-prompt report is separate and unexplained:
 `ShowSurrenderHint` already returns early when its count is above one.
+
+### The surrender prompt: three separate faults, one of them not ours
+
+**It outlived the fight by five to six seconds.** The prompt was held up by
+`player.soul:IsInCombatDanger()` alone, needing six consecutive quiet passes at
+a second each before it hid, and nothing checked whether there was anyone left
+to surrender to. Killing the last hostile left it offering a surrender to a
+corpse.
+
+Newly reachable because the rear can now kill the victims it provokes, but the
+same would happen to any fight that ended in a death.
+
+The prompt now records the victims it was raised for and drops each of them on
+death or when `EndRetaliation` fires for their fight. When the last one goes it
+hides at once. Hanging on `EndRetaliation` is safe now in a way it was not
+when the prompt was first written: the watcher requires having seen the victim
+fight before it counts settled samples, so being pulled off the horse no longer
+reads as the fight ending a second after it began.
+
+The calm passes are down from six to three, and documented as what they are: a
+guard against the danger reading blinking out mid-fight, not a wait for a fight
+to end. Six was never justified by that reason.
+
+**A race could start two re-show loops.** The loop that re-asserts the prompt
+every second is started only for the first fight, and ends by noticing the
+count has reached zero, which it can only do on its next pass. A fight ending
+and another starting inside that second left the old loop scheduled while the
+guard let a new one through, and two loops then asserted the same hint on
+independent timers. A token settles it: starting a loop claims it, and a loop
+holding a stale one retires.
+
+This is a real bug proven from the code and it was never the reported symptom.
+
+**The doubled prompt was the game's own.** The rider reproduced it reliably by
+provoking a guard in sight of another guard, and the log settles it: the mod
+logged exactly one `SurrenderHint shown` per fight, never two. A provoked guard
+in front of a witness is an arrest, and vanilla raises its own surrender prompt
+for that; ours sat beside it.
+
+Guards therefore no longer get the mod's prompt, read from the victim's social
+class, the same source the retaliation answer uses. Villagers are untouched,
+and they are the ones that need it, since they cannot arrest anyone.
+
+The lesson worth keeping is about the order of work. A reliable reproduction
+turned a guess into a measurement in one look at the log, and the race above
+would have absorbed the whole investigation otherwise.

@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.19.3
+-- @release 4.19.4
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.19.3"
+HorseCollisionMod.Version = "4.19.4"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -244,8 +244,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   seconds, before the count decays to nothing
 -- @field RetaliationCeilingSec failsafe, in seconds, after which a watched
 --   incident is closed however it looks
--- @field SurrenderHintCalmPasses how many quiet passes before the surrender
---   prompt is taken down, so it does not blink with the combat reading
+-- @field SurrenderHintYieldsToGame do not raise the mod's surrender prompt
+--   for a victim the game will prompt for itself, which is a guard, since
+--   an arrest carries vanilla's own prompt
+-- @field SurrenderHintCalmPasses quiet passes before the prompt gives up. A
+--   fallback now that the prompt tracks who it is for: enough to cover the
+--   danger reading blinking out mid-fight, not a wait for the fight to end
 -- @field SurrenderHintHoldMs how often to put the surrender prompt back, since
 --   the HUD drops it when the action map changes
 -- @field ProvokeDuringCombat whether a new victim can be provoked while the
@@ -531,7 +535,8 @@ HorseCollisionMod.Config = {
 	RetaliationSurrenderHint = true,
 	ProvokeDuringCombat      = false,
 	SurrenderHintHoldMs      = 1000,
-	SurrenderHintCalmPasses  = 6,
+	SurrenderHintYieldsToGame = true,
+	SurrenderHintCalmPasses  = 3,
 	PullDownPollMs           = 250,
 	PullDownForce            = false,
 	PullDownRepeatMs         = 1500,
@@ -1355,6 +1360,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- at once.
 		self.RearNextAt = nil
 		self.VictimActivity = {}
+		self.SurrenderHintFor = {}
 		self.Annoyance = {}
 
 		-- A hint showing when the game was saved would come back with the
