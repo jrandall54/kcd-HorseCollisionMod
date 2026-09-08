@@ -17426,3 +17426,44 @@ standing attack:
 
 > "The point of a rear hitting someone is that you are standing still, it
 > doesn't even really make sense to do a rear on a horse that's turning."
+
+### A horse standing on the dog is not a collision, and the fix for it is removed
+
+`DogIgnoresHorses` set `collisionClassIgnore = gcc_horse` on the dog. It never
+worked, and this establishes why rather than guessing.
+
+Measured with the horse actually resting on him:
+
+    dog   z = 77.122      horse z = 77.681      dz = +0.559, 0.12 m apart
+    ray straight down from the horse: hit player_dogCompanion_vorech, drop 0.001 m
+
+Re-applying the ignore, live, with the horse up there moved it 1.8 cm in 700 ms.
+Widening the mask to `gcc_all` and disabling the mod's own write so nothing
+could overwrite it moved it 0.000 m. The rider then rode off and climbed back
+on. A dog ignoring every collision class in the game still carries a horse.
+
+The reason is that the ground query is not rigid body collision. A horse is a
+living entity: it stands wherever a downward query finds a surface, and it has
+no balance to lose, so it does not need a surface broad enough to hold it. Of
+81 rays cast over a 1.35 m grid centred on the dog, his collider answers
+exactly one. The horse is balanced on a column about fifteen centimetres
+across, half a metre off the ground, and a mask on the target does not reach
+whatever put it there.
+
+Collision classes available, for anyone who tries this again: `gcc_horse` is
+65536, `gcc_ai` 131072, `gcc_ragdoll` 16384, `gcc_rigid` 32768, `gcc_vehicle`
+4096, `gcc_all` 4294967295. None of them is the answer.
+
+Correcting the result rather than the cause was built and rejected. Dropping
+the horse to the ground puts it back on the dog, who is underneath by
+definition, and it climbs him again on the next pass, which reads as bouncing.
+Moving it clear of him first and then setting it down works mechanically and
+reads as teleporting the player, which the rider judged worse than the bug:
+
+> "honestly this is worse than the original bug as it just teleports henry
+> away."
+
+So the bug stays and everything aimed at it is removed. What a future attempt
+should not do is start from collision classes, and what it would need is the
+living entity's ground query itself, or the dog's collider not being a surface
+a ground query accepts.
