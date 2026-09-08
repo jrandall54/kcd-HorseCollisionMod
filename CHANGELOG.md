@@ -29,6 +29,19 @@ number.
 
 ## [Unreleased]
 
+## [4.19.5] - 2026-09-07
+
+### Fixed
+
+- The mod now loads on any 1.9 patch. It declared support for 1.9.7 exactly,
+  and the game's mod loader disables a mod outright when the version does not
+  match, so anyone who had patched to 1.9.8 had a mod that never ran at all,
+  with nothing in game to explain why.
+
+  If you are on an older release and cannot update, deleting the `<supports>`
+  block from `mod.manifest` has the same effect: the loader treats a mod with
+  no version restriction as compatible with anything.
+
 ## [4.19.4] - 2026-09-07
 
 ### Fixed

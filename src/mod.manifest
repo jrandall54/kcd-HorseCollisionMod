@@ -4,10 +4,10 @@
     <name>HorseCollisionMod</name>
     <description>Speed-tiered horse collision reactions: NPCs stagger at walking pace, are knocked down at trot and gallop, and the horse tires as it plows through a crowd.</description>
     <author>jrandall54</author>
-    <version>4.19.4</version>
+    <version>4.19.5</version>
     <created_on>2026-08-22</created_on>
   </info>
   <supports>
-    <kcd_version>1.9.7</kcd_version>
+    <kcd_version>1.9.*</kcd_version>
   </supports>
 </kcd_mod>
