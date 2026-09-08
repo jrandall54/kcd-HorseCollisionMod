@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.19.4
+-- @release 4.19.5
 --- Stops the dog colliding with horses, so it cannot carry one.
 --
 -- Henry's dog walks under the horse and the horse ends up standing on his

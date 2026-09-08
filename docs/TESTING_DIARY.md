@@ -17142,3 +17142,36 @@ and they are the ones that need it, since they cannot arrest anyone.
 The lesson worth keeping is about the order of work. A reliable reproduction
 turned a guess into a measurement in one look at the log, and the race above
 would have absorbed the whole investigation otherwise.
+
+### The mod was disabled for anyone who had patched the game
+
+A player reported the mod not working. They were on 1.9.8; the manifest named
+1.9.7 exactly.
+
+The mod loader decides from that block whether to enable a mod at all, and the
+messages are in `WHGame.dll`:
+
+    [Mod] '%s' has no version restrictions in manifest
+    [Mod] '%s' is not limited to any game version, it will be enabled
+    [Mod] '%s' supports game version '%s' explicitly, it will be enabled
+    [Mod] '%s' supports game version '%s' by wildcard '%s', it will be enabled
+    it will be disabled
+
+So there are three ways to be enabled and one to be disabled, and a version the
+manifest does not name takes the last. Nothing appears in game to say why: the
+mod simply never runs.
+
+The wildcard branch was verified rather than assumed, on a 1.9.7 install:
+
+    [Mod] 'HorseCollisionMod_dev' supports game version '1.9.7' by wildcard
+    '1.9.*', it will be enabled
+
+Verification mattered here more than usual. An unrecognised wildcard would name
+a version matching nothing and disable the mod for everyone, which is worse
+than the fault being fixed.
+
+`pre_release_check.py` now refuses an exact version, and the check was proven
+to fire by reverting the manifest and watching it fail. Declaring one exact
+patch is never right for this mod: it overrides animation databases and depends
+on engine binds, so a guard against a major version earns its place, but a
+patch that touches none of that should not stop it loading.

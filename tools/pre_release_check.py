@@ -331,6 +331,48 @@ def readme_layout():
     return listed
 
 
+def check_supported_game_version():
+    """The game versions the manifest claims, against how the loader reads them.
+
+    The mod loader decides whether to enable a mod at all from this block, and
+    a mismatch disables it outright rather than degrading it. A player on a
+    version the manifest does not name gets a mod that never loads, with
+    nothing in game to say why.
+
+    That happened: the manifest named 1.9.7 exactly, the game shipped 1.9.8,
+    and the mod simply did not run for anyone who had patched. A minor patch
+    that touches nothing this mod uses should not do that.
+
+    The loader offers three ways to be enabled, all present in WHGame.dll:
+    no `supports` block at all, an exact match, or a wildcard. Only the last
+    two are a claim, and only a wildcard survives a patch.
+
+    So an exact version is refused here. Either commit to a wildcard, which
+    covers the patches within a release line, or drop the block and accept the
+    mod loading on anything.
+    """
+    path = os.path.join(REPO_ROOT, "src", "mod.manifest")
+
+    if not os.path.exists(path):
+        return []
+
+    text = open(path, encoding="utf-8").read()
+    declared = re.findall(r"<kcd_version>([^<]+)</kcd_version>", text)
+
+    if not declared:
+        return []
+
+    exact = [v for v in declared if "*" not in v]
+
+    if not exact:
+        return []
+
+    return [("src/mod.manifest", 0, ", ".join(exact),
+             "names an exact game version, so the mod is disabled outright on"
+             " any other patch. Use a wildcard such as 1.9.* or remove the"
+             " supports block")]
+
+
 def check_readme_layout():
     """The README's repository layout against what the repository holds.
 
@@ -577,6 +619,7 @@ def main():
                 + check_claims(paths)
                 + check_links(paths)
                 + check_config_docs()
+                + check_supported_game_version()
                 + check_readme_layout()
                 + check_readme_settings()
                 + check_generated_docs()
