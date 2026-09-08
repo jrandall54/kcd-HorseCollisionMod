@@ -120,9 +120,23 @@ HorseCollisionModSettings = {
 	-- The rear on the spot is its own tier too. Hooves coming down on someone
 	-- is not a horse riding into them, so it has its own sound, dust, shake,
 	-- blur and reaction rather than borrowing the trot's.
-	ImpactSoundRear          = { { "hs_hp_soil", 2, 0.9 },
-	                             { "body", 0, 1.2 },
-	                             { "blunt", 0, 1.4 },
+	-- A rear is hooves coming down, so it leads with the horse's own landing
+	-- rather than a hoofstep. `a_o_jump_landing` is the front feet hitting the
+	-- ground after a jump, which is the same motion.
+	--
+	-- Its level is fixed: distance and obstruction do nothing to it. The fourth
+	-- number is the only control there is, a chance of playing at all, so that
+	-- it punctuates a rear rather than being welded to every one of them.
+	-- The two armor layers sit further back than they did, and the hoofstep
+	-- closer. `body` and `blunt` resolve by what the victim is wearing, and
+	-- the chainmail variants are much brighter than the fabric ones: on an
+	-- armored target they were masking the hoof entirely, while on an
+	-- unarmored one the balance was right. Both were confirmed playing in the
+	-- log, so this is a mix rather than a missing trigger.
+	ImpactSoundRear          = { { "a_o_jump_landing", 0, 0, 0.6 },
+	                             { "hs_hp_soil", 2, 0.6 },
+	                             { "body", 0, 1.6 },
+	                             { "blunt", 0, 2.0 },
 	                             { "f_bodyfall1", 0, 1.3 } },
 	ImpactDustScaleRear      = 0.12,   -- how much dust it raises
 	CameraShakeRearScale     = 0.8,   -- how hard it shakes the camera
@@ -205,7 +219,33 @@ HorseCollisionModSettings = {
 	-- it, and so on down. Worn totals run about 0.3 in clothes, 5 in mail and
 	-- 12 or more in plate.
 	ImpactDamage             = true,  -- charge the victim for the impact
+	-- The damage model, in one place, meant to be read and tuned together.
+	--
+	-- ImpactDamageByTier says what a collision is worth before armor.
+	-- ArmorScale and ArmorCurve say how much of that survives what the victim
+	-- is wearing. ArmorFloor says how little armor is allowed to refuse.
+	--
+	-- Worked example at the defaults: a town guard reads smash_def about 6, so
+	-- worn is 5.5, the falloff is 1/(1+5.5/0.6) = 0.10, and a charge's 110
+	-- becomes 11. Raise ArmorFloor to 0.25 and the same charge lands 27.
+	ImpactDamageByTier       = {
+		Walk   = 0,     -- a walk staggers, it does not wound
+		Trot   = 18,
+		Gallop = 95,
+		Rear   = 60,    -- hooves coming down, standing still
+		Charge = 110,   -- the heaviest thing the mod does
+	},
+
+	-- Hand back whatever the engine charged for the collision, so the figures
+	-- above are the entire cost of an impact rather than an addition to one
+	-- nobody can read. This is also what keeps a death the mod's to attribute,
+	-- which is what CollisionIsCrime depends on.
+	ImpactDamageOwnsTheHit   = true,
+	ImpactDamageReclaimCeiling = 60,   -- never give back more than this at once
+
 	ImpactDamageArmorScale   = 0.6,   -- smash_def past the ignored figure that halves damage
+	ImpactDamageArmorCurve   = 1.0,   -- >1 armor bites sooner, <1 flattens
+	ImpactDamageArmorFloor   = 0.0,   -- least armor can reduce an impact to
 	ImpactDamageIgnoredArmor = 0.5,   -- smash_def that is clothing, not armor
 	ImpactDamageVariance     = 0.15,  -- spread either side of the tier figure
 	ImpactDamageDelayMs      = 600,   -- wait, so the mod lands the killing blow

@@ -1203,7 +1203,22 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	self:SendHitReaction(npc, horseWuid, force)
 	self:SendCombatHit(npc, playerEnt, force)
 	self:ApplyImpactDamage(npc, tier, armor, playerEnt, horseEnt)
-	self:ProvokeIfAnnoyed(npc, playerEnt)
+
+	-- No retaliation from a rear or a charge, deliberately.
+	--
+	-- Retaliation is the answer to being shoved: a man barged repeatedly at
+	-- walking pace loses patience and fights back, and the escalating roll in
+	-- `ProvokeIfAnnoyed` is built around a nuisance that does no real harm.
+	-- A rear brings hooves down on someone and a charge rides them down, and
+	-- neither is a shove. Being reared on four times is not a patience
+	-- problem.
+	--
+	-- It was wired here when the rear was first built, before the rear was a
+	-- tier of its own, and it meant a guard reared on repeatedly would start a
+	-- fight through `SendProvocationHit`, which deliberately bypasses the
+	-- crime system and so could not be turned off with `CollisionIsCrime`
+	-- either. `Update.lua` keeps the only remaining call, inside the walk
+	-- stagger branch.
 end
 
 --- Loads the mod's action map and points it at the player.

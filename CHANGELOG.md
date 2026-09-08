@@ -30,6 +30,38 @@ number.
 
 ## [Unreleased]
 
+## [4.21.0] - 2026-09-08
+
+### Added
+
+- `ImpactDamageByTier`, so what each kind of collision is worth is a setting
+  rather than a figure compiled into the mod.
+- `ImpactDamageOwnsTheHit` and `ImpactDamageReclaimCeiling`. The engine charges
+  a collision itself, at a rate this mod cannot read or override, so the tier
+  figures were an addition to an unknown quantity. Whatever the engine took is
+  now handed back before the mod applies its own, bounded so that an unrelated
+  injury is not healed by a passing horse.
+- `ImpactDamageArmorCurve` and `ImpactDamageArmorFloor`. The falloff had no
+  bottom, so heavy armor drove an impact arbitrarily close to nothing: a charge
+  landed about ten damage on an ordinary town guard. The floor is the least
+  armor is allowed to refuse, on the grounds that no plate makes a man weigh
+  less than the horse standing on him. Both default to the previous behaviour
+  exactly.
+
+### Changed
+
+- Retaliation is a walk-tier answer again. A victim reared on or charged no
+  longer decides to fight back, which is what happened when a guard was reared
+  on four times. It was wired in when the rear was first built, before the rear
+  was a tier of its own, and it started fights through a path that deliberately
+  bypasses the crime system and so could not be turned off with
+  `CollisionIsCrime` either. Rears and charges will get answers of their own.
+- A rear leads with the horse's own landing, so it sounds like hooves coming
+  down rather than a body impact. The layers that resolve by armor sit further
+  back, because their chainmail variants were masking the hoof entirely on an
+  armored victim while the balance was right on an unarmored one.
+
+
 ## [4.20.1] - 2026-09-08
 
 ### Removed

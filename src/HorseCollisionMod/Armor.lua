@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 4.20.1
+-- @release 4.21.0
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
 -- A sum over a person has to exclude them and a sum over a horse has to be
@@ -314,6 +314,100 @@ function HorseCollisionMod:ArmorStaminaScale(armor)
 			cfg.ArmorStaminaExponent, false,
 			cfg.MinArmorStamina, cfg.MaxArmorStamina)
 end
+
+--- The damage multiplier for a target's armor.
+--
+-- The third of the three armor multipliers, beside `ArmorImpulseScale` and
+-- `ArmorStaminaScale`, and it lives here for the same reason they do: what a
+-- victim is wearing and what that changes is this file's subject.
+--
+-- It does not run through `ArmorCurve`, and that is deliberate rather than an
+-- oversight. The other two are driven by the armor's **weight**, because being
+-- heavy is what makes a target hard to shift and tiring to hit. Damage is
+-- driven by **smash_def**, the armor's own rating against blunt force, because
+-- what stops a hoof is the plate rather than the mass. Feeding one curve from
+-- two different quantities would make the settings on it mean two things.
+--
+--- How much of the tier's damage a target in this armor takes.
+--
+-- One falling curve against the summed `smash_def` of what the victim is
+-- wearing, past the part of it that is not armor:
+-- `1 / (1 + max(0, smashDef - ImpactDamageIgnoredArmor) / ImpactDamageArmorScale)`.
+-- It reaches 1.0 on anyone in ordinary clothes and never reaches 0, so plate
+-- is a very bad day rather than immunity.
+--
+-- The subtraction is what makes the curve work at all. Shoes, a shirt and a
+-- hood are in the `armor` table and sum to 0.30 to 0.50 on a villager wearing
+-- nothing anyone would call armor. Measured against the raw figure, a villager
+-- was already taking 17 per cent off for being dressed, which meant the curve
+-- could not be made steep enough to spare a knight without also sparing her.
+--
+-- `smash_def` is the game's own blunt resistance and is the right column for a
+-- horse: it is what the engine consults for a mace or a hammer, and a horse's
+-- chest is the same kind of problem for a breastplate. Weight is deliberately
+-- not used, though `ArmorOf` returns it, because a heavy mail hauberk and a
+-- heavy padded gambeson weigh alike and stop a blunt impact very differently.
+--
+-- The scale is a half-life rather than a ceiling: at
+-- `ImpactDamageArmorScale` past the ignored figure the target takes half, at
+-- twice it a third. With the shipped 0.6 that reads across the range actually
+-- worn in game as
+--
+--     villager    smashDef 0.30   1.00
+--     light       smashDef 1.50   0.37
+--     mail        smashDef 4.99   0.12
+--     heavy mail  smashDef 7.16   0.08
+--     plate       smashDef 12.0   0.05
+--
+-- @tparam table armor totals from `ArmorOf`
+-- @treturn number multiplier on the tier's damage, in (0, 1]
+function HorseCollisionMod:ImpactDamageScale(armor)
+	local scale = self.Config.ImpactDamageArmorScale
+
+	if type(scale) ~= "number" or scale <= 0 then
+		return 1.0
+	end
+
+	local smashDef = 0
+
+	if type(armor) == "table" and type(armor.smashDef) == "number" then
+		smashDef = armor.smashDef
+	end
+
+	local ignored = self.Config.ImpactDamageIgnoredArmor or 0
+	local worn = smashDef - ignored
+
+	if worn <= 0 then
+		return 1.0
+	end
+
+	-- The curve, and then a floor under it.
+	--
+	-- `1 / (1 + worn / scale)` alone is a hyperbola with no bottom, so heavy
+	-- armor drives the multiplier arbitrarily close to zero: measured on
+	-- ordinary town guards it lands between 0.08 and 0.19, which turns a
+	-- charge's 110 into 10 and makes the heaviest move in the mod unable to
+	-- hurt anyone wearing plate. That is the right shape and the wrong depth.
+	--
+	-- `ImpactDamageArmorCurve` bends it. Above 1 armor bites harder and sooner,
+	-- below 1 it flattens, and 1 is the original hyperbola exactly, so the
+	-- default changes nothing.
+	--
+	-- `ImpactDamageArmorFloor` is the answer to "a horse is a horse". No armor
+	-- makes a man weigh less than the animal standing on him, so there is a
+	-- share of an impact that plate should not be able to refuse. It is the
+	-- lowest multiplier armor can reach, applied after the curve.
+	local curve = self.Config.ImpactDamageArmorCurve or 1.0
+	local falloff = 1.0 / (1.0 + ((worn / scale) ^ curve))
+	local floor = self.Config.ImpactDamageArmorFloor or 0
+
+	if falloff < floor then
+		falloff = floor
+	end
+
+	return falloff
+end
+
 
 --- How heavily barded the horse is, from nothing to a full set.
 --

@@ -17,7 +17,7 @@
 --
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
--- @release 4.20.1
+-- @release 4.21.0
 -- The engine's `combatAttackKind`, transcribed from
 -- `Libs/AI/TypeDefinitions.xml`. Sequential, and the type definition's own
 -- comment says the melee entries are ordered by increasing violence.

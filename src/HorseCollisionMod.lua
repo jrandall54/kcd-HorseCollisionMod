@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.20.1
+-- @release 4.21.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.20.1"
+HorseCollisionMod.Version = "4.21.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -273,6 +273,16 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   which a victim takes half the tier's damage; higher means armor matters less
 -- @field ImpactDamageIgnoredArmor `smash_def` that does not count as armor,
 --   covering the shoes and shirt every villager wears
+-- @field ImpactDamageByTier what each kind of collision is worth before armor
+-- @field ImpactDamageOwnsTheHit give back what the engine charged for a
+--   collision, so the mod's figure is the whole cost rather than an addition
+--   to an unknown one
+-- @field ImpactDamageReclaimCeiling the most that can be given back for one
+--   impact, so an unrelated injury in the delay window is not healed
+-- @field ImpactDamageArmorCurve how sharply armor bites; 1 is the plain
+--   hyperbola, above 1 bites sooner, below 1 flattens
+-- @field ImpactDamageArmorFloor the least armor can reduce an impact to, since
+--   no plate makes a man weigh less than the horse standing on him
 -- @field ImpactDamageVariance how far either side of the tier figure a single
 --   impact can land, as a fraction
 -- @field ImpactDamageDelayMs how long to wait before charging the victim, so
@@ -484,9 +494,10 @@ HorseCollisionMod.Config = {
 	RearOnlyFragTag          = "hcm_rear",
 	-- Hooves coming down, not a horse riding into someone. Lighter than a
 	-- charge and led by the hoof rather than by the body.
-	ImpactSoundRear          = { { "hs_hp_soil", 2, 0.9 },
-	                             { "body", 0, 1.2 },
-	                             { "blunt", 0, 1.4 },
+	ImpactSoundRear          = { { "a_o_jump_landing", 0, 0, 0.6 },
+	                             { "hs_hp_soil", 2, 0.6 },
+	                             { "body", 0, 1.6 },
+	                             { "blunt", 0, 2.0 },
 	                             { "f_bodyfall1", 0, 1.3 } },
 	ImpactDustScaleRear      = 0.12,
 	CameraShakeRearScale     = 0.8,
@@ -547,7 +558,20 @@ HorseCollisionMod.Config = {
 	-- What being ridden down costs the victim, over and above what the
 	-- engine charges for the collision itself.
 	ImpactDamage             = true,
+	-- What a collision is worth, before armor. The three settings below this
+	-- are the whole damage model and are meant to be read together: this table
+	-- says what the blow is, the armor pair says how much of it survives what
+	-- the victim is wearing, and the floor says how little armor can refuse.
+	ImpactDamageByTier       = {
+		Walk = 0, Trot = 18, Gallop = 95, Rear = 60, Charge = 110
+	},
+
+	ImpactDamageOwnsTheHit   = true,
+	ImpactDamageReclaimCeiling = 60,
+
 	ImpactDamageArmorScale   = 0.6,
+	ImpactDamageArmorCurve   = 1.0,
+	ImpactDamageArmorFloor   = 0.0,
 	ImpactDamageIgnoredArmor = 0.5,
 	ImpactDamageVariance     = 0.15,
 	ImpactDamageDelayMs      = 600,
