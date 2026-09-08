@@ -255,195 +255,111 @@ end
 
 
 
---- Stops the charge at a wall without stopping the charge.
+
+--- Drives the charge forward with physics once the rear has finished.
 --
--- An interactive action passes through geometry, and handing the actor back to
--- entity-driven movement with `SetMovementControlledByAnimation(false)` is
--- what makes it respect the world. On the horse that works, and applied at a
--- fixed moment it also ends the lunge: the travel is the animation's own root
--- motion, not momentum the horse carries, so releasing is a brake rather than
--- a handover.
+-- The charge used to travel by root motion, blending the rear into
+-- `relaxed_gallop_jump`. An interactive action moves the actor kinematically
+-- with collision off, and every fault on this feature came from that: riding
+-- through walls, wedging in fences, and a divergence the engine discharged at
+-- over 20 m/s when the action ended.
 --
--- A brake is exactly what is wanted, provided it is only pulled when there is
--- something to stop for. So the path ahead is watched while the lunge runs and
--- the release happens on the tick a wall comes inside stopping distance. Every
--- charge with open ground in front of it never reaches that branch and is
--- untouched.
+-- All three movement control methods were measured and none gives travel and
+-- collision together. `eMCM_Animation` travels without colliding.
+-- `eMCM_AnimationHCollision` collides while the animation keeps demanding a
+-- position collision refuses, which is the discharge. `eMCM_Entity` admits no
+-- divergence but hands the horse to its movement controller, which zeroes an
+-- impulse on the next frame.
 --
--- Checked ahead rather than on contact because the release takes a moment to
--- take hold, and by then a horse covering five and a half meters in a second
--- is already inside the wall.
+-- That last one is only true *inside* the action. Once it has ended the horse
+-- is an ordinary horse and an impulse moves it: measured at 4300 the horse
+-- reached 8.33 m/s and traveled, and at 20000 it went a very long way.
 --
--- Three rays, not one. A single ray has no width and so represents none of the
--- horse: it threads the gap between a shed's posts, and it fits through an
--- open doorway that a horse cannot. The rays are spread across the horse's own
--- width, `HorseHalfWidth` to either side of center, which is the cheapest
--- shape that answers "would the horse fit through this".
+-- So the rear plays in place and the travel is a real push afterwards. The
+-- horse then collides with the world by default, reports a genuine velocity,
+-- and the detection loop scores the collision exactly as it scores a gallop,
+-- with no synthetic speed and no raycast brake.
 --
--- All three sit at one height, and the height is the whole of what the check
--- means. The second half of the charge is `relaxed_gallop_jump`, so low
--- obstacles are not obstacles: the horse is supposed to clear a fence, and a
--- ray low enough to see the fence stops the lunge that would have jumped it.
--- `RearChargeCheckZ` is therefore set above what the horse can jump, and the
--- check reads as "is there something here too tall to get over", which is the
--- only question worth braking for.
---
--- Rigid bodies are included in what counts. Carts and wagons are rigid, not
--- static, so a mask of terrain and static geometry could never have stopped a
--- charge at one however the rays were arranged.
---
--- Nothing is cast from the horse's origin height. That sits at its feet and
--- would hit the ground on any upward slope.
+-- Waited for rather than timed, because the action's length is not fixed and
+-- an impulse applied while it still holds the horse is stored and discharged
+-- later.
 --
 -- @tparam table horseEnt the player's horse
-function HorseCollisionMod:WatchChargeForWalls(horseEnt)
+function HorseCollisionMod:ChargeForward(horseEnt)
 	local cfg = self.Config
-	local stopAt = cfg.RearChargeStopDistance or 0
 
-	if stopAt <= 0 then
+	if not cfg.RearChargeImpulse or cfg.RearChargeImpulse <= 0 then
 		return
 	end
 
 	local generation = self.TimerTick
-	local poll = cfg.RearChargePollMs or 50
-	local deadline = self:TimeMs() + (cfg.RearChargeWatchMs or 2000)
+	local started = self:TimeMs()
+	local deadline = started + (cfg.RearChargeWaitCeilingMs or 3000)
 
-	local function look()
-		if generation ~= self.TimerTick or self:TimeMs() > deadline then
-			return
-		end
+	-- The direction is taken at the moment of the push, not at the key press.
+	--
+	-- The rider can steer during the rear, and does. Sampling at the press meant
+	-- the push used a heading up to a second and a half stale, so any correction
+	-- sent the horse off diagonally.
+	--
+	-- Sampling late was wrong only for the old fragment, which blended into
+	-- `relaxed_gallop_jump`: that clip traveled and turned the horse, so the
+	-- heading at the end was whatever the animation had done rather than what
+	-- the rider wanted. With the charge rearing in place, nothing turns the
+	-- horse but the rider.
 
-		local blocked = false
-
-		pcall(function()
-			local pos = horseEnt:GetWorldPos()
-			local heading = horseEnt:GetDirectionVector(1)
-			local flat = math.sqrt((heading.x * heading.x)
-					+ (heading.y * heading.y))
+	local function push()
+		local ok = pcall(function()
+			local d = horseEnt:GetDirectionVector(1)
+			local flat = math.sqrt((d.x * d.x) + (d.y * d.y))
 
 			if flat <= 0 then
 				return
 			end
 
-			local fx, fy = heading.x / flat, heading.y / flat
-			-- Perpendicular in the ground plane, to spread the rays across the
-			-- horse rather than stack them all on its centerline.
-			local rx, ry = -fy, fx
-			local half = cfg.HorseHalfWidth or 0.70
-			local types = ent_terrain + ent_static + ent_rigid
-					+ ent_sleeping_rigid
-
-			local height = cfg.RearChargeCheckZ or 1.4
-			local near = cfg.RearChargeSideDistance or 2.0
-
-			-- The center ray looks the whole length of the lunge; the side rays
-			-- look only a short way. Three parallel rays at the horse's full
-			-- width make a corridor 1.4 m across, and over six meters anything
-			-- running alongside clips an outer one: measured, a charge refused
-			-- repeatedly on world geometry 5.11 m away on the left, with the
-			-- center clear and nothing in front of the horse at all.
-			--
-			-- Far ahead only what is directly in front matters, because the rider
-			-- steers. The horse's width matters near, where it cannot be steered
-			-- around.
-			for _, side in ipairs({ -half, 0, half }) do
-				if not blocked then
-					local reach = (side == 0) and stopAt or near
-					local along = {
-						x = fx * reach, y = fy * reach, z = 0
-					}
-					local from = {
-						x = pos.x + (rx * side),
-						y = pos.y + (ry * side),
-						z = pos.z + height
-					}
-					local found = {}
-					local hits = Physics.RayWorldIntersection(from, along, 1,
-							types, horseEnt.id, player.id, found)
-
-					-- Steepness, not class, decides whether this stops a charge.
-					--
-					-- The rays are horizontal, so facing uphill they run into the
-					-- rising ground and the charge refuses with nothing in front of
-					-- the horse. Excluding terrain did not help: hillsides here are
-					-- static meshes, reported as world geometry with no entity, the
-					-- same class as a wall.
-					--
-					-- What separates them is the surface normal the ray already
-					-- returns. Ground a horse can climb has a normal pointing
-					-- mostly up; a wall's points mostly sideways. So a hit only
-					-- blocks when its normal is flat enough to be something the
-					-- horse would hit rather than run over.
-					if (hits or 0) > 0 then
-						local upright = 0
-
-						pcall(function()
-							local n = found[1] and found[1].normal
-
-							if n and n.z then
-								upright = math.abs(n.z)
-							end
-						end)
-
-						blocked = upright < (cfg.RearChargeWallNormal or 0.5)
-					end
-
-					if blocked then
-						-- Name what stopped the charge. A refusal that cannot
-						-- say what it saw is indistinguishable from a bug, and
-						-- the rider has hit spots where the charge refuses with
-						-- nothing visible in front of the horse.
-						local hit = found[1]
-						local what, dist = "?", -1
-
-						pcall(function()
-							if hit.entity then
-								what = tostring(hit.entity:GetName())
-										.. "/" .. tostring(hit.entity.class)
-							else
-								what = "no entity, world geometry"
-							end
-
-							if hit.pos then
-								local ax = hit.pos.x - from.x
-								local ay = hit.pos.y - from.y
-								local az = hit.pos.z - from.z
-								dist = math.sqrt((ax * ax) + (ay * ay)
-										+ (az * az))
-							end
-						end)
-
-						self:Log(string.format(
-								"ChargeBlockedBy %s at %.2f m, side %.2f,"
-										.. " normal %.2f",
-								what, dist, side, upright))
-					end
-				end
-			end
+			horseEnt:AddImpulse(-1, horseEnt:GetWorldPos(), {
+				x = d.x / flat,
+				y = d.y / flat,
+				z = cfg.RearChargeLift or 0.2
+			}, cfg.RearChargeImpulse, 1)
 		end)
 
-		if blocked then
-			self:Log("Rear charge stopping, wall within "
-					.. tostring(stopAt) .. " m")
-			self:ReleaseActorMovement(horseEnt, "charge")
+		-- The elapsed time is the delay before the horse can move: the impulse
+		-- cannot fire until the interactive action ends, so it is the rear up
+		-- to its blend point plus whatever the landing clip runs. Measured at
+		-- 1856 ms with the landing played whole, and 1408 ms once its front
+		-- was skipped with `StartTime`.
+		self:Log(string.format("ChargeForward pushed=%s impulse=%s after=%.0fms",
+				tostring(ok), tostring(cfg.RearChargeImpulse),
+				self:TimeMs() - started))
+
+		-- The strike starts with the lunge, not with the key press. Started at
+		-- the press it swept while the horse was still up on its hind legs and
+		-- knocked people down before the charge had happened.
+		self:ChargeStrike(horseEnt)
+	end
+
+	local function waitForEnd()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = "?"
+
+		pcall(function()
+			state = tostring(horseEnt.actor:GetCurrentAnimationState())
+		end)
+
+		if state ~= "AnimationControlled" or self:TimeMs() > deadline then
+			push()
 
 			return
 		end
 
-		if cfg.RearChargeWatchWhileMoving then
-			Script.SetTimer(poll, look)
-		end
+		Script.SetTimer(cfg.RearChargeWaitPollMs or 30, waitForEnd)
 	end
 
-	-- Decided once, before the horse leaves the ground, and then committed.
-	--
-	-- Polling through the lunge means the brake can fire while the horse is
-	-- airborne, which takes movement control away mid-flight and drops it
-	-- straight down: the rider described it as hitting an invisible barrier.
-	-- Deciding at the start avoids that by construction, and costs nothing,
-	-- because the check already looks the whole length of the lunge. Anything
-	-- that could be reached is seen before the first step.
-	Script.SetTimer(poll, look)
+	Script.SetTimer(cfg.RearChargeWaitMs or 400, waitForEnd)
 end
 
 --- Rears the horse.
@@ -489,7 +405,7 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 			end
 		end)
 
-		self:WatchChargeForWalls(horseEnt)
+		self:ChargeForward(horseEnt)
 	end
 
 	local ok = pcall(function()
@@ -522,6 +438,94 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 					.. " horse=" .. state)
 		end)
 	end
+end
+
+--- The charge's own strike, swept along the lunge.
+--
+-- The charge does not use the mod's ordinary detection loop. That loop is
+-- driven by the horse's speed, which is a poor fit here: it exits below
+-- walking pace, so a charge detected nobody at all until the horse was given a
+-- physical push, and it then depended on the impulse landing cleanly for
+-- anyone to be hit. Whether a special move connects should not rest on how
+-- well the physics behaved.
+--
+-- So the charge carries its own detection, the way the rear on the spot
+-- already does. The rider asked for a move that knocks several people down at
+-- once, so there is no cap and no cooldown between victims: everyone in the
+-- corridor goes down, and each is hit once per charge.
+--
+-- Swept rather than sampled once, because the horse is moving and a single
+-- test at one instant would miss anyone it passes. The corridor is measured
+-- from the horse each tick, so it follows the lunge wherever it actually goes.
+--
+-- @tparam table horseEnt the player's horse
+function HorseCollisionMod:ChargeStrike(horseEnt)
+	local cfg = self.Config
+
+	if not cfg.RearChargeStrikes then
+		return
+	end
+
+	local generation = self.TimerTick
+	local deadline = self:TimeMs() + (cfg.RearChargeStrikeMs or 1600)
+	local hit = {}
+	local playerEnt = player
+
+	local function sweep()
+		if generation ~= self.TimerTick or self:TimeMs() > deadline then
+			return
+		end
+
+		pcall(function()
+			local pos = horseEnt:GetWorldPos()
+			local heading = horseEnt:GetDirectionVector(1)
+			local flat = math.sqrt((heading.x * heading.x)
+					+ (heading.y * heading.y))
+
+			if flat <= 0 then
+				return
+			end
+
+			local fx, fy = heading.x / flat, heading.y / flat
+			local reach = cfg.RearChargeStrikeReach or 3.0
+			local halfWidth = cfg.RearChargeStrikeWidth or 1.6
+			local found = System.GetEntitiesInSphere(pos, reach + 1.0)
+
+			if type(found) ~= "table" then
+				return
+			end
+
+			for _, npc in pairs(found) do
+				local id = npc and npc.id
+
+				if id and not hit[tostring(id)] and npc ~= playerEnt
+						and npc ~= horseEnt and npc.actor
+						and self:RearCanHit(npc) then
+					local p = npc:GetWorldPos()
+					local dx, dy = p.x - pos.x, p.y - pos.y
+					local ahead = (dx * fx) + (dy * fy)
+					local across = math.abs((dx * -fy) + (dy * fx))
+					local dz = math.abs(p.z - pos.z)
+
+					-- A corridor in front of the horse: far enough back to catch
+					-- anyone the chest reaches, and never behind it.
+					if ahead >= -(cfg.RearChargeStrikeBehind or 0.5)
+							and ahead <= reach and across <= halfWidth
+							and dz <= (cfg.HorseMaxVerticalDiff or 2.0) then
+						hit[tostring(id)] = true
+
+						self:RearHit(npc, horseEnt, playerEnt,
+								{ x = fx, y = fy, z = 0 }, "Charge",
+								cfg.RearChargeImpactSpeed or 9.0)
+					end
+				end
+			end
+		end)
+
+		Script.SetTimer(cfg.RearChargeStrikePollMs or 50, sweep)
+	end
+
+	sweep()
 end
 
 --- Whether a rear may land on this entity.
@@ -671,11 +675,13 @@ end
 -- @tparam table horseEnt the player's horse
 -- @tparam table playerEnt the player
 -- @tparam table heading the horse's facing, which the victim is thrown along
-function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading)
+function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
+		hitSpeed)
 	local cfg = self.Config
 	local armor = self:ArmorOf(npc)
 	local armorImpulse = self:ArmorImpulseScale(armor)
-	local speed = cfg.RearImpactSpeed or 6.0
+	tier = tier or "Trot"
+	local speed = hitSpeed or cfg.RearImpactSpeed or 6.0
 	local velocity = { x = heading.x * speed, y = heading.y * speed, z = 0 }
 	local horsePos = nil
 
@@ -692,21 +698,28 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading)
 	local strength = self.HitReactionStrength
 
 	self:SuppressAutoCure(npc)
-	self:ProbeImpactCost(npc, "Trot", strength.MinorInjury, armor)
+	self:ProbeImpactCost(npc, tier, strength.MinorInjury, armor)
 
 	-- Everything the ordinary path does at the moment of contact, in the same
 	-- order. Reaching the reaction without these gave a hit with no sound, no
 	-- dust and no kick to the camera, which reads as the animation glitching
 	-- rather than as a blow landing.
-	self:PlayImpactSound(npc, "Trot", armor)
-	self:ShakeRiderCamera(playerEnt, "Trot")
-	self:BlurRiderView(playerEnt, "Trot")
-	self:ImpactDust(npc, "Trot")
+	self:PlayImpactSound(npc, tier, armor)
+	self:ShakeRiderCamera(playerEnt, tier)
+	self:BlurRiderView(playerEnt, tier)
+	self:ImpactDust(npc, tier)
 
-	-- The same choice the trot tier makes, so the two agree: an animated
-	-- knockdown by default, and the ragdoll only if the rider has asked for it
-	-- there.
-	if cfg.TrotReaction == "knockdown" then
+	-- A charge always ragdolls, because it is the gallop treatment and the
+	-- gallop tier is where the ragdoll belongs. The rear on the spot follows
+	-- `TrotReaction`, so the two tiers stay consistent with the rest of the mod.
+	if tier == "Charge" then
+		-- The throw is its own figure rather than a full gallop's. A charge
+		-- was launching people cartoonishly far at 1.0: the horse is also
+		-- moving under physics by then, so its collider shoves the ragdoll on
+		-- top of whatever this applies.
+		self:Ragdoll(npc, velocity, speed, cfg.RearChargeThrow or 0.7,
+				armorImpulse, horsePos, horseEnt)
+	elseif cfg.TrotReaction == "knockdown" then
 		self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
 	elseif cfg.TrotReaction == "fall" then
 		self:PlayReaction(npc, velocity, speed, "hcm_fall_")
@@ -714,10 +727,13 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading)
 		self:Ragdoll(npc, velocity, speed, 0.6, armorImpulse, horsePos, horseEnt)
 	end
 
-	self:MarkVictim(npc, "Trot", velocity, speed)
-	self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
-	self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
-	self:ApplyImpactDamage(npc, "Trot", armor, playerEnt, horseEnt)
+	self:MarkVictim(npc, tier, velocity, speed)
+	local force = (tier == "Charge") and strength.MajorInjury
+			or strength.MinorInjury
+
+	self:SendHitReaction(npc, horseWuid, force)
+	self:SendCombatHit(npc, playerEnt, force)
+	self:ApplyImpactDamage(npc, tier, armor, playerEnt, horseEnt)
 	self:ProvokeIfAnnoyed(npc, playerEnt)
 end
 

@@ -94,12 +94,16 @@
 	<td class="summary">Decides whether a press should rear.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:WatchChargeForWalls">HorseCollisionMod:WatchChargeForWalls (horseEnt)</a></td>
-	<td class="summary">Stops the charge at a wall without stopping the charge.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ChargeForward">HorseCollisionMod:ChargeForward (horseEnt)</a></td>
+	<td class="summary">Drives the charge forward with physics once the rear has finished.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:RearHorse">HorseCollisionMod:RearHorse (horseEnt)</a></td>
 	<td class="summary">Rears the horse.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ChargeStrike">HorseCollisionMod:ChargeStrike (horseEnt)</a></td>
+	<td class="summary">The charge's own strike, swept along the lunge.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:RearCanHit">HorseCollisionMod:RearCanHit (npc)</a></td>
@@ -251,49 +255,37 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:WatchChargeForWalls"></a>
-    <strong>HorseCollisionMod:WatchChargeForWalls (horseEnt)</strong>
+    <a name = "HorseCollisionMod:ChargeForward"></a>
+    <strong>HorseCollisionMod:ChargeForward (horseEnt)</strong>
     </dt>
     <dd>
-    Stops the charge at a wall without stopping the charge. </p>
+    Drives the charge forward with physics once the rear has finished. </p>
 
-<p> An interactive action passes through geometry, and handing the actor back to
- entity-driven movement with <code>SetMovementControlledByAnimation(false)</code> is
- what makes it respect the world. On the horse that works, and applied at a
- fixed moment it also ends the lunge: the travel is the animation's own root
- motion, not momentum the horse carries, so releasing is a brake rather than
- a handover.</p>
+<p> The charge used to travel by root motion, blending the rear into
+ <code>relaxed_gallop_jump</code>. An interactive action moves the actor kinematically
+ with collision off, and every fault on this feature came from that: riding
+ through walls, wedging in fences, and a divergence the engine discharged at
+ over 20 m/s when the action ended.</p>
 
-<p> A brake is exactly what is wanted, provided it is only pulled when there is
- something to stop for. So the path ahead is watched while the lunge runs and
- the release happens on the tick a wall comes inside stopping distance. Every
- charge with open ground in front of it never reaches that branch and is
- untouched.</p>
+<p> All three movement control methods were measured and none gives travel and
+ collision together. <code>eMCM_Animation</code> travels without colliding.
+ <code>eMCM_AnimationHCollision</code> collides while the animation keeps demanding a
+ position collision refuses, which is the discharge. <code>eMCM_Entity</code> admits no
+ divergence but hands the horse to its movement controller, which zeroes an
+ impulse on the next frame.</p>
 
-<p> Checked ahead rather than on contact because the release takes a moment to
- take hold, and by then a horse covering five and a half meters in a second
- is already inside the wall.</p>
+<p> That last one is only true <em>inside</em> the action. Once it has ended the horse
+ is an ordinary horse and an impulse moves it: measured at 4300 the horse
+ reached 8.33 m/s and traveled, and at 20000 it went a very long way.</p>
 
-<p> Three rays, not one. A single ray has no width and so represents none of the
- horse: it threads the gap between a shed's posts, and it fits through an
- open doorway that a horse cannot. The rays are spread across the horse's own
- width, <code>HorseHalfWidth</code> to either side of center, which is the cheapest
- shape that answers "would the horse fit through this".</p>
+<p> So the rear plays in place and the travel is a real push afterwards. The
+ horse then collides with the world by default, reports a genuine velocity,
+ and the detection loop scores the collision exactly as it scores a gallop,
+ with no synthetic speed and no raycast brake.</p>
 
-<p> All three sit at one height, and the height is the whole of what the check
- means. The second half of the charge is <code>relaxed_gallop_jump</code>, so low
- obstacles are not obstacles: the horse is supposed to clear a fence, and a
- ray low enough to see the fence stops the lunge that would have jumped it.
- <code>RearChargeCheckZ</code> is therefore set above what the horse can jump, and the
- check reads as "is there something here too tall to get over", which is the
- only question worth braking for.</p>
-
-<p> Rigid bodies are included in what counts. Carts and wagons are rigid, not
- static, so a mask of terrain and static geometry could never have stopped a
- charge at one however the rays were arranged.</p>
-
-<p> Nothing is cast from the horse's origin height. That sits at its feet and
- would hit the ground on any upward slope.
+<p> Waited for rather than timed, because the action's length is not fixed and
+ an impulse applied while it still holds the horse is stored and discharged
+ later.
 
 
     <h3>Parameters:</h3>
@@ -336,6 +328,43 @@
  alone it does nothing at all and still returns true: the horse must be given
  as its own object. Every earlier attempt passed the name only, which is why
  correct data looked like broken data.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ChargeStrike"></a>
+    <strong>HorseCollisionMod:ChargeStrike (horseEnt)</strong>
+    </dt>
+    <dd>
+    The charge's own strike, swept along the lunge. </p>
+
+<p> The charge does not use the mod's ordinary detection loop. That loop is
+ driven by the horse's speed, which is a poor fit here: it exits below
+ walking pace, so a charge detected nobody at all until the horse was given a
+ physical push, and it then depended on the impulse landing cleanly for
+ anyone to be hit. Whether a special move connects should not rest on how
+ well the physics behaved.</p>
+
+<p> So the charge carries its own detection, the way the rear on the spot
+ already does. The rider asked for a move that knocks several people down at
+ once, so there is no cap and no cooldown between victims: everyone in the
+ corridor goes down, and each is hit once per charge.</p>
+
+<p> Swept rather than sampled once, because the horse is moving and a single
+ test at one instant would miss anyone it passes. The corridor is measured
+ from the horse each tick, so it follows the lunge wherever it actually goes.
 
 
     <h3>Parameters:</h3>
@@ -538,7 +567,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-07 16:17:25 </i>
+<i style="float:right;">Last updated 2026-09-07 18:35:08 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

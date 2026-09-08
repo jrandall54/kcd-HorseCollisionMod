@@ -219,6 +219,9 @@ tools/
                           account for it
   dev_peace.lua           stops the world reacting to the player, so a test
                           that kills someone is not also a test of a fight
+  dev_target.lua          puts a pinned test victim four meters in front of
+                          the rider, so a ride is not also a search for
+                          someone standing usefully
   dev_survival.lua        holds the player's nourishment and energy at 100,
                           so a test needing game time is not also a test of
                           finding food in hardcore

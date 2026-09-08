@@ -16,7 +16,65 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
--- @release 4.19.1
+-- @release 4.19.2
+--- Stops the dog colliding with horses, so it cannot carry one.
+--
+-- Henry's dog walks under the horse and the horse ends up standing on his
+-- back, riding around on him. Measured in the act: the dog sat 0.34 m from the
+-- horse's origin horizontally and 0.59 m below it, which is a horse standing
+-- on a dog rather than beside one. It is random, it is frequent, and it is not
+-- this mod's doing: the mod never touches the dog and writes nothing to the
+-- horse's physics.
+--
+-- Scoped to the dog and to horses, and to nothing else. The first attempt made
+-- the horse ignore `gcc_npc_ignored_type`, the class `BasicAnimal.lua` gives
+-- every animal, which fixed the dog by changing how the horse meets pigs,
+-- boars and everything else. Telling this one dog to ignore horses changes
+-- exactly the interaction that is wrong.
+--
+-- The dog remains excluded from everything else the mod does. This is physics
+-- filtering, not a reaction, and it makes him less affected by the horse
+-- rather than more.
+--
+-- Applied once per dog per generation: the entity is replaced by a world
+-- reload and physics parameters do not survive one.
+--
+-- @tparam table npc a candidate entity, already known to be nearby
+function HorseCollisionMod:KeepDogOffHorses(npc)
+	if not self.Config.DogIgnoresHorses or not npc then
+		return
+	end
+
+	local name = nil
+
+	pcall(function()
+		name = npc:GetName()
+	end)
+
+	if not name or not string.find(name, "dogCompanion") then
+		return
+	end
+
+	self.DogCollisionSet = self.DogCollisionSet or {}
+
+	local key = tostring(npc.id) .. "/" .. tostring(self.TimerTick)
+
+	if self.DogCollisionSet[key] then
+		return
+	end
+
+	self.DogCollisionSet[key] = true
+
+	local ok = pcall(function()
+		npc:SetPhysicParams(PHYSICPARAM_COLLISION_CLASS, {
+			collisionClassIgnore = gcc_horse
+		})
+	end)
+
+	self:Log("DogIgnoresHorses " .. tostring(name) .. " ok=" .. tostring(ok))
+end
+
+
 --- Whether this collision should count as a combat one.
 --
 -- `player.soul:IsInCombatDanger()` decides it, and only that. It is what
@@ -253,7 +311,9 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 	-- shape is right and only the weight should differ between the tiers.
 	local tier = 0
 
-	if tierName == "Gallop" then
+	if tierName == "Charge" then
+		tier = cfg.CameraShakeChargeScale or cfg.CameraShakeGallopScale or 0
+	elseif tierName == "Gallop" then
 		tier = 1
 	elseif tierName == "Trot" then
 		tier = cfg.CameraShakeTrotScale or 0
@@ -361,7 +421,10 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 	-- kept and the length cut, and a single scale could not do both.
 	local tier, length = 0, 1
 
-	if tierName == "Gallop" then
+	if tierName == "Charge" then
+		tier = cfg.RiderBlurChargeScale or cfg.RiderBlurGallopScale or 0
+		length = cfg.RiderBlurChargeLength or tier
+	elseif tierName == "Gallop" then
 		tier = 1
 	elseif tierName == "Trot" then
 		tier = cfg.RiderBlurTrotScale or 0

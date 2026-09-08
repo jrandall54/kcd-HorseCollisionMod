@@ -903,53 +903,65 @@ is visually over at around 1400.
 The charge covers about 5.4 m in a second, which the detection loop would score
 as a trot, so `RearCharging` forces it to a gallop for the duration.
 
-### The charge is stopped before it reaches anything solid
+### The charge is physics, not animation
 
-An interactive action moves the actor by root motion, and the fragment's
-`MovementControlMethod` decides whether that motion collides. `Horizontal` is
-CryEngine's `EMovementControlMethod`: `1` is `eMCM_Entity`, `2` is
-`eMCM_Animation`, `6` is `eMCM_AnimationHCollision`. The charge uses `2`, where
-the animation moves the horse and collision is off, so nothing stops it riding
-through a wall.
+An interactive action moves the actor by root motion with collision off, and
+`Horizontal` in the fragment is CryEngine's `EMovementControlMethod`: `1` is
+`eMCM_Entity`, `2` is `eMCM_Animation`, `6` is `eMCM_AnimationHCollision`. The
+charge shipped at `2` and blended into `relaxed_gallop_jump`, whose root motion
+carried the horse 5.4 m. That is where every fault came from: riding through
+walls, wedging in fences, bouncing, and a divergence discharged at over 20 m/s
+when the action ended.
 
-The other two values do not solve it. At `6` the fence blocks the horse while
-the animation keeps demanding a position collision refuses; the gap accumulates
-for the length of the lunge and is discharged when the action ends, throwing
-horse and rider backwards at over 20 m/s. At `1` physics drives and no
-divergence is possible, but entity-driven means the movement controller drives,
-and a standing horse's desired velocity is zero: an impulse of 10000 produced
-20.54 m/s, the horse traveled 0.67 m, and the controller zeroed it on the next
-frame. There is no travel to be had that way.
+None of the three values fixes it. `2` travels without colliding. `6` collides
+while the animation keeps demanding a position collision refuses, so the gap
+accumulates and discharges. `1` admits no divergence but hands the horse to its
+movement controller, whose desired velocity at a standstill is zero: an impulse
+of 10000 gave 20.54 m/s, the horse moved 0.67 m, and the controller zeroed it
+on the next frame.
 
-Since the travel is a fixed 5.4 m that cannot be shortened, the mod stops the
-horse instead of trying to make the contact work. Three rays are cast forward
-at `RearChargeCheckZ` above the horse's origin, the center reaching
-`RearChargeStopDistance` and the sides `RearChargeSideDistance` at the horse's
-half width. On a hit, `SetMovementControlledByAnimation(false)` hands the horse
-back to entity-driven movement and it stops.
+So the charge covers no distance in animation at all. The fragment rears in
+place, and the travel is an impulse applied once the action has ended, where a
+push does survive. The horse is then an ordinary moving horse: it collides with
+the world by default, and no raycast brake or synthetic speed is needed.
 
-Two details make the check correct rather than merely tuned.
+**Timing is the animation's length, not its speed.** The impulse cannot fire
+while the action holds the horse, so the delay before the horse moves is the
+fragment's duration. `relaxed_rearing` runs 2.06 s and spends its last third
+back on all fours doing nothing, so it is cut at 1.0 s and finished with
+`relaxed_idle_jump_land`. That landing is entered at `StartTime` 0.45 rather
+than played whole, since the front of a jump landing is the airborne part a
+rear has already done. Measured, the action ended at 1856 ms played whole and
+1408 ms with the front skipped.
 
-**Steepness decides what is an obstacle, not entity class.** The rays are
-horizontal, so facing uphill they run into rising ground. Excluding terrain
-does not help, because hillsides are static meshes reported as world geometry
-with no entity, the same class as a wall. The surface normal separates them:
-ground a horse climbs has a normal pointing mostly up, a wall's points
-sideways, and only a normal flatter than `RearChargeWallNormal` blocks.
+Raising `RearAnimSpeed` is not an alternative. It compresses the useful part
+and the dead part alike, so the move looks wrong and the delay barely moves.
 
-**The side rays are short.** Three parallel rays at the horse's full width
-describe a corridor 1.4 m across, and at six meters that catches anything
-running alongside. The center ray looks the distance the horse will cover; the
-sides look only as far as the rider cannot steer around.
+### The charge has its own detection and its own tier
 
-The braking distance is a trade. Refusing at the lunge's own length never
-glitches and leaves the horse standing six meters short of a wall. Braking
-close lets the horse cover the ground and stop against the wall, at the cost of
-the release landing while the horse is airborne, which drops it. Close is what
-ships: a meter from a wall the stop reads as an impact. The rear
-on the spot travels 0.00 m, so the detection loop can never see anyone and the
-move carries its own strike instead, fired on a delay because the strike is the
-hooves landing rather than the horse going up.
+The charge does not use the mod's collision loop. That loop is driven by the
+horse's speed and exits below walking pace, so a charge from a standstill
+detected nobody at all: measured across whole charges, every tick reported the
+loop declining to run. Making it work would have meant the move connecting only
+when the physics happened to behave.
+
+Instead the charge sweeps its own corridor, measured from the horse every
+`RearChargeStrikePollMs` so it follows the lunge wherever it goes:
+`RearChargeStrikeReach` ahead, `RearChargeStrikeWidth` either side,
+`RearChargeStrikeBehind` behind. There is no cap and no per-victim cooldown, so
+a crowd cannot shield each other by standing close, and each person is hit once
+per charge.
+
+`Charge` is a tier in its own right rather than a gallop wearing another name.
+It has its own damage in `ImpactDamageByTier`, its own sound in
+`ImpactSoundCharge`, and its own dust, camera shake, view blur and throw
+scalar. Nothing about it can be tuned by changing what an ordinary collision
+does, or the reverse.
+
+Its sound drops `n_lu_log_ground`, which an ordinary gallop uses, and adds
+hoofsteps. `hs_hp_soil` ignores position and plays at a fixed level, which is
+why the gallop tier has none, so the charge places it back from the ear rather
+than at zero distance.
 
 ### Input
 

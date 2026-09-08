@@ -29,7 +29,7 @@
 --
 -- @module HorseCollisionMod.Marks
 -- @author jrandall54
--- @release 4.19.1
+-- @release 4.19.2
 
 --- Body zones bloodied for each impact direction.
 --
@@ -110,7 +110,7 @@ function HorseCollisionMod:MarkVictim(npc, tierName, velocity, speed)
 	local dirt = cfg.VictimDirtTrot
 	local blood = cfg.VictimBloodTrot
 
-	if tierName == "Gallop" then
+	if tierName == "Gallop" or tierName == "Charge" then
 		dirt = cfg.VictimDirtGallop
 		blood = cfg.VictimBloodGallop
 	end
@@ -200,7 +200,11 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 
 	local scale = cfg.ImpactDustScaleTrot or 0
 
-	if tierName == "Gallop" then
+	if tierName == "Charge" then
+		scale = cfg.ImpactDustScaleCharge or cfg.ImpactDustScaleGallop or 0
+	end
+
+	if tierName == "Gallop" or tierName == "Charge" then
 		scale = cfg.ImpactDustScaleGallop or 0
 	end
 

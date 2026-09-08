@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.19.1
+-- @release 4.19.2
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.19.1"
+HorseCollisionMod.Version = "4.19.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -133,6 +133,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field MinArmorStamina floor on the armor stamina multiplier
 -- @field MaxArmorStamina ceiling on the armor stamina multiplier
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
+-- @field DogIgnoresHorses stop Henry's dog colliding with horses, which is
+--   how he ends up carrying one around on his back. Scoped to him and to
+--   horses, and to nothing else
 -- @field StaminaDrainWalk horse stamina cost per victim at walk
 -- @field StaminaDrainTrot horse stamina cost per victim at trot
 -- @field StaminaDrainGallop horse stamina cost per victim at gallop
@@ -161,6 +164,29 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   the keys the mod's action map declares
 -- @field RearOnlyKey which key rears on the spot, from the same list
 -- @field RearOnlyFragTag the FragTag that rears on the spot
+-- @field RearChargeStrikes whether the charge knocks down who it reaches. It
+--   carries its own detection rather than using the mod's collision loop,
+--   so who is hit does not depend on the physics behaving
+-- @field RearChargeStrikeReach how far ahead the charge reaches, in meters
+-- @field RearChargeStrikeWidth how wide, either side of the horse
+-- @field RearChargeStrikeBehind how far behind the horse still counts
+-- @field RearChargeStrikeMs how long the strike sweeps for
+-- @field RearChargeStrikePollMs how often it sweeps
+-- @field RearChargeImpactSpeed the speed a charge is scored at
+-- @field ImpactSoundCharge the layers a charge plays. Its own set, so the
+--   charge can be tuned without touching an ordinary gallop collision
+-- @field ImpactDustScaleCharge how much dust a charge raises
+-- @field CameraShakeChargeScale how hard a charge shakes the rider's camera
+-- @field RiderBlurChargeScale how much a charge blurs the rider's view
+-- @field RiderBlurChargeLength how long that blur lasts
+-- @field RearChargeThrow how hard a charge throws, as a scalar. The horse is
+--   moving under physics as well, so its collider adds to this
+-- @field RearChargeImpulse the physical push that carries the charge, applied
+--   once the rear animation has ended so the horse collides normally
+-- @field RearChargeLift how much of that push is upward
+-- @field RearChargeWaitMs when the mod starts watching for the rear to end
+-- @field RearChargeWaitPollMs how often it looks
+-- @field RearChargeWaitCeilingMs push anyway by this point
 -- @field RearChargeWindowMs how long after a charge starts that impacts are
 --   scored as a gallop rather than by the horse's speed
 -- @field RearFragTag the FragTag of the rear option in the mod's horse
@@ -173,23 +199,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
 -- @field RearStaminaCost what a landed rear costs the horse
--- @field RearChargeStopDistance how close a wall has to be, in meters, for a
---   charge already under way to stop against it rather than pass through.
---   0 never stops
--- @field RearChargeWatchWhileMoving keep checking during the lunge rather
---   than deciding once before it starts. Off: a brake applied in mid-air
---   drops the horse straight down
--- @field RearChargeWallNormal how upright a surface's normal may be before it
---   counts as ground rather than a wall. 0.5 is about sixty degrees, so a
---   hillside is climbed and a fence is not
--- @field RearChargeSideDistance how far the two outer rays look, as against
---   the center which looks the whole lunge. Short, because parallel rays at
---   the horse's width otherwise refuse on anything running alongside
--- @field RearChargePollMs how often the charge looks ahead for one
--- @field RearChargeWatchMs how long it keeps looking, a failsafe
--- @field RearChargeCheckZ how high above the horse's origin it looks, in
---   meters. Set above what the horse can jump: the lunge is a jump, so
---   anything lower is cleared rather than hit
 -- @field ReleaseAnimationMovement take movement control off the animation once
 --   a reaction has started, so victims are not carried into walls
 -- @field ReplanAfterReaction ask a victim to re-plan their activity once the
@@ -453,6 +462,30 @@ HorseCollisionMod.Config = {
 	RearFragTag              = "hcm_rear_charge",
 	RearOnlyKey              = "q",
 	RearOnlyFragTag          = "hcm_rear",
+	ImpactSoundCharge        = { { "body", 0, 0.6 },
+	                             { "hs_hp_soil", 3, 0.8 },
+	                             { "body_armed", 0, 0.9 },
+	                             { "blunt", 0, 1.0 },
+	                             { "hs_hp_soil", 6, 0.7 },
+	                             { "face_armed", 0, 0.9 },
+	                             { "f_bodyfall1", 0, 0.7 } },
+	ImpactDustScaleCharge    = 1.2,
+	CameraShakeChargeScale   = 1.2,
+	RiderBlurChargeScale     = 1.1,
+	RiderBlurChargeLength    = 1.1,
+	RearChargeStrikes        = true,
+	RearChargeStrikeReach    = 1.8,
+	RearChargeStrikeWidth    = 0.9,
+	RearChargeStrikeBehind   = 0.2,
+	RearChargeStrikeMs       = 1600,
+	RearChargeStrikePollMs   = 50,
+	RearChargeImpactSpeed    = 7.5,
+	RearChargeThrow          = 0.7,
+	RearChargeImpulse        = 6000,
+	RearChargeLift           = 0.2,
+	RearChargeWaitMs         = 400,
+	RearChargeWaitPollMs     = 30,
+	RearChargeWaitCeilingMs  = 3000,
 	RearChargeWindowMs       = 2600,
 	RearAnimSpeed            = 1.0,
 	RearStrikes              = true,
@@ -461,13 +494,6 @@ HorseCollisionMod.Config = {
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,
 	RearStaminaCost          = 12.0,
-	RearChargeStopDistance   = 1.2,
-	RearChargeWatchWhileMoving = true,
-	RearChargeWallNormal     = 0.5,
-	RearChargeSideDistance   = 1.0,
-	RearChargePollMs         = 50,
-	RearChargeWatchMs        = 2000,
-	RearChargeCheckZ         = 0.45,
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,
@@ -745,6 +771,7 @@ HorseCollisionMod.Config = {
 
 	-- Switches.
 	ProtectMutt              = true,
+	DogIgnoresHorses         = true,
 	WalkStagger              = true,
 	SendHitReaction          = true,
 	LogTelemetry             = true,
@@ -998,6 +1025,7 @@ HorseCollisionMod.ImpactDamageByTier = {
 	Trot = 18,
 	Gallop = 95,
 	Rear = 60,
+	Charge = 110,
 }
 
 HorseCollisionMod.RetaliationPollMs = 1000

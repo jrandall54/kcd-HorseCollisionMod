@@ -67,7 +67,7 @@
  impact at trot or gallop draws horse stamina, and a spent horse throws its
  rider.</p>
 
-<p> <code>IsCombatCollision</code> lives here despite its name. It decides how hard an
+<p> <a href="../modules/HorseCollisionMod.Rider.html#HorseCollisionMod:IsCombatCollision">IsCombatCollision</a> lives here despite its name. It decides how hard an
  impact counts, not whether it is an offence, and the stamina multiplier is
  its only consumer: charging into a fight costs the horse more than riding
  through a market. Whether a collision is a crime is <code>Crime.lua</code>.</p>
@@ -77,28 +77,28 @@
  multiplier is read from <code>Config</code> at call time.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.19.1
- Whether this collision should count as a combat one.</p>
+        <li><strong>Release</strong>:  4.19.2
+ Stops the dog colliding with horses, so it cannot carry one.</p>
 
-<p> <code>player.soul:IsInCombatDanger()</code> decides it, and only that. It is what
- vanilla scripts use, and it is the only signal here that means a fight is
- happening rather than describing someone's equipment.</p>
+<p> Henry's dog walks under the horse and the horse ends up standing on his
+ back, riding around on him. Measured in the act: the dog sat 0.34 m from the
+ horse's origin horizontally and 0.59 m below it, which is a horse standing
+ on a dog rather than beside one. It is random, it is frequent, and it is not
+ this mod's doing: the mod never touches the dog and writes nothing to the
+ horse's physics.</p>
 
-<p> The victim having a weapon drawn used to count as well, on the reasoning
- that townsfolk never walk around armed, so a drawn weapon meant a fight the
- player's own check had missed. Guards carry weapons on patrol all day, so
- that read as combat permanently: riding one down out of combat logged
- <code>danger=false armed=true</code>, took the combat multiplier anyway, and cost the
- horse 103 stamina against a pool of about 210 where the impact should have
- cost 21. It is also why polearm guards took no stagger at walking pace
- while every other NPC did.</p>
+<p> Scoped to the dog and to horses, and to nothing else. The first attempt made
+ the horse ignore <code>gcc_npc_ignored_type</code>, the class <code>BasicAnimal.lua</code> gives
+ every animal, which fixed the dog by changing how the horse meets pigs,
+ boars and everything else. Telling this one dog to ignore horses changes
+ exactly the interaction that is wrong.</p>
 
-<p> The signal never rescued a case either. In the session that introduced it,
- <code>IsInCombatDanger</code> read true for all ten combat impacts and the weapon check
- corroborated eight of them without adding one.</p>
+<p> The dog remains excluded from everything else the mod does. This is physics
+ filtering, not a reaction, and it makes him less affected by the horse
+ rather than more.</p>
 
-<p> It is still read and still logged, because a disagreement between the two is
- worth seeing, but it no longer decides anything.</li>
+<p> Applied once per dog per generation: the entity is replaced by a world
+ reload and physics parameters do not survive one.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -110,6 +110,10 @@
 	<td class="summary">
 
 </td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsCombatCollision">HorseCollisionMod:IsCombatCollision (npc)</a></td>
+	<td class="summary">Whether this collision should count as a combat one.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ThrowRider">HorseCollisionMod:ThrowRider (horseEnt, playerEnt)</a></td>
@@ -156,6 +160,47 @@
 
 
 
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a candidate entity, already known to be nearby
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:IsCombatCollision"></a>
+    <strong>HorseCollisionMod:IsCombatCollision (npc)</strong>
+    </dt>
+    <dd>
+    Whether this collision should count as a combat one. </p>
+
+<p> <code>player.soul:IsInCombatDanger()</code> decides it, and only that. It is what
+ vanilla scripts use, and it is the only signal here that means a fight is
+ happening rather than describing someone's equipment.</p>
+
+<p> The victim having a weapon drawn used to count as well, on the reasoning
+ that townsfolk never walk around armed, so a drawn weapon meant a fight the
+ player's own check had missed. Guards carry weapons on patrol all day, so
+ that read as combat permanently: riding one down out of combat logged
+ <code>danger=false armed=true</code>, took the combat multiplier anyway, and cost the
+ horse 103 stamina against a pool of about 210 where the impact should have
+ cost 21. It is also why polearm guards took no stagger at walking pace
+ while every other NPC did.</p>
+
+<p> The signal never rescued a case either. In the session that introduced it,
+ <code>IsInCombatDanger</code> read true for all ten combat impacts and the weapon check
+ corroborated eight of them without adding one.</p>
+
+<p> It is still read and still logged, because a disagreement between the two is
+ worth seeing, but it no longer decides anything.
 
 
     <h3>Parameters:</h3>
@@ -550,7 +595,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-07 16:17:25 </i>
+<i style="float:right;">Last updated 2026-09-07 18:35:08 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

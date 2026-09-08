@@ -139,7 +139,7 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.19.1</li>
+        <li><strong>Release</strong>: 4.19.2</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -489,6 +489,11 @@
         <li><span class="parameter">ProtectMutt</span>
          when true, Henry's dog is never a valid victim
         </li>
+        <li><span class="parameter">DogIgnoresHorses</span>
+         stop Henry's dog colliding with horses, which is
+   how he ends up carrying one around on his back. Scoped to him and to
+   horses, and to nothing else
+        </li>
         <li><span class="parameter">StaminaDrainWalk</span>
          horse stamina cost per victim at walk
         </li>
@@ -557,6 +562,65 @@
         <li><span class="parameter">RearOnlyFragTag</span>
          the FragTag that rears on the spot
         </li>
+        <li><span class="parameter">RearChargeStrikes</span>
+         whether the charge knocks down who it reaches. It
+   carries its own detection rather than using the mod's collision loop,
+   so who is hit does not depend on the physics behaving
+        </li>
+        <li><span class="parameter">RearChargeStrikeReach</span>
+         how far ahead the charge reaches, in meters
+        </li>
+        <li><span class="parameter">RearChargeStrikeWidth</span>
+         how wide, either side of the horse
+        </li>
+        <li><span class="parameter">RearChargeStrikeBehind</span>
+         how far behind the horse still counts
+        </li>
+        <li><span class="parameter">RearChargeStrikeMs</span>
+         how long the strike sweeps for
+        </li>
+        <li><span class="parameter">RearChargeStrikePollMs</span>
+         how often it sweeps
+        </li>
+        <li><span class="parameter">RearChargeImpactSpeed</span>
+         the speed a charge is scored at
+        </li>
+        <li><span class="parameter">ImpactSoundCharge</span>
+         the layers a charge plays. Its own set, so the
+   charge can be tuned without touching an ordinary gallop collision
+        </li>
+        <li><span class="parameter">ImpactDustScaleCharge</span>
+         how much dust a charge raises
+        </li>
+        <li><span class="parameter">CameraShakeChargeScale</span>
+         how hard a charge shakes the rider's camera
+        </li>
+        <li><span class="parameter">RiderBlurChargeScale</span>
+         how much a charge blurs the rider's view
+        </li>
+        <li><span class="parameter">RiderBlurChargeLength</span>
+         how long that blur lasts
+        </li>
+        <li><span class="parameter">RearChargeThrow</span>
+         how hard a charge throws, as a scalar. The horse is
+   moving under physics as well, so its collider adds to this
+        </li>
+        <li><span class="parameter">RearChargeImpulse</span>
+         the physical push that carries the charge, applied
+   once the rear animation has ended so the horse collides normally
+        </li>
+        <li><span class="parameter">RearChargeLift</span>
+         how much of that push is upward
+        </li>
+        <li><span class="parameter">RearChargeWaitMs</span>
+         when the mod starts watching for the rear to end
+        </li>
+        <li><span class="parameter">RearChargeWaitPollMs</span>
+         how often it looks
+        </li>
+        <li><span class="parameter">RearChargeWaitCeilingMs</span>
+         push anyway by this point
+        </li>
         <li><span class="parameter">RearChargeWindowMs</span>
          how long after a charge starts that impacts are
    scored as a gallop rather than by the horse's speed
@@ -586,37 +650,6 @@
         </li>
         <li><span class="parameter">RearStaminaCost</span>
          what a landed rear costs the horse
-        </li>
-        <li><span class="parameter">RearChargeStopDistance</span>
-         how close a wall has to be, in meters, for a
-   charge already under way to stop against it rather than pass through.
-   0 never stops
-        </li>
-        <li><span class="parameter">RearChargeWatchWhileMoving</span>
-         keep checking during the lunge rather
-   than deciding once before it starts. Off: a brake applied in mid-air
-   drops the horse straight down
-        </li>
-        <li><span class="parameter">RearChargeWallNormal</span>
-         how upright a surface's normal may be before it
-   counts as ground rather than a wall. 0.5 is about sixty degrees, so a
-   hillside is climbed and a fence is not
-        </li>
-        <li><span class="parameter">RearChargeSideDistance</span>
-         how far the two outer rays look, as against
-   the center which looks the whole lunge. Short, because parallel rays at
-   the horse's width otherwise refuse on anything running alongside
-        </li>
-        <li><span class="parameter">RearChargePollMs</span>
-         how often the charge looks ahead for one
-        </li>
-        <li><span class="parameter">RearChargeWatchMs</span>
-         how long it keeps looking, a failsafe
-        </li>
-        <li><span class="parameter">RearChargeCheckZ</span>
-         how high above the horse's origin it looks, in
-   meters. Set above what the horse can jump: the lunge is a jump, so
-   anything lower is cleared rather than hit
         </li>
         <li><span class="parameter">ReleaseAnimationMovement</span>
          take movement control off the animation once
@@ -1130,6 +1163,11 @@
 
 
         </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
     </ul>
 
 
@@ -1463,7 +1501,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-07 16:17:25 </i>
+<i style="float:right;">Last updated 2026-09-07 18:35:08 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
