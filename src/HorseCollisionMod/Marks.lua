@@ -29,7 +29,7 @@
 --
 -- @module HorseCollisionMod.Marks
 -- @author jrandall54
--- @release 4.19.2
+-- @release 4.19.3
 
 --- Body zones bloodied for each impact direction.
 --
@@ -202,6 +202,8 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 
 	if tierName == "Charge" then
 		scale = cfg.ImpactDustScaleCharge or cfg.ImpactDustScaleGallop or 0
+	elseif tierName == "Rear" then
+		scale = cfg.ImpactDustScaleRear or cfg.ImpactDustScaleTrot or 0
 	end
 
 	if tierName == "Gallop" or tierName == "Charge" then

@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 4.19.2
+-- @release 4.19.3
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -540,6 +540,41 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		pcall(function()
 			after = npc.soul:GetState("health")
 		end)
+
+		-- A victim killed while an animated reaction is still playing is left
+		-- standing in it. The game marks them dead, so other NPCs treat them
+		-- as a corpse and the world reacts accordingly, but the interactive
+		-- action still owns the body: it holds an idle pose, has no collision,
+		-- and walks through walls. Observed on a beggar reared twice, standing
+		-- in front of the rider while everyone around him mourned him.
+		--
+		-- It has been latent all along. The gallop tier ragdolls its victims,
+		-- so a death there lands on a body physics already owns, and the tiers
+		-- that play animated reactions did too little damage to kill. Raising
+		-- the rear's damage made it common.
+		--
+		-- So a death during an interactive action is handed to a ragdoll,
+		-- which is where the engine's own death handling would have put them.
+		-- Only then: an ordinary death outside an action already works, and
+		-- forcing a ragdoll onto it would override whatever the game chose.
+		if type(before) == "number" and before > 0
+				and type(after) == "number" and after <= 0 then
+			local state = "?"
+
+			pcall(function()
+				state = tostring(npc.actor:GetCurrentAnimationState())
+			end)
+
+			if state == "AnimationControlled" then
+				local freed = pcall(function()
+					npc.actor:RagDollize()
+				end)
+
+				self:Log("ImpactDeath " .. self:NameOf(npc)
+						.. " died in " .. state
+						.. ", ragdolled=" .. tostring(freed))
+			end
+		end
 
 		if self.Config.LogTelemetry then
 			self:Log("ImpactDamage " .. self:NameOf(npc)

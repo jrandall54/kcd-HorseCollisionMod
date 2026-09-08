@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.19.2
+-- @release 4.19.3
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -119,10 +119,30 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 
 	-- Deferred by a tick for the same reason the ragdoll impulse is: the
 	-- action has to have started before anything it sets can be overridden.
+	-- Repeated rather than asked once.
+	--
+	-- One call at 50 ms is right in principle: an interactive action applies
+	-- its fragment's movement layer as it starts, so an earlier call is
+	-- overwritten. But a fragment can apply that layer again as it blends
+	-- between clips, and a single release is then undone. Victims were still
+	-- being carried through walls occasionally with the call reporting
+	-- success, which is what that looks like from outside.
+	--
+	-- Cheap to repeat: the call is idempotent, and a handful of attempts over
+	-- the first part of the reaction costs nothing next to the loop that found
+	-- the victim in the first place.
 	if self.Config.ReleaseAnimationMovement then
-		Script.SetTimer(50, function()
-			self:ReleaseActorMovement(npc, "victim")
-		end)
+		local generation = self.TimerTick
+		local attempts = self.Config.ReleaseMovementAttempts or 4
+		local gap = self.Config.ReleaseMovementGapMs or 80
+
+		for index = 1, attempts do
+			Script.SetTimer(50 + ((index - 1) * gap), function()
+				if generation == self.TimerTick then
+					self:ReleaseActorMovement(npc, "victim")
+				end
+			end)
+		end
 	end
 
 	-- The fragment hands the body to physics itself, partway through the fall.
@@ -139,6 +159,16 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- What remains here is the wait for that ragdoll to resolve, because the
 	-- rebuild that follows has to land after it. A victim can leave the ragdoll
 	-- upright and still have no plan, and only the rebuild gives them one.
+	-- Only the fall carries this. The knockdown and stagger prefixes play
+	-- their clip and nothing follows, so a victim of one stands up wherever
+	-- they finished, facing whatever direction the animation left them, with
+	-- no activity to return to. The innkeeper leaning on nothing, facing the
+	-- wrong way, is what that looks like.
+	--
+	-- The wait here is for a ragdoll to resolve, and only the fall fragments
+	-- carry a Ragdoll ProcLayer, so extending this to the other prefixes needs
+	-- a different signal rather than the same call. Until then both tiers that
+	-- can knock someone down default to "fall".
 	if prefix == "hcm_fall_" then
 		self:TraceRecovery(npc, action)
 		self:WatchTurn(npc, action)

@@ -35,7 +35,7 @@
 --
 -- @module HorseCollisionMod.Sound
 -- @author jrandall54
--- @release 4.19.2
+-- @release 4.19.3
 
 --- The material a victim's armor sounds like, by engine armor type.
 --
@@ -219,6 +219,8 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	-- separately from a collision the rider merely rode into.
 	if tierName == "Charge" then
 		layers = cfg.ImpactSoundCharge
+	elseif tierName == "Rear" then
+		layers = cfg.ImpactSoundRear
 	elseif tierName == "Trot" then
 		layers = cfg.ImpactSoundTrot
 		master = cfg.ImpactSoundDistance or 0
