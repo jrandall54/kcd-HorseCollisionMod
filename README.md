@@ -78,7 +78,6 @@ breaking the mod. Deleting a line restores its default.
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
 | `Uplift` | 30.0 | Vertical knockdown force, trot and gallop only. Higher throws them upward rather than along the ground. |
 | `RagdollDampSettleSpeed` | 0.5 | The speed a thrown body must drop under, in meters per second, before the mod settles it so it stops sliding. Settling it while it is still traveling cuts the throw short. |
-| `RagdollDampGroundedSpeed` | 0.3 | The vertical speed below which a body counts as sliding on the ground rather than still being thrown. This is what tells a slide apart from a throw, since both are movement. |
 | `RagdollDampFloorMs` | 200 | The earliest a body may be settled, in milliseconds, so it cannot happen mid-launch. |
 | `RagdollDampCeilingMs` | 6000 | The latest, applied whatever the body is doing. |
 | `RagdollDampPollMs` | 100 | How often a thrown body is looked at. |
@@ -95,8 +94,8 @@ breaking the mod. Deleting a line restores its default.
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
 | `HitCooldownStateDriven` | true | Whether the wait after a knockdown reads the victim's own animation state instead of counting. A victim standing up cannot be knocked down again by anything, so hitting them costs health with no visible reaction. |
-| `HitReadySettleMs` | 2000 | How long a victim must be neither animation-driven nor ragdolling before another impact counts. |
-| `HitReadyCeilingMs` | 12000 | Failsafe, for a victim never seen busy at all. |
+| `HitReadySettleMs` | 250 | How long a victim must be neither animation-driven nor ragdolling before another impact counts. |
+| `HitReadyCeilingMs` | 6000 | Failsafe, for a victim never seen busy at all. |
 | `Horsemanship` | true | Whether the rider's `horse_riding` skill changes what a collision costs. A novice is thrown by a single gallop impact; a master rides through four or five guards. |
 | `HorsemanshipStaminaWorst` | 10.0 | The horse's stamina cost multiplier at skill 0. |
 | `HorsemanshipStaminaBest` | 1.2 | And at skill 20. |
@@ -205,8 +204,10 @@ src/
   mod.manifest
 tools/
   build_adb.py            generates the animation data from a game install
+  flow.ps1                the session's states: test, branch, land, shipping
   dev_deploy.ps1          installs into the game without Vortex
   dev_console.py          talks to the running game over its remote console
+  dev_subject.lua         spawns a test subject in front of the horse
   typed_message_probe.lua a Lua probe run in the game through dev_console.py
   probe_stuck_actor.lua   reports nearby actors' animation state, to tell a
                           mod-driven animation apart from a vanilla one

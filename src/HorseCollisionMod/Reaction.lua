@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.21.0
+-- @release 4.22.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -412,11 +412,20 @@ function HorseCollisionMod:DampVictim(npc)
 	local pollMs = self.Config.RagdollDampPollMs or 100
 	local settleAt = self.Config.RagdollDampSettleSpeed or 0.5
 	local floorMs = self.Config.RagdollDampFloorMs or 200
+
 	local ceilingMs = self.Config.RagdollDampCeilingMs or 6000
 	local generation = self.TimerTick
 	local startedAt = self:TimeMs()
 	local last = nil
 	local moving = false
+
+	-- Where the body was when it was struck, so how far it has come can be
+	-- measured rather than inferred from how long it has been moving.
+	local origin = nil
+
+	pcall(function()
+		origin = npc:GetWorldPos()
+	end)
 
 	local function apply(why, elapsed, speed, vertical)
 		local params = {}
@@ -492,14 +501,19 @@ function HorseCollisionMod:DampVictim(npc)
 
 		-- The floor covers the case where the impulse has not taken effect by
 		-- the first poll, so the body reads slow before it has been thrown.
-		-- Grounded and still traveling is a slide, and that is the moment to
-		-- damp: the throw is over and what remains is the body skating.
-		if moving and elapsed >= floorMs and vertical
-				and vertical < (self.Config.RagdollDampGroundedSpeed or 0.3) then
-			apply("grounded", elapsed, speed, vertical)
-
-			return
-		end
+		--
+		-- A second test here damped as soon as vertical
+		-- motion fell below a threshold, on the reasoning that a body still
+		-- moving without rising must be sliding. That is a guess about state
+		-- rather than state, and it is wrong for the case it is worst in: a
+		-- victim hit while already lying down has no vertical component from
+		-- the first frame, so it read as a slide immediately and the throw was
+		-- damped at 736 ms, before it happened. An impact on someone already
+		-- on the ground produced no visible reaction at all because of it.
+		--
+		-- The test below is the real question and needs no proxy: the body has
+		-- been seen moving and has since slowed. Removing the guess leaves one
+		-- threshold doing the work instead of two that had to agree.
 
 		if moving and elapsed >= floorMs and speed and speed < settleAt then
 			apply("settled", elapsed, speed, vertical)
@@ -532,11 +546,112 @@ end
 -- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
 function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 		horsePos, horseEnt)
+	-- Undo the previous impact's damping before doing anything else.
+	--
+	-- `DampVictim` sets `damping` and `min_energy` to stop a thrown body
+	-- sliding forever. A physics body below its minimum energy is put to sleep,
+	-- and a sleeping body ignores impulses and parameter writes alike. That is
+	-- one cause for three symptoms that looked separate: on a victim hit while
+	-- already down, the mass write is refused, the impulse is accepted and does
+	-- nothing, and there is no visible reaction. Measured, a commanded 3.00 m/s
+	-- on an 80 kg body moved it eight centimetres.
+	--
+	-- Clearing both wakes it, so the fall, the mass write and the impulse below
+	-- all meet a body that can respond.
 	pcall(function()
-		if npc.actor then
-			npc.actor:Fall({x=0, y=0, z=0}, true)
-		end
+		npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
+			damping = 0, min_energy = 0
+		})
 	end)
+
+	-- A victim already ragdolling is re-physicalized before anything else.
+	--
+	-- `actor:Fall` on a body that is already down has nothing to perform, so
+	-- the body never re-enters the physicalized state, the mass write is
+	-- refused, and the impulse meets something that will not move: measured, a
+	-- commanded 3.00 m/s moved an 80 kg body eight centimetres.
+	--
+	-- `RagDollize` does re-physicalize it, which is exactly why it looked like
+	-- the answer, and on its own it snaps the victim into a T-pose. Calling it
+	-- first and letting `Fall` follow immediately uses the half of it that
+	-- works and lets the fall overwrite the pose it wrecks.
+	--
+	-- Only for a victim already down. The standing path does not need it and
+	-- is where the T-pose came from when this was applied to every impact.
+	local alreadyDown = false
+	local entryState = "?"
+
+	pcall(function()
+		entryState = tostring(npc.actor:GetCurrentAnimationState())
+
+		alreadyDown = entryState == self.RagdollAnimationState
+	end)
+
+	if alreadyDown then
+		-- A victim already down is knocked down again by a fragment, not by
+		-- driving physics from here.
+		--
+		-- Setting the physicalization profile by hand works and cannot be made
+		-- to look right. It is the only thing that re-physicalizes a body
+		-- already in `BlendRagdoll`, so the mass write succeeds and the throw
+		-- reaches parity with a standing victim, 2.30 m against 2.05 to 2.18.
+		-- But something has to set the profile back, and an alive actor is an
+		-- upright capsule: returning to it from a body lying on the ground
+		-- stands the victim in a single frame with nothing in between.
+		--
+		-- Ruled out along the way, each on its own: `RagDollize` with no
+		-- argument and with the fall-and-play flag, cycling the profile out to
+		-- `alive` and back, `PostPhysicalize` once and repeated across the whole
+		-- get-up, `StandUp` before the fall, and playing an `hcm_getup_*`
+		-- fragment afterwards, which carries a measured rotation of +53, +90,
+		-- -176 and 0 degrees and is why those were removed from the reaction
+		-- path once already.
+		--
+		-- `hcm_settle` is the fall tier's own shape with the clip taken out: an
+		-- empty terminal animation so nothing imposes a pose, and a `Ragdoll`
+		-- ProcLayer at ExitTime 0 so Mannequin owns the ragdoll from the first
+		-- frame. The game then recovers the actor when the fragment ends, the
+		-- same way it recovers one knocked down by `hcm_fall_`, which is the
+		-- only recovery in this mod that has ever looked right.
+		local played = false
+
+		pcall(function()
+			played = npc.actor:StartInteractiveActionByName(
+					self.Config.SettleFragTag or "hcm_settle",
+					npc.id, false, 1.0)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("Settle " .. self:NameOf(npc)
+					.. " played=" .. tostring(played)
+					.. " entry=" .. entryState)
+		end
+
+		return
+	end
+
+	-- The fall is requested after the body is physicalized, not alongside it.
+	--
+	-- Called in the same frame as `RagDollize` the two race, the fall does not
+	-- take, and the victim stands back up in the T-pose `RagDollize` left. The
+	-- signal for when the body is ready is the one this file already relies on
+	-- further down: the mass write succeeds exactly when the body is
+	-- physicalized, and its ladder reports that at 0 to 120 ms.
+	--
+	-- A victim who was not already down keeps the original order, because
+	-- there the fall is what physicalizes the body in the first place and
+	-- nothing has to wait for anything.
+	local function requestFall()
+		pcall(function()
+			if npc.actor then
+				npc.actor:Fall({x=0, y=0, z=0}, true)
+			end
+		end)
+	end
+
+	if not alreadyDown then
+		requestFall()
+	end
 
 	-- `actor:RagDollize` does not belong here and must not be added back. It
 	-- asks for the physics profile directly rather than telling the actor to
@@ -558,6 +673,10 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	-- right signal, because it succeeds exactly when the body is physicalized,
 	-- and its own ladder reports that at 0 to 120 ms.
 	self:MassVictim(npc, armorScale, function()
+		if alreadyDown then
+			requestFall()
+		end
+
 		self:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt)
 		self:DampVictim(npc)
 	end)
@@ -676,6 +795,9 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos, hor
 				+ (combined.y * combined.y)
 				+ (combined.z * combined.z))
 
+		-- What the mass write aims for, which is what the magnitude was tuned
+		-- against. Reading the same setting the write uses keeps the two from
+		-- drifting apart.
 		-- Logged because the multiplier and the tier scalar are both visible
 		-- in telemetry while the figure they produce was not, which left a
 		-- report of armored targets moving further at trot than at gallop

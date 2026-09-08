@@ -602,17 +602,21 @@ function Test-InstalledFiles {
 			continue
 		}
 
-		# The settings file is deliberately different: Set-DeployedCrime
-		# rewrites CollisionIsCrime in the installed copy on every deploy. A
+		# The settings file is deliberately different: Set-DeployedTestValues
+		# rewrites the testing values in the installed copy on every deploy. A
 		# raw hash would report it stale every single run, and a check that is
-		# always wrong is one everybody learns to ignore. So that one value is
+		# always wrong is one everybody learns to ignore. So those values are
 		# normalized out of both sides and everything else still has to match.
 		if ((Split-Path -Leaf $file.To) -eq "HorseCollisionMod_Settings.lua") {
-			$pattern = '(CollisionIsCrime\s*=\s*)(true|false)'
-			$a = [regex]::Replace([System.IO.File]::ReadAllText($file.From),
-					$pattern, '${1}X')
-			$b = [regex]::Replace([System.IO.File]::ReadAllText($file.To),
-					$pattern, '${1}X')
+			$a = [System.IO.File]::ReadAllText($file.From)
+			$b = [System.IO.File]::ReadAllText($file.To)
+
+			foreach ($key in $script:DevTestValues.Keys) {
+				$pattern = "($key\s*=\s*)([^,
+]+)"
+				$a = [regex]::Replace($a, $pattern, '${1}X')
+				$b = [regex]::Replace($b, $pattern, '${1}X')
+			}
 
 			if ($a -ne $b) {
 				Write-Host "[VERIFY] STALE    $(Split-Path -Leaf $file.To)" -ForegroundColor Red
@@ -687,9 +691,11 @@ function Sync-LooseFiles {
 		$changed[$file.Half] = $true
 	}
 
-	# A development deploy leaves riding someone down legal, because almost
-	# every collision test is about the collision and not about the crime, and
-	# guards arriving mid-test end the test. -Crime keeps the shipping value.
+	# A development deploy leaves the world unable to interrupt a test: riding
+	# someone down is legal, a spent horse keeps its rider, nobody is pulled
+	# down or calls for guards. Almost every collision test is about the
+	# collision. -Crime keeps every one of those at its shipping value, for the
+	# rarer test that is about the reaction rather than the impact.
 	#
 	# This has to happen here, between the copy and the reload the caller runs
 	# next. src\HorseCollisionMod_Settings.lua cannot carry the change, because
@@ -697,22 +703,59 @@ function Sync-LooseFiles {
 	# patching the installed file after the reload is too late: the value the
 	# engine already read is the one a later save load keeps.
 	if ($changed.Script) {
-		Set-DeployedCrime -Root $Root -Enabled:$Crime
+		Set-DeployedTestValues -Root $Root -Crime:$Crime
 	}
 
 	return $changed
 }
 
-# Rewrites CollisionIsCrime in the installed settings file, and reports what it
-# left behind rather than assuming the edit took. The value is written as bytes
-# with no byte order mark: Set-Content -Encoding utf8 on Windows PowerShell
-# writes one, and a BOM on the first line makes Lua reject the entire settings
-# file, at which point the mod silently keeps every compiled-in default and the
-# setting appears not to work at all.
-function Set-DeployedCrime {
+# Values forced into the **installed** settings file on every development
+# deploy, so a testing session is not fighting the mod's shipping behavior.
+#
+# The installed copy is the right place for these and the repository copy is
+# not. `build.ps1` refuses a release carrying `CollisionIsCrime = false`, and
+# more importantly these are not opinions about how the mod should behave, they
+# are the conditions a test needs. Writing them here means they survive a save
+# load and a script reload, which is the whole point: the engine reads this file
+# again on both, so anything pushed over the console is gone and anything
+# written here is not.
+#
+# Add to this table rather than poking the console after every reload. That was
+# the previous practice and it cost a rider several tests to settings quietly
+# reverting under them mid-session.
+# The principle, so this table does not have to be argued about a key at a
+# time: a development deploy produces a world that reacts to a collision and
+# does nothing else. Anything whose job is to interrupt the rider belongs here.
+# Anything that changes what a collision itself does must not, because that is
+# the thing under test.
+#
+# On that line: crime, being pulled off the horse, guards arriving, a spent
+# horse throwing its rider or wandering off, and the surrender prompt are all
+# interruptions. Damage, impulse, sound, reactions and the tier thresholds are
+# the subject and are left exactly as they ship.
+#
+# Stamina still drains. It is the horse's own resource and part of what a
+# collision costs; only its consequences are suppressed, so a test can still
+# read the drain in the log without the rider ending up on the ground.
+$script:DevTestValues = [ordered]@{
+	CollisionIsCrime          = "false"
+	ThrowRiderOnStaminaEmpty  = "false"
+	HorseBoltsWhenSpent       = "false"
+	RetaliationPullsRiderDown = "false"
+	RetaliationSurrenderHint  = "false"
+	WomenRaiseAlarm           = "false"
+}
+
+# Rewrites the test values in the installed settings file, and reports what it
+# left behind rather than assuming the edits took. Written as bytes with no byte
+# order mark: Set-Content -Encoding utf8 on Windows PowerShell writes one, and a
+# BOM on the first line makes Lua reject the entire settings file, at which point
+# the mod silently keeps every compiled-in default and the settings appear not to
+# work at all.
+function Set-DeployedTestValues {
 	param (
 		[string]$Root,
-		[switch]$Enabled
+		[switch]$Crime
 	)
 
 	$path = Join-Path $Root "Data\Scripts\Startup\HorseCollisionMod_Settings.lua"
@@ -721,30 +764,57 @@ function Set-DeployedCrime {
 		return
 	}
 
-	$want = if ($Enabled) { "true" } else { "false" }
+	$wanted = [ordered]@{}
+
+	foreach ($key in $script:DevTestValues.Keys) {
+		# -Crime asks for the shipping behavior, so that one value is left
+		# exactly as the repository has it.
+		if ($Crime -and $key -eq "CollisionIsCrime") {
+			continue
+		}
+
+		$wanted[$key] = $script:DevTestValues[$key]
+	}
+
 	$text = [System.IO.File]::ReadAllText($path)
-	$patched = [regex]::Replace($text,
-		'(CollisionIsCrime\s*=\s*)(true|false)', "`${1}$want")
+	$patched = $text
+
+	foreach ($key in $wanted.Keys) {
+		# Everything up to the comma, so a trailing comment survives.
+		$patched = [regex]::Replace($patched,
+			"($key\s*=\s*)([^,
+]+)", "`${1}$($wanted[$key])")
+	}
 
 	if ($patched -ne $text) {
 		$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 		[System.IO.File]::WriteAllText($path, $patched, $utf8NoBom)
 	}
 
-	# Read it back off disk. A regex that matched nothing looks exactly like a
-	# successful patch from here, and the cost of the difference is the rider
-	# fending off guards through a test that then has to be run again.
-	$now = [regex]::Match([System.IO.File]::ReadAllText($path),
-		'CollisionIsCrime\s*=\s*(true|false)')
+	# Read back off disk. A regex that matched nothing looks exactly like a
+	# successful patch from here, and the cost of the difference is a rider
+	# fending off guards, or being thrown off a spent horse, through a test that
+	# then has to be run again.
+	$disk = [System.IO.File]::ReadAllText($path)
+	$report = @()
 
-	if (-not $now.Success) {
-		Write-Host "[DEPLOY] CollisionIsCrime not found in the installed settings." -ForegroundColor Yellow
+	foreach ($key in $wanted.Keys) {
+		$now = [regex]::Match($disk, "$key\s*=\s*([^,
+]+)")
+
+		if (-not $now.Success) {
+			Write-Host "[DEPLOY] $key not found in the installed settings." -ForegroundColor Yellow
+		}
+		elseif ($now.Groups[1].Value.Trim() -ne $wanted[$key]) {
+			Write-Host "[DEPLOY] $key is $($now.Groups[1].Value.Trim()), wanted $($wanted[$key])." -ForegroundColor Red
+		}
+		else {
+			$report += "$key=$($wanted[$key])"
+		}
 	}
-	elseif ($now.Groups[1].Value -ne $want) {
-		Write-Host "[DEPLOY] CollisionIsCrime is $($now.Groups[1].Value), wanted $want." -ForegroundColor Red
-	}
-	else {
-		Write-Host "[DEPLOY] CollisionIsCrime = $want (installed settings)"
+
+	if ($report.Count -gt 0) {
+		Write-Host "[DEPLOY] test values (installed settings): $($report -join ' ')"
 	}
 }
 

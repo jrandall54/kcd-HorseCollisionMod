@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.21.0
+-- @release 4.22.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.21.0"
+HorseCollisionMod.Version = "4.22.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -105,6 +105,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field MaxSweepExtra cap on the forward sweep, in meters
 -- @field HitCooldownStateDriven whether the knockdown wait reads the victim's
 --   animation state instead of counting
+-- @field HitMinIntervalMs the least time between two scored impacts on one
+--   victim, so a single pass through someone is one impact and not five
+-- @field HitReadyByTier which tiers wait for a victim to be ready
 -- @field HitReadySettleMs how long a victim must be neither animation-driven
 --   nor ragdolling before another impact counts
 -- @field HitReadyPollMs how often that state is sampled
@@ -225,15 +228,16 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDampPollMs how often a thrown body is looked at, milliseconds
 -- @field RagdollDampSettleSpeed the speed it must fall under before the
 --   damping is applied, meters per second
--- @field RagdollDampGroundedSpeed the vertical speed below which a body
---   counts as sliding on the ground rather than still being thrown
+-- @field GetupRestPollMs how often a forced ragdoll is checked for rest
+-- @field GetupRestBand how little movement between samples counts as rest
+-- @field GetupRestCeilingMs stand the victim anyway by this point
+-- @field SettleFragTag the empty fragment played to take a victim out of a
+--   ragdoll without imposing a pose or a facing on them
 -- @field RagdollDampFloorMs the earliest the damping may be applied, so it
 --   cannot fire while the body is still being launched
 -- @field RagdollDampCeilingMs the latest, applied regardless of speed
 --   0 for the engine's own value
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
--- @field RearTrace log the horse's position through the end of a rear
--- @field RearSettleMs how long after a rear ends before the horse is measured
 -- @field Retaliation whether a victim shoved repeatedly at a walk can lose
 --   patience and fight back
 -- @field RetaliationFreeBumps how many walk impacts a victim tolerates before
@@ -274,6 +278,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpactDamageIgnoredArmor `smash_def` that does not count as armor,
 --   covering the shoes and shirt every villager wears
 -- @field ImpactDamageByTier what each kind of collision is worth before armor
+-- @field ImpactDamageRushBelow deal immediately, ahead of the engine, when
+--   the victim has this little health left, because waiting hands the kill
+--   to the engine and the rider is charged for it
 -- @field ImpactDamageOwnsTheHit give back what the engine charged for a
 --   collision, so the mod's figure is the whole cost rather than an addition
 --   to an unknown one
@@ -369,6 +376,7 @@ HorseCollisionMod.Config = {
 	TickSeconds              = 0.033,
 	SweepMultiplier          = 0.50,
 	MaxSweepExtra            = 0.35,
+	HitMinIntervalMs         = 700,
 	HitCooldownMs            = 3000,
 	KnockdownRecoveryMs      = 6000,
 
@@ -567,6 +575,7 @@ HorseCollisionMod.Config = {
 	},
 
 	ImpactDamageOwnsTheHit   = true,
+	ImpactDamageRushBelow    = 35,
 	ImpactDamageReclaimCeiling = 60,
 
 	ImpactDamageArmorScale   = 0.6,
@@ -789,10 +798,18 @@ HorseCollisionMod.Config = {
 	--
 	-- Setting HitCooldownStateDriven false goes back to counting, on
 	-- HitCooldownMs and KnockdownRecoveryMs alone.
+	-- Which tiers wait for a victim to be ready. Only the ones that play an
+	-- animation need to: a knockdown clip starts from standing and has nothing
+	-- to blend from on a victim already flat, while a ragdoll has no pose to
+	-- start from and can land at any point in a recovery.
+	HitReadyByTier           = {
+		Walk = true, Trot = true, Rear = true, Gallop = false, Charge = false
+	},
+
 	HitCooldownStateDriven   = true,
-	HitReadySettleMs         = 2000,
+	HitReadySettleMs         = 250,
 	HitReadyPollMs           = 250,
-	HitReadyCeilingMs        = 12000,
+	HitReadyCeilingMs        = 6000,
 
 	-- The dust a body throws up where it lands. Nothing at a walk, where
 	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
@@ -837,24 +854,9 @@ HorseCollisionMod.Config = {
 	-- useful while investigating.
 	DiagnoseMisses           = false,
 
-	-- Logs the horse's position every frame or so through the end of a rear,
-	-- splitting vertical from horizontal. Off for the same reason as the line
-	-- above, and more so: it writes about eighty lines per rear.
-	--
-	-- It exists because the end of a rear is a handover. The fragment's
-	-- `MovementControlMethod` gives the animation ownership of the horse's
-	-- position, and when the fragment ends the horse returns to its own
-	-- movement controller. Anything visible at that boundary is easier to read
-	-- off the position than to guess at from values.
-	-- Stops the horse dead the instant a rear begins, linear and angular.
-	-- Without it, turning and then rearing pushes the horse sideways: the
-	-- momentum it carried in is still there when the animation ends. Neither
-	-- `XyMove` nor `Rotate` in the fragment prevents this, in any combination.
 
 	-- How long after the action ends before the displacement is read back.
-	RearSettleMs             = 250,
 
-	RearTrace                = false,
 
 	-- Times every animation state a recovering victim passes through and
 	-- logs the sequence. Answers where a recovery spends its seconds, which
@@ -898,7 +900,10 @@ HorseCollisionMod.Config = {
 	RagdollMinEnergy         = 1.0,
 	RagdollDampPollMs        = 100,
 	RagdollDampSettleSpeed   = 0.5,
-	RagdollDampGroundedSpeed = 0.3,
+	SettleFragTag            = "hcm_settle",
+	GetupRestPollMs          = 100,
+	GetupRestBand            = 0.02,
+	GetupRestCeilingMs       = 4000,
 	RagdollDampFloorMs       = 200,
 	RagdollDampCeilingMs     = 6000,
 }
@@ -912,6 +917,25 @@ HorseCollisionMod.Config = {
 -- seconds.
 -- @table RecentHits
 HorseCollisionMod.RecentHits = {}
+
+--- When each victim was last scored, keyed the same way as `RecentHits`.
+--
+-- Separate from it deliberately. `RecentHits` answers whether a victim is ready
+-- for an animated reaction; this answers whether the horse has already been
+-- charged for the contact it is still passing through. A gallop is exempt from
+-- the first and subject to the second.
+--
+-- @table LastScoredHit
+HorseCollisionMod.LastScoredHit = {}
+
+--- Entities the development tooling created, which take no impact damage.
+--
+-- Populated only by `tools/dev_subject.lua`. Nothing in normal play writes to
+-- it, and it is not a setting, so a shipped build can never have anything in
+-- it. It exists because an NPC cannot be made unkillable through the engine.
+--
+-- @table ImmortalSubjects
+HorseCollisionMod.ImmortalSubjects = {}
 
 --- What each victim was doing when it was hit, keyed by entity id.
 --
@@ -1386,6 +1410,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- survives the transition, so the table is dropped rather than
 		-- carried into a world it no longer describes.
 		self.RecentHits = {}
+		self.LastScoredHit = {}
 		self.RecentRejections = {}
 		self.SphereCache = { pos = nil, ents = nil, at = 0 }
 

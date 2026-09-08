@@ -155,6 +155,12 @@ SETTINGS_SCRIPT = "Scripts/Startup/HorseCollisionMod_Settings.lua"
 # would break again the next time a line was added.
 MAX_CHUNK_BYTES = 4000
 
+# Where a script too large for a console command is dropped instead. Read from
+# the environment so a different install does not need this file edited, with
+# the recorded path as the default.
+GAME_ROOT = os.environ.get(
+    "KCD_ROOT", r"C:\Games\Kingdom Come - Deliverance")
+
 RIDE_SCRIPTS = [
     "tools/dev_survival.lua",
 ]
@@ -597,19 +603,70 @@ def main():
 
                 return 2
 
-            size = len(body.encode("utf-8"))
+            # Comments are for the repository, not the wire. A dev script
+            # that documents why it makes the engine calls it makes is worth
+            # more than one that fits, and these files run up against the
+            # console's 4000 byte limit on their header alone. Stripping is
+            # safe on this project's files and is not a general Lua minifier: it
+            # drops whole-line comments and blank lines only, so a `--` inside
+            # a string is untouched because such a line does not start with
+            # one.
+            body_full = body
+            stripped = []
+
+            for line in body.splitlines():
+                bare = line.strip()
+
+                if bare == "" or bare.startswith("--"):
+                    continue
+
+                # Indentation is dead weight on the wire. Lua does not care
+                # about it, and these files are tab-indented several levels
+                # deep, which is hundreds of bytes against a 4000 byte limit.
+                stripped.append(bare)
+
+            lean = chr(10).join(stripped)
+            size = len(lean.encode("utf-8"))
+
+            if size < len(body.encode("utf-8")):
+                print("stripped comments: %d -> %d bytes"
+                      % (len(body.encode("utf-8")), size))
+                body = lean
 
             if size > MAX_CHUNK_BYTES:
-                print("%s is %d bytes, over the %d the remote console accepts."
-                      % (path, size, MAX_CHUNK_BYTES))
-                print("  The server drops an oversized command silently, so "
-                      "this would look")
-                print("  exactly like a game launched without -devmode. "
-                      "Shorten the file,")
-                print("  usually by trimming its comment header, or split it "
-                      "in two.")
+                # Too big for a console command, so it goes the way the mod's
+                # own part files go: written into the game's script folder and
+                # pulled in with Script.ReloadScript, which has no size limit.
+                #
+                # Deliberately not Data/Scripts/Startup. Anything there is
+                # executed at startup, so a dev script left behind would run
+                # on every launch. This path is loaded only when asked for.
+                #
+                # The full source is written, comments and all. Only the
+                # console needed it stripped.
+                dropped = os.path.join(
+                    GAME_ROOT, "Data", "Scripts", "hcm_dev_scratch.lua")
 
-                return 2
+                try:
+                    os.makedirs(os.path.dirname(dropped), exist_ok=True)
+
+                    with io.open(dropped, "w", encoding="utf-8",
+                                 newline=chr(10)) as handle:
+                        handle.write(body_full)
+                except Exception as problem:
+                    print("%s is %d bytes, over the %d the console accepts, "
+                          "and it could not be written to the game folder "
+                          "either: %s" % (path, size, MAX_CHUNK_BYTES,
+                                          problem))
+
+                    return 2
+
+                print("%d bytes, over the %d console limit, so loading it "
+                      "from disk instead" % (size, MAX_CHUNK_BYTES))
+
+                console.lua('Script.ReloadScript("Scripts/hcm_dev_scratch.lua")')
+
+                return 0
 
             print("sending %s, %d lines" % (path, body.count(chr(10)) + 1))
             console.lua(body)

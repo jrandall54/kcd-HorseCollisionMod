@@ -83,7 +83,7 @@
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  4.21.0
+        <li><strong>Release</strong>:  4.22.0
  Stops the animation driving an actor's own movement.</p>
 
 <p> <code>actor:SetMovementControlledByAnimation</code> is the runtime equivalent of a
@@ -139,6 +139,14 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:RebuildVictim">HorseCollisionMod:RebuildVictim (npc)</a></td>
 	<td class="summary">Rebuilds a victim so their own behavior reattaches to their body.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ImpactIsNewContact">HorseCollisionMod:ImpactIsNewContact (npcId, now)</a></td>
+	<td class="summary">Whether enough time has passed since this victim was last scored.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HitReadyApplies">HorseCollisionMod:HitReadyApplies (tierName)</a></td>
+	<td class="summary">Whether a tier waits for a victim to be ready before it will land.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:WatchHitReady">HorseCollisionMod:WatchHitReady (npc, npcId, tierName)</a></td>
@@ -461,6 +469,106 @@
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:ImpactIsNewContact"></a>
+    <strong>HorseCollisionMod:ImpactIsNewContact (npcId, now)</strong>
+    </dt>
+    <dd>
+    Whether enough time has passed since this victim was last scored. </p>
+
+<p> One contact should be one impact. The detection loop runs every 33 ms and a
+ galloping horse takes about 150 ms to clear a person, so a single pass
+ crosses four or five ticks and every one of them is a collision by the
+ loop's reckoning.</p>
+
+<p> Repeats were suppressed by accident before this existed. The readiness
+ wait blocked a second
+ impact for seconds afterward, which suppressed the repeats as a side effect
+ of suppressing everything. Taking a gallop out of that wait, so it can land
+ at any stage of a victim's recovery, removed the accident with it and the
+ repeats came straight back.</p>
+
+<p> So they are separate rules now, because they are separate questions.
+ Readiness asks whether an animation has anything to blend from. This asks
+ whether the horse has already been charged for the contact it is still in.
+ A gallop needs the second and not the first.</p>
+
+<p> The interval only has to outlast one pass. It must not approach the time a
+ rider needs to turn around and come back, because a deliberate second run is
+ a second impact and should be scored as one.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npcId</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the victim's id, as the table is keyed
+        </li>
+        <li><span class="parameter">now</span>
+            <span class="types"><span class="type">number</span></span>
+         the current time in milliseconds
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when this impact should be scored
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:HitReadyApplies"></a>
+    <strong>HorseCollisionMod:HitReadyApplies (tierName)</strong>
+    </dt>
+    <dd>
+    Whether a tier waits for a victim to be ready before it will land. </p>
+
+<p> The wait exists for one reason: a knockdown clip starts from standing, so
+ playing it at a victim already flat on the ground has nothing to blend from
+ and looks wrong. That reason applies to the tiers that play an animation and
+ to no others.</p>
+
+<p> A gallop ragdolls. There is no clip and no pose to start from, so no stage of
+ a victim's recovery makes it impossible, and the rider's position is that it
+ should always be available:</p>
+
+<p> A gallop is pure physics, so it belongs on the table of possibilities at
+ any stage of a victim's recovery.</p>
+
+<p> Leaving a gallop gated is also what produced the worst of the feedback
+ problem. The mod declined the impact, the engine's own collision happened
+ regardless, and what the rider got was the vanilla result: the horse wedged
+ in the victim, no reaction, and a bark. Nothing this mod does should ever
+ hand an impact back to that.</p>
+
+<p> A charge is here for the same reason a gallop is. It is a physical ride-down
+ that ends in a ragdoll, and it is already scored as a gallop.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the tier the impact scored as
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when this tier waits
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:WatchHitReady"></a>
     <strong>HorseCollisionMod:WatchHitReady (npc, npcId, tierName)</strong>
     </dt>
@@ -530,7 +638,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-08 12:25:38 </i>
+<i style="float:right;">Last updated 2026-09-08 16:47:43 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

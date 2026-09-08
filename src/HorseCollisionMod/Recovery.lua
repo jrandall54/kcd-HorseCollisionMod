@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.21.0
+-- @release 4.22.0
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -499,6 +499,98 @@ function HorseCollisionMod:RebuildVictim(npc)
 
 	return ok
 end
+
+--- Whether enough time has passed since this victim was last scored.
+--
+-- One contact should be one impact. The detection loop runs every 33 ms and a
+-- galloping horse takes about 150 ms to clear a person, so a single pass
+-- crosses four or five ticks and every one of them is a collision by the
+-- loop's reckoning.
+--
+-- Repeats were suppressed by accident before this existed. The readiness
+-- wait blocked a second
+-- impact for seconds afterward, which suppressed the repeats as a side effect
+-- of suppressing everything. Taking a gallop out of that wait, so it can land
+-- at any stage of a victim's recovery, removed the accident with it and the
+-- repeats came straight back.
+--
+-- So they are separate rules now, because they are separate questions.
+-- Readiness asks whether an animation has anything to blend from. This asks
+-- whether the horse has already been charged for the contact it is still in.
+-- A gallop needs the second and not the first.
+--
+-- The interval only has to outlast one pass. It must not approach the time a
+-- rider needs to turn around and come back, because a deliberate second run is
+-- a second impact and should be scored as one.
+--
+-- @tparam string npcId the victim's id, as the table is keyed
+-- @tparam number now the current time in milliseconds
+-- @treturn boolean true when this impact should be scored
+function HorseCollisionMod:ImpactIsNewContact(npcId, now)
+	local interval = self.Config.HitMinIntervalMs or 0
+
+	if interval <= 0 then
+		return true
+	end
+
+	local last = self.LastScoredHit[npcId]
+
+	if last and now - last < interval then
+		return false
+	end
+
+	return true
+end
+
+
+--- Whether a tier waits for a victim to be ready before it will land.
+--
+-- The wait exists for one reason: a knockdown clip starts from standing, so
+-- playing it at a victim already flat on the ground has nothing to blend from
+-- and looks wrong. That reason applies to the tiers that play an animation and
+-- to no others.
+--
+-- A gallop ragdolls. There is no clip and no pose to start from, so no stage of
+-- a victim's recovery makes it impossible, and the rider's position is that it
+-- should always be available:
+--
+-- A gallop is pure physics, so it belongs on the table of possibilities at
+-- any stage of a victim's recovery.
+--
+-- Leaving a gallop gated is also what produced the worst of the feedback
+-- problem. The mod declined the impact, the engine's own collision happened
+-- regardless, and what the rider got was the vanilla result: the horse wedged
+-- in the victim, no reaction, and a bark. Nothing this mod does should ever
+-- hand an impact back to that.
+--
+-- A charge is here for the same reason a gallop is. It is a physical ride-down
+-- that ends in a ragdoll, and it is already scored as a gallop.
+--
+-- @tparam string tierName the tier the impact scored as
+-- @treturn boolean true when this tier waits
+function HorseCollisionMod:HitReadyApplies(tierName)
+	local byTier = self.Config.HitReadyByTier
+
+	if type(byTier) ~= "table" then
+		return true
+	end
+
+	local applies = byTier[tierName]
+
+	-- A tier nobody has decided about waits, because that is the older and
+	-- more cautious behavior, but it says so rather than deciding silently.
+	if applies == nil then
+		if self.Config.LogTelemetry then
+			self:Log("HitReadyApplies has no entry for tier "
+					.. tostring(tierName) .. ", waiting by default")
+		end
+
+		return true
+	end
+
+	return applies and true or false
+end
+
 
 --- Clears a victim's hit cooldown when they are back on their feet.
 --
