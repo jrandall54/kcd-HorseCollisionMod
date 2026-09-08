@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.19.1
+-- @release 4.19.2
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -346,9 +346,12 @@ function HorseCollisionMod:SafeUpdate()
 	end)
 
 	local speed = self:VectorLength(velocity)
+
+
 	self:TrackSpeed(speed)
 
 	local impactSpeed = self:ImpactSpeed()
+
 
 	-- Below walking pace nothing can happen, so the loop normally stops here
 	-- before looking at a single entity. While diagnosing it keeps going, or
@@ -405,6 +408,14 @@ function HorseCollisionMod:SafeUpdate()
 					isMutt = true
 				end
 			end)
+
+			-- The dog is already found here, so the collision filtering that
+			-- stops him carrying the horse rides along with the check that
+			-- keeps him from being trampled. It runs once per dog per
+			-- generation and does nothing on any later pass.
+			if isMutt then
+				self:KeepDogOffHorses(ent)
+			end
 
 			local isProtected = (self.Config.ProtectMutt and isMutt)
 

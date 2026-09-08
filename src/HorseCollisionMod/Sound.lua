@@ -35,7 +35,7 @@
 --
 -- @module HorseCollisionMod.Sound
 -- @author jrandall54
--- @release 4.19.1
+-- @release 4.19.2
 
 --- The material a victim's armor sounds like, by engine armor type.
 --
@@ -214,7 +214,12 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	-- three meters off a shove leaves nothing behind.
 	local master = 0
 
-	if tierName == "Trot" then
+	-- The charge is its own tier, not a gallop. It carries a deliberate rear
+	-- and a horse driving forward under its own weight, and it is tuned
+	-- separately from a collision the rider merely rode into.
+	if tierName == "Charge" then
+		layers = cfg.ImpactSoundCharge
+	elseif tierName == "Trot" then
 		layers = cfg.ImpactSoundTrot
 		master = cfg.ImpactSoundDistance or 0
 	elseif tierName == "Gallop" then
@@ -245,7 +250,8 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	-- effect attached to the tier.
 	local cracked = false
 
-	if tierName == "Gallop" and type(cfg.ImpactSoundCrack) == "table"
+	if (tierName == "Gallop" or tierName == "Charge")
+			and type(cfg.ImpactSoundCrack) == "table"
 			and math.random() < (cfg.ImpactSoundCrackChance or 0) then
 		plan[#plan + 1] = cfg.ImpactSoundCrack
 		cracked = true

@@ -16989,3 +16989,55 @@ a wall, which reads as wrong. Braking close lets the horse cover the ground and
 stop against the wall, at the cost of the release landing while the horse is
 airborne. Close won on inspection: a metre from a wall the stop reads as an
 impact, whereas the same stop 2.4 m from a low fence read as hitting nothing.
+
+### The charge rebuilt: physics for the travel, its own detection for the hit
+
+The animation-driven charge was abandoned rather than tuned further. Every
+fault traced to one property, and all three of the engine's movement control
+methods were measured against it:
+
+- `eMCM_Animation`, `Horizontal = 2`, travels 5.4 m and does not collide.
+- `eMCM_AnimationHCollision`, `6`, collides while the animation keeps demanding
+  a position collision refuses. The gap accumulates and discharges when the
+  action ends, which is the rubberband, and total blocking makes it worse.
+- `eMCM_Entity`, `1`, admits no divergence but hands the horse to its movement
+  controller. An impulse of 10000 gave 20.54 m/s, the horse moved 0.67 m, and
+  the controller zeroed it on the next frame.
+
+An impulse applied *after* the action has ended does survive, so the fragment
+now rears in place and the travel is a push. The horse then collides by
+default, and the raycast brake, the ground seating and the synthetic detection
+speed all came out.
+
+**Timing is the clip's length.** The impulse cannot fire while the action holds
+the horse. `relaxed_rearing` is 2.06 s with a dead last third, so it is cut at
+1.0 s into `relaxed_idle_jump_land`, entered at `StartTime` 0.45 because the
+front of a landing is the airborne part a rear has already done. The action
+ended at 1856 ms played whole and 1408 ms with the front skipped, both stable
+to about 30 ms across runs.
+
+`ExitTime`, `StartTime` and `Duration` on a Blend are the three controls: when
+the next clip starts, where in it to begin, and the crossfade. A fragment ends
+when its last clip ends and there is no end time, so a tail can only be trimmed
+by entering the clip late.
+
+**Detection is the charge's own.** The shared loop is driven by the horse's
+speed and exits below walking pace, so a charge from a standstill detected
+nobody: every tick reported the loop declining to run. The charge now sweeps a
+corridor measured from the horse each tick, with no cap and one hit per person.
+
+**`Charge` is a tier of its own**, with its own damage, sound, dust, camera
+shake, view blur and throw. Its sound drops the log layer an ordinary gallop
+uses and adds hoofsteps, set back from the ear because `hs_hp_soil` ignores
+position.
+
+#### What the measurements said along the way
+
+The diagonal veer was the rider steering. With no input, `offAim` and
+`horseTurned` both read 0.0 degrees across five runs; the runs that veered had
+`horseTurned` between 24 and 43 degrees. Residual velocity was ruled out
+separately: `sideways` read 0.00 at the moment of the push.
+
+Aiming was moved to the push rather than the key press. The horse's rotation is
+the rider's during a rear in place, so a heading captured 1.4 s earlier ignored
+their correction.

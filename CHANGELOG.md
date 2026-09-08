@@ -29,6 +29,43 @@ number.
 
 ## [Unreleased]
 
+## [4.19.2] - 2026-09-07
+
+### Changed
+
+- The rear and charge is a special move rather than a fast collision. The horse
+  rears on the spot and is then driven forward physically, so it collides with
+  the world like any moving horse: walls and fences stop it instead of being
+  ridden through, and you can steer it slightly on the way in.
+
+- The charge knocks down everyone in a corridor in front of the horse, with no
+  limit, so a crowd cannot shield each other by standing close.
+
+- **NOT BREAKING** The settings that steered the old animation-driven charge
+  are gone, replaced by the ones that drive the physical version:
+  `RearChargeStopDistance`, `RearChargeSideDistance`, `RearChargeCheckZ`,
+  `RearChargeWallNormal`, `RearChargeWatchWhileMoving`, `RearChargePollMs`,
+  `RearChargeWatchMs` and `RearChargeSpeed`. They existed to stop an animation
+  riding through walls, which a physically driven horse does not do.
+
+  Not breaking because no published version ever carried them. The last release
+  on Nexus is 4.9.3, which predates the rear entirely, so no player has any of
+  these in a settings file.
+
+- A charge is now its own kind of impact rather than being scored as a gallop.
+  It hits harder, raises more dust, shakes the camera more, and has its own
+  sound, built from hoofsteps rather than the layers an ordinary collision
+  uses. All of it is tuned separately from riding someone down.
+
+### Fixed
+
+- A charge could hit nobody at all. The detection the mod uses for ordinary
+  collisions needs the horse to be moving, and a charge starts from a
+  standstill, so it declined to look for anyone. The charge now finds its own
+  victims.
+
+- Your dog can no longer carry your horse around on his back.
+
 ## [4.19.1] - 2026-09-07
 
 ### Fixed

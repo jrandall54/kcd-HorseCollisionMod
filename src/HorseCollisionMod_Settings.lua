@@ -114,23 +114,42 @@ HorseCollisionModSettings = {
 	RearCooldownMs           = 2500,  -- before another rear is accepted
 	RearFragTag              = "hcm_rear_charge", -- rear, then drive forward
 	RearOnlyFragTag          = "hcm_rear",       -- the second key rears on the spot
+	-- The charge rears in place and is then pushed forward physically, so the
+	-- horse collides with the world like any moving horse.
+	-- The charge is its own tier, not a gallop. It has its own damage, sound,
+	-- dust, camera shake and view blur, so it can be tuned without touching
+	-- what an ordinary collision does. It knocks down everyone in a corridor in
+	-- front of the horse, with no cap: a crowd cannot shield each other by
+	-- standing close.
+	--
+	-- Its sound drops the log layer an ordinary gallop uses and adds hoofsteps,
+	-- so a charge sounds like a horse coming down on someone rather than like
+	-- riding into them. `hs_hp_soil` ignores position and plays at a fixed
+	-- level, so it is set back from the ear rather than sitting on top.
+	ImpactSoundCharge        = { { "body", 0, 0.6 },
+	                             { "hs_hp_soil", 3, 0.8 },
+	                             { "body_armed", 0, 0.9 },
+	                             { "blunt", 0, 1.0 },
+	                             { "hs_hp_soil", 6, 0.7 },
+	                             { "face_armed", 0, 0.9 },
+	                             { "f_bodyfall1", 0, 0.7 } },
+	ImpactDustScaleCharge    = 1.2,   -- how much dust it raises
+	CameraShakeChargeScale   = 1.2,   -- how hard it shakes the camera
+	RiderBlurChargeScale     = 1.1,   -- how much it blurs the view
+	RiderBlurChargeLength    = 1.1,   -- how long that lasts
+	RearChargeStrikes        = true,  -- whether the charge knocks people down
+	RearChargeStrikeReach    = 1.8,   -- how far ahead it reaches
+	RearChargeStrikeWidth    = 0.9,   -- how wide, either side
+	RearChargeImpactSpeed    = 7.5,   -- the speed it is scored at
+	RearChargeThrow          = 0.7,   -- how hard it throws, lower is gentler
+	RearChargeImpulse        = 6000,  -- how hard the charge is pushed
+	RearChargeLift           = 0.2,   -- how much of that is upward
 	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop
 	RearStrikes              = true,  -- the rear on the spot hits who is in front
 	RearStrikeMs             = 700,   -- when in the animation they land
 	RearReach                = 2.0,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse
-	-- The charge is an animation, and an animation does not collide, so the
-	-- horse is stopped before it reaches anything solid. Without this it rides
-	-- through walls. 0 switches the whole check off.
-	RearChargeStopDistance   = 1.2,   -- how close to a wall the charge stops
-	RearChargeSideDistance   = 1.0,   -- how far the two outer rays look
-	RearChargeCheckZ         = 0.45,  -- how high above the hooves they look
-	RearChargeWallNormal     = 0.5,   -- flatter than this is a wall, more
-	                                  -- upright is ground the horse runs over
-	RearChargeWatchWhileMoving = true, -- keep looking during the lunge
-	RearChargePollMs         = 50,    -- how often it looks
-	RearChargeWatchMs        = 2000,  -- how long it keeps looking
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance
@@ -464,6 +483,8 @@ HorseCollisionModSettings = {
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
+	DogIgnoresHorses         = true,  -- stop your dog carrying your horse
+	                                  -- around on his back
 	LogTelemetry             = true,  -- diagnostics in kcd.log
 
 	-- Names the reason a nearby NPC produced no reaction. Writes a line for
