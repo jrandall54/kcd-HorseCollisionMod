@@ -50,7 +50,6 @@ HorseCollisionModSettings = {
 	RagdollMinEnergy         = 1.0,   -- higher puts it to rest sooner
 	RagdollDampPollMs        = 100,   -- how often to look at a thrown body
 	RagdollDampSettleSpeed   = 0.5,   -- speed it must fall under before damping
-	RagdollDampGroundedSpeed = 0.3,   -- vertical speed under which it is sliding, not flying
 	RagdollDampFloorMs       = 200,   -- never damp before this, mid-launch
 	RagdollDampCeilingMs     = 6000,  -- damp regardless by this point
 
@@ -241,6 +240,13 @@ HorseCollisionModSettings = {
 	-- nobody can read. This is also what keeps a death the mod's to attribute,
 	-- which is what CollisionIsCrime depends on.
 	ImpactDamageOwnsTheHit   = true,
+
+	-- Below this much health the mod stops waiting for the engine and lands
+	-- first. The wait exists so the mod delivers the killing blow and the death
+	-- is its own to attribute, which only works while the engine cannot kill on
+	-- its own. Its collision charges between 7 and 21, so a victim already hurt
+	-- dies to it inside the window and the rider is charged with murder.
+	ImpactDamageRushBelow    = 35,
 	ImpactDamageReclaimCeiling = 60,   -- never give back more than this at once
 
 	ImpactDamageArmorScale   = 0.6,   -- smash_def past the ignored figure that halves damage
@@ -477,22 +483,46 @@ HorseCollisionModSettings = {
 	ImpactSoundCrackChance   = 0.12,
 
 	-- How long a victim is left alone after being hit. The knockdown tiers
-	-- read the victim's own state rather than counting: a fall, the ragdoll
-	-- that follows it and the get-up run about seven seconds together, and a
-	-- second impact inside that plays no reaction and usually costs no health.
-	--
-	-- The victim is busy while an animation the mod started or a ragdoll owns
-	-- their body, and hittable again once HitReadySettleMs has passed with
-	-- neither. Any busy state restarts that window, because a trot victim is
-	-- briefly idle between the fall clip ending and the ragdoll taking over.
+	-- read the victim's own state rather than counting. The victim is busy
+	-- while an animation the mod started or a ragdoll owns their body, and
+	-- hittable again once HitReadySettleMs has passed with neither. Any busy
+	-- state restarts that window, because a trot victim is briefly idle
+	-- between the fall clip ending and the ragdoll taking over.
 	-- HitReadyCeilingMs releases a victim who is never seen busy at all.
 	--
-	-- Setting HitCooldownStateDriven false goes back to counting, on
-	-- HitCooldownMs and KnockdownRecoveryMs alone.
+	-- The settle was 2000 and the ceiling 12000, which put roughly nine
+	-- seconds between a gallop and being able to hit the same person again:
+	-- their reaction, then two more seconds of standing there. The engine's
+	-- own collision keeps firing through all of it, so a second impact gave a
+	-- vanilla bark, no feedback from the mod, and the horse wedged inside the
+	-- victim. That is what "muddy and unresponsive" was.
+	--
+	-- Zero is worse in the other direction. At a 1500 ceiling a victim was
+	-- released while still flat, and trotting a downed guard rotated him along
+	-- the ground, which looks wrong. The ceiling has to outlast a knockdown.
+	--
+	-- So the settle is short enough to be immediate once they are up, and the
+	-- ceiling long enough that it never releases someone mid-knockdown.
+	-- Only the tiers that play an animation wait. A gallop ragdolls, which is
+	-- pure physics with no pose to start from, so it can land at any stage of a
+	-- victim's recovery; gating it meant the mod declined the impact while the
+	-- engine's own collision happened anyway, which is the vanilla result of
+	-- getting wedged in someone with no reaction and a bark.
+	-- One contact is one impact. Detection runs every 33 ms and a galloping
+	-- horse clears a person in about 150 ms, so a single pass is four or five
+	-- ticks and each is a collision by the loop's reckoning. Long enough to
+	-- outlast a pass, far short of the time it takes to turn around and make a
+	-- second deliberate run.
+	HitMinIntervalMs         = 700,
+
+	HitReadyByTier           = {
+		Walk = true, Trot = true, Rear = true, Gallop = false, Charge = false
+	},
+
 	HitCooldownStateDriven   = true,
-	HitReadySettleMs         = 2000,
+	HitReadySettleMs         = 250,
 	HitReadyPollMs           = 250,
-	HitReadyCeilingMs        = 12000,
+	HitReadyCeilingMs        = 6000,
 
 	-- The dust a body throws up where it lands. Nothing at a walk, where
 	-- nobody falls. Scale is the size of the effect, so a gallop kicks up

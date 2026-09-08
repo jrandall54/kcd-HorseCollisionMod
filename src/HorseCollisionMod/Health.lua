@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 4.21.0
+-- @release 4.22.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -465,8 +465,6 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 	-- that says "the trample has resolved" to read. The figure comes from the
 	-- impact probe, whose first sample at 500 ms already shows the trample
 	-- settled.
-	local delay = self.Config.ImpactDamageDelayMs or 0
-
 	-- The victim's health at the moment of the impact, before anything has had
 	-- a chance to charge them for it.
 	--
@@ -485,6 +483,83 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 	pcall(function()
 		atImpact = npc.soul:GetState("health")
 	end)
+
+	-- Subjects the development tooling created take no damage.
+	--
+	-- An NPC cannot be made unkillable through the engine. There is no
+	-- writable path to its health cap: `SetMaxHealth`, `SetStatLevel` and
+	-- `SetDerivedStat` are all absent from a soul, and `SetState("health", n)`
+	-- clamps at 100. The Cheat mod's immortality works because it is applied
+	-- to the player, who is not capped that way.
+	--
+	-- So the exemption lives here instead, and it is narrow on purpose: only
+	-- entities `tools/dev_subject.lua` spawned are in this table, nothing in
+	-- normal play ever puts anything in it, and it is not a setting. Damage is
+	-- the only thing skipped. The reaction, the impulse, the sound and every
+	-- log line still run, which is what a test of collision feedback needs.
+	local exempt = self.ImmortalSubjects and npc.id
+			and self.ImmortalSubjects[tostring(npc.id)]
+
+	if exempt then
+		-- Skipping the mod's own damage is not enough on its own. The engine
+		-- charges a collision too, at about 18 a pass, and that accumulates
+		-- unopposed: a subject exempted this way still died after a handful of
+		-- runs, and because the engine landed the killing blow the rider was
+		-- charged with murder.
+		--
+		-- So the health is put back to what it was at the impact, which undoes
+		-- the engine's charge as well as declining to add one.
+		local was = nil
+
+		pcall(function()
+			was = npc.soul:GetState("health")
+		end)
+
+		Script.SetTimer(self.Config.ImpactDamageDelayMs or 600, function()
+			pcall(function()
+				if was then
+					npc.soul:SetState("health", was)
+				end
+			end)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("ImpactDamage " .. self:NameOf(npc)
+					.. " tier=" .. tostring(tierName)
+					.. " testSubject=true restoredTo="
+					.. string.format("%.1f", was or -1))
+		end
+
+		return 0
+	end
+
+	local delay = self.Config.ImpactDamageDelayMs or 0
+
+	-- Waiting is right only while the engine cannot land the killing blow.
+	--
+	-- The delay exists so the engine charges its collision first and this mod
+	-- finishes the victim, which is what puts the death under the mod's
+	-- attribution and lets `CollisionIsCrime` decide it. That reasoning holds
+	-- at full health and fails at low health, where the engine's own charge is
+	-- enough on its own: measured, it takes between 7 and 21, and a victim left
+	-- on 3.7 by a previous impact was killed by it inside the window. The mod
+	-- logged `preempted=true`, the kill belonged to the engine, and the rider
+	-- was charged with murder.
+	--
+	-- So when the victim cannot survive what the engine might take, the order
+	-- reverses and this lands immediately. The mod still delivers the killing
+	-- blow; it just has to be first rather than last to do it.
+	local rush = self.Config.ImpactDamageRushBelow or 0
+
+	if rush > 0 and type(atImpact) == "number" and atImpact > 0
+			and atImpact <= rush then
+		if self.Config.LogTelemetry then
+			self:Log(string.format("ImpactDamage %s tier=%s rushed at %.1f health",
+					self:NameOf(npc), tostring(tierName), atImpact))
+		end
+
+		delay = 0
+	end
 
 	local function deal()
 		local before = nil

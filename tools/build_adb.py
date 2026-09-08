@@ -272,6 +272,19 @@ REACTIONS = [
     # The recovery half of the knockdown. Without one the fall clip ends and
     # the victim snaps upright, which reads as a break rather than a get-up.
     # Both character sets carry all four.
+    # Nothing to play, for taking a victim out of a ragdoll without imposing a
+    # pose or a facing on them.
+    #
+    # An actor has to be animation driven or it holds its bind pose, which is
+    # the T-pose seen when a ragdolled victim is returned to the alive profile
+    # with no fragment running. Every real option carries a pose of its own,
+    # and the get-up options carry a measured rotation with it: +53 forward,
+    # +90 back, -176 left and 0 right. This one carries neither.
+    #
+    # See `render_option` for the shape, which is the terminal clip found for
+    # the charge.
+    ("hcm_settle", (), BOTH),
+
     ("hcm_getup_forward", "getup_ground_front", BOTH),
     ("hcm_getup_back", "getup_ground_back", BOTH),
     ("hcm_getup_left", "getup_ground_left", BOTH),
@@ -535,6 +548,21 @@ def settle_for(tag, gender):
     if tag.startswith(("hcm_knockdown_", "hcm_pb_")) and SETTLE_AT is not None:
         return (SETTLE_AT, SETTLE_SLEEP, SETTLE_STIFFNESS)
 
+    # The empty fragment carries one too, and it is the whole point of it.
+    #
+    # A victim hit while already down has to be ragdolled again, and doing that
+    # from Lua by setting the physicalization profile means something has to set
+    # it back. That flip is what shoots the actor upright: an alive actor is an
+    # upright capsule, so returning to it from a body lying on the ground stands
+    # them in a frame with nothing in between.
+    #
+    # Letting the fragment own the ragdoll is how the fall tier already works,
+    # and the game recovers those actors its own way when the fragment ends. At
+    # ExitTime 0 the layer takes the body immediately, which is correct here
+    # because there is no clip to play first.
+    if tag == "hcm_settle":
+        return (0, FALL_SETTLE_SLEEP, FALL_SETTLE_STIFFNESS)
+
     return None
 
 
@@ -566,8 +594,19 @@ def render_option(tags, clips, nl, settle=None, ground=False):
     if ground and GROUND_ROTATION:
         ground_layer = GROUND_ROTATION_LAYER
 
-    body = "\n".join(CLIP % ("0" if i == 0 else "-1", clip)
-                      for i, clip in enumerate(as_clips(clips)))
+    # An option named with no clips is the empty fragment.
+    #
+    # The shape is the terminal clip found for the charge: a blend marked
+    # terminal paired with an animation of no name. The pair is required
+    # rather than decorative, because a fragment sizes its clip array at half
+    # its child count and a lone trailing blend writes one clip past the end.
+    if not as_clips(clips):
+        body = ('          <Blend ExitTime="0" StartTime="0" Duration="0.1"'
+                ' terminal="1" />' + chr(10) +
+                '          <Animation name="" />')
+    else:
+        body = chr(10).join(CLIP % ("0" if i == 0 else "-1", clip)
+                            for i, clip in enumerate(as_clips(clips)))
     option = TEMPLATE.format(tags=tags, clips=body, collider=collider,
                              ground=ground_layer, settle=settle_layer,
                              movement=movement)
@@ -734,9 +773,29 @@ def write_additive():
                 TAGS_ENTRY.rsplit("/", 1)[-1],
                 GENDERS["female"]["ids"].rsplit("/", 1)[-1]])
 
-    for stale in sorted(set(os.listdir(OUT_DIR)) - keep):
+    # Only files this generator has produced before may be removed.
+    #
+    # Everything else in this directory is hand authored and, because
+    # `mod_assets` is excluded from git, deleting one destroys it outright.
+    # This sweep did exactly that to the horse database and the two horse
+    # declaration files, which carry work no generator can reproduce, and they
+    # were recoverable only because the game folder still held installed
+    # copies.
+    #
+    # The horse set is named rather than pattern matched, so a file this
+    # generator does not know about is left alone by default instead of being
+    # removed by default.
+    generated = set(["hcm_male_database.adb", "hcm_female_database.adb",
+                     "kcd_male_database.adb", "wh_female_database.adb",
+                     TAGS_ENTRY.rsplit("/", 1)[-1],
+                     GENDERS["female"]["ids"].rsplit("/", 1)[-1]])
+
+    for stale in sorted((set(os.listdir(OUT_DIR)) & generated) - keep):
         os.remove(out(stale))
         print("  removed stale file: %s" % stale)
+
+    for foreign in sorted(set(os.listdir(OUT_DIR)) - keep - generated):
+        print("  left alone, not generated here: %s" % foreign)
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)

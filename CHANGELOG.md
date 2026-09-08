@@ -30,6 +30,48 @@ number.
 
 ## [Unreleased]
 
+## [4.22.0] - 2026-09-08
+
+### Added
+
+- `HitReadyByTier`, so only the tiers that play an animation wait for a victim
+  to be ready. A gallop and a charge ragdoll, which has no pose to blend from,
+  and they can now land at any stage of a victim's recovery.
+- `HitMinIntervalMs`, the least time between two scored impacts on one victim.
+  Detection runs every 33 ms and a galloping horse clears a person in about
+  150 ms, so a single pass was four or five separate impacts.
+- `ImpactDamageRushBelow`, which lands the mod's damage immediately instead of
+  waiting when the victim is too weak to survive what the engine takes. The
+  wait exists so the mod delivers the killing blow and the death is its own to
+  attribute; below about 35 health the engine got there first and the rider was
+  charged with murder.
+- `hcm_settle`, a fragment holding only an empty terminal clip and a `Ragdoll`
+  layer, for knocking down a victim who is already down.
+
+### Changed
+
+- An impact on a victim already on the ground now produces a real reaction.
+  Previously the mod declined it, the engine's own collision happened anyway,
+  and what the rider got was the vanilla result: the horse wedged in the victim,
+  no feedback, and a bark.
+- Retaliation is a walk-tier answer again. A victim reared on or charged no
+  longer decides to fight back; it was wired in when the rear was first built,
+  before the rear was a tier of its own.
+- `RearMaxSpeed` measures horizontal speed rather than the length of the whole
+  velocity vector. A stationary horse reports 1 to 2 m/s because the reading
+  carries its settling fall, so the gate was comparing against noise.
+
+### Removed
+
+- `RagdollDampGroundedSpeed`. It damped a body as soon as its vertical motion
+  fell below a threshold, on the reasoning that a body still moving without
+  rising must be sliding. That is a guess about state rather than state, and it
+  was wrong for the case it was worst in: a victim hit while already lying down
+  has no vertical component from the first frame, so the throw was arrested
+  before it happened. **NOT BREAKING**: the setting is replaced by the test
+  below it, which needs no threshold to agree with another threshold.
+
+
 ## [4.21.0] - 2026-09-08
 
 ### Added

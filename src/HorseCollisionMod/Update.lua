@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.21.0
+-- @release 4.22.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -98,7 +98,38 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		end
 	end
 
-	if readyAt and now < readyAt then
+	local tierName = self:GetSpeedTier(speed)
+
+	-- A charge is always a gallop impact, whatever the horse's speed reads.
+	-- The lunge covers about five and a half meters in a second, which scores
+	-- as a trot, so a deliberate charge was producing the animated knockdown
+	-- rather than the ragdoll it should. The rider decides to do this; it is
+	-- not something the horse wandered into.
+	if self.RearCharging then
+		tierName = "Gallop"
+	end
+
+	-- The wait is animation business, so only the tiers that play an animation
+	-- observe it.
+	--
+	-- A trot knocks a victim down with a clip that starts from standing, so
+	-- firing it at someone already flat has nothing to blend from. A gallop
+	-- ragdolls, which is pure physics and has no pose to start from, so there
+	-- is no stage of a victim's recovery where it cannot land.
+	--
+	-- Leaving a gallop gated is what produced the worst of the feedback
+	-- problem: the mod declined the impact, the engine's own collision
+	-- happened anyway, and the rider got the vanilla result, which is the
+	-- horse wedged in the victim, no reaction, and a bark. That reads as the
+	-- mod having stopped working.
+	-- One contact, one impact. Checked for every tier, including the ones that
+	-- do not wait for readiness, because a horse mid-pass is still inside the
+	-- same collision it has already been charged for.
+	if not self:ImpactIsNewContact(npcId, now) then
+		return
+	end
+
+	if readyAt and now < readyAt and self:HitReadyApplies(tierName) then
 		-- Once per victim per wait, not once per pass.
 		--
 		-- This fires on every pass of the detection loop for as long as the
@@ -131,16 +162,6 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		return
 	end
 
-	local tierName = self:GetSpeedTier(speed)
-
-	-- A charge is always a gallop impact, whatever the horse's speed reads.
-	-- The lunge covers about five and a half meters in a second, which scores
-	-- as a trot, so a deliberate charge was producing the animated knockdown
-	-- rather than the ragdoll it should. The rider decides to do this; it is
-	-- not something the horse wandered into.
-	if self.RearCharging then
-		tierName = "Gallop"
-	end
 	local strength = self.HitReactionStrength
 	local cfg = self.Config
 	local combatScale = 1.0
@@ -153,6 +174,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	if tierName ~= "Walk" then
 		recovery = cfg.KnockdownRecoveryMs
 	end
+
+	-- Stamped for every tier, including the ones exempt from the readiness
+	-- wait. This is what makes one pass one impact, and a gallop needs it
+	-- precisely because it is exempt from everything else.
+	self.LastScoredHit[npcId] = now
 
 	-- What is stamped depends on which wait is running. Counting stamps the
 	-- duration; observing stamps the ceiling and lets the watcher clear it

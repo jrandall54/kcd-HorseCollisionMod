@@ -139,7 +139,7 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.21.0</li>
+        <li><strong>Release</strong>: 4.22.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -168,6 +168,14 @@
 	<tr>
 	<td class="name" nowrap><a href="#RecentHits">RecentHits</a></td>
 	<td class="summary">When each victim may react again, in milliseconds, keyed by entity id.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#LastScoredHit">LastScoredHit</a></td>
+	<td class="summary">When each victim was last scored, keyed the same way as <a href="../modules/HorseCollisionMod.html#RecentHits">RecentHits</a>.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#ImmortalSubjects">ImmortalSubjects</a></td>
+	<td class="summary">Entities the development tooling created, which take no impact damage.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#VictimActivity">VictimActivity</a></td>
@@ -420,6 +428,13 @@
         <li><span class="parameter">HitCooldownStateDriven</span>
          whether the knockdown wait reads the victim's
    animation state instead of counting
+        </li>
+        <li><span class="parameter">HitMinIntervalMs</span>
+         the least time between two scored impacts on one
+   victim, so a single pass through someone is one impact and not five
+        </li>
+        <li><span class="parameter">HitReadyByTier</span>
+         which tiers wait for a victim to be ready
         </li>
         <li><span class="parameter">HitReadySettleMs</span>
          how long a victim must be neither animation-driven
@@ -713,9 +728,18 @@
          the speed it must fall under before the
    damping is applied, meters per second
         </li>
-        <li><span class="parameter">RagdollDampGroundedSpeed</span>
-         the vertical speed below which a body
-   counts as sliding on the ground rather than still being thrown
+        <li><span class="parameter">GetupRestPollMs</span>
+         how often a forced ragdoll is checked for rest
+        </li>
+        <li><span class="parameter">GetupRestBand</span>
+         how little movement between samples counts as rest
+        </li>
+        <li><span class="parameter">GetupRestCeilingMs</span>
+         stand the victim anyway by this point
+        </li>
+        <li><span class="parameter">SettleFragTag</span>
+         the empty fragment played to take a victim out of a
+   ragdoll without imposing a pose or a facing on them
         </li>
         <li><span class="parameter">RagdollDampFloorMs</span>
          the earliest the damping may be applied, so it
@@ -727,12 +751,6 @@
         </li>
         <li><span class="parameter">DiagnoseMisses</span>
          name the reason a nearby NPC produced no reaction
-        </li>
-        <li><span class="parameter">RearTrace</span>
-         log the horse's position through the end of a rear
-        </li>
-        <li><span class="parameter">RearSettleMs</span>
-         how long after a rear ends before the horse is measured
         </li>
         <li><span class="parameter">Retaliation</span>
          whether a victim shoved repeatedly at a walk can lose
@@ -815,6 +833,11 @@
         </li>
         <li><span class="parameter">ImpactDamageByTier</span>
          what each kind of collision is worth before armor
+        </li>
+        <li><span class="parameter">ImpactDamageRushBelow</span>
+         deal immediately, ahead of the engine, when
+   the victim has this little health left, because waiting hands the kill
+   to the engine and the rider is charged for it
         </li>
         <li><span class="parameter">ImpactDamageOwnsTheHit</span>
          give back what the engine charged for a
@@ -1022,6 +1045,43 @@
  hit, because how long that takes depends on what the last impact did. A
  stagger is over quickly; a knockdown leaves them on the ground for several
  seconds.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "LastScoredHit"></a>
+    <strong>LastScoredHit</strong>
+    </dt>
+    <dd>
+    When each victim was last scored, keyed the same way as <a href="../modules/HorseCollisionMod.html#RecentHits">RecentHits</a>. </p>
+
+<p> Separate from it deliberately. <a href="../modules/HorseCollisionMod.html#RecentHits">RecentHits</a> answers whether a victim is ready
+ for an animated reaction; this answers whether the horse has already been
+ charged for the contact it is still passing through. A gallop is exempt from
+ the first and subject to the second.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "ImmortalSubjects"></a>
+    <strong>ImmortalSubjects</strong>
+    </dt>
+    <dd>
+    Entities the development tooling created, which take no impact damage. </p>
+
+<p> Populated only by <code>tools/dev_subject.lua</code>. Nothing in normal play writes to
+ it, and it is not a setting, so a shipped build can never have anything in
+ it. It exists because an NPC cannot be made unkillable through the engine.
 
 
 
@@ -1560,7 +1620,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-08 12:25:38 </i>
+<i style="float:right;">Last updated 2026-09-08 16:47:43 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
