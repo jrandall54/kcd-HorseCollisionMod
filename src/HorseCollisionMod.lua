@@ -236,7 +236,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   0 for the engine's own value
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
 -- @field RearTrace log the horse's position through the end of a rear
--- @field RearSettleMs how long after a rear ends before measuring where the horse finished
+-- @field RearSettleMs how long after a rear ends before the horse is measured
 -- @field Retaliation whether a victim shoved repeatedly at a walk can lose
 --   patience and fight back
 -- @field RetaliationFreeBumps how many walk impacts a victim tolerates before
