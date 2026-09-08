@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.19.5
+-- @release 4.20.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.19.5"
+HorseCollisionMod.Version = "4.20.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -157,6 +157,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearActionMap the name of that action map
 -- @field RearActionMapFile where the mod ships it, loaded with
 --   `ActionMapManager.LoadFromXML` so no vanilla input file is overridden
+-- @field RearIdleOnly rear only from the horse's idle state, not while it moves
 -- @field RearMaxSpeed the speed above which a rear request is ignored, in
 --   meters per second, since a rear is a standstill move
 -- @field RearCooldownMs how long before another rear is accepted
@@ -234,6 +235,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDampCeilingMs the latest, applied regardless of speed
 --   0 for the engine's own value
 -- @field DiagnoseMisses name the reason a nearby NPC produced no reaction
+-- @field RearTrace log the horse's position through the end of a rear
+-- @field RearSettleMs how long after a rear ends before the horse is measured
 -- @field Retaliation whether a victim shoved repeatedly at a walk can lose
 --   patience and fight back
 -- @field RetaliationFreeBumps how many walk impacts a victim tolerates before
@@ -476,7 +479,8 @@ HorseCollisionMod.Config = {
 	RearChargeKey            = "r",
 	RearActionMap            = "hcm_rear",
 	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
-	RearMaxSpeed             = 1.0,
+	RearIdleOnly             = true,
+	RearMaxSpeed             = 0.15,
 	RearCooldownMs           = 2500,
 	RearFragTag              = "hcm_rear_charge",
 	RearOnlyKey              = "q",
@@ -812,6 +816,25 @@ HorseCollisionMod.Config = {
 	-- never happened look identical. Off by default: it is noisy and only
 	-- useful while investigating.
 	DiagnoseMisses           = false,
+
+	-- Logs the horse's position every frame or so through the end of a rear,
+	-- splitting vertical from horizontal. Off for the same reason as the line
+	-- above, and more so: it writes about eighty lines per rear.
+	--
+	-- It exists because the end of a rear is a handover. The fragment's
+	-- `MovementControlMethod` gives the animation ownership of the horse's
+	-- position, and when the fragment ends the horse returns to its own
+	-- movement controller. Anything visible at that boundary is easier to read
+	-- off the position than to guess at from values.
+	-- Stops the horse dead the instant a rear begins, linear and angular.
+	-- Without it, turning and then rearing pushes the horse sideways: the
+	-- momentum it carried in is still there when the animation ends. Neither
+	-- `XyMove` nor `Rotate` in the fragment prevents this, in any combination.
+
+	-- How long after the action ends before the displacement is read back.
+	RearSettleMs             = 250,
+
+	RearTrace                = false,
 
 	-- Times every animation state a recovering victim passes through and
 	-- logs the sequence. Answers where a recovery spends its seconds, which

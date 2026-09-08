@@ -29,6 +29,35 @@ number.
 
 ## [Unreleased]
 
+## [4.20.0] - 2026-09-08
+
+### Added
+
+- `RearIdleOnly`, which requires the horse's own locomotion state to be idle
+  before a rear fires.
+
+### Changed
+
+- The rear no longer holds the horse for the third of a second after the
+  animation is visually over. The fragment now ends where the horse's feet come
+  down rather than where the clip runs out, cutting it from 2032 ms to about
+  1400 ms.
+- The charge reaches its lunge sooner for the same reason, 1408 ms down to
+  about 1050 ms.
+- `RearMaxSpeed` measures horizontal speed rather than the length of the whole
+  velocity vector, and is 0.15 rather than 1.0. A horse standing still reports
+  1 to 2 m/s because the reading carries its settling fall, so the old gate was
+  comparing against noise: it refused rears from a dead stop and admitted ones
+  that slid.
+
+### Fixed
+
+- A rear taken while the horse was still moving slid it about 0.12 m before the
+  animation took hold. A rear is a standing attack, and it now behaves like one.
+- Hitting someone no longer costs frames for the following ten seconds. The
+  wait that lets a downed victim recover was writing a log line on every pass
+  of the detection loop, several hundred per victim, and now writes one.
+
 ## [4.19.5] - 2026-09-07
 
 ### Fixed

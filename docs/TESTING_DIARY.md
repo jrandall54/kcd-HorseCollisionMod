@@ -17193,3 +17193,236 @@ to fire by reverting the manifest and watching it fail. Declaring one exact
 patch is never right for this mod: it overrides animation databases and depends
 on engine binds, so a guard against a major version earns its place, but a
 patch that touches none of that should not stop it loading.
+
+## A fragment can be ended at a chosen time
+
+The limit we had been working around: `ExitTime` on a Blend cuts the *previous*
+clip and `StartTime` skips into the *incoming* one, so the front of every clip
+is controllable and the tail of the last one is not. A fragment ends when its
+final clip runs out. For the charge that tail was pure dead time, because the
+lunge impulse cannot fire until the interactive action ends, and `StartTime`
+into the landing was a workaround that bought back the front of that clip only.
+
+The proposal on the table was to author an empty `.caf` and blend into it. No
+asset was needed. The engine's own loader already represents a clip with no
+animation.
+
+Reading `CAnimationDatabaseManager::LoadDatabase` in the decompilation:
+
+- An `SAnimClip` is 0x50 bytes, blend at 0x00 and animation at 0x18.
+- The clip index advances on `<Animation>` alone, never on `<Blend>`. A blend
+  and an animation are not one element; they are two writes into the same clip.
+- The blend reader parses five attributes, not four: `ExitTime`, `StartTime`,
+  `Duration`, `flags`, and **`terminal`**. The writer emits `terminal` only when
+  it is set, which is why no vanilla file shows one and why it had not been
+  noticed.
+
+So a blend paired with an empty animation is a clip that plays nothing, and
+`terminal` marks it as ending the sequence. Appended to the charge fragment's
+AnimLayer:
+
+    <Blend ExitTime="0.05" StartTime="0" Duration="0.1" terminal="1" />
+    <Animation name="" />
+
+Measured against the `ChargeForward ... after=` line, which is the delay from
+the key press to the impulse firing:
+
+    before, nine charges     1392, 1408, 1408, 1424, 1392, 1408, 1392, 1408, 1392 ms
+    after, three charges     1040, 1072, 1072 ms
+
+The animation database reload sits between the ninth and tenth charge in
+`kcd.log`, so the break is the change and nothing else. Around 350 ms removed,
+which matches the landing having run about 400 ms and being cut 50 ms in. No
+warning, no `Broken fragment entry`, nothing in the log at all.
+
+The empty `<Animation>` is load-bearing and not decoration. The clip array is
+sized `childCount / 2` for a fragment, so a trailing `<Blend>` on its own leaves
+five children, still sizes the array at two, and writes a third clip past the
+end of it. The pair keeps the count even and the write in bounds. A transition
+blend gets `childCount / 2 + 1` and so has room for a lone terminal blend; a
+fragment does not.
+
+`ExitTime="0.05"` was chosen to make the result unmistakable rather than to
+look right, and how much of the landing is worth keeping is a separate
+question from whether the mechanism works.
+
+### The same cut applied to the rear on the spot
+
+`hcm_rear` had no end-of-action instrument, because only the charge needs to
+wait for the action to finish before it can push. `LogActionEnd` gives the rear
+one, polling the same signal the charge's wait uses: the action owns the horse
+for exactly as long as `GetCurrentAnimationState` reads `AnimationControlled`.
+
+Measured before changing anything, six rears:
+
+    ActionEnd hcm_rear held=  2032, 2032, 2048, 2032, 2032, 2048 ms
+
+`relaxed_rearing` is 2064 ms, so the fragment was holding the horse for the
+entire clip including the last third where it stands on all fours doing
+nothing. That is the hang, and it was never cut by anything.
+
+A terminal clip at `ExitTime="1.4"`, eight rears:
+
+    ActionEnd hcm_rear held=  1392, 1424, 1424, 1440, 1408, 1392, 1440, 1392 ms
+
+About 630 ms removed, landing on the requested cut. A save load happened partway
+through and changed nothing, which is expected: loose animation databases are
+read at startup and `sys_PakPriority = 0` makes them win regardless. The charge
+measured 1056 to 1072 ms across the same reload, so neither fragment depends on
+the reload having been done by hand.
+
+No `Broken fragment entry`, no Mannequin warning, nothing logged at all for
+either fragment.
+
+Worth stating plainly, because it is now proven twice on two fragments: both
+ends of every clip are controllable, and the last clip's tail is no longer a
+fixed cost. Wherever a fragment's length was worked around rather than chosen,
+it can now be chosen.
+
+### The terminal blend's `Duration` is the handover, not just a crossfade
+
+Cutting `hcm_rear` at 1.4 s left a jerk shortly after the hooves came down.
+
+The cut is the moment the animation stops owning the horse's position and the
+horse returns to its own movement controller, so the `Duration` on the terminal
+blend is doing more than fading one clip into another: it is the length of that
+handover. At `0.2` the jerk was there. At `0.6`, matching the fragment's own
+`BlendOutDuration`, it is gone.
+
+`held=` is identical either way, 1392 to 1440 ms across sixteen rears spanning
+both values. So `Duration` on a terminal blend does not extend the fragment. It
+sets how the fragment lets go, and the fragment still ends at `ExitTime`. Those
+being independent is what makes the mechanism usable: the length of a rear and
+the smoothness of its exit are two separate numbers.
+
+The reading was not obvious from one look. The first few rears after the change
+read as unchanged, and the improvement was only clear after riding with it for a
+while, which is worth knowing before judging a blend value on two attempts.
+
+`RearTrace` was written to settle this by sampling the horse's position through
+the boundary, splitting vertical from horizontal, and was not needed. It stays
+off by default, alongside `DiagnoseMisses`, because the next question at this
+boundary will want it.
+
+### The dog fix does not work, measured while the bug was happening
+
+The horse being carried around on Mutt recurred, and was caught live rather
+than reconstructed. With the rider sitting on a horse that was resting on the
+dog:
+
+    dog   = (2515.49, 570.68, 76.94)
+    horse = (2515.45, 570.57, 77.54)
+    dz    = +0.600 m      horizontal distance = 0.12 m
+
+The horse is 60 cm above the dog and 12 cm off centre. It is standing on him.
+
+`DogIgnoresHorses` had already logged `ok=true` many times before this, so the
+mod's `collisionClassIgnore = gcc_horse` write had been applied and the horse
+climbed on anyway. Re-applying it live, with the horse still up there, moved
+the horse 1.8 cm in 700 ms — noise:
+
+    DOGFIX reapplied=true  horseZ_before=77.495
+    DOGFIX after 700ms     horseZ=77.478  dz=+0.580  drop=-0.018
+
+So collision class is not the mechanism by which a horse comes to rest on the
+dog, and the fix shipped for it does not do what it claims. The handoff called
+it "not confirmed, but promising"; it is now confirmed as not working, which is
+worth more than the guess was. `gcc_horse` reads back as 65536 and
+`SetPhysicParams` is present, so the call is real and lands.
+
+The next place to look is the horse's side: what a living entity's ground
+support actually queries, since that is evidently not filtered by the target's
+collision class. The rider can reproduce this on demand, which is the most
+valuable thing about the whole episode.
+
+### What the rear displacement is not
+
+Recorded because the negatives cost the session a lot of rides and should not
+be paid for twice.
+
+The rear pushes the horse sideways, worst when the horse is turned first and
+then reared. None of the following changes it, each tried in both directions
+and judged from the saddle:
+
+    ExitTime      1.4 and 1.75
+    Duration      0.2 and 0.6
+    Horizontal    2 (eMCM_Animation) and 1 (eMCM_Entity)
+    XyMove        1 and 0
+    Rotate        1 and 0
+
+Freeing `XyMove` also reproduces the 0.80 m of drift that parameter is on
+record for, so that half of the old note is confirmed and the parameter stays
+at 1. Zeroing the horse's linear and angular velocity with `SetVelocityEx` does
+not change it either, tried at the start of the rear and again at the release:
+the horse's movement controller re-issues velocity on the next frame.
+
+Two measurement mistakes are worth more than the negatives.
+
+The first probe wrote a log line per sample, about eighty synchronous writes
+spread across the animation being judged, and it stayed armed across several
+rounds of visual judgement. Values the rider had called smooth stopped looking
+smooth while it ran. Any probe used while something is judged by eye has to
+accumulate and write once at the end.
+
+The second was a window that was too long. Sampling the offset a full second
+after the fragment released produced readings up to 1.76 m ahead and 0.97 m to
+the side, which looked like a large push and was the rider riding away; one of
+them logged `state=MotionMovement`. It also produced a false correlation
+between entry speed and displacement that briefly justified tightening
+`RearMaxSpeed`, on a sample that entered at 0.09 m/s. The window is now 250 ms.
+
+The figure that has held steady through every one of the above is the offset
+while the fragment owns the horse: **0.06 to 0.15 m ahead and up to 0.16 m to
+the side.** That is the real signal and nothing has moved it yet.
+
+`RearMaxSpeed` now measures horizontal speed rather than the length of the full
+velocity vector. That is unrelated to the push and correct on its own account:
+`GetVelocity` on a stationary horse carries the vertical settling fall and
+reports 1 to 2 m/s, so a three dimensional length is mostly that noise and the
+gate was refusing rears from a dead stop.
+
+### The rear displacement was the opening 128 ms
+
+The horse being shifted sideways out of a rear was chased through the animation
+data for most of a session and was never there. Measured every 16 ms from the
+key press:
+
+    before    0:0.00  64:0.08  128:0.12  then flat 0.12 for the whole animation
+    after     0:0.00  64:0.01  128:0.01  and another reading -0.00 throughout
+
+The horse slides in the first 128 ms and is then frozen by the fragment for the
+remaining 1.3 seconds. Everything tried before this aimed at the end of the
+animation, which is why none of it moved the number: `ExitTime` at 1.4 and 1.75,
+`Duration` at 0.2 and 0.6, `Horizontal` at 1 and 2, `XyMove` at 0 and 1,
+`Rotate` at 0 and 1, and `SetVelocityEx` at the start, at the release, and held
+down every 16 ms across the opening window. None of them changed it.
+
+The rider is not displaced at all, which took separating the two entities to
+establish. The absolute seat offset, rider minus horse in the horse's frame,
+reads the same on four consecutive rears and returns to it every time:
+
+    seatAhead 0.04 -> -0.03      seatSide -0.00 -> 0.01
+
+An earlier reading that appeared to show the rider ending 0.16 m to the side
+was an artifact of comparing two displacements rather than measuring the seat.
+
+What fixes it is the standstill gate that already existed, set to a figure that
+means standstill. Entry speed separates the two cases exactly: every clean rear
+all session entered at 0.00, and 0.09, 0.11, 0.13 and 0.24 all slid. So
+`RearMaxSpeed` is 0.05 rather than 1.0.
+
+Two things had to be corrected to get there. The gate measured the length of
+the whole velocity vector, and `GetVelocity` on a stationary horse carries its
+settling fall and reports 1 to 2 m/s, so the reading was mostly vertical noise;
+it now measures horizontal speed only. And neither velocity source predicts the
+slide on its own: a rear entered at 0.11 m/s covered 0.12 m in 128 ms, which is
+0.94 m/s, so the horse accelerates once the rear begins. A position-derived
+speed was added for the gate to take the higher of the two, and the horse's
+`MotionIdle` state was added as a further condition, though on its own the state
+is not sufficient: a horse reporting `MotionIdle` still slid 0.08 m.
+
+The rider's verdict on the cost is that there is none, because the move is a
+standing attack:
+
+> "The point of a rear hitting someone is that you are standing still, it
+> doesn't even really make sense to do a rear on a horse that's turning."
