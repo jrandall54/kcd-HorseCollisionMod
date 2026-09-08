@@ -362,6 +362,121 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 	Script.SetTimer(cfg.RearChargeWaitMs or 400, waitForEnd)
 end
 
+--- Reports how long an interactive action held the horse.
+--
+-- The charge gets this figure for free, because it has to wait for the action
+-- to end before it can push and logs the wait as `after=`. The rear on the
+-- spot waits for nothing, so its tail was only ever judged by eye.
+--
+-- That matters because `relaxed_rearing` runs 2.06 s and spends its last third
+-- back on all fours doing nothing. Cutting that tail with a terminal blend
+-- means choosing an `ExitTime`, and choosing it by eye costs a ride per guess.
+--
+-- Same instrument as the charge's wait: the action owns the horse for exactly
+-- as long as `GetCurrentAnimationState` reads `AnimationControlled`.
+--
+-- @tparam table horseEnt the player's horse
+-- @tparam string tag the fragment tag that was started, for the log line
+function HorseCollisionMod:LogActionEnd(horseEnt, tag)
+	if not self.Config.LogTelemetry then
+		return
+	end
+
+	local generation = self.TimerTick
+	local started = self:TimeMs()
+	local deadline = started + (self.Config.RearChargeWaitCeilingMs or 3000)
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = "?"
+
+		pcall(function()
+			state = tostring(horseEnt.actor:GetCurrentAnimationState())
+		end)
+
+		if state ~= "AnimationControlled" or self:TimeMs() > deadline then
+			self:Log(string.format("ActionEnd %s held=%.0fms state=%s",
+					tostring(tag), self:TimeMs() - started, state))
+
+			return
+		end
+
+		Script.SetTimer(self.Config.RearChargeWaitPollMs or 30, poll)
+	end
+
+	-- Started after the same delay the charge uses, because the state does not
+	-- read back as `AnimationControlled` the instant the call returns and a
+	-- poll that begins too early ends immediately with a length of nothing.
+	Script.SetTimer(self.Config.RearChargeWaitMs or 400, poll)
+
+	self:TraceRearMotion(horseEnt)
+end
+
+--- Samples where the horse actually is, right through the end of a rear.
+--
+-- A jerk shortly after the hooves come down is not something a log line saying
+-- when the action ended can explain, and it is not the animation crossfade:
+-- lengthening that from 0.2 s to 0.6 s changed neither the look nor `held=`.
+--
+-- The remaining candidate is the handover. `MovementControlMethod` gives the
+-- animation ownership of the horse's position for the length of the fragment,
+-- and when the fragment ends the horse goes back to its own movement
+-- controller. That boundary is a discontinuity, and whether it is the one
+-- being seen is answerable by watching the position across it rather than by
+-- trying values.
+--
+-- Vertical and horizontal are kept apart deliberately. A settling drop and a
+-- positional snap look alike at speed and mean different things: the first is
+-- the horse falling the small distance the animation was holding it above the
+-- ground, the second is the engine reconciling a position physics disagreed
+-- with.
+--
+-- @tparam table horseEnt the player's horse
+function HorseCollisionMod:TraceRearMotion(horseEnt)
+	if not self.Config.RearTrace then
+		return
+	end
+
+	local generation = self.TimerTick
+	local started = self:TimeMs()
+	local stop = started + (self.Config.RearTraceMs or 2600)
+	local last = nil
+
+	local function sample()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local now = self:TimeMs()
+
+		pcall(function()
+			local p = horseEnt:GetWorldPos()
+			local state = tostring(horseEnt.actor:GetCurrentAnimationState())
+
+			if last then
+				local dx = p.x - last.x
+				local dy = p.y - last.y
+
+				self:Log(string.format(
+						"RearTrace t=%.0f dz=%+.4f dxy=%.4f z=%.3f state=%s",
+						now - started, p.z - last.z,
+						math.sqrt((dx * dx) + (dy * dy)), p.z, state))
+			end
+
+			last = { x = p.x, y = p.y, z = p.z }
+		end)
+
+		if now < stop then
+			Script.SetTimer(self.Config.RearTracePollMs or 32, sample)
+		end
+	end
+
+	sample()
+end
+
 --- Rears the horse.
 --
 -- The horse plays its own `relaxed_rearing` clip and the rider stays in the
@@ -421,6 +536,8 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 		Script.SetTimer(self.Config.RearStrikeMs or 700, function()
 			self:RearStrike(horseEnt)
 		end)
+
+		self:LogActionEnd(horseEnt, tag)
 	end
 
 	if self.Config.LogTelemetry then

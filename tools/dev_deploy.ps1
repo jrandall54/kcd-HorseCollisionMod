@@ -433,7 +433,24 @@ if ($RestoreDevEnvironment) {
 		Write-Host "[DEPLOY] restored $rel"
 	}
 
-	Remove-Item $park -Recurse -Force -ErrorAction SilentlyContinue
+	# Only the manifest and what it listed are ours to delete. The park is a
+	# plain folder inside the game install and things get put there by hand:
+	# a restore that removed the whole tree destroyed a folder of parked
+	# scripts that no manifest ever mentioned, and said nothing about it.
+	Remove-Item $manifest -Force -ErrorAction SilentlyContinue
+
+	$leftovers = @(Get-ChildItem $park -Force -ErrorAction SilentlyContinue)
+
+	if ($leftovers.Count -eq 0) {
+		Remove-Item $park -Recurse -Force -ErrorAction SilentlyContinue
+	} else {
+		Write-Host "[DEPLOY] $parkedDir kept; it holds $($leftovers.Count) item(s) no manifest listed:" -ForegroundColor Yellow
+
+		foreach ($item in $leftovers) {
+			Write-Host "         $($item.Name)" -ForegroundColor Yellow
+		}
+	}
+
 	Set-CfgValues -Root $gameRoot -Which "Dev"
 	Write-Host "[DEPLOY] development environment restored. Restart the game."
 	exit 0

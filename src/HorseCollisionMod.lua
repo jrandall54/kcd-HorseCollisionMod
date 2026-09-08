@@ -813,6 +813,19 @@ HorseCollisionMod.Config = {
 	-- useful while investigating.
 	DiagnoseMisses           = false,
 
+	-- Logs the horse's position every frame or so through the end of a rear,
+	-- splitting vertical from horizontal. Off for the same reason as the line
+	-- above, and more so: it writes about eighty lines per rear.
+	--
+	-- It exists because the end of a rear is a handover. The fragment's
+	-- `MovementControlMethod` gives the animation ownership of the horse's
+	-- position, and when the fragment ends the horse returns to its own
+	-- movement controller. Anything visible at that boundary is easier to read
+	-- off the position than to guess at from values.
+	RearTrace                = false,
+	RearTraceMs              = 2600,
+	RearTracePollMs          = 32,
+
 	-- Times every animation state a recovering victim passes through and
 	-- logs the sequence. Answers where a recovery spends its seconds, which
 	-- a single duration cannot. Off by default: one line per impact and a

@@ -17193,3 +17193,113 @@ to fire by reverting the manifest and watching it fail. Declaring one exact
 patch is never right for this mod: it overrides animation databases and depends
 on engine binds, so a guard against a major version earns its place, but a
 patch that touches none of that should not stop it loading.
+
+## A fragment can be ended at a chosen time
+
+The limit we had been working around: `ExitTime` on a Blend cuts the *previous*
+clip and `StartTime` skips into the *incoming* one, so the front of every clip
+is controllable and the tail of the last one is not. A fragment ends when its
+final clip runs out. For the charge that tail was pure dead time, because the
+lunge impulse cannot fire until the interactive action ends, and `StartTime`
+into the landing was a workaround that bought back the front of that clip only.
+
+The proposal on the table was to author an empty `.caf` and blend into it. No
+asset was needed. The engine's own loader already represents a clip with no
+animation.
+
+Reading `CAnimationDatabaseManager::LoadDatabase` in the decompilation:
+
+- An `SAnimClip` is 0x50 bytes, blend at 0x00 and animation at 0x18.
+- The clip index advances on `<Animation>` alone, never on `<Blend>`. A blend
+  and an animation are not one element; they are two writes into the same clip.
+- The blend reader parses five attributes, not four: `ExitTime`, `StartTime`,
+  `Duration`, `flags`, and **`terminal`**. The writer emits `terminal` only when
+  it is set, which is why no vanilla file shows one and why it had not been
+  noticed.
+
+So a blend paired with an empty animation is a clip that plays nothing, and
+`terminal` marks it as ending the sequence. Appended to the charge fragment's
+AnimLayer:
+
+    <Blend ExitTime="0.05" StartTime="0" Duration="0.1" terminal="1" />
+    <Animation name="" />
+
+Measured against the `ChargeForward ... after=` line, which is the delay from
+the key press to the impulse firing:
+
+    before, nine charges     1392, 1408, 1408, 1424, 1392, 1408, 1392, 1408, 1392 ms
+    after, three charges     1040, 1072, 1072 ms
+
+The animation database reload sits between the ninth and tenth charge in
+`kcd.log`, so the break is the change and nothing else. Around 350 ms removed,
+which matches the landing having run about 400 ms and being cut 50 ms in. No
+warning, no `Broken fragment entry`, nothing in the log at all.
+
+The empty `<Animation>` is load-bearing and not decoration. The clip array is
+sized `childCount / 2` for a fragment, so a trailing `<Blend>` on its own leaves
+five children, still sizes the array at two, and writes a third clip past the
+end of it. The pair keeps the count even and the write in bounds. A transition
+blend gets `childCount / 2 + 1` and so has room for a lone terminal blend; a
+fragment does not.
+
+`ExitTime="0.05"` was chosen to make the result unmistakable rather than to
+look right, and how much of the landing is worth keeping is a separate
+question from whether the mechanism works.
+
+### The same cut applied to the rear on the spot
+
+`hcm_rear` had no end-of-action instrument, because only the charge needs to
+wait for the action to finish before it can push. `LogActionEnd` gives the rear
+one, polling the same signal the charge's wait uses: the action owns the horse
+for exactly as long as `GetCurrentAnimationState` reads `AnimationControlled`.
+
+Measured before changing anything, six rears:
+
+    ActionEnd hcm_rear held=  2032, 2032, 2048, 2032, 2032, 2048 ms
+
+`relaxed_rearing` is 2064 ms, so the fragment was holding the horse for the
+entire clip including the last third where it stands on all fours doing
+nothing. That is the hang, and it was never cut by anything.
+
+A terminal clip at `ExitTime="1.4"`, eight rears:
+
+    ActionEnd hcm_rear held=  1392, 1424, 1424, 1440, 1408, 1392, 1440, 1392 ms
+
+About 630 ms removed, landing on the requested cut. A save load happened partway
+through and changed nothing, which is expected: loose animation databases are
+read at startup and `sys_PakPriority = 0` makes them win regardless. The charge
+measured 1056 to 1072 ms across the same reload, so neither fragment depends on
+the reload having been done by hand.
+
+No `Broken fragment entry`, no Mannequin warning, nothing logged at all for
+either fragment.
+
+Worth stating plainly, because it is now proven twice on two fragments: both
+ends of every clip are controllable, and the last clip's tail is no longer a
+fixed cost. Wherever a fragment's length was worked around rather than chosen,
+it can now be chosen.
+
+### The terminal blend's `Duration` is the handover, not just a crossfade
+
+Cutting `hcm_rear` at 1.4 s left a jerk shortly after the hooves came down.
+
+The cut is the moment the animation stops owning the horse's position and the
+horse returns to its own movement controller, so the `Duration` on the terminal
+blend is doing more than fading one clip into another: it is the length of that
+handover. At `0.2` the jerk was there. At `0.6`, matching the fragment's own
+`BlendOutDuration`, it is gone.
+
+`held=` is identical either way, 1392 to 1440 ms across sixteen rears spanning
+both values. So `Duration` on a terminal blend does not extend the fragment. It
+sets how the fragment lets go, and the fragment still ends at `ExitTime`. Those
+being independent is what makes the mechanism usable: the length of a rear and
+the smoothness of its exit are two separate numbers.
+
+The reading was not obvious from one look. The first few rears after the change
+read as unchanged, and the improvement was only clear after riding with it for a
+while, which is worth knowing before judging a blend value on two attempts.
+
+`RearTrace` was written to settle this by sampling the horse's position through
+the boundary, splitting vertical from horizontal, and was not needed. It stays
+off by default, alongside `DiagnoseMisses`, because the next question at this
+boundary will want it.
