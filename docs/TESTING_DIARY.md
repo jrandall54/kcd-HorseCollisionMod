@@ -17467,3 +17467,28 @@ So the bug stays and everything aimed at it is removed. What a future attempt
 should not do is start from collision classes, and what it would need is the
 living entity's ground query itself, or the dog's collider not being a surface
 a ground query accepts.
+
+### The dog-carrying bug is vanilla, ruled out rather than assumed
+
+Whether the mod caused it was tested properly instead of argued about. The
+install was put into shipping configuration with `-PrepareShippingTest`: every
+loose script, animation database and config file the mod installs was parked,
+the mod folder was removed from `Mods`, `mod_order.txt` was cut back to the one
+unrelated mod, `sys_PakPriority` returned to 2, and the game was launched with
+no `-devmode`. Verified afterwards that nothing matching the mod's name
+remained anywhere under `Data`.
+
+The rider walked the horse onto the dog immediately.
+
+So the mod does not cause it. Worth stating plainly because the reasoning that
+nearly stood in for this test was wrong twice over: first a suggestion to see
+whether removing the failed fix made the bug go away, when the bug is older
+than the fix and the fix was written in response to it; and then a claim that
+the setup was rare enough to explain why nobody has reported it, when the rider
+can climb the dog on demand by walking at him.
+
+That last point is unresolved and worth keeping. The bug is trivially
+reproducible and there is no report of it anywhere, in either game. Standing on
+other creatures is documented in vanilla, on the official forum, as far back as
+October 2014 and again for horse saddles and overlapping NPCs, so the class of
+bug is real and old. Why this particular case draws no comment is not known.
