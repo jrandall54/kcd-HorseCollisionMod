@@ -98,6 +98,18 @@
 	<td class="summary">Drives the charge forward with physics once the rear has finished.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:StillTheHorse">HorseCollisionMod:StillTheHorse (horseEnt)</a></td>
+	<td class="summary">Takes the horse's momentum away before a rear begins.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:LogActionEnd">HorseCollisionMod:LogActionEnd (horseEnt, tag)</a></td>
+	<td class="summary">Reports how long an interactive action held the horse.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:TraceRearMotion">HorseCollisionMod:TraceRearMotion (horseEnt)</a></td>
+	<td class="summary">Samples where the horse actually is, right through the end of a rear.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:RearHorse">HorseCollisionMod:RearHorse (horseEnt)</a></td>
 	<td class="summary">Rears the horse.</td>
 	</tr>
@@ -286,6 +298,120 @@
 <p> Waited for rather than timed, because the action's length is not fixed and
  an impulse applied while it still holds the horse is stored and discharged
  later.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:StillTheHorse"></a>
+    <strong>HorseCollisionMod:StillTheHorse (horseEnt)</strong>
+    </dt>
+    <dd>
+    Takes the horse's momentum away before a rear begins. </p>
+
+<p> Turning the horse and then rearing pushes it sideways, reproducibly, mostly
+ in the direction of the turn. The obvious explanation was that the fragment
+ suppresses a channel for its length and releases it at the end, so both
+ channels were handed back one at a time: <code>Rotate</code> at 0, then <code>XyMove</code> at 0.
+ The push survives every combination of the two, and freeing <code>XyMove</code> also
+ brings back the 0.80 m of drift that parameter is on record for. So the
+ fragment is not withholding anything. The horse is genuinely still moving.</p>
+
+<p> Which is the rider's own reading of it, and the reason to fix it here rather
+ than in the animation data. Their suggestion was to refuse the rear unless
+ the horse is completely stopped. Killing the momentum does the same job to
+ the physics without that cost: a rear that only works from a standstill is a
+ different move than the one the key is bound to, and the mechanic's contract
+ with the player is not the thing to trade away for a defect.</p>
+
+<p> <code>SetVelocityEx</code> takes linear and angular velocity together, which is what
+ vanilla's own scripts use to stop something dead. Both are needed: the push
+ follows the turn, so there is angular momentum in it as well as linear.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:LogActionEnd"></a>
+    <strong>HorseCollisionMod:LogActionEnd (horseEnt, tag)</strong>
+    </dt>
+    <dd>
+    Reports how long an interactive action held the horse. </p>
+
+<p> The charge gets this figure for free, because it has to wait for the action
+ to end before it can push and logs the wait as <code>after=</code>. The rear on the
+ spot waits for nothing, so its tail was only ever judged by eye.</p>
+
+<p> That matters because <code>relaxed_rearing</code> runs 2.06 s and spends its last third
+ back on all fours doing nothing. Cutting that tail with a terminal blend
+ means choosing an <code>ExitTime</code>, and choosing it by eye costs a ride per guess.</p>
+
+<p> Same instrument as the charge's wait: the action owns the horse for exactly
+ as long as <code>GetCurrentAnimationState</code> reads <code>AnimationControlled</code>.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+        <li><span class="parameter">tag</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the fragment tag that was started, for the log line
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:TraceRearMotion"></a>
+    <strong>HorseCollisionMod:TraceRearMotion (horseEnt)</strong>
+    </dt>
+    <dd>
+    Samples where the horse actually is, right through the end of a rear. </p>
+
+<p> A jerk shortly after the hooves come down is not something a log line saying
+ when the action ended can explain, and it is not the animation crossfade:
+ lengthening that from 0.2 s to 0.6 s changed neither the look nor <code>held=</code>.</p>
+
+<p> The remaining candidate is the handover. <code>MovementControlMethod</code> gives the
+ animation ownership of the horse's position for the length of the fragment,
+ and when the fragment ends the horse goes back to its own movement
+ controller. That boundary is a discontinuity, and whether it is the one
+ being seen is answerable by watching the position across it rather than by
+ trying values.</p>
+
+<p> Vertical and horizontal are kept apart deliberately. A settling drop and a
+ positional snap look alike at speed and mean different things: the first is
+ the horse falling the small distance the animation was holding it above the
+ ground, the second is the engine reconciling a position physics disagreed
+ with.
 
 
     <h3>Parameters:</h3>
@@ -567,7 +693,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-07 20:21:04 </i>
+<i style="float:right;">Last updated 2026-09-08 09:45:40 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
