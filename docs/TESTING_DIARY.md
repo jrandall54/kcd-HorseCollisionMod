@@ -17682,3 +17682,31 @@ Which tiers reach any of this: gallop and charge always, since both call
 `Ragdoll`. Trot and rear only if their reaction setting is `ragdoll`, and the
 shipped default for both is `fall`, which plays an animation and never
 physicalizes the victim.
+
+## 5.0.0 verification run
+
+Dozens of impacts across Rattay, gallop and lunge mixed, on the packaged 5.0.0
+behaviour after the instruments were removed.
+
+Throws: 45 damped, 43 exiting `grounded` and 2 on the failsafe ceiling, which is
+the path the parameter release was added to on this branch and had not been
+exercised before. No floating bodies. The highest air peak of the run was 14.67
+and it was braked like the rest.
+
+Charges: 11, every one closing on decay rather than on the ceiling, between
+128 ms and 288 ms, with the horse covering 0.44 m to 1.69 m in that window.
+
+The killing-blow preempt fired once and is worth recording because it is the
+case the whole mechanism exists for:
+
+    ImpactCost   rat_guard8 t+500ms from=79.5187 health=0.0000 delta=-79.5187
+    ImpactDamage rat_guard8 tier=Charge preempted=true
+
+A guard on 79.5 health. The mod judged the charge lethal by anyone's hand before
+the wait and finished him itself, rather than waiting and letting the engine's
+trample land the kill and the crime with it.
+
+The run ended with the rider dying instantly at full health on a lunge, which
+they had never seen before. It is recorded as an open issue in `ROADMAP.md` and
+is not explained; the mod logs nothing about the player's health, so there is no
+evidence in the log beyond the absence of any `Retaliation` line.

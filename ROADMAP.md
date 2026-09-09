@@ -959,3 +959,32 @@ wrecking the body the way `RagDollize` wrecks a pose.
 
 The instrument that produced the evidence above, `TraceHealthLoss`, was removed
 before 5.0.0 shipped. It is in the history if it is wanted again.
+
+
+## Open issue: a lunge killed the rider outright, once
+
+Seen once, in the 5.0.0 verification run, after riding down dozens of people in
+Rattay with a mix of gallop and lunge. The rider was at **full health** and died
+instantly on a lunge. They have never seen it before in the whole project, so it
+is rare rather than a regression that would show up on the next ride.
+
+**It is not explained and nothing should be built on a guess about it.** What is
+known is only this:
+
+- The mod logs nothing about the player's health, so there is no record of the
+  death in `kcd.log` at all. This is the first thing to change if it recurs.
+- The mod did not start the fight. There are zero `Retaliation` lines in the
+  entire run, and `RetaliationPullsRiderDown` was off in the testing world.
+- The last charge before it was the fastest of the run:
+  `ChargeWindow spent peak=13.48 spike=13.53 now=3.70 moved=1.69 after=208ms`.
+  That is recorded as a fact about the run and not as a cause.
+- The charge drives the horse forward physically and collides with the world
+  rather than passing through it, so a wall at speed is reachable in principle.
+  Nothing observed says that is what happened.
+
+Full health to dead in one event rules out accumulated damage and points at
+something resolving as a single large hit or a fall. Instrumenting the rider's
+own health across a lunge is the obvious first step, and it is cheap: one line
+per lunge, accumulated, following the pattern the throw traces used.
+
+Until it is seen a second time there is nothing to reproduce.
