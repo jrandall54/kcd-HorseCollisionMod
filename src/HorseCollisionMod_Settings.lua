@@ -182,6 +182,7 @@ HorseCollisionModSettings = {
 	RearReach                = 2.0,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse
+	RearChargeStaminaCost    = 22.0,  -- what a landed charge costs the horse
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance
@@ -246,7 +247,13 @@ HorseCollisionModSettings = {
 	-- is its own to attribute, which only works while the engine cannot kill on
 	-- its own. Its collision charges between 7 and 21, so a victim already hurt
 	-- dies to it inside the window and the rider is charged with murder.
-	ImpactDamageRushBelow    = 35,
+
+	-- The most the engine's own trample takes on each tier, measured from the
+	-- log rather than chosen. When the mod's damage would leave a remainder this
+	-- small, the mod finishes the victim so the kill is not the engine's.
+	ImpactDamageEngineCeiling = {
+		Walk = 0.0, Rear = 0.0, Trot = 12.0, Gallop = 36.0, Charge = 62.0
+	},
 	ImpactDamageReclaimCeiling = 60,   -- never give back more than this at once
 
 	ImpactDamageArmorScale   = 0.6,   -- smash_def past the ignored figure that halves damage

@@ -419,6 +419,45 @@ kg, where the mod's own knockdown impulse stops being negligible and adds up to
 4.34 m/s to a body the horse has already launched. Those victims travel twelve
 meters and more, which does not read as a person being hit by a horse.
 
+### Ending a throw
+
+A thrown body left to the engine slides until friction stops it, which is much
+further than a person struck by a horse should travel and varies wildly with
+the ground. `DampVictim` ends the throw instead, through two brakes that answer
+different questions, and then gets out of the way.
+
+**The grounded brake** arms when `IsColliding` reads true for
+`RagdollDampContactRun` samples in a row, and ramps the damping in over
+`RagdollDampRampSamples` more rather than applying it at once. Landed and
+stopped are two separate facts: speed alone fires whenever a tumbling body dips
+below a threshold, measured anywhere from 736 ms to 2848 ms, and contact alone
+fires on a body skidding at 8.6 m/s in front of the rider. Applying the full
+figure the instant a body lands reads as braking, so it comes in gradually.
+
+**The air brake** covers the window the grounded brake cannot reach. The first
+three or four samples of a long throw are exactly the ones that report no
+contact, and that is where the distance is. Above `RagdollSpeedSoftCap` the mod
+applies drag proportional to how far over the cap the body is, scaled across
+`RagdollSpeedSoftCapSpan` and released again below it. Drag rather than a
+velocity clamp, because a hard ceiling applied every frame reads as the body
+hitting an invisible wall.
+
+The cap was first set at 9.0 on the theory that the far throws were victims
+launched into the air. They were not, and it fired on nothing. Pairing the
+contact string against the speed trace, one sample per column, settled it: a
+launch holds 8 to 9 m/s across its uncontacted samples while a short throw
+never passes 3.9, so 4.0 separates them.
+
+**Both are released when the watch ends.** `damping` and `min_energy` are
+persistent fields of `pe_simulation_params`, not a one-shot effect, so a body
+damped once carries them for the rest of its existence unless something takes
+them back. `min_energy` is the threshold below which physics puts a body to
+sleep, and at 1.0 that is anything slower than roughly 1.4 m/s. A corpse still
+carrying it that the horse nudges into the air drops under the threshold near
+the top of the arc and sleeps holding that position, which is a body floating
+in mid-air until something wakes it. The release runs at both exits of the
+watch, the settled one and the failsafe ceiling.
+
 ### Stamina
 
 A full horse stamina pool is 210. At the current values a gallop costs roughly
@@ -568,8 +607,16 @@ it.
 
 ## Collision damage
 
-The mod contains no damage code. Health lost to a knockdown is the engine's,
-and it comes from one parameter:
+Two things damage a victim, and only one of them is the mod's.
+
+The engine's share is described below and cannot be seen, stopped or attributed
+from Lua. The mod's own share is `ApplyImpactDamage`, dealt from
+`ImpactDamageByTier`, and it exists so that the mod rather than the engine owns
+the killing blow. Which of the two lands last decides who the game blames, so
+that ordering is a feature and not an implementation detail; it is described
+under **Owning the killing blow** below.
+
+Health lost to a knockdown by the engine comes from one parameter:
 
 ```
 Libs/Tables/rpg/rpg_param.xml
@@ -598,6 +645,44 @@ Overriding the parameter is rejected. It is a single global value read by
 everything that resolves a physical collision, including the player's own, and
 shipping `rpg_param.xml` reintroduces the whole-file conflict surface additive
 deployment removed.
+
+### Owning the killing blow
+
+A kill the engine resolves is attributed to the rider, and `CollisionIsCrime`
+has no reach over it: the switch gates `SendCombatHit`, so with it off the mod
+reports no collision, but the engine's trample is not the mod's to withhold.
+Suppression therefore follows the killing blow rather than the setting. An
+armored victim finished by repeated trampling, where the mod's contribution is
+not what ends them, still raises a flag with the switch off.
+
+`ApplyImpactDamage` normally waits for the trample to settle so its own damage
+lands last. That is not sufficient on its own, because a victim already hurt
+can be finished by the trample during the wait. So the question is answered
+before the wait rather than during it: is this impact going to be lethal at
+all, by anyone's hand.
+
+```
+if damage >= atImpact then          -- already fatal, do not wait
+elseif (atImpact - damage) <= ceiling[tier] then
+    damage = atImpact + overkill    -- the engine could finish it, so finish it
+end
+```
+
+`ImpactDamageEngineCeiling` is a table rather than a single number, because the
+engine's trample scales with the collision and one figure is wrong in both
+directions. The values are the largest seen over 136 logged impacts, rounded
+up: rear 0.0, trot 9.2, gallop 33.1, charge 58.5, carried as
+`Walk 0, Rear 0, Trot 12, Gallop 36, Charge 62`.
+
+Damage variance is overruled in the same spirit. The dealt figure is
+`intended * spread`, and a roll that turns a fatal blow non-fatal hands the
+kill back to the engine, so when `intended` would have killed the roll does not
+stand.
+
+An earlier setting, `ImpactDamageRushBelow`, asked instead how hurt the victim
+already was. What matters instead is the size of the remainder against what
+the engine can take, and its threshold was never measured. It was removed in
+5.0.0.
 
 ## The auto-cure daycycle
 
@@ -1018,9 +1103,43 @@ per charge.
 
 `Charge` is a tier in its own right rather than a gallop wearing another name.
 It has its own damage in `ImpactDamageByTier`, its own sound in
-`ImpactSoundCharge`, and its own dust, camera shake, view blur and throw
-scalar. Nothing about it can be tuned by changing what an ordinary collision
-does, or the reverse.
+`ImpactSoundCharge`, its own stamina in `RearChargeStaminaCost`, its own victim
+lockout in `RearChargeVictimLockMs`, and its own dust, camera shake, view blur
+and throw scalar. Nothing about it can be tuned by changing what an ordinary
+collision does, or the reverse.
+
+Keeping that separation took removing an explicit alias. The detection loop used
+to set `tierName = "Gallop"` whenever a charge was in progress; it now returns
+instead, so the loop stays out of a lunge entirely and `ChargeStrike` owns it
+end to end. Two things had been resting on the alias. The charge received a
+gallop's stamina as a side effect of being counted as one, which is why it now
+pays its own. And the corridor sweep honored no existing contact while
+recording one, so with the loop also running each victim was scored twice; the
+sweep now consults `ImpactIsNewContact` like every other path.
+
+The victim lockout is gated on the tier for the same reason. It was written for
+the charge but sat unconditionally in a function both the rear and the charge
+call, so an ordinary rear held its victim out of every impact for 2.6 seconds.
+
+### When the lunge is over
+
+A stopwatch cannot say when a lunge is over. Three numbers governed the window
+before this and had to agree with each other: a `SpeedWalk` threshold, a floor
+of 1200 ms and a ceiling of 2600. None of them described the lunge, so the horse
+went on striking people after it was already slowing.
+
+`WatchLunge` closes the window when the lunge itself is spent. It starts at the
+push rather than at the key press, tracks the horse's peak speed, and closes
+when speed decays to `RearChargeLungeSpentAt` of that peak.
+`RearChargeLungePeakMin` is the speed a lunge has to reach before it can be
+judged spent at all. The 2600 ms remains as a ceiling and nothing else.
+
+The peak is taken as the larger of each neighbouring pair rather than any single
+sample. Derived horse speed throws occasional 21 to 28 m/s readings, and half of
+a spike is reached by the next ordinary sample, so the first version of this
+closed every window inside 200 ms. A healthy lunge reads as
+`peak=13.4 spike=13.5 moved=2.1 after=256ms`: about two meters in a quarter
+second off a 13 m/s peak.
 
 Its sound drops `n_lu_log_ground`, which an ordinary gallop uses, and adds
 hoofsteps. `hs_hp_soil` ignores position and plays at a fixed level, which is

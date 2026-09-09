@@ -17542,3 +17542,171 @@ Two things seen and not chased. A victim who did not move at all turned out to
 be standing against a fence. And jumping the horse into a victim at the moment
 of impact launches the horse high into the air, which is not realistic and looks
 exploitable.
+
+## Why unarmored victims are sometimes launched, and what it is not
+
+The report was that unarmored NPCs have a random chance of being thrown far
+further than usual, with no apparent pattern from the saddle. The rider tested
+varying approach angles and holding forward and backward while lunging and saw
+no correlation by eye.
+
+The distances are real. Over 66 charge and 10 gallop impacts on victims under
+200 kg:
+
+    tier      n     mean     max
+    Gallop    10    7.07     17.58
+    Charge    66    3.32     18.87
+    Trot       2    0.12      0.18
+    Walk       5    0.14      0.29
+
+So it is not the charge. Both knockdown tiers do it, and the gallop mean is
+higher because the gallop's tier scalar is 1.00 against the charge's 0.70.
+
+### Ruled out
+
+- **The horse's speed.** Every charge peaks within 12.7 to 13.7 m/s while the
+  throws off those charges range from 0.07 m to 18.87 m. A near-constant input
+  cannot produce a 250x spread.
+- **The occasional 26 to 28 m/s reading** in the derived horse speed. Those are
+  sampling artifacts, confirmed by pairing them with outcomes: `spike=28.04`
+  produced throws of 0.48, 0.21 and 0.06.
+- **The victim's animation state at impact.** `MotionIdle` produced 0.42 and
+  8.54; `ADLG` produced 0.61 and 11.44.
+- **The victim's mass alone.** A 22 kg victim went 7.09 and a 42 kg one went
+  0.42. Mass raises the average but does not explain the variance.
+- **When the body is physicalized.** `Mass ... atMs=16` on every impact in the
+  log without exception.
+- **Where the strike lands relative to the horse.** `ChargeStrike` was
+  temporarily instrumented with the along-axis distance, the lateral offset and
+  the height difference at the moment of the hit. Across 28 strikes none of the
+  three relates to distance: 7.57 m came from `ahead=1.18` and 0.36 m from
+  `ahead=1.36`. The instrument was removed afterwards.
+
+### What is established
+
+Launches are the victims who stay off the ground. Every throw over 10 m had at
+least three leading samples with no ground contact; nothing with two or fewer
+exceeded 8.7 m. Half a second after impact a launched victim is still at or
+above their starting height, while an ordinary one has already dropped half a
+meter to a meter.
+
+    thrown    dz at 500 ms    damping engaged
+    18.87     +0.90           2208 ms
+    17.58     +0.09           2368 ms
+    11.44     -0.03           1952 ms
+     8.69     -1.10           1600 ms
+     1.60     -0.56           1136 ms
+
+That matters because `DampVictim` waits for three consecutive ground contacts
+before it ramps. A body in flight is never damped, so nothing arrests it for the
+whole arc and the damping only begins once it lands, by which point it is
+already 18 m away.
+
+What lifts them is contact geometry inside the engine's collision solver. There
+is no bind that reports a contact normal, so it is not readable, and the mod
+does not apply enough vertical impulse to account for it: `Uplift` delivers dv
+of 0.02 to 0.97 m/s, which is a couple of centimeters of height.
+
+The mod's causal contribution is that `actor:Fall` makes them a physics body at
+all. Before that they are an animated actor and the horse shoves past them,
+which is why the walk tier throws nobody: five walk impacts averaged 0.14 m.
+
+## The air brake stops the long slides
+
+`DampVictim` gained a second brake that does not wait for ground contact:
+`RagdollSpeedSoftCap = 4.0`, `RagdollSpeedSoftCapSpan = 3.0`,
+`RagdollAirDamping = 8.0`. Above the cap it applies damping proportional to how
+far past the cap the body is, and releases again below it. Drag rather than a
+velocity ceiling, because a hard clamp reads in game as the body hitting an
+invisible wall.
+
+The cap sat at 9.0 for two rounds and fired on nothing, because 9 is above the
+entire phenomenon. Pairing the contact string with the speed trace, one sample
+per column, is what settled the number: a launch spends its first three or four
+samples at 8 to 9 m/s with no ground contact, which is most of the distance
+gone before the grounded damping can arm, while a short throw never passes
+3.9 m/s. 4.0 separates them.
+
+Judged in game over fourteen throws on unarmored villagers, first person. The
+rider saw no long throws at all. The brake fired on thirteen of the fourteen,
+the exception being a victim whose peak was 3.9 and therefore below the cap.
+
+    victim                airPeak  airBraked  speeds
+    rat_swordsmiths_wife    13.00      3      12.5,13.0,7.0,3.2,1.4,0.6,0.2
+    rat_konyas_wife         12.33      2      12.3,8.2,3.1,0.7,0.2,0.0
+    rat_woman21              9.64      5      9.6,9.0,8.6,8.6,5.8,3.8,2.2
+    rat_woman34              6.28      4      6.3,5.5,5.3,5.0,2.9,2.3,2.0,1.7
+    rat_man97                0.00      0      2.7,2.8,3.2,3.9,1.0,0.6,0.2
+
+Every throw was over between 1104 ms and 1696 ms. Before this, a launched body
+held around 8.4 m/s flat for three samples with nothing acting on it.
+
+The failure this could have introduced did not happen: no body stops dead when
+it touches the ground. `rat_woman34` above bleeds off across eleven samples,
+which is a decay and not a wall, so 8.0 is not too much drag.
+
+## Corpses floated because the mod never took its physics parameters back
+
+The rider rode down a crowd with gallops and lunges and found bodies hanging in
+the air after death. Striking one dropped it to the ground.
+
+`DampVictim` writes `damping = 5.0` and `min_energy = 1.0` through
+`SetPhysicParams(PHYSICPARAM_SIMULATION, ...)`. Both are persistent parameters
+on the body, not a one-shot effect, and nothing removed them once the slide they
+exist to end was over. `Ragdoll` clears them with the same call, but only when
+that victim is struck a second time, which most bodies never are.
+
+`min_energy` is the threshold below which physics puts a body to sleep. At 1.0
+that is anything slower than roughly 1.4 m/s. A corpse carrying it gets nudged
+into the air by the horse, drops under the threshold near the top of the arc,
+and sleeps holding that position. A sleeping body ignores impulses and parameter
+writes until something wakes it, which is why hitting one made it fall. The
+mechanism was already documented in `Ragdoll`, as the reason a victim struck
+while down took a commanded 3.00 m/s and moved eight centimeters.
+
+The fix releases both to 0 at the settled exit of the damping watch, once the
+ramp has finished and the body has stopped, so the corpse is handed back to the
+engine's own sleep rules.
+
+Judged in game over a run that killed most of Rattay with a mix of gallop and
+lunge: no floating bodies at all. 110 throws reached the `grounded` exit that
+performs the release, against one that hit the failsafe ceiling.
+
+Two things this leaves. The `Damped` line still prints `damping=5.00
+minEnergy=1`, because it is written at the `apply` call that precedes the
+release, so it describes the state during the slide and not the state the corpse
+is left in. And the `ceiling` exit does not release, so a body still moving when
+the failsafe fires keeps both parameters; that was 1 impact in 111.
+
+Which tiers reach any of this: gallop and charge always, since both call
+`Ragdoll`. Trot and rear only if their reaction setting is `ragdoll`, and the
+shipped default for both is `fall`, which plays an animation and never
+physicalizes the victim.
+
+## 5.0.0 verification run
+
+Dozens of impacts across Rattay, gallop and lunge mixed, on the packaged 5.0.0
+behaviour after the instruments were removed.
+
+Throws: 45 damped, 43 exiting `grounded` and 2 on the failsafe ceiling, which is
+the path the parameter release was added to on this branch and had not been
+exercised before. No floating bodies. The highest air peak of the run was 14.67
+and it was braked like the rest.
+
+Charges: 11, every one closing on decay rather than on the ceiling, between
+128 ms and 288 ms, with the horse covering 0.44 m to 1.69 m in that window.
+
+The killing-blow preempt fired once and is worth recording because it is the
+case the whole mechanism exists for:
+
+    ImpactCost   rat_guard8 t+500ms from=79.5187 health=0.0000 delta=-79.5187
+    ImpactDamage rat_guard8 tier=Charge preempted=true
+
+A guard on 79.5 health. The mod judged the charge lethal by anyone's hand before
+the wait and finished him itself, rather than waiting and letting the engine's
+trample land the kill and the crime with it.
+
+The run ended with the rider dying instantly at full health on a lunge, which
+they had never seen before. It is recorded as an open issue in `ROADMAP.md` and
+is not explained; the mod logs nothing about the player's health, so there is no
+evidence in the log beyond the absence of any `Retaliation` line.

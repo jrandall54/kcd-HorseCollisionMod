@@ -430,6 +430,7 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 		-- the press it swept while the horse was still up on its hind legs and
 		-- knocked people down before the charge had happened.
 		self:ChargeStrike(horseEnt)
+		self:WatchLunge(horseEnt)
 	end
 
 	local function waitForEnd()
@@ -453,6 +454,115 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 	end
 
 	Script.SetTimer(cfg.RearChargeWaitMs or 400, waitForEnd)
+end
+
+--- Closes the charge window when the lunge has spent itself.
+--
+-- The rider's definition, and it is a better one than any threshold: the charge
+-- is over the moment the horse is no longer being carried by the impulse.
+--
+-- What came before was three numbers that had to agree with each other -- a
+-- speed under which the horse counted as stopped, a floor before that test was
+-- allowed to run, and a ceiling in case it never fired. All three were guesses,
+-- and the rider could finish the whole animation and then walk into someone and
+-- have it score as a charge.
+--
+-- The impulse is a single shove rather than sustained drive, so the horse
+-- reaches its top speed within a frame or two of the push and everything after
+-- that is friction taking it back. That makes the shape of the lunge readable
+-- without any absolute figure in it: track the peak, and call the move finished
+-- once the speed has decayed to a fraction of it. A horse walking away
+-- afterwards is nowhere near its own peak, so it cannot hold the window open.
+--
+-- Started at the push and not at the key press, which is what removes the need
+-- for a floor: the horse is stationary through the rear itself, and a watcher
+-- begun there would have closed on the animation rather than on the lunge.
+--
+-- **A single sample cannot set the peak.** `HorseSpeed` is derived from two
+-- positions rather than read from `GetVelocity`, for the reasons in
+-- `TrackHorseSpeed`, and the first version of this closed every window inside
+-- 200 ms because of it: measured peaks of 21.2, 25.5 and 25.8 m/s appeared for
+-- one sample each, against 13.0 on the same move, and half of a spike is
+-- reached by the very next ordinary reading. The lunge then ended before the
+-- horse had traveled, the sweep died with it, and the charge landed as an
+-- ordinary walk stagger.
+--
+-- So the peak is the larger of each neighbouring pair, which a lone spike can
+-- never win. `RearChargeLungePeakMin` is the second guard, against a dip early
+-- on being read as decay before the horse has gone anywhere.
+--
+-- Whether those spikes are measurement noise or the engine really discharging
+-- the horse at 25 m/s is not settled, and it matters: the second would explain
+-- bodies thrown thirty meters. `moved=` is here to tell them apart. A real
+-- 25 m/s for even a tenth of a second puts the horse meters further along than
+-- a 13 m/s lunge does.
+--
+-- @tparam table horseEnt the player's horse
+function HorseCollisionMod:WatchLunge(horseEnt)
+	local cfg = self.Config
+	local generation = self.TimerTick
+	local started = self:TimeMs()
+	local peak = 0
+	local spike = 0
+	local previous = nil
+	local origin = nil
+
+	pcall(function()
+		origin = horseEnt:GetWorldPos()
+	end)
+
+	local function watch()
+		if generation ~= self.TimerTick or not self.RearCharging then
+			return
+		end
+
+		local speed = self.HorseSpeed or 0
+
+		if speed > spike then
+			spike = speed
+		end
+
+		-- Two consecutive samples both above a figure is evidence the horse
+		-- was actually traveling at it, where one alone is not.
+		if previous then
+			local held = math.min(previous, speed)
+
+			if held > peak then
+				peak = held
+			end
+		end
+
+		previous = speed
+
+		if peak >= (cfg.RearChargeLungePeakMin or 3.0)
+				and speed <= peak * (cfg.RearChargeLungeSpentAt or 0.5) then
+			self.RearCharging = false
+
+			if cfg.LogTelemetry then
+				local moved = -1
+
+				pcall(function()
+					local p = horseEnt:GetWorldPos()
+
+					if origin then
+						moved = math.sqrt(((p.x - origin.x) ^ 2)
+								+ ((p.y - origin.y) ^ 2))
+					end
+				end)
+
+				self:Log(string.format(
+						"ChargeWindow spent peak=%.2f spike=%.2f now=%.2f"
+								.. " moved=%.2f after=%.0fms",
+						peak, spike, speed, moved, self:TimeMs() - started))
+			end
+
+			return
+		end
+
+		Script.SetTimer(cfg.RearChargeWaitPollMs or 30, watch)
+	end
+
+	Script.SetTimer(cfg.RearChargeWaitPollMs or 30, watch)
 end
 
 --- Reports how long an interactive action held the horse.
@@ -541,6 +651,15 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 
 		local generation = self.TimerTick
 
+		-- The window ends when the lunge is spent, which `ChargeForward`
+		-- decides because it is the only thing that knows when the push
+		-- happened. This timer is the ceiling for a lunge never seen to decay.
+		--
+		-- While the window is open, any impact the detection loop finds is
+		-- scored as a gallop whatever the horse's real speed. A fixed 2600 ms
+		-- outlives the move by a long way: the action ends around 1050 ms and
+		-- the lunge covers one to two meters, so more than a second remains in
+		-- which walking into someone plays a full charge reaction.
 		Script.SetTimer(self.Config.RearChargeWindowMs or 2600, function()
 			if generation == self.TimerTick then
 				self.RearCharging = false
@@ -613,10 +732,21 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 	local generation = self.TimerTick
 	local deadline = self:TimeMs() + (cfg.RearChargeStrikeMs or 1600)
 	local hit = {}
+	local drained = false
 	local playerEnt = player
 
 	local function sweep()
-		if generation ~= self.TimerTick or self:TimeMs() > deadline then
+		-- The sweep lives exactly as long as the charge does.
+		--
+		-- `RearChargeStrikeMs` is a ceiling and not the definition. The lunge
+		-- ends around 1050 ms and the sweep ran for 1600, so it kept striking
+		-- anyone within 1.8 m after the horse had stopped, scoring them as a
+		-- charge. `RearCharging` is the one fact that says whether the move is
+		-- still happening, and it is already closed when the horse slows below
+		-- walking pace, so the sweep reads it rather than keeping a second
+		-- clock that has to agree with the first.
+		if generation ~= self.TimerTick or not self.RearCharging
+				or self:TimeMs() > deadline then
 			return
 		end
 
@@ -634,6 +764,7 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 			local reach = cfg.RearChargeStrikeReach or 3.0
 			local halfWidth = cfg.RearChargeStrikeWidth or 1.6
 			local found = System.GetEntitiesInSphere(pos, reach + 1.0)
+			local now = self:TimeMs()
 
 			if type(found) ~= "table" then
 				return
@@ -642,8 +773,16 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 			for _, npc in pairs(found) do
 				local id = npc and npc.id
 
+				-- `hit` only knows about this sweep. The detection loop is
+				-- scoring the same lunge at the same time, and it writes its
+				-- contacts where `ImpactIsNewContact` can see them, so without
+				-- asking that question here the two paths honor different
+				-- rules: the loop respects a contact the sweep wrote, and the
+				-- sweep ignores one the loop wrote. Loop first, then sweep,
+				-- was the half of the double hit that survived the lockout.
 				if id and not hit[tostring(id)] and npc ~= playerEnt
 						and npc ~= horseEnt and npc.actor
+						and self:ImpactIsNewContact(tostring(id), now)
 						and self:RearCanHit(npc) then
 					local p = npc:GetWorldPos()
 					local dx, dy = p.x - pos.x, p.y - pos.y
@@ -661,6 +800,21 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 						self:RearHit(npc, horseEnt, playerEnt,
 								{ x = fx, y = fy, z = 0 }, "Charge",
 								cfg.RearChargeImpactSpeed or 9.0)
+
+						-- The charge pays for itself now that the detection
+						-- loop stays out of a lunge. It received the gallop's
+						-- drain as a side effect of being scored as a gallop,
+						-- and taking that relabel away took the cost with it.
+						--
+						-- Once per charge, not once per victim. Riding down a
+						-- group is the move; a crowd should not empty the horse
+						-- for standing close together.
+						if not drained then
+							drained = true
+
+							self:DrainHorseStamina(horseEnt, playerEnt,
+									cfg.RearChargeStaminaCost or 0)
+						end
 					end
 				end
 			end
@@ -899,6 +1053,32 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 			or strength.MinorInjury
 
 	self:SendHitReaction(npc, horseWuid, force)
+
+	-- Both strikes record their contact, because neither goes through the
+	-- detection loop and the loop cannot honor a gap it was never told about.
+	-- Without this the sweep reaches 1.8 m ahead and hits, the loop comes round
+	-- and hits the same person again, and `HitMinIntervalMs` is powerless
+	-- because no contact was ever written for it to measure from. That is the
+	-- double hit on one lunge.
+	local victimId = tostring(npc.id)
+	local now = self:TimeMs()
+
+	self.LastScoredHit[victimId] = now
+
+	-- The lockout is the charge's alone.
+	--
+	-- It is the length of the whole move rather than the gap between two
+	-- passes, because a charge is one deliberate act and a victim struck by it
+	-- should be finished with it. That reasoning is about the charge and
+	-- nothing else, and applying it here unconditionally closed a victim out of
+	-- every impact for 2.6 seconds after an ordinary rear as well -- one
+	-- feature's rule silently governing another because the two share this
+	-- function.
+	if tier == "Charge" then
+		self.LockedUntil[victimId] = now
+				+ (self.Config.RearChargeVictimLockMs or 0)
+	end
+
 	self:SendCombatHit(npc, playerEnt, force)
 	self:ApplyImpactDamage(npc, tier, armor, playerEnt, horseEnt)
 

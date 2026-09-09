@@ -30,6 +30,82 @@ number.
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-09-09
+
+### Added
+
+- `RagdollSpeedSoftCap`, `RagdollSpeedSoftCapSpan` and `RagdollAirDamping`. A
+  thrown body traveling faster than the cap is dragged in proportion to how
+  far over it is, whether or not it is touching the ground.
+
+- `RearChargeLungePeakMin` and `RearChargeLungeSpentAt`. The charge window now
+  closes when the lunge itself is spent, judged as the horse's speed decaying
+  to a fraction of the peak it reached, rather than on a fixed timer.
+
+- `RearChargeStaminaCost`. The charge pays its own stamina rather than
+  receiving a gallop's as a side effect of being counted as one.
+
+- `RearChargeVictimLockMs`. How long a victim of a charge is held out of
+  further impacts.
+
+- `ImpactDamageEngineCeiling` and `ImpactDamageOverkill`. The ceiling is the
+  most damage the engine's own trample has been seen to deal at each tier,
+  measured over 136 impacts rather than chosen, and the overkill is how far
+  past zero the mod aims when it finishes a victim.
+
+### Changed
+
+- **BREAKING** The charge is its own tier rather than a relabelled gallop. The
+  detection loop stays out of a lunge entirely and `ChargeStrike` owns it end
+  to end, so the charge's throw, stamina and victim lockout are its own
+  figures and no longer inherit the gallop's.
+
+### Fixed
+
+- Unarmored victims were sometimes thrown far too far. The existing damping
+  cannot arm until the engine reports the body in contact for three samples,
+  and the first three or four samples of a long throw are exactly the ones
+  that report no contact, so most of the distance was spent before anything
+  acted on it. Drag now applies in that window as well. Judged over fourteen
+  throws: no long throws, and no body stopping dead on contact.
+
+- Bodies stayed floating in the air after death, and fell only when struck.
+  The damping sets `damping` and `min_energy` on the victim, which are
+  persistent physics parameters rather than a one-shot effect, and nothing
+  removed them once the slide had ended. `min_energy` puts a body to sleep
+  below the threshold, so a corpse nudged into the air by the horse slept
+  holding that position. Both are now released once the body has stopped.
+
+- A charge kept striking after its lunge was over. The window was governed by
+  three numbers that had to agree with each other, one of them a floor of
+  1200 ms, so the horse went on hitting people while it was already slowing.
+  It now closes when the lunge is spent.
+
+- A charge hit each victim twice. `ChargeStrike` honored no existing contact
+  but recorded one, so the detection loop and the corridor sweep both scored
+  the same impact.
+
+- An ordinary rear locked its victim out of every impact for 2.6 seconds. The
+  lockout was written for the charge and sat unconditionally in a function
+  both features call.
+
+- The rider was charged with murder for collision kills while
+  `CollisionIsCrime` was off. A kill the engine resolves always belongs to the
+  rider, so the mod now decides before the hit lands whether the impact is
+  going to be lethal by anyone's hand, and finishes a victim the engine's
+  trample could otherwise finish. Reproduced and then verified fixed in game
+  on all three paths that let it through.
+
+- Damage variance could turn a fatal blow non-fatal, which handed the kill
+  back to the engine. A charge on an unarmored villager left her alive on 0.57
+  health. The roll is now overruled when the intended damage would have killed.
+
+### Removed
+
+- `ImpactDamageRushBelow`. It asked how hurt the victim already was, which is
+  the wrong question for deciding who lands the killing blow, and its value
+  was never measured.
+
 ## [4.23.1] - 2026-09-08
 
 ### Fixed

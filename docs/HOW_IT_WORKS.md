@@ -37,6 +37,20 @@ mod charged first, fell a little short about two times in three, and let the
 game's trample decide. The same collision was then ignored on one villager and
 an instant hanging offence on the next, whatever `CollisionIsCrime` was set to.
 
+Waiting is not enough on its own, because a victim already hurt can be finished
+by the trample while the mod is still waiting. So the mod asks one question
+before the wait rather than during it: is this impact going to be lethal at
+all, by anyone's hand. If the victim is close enough to death that the game's
+trample could finish them, the mod does not wait and finishes them itself. How
+close counts is measured per tier, from the most the trample has been seen to
+take, rather than chosen: a rear takes nothing, a trot up to twelve, a gallop
+up to thirty-six, a charge up to sixty-two.
+
+The same reasoning covers the mod's own damage roll. Impacts vary a little so
+that two identical collisions are not identical, but a roll that turns a fatal
+blow non-fatal hands the kill back to the game. When the intended damage would
+have killed, the roll is overruled.
+
 A badly hurt NPC left in the street would otherwise be taken over by the game's
 own behavior for the wounded, which stands them still until they slowly heal.
 The mod exempts anyone it knocks down from that, using the same mechanism the
@@ -97,10 +111,13 @@ already down hits them again without restarting their fall.
 The rear on the spot brings the hooves down on whoever is directly in front,
 inside an arc rather than on everyone nearby, and it hits everybody standing in
 that arc rather than a capped number. It is scored as a trot, because a horse
-coming down from a standstill is a real blow but it is not a charge. The charge
-is the move that earns a gallop's treatment: the horse rears and then covers
-several meters, and anyone in the way is ridden down as though it had galloped
-into them, which it effectively has.
+coming down from a standstill is a real blow but it is not a charge.
+
+The charge is a tier of its own rather than a gallop by another name. The horse
+rears and then covers several meters, and what that costs the victim, what it
+costs the horse in stamina, how far it throws someone and how long it holds
+them out of the next impact are all its own figures. It used to borrow a
+gallop's, which meant tuning one silently moved the other.
 
 The charge is a special move rather than a fast collision. The horse rears on
 the spot and is then driven forward physically, so it collides with the world

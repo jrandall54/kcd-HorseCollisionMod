@@ -910,13 +910,24 @@ if (-not (Test-Path $zip)) {
 	exit 1
 }
 
-# Refuse to write into the running game. The engine holds its paks open, so a
-# deploy would either fail on a locked file or, worse, half succeed.
+# A development deploy writes into the running game deliberately.
+#
+# This used to refuse outright, on the stated grounds that the engine holds its
+# paks open. That is true of the shipping layout and irrelevant to this one: a
+# development install runs at sys_PakPriority 0 and loads loose files, which
+# nothing holds open, and reloading them from the console is the whole point of
+# the loop. The refusal did not protect anything, and the only way past it was
+# to kill the game, which from the rider's side is indistinguishable from a
+# crash and cost several rides.
+#
+# The pak case is still real, so the refusal is kept for it. -PrepareShippingTest
+# has its own handling further up, and a shipping-configured install is caught by
+# Assert-DevEnvironment before reaching here.
 $running = Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue
 
 if ($running) {
-	Write-Host "[DEPLOY] the game is running. Close it, or use the console reload path." -ForegroundColor Red
-	exit 1
+	Write-Host "[DEPLOY] the game is running. Writing loose files into it." -ForegroundColor Yellow
+	Write-Host "         Reload from the console to pick them up, or load a save."
 }
 
 # Vortex installed its own copy under a versioned folder name. Two folders both

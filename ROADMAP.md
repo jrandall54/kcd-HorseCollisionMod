@@ -874,3 +874,117 @@ bands rather than one.
 The largest item of the five and the only one that is a feature rather than a
 defect. It should go last, because the first two change what the lunge does to
 the people around it and this is built on top of that.
+
+## Phase 6: The balance pass
+
+Deferred deliberately, and it is the largest item on this document. Three
+numbers govern how hard a collision lands and none of them is where it should
+be:
+
+- **Armor mass scaling.** What a victim's ragdoll weighs, which is the mod's
+  only real lever on how far the horse's collision throws them. An unarmored
+  villager is written down to about 42 kg and flies; a mailed guard goes to
+  several thousand and barely moves. The heavy end is already saturated, so the
+  curve is doing most of its work in a narrow band.
+- **Armor defense scaling.** What armor takes off the damage. A charge worth
+  110 becomes 12 against chainmail, which is a factor of nine across a range
+  the player experiences as "wearing armor or not".
+- **Base damage per tier.** The figures the other two scale.
+
+The three are not separable. Changing any one of them moves what the other two
+are compensating for, which is why this is a single project rather than three
+adjustments and why it cannot be done incrementally alongside feature work.
+
+**It comes after every pillar is implemented, not before.** Each pillar adds
+another tier that has to be balanced against the rest, and tuning against a set
+that is still growing means tuning the same numbers repeatedly. The charge is
+the current example: it arrived with a base of 110 and an armor curve inherited
+from the gallop, and neither figure was chosen for it.
+
+### The rider's starting position on mass
+
+Unarmored NPCs should sit at their normal mass, and the curve should scale
+**up** from there rather than writing light victims down below it. Today the
+curve runs in both directions off a `RagdollMass` of 100, so an unarmored
+villager is written down to about 42 kg and a mailed guard up to several
+thousand.
+
+The evidence that prompted it: over 40 logged throws, unarmored victims average
+roughly three times the armored distance, and the spread within a single mass is
+the striking part. Every 42 kg victim ranges from 0.07 m to 7.71 m on the same
+tier with the same impulse. Nothing in the mod varies between those; the contact
+angle does, and a very light body converts more of that variation into distance.
+Raising the unarmored floor compresses the whole distribution rather than
+capping the outliers.
+
+Ruled out as the cause while investigating this, so it does not need testing
+again: the occasional 26 to 28 m/s reading in the horse's derived speed is a
+sampling artifact, not a real discharge. Those samples produced throws of 0.48,
+0.21 and 0.06, while the largest launch seen had an ordinary 13.50.
+
+Nothing here is a defect. The mod is playable at these values and they are
+deliberate placeholders.
+
+
+## Phase 7: The crime the mod cannot see
+
+The damage ownership work in 5.0.0 closed every path where the mod's own
+collision handling let the engine land the killing blow. One hole remains and it
+is different in kind, because the mod is not involved in it at all.
+
+A victim knocked down by a trot read 68.7 health, and 17.7 when the next impact
+landed: fifty-one health gone with no damage line of the mod's between them, on
+a body lying inside the mod's own fall fragment while the horse stood over it.
+The rider was charged with a crime and the mod had attributed nothing.
+
+It is not bleeding. A trace sampling a victim every 250 ms for ten seconds is
+flat after the impact resolves, in every case:
+
+    HealthTrace rat_woman3 tier=Trot from=100 every=250ms [94,94,83,83, ...83]
+
+Two steps, the engine's collision and then the mod's damage, and then nothing
+moves for ten seconds. It was not a save reload either, which would have
+restored the victim to the save's figure.
+
+So it is the engine charging its own collision repeatedly against a body that
+cannot get out from under the horse. **None of the damage ownership work reaches
+this**, because the mod never sends that hit and so has nothing to attribute or
+withhold. Reclaiming the health afterwards would not help either: the crime is
+raised by the hit event, not by the death.
+
+Nothing has been tried. The obvious first question is whether the victim can be
+moved, unphysicalized, or made non-collidable for as long as the horse is
+standing on them, and whether any of that is reachable from Lua without
+wrecking the body the way `RagDollize` wrecks a pose.
+
+The instrument that produced the evidence above, `TraceHealthLoss`, was removed
+before 5.0.0 shipped. It is in the history if it is wanted again.
+
+
+## Open issue: a lunge killed the rider outright, once
+
+Seen once, in the 5.0.0 verification run, after riding down dozens of people in
+Rattay with a mix of gallop and lunge. The rider was at **full health** and died
+instantly on a lunge. They have never seen it before in the whole project, so it
+is rare rather than a regression that would show up on the next ride.
+
+**It is not explained and nothing should be built on a guess about it.** What is
+known is only this:
+
+- The mod logs nothing about the player's health, so there is no record of the
+  death in `kcd.log` at all. This is the first thing to change if it recurs.
+- The mod did not start the fight. There are zero `Retaliation` lines in the
+  entire run, and `RetaliationPullsRiderDown` was off in the testing world.
+- The last charge before it was the fastest of the run:
+  `ChargeWindow spent peak=13.48 spike=13.53 now=3.70 moved=1.69 after=208ms`.
+  That is recorded as a fact about the run and not as a cause.
+- The charge drives the horse forward physically and collides with the world
+  rather than passing through it, so a wall at speed is reachable in principle.
+  Nothing observed says that is what happened.
+
+Full health to dead in one event rules out accumulated damage and points at
+something resolving as a single large hit or a fall. Instrumenting the rider's
+own health across a lunge is the obvious first step, and it is cheap: one line
+per lunge, accumulated, following the pattern the throw traces used.
+
+Until it is seen a second time there is nothing to reproduce.
