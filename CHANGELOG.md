@@ -30,6 +30,33 @@ number.
 
 ## [Unreleased]
 
+## [4.23.0] - 2026-09-08
+
+### Added
+
+- `RagdollDampContactRun` and `RagdollDampRampSamples`. A thrown body is damped
+  once the engine reports it in contact with something for three samples in a
+  row, and the damping then comes in over eight more rather than all at once.
+
+### Fixed
+
+- Thrown bodies slid too far and traveled inconsistent distances. Damping
+  decided a throw was over when the body's speed dropped below a threshold,
+  which for a tumbling body in the air is arbitrary: it fired anywhere between
+  736 ms and 2848 ms, and the throw ended wherever it caught the body. It now
+  waits for the body to actually be on the ground, which the engine answers
+  directly, and bleeds the motion off instead of arresting it. Measured over
+  seventeen impacts afterwards, every one damped on contact and none reached
+  the failsafe.
+
+### Removed
+
+- `RagdollDampGroundedSpeed` and `RagdollDampMinTravel`. Both were attempts to
+  tell a body still being thrown from one sliding, using vertical motion and
+  distance as stand-ins for a fact the engine reports directly.
+  **NOT BREAKING**: neither reached a published release.
+
+
 ## [4.22.0] - 2026-09-08
 
 ### Added
@@ -122,7 +149,7 @@ number.
   stands wherever a downward ground query finds a surface, with no rigid body
   balance to lose, so it does not need a surface broad enough to hold it: of
   81 rays cast over a 1.35 m grid, the dog's collider answers one. The horse
-  balances on a column about fifteen centimetres across, and collision class
+  balances on a column about fifteen centimeters across, and collision class
   masks do not reach the code path that put it there.
 
   A correction that moved the horse back to the ground was built and rejected.

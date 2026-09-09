@@ -29,7 +29,7 @@
 --
 -- @module HorseCollisionMod.Marks
 -- @author jrandall54
--- @release 4.22.0
+-- @release 4.23.0
 
 --- Body zones bloodied for each impact direction.
 --

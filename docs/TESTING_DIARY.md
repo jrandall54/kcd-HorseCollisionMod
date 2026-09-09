@@ -7672,7 +7672,7 @@ correctly. This is not a lever, and the slight improvement reported while
 
 The reported "slight teleporting" is also answered. With the values at 1 the
 entity origin does not move at all during a knockdown, so nothing about the
-actor was jumping; what was visible was the skeleton, and the 58 metre result
+actor was jumping; what was visible was the skeleton, and the 58 meter result
 above is what an actual teleport measures like.
 
 **Terrain conformance has no remaining knob on this fragment.** The animation
@@ -7746,7 +7746,7 @@ A runtime, per-victim switch for whether the animation drives the actor's
 movement. This is the same thing `MovementControlMethod` sets inside a fragment,
 except it can be set per victim at the moment of impact rather than baked into
 every option. Confirmed callable and accepted; the animation still plays and
-still travels about a metre afterwards. Whether it prevents a victim passing
+still travels about a meter afterwards. Whether it prevents a victim passing
 through geometry is untested and is the obvious next experiment, because it is
 the only lever found that can be applied to one victim at a time.
 
@@ -7939,13 +7939,13 @@ behaviour, since the player is not on a horse.
 
 The mounted samples that produced that reading have a defect. The probe logged
 one line per subject per state, and the state never changed, so a subject first
-seen at the edge of the six metre sphere with every call reading zero was never
+seen at the edge of the six meter sphere with every call reading zero was never
 logged again as the horse closed on it. **Nothing closer than 5.15 m was ever
 recorded while mounted**, which is well outside any plausible reach for an
 action performed by leaning out of the saddle. The declared angle limits were
 satisfied in those samples, but distance was not tested at all.
 
-The key now carries a half-metre distance bucket, so a subject logs afresh as
+The key now carries a half-meter distance bucket, so a subject logs afresh as
 it closes. Re-running it mounted is what actually tests the gate.
 
 ## Loading a save locks every previously hit NPC out of reactions
@@ -15316,7 +15316,7 @@ resting on. Measured across twelve consecutive gallops, the ground was **0.65
 to 0.77 m above the body's own origin, every single time**.
 
 An emitter placed there is buried and renders the top of itself or nothing at
-all, depending on how the body settled. Every size judgement made before this
+all, depending on how the body settled. Every size judgment made before this
 was made against a partly buried effect, which is why the usable scale looked
 like a narrow band between "bomb" and "invisible".
 
@@ -15626,7 +15626,7 @@ question is about.
 Unusable, and worth recording so the conditions are not repeated. The first
 pass had killed six villagers, so the town was hostile and every impact logged
 `combatScale=2.2`. The victims available were a mixed set with base armor from
-0.94 to 1.26, and several were struck near a slope and finished a metre below
+0.94 to 1.26, and several were struck near a slope and finished a meter below
 where they started, which makes a horizontal distance meaningless.
 
 Two samples did match the baseline armor class, and both came in under it:
@@ -15674,7 +15674,7 @@ armor, so a barding multiplier of 1.12 puts the total near 1.41. That is a
 twelve per cent step against a baseline whose own spread at a fixed multiplier
 runs 0.91 to 7.97. The signal is an order of magnitude under the noise. No
 amount of careful watching was ever going to resolve it, and the four
-contradictory judgements were reading variance.
+contradictory judgments were reading variance.
 
 There is no value that is both noticeable and not absurd. The band from 1.5 to
 2.25 is the whole transition from invisible to comic.
@@ -16243,7 +16243,7 @@ from rides made while the damping was cutting the throws.
 same 2230 impulse gives a villager 80 m/s and a guard 0.46, and no knockback
 value can move them. At 1.5 the spread falls from 114x to about 7x, guards read
 5 to 8.5 m/s, and they visibly respond. That is a tuning decision, not a bug,
-and it is left at 3.7 pending the rider's judgement.
+and it is left at 3.7 pending the rider's judgment.
 
 ### An NPC with a weapon drawn is no longer treated as combat
 
@@ -16987,7 +16987,7 @@ rider steers.
 lunge's own length, never glitches and leaves the horse standing six meters off
 a wall, which reads as wrong. Braking close lets the horse cover the ground and
 stop against the wall, at the cost of the release landing while the horse is
-airborne. Close won on inspection: a metre from a wall the stop reads as an
+airborne. Close won on inspection: a meter from a wall the stop reads as an
 impact, whereas the same stop 2.4 m from a low fence read as hitting nothing.
 
 ### The charge rebuilt: physics for the travel, its own detection for the hit
@@ -17360,7 +17360,7 @@ Two measurement mistakes are worth more than the negatives.
 
 The first probe wrote a log line per sample, about eighty synchronous writes
 spread across the animation being judged, and it stayed armed across several
-rounds of visual judgement. Values the rider had called smooth stopped looking
+rounds of visual judgment. Values the rider had called smooth stopped looking
 smooth while it ran. Any probe used while something is judged by eye has to
 accumulate and write once at the end.
 
@@ -17446,8 +17446,8 @@ The reason is that the ground query is not rigid body collision. A horse is a
 living entity: it stands wherever a downward query finds a surface, and it has
 no balance to lose, so it does not need a surface broad enough to hold it. Of
 81 rays cast over a 1.35 m grid centred on the dog, his collider answers
-exactly one. The horse is balanced on a column about fifteen centimetres
-across, half a metre off the ground, and a mask on the target does not reach
+exactly one. The horse is balanced on a column about fifteen centimeters
+across, half a meter off the ground, and a mask on the target does not reach
 whatever put it there.
 
 Collision classes available, for anyone who tries this again: `gcc_horse` is
@@ -17492,3 +17492,53 @@ reproducible and there is no report of it anywhere, in either game. Standing on
 other creatures is documented in vanilla, on the official forum, as far back as
 October 2014 and again for horse saddles and overlapping NPCs, so the class of
 bug is real and old. Why this particular case draws no comment is not known.
+
+## Damping waits for contact, and comes in over time
+
+Thrown bodies slid too far and traveled inconsistent distances. Both came from
+how damping decided when a throw was over.
+
+It fired on speed alone: the body had to be seen moving, then drop below half a
+meter per second. For a tumbling body in the air that moment is arbitrary.
+Measured across a dozen throws it landed anywhere between 736 ms and 2848 ms,
+and the throw ended wherever it caught the body, from 0.07 m to 13.87 m.
+
+`IsColliding` is a bind on every entity and answers the question the speed and
+vertical tests were approximating. The engine's `pe_status_living` carries
+`bFlying`, `groundHeight` and `bStuck`, but none of that struct reaches Lua;
+this does, and vanilla uses the neighboring `AwakePhysics` on doors and lifts.
+
+Sampled every 100 ms across a flight it reads, for one throw:
+
+    contact[ffffTTTfffTTTTT]
+
+Airborne, landed, bounced, landed. So it is real but noisy, and a single contact
+sample would damp mid-bounce. A run of three does not.
+
+Contact alone is not enough either. A body skidding along the ground reports
+contact continuously while still travelling, and damping it there brakes it in
+front of the rider: measured at 8.61 and 8.59 m/s. Requiring the body to be slow
+as well is worse again, because then damping waits until the slide has ended on
+its own, which is too late to be the thing that ends it: a low throw skidded
+1900 ms and 13.87 m before its speed fell under the threshold.
+
+What works is contact as the trigger and time as the strength. Once the body has
+been down for three samples the damping ramps in over eight more, in proportion
+to how long it has been grounded. A fast landing decelerates; a body that keeps
+sliding reaches the full figure and stops. The rest threshold is not ramped,
+since a fraction of it on a moving body stops it outright.
+
+Measured after, on an armored guard over seventeen gallop impacts:
+
+    tier                 51 lines, all Gallop
+    mass write           17 of 17 took, at 1015 kg, first attempt
+    damping outcome      17 of 17 why=grounded, all reaching ramp=1.00
+    thrown               0.75 to 7.72 m
+
+Not one reached the six second ceiling, which is what a body sliding too long
+looks like. The spread that remains is contact geometry.
+
+Two things seen and not chased. A victim who did not move at all turned out to
+be standing against a fence. And jumping the horse into a victim at the moment
+of impact launches the horse high into the air, which is not realistic and looks
+exploitable.

@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.22.0
+-- @release 4.23.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.22.0"
+HorseCollisionMod.Version = "4.23.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -233,6 +233,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field GetupRestCeilingMs stand the victim anyway by this point
 -- @field SettleFragTag the empty fragment played to take a victim out of a
 --   ragdoll without imposing a pose or a facing on them
+-- @field RagdollDampRampSamples over how many samples the damping reaches its
+--   full value once the body is down, so a fast landing decelerates rather
+--   than being braked
+-- @field RagdollDampContactRun how many samples in a row must report contact
+--   before a thrown body is damped, so a bounce does not count as landing
 -- @field RagdollDampFloorMs the earliest the damping may be applied, so it
 --   cannot fire while the body is still being launched
 -- @field RagdollDampCeilingMs the latest, applied regardless of speed
@@ -904,6 +909,8 @@ HorseCollisionMod.Config = {
 	GetupRestPollMs          = 100,
 	GetupRestBand            = 0.02,
 	GetupRestCeilingMs       = 4000,
+	RagdollDampContactRun    = 3,
+	RagdollDampRampSamples   = 8,
 	RagdollDampFloorMs       = 200,
 	RagdollDampCeilingMs     = 6000,
 }
