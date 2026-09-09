@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 4.23.1
+-- @release 5.0.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -438,6 +438,12 @@ function HorseCollisionMod:DampVictim(npc)
 	-- How many samples in a row have reported contact.
 	local touching = 0
 
+	-- What the air braking did, accumulated rather than logged per sample. A
+	-- line every poll while a body is in flight is exactly the kind of probe
+	-- that costs frames in the window the throw is being watched.
+	local airSamples = 0
+	local airPeak = 0
+
 	local function apply(why, elapsed, speed, vertical, touching, share)
 		local params = {}
 		local scale = share or 1
@@ -470,12 +476,45 @@ function HorseCollisionMod:DampVictim(npc)
 					.. " speed=" .. string.format("%.2f", speed or -1)
 					.. " vertical=" .. string.format("%.2f", vertical or -1)
 					.. " contact[" .. table.concat(contactLog, "") .. "]"
+					.. " airBraked=" .. tostring(airSamples)
+					.. " airPeak=" .. string.format("%.2f", airPeak)
+
 					.. " ramp=" .. string.format("%.2f", scale)
-					.. " damping=" .. string.format("%.2f", damping * scale)
-					.. " minEnergy=" .. tostring(minEnergy)
+
+					-- Named for the slide rather than for the corpse. Both
+					-- values are released the moment this watch ends, so they
+					-- describe what acted on the body while it was moving and
+					-- not the state it is left in. Read as `damping` and
+					-- `minEnergy` they said the opposite.
+					.. " slideDamping=" .. string.format("%.2f", damping * scale)
+					.. " slideMinEnergy=" .. tostring(minEnergy)
 					.. " ok=" .. tostring(ok)
 					.. " err=" .. tostring(err))
 		end
+	end
+
+	-- Hand the body back to the engine once its slide has ended.
+	--
+	-- `damping` and `min_energy` are persistent physics parameters rather than
+	-- a one-shot effect, so a body damped once carries them for the rest of its
+	-- existence. `min_energy` is the threshold below which physics puts a body
+	-- to sleep, and at 1.0 that is anything slower than about 1.4 m/s, which an
+	-- ordinary corpse nudged by a horse drops under almost immediately. A
+	-- sleeping body holds the position it had, so one lifted by the horse and
+	-- then left unsupported stays in the air. Striking it wakes it and it
+	-- falls, which is how this was found.
+	--
+	-- Both values exist to end a slide and have no job once the slide is over.
+	-- Leaving them written is the mod changing how a body behaves long after
+	-- its own effect has finished. `Ragdoll` already clears them with this
+	-- exact call, but only when the same victim is hit a second time, which
+	-- most bodies never are.
+	local function release()
+		pcall(function()
+			npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
+				damping = 0, min_energy = 0
+			})
+		end)
 	end
 
 	local function watch()
@@ -532,12 +571,21 @@ function HorseCollisionMod:DampVictim(npc)
 			if speed >= settleAt then
 				moving = true
 			end
+
 		end
 
 		last = here
 
 		if elapsed >= ceilingMs then
 			apply("ceiling", elapsed, speed, vertical, contact)
+
+			-- Released here as well as at the settled exit. This is the
+			-- failsafe, so the body may still be moving, and letting it slide
+			-- on is the lesser fault: the alternative is a corpse left carrying
+			-- `min_energy` for the rest of its existence, which is what made
+			-- bodies sleep in mid-air. The window this mod owns is over either
+			-- way, and it should not still be writing physics when it is.
+			release()
 
 			return
 		end
@@ -589,6 +637,68 @@ function HorseCollisionMod:DampVictim(npc)
 			touching = 0
 		end
 
+		-- Drag on a body that is travelling and not yet in contact.
+		--
+		-- The grounded damping below cannot arm until `IsColliding` has read
+		-- true three samples running, and the first three or four samples of a
+		-- long throw are exactly the ones that read false. That window is where
+		-- the distance is, and nothing touched it.
+		--
+		-- Read straight off a paired trace, one sample per column:
+		--
+		--   contact[fffTTTTTTTTTTT]
+		--   speeds[8.9,8.1,8.4,7.3,6.1,5.7,4.5,3.9,3.1,2.4,1.4,0.6,0.1]
+		--
+		-- About 3.3 m of a 6 m throw is spent in those first columns, before
+		-- any damping exists, and the rest bleeds off once the grounded ramp
+		-- takes over. A short throw never passes 3.9 m/s and is over inside
+		-- half a second, so 4 separates them cleanly.
+		--
+		-- This was first written with the cap at 9, on the theory that the far
+		-- throws were victims launched into the air. They are not. The rider
+		-- watched them and reported the distance is a slide along the ground,
+		-- and the traces agree: `airBraked=0` on every long throw, because none
+		-- of them ever reached the old cap. The peak that suggested flight was
+		-- a single early sample; the sustained speed is what carries the body.
+		--
+		-- Drag rather than a velocity clamp, deliberately. A hard ceiling
+		-- applied every frame reads as the body hitting an invisible wall.
+		-- Damping is a decay coefficient, so the body eases down over several
+		-- frames, and the strength scales with how far over the line it is: a
+		-- body barely above the cap gets a nudge and a fast one gets real drag.
+		--
+		-- Released again below the cap rather than left in place, because the
+		-- damping is a persistent physics parameter and a body that has already
+		-- slowed should fall the rest of the way on its own. `min_energy` is
+		-- deliberately not set here: it puts a body to sleep, which is right for
+		-- a slide that has ended and wrong for one still moving.
+		local cap = self.Config.RagdollSpeedSoftCap or 0
+
+		if cap > 0 and speed and touching < (self.Config.RagdollDampContactRun or 3) then
+			local strength = 0
+
+			if speed > cap then
+				strength = (speed - cap)
+						/ (self.Config.RagdollSpeedSoftCapSpan or 6.0)
+
+				if strength > 1 then
+					strength = 1
+				end
+
+				airSamples = airSamples + 1
+
+				if speed > airPeak then
+					airPeak = speed
+				end
+			end
+
+			pcall(function()
+				npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
+					damping = (self.Config.RagdollAirDamping or 3.0) * strength
+				})
+			end)
+		end
+
 		-- Grounded is the trigger, and the damping ramps in from there.
 		--
 		-- Requiring the body to be slow as well as grounded means damping waits
@@ -623,6 +733,10 @@ function HorseCollisionMod:DampVictim(npc)
 
 				return
 			end
+
+			-- The ramp is finished and the body has stopped, so the damping has
+			-- done its whole job and is released rather than left on the corpse.
+			release()
 
 			return
 		end

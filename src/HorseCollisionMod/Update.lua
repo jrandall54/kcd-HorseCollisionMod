@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 4.23.1
+-- @release 5.0.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -98,16 +98,27 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		end
 	end
 
-	local tierName = self:GetSpeedTier(speed)
-
-	-- A charge is always a gallop impact, whatever the horse's speed reads.
-	-- The lunge covers about five and a half meters in a second, which scores
-	-- as a trot, so a deliberate charge was producing the animated knockdown
-	-- rather than the ragdoll it should. The rider decides to do this; it is
-	-- not something the horse wandered into.
+	-- A lunge belongs to the charge, and this loop stays out of it.
+	--
+	-- What stood here relabelled a charge as a gallop: the lunge reads about
+	-- 5.5 m/s, which scores as a trot, and a trot plays an animated knockdown
+	-- rather than the ragdoll a deliberate charge should earn. That was written
+	-- when the charge had no detection of its own and the loop was the only
+	-- thing that could score it.
+	--
+	-- `ChargeStrike` now sweeps the corridor itself and carries a `Charge`
+	-- tier the whole way down, with its own damage, sound, throw and lockout.
+	-- So the relabel bought nothing and cost the separation: every rule written
+	-- for a gallop silently governed the charge, and the log called it Gallop.
+	--
+	-- Standing out entirely is better than scoring alongside the sweep. Two
+	-- paths on one collision is what the double hit was, and the contact gate
+	-- suppresses the second rather than preventing it.
 	if self.RearCharging then
-		tierName = "Gallop"
+		return
 	end
+
+	local tierName = self:GetSpeedTier(speed)
 
 	-- The wait is animation business, so only the tiers that play an animation
 	-- observe it.

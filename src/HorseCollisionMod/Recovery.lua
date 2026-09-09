@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 4.23.1
+-- @release 5.0.0
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -531,6 +531,17 @@ function HorseCollisionMod:ImpactIsNewContact(npcId, now)
 
 	if interval <= 0 then
 		return true
+	end
+
+	-- An explicit lockout outlives the ordinary interval.
+	--
+	-- A charge is one deliberate move, not a series of collisions, so a victim
+	-- it strikes is closed to further impacts for the whole of it rather than
+	-- for the 700 ms that separates two passes of an ordinary gallop.
+	local until_ = self.LockedUntil and self.LockedUntil[npcId]
+
+	if until_ and now < until_ then
+		return false
 	end
 
 	local last = self.LastScoredHit[npcId]

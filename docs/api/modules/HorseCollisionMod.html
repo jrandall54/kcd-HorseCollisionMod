@@ -139,7 +139,7 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 4.23.1</li>
+        <li><strong>Release</strong>: 5.0.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -174,6 +174,10 @@
 	<td class="summary">When each victim was last scored, keyed the same way as <a href="../modules/HorseCollisionMod.html#RecentHits">RecentHits</a>.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#LockedUntil">LockedUntil</a></td>
+	<td class="summary">Victims closed to further impacts until a stated time.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#ImmortalSubjects">ImmortalSubjects</a></td>
 	<td class="summary">Entities the development tooling created, which take no impact damage.</td>
 	</tr>
@@ -196,6 +200,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#SpeedHistory">SpeedHistory</a></td>
 	<td class="summary">Recent horse speeds, newest last, for spotting deceleration on impact.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#ImpactDamageEngineCeiling">ImpactDamageEngineCeiling</a></td>
+	<td class="summary">The most the engine's own trample takes on each tier.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#ImpactDamageByTier">ImpactDamageByTier</a></td>
@@ -656,6 +664,24 @@
         <li><span class="parameter">RearChargeWaitCeilingMs</span>
          push anyway by this point
         </li>
+        <li><span class="parameter">RearChargeVictimLockMs</span>
+         how long a victim struck by a charge is closed
+   to further impacts, so one lunge is one hit
+        </li>
+        <li><span class="parameter">RearChargeStaminaCost</span>
+         what a landed charge costs the horse. Its own
+   figure, because the detection loop no longer scores a lunge and so no
+   longer charges it the gallop's drain
+        </li>
+        <li><span class="parameter">RearChargeLungePeakMin</span>
+         the top speed a lunge must reach before it can
+   be judged spent, so noise in the derived speed cannot close the window
+   before the horse has gone anywhere
+        </li>
+        <li><span class="parameter">RearChargeLungeSpentAt</span>
+         the fraction of its own peak speed the horse
+   must fall to for the lunge to count as finished
+        </li>
         <li><span class="parameter">RearChargeWindowMs</span>
          how long after a charge starts that impacts are
    scored as a gallop rather than by the horse's speed
@@ -745,6 +771,21 @@
          over how many samples the damping reaches its
    full value once the body is down, so a fast landing decelerates rather
    than being braked
+        </li>
+        <li><span class="parameter">RagdollSpeedSoftCap</span>
+         the speed past which a travelling body is
+   dragged down whether it is touching anything or not, in meters per
+   second. Read off the per-throw speed traces: a long throw runs 8 to 9
+   for its first three or four samples and a short one never passes 3.9,
+   so 4 separates them and nothing ordinary is touched
+        </li>
+        <li><span class="parameter">RagdollSpeedSoftCapSpan</span>
+         how far above the cap the drag reaches full
+   strength, so it comes in progressively rather than as a wall
+        </li>
+        <li><span class="parameter">RagdollAirDamping</span>
+         the damping applied at full strength in the air,
+   against RagdollDamping on the ground
         </li>
         <li><span class="parameter">RagdollDampContactRun</span>
          how many samples in a row must report contact
@@ -843,10 +884,16 @@
         <li><span class="parameter">ImpactDamageByTier</span>
          what each kind of collision is worth before armor
         </li>
-        <li><span class="parameter">ImpactDamageRushBelow</span>
-         deal immediately, ahead of the engine, when
-   the victim has this little health left, because waiting hands the kill
-   to the engine and the rider is charged for it
+        <li><span class="parameter">ImpactDamageEngineCeiling</span>
+         a table, tier name to the most the
+   engine's own trample takes on that tier. Measured, not chosen: largest
+   seen over 136 impacts was rear 0.0, trot 9.2, gallop 33.1, charge 58.5.
+   A remainder this size or smaller is finished by the mod, so the engine
+   cannot take the killing blow and the crime attribution with it
+        </li>
+        <li><span class="parameter">ImpactDamageOverkill</span>
+         how far past zero the mod aims when it finishes
+   a victim, so rounding cannot leave a sliver behind
         </li>
         <li><span class="parameter">ImpactDamageOwnsTheHit</span>
          give back what the engine charged for a
@@ -1082,6 +1129,24 @@
 
 </dd>
     <dt>
+    <a name = "LockedUntil"></a>
+    <strong>LockedUntil</strong>
+    </dt>
+    <dd>
+    Victims closed to further impacts until a stated time. </p>
+
+<p> Separate from <a href="../modules/HorseCollisionMod.html#LastScoredHit">LastScoredHit</a>, which is a rolling interval between ordinary
+ collisions. This is a deliberate lockout: a charge strikes once and the
+ victim is not available again for the length of the move.
+
+
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "ImmortalSubjects"></a>
     <strong>ImmortalSubjects</strong>
     </dt>
@@ -1231,6 +1296,66 @@
  deceleration and not so much that an earlier gallop colors a later walk.
 
 
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "ImpactDamageEngineCeiling"></a>
+    <strong>ImpactDamageEngineCeiling</strong>
+    </dt>
+    <dd>
+    The most the engine's own trample takes on each tier. </p>
+
+<p> Not a setting the mod chooses, a measurement of the game. The engine charges
+ its own damage for a horse collision, at <code>CollisionVelocityDeltaToDmgR</code>,
+ which is neither readable nor overridable from Lua. What it takes scales with
+ the collision, so one figure across every tier is wrong in both directions.</p>
+
+<p> Largest seen over 136 logged impacts: rear 0.0, trot 9.2, gallop 33.1,
+ charge 58.5. These carry a little headroom above that, because a sample
+ maximum is not a bound. A rear is zero because the horse is not moving.</p>
+
+<p> <code>ApplyImpactDamage</code> uses them to answer one question: could the engine kill
+ this victim with what the mod is about to leave behind. When it could, the
+ mod finishes them instead, so the death is attributed to the mod and
+ <code>CollisionIsCrime</code> governs it.</p>
+
+<p> Documented as an ordinary comment rather than an LDoc block, as
+ <code>ImpactProbeSamples</code> is, because LDoc reads an annotated table as named
+ fields.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
 
 
 
@@ -1629,7 +1754,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-08 19:00:23 </i>
+<i style="float:right;">Last updated 2026-09-09 10:21:32 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

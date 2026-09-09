@@ -7,7 +7,7 @@
 --
 -- @module HorseCollisionMod.Enums
 -- @author jrandall54
--- @release 4.23.1
+-- @release 5.0.0
 
 --- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
 --

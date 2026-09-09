@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 4.23.1
+-- @release 5.0.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "4.23.1"
+HorseCollisionMod.Version = "5.0.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -198,6 +198,16 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeWaitMs when the mod starts watching for the rear to end
 -- @field RearChargeWaitPollMs how often it looks
 -- @field RearChargeWaitCeilingMs push anyway by this point
+-- @field RearChargeVictimLockMs how long a victim struck by a charge is closed
+--   to further impacts, so one lunge is one hit
+-- @field RearChargeStaminaCost what a landed charge costs the horse. Its own
+--   figure, because the detection loop no longer scores a lunge and so no
+--   longer charges it the gallop's drain
+-- @field RearChargeLungePeakMin the top speed a lunge must reach before it can
+--   be judged spent, so noise in the derived speed cannot close the window
+--   before the horse has gone anywhere
+-- @field RearChargeLungeSpentAt the fraction of its own peak speed the horse
+--   must fall to for the lunge to count as finished
 -- @field RearChargeWindowMs how long after a charge starts that impacts are
 --   scored as a gallop rather than by the horse's speed
 -- @field RearFragTag the FragTag of the rear option in the mod's horse
@@ -236,6 +246,15 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDampRampSamples over how many samples the damping reaches its
 --   full value once the body is down, so a fast landing decelerates rather
 --   than being braked
+-- @field RagdollSpeedSoftCap the speed past which a travelling body is
+--   dragged down whether it is touching anything or not, in meters per
+--   second. Read off the per-throw speed traces: a long throw runs 8 to 9
+--   for its first three or four samples and a short one never passes 3.9,
+--   so 4 separates them and nothing ordinary is touched
+-- @field RagdollSpeedSoftCapSpan how far above the cap the drag reaches full
+--   strength, so it comes in progressively rather than as a wall
+-- @field RagdollAirDamping the damping applied at full strength in the air,
+--   against RagdollDamping on the ground
 -- @field RagdollDampContactRun how many samples in a row must report contact
 --   before a thrown body is damped, so a bounce does not count as landing
 -- @field RagdollDampFloorMs the earliest the damping may be applied, so it
@@ -283,9 +302,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpactDamageIgnoredArmor `smash_def` that does not count as armor,
 --   covering the shoes and shirt every villager wears
 -- @field ImpactDamageByTier what each kind of collision is worth before armor
--- @field ImpactDamageRushBelow deal immediately, ahead of the engine, when
---   the victim has this little health left, because waiting hands the kill
---   to the engine and the rider is charged for it
+-- @field ImpactDamageEngineCeiling a table, tier name to the most the
+--   engine's own trample takes on that tier. Measured, not chosen: largest
+--   seen over 136 impacts was rear 0.0, trot 9.2, gallop 33.1, charge 58.5.
+--   A remainder this size or smaller is finished by the mod, so the engine
+--   cannot take the killing blow and the crime attribution with it
+-- @field ImpactDamageOverkill how far past zero the mod aims when it finishes
+--   a victim, so rounding cannot leave a sliver behind
 -- @field ImpactDamageOwnsTheHit give back what the engine charged for a
 --   collision, so the mod's figure is the whole cost rather than an addition
 --   to an unknown one
@@ -541,6 +564,10 @@ HorseCollisionMod.Config = {
 	RearChargeWaitMs         = 400,
 	RearChargeWaitPollMs     = 30,
 	RearChargeWaitCeilingMs  = 3000,
+	RearChargeVictimLockMs   = 2600,
+	RearChargeStaminaCost    = 22.0,
+	RearChargeLungePeakMin   = 3.0,
+	RearChargeLungeSpentAt   = 0.5,
 	RearChargeWindowMs       = 2600,
 	RearAnimSpeed            = 1.0,
 	RearStrikes              = true,
@@ -579,8 +606,12 @@ HorseCollisionMod.Config = {
 		Walk = 0, Trot = 18, Gallop = 95, Rear = 60, Charge = 110
 	},
 
+	ImpactDamageEngineCeiling = {
+		Walk = 0.0, Rear = 0.0, Trot = 12.0, Gallop = 36.0, Charge = 62.0
+	},
+
 	ImpactDamageOwnsTheHit   = true,
-	ImpactDamageRushBelow    = 35,
+	ImpactDamageOverkill     = 1.0,
 	ImpactDamageReclaimCeiling = 60,
 
 	ImpactDamageArmorScale   = 0.6,
@@ -909,6 +940,9 @@ HorseCollisionMod.Config = {
 	GetupRestPollMs          = 100,
 	GetupRestBand            = 0.02,
 	GetupRestCeilingMs       = 4000,
+	RagdollSpeedSoftCap      = 4.0,
+	RagdollSpeedSoftCapSpan  = 3.0,
+	RagdollAirDamping        = 8.0,
 	RagdollDampContactRun    = 3,
 	RagdollDampRampSamples   = 8,
 	RagdollDampFloorMs       = 200,
@@ -934,6 +968,15 @@ HorseCollisionMod.RecentHits = {}
 --
 -- @table LastScoredHit
 HorseCollisionMod.LastScoredHit = {}
+
+--- Victims closed to further impacts until a stated time.
+--
+-- Separate from `LastScoredHit`, which is a rolling interval between ordinary
+-- collisions. This is a deliberate lockout: a charge strikes once and the
+-- victim is not available again for the length of the move.
+--
+-- @table LockedUntil
+HorseCollisionMod.LockedUntil = {}
 
 --- Entities the development tooling created, which take no impact damage.
 --
@@ -1099,6 +1142,29 @@ HorseCollisionMod.ReplanHaltSpeed = 1
 -- meters per second it covers a centimeter every millisecond, so a mass that
 -- arrives late arrives after the collision it was meant to change.
 HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
+
+--- The most the engine's own trample takes on each tier.
+--
+-- Not a setting the mod chooses, a measurement of the game. The engine charges
+-- its own damage for a horse collision, at `CollisionVelocityDeltaToDmgR`,
+-- which is neither readable nor overridable from Lua. What it takes scales with
+-- the collision, so one figure across every tier is wrong in both directions.
+--
+-- Largest seen over 136 logged impacts: rear 0.0, trot 9.2, gallop 33.1,
+-- charge 58.5. These carry a little headroom above that, because a sample
+-- maximum is not a bound. A rear is zero because the horse is not moving.
+--
+-- `ApplyImpactDamage` uses them to answer one question: could the engine kill
+-- this victim with what the mod is about to leave behind. When it could, the
+-- mod finishes them instead, so the death is attributed to the mod and
+-- `CollisionIsCrime` governs it.
+--
+-- Documented as an ordinary comment rather than an LDoc block, as
+-- `ImpactProbeSamples` is, because LDoc reads an annotated table as named
+-- fields.
+HorseCollisionMod.ImpactDamageEngineCeiling = {
+	Walk = 0.0, Rear = 0.0, Trot = 12.0, Gallop = 36.0, Charge = 62.0
+}
 
 --- How often a provoked victim is sampled while the incident is open.
 --
@@ -1418,6 +1484,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- carried into a world it no longer describes.
 		self.RecentHits = {}
 		self.LastScoredHit = {}
+		self.LockedUntil = {}
 		self.RecentRejections = {}
 		self.SphereCache = { pos = nil, ents = nil, at = 0 }
 
