@@ -35,7 +35,8 @@ param (
 
 	# Keep the shipping values for crime and the rest, for the rarer test that
 	# is about the world's reaction rather than the collision.
-	[switch]$Crime
+	[switch]$Crime,
+	[switch]$FreeGallop
 )
 
 $ErrorActionPreference = "Stop"
@@ -193,10 +194,21 @@ function Enter-Test {
 		& $deploy -SetDevEnvironment | Out-Null
 	}
 
-	$args = @()
+	# Not $args. That is a PowerShell automatic variable holding a function's
+	# own unbound arguments, and reassigning it inside a function then splatting
+	# it silently dropped the switches: -FreeGallop was accepted, printed, and
+	# never reached the deploy.
+	$deployArgs = @()
 
 	if ($Crime) {
-		$args += "-Crime"
+		$deployArgs += "-Crime"
+	}
+
+	# Long tests are slowed by stopping to rest, so this zeroes what a collision
+	# costs the horse. Opt in rather than default: the drain is part of what an
+	# impact does and hiding it would falsify a test that is measuring it.
+	if ($FreeGallop) {
+		$deployArgs += "-FreeGallop"
 	}
 
 	if (Game-Running) {
@@ -204,14 +216,14 @@ function Enter-Test {
 		# replaced. Both, always: a script-only deploy leaving the animation
 		# databases stale is silent, survives a reload, and has cost rides.
 		Say "game is running, syncing loose files"
-		& $deploy -ScriptOnly @args
-		& $deploy -AnimOnly @args
+		& $deploy -ScriptOnly @deployArgs
+		& $deploy -AnimOnly @deployArgs
 	}
 	else {
-		& $deploy @args
+		& $deploy @deployArgs
 
 		if ($Launch) {
-			& $deploy -NoBuild -Launch @args
+			& $deploy -NoBuild -Launch @deployArgs
 		}
 	}
 

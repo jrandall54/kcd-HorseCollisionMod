@@ -17758,3 +17758,23 @@ configuration previously ran 0.07 m to 7.71 m, and it is the first change that
 has removed the outliers rather than moved the average.
 
 Six unarmored samples is thin, so the ratio is soft. The mechanism is not.
+
+### More lying-mode damping is not better, and 6.0 is near the optimum
+
+`RagdollLyingDampingArmored` was doubled from 6.0 to 12.0 to widen the gradient.
+It made armored victims travel **further**, reproducibly, across two runs:
+
+    armored 6.0    full mail mean 1.87   separation 1.59x
+    armored 12.0   full mail mean 2.53   (first run, no unarmored sample)
+    armored 12.0   full mail mean 2.39   separation ~1.23x
+
+A reading that fits, though it has not been tested: very high damping suppresses
+the limbs' own motion, so the ragdoll stops tumbling and behaves more like a
+rigid plank, and a plank slides further than a body throwing energy away through
+its own flailing. If that is right there is an optimum in the middle rather than
+a monotonic relationship, and 6.0 is nearer it than 12.0.
+
+Reverted to 6.0. Note also that the unarmored end of the bracket cannot be
+usefully lowered: the mod only ever subtracts, so an unarmored victim is already
+travelling as far as the engine threw them and no setting can extend that. All
+the usable range is at the armored end, and it is smaller than it looks.

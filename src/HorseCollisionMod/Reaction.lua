@@ -589,6 +589,13 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 					.. " achieved=" .. string.format("%.2f", travelled)
 					.. " sculptDamping=" .. string.format("%.2f", sculptDamping)
 
+					-- The armor itself, not the damping derived from it.
+					-- Banding throws by the damping value made two runs
+					-- incomparable the moment the bracket changed, because the
+					-- same guard scores a different figure under a different
+					-- bracket. This is the same number in every run.
+					.. " armor=" .. string.format("%.2f", armorScale or -1)
+
 					-- Named for the slide rather than for the corpse. Both
 					-- values are released the moment this watch ends, so they
 					-- describe what acted on the body while it was moving and
