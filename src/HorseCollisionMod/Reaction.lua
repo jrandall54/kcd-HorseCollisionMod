@@ -438,6 +438,55 @@ function HorseCollisionMod:DampVictim(npc)
 	-- How many samples in a row have reported contact.
 	local touching = 0
 
+	-- The distance this throw is allowed, sculpted from what the engine gave.
+	--
+	-- The engine resolves the collision on its own and hands over a body that
+	-- is, deliberately, moving too fast. Nothing here tries to change that. From
+	-- the moment the body is a ragdoll it is the mod's, and the job is to remove
+	-- exactly enough of that motion to land on a chosen distance.
+	--
+	-- **This can only ever subtract.** No energy is added to a victim, ever, so
+	-- a commanded distance is a ceiling and not a target: a body the engine only
+	-- threw a meter will travel a meter whatever is commanded. That is the point
+	-- rather than a shortcoming. The complaint this exists to answer is that
+	-- throws within one configuration ran 0.07 m to 7.71 m, so cutting the long
+	-- tail to a commanded ceiling is the whole fix.
+	--
+	-- Armor chooses the ceiling, between two figures that are set directly in
+	-- meters rather than derived from a lie about what a person weighs. The
+	-- armor scale runs high for an unarmored victim and low for one in mail.
+	local commanded = 0
+
+	if self.Config.RagdollThrowSculpt then
+		local far = self.Config.RagdollThrowDistanceUnarmored or 4.0
+		local near = self.Config.RagdollThrowDistanceArmored or 1.5
+		local lo = self.Config.RagdollThrowArmorScaleArmored or 0.35
+		local hi = self.Config.RagdollThrowArmorScaleUnarmored or 1.50
+		local t = 1.0
+
+		if armorScale and hi > lo then
+			t = (armorScale - lo) / (hi - lo)
+
+			if t < 0 then
+				t = 0
+			elseif t > 1 then
+				t = 1
+			end
+		end
+
+		commanded = near + ((far - near) * t)
+	end
+
+	-- Where the body started, so travel can be measured rather than assumed.
+	local origin = nil
+
+	pcall(function()
+		origin = npc:GetWorldPos()
+	end)
+
+	local travelled = 0
+	local sculptDamping = 0
+
 	-- What the air braking did, accumulated rather than logged per sample. A
 	-- line every poll while a body is in flight is exactly the kind of probe
 	-- that costs frames in the window the throw is being watched.
@@ -480,6 +529,15 @@ function HorseCollisionMod:DampVictim(npc)
 					.. " airPeak=" .. string.format("%.2f", airPeak)
 
 					.. " ramp=" .. string.format("%.2f", scale)
+
+					-- The pair that makes this verifiable on a single throw
+					-- instead of across a hundred. If commanded and achieved
+					-- agree, the controller works; no ratios, no sample size,
+					-- and none of the variance that made every separation
+					-- measurement on this project swing by a factor of two.
+					.. " commanded=" .. string.format("%.2f", commanded)
+					.. " achieved=" .. string.format("%.2f", travelled)
+					.. " sculptDamping=" .. string.format("%.2f", sculptDamping)
 
 					-- Named for the slide rather than for the corpse. Both
 					-- values are released the moment this watch ends, so they
@@ -572,6 +630,75 @@ function HorseCollisionMod:DampVictim(npc)
 				moving = true
 			end
 
+			-- The controller. One line of physics and a great deal of care
+			-- about the edges.
+			--
+			-- Under exponential decay a body at speed `v` with damping `d`
+			-- covers `v / d` before stopping. So to cover exactly the distance
+			-- still owed, the damping wanted right now is
+			--
+			--     d = v / remaining
+			--
+			-- Recomputed every poll from the body's **actual** speed and
+			-- **actual** travel, which is what makes this self correcting.
+			-- Contact geometry, ground friction, a wall, an unlucky launch:
+			-- none of it has to be modelled, because each poll measures where
+			-- the body really is and re-solves for what is left.
+			--
+			-- The first poll is uncontrolled. The body is already moving when
+			-- this loop starts, so roughly a poll interval of travel is spent
+			-- before anything can act, and that is measured into `travelled`
+			-- rather than assumed away.
+			if commanded > 0 and origin and here
+					and elapsed >= (self.Config.RagdollThrowOnsetMs or 0) then
+				travelled = self:VectorLength({
+					x = here.x - origin.x,
+					y = here.y - origin.y,
+					z = here.z - origin.z
+				})
+
+				local remaining = commanded - travelled
+				local wanted = 0
+
+				if remaining <= 0.05 then
+					-- The budget is spent. Stop it rather than dividing by
+					-- something near zero.
+					wanted = self.Config.RagdollThrowMaxDamping or 30.0
+				else
+					wanted = speed / remaining
+				end
+
+				if wanted < 0 then
+					wanted = 0
+				end
+
+				local most = self.Config.RagdollThrowMaxDamping or 30.0
+
+				if wanted > most then
+					wanted = most
+				end
+
+				-- Rate limited between polls. A body whose damping jumps from
+				-- nothing to the ceiling in one frame reads as hitting an
+				-- invisible wall, which is the objection that shaped this whole
+				-- mechanism, so the change is allowed to move only so far at a
+				-- time and the loop converges over a few samples instead.
+				local step = self.Config.RagdollThrowDampingStep or 8.0
+
+				if wanted > sculptDamping + step then
+					wanted = sculptDamping + step
+				elseif wanted < sculptDamping - step then
+					wanted = sculptDamping - step
+				end
+
+				sculptDamping = wanted
+
+				pcall(function()
+					npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
+						damping = sculptDamping
+					})
+				end)
+			end
 		end
 
 		last = here

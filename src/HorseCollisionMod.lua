@@ -232,6 +232,22 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpulseDelayMs how long to wait before the ragdoll impulse
 -- @field LateralImpulse how much of the impulse pushes across the
 --   horse's line rather than along it
+-- @field RagdollThrowSculpt whether the mod sculpts a thrown body's distance
+--   down to a commanded figure. The engine's own collision decides the launch
+--   and is never interfered with; this removes exactly enough of that motion to
+--   land on a chosen distance, and can only ever subtract
+-- @field RagdollThrowDistanceUnarmored how far an unarmored victim is allowed
+--   to travel, in meters, as a ceiling rather than a target
+-- @field RagdollThrowDistanceArmored the same for a victim in full mail
+-- @field RagdollThrowArmorScaleArmored the armor scale treated as fully
+--   armored, the low end of the range
+-- @field RagdollThrowArmorScaleUnarmored the armor scale treated as unarmored
+-- @field RagdollThrowOnsetMs how long after the body ragdolls before the mod
+--   takes control, so the engine's launch is left alone
+-- @field RagdollThrowMaxDamping the most drag the controller may command, the
+--   guard against dividing by a nearly spent budget
+-- @field RagdollThrowDampingStep the most the commanded drag may change between
+--   polls, so a body eases rather than hitting an invisible wall
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
@@ -932,6 +948,14 @@ HorseCollisionMod.Config = {
 	-- body and `min_energy` is the threshold below which physics puts it to
 	-- rest, both fields of `pe_simulation_params`, reached through
 	-- `entity:SetPhysicParams(PHYSICPARAM_SIMULATION, ...)`.
+	RagdollThrowSculpt       = true,
+	RagdollThrowDistanceUnarmored = 4.0,
+	RagdollThrowDistanceArmored   = 1.5,
+	RagdollThrowArmorScaleArmored = 0.35,
+	RagdollThrowArmorScaleUnarmored = 1.50,
+	RagdollThrowOnsetMs      = 0,
+	RagdollThrowMaxDamping   = 30.0,
+	RagdollThrowDampingStep  = 8.0,
 	RagdollDamping           = 5.0,
 	RagdollMinEnergy         = 1.0,
 	RagdollDampPollMs        = 100,
