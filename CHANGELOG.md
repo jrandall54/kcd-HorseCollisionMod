@@ -35,7 +35,7 @@ number.
 ### Added
 
 - `RagdollSpeedSoftCap`, `RagdollSpeedSoftCapSpan` and `RagdollAirDamping`. A
-  thrown body travelling faster than the cap is dragged in proportion to how
+  thrown body traveling faster than the cap is dragged in proportion to how
   far over it is, whether or not it is touching the ground.
 
 - `RearChargeLungePeakMin` and `RearChargeLungeSpentAt`. The charge window now

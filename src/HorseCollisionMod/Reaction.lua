@@ -637,7 +637,7 @@ function HorseCollisionMod:DampVictim(npc)
 			touching = 0
 		end
 
-		-- Drag on a body that is travelling and not yet in contact.
+		-- Drag on a body that is traveling and not yet in contact.
 		--
 		-- The grounded damping below cannot arm until `IsColliding` has read
 		-- true three samples running, and the first three or four samples of a

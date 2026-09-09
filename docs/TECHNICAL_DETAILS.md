@@ -680,9 +680,9 @@ kill back to the engine, so when `intended` would have killed the roll does not
 stand.
 
 An earlier setting, `ImpactDamageRushBelow`, asked instead how hurt the victim
-already was. That is the wrong question — what matters is the size of the
-remainder against what the engine can take — and its threshold was never
-measured. It was removed in 5.0.0.
+already was. What matters instead is the size of the remainder against what
+the engine can take, and its threshold was never measured. It was removed in
+5.0.0.
 
 ## The auto-cure daycycle
 
@@ -1123,10 +1123,10 @@ call, so an ordinary rear held its victim out of every impact for 2.6 seconds.
 
 ### When the lunge is over
 
-The charge window used to be a stopwatch, governed by three numbers that had to
-agree with each other: a `SpeedWalk` threshold, a floor of 1200 ms and a ceiling
-of 2600. None of them described the lunge, so the horse went on striking people
-after it was already slowing.
+A stopwatch cannot say when a lunge is over. Three numbers governed the window
+before this and had to agree with each other: a `SpeedWalk` threshold, a floor
+of 1200 ms and a ceiling of 2600. None of them described the lunge, so the horse
+went on striking people after it was already slowing.
 
 `WatchLunge` closes the window when the lunge itself is spent. It starts at the
 push rather than at the key press, tracks the horse's peak speed, and closes

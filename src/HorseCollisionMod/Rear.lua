@@ -522,8 +522,8 @@ function HorseCollisionMod:WatchLunge(horseEnt)
 			spike = speed
 		end
 
-		-- Confirmed by its neighbour. Two consecutive samples both above a
-		-- figure is evidence the horse was actually traveling at it.
+		-- Two consecutive samples both above a figure is evidence the horse
+		-- was actually traveling at it, where one alone is not.
 		if previous then
 			local held = math.min(previous, speed)
 
@@ -802,10 +802,9 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 								cfg.RearChargeImpactSpeed or 9.0)
 
 						-- The charge pays for itself now that the detection
-						-- loop stays out of a lunge. It used to be charged the
-						-- gallop's drain as a side effect of being scored as a
-						-- gallop, and taking that relabel away took the cost
-						-- with it.
+						-- loop stays out of a lunge. It received the gallop's
+						-- drain as a side effect of being scored as a gallop,
+						-- and taking that relabel away took the cost with it.
 						--
 						-- Once per charge, not once per victim. Riding down a
 						-- group is the move; a crowd should not empty the horse
