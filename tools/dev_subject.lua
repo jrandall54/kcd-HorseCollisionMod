@@ -49,7 +49,7 @@ local pick = {
 	-- trot, so a run meant to measure a gallop scores as a trot and the gated,
 	-- animation-driven tier answers instead. Check the tier in the log rather
 	-- than trusting the intent.
-	distance = 25.0,
+	distance = 15.0,
 
 	count = 1,
 
