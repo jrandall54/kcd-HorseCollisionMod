@@ -244,10 +244,14 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollThrowArmorScaleUnarmored the armor scale treated as unarmored
 -- @field RagdollThrowOnsetMs how long after the body ragdolls before the mod
 --   takes control, so the engine's launch is left alone
--- @field RagdollThrowMaxDamping the most drag the controller may command, the
---   guard against dividing by a nearly spent budget
--- @field RagdollThrowDampingStep the most the commanded drag may change between
---   polls, so a body eases rather than hitting an invisible wall
+-- @field RagdollThrowMinScale the most speed one poll may remove, as a
+--   fraction kept. Without a floor the scale reached zero and a body stopped
+--   dead inside one frame, which is accurate and looks broken
+-- @field RagdollThrowSlack how far over its ceiling a body must be before it is
+--   corrected at all, so one near its ceiling is not nudged every poll
+-- @field RagdollThrowStopSeconds how long a body is given to spend the
+--   distance still owed to it. The speed ceiling is the remaining budget
+--   divided by this, so a smaller figure brakes harder
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
@@ -954,8 +958,9 @@ HorseCollisionMod.Config = {
 	RagdollThrowArmorScaleArmored = 0.35,
 	RagdollThrowArmorScaleUnarmored = 1.50,
 	RagdollThrowOnsetMs      = 0,
-	RagdollThrowMaxDamping   = 30.0,
-	RagdollThrowDampingStep  = 8.0,
+	RagdollLyingDampingArmored   = 6.0,
+	RagdollLyingDampingUnarmored = 1.5,
+	RagdollLyingContacts     = 2,
 	RagdollDamping           = 5.0,
 	RagdollMinEnergy         = 1.0,
 	RagdollDampPollMs        = 100,

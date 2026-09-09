@@ -379,7 +379,10 @@ end
 -- Applied after the impulse, so the throw is not damped before it happens.
 --
 -- @tparam table npc victim entity
-function HorseCollisionMod:DampVictim(npc)
+-- @tparam[opt] number armorScale the victim's armor scale, high for an
+--   unarmored victim and low for one in mail, the same figure the ragdoll mass
+--   is derived from. Chooses the commanded throw distance
+function HorseCollisionMod:DampVictim(npc, armorScale)
 	local damping = self.Config.RagdollDamping or 0
 	local minEnergy = self.Config.RagdollMinEnergy or 0
 
@@ -486,6 +489,53 @@ function HorseCollisionMod:DampVictim(npc)
 
 	local travelled = 0
 	local sculptDamping = 0
+
+	-- Written once, when the body becomes a ragdoll, and never again.
+	--
+	-- Two actuators were tried per poll and both failed. `damping` in
+	-- `PHYSICPARAM_SIMULATION` is clamped or ignored on a ragdoll: raising it
+	-- from 30 to 250 left the overshoot unchanged, so no value of it would ever
+	-- have held a body. Setting velocity through `PHYSICPARAM_VELOCITY` was
+	-- accurate -- mean error fell from +1.31 m to -0.69 m with nothing
+	-- overshooting -- and looked, in the rider's words, absolutely horrible:
+	-- writing one velocity onto an articulated body flattens its per-limb
+	-- state, so the whole reaction glitches rather than just the moment of
+	-- correction. That is structural and no amount of gentler scaling fixes it.
+	--
+	-- `pe_params_articulated_body` is the group that actually governs a
+	-- ragdoll. `dampingLyingMode` is the damping the solver applies once the
+	-- body is in lying mode, which is a body sliding on the ground, and that is
+	-- where the unnatural distance comes from. The solver applies it itself, so
+	-- the limbs keep their own motion and there is nothing per-frame to glitch.
+	--
+	-- Armor picks the figure. `nCollLyingMode` is lowered as well so lying mode
+	-- engages after fewer contacts and the damping starts acting sooner.
+	if self.Config.RagdollThrowSculpt then
+		local heavy = self.Config.RagdollLyingDampingArmored or 6.0
+		local light = self.Config.RagdollLyingDampingUnarmored or 1.5
+		local lo = self.Config.RagdollThrowArmorScaleArmored or 0.35
+		local hi = self.Config.RagdollThrowArmorScaleUnarmored or 1.50
+		local t = 1.0
+
+		if armorScale and hi > lo then
+			t = (armorScale - lo) / (hi - lo)
+
+			if t < 0 then
+				t = 0
+			elseif t > 1 then
+				t = 1
+			end
+		end
+
+		sculptDamping = heavy + ((light - heavy) * t)
+
+		pcall(function()
+			npc:SetPhysicParams(PHYSICPARAM_ARTICULATED, {
+				dampingLyingMode = sculptDamping,
+				nCollLyingMode = self.Config.RagdollLyingContacts or 2
+			})
+		end)
+	end
 
 	-- What the air braking did, accumulated rather than logged per sample. A
 	-- line every poll while a body is in flight is exactly the kind of probe
@@ -630,74 +680,15 @@ function HorseCollisionMod:DampVictim(npc)
 				moving = true
 			end
 
-			-- The controller. One line of physics and a great deal of care
-			-- about the edges.
-			--
-			-- Under exponential decay a body at speed `v` with damping `d`
-			-- covers `v / d` before stopping. So to cover exactly the distance
-			-- still owed, the damping wanted right now is
-			--
-			--     d = v / remaining
-			--
-			-- Recomputed every poll from the body's **actual** speed and
-			-- **actual** travel, which is what makes this self correcting.
-			-- Contact geometry, ground friction, a wall, an unlucky launch:
-			-- none of it has to be modelled, because each poll measures where
-			-- the body really is and re-solves for what is left.
-			--
-			-- The first poll is uncontrolled. The body is already moving when
-			-- this loop starts, so roughly a poll interval of travel is spent
-			-- before anything can act, and that is measured into `travelled`
-			-- rather than assumed away.
-			if commanded > 0 and origin and here
-					and elapsed >= (self.Config.RagdollThrowOnsetMs or 0) then
+			-- Measurement only. The sculpting is a single write at ragdoll
+			-- time, above, and nothing is written from inside this loop: that
+			-- is what stopped the animation glitching, so it must stay true.
+			if origin and here then
 				travelled = self:VectorLength({
 					x = here.x - origin.x,
 					y = here.y - origin.y,
 					z = here.z - origin.z
 				})
-
-				local remaining = commanded - travelled
-				local wanted = 0
-
-				if remaining <= 0.05 then
-					-- The budget is spent. Stop it rather than dividing by
-					-- something near zero.
-					wanted = self.Config.RagdollThrowMaxDamping or 30.0
-				else
-					wanted = speed / remaining
-				end
-
-				if wanted < 0 then
-					wanted = 0
-				end
-
-				local most = self.Config.RagdollThrowMaxDamping or 30.0
-
-				if wanted > most then
-					wanted = most
-				end
-
-				-- Rate limited between polls. A body whose damping jumps from
-				-- nothing to the ceiling in one frame reads as hitting an
-				-- invisible wall, which is the objection that shaped this whole
-				-- mechanism, so the change is allowed to move only so far at a
-				-- time and the loop converges over a few samples instead.
-				local step = self.Config.RagdollThrowDampingStep or 8.0
-
-				if wanted > sculptDamping + step then
-					wanted = sculptDamping + step
-				elseif wanted < sculptDamping - step then
-					wanted = sculptDamping - step
-				end
-
-				sculptDamping = wanted
-
-				pcall(function()
-					npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
-						damping = sculptDamping
-					})
-				end)
 			end
 		end
 
@@ -1025,7 +1016,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 		end
 
 		self:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt)
-		self:DampVictim(npc)
+		self:DampVictim(npc, armorScale)
 	end)
 
 	-- The control for the same reading taken on the fall path. This tier uses

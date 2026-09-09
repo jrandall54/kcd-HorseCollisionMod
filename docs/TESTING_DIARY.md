@@ -17710,3 +17710,51 @@ The run ended with the rider dying instantly at full health on a lunge, which
 they had never seen before. It is recorded as an open issue in `ROADMAP.md` and
 is not explained; the mod logs nothing about the player's health, so there is no
 evidence in the log beyond the absence of any `Retaliation` line.
+
+## Sculpting the throw: three actuators, and the one that works
+
+The rider's design: let the engine resolve the collision however it likes, and
+from the moment the body is a ragdoll, take control of its deceleration, scaled
+by armor. Sculpting from an excess the mod did not choose and cannot add to.
+
+Three actuators were tried.
+
+**`damping` in `PHYSICPARAM_SIMULATION` is inert on a ragdoll.** Raised from 30
+to 250, eight times the drag, the overshoot did not change at all: mean error
++1.47 m against +1.31 m. No value of it would ever have held a body.
+
+**`PHYSICPARAM_VELOCITY` is accurate and unusable.** Setting the body's speed
+directly each poll took the mean error from +1.31 m to -0.69 m with nothing
+overshooting at all, the best accuracy measured. It also looked, in the rider's
+words, "absolutely horrible, full glitchy animation all the way through". That
+is structural rather than a tuning problem: writing one velocity onto an
+articulated body flattens its per-limb state every poll, so the whole reaction
+breaks rather than just the moment of correction. Gentler scaling, a deadband
+and a floor on how much speed one poll could remove did not help.
+
+**`dampingLyingMode` in `PHYSICPARAM_ARTICULATED` is the answer.** It is the
+damping the solver applies once a ragdoll is in lying mode, which is a body
+sliding on the ground, and the solver applies it itself so the limbs keep their
+own motion. Written **once** when the body ragdolls and never again, so there is
+nothing per-frame to glitch.
+
+    RagdollLyingDampingArmored    6.0
+    RagdollLyingDampingUnarmored  1.5
+    RagdollLyingContacts          2
+    RagdollMassArmorScaled        false, every victim at a flat 80 kg
+
+Judged in game: the rider reported it feels good with no detectable weirdness in
+the throws or in the bodies on the ground.
+
+    armored    n=40  mean=1.97  median=1.79  max=4.02
+    unarmored  n=6   mean=3.13  median=3.48  max=4.91
+    separation 1.59x
+
+That equals the best separation measured all session, from the armor-scaled
+speed cap, and it beats it everywhere else. **The long tail has collapsed**:
+earlier builds produced maxima of 8.33 m and 7.74 m, this one 4.02 and 4.91.
+That is the complaint this work exists to answer, since throws within one
+configuration previously ran 0.07 m to 7.71 m, and it is the first change that
+has removed the outliers rather than moved the average.
+
+Six unarmored samples is thin, so the ratio is soft. The mechanism is not.
