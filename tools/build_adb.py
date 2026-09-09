@@ -168,6 +168,10 @@ PAK = os.path.join(GAME_ROOT, PAK_RELATIVE)
 
 # The subTagDef for the AnimationControlled fragment. This mod ships its own
 # version of this file, under this same name, with four tags added.
+# FragTags used by the hand-authored horse database. Declared here because this
+# is the tag file the mod ships and the horse database is not generated.
+HORSE_TAGS = ("hcm_rear", "hcm_rear_charge")
+
 TAGS_ENTRY = "Animations/Mannequin/ADB/kcd_animationControlledTags.xml"
 
 # Output lands in mod_assets/ at the repository root, never in the working
@@ -644,6 +648,22 @@ def write_shared_tags(nl):
     group += ['      <Tag name="%s" />' % tag for tag, _, _ in REACTIONS]
     group += ["    </Group>"]
 
+    # The horse's own tags, which nothing else declares.
+    #
+    # `hcm_rear` and `hcm_rear_charge` are the FragTags of the two options in
+    # `hcm_horse_database.adb`, and that file is hand authored and not produced
+    # here. This file is, and it is the only place those tags are declared, so
+    # regenerating without them silently deletes them.
+    #
+    # That has happened. The fragments stayed, the tags went, and
+    # `StartInteractiveActionByName` returned true while resolving nothing:
+    # seventy-seven rears that worked, then seventeen that requested the
+    # fragment and left the horse in `MotionIdle`. Nothing in the log said why,
+    # because a fragment that cannot resolve is not an error.
+    group += ['    <Group name="HcmHorse">']
+    group += ['      <Tag name="%s" />' % tag for tag in HORSE_TAGS]
+    group += ["    </Group>"]
+
     anchor = nl + "  </Tags>"
     patched = raw.replace(anchor, nl + nl.join(group) + anchor, 1)
 
@@ -657,7 +677,7 @@ def write_shared_tags(nl):
 
     print("  tags   %s (%d B, %d vanilla + %d added)"
           % (name, os.path.getsize(out(name)),
-             raw.count("<Tag "), len(REACTIONS)))
+             raw.count("<Tag "), len(REACTIONS) + len(HORSE_TAGS)))
 
 
 def write_female_declaration(paths, nl):

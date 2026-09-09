@@ -30,6 +30,20 @@ number.
 
 ## [Unreleased]
 
+## [4.23.1] - 2026-09-08
+
+### Fixed
+
+- Rearing and charging stopped working. `kcd_animationControlledTags.xml` is the
+  only place `hcm_rear` and `hcm_rear_charge` are declared, and
+  `tools/build_adb.py` rebuilds that file from its own list, which did not
+  include them. Regenerating the animation data to add an unrelated fragment
+  deleted the horse's tag group, after which the fragments still existed but the
+  names they resolve against did not:
+  `StartInteractiveActionByName` returned true and left the horse in
+  `MotionIdle`. The generator now emits that group itself.
+
+
 ## [4.23.0] - 2026-09-08
 
 ### Added
