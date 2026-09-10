@@ -137,7 +137,8 @@ HorseCollisionModSettings = {
 	                             { "body", 0, 1.6 },
 	                             { "blunt", 0, 2.0 },
 	                             { "f_bodyfall1", 0, 1.3 } },
-	ImpactDustScaleRear      = 0.12,   -- how much dust it raises
+	ImpactDustEffectRear     = "collisions.destructibles.arrow_soil",
+	ImpactDustScaleRear      = 0.6,   -- how much dust it raises
 	CameraShakeRearScale     = 0.8,   -- how hard it shakes the camera
 	RiderBlurRearScale       = 0.6,   -- how much it blurs the view
 	RiderBlurRearLength      = 0.4,   -- how long that lasts
@@ -165,7 +166,7 @@ HorseCollisionModSettings = {
 	                             { "hs_hp_soil", 6, 0.7 },
 	                             { "face_armed", 0, 0.9 },
 	                             { "f_bodyfall1", 0, 0.7 } },
-	ImpactDustScaleCharge    = 0.17,   -- how much dust it raises
+	ImpactDustScaleCharge    = 0.10,   -- how much dust it raises
 	CameraShakeChargeScale   = 1.2,   -- how hard it shakes the camera
 	RiderBlurChargeScale     = 1.1,   -- how much it blurs the view
 	RiderBlurChargeLength    = 1.1,   -- how long that lasts
@@ -179,7 +180,7 @@ HorseCollisionModSettings = {
 	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop
 	RearStrikes              = true,  -- the rear on the spot hits who is in front
 	RearStrikeMs             = 700,   -- when in the animation they land
-	RearReach                = 2.0,   -- how far in front they reach
+	RearReach                = 2.5,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse
 	RearChargeStaminaCost    = 22.0,  -- what a landed charge costs the horse
@@ -551,8 +552,8 @@ HorseCollisionModSettings = {
 	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
 	ImpactDust               = true,
 	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
-	ImpactDustScaleTrot      = 0.11,
-	ImpactDustScaleGallop    = 0.15,
+	ImpactDustScaleTrot      = 0,
+	ImpactDustScaleGallop    = 0.09,
 	ImpactDustHeight         = 0.15,
 	ImpactDustSampleMs       = 50,
 	ImpactDustFallVz         = -0.5,

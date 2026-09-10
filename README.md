@@ -123,8 +123,8 @@ breaking the mod. Deleting a line restores its default.
 | `ImpactDamageDelayMs` | 600 | How long the mod waits, in milliseconds, before charging the victim for the impact. The engine applies trample damage of its own for a collision and attributes it to you; waiting lets that land first so the mod delivers the killing blow. That decides whether guards treat a death as murder or as a corpse nobody is blamed for, and so it is what makes `CollisionIsCrime` mean anything. Set to 0 to charge immediately. |
 | `ImpactDust` | true | Whether a collision throws dust off the ground where the victim lands. |
 | `ImpactDustEffect` | "WH_Particels.other.explosion_dust" | The particle library node to spawn. |
-| `ImpactDustScaleGallop` | 0.15 | Size of it at a gallop. |
-| `ImpactDustScaleTrot` | 0.11 | Size of it at a trot. |
+| `ImpactDustScaleGallop` | 0.09 | Size of it at a gallop. |
+| `ImpactDustScaleTrot` | 0 | Size of it at a trot. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
 | `ImpactSoundDistance` | 2.0 | Master level for trot and gallop, in meters. Higher is quieter. The listener follows the camera, so a third-person camera mod hears the mix from further away and will want this lower. |
 | `ImpactSoundWalk` | layered | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
@@ -144,7 +144,7 @@ breaking the mod. Deleting a line restores its default.
 | `RearMaxSpeed` | 0.15 | Horizontal speed above which a rear is refused. A rear is a standing attack: a horse still moving when it starts slides about 0.12 m before the animation takes hold. |
 | `RearIdleOnly` | true | Also require the horse's own locomotion state to be idle, which catches slow drift a speed reading misses. |
 | `RearCooldownMs` | 2500 | How long before another rear is accepted. |
-| `RearReach` | 2.0 | How far in front the hooves reach, for the rear on the spot. |
+| `RearReach` | 2.5 | How far in front the hooves reach, for the rear on the spot. |
 | `RearArc` | 70 | The arc in front that counts, in degrees. |
 | `RearStaminaCost` | 12.0 | What a landed rear costs the horse. |
 | `Retaliation` | true | Whether a man shoved repeatedly at walking pace can lose patience and fight back. |

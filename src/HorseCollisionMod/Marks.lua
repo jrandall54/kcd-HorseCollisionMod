@@ -29,7 +29,7 @@
 --
 -- @module HorseCollisionMod.Marks
 -- @author jrandall54
--- @release 5.1.0
+-- @release 5.2.0
 
 --- Body zones bloodied for each impact direction.
 --
@@ -198,16 +198,15 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 		return false
 	end
 
-	local scale = cfg.ImpactDustScaleTrot or 0
-
+	local scale = 0
 	if tierName == "Charge" then
 		scale = cfg.ImpactDustScaleCharge or cfg.ImpactDustScaleGallop or 0
 	elseif tierName == "Rear" then
 		scale = cfg.ImpactDustScaleRear or cfg.ImpactDustScaleTrot or 0
-	end
-
-	if tierName == "Gallop" or tierName == "Charge" then
+	elseif tierName == "Gallop" then
 		scale = cfg.ImpactDustScaleGallop or 0
+	elseif tierName == "Trot" then
+		scale = cfg.ImpactDustScaleTrot or 0
 	end
 
 	if scale <= 0 then
@@ -220,7 +219,23 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 		return false
 	end
 
-	self:DustWhenLanded(npc, tierName, scale, 0)
+	if tierName == "Rear" then
+		local pos = npc:GetWorldPos()
+		if pos then
+			local ok = pcall(function()
+				Particle.SpawnEffect(cfg.ImpactDustEffectRear or cfg.ImpactDustEffect,
+						{ x = pos.x, y = pos.y, z = pos.z + 1.3 },
+						{ x = 0, y = 0, z = 1 },
+						scale)
+			end)
+			if cfg.LogTelemetry then
+				self:Log("ImpactDust tier=Rear INSTANT scale=" .. string.format("%.2f", scale)
+						.. " ok=" .. tostring(ok))
+			end
+		end
+	else
+		self:DustWhenLanded(npc, tierName, scale, 0)
+	end
 
 	return true
 end

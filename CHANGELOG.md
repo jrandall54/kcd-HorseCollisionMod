@@ -30,6 +30,19 @@ number.
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-09-10
+
+### Added
+- `ImpactDustEffectRear` setting to choose a separate particle for rear impacts.
+
+### Changed
+- Rear impact dust now uses `collisions.destructibles.arrow_soil` for a short, punchy effect instead of the lingering `explosion_dust`.
+- Rear impact dust spawns instantly at chest height on contact rather than waiting for the victim to hit the ground.
+- Scaled down gallop dust from 0.15 to 0.09 and charge dust from 0.17 to 0.10.
+- Disabled trot dust (scale 0) as it was not visually effective.
+- Increased `RearReach` from 2.0 to 2.5 meters to reliably hit NPCs at standard interaction distance.
+- Fixed a bug where `ImpactDustScaleCharge` was overwritten by the gallop scale.
+
 ## [5.1.0] - 2026-09-09
 
 ### Added
