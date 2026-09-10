@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.0.0
+-- @release 5.1.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.0.0"
+HorseCollisionMod.Version = "5.1.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -232,6 +232,32 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpulseDelayMs how long to wait before the ragdoll impulse
 -- @field LateralImpulse how much of the impulse pushes across the
 --   horse's line rather than along it
+-- @field RagdollThrowSculpt whether the mod sculpts a thrown body's distance
+--   down to a commanded figure. The engine's own collision decides the launch
+--   and is never interfered with; this removes exactly enough of that motion to
+--   land on a chosen distance, and can only ever subtract
+-- @field RagdollThrowDistanceUnarmored how far an unarmored victim is allowed
+--   to travel, in meters, as a ceiling rather than a target
+-- @field RagdollThrowDistanceArmored the same for a victim in full mail
+-- @field RagdollThrowArmorScaleArmored the armor scale treated as fully
+--   armored, the low end of the range
+-- @field RagdollThrowArmorScaleUnarmored the armor scale treated as unarmored
+-- @field RagdollThrowOnsetMs how long after the body ragdolls before the mod
+-- @field RagdollBrake whether to brake ragdolls after they are thrown.
+-- @field RagdollBrakeKeepArmored fraction of speed kept by armored victims.
+-- @field RagdollBrakeKeepUnarmored fraction of speed kept by unarmored victims.
+-- @field RagdollBrakeMs length of the braking window.
+-- @field RagdollBrakeArmorScaleArmored the armor scale treated as fully armored.
+-- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as unarmored.
+-- @field RagdollBrakeDampingArmored damping applied to armored victims.
+-- @field RagdollBrakeDampingUnarmored damping applied to unarmored victims.
+-- @field RagdollLyingContacts contacts needed to trigger lying mode.
+--   takes control, so the engine's launch is left alone
+--   fraction kept. Without a floor the scale reached zero and a body stopped
+--   dead inside one frame, which is accurate and looks broken
+--   corrected at all, so one near its ceiling is not nudged every poll
+--   distance still owed to it. The speed ceiling is the remaining budget
+--   divided by this, so a smaller figure brakes harder
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
@@ -932,6 +958,21 @@ HorseCollisionMod.Config = {
 	-- body and `min_energy` is the threshold below which physics puts it to
 	-- rest, both fields of `pe_simulation_params`, reached through
 	-- `entity:SetPhysicParams(PHYSICPARAM_SIMULATION, ...)`.
+	RagdollThrowSculpt       = true,
+	RagdollThrowDistanceUnarmored = 4.0,
+	RagdollThrowDistanceArmored   = 1.5,
+	RagdollThrowArmorScaleArmored = 0.35,
+	RagdollThrowArmorScaleUnarmored = 1.50,
+	RagdollThrowOnsetMs      = 0,
+	RagdollBrake             = true,
+	RagdollBrakeKeepArmored  = 0.45,
+	RagdollBrakeKeepUnarmored = 1.0,
+	RagdollBrakeMs           = 400,
+	RagdollBrakeArmorScaleArmored = 0.35,
+	RagdollBrakeArmorScaleUnarmored = 1.26,
+	RagdollBrakeDampingArmored = 6.0,
+	RagdollBrakeDampingUnarmored = 0.0,
+	RagdollLyingContacts     = 0,
 	RagdollDamping           = 5.0,
 	RagdollMinEnergy         = 1.0,
 	RagdollDampPollMs        = 100,

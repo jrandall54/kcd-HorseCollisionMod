@@ -36,6 +36,7 @@ param (
 	[switch]$ScriptOnly,
 	[switch]$AnimOnly,
 	[switch]$Crime,
+	[switch]$FreeGallop,
 	[switch]$SetDevEnvironment,
 	[switch]$SetPlayEnvironment,
 	[switch]$PrepareShippingTest,
@@ -702,9 +703,13 @@ function Sync-LooseFiles {
 	# build.ps1 rejects a release that ships CollisionIsCrime = false, and
 	# patching the installed file after the reload is too late: the value the
 	# engine already read is the one a later save load keeps.
-	if ($changed.Script) {
-		Set-DeployedTestValues -Root $Root -Crime:$Crime
-	}
+	# Run unconditionally rather than only when a script file moved. The values
+	# depend on the switches as well as on the files, so a deploy that changes
+	# no script but does change -Crime or -FreeGallop still has to rewrite them.
+	# Gated on $changed.Script, asking for a different world silently did
+	# nothing whenever the scripts happened to be identical, which is exactly
+	# the case when only a switch is being changed. It is idempotent and cheap.
+	Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop
 
 	return $changed
 }
@@ -734,9 +739,20 @@ function Sync-LooseFiles {
 # interruptions. Damage, impulse, sound, reactions and the tier thresholds are
 # the subject and are left exactly as they ship.
 #
-# Stamina still drains. It is the horse's own resource and part of what a
-# collision costs; only its consequences are suppressed, so a test can still
-# read the drain in the log without the rider ending up on the ground.
+# Stamina still drains by default. It is the horse's own resource and part of
+# what a collision costs; only its consequences are suppressed, so a test can
+# still read the drain in the log without the rider ending up on the ground.
+#
+# -FreeGallop overrides that, for the case where the test is long and the
+# stopping to rest is the slow part of it. It is a switch rather than a default
+# for the reason above: zeroing the drain hides something a test may be
+# measuring, so it has to be asked for.
+$script:DevFreeGallopValues = [ordered]@{
+	StaminaDrainTrot      = "0.0"
+	StaminaDrainGallop    = "0.0"
+	RearChargeStaminaCost = "0.0"
+}
+
 $script:DevTestValues = [ordered]@{
 	CollisionIsCrime          = "false"
 	ThrowRiderOnStaminaEmpty  = "false"
@@ -755,7 +771,8 @@ $script:DevTestValues = [ordered]@{
 function Set-DeployedTestValues {
 	param (
 		[string]$Root,
-		[switch]$Crime
+		[switch]$Crime,
+		[switch]$FreeGallop
 	)
 
 	$path = Join-Path $Root "Data\Scripts\Startup\HorseCollisionMod_Settings.lua"
@@ -774,6 +791,12 @@ function Set-DeployedTestValues {
 		}
 
 		$wanted[$key] = $script:DevTestValues[$key]
+	}
+
+	if ($FreeGallop) {
+		foreach ($key in $script:DevFreeGallopValues.Keys) {
+			$wanted[$key] = $script:DevFreeGallopValues[$key]
+		}
 	}
 
 	$text = [System.IO.File]::ReadAllText($path)
