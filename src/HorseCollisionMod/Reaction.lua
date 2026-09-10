@@ -441,30 +441,36 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	-- How many samples in a row have reported contact.
 	local touching = 0
 
-	-- The distance this throw is allowed, sculpted from what the engine gave.
+	-- How much of its speed this victim is allowed to keep.
 	--
-	-- The engine resolves the collision on its own and hands over a body that
-	-- is, deliberately, moving too fast. Nothing here tries to change that. From
-	-- the moment the body is a ragdoll it is the mod's, and the job is to remove
-	-- exactly enough of that motion to land on a chosen distance.
+	-- The engine resolves the collision and throws the body. That is never
+	-- interfered with, and the spread it produces is wanted: contact geometry
+	-- is never the same twice, which is why no two impacts look alike, and that
+	-- is realism rather than noise to be flattened.
 	--
-	-- **This can only ever subtract.** No energy is added to a victim, ever, so
-	-- a commanded distance is a ceiling and not a target: a body the engine only
-	-- threw a meter will travel a meter whatever is commanded. That is the point
-	-- rather than a shortcoming. The complaint this exists to answer is that
-	-- throws within one configuration ran 0.07 m to 7.71 m, so cutting the long
-	-- tail to a commanded ceiling is the whole fix.
+	-- So nothing here targets a distance. Braking a body with damping `d` for a
+	-- time `T` leaves it with
 	--
-	-- Armor chooses the ceiling, between two figures that are set directly in
-	-- meters rather than derived from a lie about what a person weighs. The
-	-- armor scale runs high for an unarmored victim and low for one in mail.
-	local commanded = 0
+	--     keep = e^(-d * T)
+	--
+	-- of its speed, and **that fraction does not depend on how fast it was
+	-- going**. A guard the engine launched at 12 m/s and one it barely nudged
+	-- at 3 m/s both keep the same proportion, so the engine's variation passes
+	-- through intact and what is controlled is how much is taken away.
+	--
+	-- Armor picks the fraction. Distance after the brake scales with speed, so
+	-- the ratio between an armored victim and an unarmored one is the ratio of
+	-- their keep fractions, which makes it a number that can simply be set.
+	--
+	-- An unarmored victim at keep = 1.0 is not touched at all.
+	local keep = 1.0
+	local brakeFor = 0
 
-	if self.Config.RagdollThrowSculpt then
-		local far = self.Config.RagdollThrowDistanceUnarmored or 4.0
-		local near = self.Config.RagdollThrowDistanceArmored or 1.5
-		local lo = self.Config.RagdollThrowArmorScaleArmored or 0.35
-		local hi = self.Config.RagdollThrowArmorScaleUnarmored or 1.50
+	if self.Config.RagdollBrake then
+		local heavy = self.Config.RagdollBrakeKeepArmored or 0.45
+		local light = self.Config.RagdollBrakeKeepUnarmored or 1.0
+		local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+		local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.50
 		local t = 1.0
 
 		if armorScale and hi > lo then
@@ -477,8 +483,63 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 			end
 		end
 
-		commanded = near + ((far - near) * t)
+		keep = heavy + ((light - heavy) * t)
+
+		if keep < 0.02 then
+			keep = 0.02
+		end
+
+		brakeFor = self.Config.RagdollBrakeMs or 400
 	end
+
+	-- The armor scale's real range, which is not what it was assumed to be.
+	--
+	-- The unarmored end was set to 1.50 and the highest scale that actually
+	-- occurs is 1.26, so no victim ever reached the untouched end of the
+	-- bracket: the lightest were still braked by twelve percent, and the rider
+	-- reported that nobody was going anywhere. An endpoint outside the real
+	-- range silently converts "leave them alone" into "slow everyone".
+
+
+	-- The damping that removes exactly that fraction over the window. Solved
+	-- rather than tuned: a longer window needs proportionally less drag for the
+	-- same result, so the two settings do not have to be kept in agreement by
+	-- hand.
+	-- The damping is set directly rather than solved from the fraction.
+	--
+	-- `keep = e^(-d * T)` is the right physics and the wrong units. It assumes
+	-- `dampingLyingMode` is a decay rate in 1/s, and the engine's own figures
+	-- say otherwise: damping 1.5 produced 3.13 m and damping 6.0 produced
+	-- 1.87 m, a fourfold change in damping for 1.67x in distance, which is not
+	-- exponential in anything. Solving for a fraction therefore produced a
+	-- number with no relationship to the distance it promised.
+	--
+	-- So the two ends are damping values that were measured, and `keep` is kept
+	-- only as the thing the log reports so a run can still be read.
+	local brakeDamping = 0
+
+	if brakeFor > 0 and keep < 0.999 then
+		local heavyD = self.Config.RagdollBrakeDampingArmored or 6.0
+		local lightD = self.Config.RagdollBrakeDampingUnarmored or 0.0
+		local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+		local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
+		local t = 1.0
+
+		if armorScale and hi > lo then
+			t = (armorScale - lo) / (hi - lo)
+
+			if t < 0 then
+				t = 0
+			elseif t > 1 then
+				t = 1
+			end
+		end
+
+		brakeDamping = heavyD + ((lightD - heavyD) * t)
+	end
+
+	local braking = false
+	local brakeStarted = 0
 
 	-- Where the body started, so travel can be measured rather than assumed.
 	local origin = nil
@@ -489,53 +550,6 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 
 	local travelled = 0
 	local sculptDamping = 0
-
-	-- Written once, when the body becomes a ragdoll, and never again.
-	--
-	-- Two actuators were tried per poll and both failed. `damping` in
-	-- `PHYSICPARAM_SIMULATION` is clamped or ignored on a ragdoll: raising it
-	-- from 30 to 250 left the overshoot unchanged, so no value of it would ever
-	-- have held a body. Setting velocity through `PHYSICPARAM_VELOCITY` was
-	-- accurate -- mean error fell from +1.31 m to -0.69 m with nothing
-	-- overshooting -- and looked, in the rider's words, absolutely horrible:
-	-- writing one velocity onto an articulated body flattens its per-limb
-	-- state, so the whole reaction glitches rather than just the moment of
-	-- correction. That is structural and no amount of gentler scaling fixes it.
-	--
-	-- `pe_params_articulated_body` is the group that actually governs a
-	-- ragdoll. `dampingLyingMode` is the damping the solver applies once the
-	-- body is in lying mode, which is a body sliding on the ground, and that is
-	-- where the unnatural distance comes from. The solver applies it itself, so
-	-- the limbs keep their own motion and there is nothing per-frame to glitch.
-	--
-	-- Armor picks the figure. `nCollLyingMode` is lowered as well so lying mode
-	-- engages after fewer contacts and the damping starts acting sooner.
-	if self.Config.RagdollThrowSculpt then
-		local heavy = self.Config.RagdollLyingDampingArmored or 6.0
-		local light = self.Config.RagdollLyingDampingUnarmored or 1.5
-		local lo = self.Config.RagdollThrowArmorScaleArmored or 0.35
-		local hi = self.Config.RagdollThrowArmorScaleUnarmored or 1.50
-		local t = 1.0
-
-		if armorScale and hi > lo then
-			t = (armorScale - lo) / (hi - lo)
-
-			if t < 0 then
-				t = 0
-			elseif t > 1 then
-				t = 1
-			end
-		end
-
-		sculptDamping = heavy + ((light - heavy) * t)
-
-		pcall(function()
-			npc:SetPhysicParams(PHYSICPARAM_ARTICULATED, {
-				dampingLyingMode = sculptDamping,
-				nCollLyingMode = self.Config.RagdollLyingContacts or 2
-			})
-		end)
-	end
 
 	-- What the air braking did, accumulated rather than logged per sample. A
 	-- line every poll while a body is in flight is exactly the kind of probe
@@ -585,9 +599,10 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 					-- agree, the controller works; no ratios, no sample size,
 					-- and none of the variance that made every separation
 					-- measurement on this project swing by a factor of two.
-					.. " commanded=" .. string.format("%.2f", commanded)
+					.. " keep=" .. string.format("%.2f", keep)
 					.. " achieved=" .. string.format("%.2f", travelled)
-					.. " sculptDamping=" .. string.format("%.2f", sculptDamping)
+					.. " brakeDamping=" .. string.format("%.2f", brakeDamping)
+					.. " brakeMs=" .. tostring(brakeFor)
 
 					-- The armor itself, not the damping derived from it.
 					-- Banding throws by the damping value made two runs
@@ -687,9 +702,50 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 				moving = true
 			end
 
-			-- Measurement only. The sculpting is a single write at ragdoll
-			-- time, above, and nothing is written from inside this loop: that
-			-- is what stopped the animation glitching, so it must stay true.
+			-- The brake window. Opened the moment the body is a ragdoll and
+			-- held for `RagdollBrakeMs`, then closed again.
+			--
+			-- **Not keyed off ground contact.** An earlier version was, because
+			-- `dampingLyingMode` normally applies only once a ragdoll is in
+			-- lying mode, and that was letting the tool dictate the design: by
+			-- the time a thrown body lands it has already travelled at full
+			-- speed through the air, which is where the distance is. The
+			-- deceleration has to begin at the impact.
+			--
+			-- `nCollLyingMode` is the number of contacts that triggers lying
+			-- mode, so setting it to zero puts the body in that mode from the
+			-- start and the damping applies immediately, airborne included.
+			--
+			-- What is written is a damping coefficient the solver integrates
+			-- itself, which is why this can change over time without breaking
+			-- the animation. Writing a velocity per poll is what glitched;
+			-- writing a coefficient does not.
+			if brakeDamping > 0 and brakeStarted == 0 then
+				braking = true
+				brakeStarted = elapsed
+				sculptDamping = brakeDamping
+
+				pcall(function()
+					npc:SetPhysicParams(PHYSICPARAM_ARTICULATED, {
+						dampingLyingMode = brakeDamping,
+						nCollLyingMode = self.Config.RagdollLyingContacts or 0
+					})
+				end)
+			elseif braking and (elapsed - brakeStarted) >= brakeFor then
+				-- Window closed. The drag comes off and the body carries
+				-- whatever it has left, which is the fraction that was asked
+				-- for. Leaving it on would keep taking speed and turn a
+				-- proportional brake into an absolute stop.
+				braking = false
+				sculptDamping = 0
+
+				pcall(function()
+					npc:SetPhysicParams(PHYSICPARAM_ARTICULATED, {
+						dampingLyingMode = 0
+					})
+				end)
+			end
+
 			if origin and here then
 				travelled = self:VectorLength({
 					x = here.x - origin.x,

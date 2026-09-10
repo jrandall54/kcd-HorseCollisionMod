@@ -194,21 +194,28 @@ function Enter-Test {
 		& $deploy -SetDevEnvironment | Out-Null
 	}
 
-	# Not $args. That is a PowerShell automatic variable holding a function's
-	# own unbound arguments, and reassigning it inside a function then splatting
-	# it silently dropped the switches: -FreeGallop was accepted, printed, and
-	# never reached the deploy.
-	$deployArgs = @()
+	# A hashtable, not an array, and not $args.
+	#
+	# Two separate defects lived here. $args is a PowerShell automatic variable
+	# holding a function's own unbound arguments, so reassigning it inside a
+	# function and splatting it dropped the switches. And splatting an **array**
+	# passes its elements positionally rather than by name, so "-Crime" arrived
+	# as the value of -GameRoot and the deploy exited with "-GameRoot points at
+	# -Crime" -- having installed nothing, while the caller reported success.
+	#
+	# A hashtable splats by parameter name, which is the only form that works
+	# for switches.
+	$deployArgs = @{}
 
 	if ($Crime) {
-		$deployArgs += "-Crime"
+		$deployArgs.Crime = $true
 	}
 
 	# Long tests are slowed by stopping to rest, so this zeroes what a collision
 	# costs the horse. Opt in rather than default: the drain is part of what an
 	# impact does and hiding it would falsify a test that is measuring it.
 	if ($FreeGallop) {
-		$deployArgs += "-FreeGallop"
+		$deployArgs.FreeGallop = $true
 	}
 
 	if (Game-Running) {
