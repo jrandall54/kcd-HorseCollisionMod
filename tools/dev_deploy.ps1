@@ -1100,9 +1100,9 @@ if ($Launch) {
 	Write-Host "[DEPLOY] launching $(if ($launchArgs) { $launchArgs -join ' ' } else { '(no flags)' })..."
 
 	if ($launchArgs) {
-		Start-Process -FilePath $exe -ArgumentList $launchArgs -WorkingDirectory (Split-Path $exe -Parent)
+		Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "`"$exe`" $($launchArgs -join ' ')"; CurrentDirectory = (Split-Path $exe -Parent) } | Out-Null
 	}
 	else {
-		Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe -Parent)
+		Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "`"$exe`""; CurrentDirectory = (Split-Path $exe -Parent) } | Out-Null
 	}
 }
