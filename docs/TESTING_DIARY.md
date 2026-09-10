@@ -17778,3 +17778,12 @@ Reverted to 6.0. Note also that the unarmored end of the bracket cannot be
 usefully lowered: the mod only ever subtracts, so an unarmored victim is already
 travelling as far as the engine threw them and no setting can extend that. All
 the usable range is at the armored end, and it is smaller than it looks.
+
+
+## 2026-09-09: Three-stage collision physics pipeline perfectly scrubs tumbling inertia
+
+### The test condition
+The three-stage collision pipeline implemented on the previous branch was packaged and tested. Armored characters stop correctly upon impact while unarmored characters no longer suffer from the tumbling inertia or sliding-wall visual glitch.
+
+### Outcome
+Build 5.1.0 packaged and released. All pre-commit style violations resolved (hard tabs over spaces, line wrapping limits on comments in Reaction.lua).
