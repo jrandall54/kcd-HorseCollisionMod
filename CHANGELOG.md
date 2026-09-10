@@ -30,6 +30,15 @@ number.
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-09-09
+
+### Added
+- Three-stage collision physics pipeline perfectly scrubs tumbling inertia off unarmored pedestrians to eliminate the sliding-wall glitch while stopping armored guards instantly.
+
+### Fixed
+- Stale Lua documentation references that broke the previous api build.
+
+
 ## [5.0.0] - 2026-09-09
 
 ### Added

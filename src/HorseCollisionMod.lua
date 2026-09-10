@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.0.0
+-- @release 5.1.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.0.0"
+HorseCollisionMod.Version = "5.1.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -243,13 +243,19 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   armored, the low end of the range
 -- @field RagdollThrowArmorScaleUnarmored the armor scale treated as unarmored
 -- @field RagdollThrowOnsetMs how long after the body ragdolls before the mod
+-- @field RagdollBrake whether to brake ragdolls after they are thrown.
+-- @field RagdollBrakeKeepArmored fraction of speed kept by armored victims.
+-- @field RagdollBrakeKeepUnarmored fraction of speed kept by unarmored victims.
+-- @field RagdollBrakeMs length of the braking window.
+-- @field RagdollBrakeArmorScaleArmored the armor scale treated as fully armored.
+-- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as unarmored.
+-- @field RagdollBrakeDampingArmored damping applied to armored victims.
+-- @field RagdollBrakeDampingUnarmored damping applied to unarmored victims.
+-- @field RagdollLyingContacts contacts needed to trigger lying mode.
 --   takes control, so the engine's launch is left alone
--- @field RagdollThrowMinScale the most speed one poll may remove, as a
 --   fraction kept. Without a floor the scale reached zero and a body stopped
 --   dead inside one frame, which is accurate and looks broken
--- @field RagdollThrowSlack how far over its ceiling a body must be before it is
 --   corrected at all, so one near its ceiling is not nudged every poll
--- @field RagdollThrowStopSeconds how long a body is given to spend the
 --   distance still owed to it. The speed ceiling is the remaining budget
 --   divided by this, so a smaller figure brakes harder
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
