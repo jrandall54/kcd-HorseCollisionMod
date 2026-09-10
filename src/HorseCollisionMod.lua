@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.1.0
+-- @release 5.2.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.1.0"
+HorseCollisionMod.Version = "5.2.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -176,6 +176,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeImpactSpeed the speed a charge is scored at
 -- @field ImpactSoundRear the layers the rear on the spot plays. Hooves coming
 --   down on someone, not a horse riding into them
+-- @field ImpactDustEffectRear the particle to spawn for a rear impact
 -- @field ImpactDustScaleRear how much dust a rear raises
 -- @field CameraShakeRearScale how hard a rear shakes the rider's camera
 -- @field RiderBlurRearScale how much a rear blurs the rider's view
@@ -884,6 +885,7 @@ HorseCollisionMod.Config = {
 	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
 	ImpactDust               = true,
 	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
+	ImpactDustEffectRear     = "bullet.hit_flesh.armor",
 	ImpactDustScaleTrot      = 0.11,
 	ImpactDustScaleGallop    = 0.15,
 	ImpactDustHeight         = 0.15,
