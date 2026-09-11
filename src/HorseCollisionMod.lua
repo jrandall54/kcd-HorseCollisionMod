@@ -263,6 +263,10 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   is not treated as looking away, which stops meaning anything once the
 --   horizontal component collapses. Looking down is also where the camera is
 --   nearest the rider's own model
+-- @field LeanSuppressShake whether an impact's camera shake is held back
+--   while the rider is leaning. Both are SetViewShake, and a second call
+--   reverses the camera rather than adding to it, so a shake mid lean sends
+--   the camera home at the moment the rider leaned out to watch
 -- @field LeanRunawayFactor how far past the target the camera may get, as a
 --   multiple of LeanDistance, before the lean is ended outright
 -- @field LeanReleaseSec the short shake fired on release, which expires and
@@ -665,6 +669,7 @@ HorseCollisionMod.Config = {
 	LeanRunawayFactor        = 2.0,
 	LeanMaxAngleDeg          = 45,
 	LeanMaxPitchDeg          = 55,
+	LeanSuppressShake        = true,
 	LeanHomeMs               = 220,
 	LeanShakePeriod          = 40.0,
 	LeanShakeSec             = 1.5,
