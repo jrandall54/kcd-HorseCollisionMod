@@ -18610,3 +18610,35 @@ against memory or the CPU itself, which usually announce themselves.
 The mod cannot cause this, but **running the game is a heavy load and therefore
 a trigger**, which is why it happens during testing rather than at idle. That
 distinction matters for the next time it happens mid ride.
+
+## A corpse reared onto fell through the world, and the mod did not push it
+
+The rider reared twice on `rat_ruch`, who fell, died and then vanished.
+
+    rear 1   dealt 56.3   health 83.0 -> 26.8   knocked down
+    rear 2   state=BlendRagdoll, already a ragdoll on the ground
+             fatal, dealing 55.8 against 26.8   -> 0.0
+    corpse   dz=-34.57   then -156.64   then -216.31
+
+**The mod's physical contribution was nothing.** There is no `Impulse`, no
+`Mass` and no `Phase2Grounded` line for him anywhere in the run, so no impulse
+was applied, no ragdoll mass written and no damping set. The rear on the spot
+reaches a victim through damage and a reaction fragment, and that is all it did
+here.
+
+What the second rear did do is bring the horse down on a body already lying
+underneath it. The engine resolved that overlap by ejecting the body downward
+through the terrain. That is the same family as the horse standing on the dog
+and on the merchant, which the entry above establishes as vanilla by testing it
+in full shipping configuration with the mod absent.
+
+### The kill itself was deliberate and is worth a decision
+
+`fatal, dealing 55.8 against 26.8 health` is the preempt: the mod judges a blow
+lethal by anyone's hand and finishes the victim so the engine's trample cannot
+take the kill and the crime with it. It worked, and `attributed=false` means no
+charge was laid.
+
+The consequence is that **two rears kill an unarmored civilian**, at a rear base
+of 60 against about 83 health. That is a balance figure rather than a defect,
+and it is better decided than discovered on a merchant.
