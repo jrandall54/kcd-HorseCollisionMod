@@ -17787,3 +17787,77 @@ The three-stage collision pipeline implemented on the previous branch was packag
 
 ### Outcome
 Build 5.1.0 packaged and released. All pre-commit style violations resolved (hard tabs over spaces, line wrapping limits on comments in Reaction.lua).
+
+## The lying-mode damping is gone, and what replaced it
+
+The section above, *Sculpting the throw*, names `dampingLyingMode` in
+`PHYSICPARAM_ARTICULATED` as the one actuator of three that works. That call no
+longer exists anywhere in the mod. Neither does `PHYSICPARAM_ARTICULATED`, and
+`RagdollLyingContacts` survived as a setting nothing read. Anyone reading this
+diary forward would go looking for a mechanism that was removed, so it is
+recorded here.
+
+What replaced it is a single counter-impulse. Sixty milliseconds after the
+victim ragdolls the body's velocity is read, and an impulse of
+`mass * speed * (1 - keep)` is applied straight back along it. Braking to a
+fraction of speed is proportional, so the engine's variation between one
+contact and the next still passes through and what is controlled is how much is
+taken away, which was the property the damping was chosen for.
+
+### First telemetry of it, and two readings that settle old arguments
+
+    Impulse     rat_woman43  magnitude=58.3   mass=58.7    dv=0.99
+    Phase1Brake rat_woman43  speed=16.83  keep=0.94  mag=62.9    ok=true
+    Phase1Brake rat_guard27  speed=4.63   keep=0.55  mag=2576.3  mass=1225.5
+
+**A velocity read works on a ragdoll.** Earlier work assumed it might not, and
+measured speed from the distance between two polls instead. 16.83 m/s is a real
+thrown body, and the figure agrees with the polled speeds that follow it.
+
+**Sixty milliseconds is not too early.** The obvious objection is that this is
+the old fixed-150 ms damping fault returning, catching bodies before they reach
+top speed. It is not: `airPeak` for the armored guard reads 0.00 across the
+whole later poll window, and the unarmored victim's peak of 12.51 is below the
+16.83 the brake saw. The brake is landing at or past the peak in both cases.
+
+### `keep` is an endpoint, not a delivered figure
+
+`RagdollBrakeKeepUnarmored` is 1.0 and no victim receives it. `keep` is
+interpolated across an armor bracket whose unarmored end is 1.26, and ordinary
+villagers score about 1.15, so they are braked by six percent where the setting
+reads untouched. That is wanted, since the engine's throws run long at every
+armor level, but the setting names an endpoint and should be read that way.
+
+## The throw sculpting was measured in a configuration that does not ship
+
+`RagdollMassArmorScaled` is `true` in the shipped settings file and has been
+continuously since it was introduced. It has never shipped as `false`.
+
+The *Sculpting the throw* measurements above are labelled
+`RagdollMassArmorScaled false, every victim at a flat 80 kg`. That was the
+experiment's configuration. So the 1.59x separation, the 6.0 damping optimum
+and the collapse of the long tail were all measured with the mass rewrite
+switched off, and the build that ships has it switched on. The two armor levers
+are stacked, not substituted.
+
+What the stack actually produces, measured:
+
+| victim | armor scale | ragdoll mass | mod's own impulse | resulting dv |
+| --- | --- | --- | --- | --- |
+| villager | 1.15 | 58.7 kg | 58.3 | 0.99 m/s |
+| mailed guard | 0.51 | 1225.5 kg | 58.3 | **0.05 m/s** |
+
+### The consequence for barding
+
+`Knockback`, `Uplift` and the entire barding force bonus move a mailed guard by
+five centimetres per second. They are inert against anyone in armor, because
+the mass they are divided by is a hundredfold lie about what a person weighs.
+The counter-impulse, computed from that same mass, is 2576 units against the
+mod's own 58.3 — forty times larger. The largest impulse the mod applies to an
+armored victim is now its brake.
+
+This is not a defect in the brake. It is the cost of the mass rewrite, which
+`experiment/armor-scaled-damping` established cannot simply be removed: damping
+alone separates 1.22x to 1.29x against the mass rewrite's 1.84x, and honest
+masses would separate worse still, about 1.17x. Recorded as an open issue
+rather than changed.

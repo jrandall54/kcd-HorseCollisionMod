@@ -29,7 +29,7 @@
 --
 -- @module HorseCollisionMod.Marks
 -- @author jrandall54
--- @release 5.2.0
+-- @release 5.2.1
 
 --- Body zones bloodied for each impact direction.
 --
@@ -219,23 +219,43 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 		return false
 	end
 
+	-- The rear spawns on contact rather than on landing.
+	--
+	-- A rear is a standing attack and the victim is directly in front of the
+	-- hooves, so there is no flight to wait out and the dust belongs at chest
+	-- height where the blow lands rather than at the feet.
 	if tierName == "Rear" then
-		local pos = npc:GetWorldPos()
-		if pos then
-			local ok = pcall(function()
-				Particle.SpawnEffect(cfg.ImpactDustEffectRear or cfg.ImpactDustEffect,
-						{ x = pos.x, y = pos.y, z = pos.z + 1.3 },
-						{ x = 0, y = 0, z = 1 },
-						scale)
-			end)
-			if cfg.LogTelemetry then
-				self:Log("ImpactDust tier=Rear INSTANT scale=" .. string.format("%.2f", scale)
-						.. " ok=" .. tostring(ok))
-			end
+		local pos = nil
+
+		-- Read through `pcall` like every other position read in this mod.
+		-- Bare, a victim who has been removed between the impact and this
+		-- call throws out of `ImpactDust` and takes the rest of the caller's
+		-- impact handling with it, since `Update` does not wrap this.
+		pcall(function()
+			pos = npc:GetWorldPos()
+		end)
+
+		if not pos then
+			return false
 		end
-	else
-		self:DustWhenLanded(npc, tierName, scale, 0)
+
+		local ok = pcall(function()
+			Particle.SpawnEffect(cfg.ImpactDustEffectRear or cfg.ImpactDustEffect,
+					{ x = pos.x, y = pos.y, z = pos.z + 1.3 },
+					{ x = 0, y = 0, z = 1 },
+					scale)
+		end)
+
+		if cfg.LogTelemetry then
+			self:Log("ImpactDust tier=Rear INSTANT scale="
+					.. string.format("%.2f", scale)
+					.. " ok=" .. tostring(ok))
+		end
+
+		return ok
 	end
+
+	self:DustWhenLanded(npc, tierName, scale, 0)
 
 	return true
 end

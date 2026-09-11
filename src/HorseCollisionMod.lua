@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.2.0
+-- @release 5.2.1
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.2.0"
+HorseCollisionMod.Version = "5.2.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -233,32 +233,20 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpulseDelayMs how long to wait before the ragdoll impulse
 -- @field LateralImpulse how much of the impulse pushes across the
 --   horse's line rather than along it
--- @field RagdollThrowSculpt whether the mod sculpts a thrown body's distance
---   down to a commanded figure. The engine's own collision decides the launch
---   and is never interfered with; this removes exactly enough of that motion to
---   land on a chosen distance, and can only ever subtract
--- @field RagdollThrowDistanceUnarmored how far an unarmored victim is allowed
---   to travel, in meters, as a ceiling rather than a target
--- @field RagdollThrowDistanceArmored the same for a victim in full mail
--- @field RagdollThrowArmorScaleArmored the armor scale treated as fully
+-- @field RagdollBrake whether a thrown body is braked at all. The engine's
+--   own collision decides the launch and is never interfered with; the brake
+--   is one counter-impulse along the body's own velocity and can only ever
+--   subtract
+-- @field RagdollBrakeKeepArmored the fraction of its speed a victim in full
+--   mail keeps, the low end of the bracket
+-- @field RagdollBrakeKeepUnarmored the fraction an unarmored victim keeps,
+--   the high end. 1.0 is untouched, and is only reached by a victim whose
+--   armor scale reaches `RagdollBrakeArmorScaleUnarmored` exactly
+-- @field RagdollBrakeArmorScaleArmored the armor scale treated as fully
 --   armored, the low end of the range
--- @field RagdollThrowArmorScaleUnarmored the armor scale treated as unarmored
--- @field RagdollThrowOnsetMs how long after the body ragdolls before the mod
--- @field RagdollBrake whether to brake ragdolls after they are thrown.
--- @field RagdollBrakeKeepArmored fraction of speed kept by armored victims.
--- @field RagdollBrakeKeepUnarmored fraction of speed kept by unarmored victims.
--- @field RagdollBrakeMs length of the braking window.
--- @field RagdollBrakeArmorScaleArmored the armor scale treated as fully armored.
--- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as unarmored.
--- @field RagdollBrakeDampingArmored damping applied to armored victims.
--- @field RagdollBrakeDampingUnarmored damping applied to unarmored victims.
--- @field RagdollLyingContacts contacts needed to trigger lying mode.
---   takes control, so the engine's launch is left alone
---   fraction kept. Without a floor the scale reached zero and a body stopped
---   dead inside one frame, which is accurate and looks broken
---   corrected at all, so one near its ceiling is not nudged every poll
---   distance still owed to it. The speed ceiling is the remaining budget
---   divided by this, so a smaller figure brakes harder
+-- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as
+--   unarmored. An endpoint set above the highest scale that actually occurs
+--   silently converts "leave them alone" into "slow everyone"
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
@@ -562,7 +550,7 @@ HorseCollisionMod.Config = {
 	                             { "body", 0, 1.6 },
 	                             { "blunt", 0, 2.0 },
 	                             { "f_bodyfall1", 0, 1.3 } },
-	ImpactDustScaleRear      = 0.12,
+	ImpactDustScaleRear      = 0.6,
 	CameraShakeRearScale     = 0.8,
 	RiderBlurRearScale       = 0.6,
 	RiderBlurRearLength      = 0.4,
@@ -574,7 +562,7 @@ HorseCollisionMod.Config = {
 	                             { "hs_hp_soil", 6, 0.7 },
 	                             { "face_armed", 0, 0.9 },
 	                             { "f_bodyfall1", 0, 0.7 } },
-	ImpactDustScaleCharge    = 0.17,
+	ImpactDustScaleCharge    = 0.10,
 	CameraShakeChargeScale   = 1.2,
 	RiderBlurChargeScale     = 1.1,
 	RiderBlurChargeLength    = 1.1,
@@ -599,7 +587,7 @@ HorseCollisionMod.Config = {
 	RearAnimSpeed            = 1.0,
 	RearStrikes              = true,
 	RearStrikeMs             = 700,
-	RearReach                = 2.0,
+	RearReach                = 2.5,
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,
 	RearStaminaCost          = 12.0,
@@ -885,9 +873,9 @@ HorseCollisionMod.Config = {
 	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
 	ImpactDust               = true,
 	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
-	ImpactDustEffectRear     = "bullet.hit_flesh.armor",
-	ImpactDustScaleTrot      = 0.11,
-	ImpactDustScaleGallop    = 0.15,
+	ImpactDustEffectRear     = "collisions.destructibles.arrow_soil",
+	ImpactDustScaleTrot      = 0,
+	ImpactDustScaleGallop    = 0.09,
 	ImpactDustHeight         = 0.15,
 	ImpactDustSampleMs       = 50,
 	ImpactDustFallVz         = -0.5,
@@ -960,21 +948,30 @@ HorseCollisionMod.Config = {
 	-- body and `min_energy` is the threshold below which physics puts it to
 	-- rest, both fields of `pe_simulation_params`, reached through
 	-- `entity:SetPhysicParams(PHYSICPARAM_SIMULATION, ...)`.
-	RagdollThrowSculpt       = true,
-	RagdollThrowDistanceUnarmored = 4.0,
-	RagdollThrowDistanceArmored   = 1.5,
-	RagdollThrowArmorScaleArmored = 0.35,
-	RagdollThrowArmorScaleUnarmored = 1.50,
-	RagdollThrowOnsetMs      = 0,
+	-- What fraction of its speed a thrown body is allowed to keep, and the
+	-- armor scales the two ends of that bracket belong to.
+	--
+	-- The brake is a single counter-impulse along the body's own velocity,
+	-- fired once shortly after the ragdoll is thrown. Braking a body to a
+	-- fraction of its speed is proportional rather than absolute, so the
+	-- engine's own variation between one contact and the next passes through
+	-- intact and what is controlled is how much is taken away.
+	--
+	-- Ten settings were removed from here in the audit of the pipeline
+	-- rewrite: `RagdollThrowSculpt`, `RagdollThrowDistanceArmored` and
+	-- `RagdollThrowDistanceUnarmored`, `RagdollThrowArmorScaleArmored` and
+	-- `RagdollThrowArmorScaleUnarmored`, `RagdollThrowOnsetMs`,
+	-- `RagdollBrakeMs`, `RagdollBrakeDampingArmored` and
+	-- `RagdollBrakeDampingUnarmored`, and `RagdollLyingContacts`. All of them
+	-- belonged to the distance-targeting and lying-mode damping mechanisms
+	-- the rewrite replaced, and every one had been unread since. None was
+	-- ever exposed in the settings file, so no install is broken by their
+	-- going.
 	RagdollBrake             = true,
 	RagdollBrakeKeepArmored  = 0.45,
 	RagdollBrakeKeepUnarmored = 1.0,
-	RagdollBrakeMs           = 400,
 	RagdollBrakeArmorScaleArmored = 0.35,
 	RagdollBrakeArmorScaleUnarmored = 1.26,
-	RagdollBrakeDampingArmored = 6.0,
-	RagdollBrakeDampingUnarmored = 0.0,
-	RagdollLyingContacts     = 0,
 	RagdollDamping           = 5.0,
 	RagdollMinEnergy         = 1.0,
 	RagdollDampPollMs        = 100,

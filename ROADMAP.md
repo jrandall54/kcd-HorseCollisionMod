@@ -988,3 +988,48 @@ own health across a lunge is the obvious first step, and it is cheap: one line
 per lunge, accumulated, following the pattern the throw traces used.
 
 Until it is seen a second time there is nothing to reproduce.
+
+
+## Open issue: barding and knockback are inert against anyone in armor
+
+The mod writes a ragdoll mass derived from the victim's armor, and at the
+shipped exponent of 3.7 a mailed guard becomes about 1225 kg against a
+villager's 59. That mass is what every impulse the mod applies is divided by,
+so the tuned force settings land differently by two orders of magnitude:
+
+    villager      mass=58.7    magnitude=58.3  dv=0.99 m/s
+    mailed guard  mass=1225.5  magnitude=58.3  dv=0.05 m/s
+
+Five centimetres per second is nothing. `Knockback`, `Uplift` and the whole
+barding force bonus therefore do nothing at all to an armored victim, which
+makes barding a stamina-and-damage feature in practice rather than the force
+feature it is documented as. A player who armors their horse and rides down a
+guard gets no more push than one who does not.
+
+### Why the obvious fix is not available
+
+Removing the mass rewrite is the change that suggests itself and it has already
+been ridden, on `experiment/armor-scaled-damping`, which is unmerged. Measured
+there:
+
+    mass-based (shipping, 43 to 4900 kg)     1.84x separation
+    damping, exponent 0.35                   1.22x
+    damping, exponent 1.0                    1.29x
+
+and throw distance responds to mass as `mass ^ -0.185`, so an honest 60 kg
+against 140 kg would separate about 1.17x. The separation the mod has is what
+the lie buys; nothing honest reproduces it. Tripling the damping spread bought
+0.07x.
+
+### What is actually open
+
+Not "should the mass rewrite go". The question is whether the force settings
+can be made to mean something against armored victims while the mass rewrite
+stays, and the shape of the answer is probably to scale the applied magnitude
+by the same figure the mass was scaled by, so that a commanded knockback
+delivers a commanded velocity change rather than a commanded impulse. That is
+a small change and it has not been tried.
+
+Note also that the sculpting measurements in the diary were taken with
+`RagdollMassArmorScaled = false`, which is not the shipped configuration, so
+the separation figures quoted for the brake do not describe the shipped build.
