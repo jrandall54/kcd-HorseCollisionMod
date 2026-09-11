@@ -18203,3 +18203,68 @@ The long tail this project spent several sessions removing is reappearing at the
 unarmored end, where the drag is now 4.0 rather than the 8.0 everyone used to
 receive. Separation was bought partly by letting unarmored victims travel
 further, which is not the same thing as holding armored ones back.
+
+### Correction: 2.05x was one run. Pooled, it is 1.70x to 1.87x
+
+The 2.05x above came from a single run of 71 throws and does not survive a
+second one. The next run, same settings, measured 1.38x on the same split. Both
+are the same configuration, so they pool:
+
+| | n | mean | median | max |
+| --- | --- | --- | --- | --- |
+| armored | 105 | 2.04 | 1.89 | 4.80 |
+| unarmored | 38 | 3.46 | 3.53 | 7.11 |
+
+    separation on means    1.70x
+    separation on medians  1.87x
+
+Against the mass rewrite's 1.84x that is a **match rather than a win**, and the
+honest claim is that the brake reaches the same separation the mass lie did
+while every figure in it is one that was set. The gain is control, not distance.
+
+The lesson is the one this diary keeps having to relearn: a single run of
+seventy throws does not resolve this question, because the spread inside one
+armor band is wider than the difference between bands. Quote pooled figures or
+quote none.
+
+### The gradient is real but it is a step, not a slope
+
+Mean distance by armor scale, with the ceiling and drag each victim received:
+
+    scale 0.2-0.4   n=21  cap=2.50  drag=20.0   mean=1.99
+    scale 0.4-0.6   n=31  cap=2.76  drag=18.8   mean=2.02
+    scale 0.6-0.8   n=4   cap=4.17  drag=12.4   mean=1.58
+    scale 0.8-1.0   n=2   cap=4.78  drag=9.6    mean=2.73
+    scale 1.0-1.2   n=4   cap=5.60  drag=5.9    mean=2.59
+    scale 1.2-1.4   n=9   cap=6.00  drag=4.0    mean=3.05
+
+The ends are clean and the middle is four samples wide and unreadable. Note the
+first two bands receive almost the same treatment, because the bracket's armored
+endpoint is 0.35 and real guards score from 0.10 up, so everything below 0.35
+clamps to the same figures. That is intended and it is why the heavily armored
+band and the mail band land together.
+
+**The rider's verdict on this build**: "It feels good and I can tell the
+separation between heavily armored and unarmored and feel a difference and the
+animations don't seem odd or buggy." No syrup at drag 20.0, which was the
+objection raised against heavy drag before it was ever tested.
+
+## The horse leaving the ground is collision-linked, and parked
+
+The probe fired five times in about eighty impacts, and the rider saw none of
+them, so these are small lifts rather than the five-meter launch that prompted
+it.
+
+    vz=3.60  speed=12.07  sinceImpactMs=448
+    vz=4.15  speed=17.50  sinceImpactMs=272
+    vz=2.55  speed=8.32   sinceImpactMs=224
+    vz=3.91  speed=4.92   sinceImpactMs=128
+    vz=2.52  speed=10.50  sinceImpactMs=2640
+
+**Four of the five land within 450 ms of an impact**, which is the first
+evidence of any kind that the lift is collision-linked rather than terrain.
+Parked at the rider's direction, since the visible event is rare enough not to
+be worth chasing. Two things to pick up from if it is ever worth it: the
+threshold of 2.5 m/s is too low to isolate the visible event and would want
+raising, and one sample reads the horse at 17.50 m/s, which is well above both
+the gallop tier and `MaxImpactSpeed`.
