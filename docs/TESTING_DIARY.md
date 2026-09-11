@@ -17861,3 +17861,114 @@ This is not a defect in the brake. It is the cost of the mass rewrite, which
 alone separates 1.22x to 1.29x against the mass rewrite's 1.84x, and honest
 masses would separate worse still, about 1.17x. Recorded as an open issue
 rather than changed.
+
+## The animation queue does not overflow on repeated impacts, at any tier tested
+
+Hunted with two instruments that had not been used before. `log_SpamDelay` was
+set to 0, because at the deployed value of 30 the engine collapses repeats of an
+identical line, and the overflow warning is byte-identical for a given character
+apart from a pointer. The earlier claim that the spam delay is harmless because
+"the mod's own telemetry carries changing numbers on every line" is true of the
+mod and false of the engine's own warnings about one repeating entity, which is
+why the message looked absent from the log while being visible on screen.
+
+`ca_AnimWarningLevel` was raised from 0 to 2. The decompiled emitter gates its
+earlier "Animation-queue filled up to 15 entries" message behind that level
+being above 1, so at the shipped default only the hard failure can ever print.
+At level 2 the queue can be watched approaching the limit instead of being
+caught at it. Level 2 produced no noise at idle, so it costs nothing.
+
+Two runs against one victim, both clean:
+
+| run | victim | impacts | tiers | queue lines |
+| --- | --- | --- | --- | --- |
+| 1 | `rat_guardJanik` | 43 | 41 trot, 2 gallop | 0 |
+| 2 | `rat_woman32` | 63 | 61 walk, 2 trot | 0 |
+
+Forty-three is already past the twenty-four knockdowns that overflowed in the
+run recorded earlier, so the plain repeated-impact path is not the trigger.
+Reactions played correctly throughout: `ok=true`, and the victim reaching
+`AnimationControlled` on the `Stranded` line, which is the state that says the
+fragment took hold rather than being accepted and dropped.
+
+The reasoning that picked the walk tier was that trot and gallop ragdoll the
+victim, and a ragdoll tears down the animation state and takes the queue with
+it, so the walk stagger is the only tier that plays a fragment on a standing
+actor with nothing behind it to flush the queue. That reasoning was sound and
+the answer was still no.
+
+**Not yet tested**: the rear and the charge, which queue on the horse rather
+than on the victim. The horse is the better candidate on its face, being a
+single character instance that lives for the whole session, is never ragdolled,
+and receives a fragment every time the rider rears.
+
+### The overflow rejects the animation, it does not merely warn
+
+Worth recording because the message calls itself a performance problem. In the
+decompiled emitter the overflow branch returns 0, so the requested animation
+does not start. An actor that has overflowed goes deaf to further requests,
+which is exactly the symptom recorded earlier as "a valid call that plays
+nothing" and blamed at the time on a stale entity reference.
+
+## Walking into someone can be scored as a trot
+
+**Rider report**: "I had two trot reactions fire but at no point did I press the
+trot/sprint button."
+
+Both are in the log and both are real. They are not the same fault.
+
+    Impact tier=Walk  speed=3.79  sampled=2.24
+    Impact tier=Trot  speed=6.23  sampled=2.05     scored 3x the real speed
+    Impact tier=Trot  speed=5.54  sampled=5.54     the horse really was moving
+
+`speed` is the score and `sampled` is the horse's speed on the tick of contact.
+On an ordinary walk impact they agree to two decimal places: 3.06 against 3.05,
+2.90 against 2.89. On the first trot event they disagree by a factor of three.
+
+### The first: a 900 ms peak hold carrying a spike
+
+`ImpactSpeed` returns `RecentPeak(ImpactSpeedSamples)`, which is 9 samples at
+the 100 ms reaction poll, so **the score is the highest speed seen in the last
+900 milliseconds**. The trot threshold is 4.5. One spike anywhere in that window
+tiers the impact as a trot however slowly the horse is travelling on contact.
+
+The hold is not a mistake in itself and must not simply be removed: it exists so
+a collision is rated by the speed the horse carried *into* it, since contact
+slows the horse and the instantaneous reading under-rates the blow. The fault is
+that it cannot tell speed carried into a collision from speed produced by one.
+
+### The second: the horse is genuinely being thrown by the body it walks into
+
+On the second event score and sample agree at 5.54, so the horse really was
+doing 5.54 m/s with the rider walking. Watch the scores climb across successive
+shoves while the sampled speed stays at walking pace:
+
+    3.06 / 3.05    agreeing
+    2.90 / 2.89    agreeing
+    3.79 / 2.24    diverging
+    6.23 / 2.05    trot
+
+That is a feedback loop. Each shove kicks the horse off the victim's body, the
+kick enters the speed history, and the peak hold tiers the following impact
+higher.
+
+### This was recorded before and dismissed on a figure that is wrong
+
+An unmerged note on `experiment/armor-scaled-damping`, "The horse was launched
+into the air off a body being trampled", attributes the launch to that
+experiment's flat 80 kg victims and reassures that shipping values put a
+villager at "roughly 22 kg", far too light to throw a horse. That figure assumed
+an armor scale of 1.5. Measured at shipping values today, `rat_woman32` scores
+an armor scale of **1.00** for a ragdoll mass of **100 kg**, and `rat_woman43`
+scored 58.7 kg. Villagers run 58 to 100 kg, not 22, which is the range the note
+itself said "has far more scope to throw the horse" and asked to have watched.
+
+It is now observed at shipping values and at walking pace, so the dismissal does
+not hold.
+
+### What the player gets
+
+`rat_woman32` took 16 damage, a knockdown, dirt and blood, and a camera shake
+from what the rider experienced as walking into her. With `CollisionIsCrime`
+on, that is charged as the heavier tier as well. The walk tier's entire contract
+with the player is that it shoves and does not knock down.
