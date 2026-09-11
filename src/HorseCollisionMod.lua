@@ -233,6 +233,14 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   Lower is a steadier hold, because the residual wobble is the travel speed
 --   times the poll interval
 -- @field LeanPollMs how often the held offset is checked and corrected
+-- @field LeanMaxAngleDeg how far off the horse's line the rider may be
+--   looking and still lean, in degrees. Past it the camera travels through the
+--   rider and the horse rather than out beside them, because the offset is
+--   applied in camera space. Turning past it mid lean ends the lean. 0 removes
+--   the limit
+-- @field LeanLeftTrim meters added to the left lean only, for the slight
+--   asymmetry between the sides. A trim rather than a correction, since the
+--   cause is not established
 -- @field LeanDeadband how far off target the camera may sit before a
 --   correction is spent on it, in meters. Without it the loop flips on every
 --   poll once the camera is on the target
@@ -638,6 +646,8 @@ HorseCollisionMod.Config = {
 	LeanHoldAmplitude        = 3.0,
 	LeanPollMs               = 30,
 	LeanDeadband             = 0.03,
+	LeanMaxAngleDeg          = 45,
+	LeanLeftTrim             = 0,
 	LeanHomeMs               = 220,
 	LeanShakePeriod          = 40.0,
 	LeanShakeSec             = 20.0,

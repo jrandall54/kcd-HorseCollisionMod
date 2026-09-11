@@ -40,8 +40,11 @@ number.
   `LeanForwardShare`, `LeanTravelAmplitude`, `LeanHoldAmplitude` and
   `LeanPollMs` configure it.
 
-  The lean only works while mounted: on foot there is no horse's head to look
-  around.
+  The lean only works while mounted, and only while looking roughly along the
+  horse. `LeanMaxAngleDeg` refuses it past 45 degrees off the horse's line and
+  ends one already running if the rider turns past it, because the camera is
+  displaced in its own space and past that point it travels through the rider
+  and the horse rather than out beside them.
 
 ### Changed
 - The rear on the spot moves from `q` to `f`, since the lean takes `q` and `e`.

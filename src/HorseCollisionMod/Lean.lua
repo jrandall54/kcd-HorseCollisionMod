@@ -161,6 +161,59 @@ function HorseCollisionMod:LeanBaselineNow()
 end
 
 
+--- How far off the horse's line the rider is looking, in degrees.
+--
+-- Leaning only makes sense while looking roughly along the horse. Turned far
+-- enough to the side the camera travels into the rider's own body and into the
+-- horse, because the offset is applied in camera space and the camera is
+-- already inside the pair of them once it stops pointing down the horse's line.
+--
+-- @treturn ?number degrees, 0 looking straight ahead, always positive
+function HorseCollisionMod:LeanViewAngle()
+	local playerEnt = rawget(_G, "player")
+	local horse, dir, heading = nil, nil, nil
+
+	if not playerEnt then
+		return nil
+	end
+
+	pcall(function()
+		horse = playerEnt.player:GetPlayerHorse()
+	end)
+
+	if not horse then
+		return nil
+	end
+
+	pcall(function()
+		dir = System.GetViewCameraDir()
+		heading = horse:GetDirectionVector(1)
+	end)
+
+	if not dir or not heading then
+		return nil
+	end
+
+	local dl = math.sqrt((dir.x * dir.x) + (dir.y * dir.y))
+	local hl = math.sqrt((heading.x * heading.x) + (heading.y * heading.y))
+
+	if dl <= 0 or hl <= 0 then
+		return nil
+	end
+
+	-- Flattened, because looking up or down is not looking away.
+	local dot = ((dir.x / dl) * (heading.x / hl)) + ((dir.y / dl) * (heading.y / hl))
+
+	if dot > 1 then
+		dot = 1
+	elseif dot < -1 then
+		dot = -1
+	end
+
+	return math.deg(math.acos(dot))
+end
+
+
 --- Flips the camera's direction of travel.
 --
 -- `SetViewShake` does not set a position or a speed. Firing it while a shake is
@@ -239,6 +292,16 @@ function HorseCollisionMod:StartLean(sign)
 	-- compared nil against a number, threw, and the error was swallowed by the
 	-- pcall wrapping the action hook, so the lean died silently and stayed dead
 	-- through a save load, since the mod's table survives one.
+	-- Refused when looking too far off the horse's line, because the camera
+	-- travels in its own space and past a point that takes it through the
+	-- rider and the horse rather than out beside them.
+	local maxAngle = cfg.LeanMaxAngleDeg or 45
+	local angle = self:LeanViewAngle()
+
+	if maxAngle > 0 and angle and angle > maxAngle then
+		return
+	end
+
 	local now = self:TimeMs()
 
 	if self.LeanHomeUntil and now < self.LeanHomeUntil then
@@ -256,7 +319,19 @@ function HorseCollisionMod:StartLean(sign)
 
 	local generation = self.LeanGeneration
 	local timerTick = self.TimerTick
-	local target = (cfg.LeanDistance or 0.65) * sign
+	-- The two sides are not quite symmetric to the rider's eye, the left
+	-- reading as slightly further out. The cause is not established, so this is
+	-- a trim rather than a correction: it adds to the left target only and
+	-- defaults to zero, which changes nothing until someone tunes it. The
+	-- `LeanBack` line carries the side and the achieved offset, so whether the
+	-- asymmetry is real can be read off a run rather than argued about.
+	local reach = cfg.LeanDistance or 0.65
+
+	if sign < 0 then
+		reach = reach + (cfg.LeanLeftTrim or 0)
+	end
+
+	local target = reach * sign
 	local pollMs = cfg.LeanPollMs or 30
 	local reached = false
 	local last = nil
@@ -269,6 +344,17 @@ function HorseCollisionMod:StartLean(sign)
 		end
 
 		if not self.LeanHeld then
+			return
+		end
+
+		-- Turning past the limit mid lean ends it, rather than leaving the
+		-- camera parked inside the horse until the key comes up.
+		local turned = self:LeanViewAngle()
+
+		if (cfg.LeanMaxAngleDeg or 45) > 0 and turned
+				and turned > (cfg.LeanMaxAngleDeg or 45) then
+			self:StopLean()
+
 			return
 		end
 
@@ -337,6 +423,10 @@ function HorseCollisionMod:StopLean()
 
 	local cfg = self.Config
 
+	-- Read before the hold is cleared, because clearing it is what loses which
+	-- side this lean was.
+	local sign = self.LeanHeld
+
 	self.LeanHeld = nil
 	self.LeanGoingBack = false
 	self.LeanGeneration = (self.LeanGeneration or 0) + 1
@@ -350,8 +440,10 @@ function HorseCollisionMod:StopLean()
 	if cfg.LogTelemetry then
 		local offset = self:LeanOffset()
 
-		self:Log("LeanBack from=" .. string.format("%.2f", offset or -9)
-				.. " target=" .. string.format("%.2f", cfg.LeanDistance or 0.65))
+		self:Log("LeanBack side=" .. ((sign or 1) < 0 and "left" or "right")
+				.. " from=" .. string.format("%.2f", offset or -9)
+				.. " target=" .. string.format("%.2f", cfg.LeanDistance or 0.65)
+				.. " angle=" .. string.format("%.0f", self:LeanViewAngle() or -1))
 	end
 end
 
