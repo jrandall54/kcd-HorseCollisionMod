@@ -18148,3 +18148,58 @@ change.
 At the current endpoints, 0.45 armored against 1.0 unarmored, that is a 2.2x
 separation available with flat mass, which is more than the rewrite's 1.84x and
 under direct control rather than emergent from an armor table raised to 3.7.
+
+## The brake replaces the mass rewrite, at 2.05x, in three steps
+
+Mass flat at the engine's 80 kg for every victim throughout. Each step is one
+change, measured before the next was made.
+
+| configuration | armored | unarmored | separation |
+| --- | --- | --- | --- |
+| brake only, `keep` 0.45 to 1.0 | n=14 mean 2.67 | n=10 mean 2.96 | **1.11x** |
+| + armor-scaled ceiling 2.5 / 6.0 | n=44 mean 2.47 | n=8 mean 3.55 | **1.43x** |
+| + armor-scaled drag 20.0 / 4.0 | n=53 mean 2.07 | n=18 mean 4.24 | **2.05x** |
+
+**2.05x beats the mass rewrite's 1.84x**, and every figure in it is a number
+that was set rather than one that emerged from an armor table raised to 3.7.
+The ordering is correct for the first time as well: the armored maximum, 4.41,
+is now below the unarmored mean of 4.24 rather than above its maximum.
+
+### Why the keep fraction alone did almost nothing
+
+Distance tracked how long a body spent above the speed ceiling and barely
+tracked `keep` at all:
+
+    airBraked 0     0.45  0.55  0.56  0.92  1.03  1.40
+    airBraked 3-4   3.43 ... 5.32
+
+The ceiling was one figure for everyone, so it flattened whatever the brake had
+done onto a single curve.
+
+The counter-impulse also fires before the engine has finished delivering the
+throw at this mass. A guard braked at 10.43 m/s with `keep` 0.45 should have
+been left at 4.7 and his `airPeak` afterwards read 11.17. At 1,208 kg the
+engine had finished by sixty milliseconds, which is exactly why the one-shot
+brake looked sufficient while the mass rewrite was quietly carrying the
+separation. A subtraction taken once cannot hold a body that is still being
+pushed; a ceiling can.
+
+### Why the ceiling alone was not enough either
+
+`strength` is `(speed - cap) / span` clamped to 1, so past `cap + span`, about
+5.5 m/s, it saturates and every victim receives the same drag however their
+ceiling was set. Armored bodies held to a ceiling of 2.50 still reached peaks
+of 11.37, 13.28 and 15.37 m/s. Eight of drag does not hold a body the engine
+threw that hard, and on the fast throws, which are the ones where armor is
+supposed to tell victims apart, the ceiling was doing nothing.
+
+Scaling the drag itself, 20.0 in full mail against 4.0 unarmored, is what moved
+1.43x to 2.05x.
+
+### Open, and visible in these numbers
+
+The unarmored maximum is **7.11 m**, against 4.84 in the previous configuration.
+The long tail this project spent several sessions removing is reappearing at the
+unarmored end, where the drag is now 4.0 rather than the 8.0 everyone used to
+receive. Separation was bought partly by letting unarmored victims travel
+further, which is not the same thing as holding armored ones back.
