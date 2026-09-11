@@ -254,7 +254,16 @@ function Enter-Test {
 		& $deploy @deployArgs
 
 		if ($Launch) {
-			& $deploy -NoBuild -Launch @deployArgs
+			# -Launch goes in the hashtable rather than beside it. Passed as a
+			# bare switch in front of a splat it was accepted and did nothing:
+			# the deploy ran, installed and never launched, while this script
+			# said "ready to test" and the status line said the game was not
+			# running. Same family as the splatting defect above, same rule.
+			$launchArgs = $deployArgs.Clone()
+			$launchArgs.NoBuild = $true
+			$launchArgs.Launch = $true
+
+			& $deploy @launchArgs
 		}
 	}
 

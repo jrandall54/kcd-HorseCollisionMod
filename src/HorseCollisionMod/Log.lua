@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Log
 -- @author jrandall54
--- @release 5.3.1
+-- @release 5.4.0-dev.1
 --- The engine clock in milliseconds.
 --
 -- `System.GetCurrTime` returns seconds as a float and `os.clock` returns nil

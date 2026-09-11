@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.4.0-dev.1] - 2026-09-11
+
 ### Added
 - Leaning, so the rider can see past the horse's head in first person. Two keys
   slide the camera out to either side and back, which looks along the horse's

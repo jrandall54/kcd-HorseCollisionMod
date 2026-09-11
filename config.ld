@@ -34,6 +34,7 @@ file = {
 	"src/HorseCollisionMod/Crime.lua",
 	"src/HorseCollisionMod/Retaliation.lua",
 	"src/HorseCollisionMod/Rider.lua",
+	"src/HorseCollisionMod/Lean.lua",
 	"src/HorseCollisionMod/Rear.lua",
 	"src/HorseCollisionMod/Update.lua"
 }
