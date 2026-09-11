@@ -158,10 +158,34 @@ function Show-Status {
 		$text = [System.IO.File]::ReadAllText($settings)
 		$shown = @()
 
-		foreach ($key in @("CollisionIsCrime", "ThrowRiderOnStaminaEmpty",
-				"HorseBoltsWhenSpent", "RetaliationPullsRiderDown",
-				"RetaliationSurrenderHint", "WomenRaiseAlarm")) {
-			$m = [regex]::Match($text, "$key\s*=\s*([^,\r\n]+)")
+		# The keys come from dev_deploy.ps1's own table rather than from a
+		# second copy of the list kept here.
+		#
+		# There were two lists, and adding Retaliation to the one that writes
+		# the settings left the one that reports them unchanged, so the status
+		# line said the testing world was one key smaller than it was. A status
+		# line that under-reports is worse than no status line, because the
+		# whole reason these are printed is that a silent revert costs a test.
+		$deploySource = Join-Path $PSScriptRoot "dev_deploy.ps1"
+		$keys = @()
+
+		if (Test-Path $deploySource) {
+			$deployText = [System.IO.File]::ReadAllText($deploySource)
+			$block = [regex]::Match($deployText,
+					'(?s)\$script:DevTestValues\s*=\s*\[ordered\]@\{(.*?)\n\}')
+
+			if ($block.Success) {
+				foreach ($entry in [regex]::Matches($block.Groups[1].Value,
+						'(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=')) {
+					$keys += $entry.Groups[1].Value
+				}
+			}
+		}
+
+		foreach ($key in $keys) {
+			# Anchored to the start of a line so a key that is a prefix of a
+			# longer one, or a mention inside a comment, cannot answer for it.
+			$m = [regex]::Match($text, "(?m)^\s*$([regex]::Escape($key))\s*=\s*([^,\r\n]+)")
 
 			if ($m.Success) {
 				$shown += "$key=$($m.Groups[1].Value.Trim())"
