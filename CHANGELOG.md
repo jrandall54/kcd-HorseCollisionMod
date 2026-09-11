@@ -30,22 +30,42 @@ number.
 
 ## [Unreleased]
 
+### Added
+- `RagdollSpeedCapArmorScaled`, `RagdollSpeedCapArmored` and
+  `RagdollSpeedCapUnarmored`. The speed ceiling a traveling body is held under
+  is set by what the victim is wearing, 2.5 m/s in full mail against 6.0
+  unarmored.
+- `RagdollAirDampingArmorScaled`, `RagdollAirDampingArmored` and
+  `RagdollAirDampingUnarmored`. The drag is scaled by armor as well, 20.0
+  against 4.0. The ceiling alone only decides when drag starts, and past the
+  ceiling plus the span it saturates, so without this every victim received the
+  same drag on exactly the fast throws where armor should tell them apart.
+- `HorseAirborneVz`, the upward speed at which the mod reports the horse has
+  left the ground. It writes nothing at rest and samples nothing the detection
+  loop was not already reading.
+
 ### Changed
-- **BREAKING** The mod no longer rewrites a victim's ragdoll mass by their
-  armor. `RagdollMass` is the engine's own 80 kg and `RagdollMassArmorScaled`
-  is off, so a knight and a peasant weigh what the engine says they weigh.
-  Armor is separated by the brake instead. The scaling had no bound on it: at
-  the old base of 100 and exponent 3.7 it ran from 43 kg for a villager to
-  1,208 kg for a mailed guard and 501,187 kg at an armor scale real guards
-  score, which left every force the mod applies divided by a figure swinging
-  across four orders of magnitude. Knockback, uplift and the barding force
-  bonus moved an armored victim five centimeters per second.
+- **NOT BREAKING** Armor separates throw distance through the brake rather than
+  through a rewritten ragdoll mass. `RagdollMass` is the engine's own 80 kg and
+  `RagdollMassArmorScaled` is off, so a knight and a peasant weigh what the
+  engine says they weigh. No setting is removed and every key an existing
+  install carries still works, so nothing has to be reconfigured.
+- The old mass scaling had no bound. At base 100 and exponent 3.7 it ran from
+  43 kg for a villager to 1,208 kg for a mailed guard and 501,187 kg at an
+  armor scale real guards score, which left every force the mod applies divided
+  by a figure swinging across four orders of magnitude: knockback, uplift and
+  the whole barding force bonus moved an armored victim five centimeters per
+  second. Measured over 143 throws the brake reaches 1.70x separation on means
+  and 1.87x on medians, matching what the mass rewrite produced, with every
+  figure in it one that was set.
 
 ### Fixed
 - `RagdollMass = 0`, documented as leaving the engine's figure alone, silently
-  removed every throw: victims ragdolled and then nothing else ran. It now
-  waits for the body to physicalize and hands on as normal without writing a
-  mass.
+  removed every throw: victims ragdolled and nothing else ran, because the
+  early return skipped the callback that fires the impulse, the brake and the
+  damping. It now waits for the body to physicalize and hands on without
+  writing a mass.
+
 
 ## [5.2.2] - 2026-09-11
 
