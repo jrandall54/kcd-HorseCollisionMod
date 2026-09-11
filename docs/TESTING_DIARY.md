@@ -18450,3 +18450,61 @@ spoken for. Every action currently declares `onPress="1"` and the handler tests
 in `Rear.lua` that a hold is unusable was written about borrowing vanilla's
 `jump`, not about the mod's own actions, so it does not settle this. It decides
 hold-to-peek against press-to-toggle and is the next thing to find out.
+
+## The lean works, and the fourth argument to SetViewShake is a period
+
+The rider's correction reframed the whole feature: rotating the view does not
+help, because turning your eyes in place still leaves the horse's head between
+you and what is in front of it. **The camera has to move sideways**, which is
+parallax rather than rotation, and is how a person actually looks around
+something.
+
+`actor:SetViewShake(angular, positional, duration, period, randomness)` is the
+only call found that translates the first-person camera. The second vector is a
+displacement in meters. All 47 `cl_cam*` CVars are inert on this camera.
+
+### The second vector is an amplitude, not a direction
+
+The first attempts swung the camera left and right rather than holding it to one
+side, because a shake oscillates along the axis by construction. `{x = 0.8}`
+means 0.8 m each way, not 0.8 m to the left.
+
+### The fourth argument is a period in seconds, and this file said otherwise
+
+`Rider.lua` documents it as "oscillations per second", taken from vanilla's
+`1/20` in `SinglePlayer:ViewShake`. Measured across a 2000x spread at a fixed
+amplitude and duration, the rider reported:
+
+    0.01   very quick
+    1.0    natural
+    20.0   not noticed at all
+
+That is only consistent with **seconds per oscillation**. At 0.01 the period is
+a hundredth of a second, which is 100 Hz and reads as a blur. At 20 the period
+is twenty seconds, so a two second duration covers a tenth of one swing and the
+camera barely leaves its position.
+
+### Which is what makes a lean possible
+
+A long period turns the shake into a one-way push, because the duration only
+ever covers the opening sliver of a swing and the return half never arrives. The
+amplitude is therefore much larger than the distance actually travelled: at a 30
+second period a 2 second window reaches roughly 40 per cent of the amplitude.
+
+    amplitude 3.0  period 30  duration 2.0   a moderate lean
+    amplitude 5.0  period 60  duration 3.0   further and slower
+    amplitude -3.0 period 30  duration 2.0   the other side
+
+Judged in game: **"It's looking decent, still need some tuning."**
+
+So the three knobs separate cleanly. Amplitude sets how far, period sets how
+fast it gets there, duration sets how long before it lets go. A held key would
+re-fire before the duration expires so the return never begins.
+
+### Ruled out along the way
+
+`PlayerSetViewAngles` rotates the view cleanly and holds, and is the right call
+for anything that wants to turn the view, but it cannot help here. The whole
+`ForcedLook` family constrains pitch only. `SetWorldAngles` on the rider is
+reverted by the mount inside 400 ms. No bone is writable from Lua and no horse
+clip turns the head.
