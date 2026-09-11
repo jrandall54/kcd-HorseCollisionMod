@@ -247,6 +247,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as
 --   unarmored. An endpoint set above the highest scale that actually occurs
 --   silently converts "leave them alone" into "slow everyone"
+-- @field RagdollSpeedCapArmorScaled whether the speed ceiling a travelling
+--   body is held to is scaled by the victim's armor. This is the lever that
+--   separates an armored victim from an unarmored one, because distance
+--   tracks how long a body spends above the ceiling
+-- @field RagdollSpeedCapArmored the ceiling for a victim in full mail
+-- @field RagdollSpeedCapUnarmored the ceiling for an unarmored victim
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
@@ -980,6 +986,9 @@ HorseCollisionMod.Config = {
 	GetupRestPollMs          = 100,
 	GetupRestBand            = 0.02,
 	GetupRestCeilingMs       = 4000,
+	RagdollSpeedCapArmorScaled = true,
+	RagdollSpeedCapArmored   = 2.5,
+	RagdollSpeedCapUnarmored = 6.0,
 	RagdollSpeedSoftCap      = 4.0,
 	RagdollSpeedSoftCapSpan  = 3.0,
 	RagdollAirDamping        = 8.0,

@@ -567,6 +567,11 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	local airSamples = 0
 	local airPeak = 0
 
+	-- The armor-scaled ceiling this victim was actually held to, reported on
+	-- the summary line. The cap is derived per victim, so without it nothing
+	-- in the log says what the figure came out as.
+	local lastCap = 0
+
 	local function apply(why, elapsed, speed, vertical, contact, share)
 		local params = {}
 		local scale = share or 1
@@ -594,6 +599,7 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 					.. " airPeak=" .. string.format("%.2f", airPeak)
 					.. " scale=" .. string.format("%.2f", armorScale or -1)
 					.. " keep=" .. string.format("%.2f", keep)
+					.. " cap=" .. string.format("%.2f", lastCap)
 
 					-- How far the body actually came, against the fraction of
 					-- its speed it was allowed to keep. The pair is what makes
@@ -672,9 +678,58 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 			return
 		end
 
-		-- Bouncing Friction: Binds proportional drag to fast-sliding bodies
-		-- that have not yet settled.
+		-- Drag on a body still travelling and not yet settled, and **the lever
+		-- that actually decides how far a victim goes**.
+		--
+		-- Measured over 24 throws with mass flat at 80 kg, the distance a body
+		-- reached tracked the number of samples it spent above this cap and
+		-- barely tracked `keep` at all:
+		--
+		--     airBraked 0     0.45  0.55  0.56  0.92  1.03  1.40
+		--     airBraked 1-2   1.74  2.08  2.96  3.27  3.39
+		--     airBraked 3-4   3.43 ... 5.32
+		--
+		-- Separation across the whole run was 1.11x, which is nothing, because
+		-- this cap was the same figure for everyone. The counter-impulse
+		-- removes 55 per cent of an armored victim's speed and the cap then
+		-- flattens what is left onto the same curve as an unarmored one.
+		--
+		-- The impulse also fires before the engine has finished delivering the
+		-- throw at this mass. A guard braked at 10.43 m/s with keep 0.45 should
+		-- have been left at 4.7, and his `airPeak` afterwards read 11.17: the
+		-- horse goes on driving a body of 80 kg well past the sixty
+		-- millisecond mark. At 1,208 kg it did not, which is why the one-shot
+		-- brake looked sufficient while the mass rewrite was carrying the
+		-- separation.
+		--
+		-- So the cap is what armor scales. It is a ceiling rather than a
+		-- subtraction, so it does not care when the engine stops pushing: a
+		-- body held under 2.5 m/s cannot travel like one allowed 6.0 however
+		-- it got its speed.
 		local cap = self.Config.RagdollSpeedSoftCap or 0
+
+		if self.Config.RagdollSpeedCapArmorScaled and armorScale then
+			local heavy = self.Config.RagdollSpeedCapArmored or 2.5
+			local light = self.Config.RagdollSpeedCapUnarmored or 6.0
+			local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+			local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
+			local t = 1.0
+
+			if hi > lo then
+				t = (armorScale - lo) / (hi - lo)
+
+				if t < 0 then
+					t = 0
+				elseif t > 1 then
+					t = 1
+				end
+			end
+
+			cap = heavy + ((light - heavy) * t)
+		end
+
+		lastCap = cap
+
 		if cap > 0 and speed and
 				touching < (self.Config.RagdollDampContactRun or 3) then
 			local strength = 0

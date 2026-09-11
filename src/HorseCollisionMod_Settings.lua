@@ -52,6 +52,14 @@ HorseCollisionModSettings = {
 	RagdollMass              = 80.0,
 	RagdollMassArmorScaled   = false,
 	RagdollMassArmorExponent = 3.7,
+	-- The speed ceiling a travelling body is held under, and the lever that
+	-- decides how far a victim goes. Measured over 24 throws at a flat 80 kg,
+	-- distance tracked how long a body spent above this ceiling and barely
+	-- tracked the brake's keep fraction at all. Lower is shorter.
+	RagdollSpeedCapArmorScaled = true,
+	RagdollSpeedCapArmored   = 2.5,   -- the ceiling for a victim in full mail
+	RagdollSpeedCapUnarmored = 6.0,   -- the ceiling for an unarmored victim
+
 	RagdollDamping           = 5.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 1.0,   -- higher puts it to rest sooner
 	RagdollDampPollMs        = 100,   -- how often to look at a thrown body
