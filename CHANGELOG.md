@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.2.2] - 2026-09-11
+
 ### Fixed
 - Walking a horse into someone repeatedly could score the next shove as a trot,
   knocking them down for 16 damage at walking pace. Each shove kicks the horse
