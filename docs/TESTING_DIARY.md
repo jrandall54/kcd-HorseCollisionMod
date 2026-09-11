@@ -17996,3 +17996,36 @@ reaching 26 m/s during a charge. `MaxImpactSpeed` caps the score at 11.0, so a
 charge leaves the speed history pinned at the cap and the 900 ms peak hold
 carries it. Any impact within 900 ms of a charge is therefore scored as a
 gallop whatever the horse is doing. Same leak as the walk case, one tier wider.
+
+## The two-sample rule holds the walk tier, with less margin than is comfortable
+
+Verified after the fix, 47 walk impacts in one run of shoving one victim:
+
+    tier=Walk   score=4.32  sampled=1.06   worst divergence
+    tier=Walk   score=3.72  sampled=2.30
+    tier=Walk   score=3.05  sampled=3.04   ordinary, agreeing
+    tier=Gallop score=10.10 sampled=9.26   the hold doing its job
+
+**No trot fired**, which is the result the fix exists for. The gallop line is
+the control: score above sampled by 0.84 because contact slowed the horse, and
+the tier still scored correctly off the speed carried in. The hold was not
+broken by narrowing it.
+
+The worst walk impact scored 4.32 against a trot threshold of 4.5. It held by
+0.18 m/s. That is a kick that persisted across two consecutive samples, which
+the pair test cannot catch by construction, so the leak is reduced rather than
+closed.
+
+**Widening to three consecutive samples was considered and rejected.** It would
+catch this case, and it would also under-rate a rider who strikes someone while
+accelerating from a walk into a gallop, because a ramping speed differs on every
+sample and the minimum across three of them lands well below what the horse is
+actually doing. Hitting someone mid-acceleration is a normal thing for a player
+to do and a phantom trot at walking pace is not, so the trade runs the wrong
+way.
+
+If this tips over the threshold in play, the next instrument is not a wider
+window. The mod knows when it has just scored an impact, so it can discard or
+clamp the speed samples for a few hundred milliseconds afterwards, which removes
+collision-produced speed without touching acceleration at all. That is the
+targeted fix and it is only worth building once there is a case that needs it.

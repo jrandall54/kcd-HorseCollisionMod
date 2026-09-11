@@ -30,6 +30,16 @@ number.
 
 ## [Unreleased]
 
+## [5.2.2] - 2026-09-11
+
+### Fixed
+- Walking a horse into someone repeatedly could score the next shove as a trot,
+  knocking them down for 16 damage at walking pace. Each shove kicks the horse
+  off the victim's body, and the 900 ms speed hold that rates a collision by the
+  speed the horse carried into it could not tell that kick from real travel. A
+  speed now has to be held across two samples before it counts, so a one-tick
+  kick cannot set it while a genuine gallop is scored exactly as before.
+
 ## [5.2.1] - 2026-09-11
 
 ### Fixed
