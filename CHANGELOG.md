@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-09-11
+
 ### Added
 
 - **Leaning out to see past the horse's head.** In first person the horse's head
