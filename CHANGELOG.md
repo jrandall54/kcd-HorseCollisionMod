@@ -30,6 +30,23 @@ number.
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING** The mod no longer rewrites a victim's ragdoll mass by their
+  armor. `RagdollMass` is the engine's own 80 kg and `RagdollMassArmorScaled`
+  is off, so a knight and a peasant weigh what the engine says they weigh.
+  Armor is separated by the brake instead. The scaling had no bound on it: at
+  the old base of 100 and exponent 3.7 it ran from 43 kg for a villager to
+  1,208 kg for a mailed guard and 501,187 kg at an armor scale real guards
+  score, which left every force the mod applies divided by a figure swinging
+  across four orders of magnitude. Knockback, uplift and the barding force
+  bonus moved an armored victim five centimetres per second.
+
+### Fixed
+- `RagdollMass = 0`, documented as leaving the engine's figure alone, silently
+  removed every throw: victims ragdolled and then nothing else ran. It now
+  waits for the body to physicalize and hands on as normal without writing a
+  mass.
+
 ## [5.2.2] - 2026-09-11
 
 ### Fixed

@@ -439,8 +439,8 @@ HorseCollisionMod.Config = {
 	-- a man in mail is the heavier thing to move. Every human is 80 to the
 	-- physics engine, which is why armor has never been felt in a throw.
 	-- 0 leaves the engine's own figure alone.
-	RagdollMass              = 100.0,
-	RagdollMassArmorScaled   = true,
+	RagdollMass              = 80.0,
+	RagdollMassArmorScaled   = false,
 
 	-- How hard armor is felt as weight. The mass written is the base over the
 	-- armor scale raised to this, so the ratio between an armored victim and

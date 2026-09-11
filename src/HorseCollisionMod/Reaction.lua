@@ -243,7 +243,56 @@ end
 function HorseCollisionMod:MassVictim(npc, armorScale, onTook)
 	local base = self.Config.RagdollMass or 0
 
+	-- Zero means "do not touch the mass", and it must still hand control on.
+	--
+	-- This returned outright, which reads as harmless and is not: `onTook` is
+	-- what fires the impulse, the brake and the damping, so a zero here
+	-- silently removed every throw in the mod while the settings file
+	-- described the value as leaving the engine's figure alone. Anyone
+	-- turning the mass rewrite off the obvious way got victims who ragdolled
+	-- and then sat there.
+	--
+	-- The wait cannot be skipped either. An impulse applied before the body
+	-- is physicalized is ignored without saying so, which is the whole reason
+	-- the ladder below exists. So the readiness test becomes the mass reading
+	-- back as anything at all, rather than reading back as the figure that
+	-- was written.
 	if base <= 0 then
+		local generation = self.TimerTick
+		local attempts = self.RagdollMassAttemptsMs
+
+		local function wait(index)
+			if generation ~= self.TimerTick then
+				return
+			end
+
+			local ready = false
+
+			pcall(function()
+				ready = (npc:GetMass() or 0) > 0
+			end)
+
+			if ready or index == #attempts then
+				if self.Config.LogTelemetry then
+					self:Log("Mass " .. self:NameOf(npc)
+							.. " untouched, ready=" .. tostring(ready)
+							.. " atMs=" .. tostring(attempts[index]))
+				end
+
+				if onTook then
+					onTook(attempts[index])
+				end
+
+				return
+			end
+
+			Script.SetTimer(attempts[index + 1] - attempts[index], function()
+				wait(index + 1)
+			end)
+		end
+
+		wait(1)
+
 		return
 	end
 
