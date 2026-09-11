@@ -30,6 +30,16 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+- Corpses could stay frozen in mid-air after being lifted by the horse, falling
+  only when struck. When a throw settles the mod hands the body back to the
+  engine by clearing `damping` and `min_energy`, but a body that had already
+  reached its sleep threshold ignored that write, because a sleeping physics
+  body discards parameter writes and reports no error. The corpse kept
+  `min_energy` for the rest of its existence and slept the moment it slowed.
+  The body is now woken before the write.
+
+
 ## [5.3.0] - 2026-09-11
 
 ### Added
