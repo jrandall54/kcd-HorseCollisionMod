@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.3.0
+-- @release 5.3.1
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -617,6 +617,36 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	end
 
 	local function release()
+		-- Woken before the write, because a sleeping body cannot receive one.
+		--
+		-- `min_energy` is the threshold below which physics puts a body to
+		-- sleep, and a sleeping body ignores impulses and parameter writes
+		-- alike. So a body that reached its sleep threshold before this watch
+		-- ended never received the release at all: the write was issued,
+		-- reported no error, and was discarded, leaving `min_energy` set on
+		-- that corpse permanently. A corpse carrying it sleeps the moment it
+		-- slows, and one lifted by the horse and then left unsupported holds
+		-- its position in the air.
+		--
+		-- That is why the symptom was intermittent. It bites only when the
+		-- body sleeps before the watch closes, which depends on how quickly it
+		-- came to rest.
+		--
+		-- Diagnosed from the rider's cure rather than from telemetry. Walking
+		-- the horse into a stuck corpse drops it, and physical contact wakes a
+		-- sleeping physics body and does almost nothing else, which is a much
+		-- narrower clue than a probe reading. Entity position read as normal
+		-- throughout, because the entity was never what moved: the ragdoll's
+		-- bones were asleep in a raised pose while the entity sat on the
+		-- ground, so probing entity height and animation state both led
+		-- nowhere.
+		--
+		-- `AwakePhysics` is the neighbouring call to `SetPhysicParams` and
+		-- vanilla uses it on doors and elevators for the same reason.
+		pcall(function()
+			npc:AwakePhysics(1)
+		end)
+
 		pcall(function()
 			npc:SetPhysicParams(PHYSICPARAM_SIMULATION, { damping = 0, min_energy = 0 })
 		end)
