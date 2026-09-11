@@ -18315,3 +18315,80 @@ the commit message of the stale branch it came from and never checked against
 this diary. The entry has been corrected. Nothing here should be read as a fix
 for the floating behavior until someone reproduces that behavior and measures
 it.
+
+# Research: seeing past the horse's head in first person
+
+The rider cannot see what is directly in front of the horse from first person,
+which makes lining up on a target and watching an impact both guesswork. The
+question asked was whether the horse's head can be moved aside with a keypress.
+
+## The horse's head cannot be moved, on two independent counts
+
+**No bone can be written from Lua.** `GetBonePos(name, vec)` exists and vanilla
+uses it on `"Bip01 Spine2"` in `BasicActor.lua`, but it reads. Searched the
+whole vanilla Lua tree, the `libKCD1` script bind headers and the cheat mod for
+any setter, `SetBone`, `BoneRot`, `SetJoint`, `PoseModifier`, `SetSkeleton`, and
+there is none. That matches the engine: writing bone transforms means
+registering an `IAnimationPoseModifier` in the animation update, which is a C++
+interface a pure-Lua mod cannot reach. The horse does carry an
+`m_neckPhysPartId` internally, per `C_Horse.h`, and it is not exposed.
+
+**No head-turn animation exists.** The complete vanilla horse clip set is 45
+clips, read out of `kcd_horse_database.adb` in `Animations-part1.pak`. It is
+locomotion, jumps, mounts and dismounts, collision reactions, rearing and
+grazing. Nothing turns the head to either side. The nearest are `grazing_01`,
+where the head goes down to the ground, and `relaxed_gallop_scare_add`, which is
+the only additive clip in the set. The plumbing to play a new horse fragment
+already exists in this mod, since `hcm_rear` and `hcm_rear_charge` are driven
+through `StartInteractiveActionByName` on the horse, so the obstacle is the
+absence of a clip rather than any inability to play one.
+
+## The view can be moved instead, and that is the answer
+
+The rider's reframing is the one that works: rather than moving the horse, move
+where Henry looks from.
+
+    player.actor:PlayerSetViewAngles({ x = 0, y = 0, z = yaw })
+
+Yaw in radians. Vanilla uses it in `SpawnPoint.lua` and `SinglePlayer.lua` to
+point the player's view on spawn, zeroing x and y and passing only z.
+
+**Confirmed in game, mounted and in first person: it moves the view.**
+
+### The camera CVars are inert here, all of them
+
+Tried first and worth recording as ruled out, because the names are inviting.
+`cl_camModify` is a master switch with `cl_camOffsetX/Y/Z`,
+`cl_camRotateX/Y/Z`, `cl_camTranslateX/Y/Z` and `cl_camKeepX/Y/Z` behind it, 47
+`cl_cam*` CVars in total. Set live while mounted: `cl_camModify 1` with
+`cl_camOffsetX 0.4` did nothing, and `cl_camTranslateX 1.0` with `cl_camKeepX 1`
+did nothing either, at a full meter where any effect would have been
+unmissable. They do not reach the mounted first-person view.
+
+### `SetWorldAngles` on the rider is overwritten, and the readback lies
+
+`player:SetWorldAngles` reports `ok=true` and is reverted inside 400 ms: asked
+for a yaw of -0.137, read back -0.755 against an original -0.747. The mount
+reasserts the rider's rotation every frame.
+
+More useful than the failure is the trap beside it. **`GetAngles` on the player
+returns the entity's angles, not the view's.** After `PlayerSetViewAngles`
+visibly moved the rider's view, the entity yaw read -0.743 both before and
+after, unchanged to three decimal places. Reading entity angles to judge whether
+the view moved reports nothing happened while the screen says otherwise, which
+is the same shape as the corpse whose entity position read normal while the
+rendered body hung in the air. The rider's eyes settled this one.
+
+### Still to determine
+
+Whether the view stays where it is put or springs back once mouse input
+resumes, which decides the whole design. A view that holds allows a snap on key
+down and a snap back on release, two calls and no per-frame writes. A view that
+springs back needs reapplication while the key is held, and per-frame writes
+have looked glitchy every time this project has tried them on anything else.
+
+Two further candidates are unexplored and both are on the actor:
+`SetForcedLookDir(dir)`, which takes a direction vector and has a matching
+`ClearForcedLookDir`, and which vanilla drives on the player through
+`SetForcedLookObjectId` during quests, so it is built to hold against input; and
+`SetLookIK(bool)`, which may be a prerequisite for either.
