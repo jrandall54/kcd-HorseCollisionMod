@@ -38,21 +38,39 @@
 -- its first eighth the curve is indistinguishable from a straight line, and
 -- reading a velocity off it gives an amplitude twenty times too large.
 --
--- Concurrent shakes **sum**, which is why tapping the key repeatedly used to
--- send the camera absurdly far: each press added another curve and nothing
--- subtracted one. A lean already running is therefore left alone.--- The action name this mod listens to for a lean, for a given key.
+-- Firing a shake while one is running **reverses the camera's direction of
+-- travel**. It neither sums with the running shake nor replaces it from zero.
+-- Four identical calls two seconds apart drove the camera out, back through
+-- center, out again and back, each flip smooth and continuous.
+--
+-- That is a toggle for an actuator, and `System.GetViewCameraPos` is a sensor,
+-- so the hold is bang-bang control: drive out, then flip on every crossing back
+-- over the target. The residual wobble is the travel speed times the poll
+-- interval, which at the hold amplitude is under a centimeter.
+--
+-- A shake whose duration expires returns the camera home smoothly in about
+-- 160 ms, and that is the release.
+--
+-- Attached to the `HorseCollisionMod` table created by the entry point, which
+-- pulls this file in with `Script.ReloadScript`.
+--
+-- @module HorseCollisionMod.Lean
+-- @author jrandall54
+
+
+--- The action name this mod listens to for a lean, for a given key.
 --
 -- Each feature is declared once per candidate key in `hcm_actionmaps.xml`,
 -- because Lua cannot write a file and `LoadFromXML` can only read one, so a
 -- key cannot be rebound at runtime. The settings file picks which declaration
 -- the mod answers to by naming the key.
 --
--- Action maps are read once, at startup. A key added to that file is dead
+-- Action maps are read once, at startup, so a key added to that file is dead
 -- until the game is restarted.
 --
--- @tparam string key one of r, q, y, u, o, h
+-- @tparam string key one of the candidate keys
 -- @tparam string side "left" or "right"
--- @treturn ?string the action name, or nil when the key is not one of the six
+-- @treturn ?string the action name, or nil when no key is named
 function HorseCollisionMod:LeanActionFor(key, side)
 	if type(key) ~= "string" or key == "" then
 		return nil
@@ -62,27 +80,77 @@ function HorseCollisionMod:LeanActionFor(key, side)
 end
 
 
---- Leans the camera out, and lets it come back.
+--- The camera's offset from where the lean started, in meters.
 --
--- One shake, cut at its own peak. The period is the time to full extension and
--- the amplitude is the distance wanted divided by 0.63, which is the measured
--- fraction of the amplitude the camera actually reaches.
+-- Sideways and forward are reported separately, measured against the camera's
+-- own axes at the moment the lean began, so turning the horse mid lean does not
+-- read as the camera having moved.
 --
--- Cutting at the peak is deliberate: a cut returns the camera home smoothly in
--- about 160 ms, so the return costs nothing and needs no second call.
+-- @treturn ?number sideways offset, positive to the right
+function HorseCollisionMod:LeanOffset()
+	local here = nil
+
+	pcall(function()
+		here = System.GetViewCameraPos()
+	end)
+
+	if not here or not self.LeanBase or not self.LeanRight then
+		return nil
+	end
+
+	local dx = here.x - self.LeanBase.x
+	local dy = here.y - self.LeanBase.y
+
+	return (dx * self.LeanRight.x) + (dy * self.LeanRight.y)
+end
+
+
+--- Flips the camera's direction of travel.
+--
+-- `SetViewShake` does not set a position or a speed. Firing it while a shake is
+-- running reverses which way the camera is going, measured across four calls
+-- at two second intervals. The sign of the amplitude only chooses a direction
+-- when nothing is already running.
+--
+-- The forward component rides along on the same call, so a lean carries the
+-- camera a little past the horse's shoulder rather than straight out from it.
+--
+-- @tparam number amplitude how hard, which sets how fast the camera travels
+-- @tparam number sign the direction wanted, used only for the first call
+-- @tparam number seconds how long this shake lives before it expires and
+--   returns the camera home
+function HorseCollisionMod:FlipLean(amplitude, sign, seconds)
+	local cfg = self.Config
+	local playerEnt = rawget(_G, "player")
+
+	if not playerEnt or not playerEnt.actor then
+		return
+	end
+
+	local forward = amplitude * (cfg.LeanForwardShare or 0.35)
+
+	pcall(function()
+		playerEnt.actor:SetViewShake(
+				{ x = 0, y = 0, z = 0 },
+				{ x = amplitude * sign, y = forward, z = 0 },
+				seconds, cfg.LeanShakePeriod or 8.0, 0)
+	end)
+end
+
+
+--- Leans out and holds there until the key is released.
+--
+-- Bang-bang control. The camera is driven out at the travel amplitude, and once
+-- it has passed the target offset every crossing back over that offset flips it
+-- again, so it dithers around the target rather than sailing past. The dither
+-- is the travel speed times the poll interval, which at the hold amplitude is
+-- under a centimeter.
 --
 -- @tparam number sign -1 for left, 1 for right
 function HorseCollisionMod:StartLean(sign)
 	local cfg = self.Config
 
-	if not cfg.Lean then
-		return
-	end
-
-	local now = self:TimeMs()
-
-	-- Concurrent shakes sum, so a second lean on top of a first runs away.
-	if self.LeanBusyUntil and now < self.LeanBusyUntil then
+	if not cfg.Lean or self.LeanHeld then
 		return
 	end
 
@@ -92,24 +160,95 @@ function HorseCollisionMod:StartLean(sign)
 		return
 	end
 
-	local outSec = cfg.LeanOutSec or 0.4
-	local distance = cfg.LeanDistance or 0.65
-	local amplitude = (distance / 0.63) * sign
-
-	self.LeanBusyUntil = now + (outSec * 1000) + 200
-
 	pcall(function()
-		playerEnt.actor:SetViewShake(
-				{ x = 0, y = 0, z = 0 },
-				{ x = amplitude, y = 0, z = 0 },
-				outSec, outSec, 0)
+		self.LeanBase = System.GetViewCameraPos()
+
+		local d = System.GetViewCameraDir()
+		local l = math.sqrt((d.x * d.x) + (d.y * d.y))
+
+		if l > 0 then
+			self.LeanRight = { x = d.y / l, y = -d.x / l }
+		end
 	end)
 
+	if not self.LeanBase or not self.LeanRight then
+		return
+	end
+
+	self.LeanHeld = sign
+	self.LeanGeneration = (self.LeanGeneration or 0) + 1
+
+	local generation = self.LeanGeneration
+	local timerTick = self.TimerTick
+	local target = (cfg.LeanDistance or 0.65) * sign
+	local pollMs = cfg.LeanPollMs or 50
+	local reached = false
+
+	self:FlipLean(cfg.LeanTravelAmplitude or 6.0, sign, cfg.LeanShakeSec or 20.0)
+
+	local function watch()
+		if generation ~= self.LeanGeneration or timerTick ~= self.TimerTick then
+			return
+		end
+
+		if not self.LeanHeld then
+			return
+		end
+
+		local offset = self:LeanOffset()
+
+		if offset then
+			-- Past the target in the direction of travel, so turn around. The
+			-- first crossing switches to the hold amplitude, which is slower
+			-- and makes the dither small.
+			local past = (sign > 0 and offset >= target) or (sign < 0 and offset <= target)
+			local back = (sign > 0 and offset < target) or (sign < 0 and offset > target)
+
+			if not reached and past then
+				reached = true
+				self:FlipLean(cfg.LeanHoldAmplitude or 1.2, sign,
+						cfg.LeanShakeSec or 20.0)
+			elseif reached and ((past and not self.LeanGoingBack)
+					or (back and self.LeanGoingBack)) then
+				self.LeanGoingBack = not self.LeanGoingBack
+				self:FlipLean(cfg.LeanHoldAmplitude or 1.2, sign,
+						cfg.LeanShakeSec or 20.0)
+			end
+		end
+
+		Script.SetTimer(pollMs, watch)
+	end
+
 	if cfg.LogTelemetry then
-		self:Log("Lean side=" .. (sign < 0 and "left" or "right")
-				.. " distance=" .. string.format("%.2f", distance)
-				.. " amplitude=" .. string.format("%.2f", math.abs(amplitude))
-				.. " outSec=" .. string.format("%.2f", outSec))
+		self:Log("LeanOut side=" .. (sign < 0 and "left" or "right")
+				.. " target=" .. string.format("%.2f", math.abs(target)))
+	end
+
+	Script.SetTimer(pollMs, watch)
+end
+
+
+--- Releases the lean and lets the camera come home.
+--
+-- A shake whose duration expires returns the camera smoothly in about 160 ms,
+-- so the release is a short shake rather than any attempt to drive back.
+function HorseCollisionMod:StopLean()
+	if not self.LeanHeld then
+		return
+	end
+
+	local cfg = self.Config
+
+	self.LeanHeld = nil
+	self.LeanGoingBack = false
+	self.LeanGeneration = (self.LeanGeneration or 0) + 1
+
+	self:FlipLean(cfg.LeanHoldAmplitude or 1.2, 1, cfg.LeanReleaseSec or 0.05)
+
+	if cfg.LogTelemetry then
+		local offset = self:LeanOffset()
+
+		self:Log("LeanBack from=" .. string.format("%.2f", offset or -9))
 	end
 end
 
@@ -140,6 +279,8 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 
 	if activation == "press" then
 		self:StartLean(sign)
+	elseif activation == "release" then
+		self:StopLean()
 	end
 
 	return true

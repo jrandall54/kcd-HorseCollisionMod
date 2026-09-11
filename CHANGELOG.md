@@ -36,8 +36,14 @@ number.
 - Leaning, so the rider can see past the horse's head in first person. Two keys
   slide the camera out to either side and back, which looks along the horse's
   neck rather than into it. `Lean`, `LeanLeftKey`, `LeanRightKey`,
-  `LeanSpeed`, `LeanDistance` and `LeanHoldSec` configure it. Defaults to `y`
-  and `u`, which vanilla leaves unbound.
+  The camera holds out for as long as the key is held and returns on release.
+  `LeanDistance` sets how far, `LeanForwardShare` how much it also carries
+  forward. Bound to `q` and `e`, the usual lean keys, neither of which vanilla
+  uses while mounted.
+
+### Changed
+- The rear on the spot moves from `q` to `g`, since the lean takes `q` and `e`.
+  The charge stays on `r`.
 
 
 ## [5.3.1] - 2026-09-11

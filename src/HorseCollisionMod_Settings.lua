@@ -130,7 +130,7 @@ HorseCollisionModSettings = {
 	-- advance: r, q, y, u, o, h. Vanilla leaves y, u, o and h unbound, and
 	-- uses r and q only in minigame maps that never run while riding.
 	RearChargeKey            = "r",   -- rear, then drive forward
-	RearOnlyKey              = "q",   -- rear on the spot
+	RearOnlyKey              = "g",   -- rear on the spot
 	Rear                     = true,
 	RearIdleOnly             = true,  -- also require the horse's idle state
 	RearMaxSpeed             = 0.15,  -- horizontal m/s; above this it slides
@@ -212,10 +212,16 @@ HorseCollisionModSettings = {
 	--
 	-- Lower LeanPeriod to lean faster, raise LeanAmplitude to lean further.
 	Lean                     = true,
-	LeanLeftKey              = "y",   -- one of r, q, y, u, o, h
-	LeanRightKey             = "u",
-	LeanDistance             = 0.65,  -- how far out it goes, in meters
-	LeanOutSec               = 0.40,  -- how long it takes to get there
+	LeanLeftKey              = "q",   -- q and e, the usual lean keys
+	LeanRightKey             = "e",
+	LeanDistance             = 0.65,  -- how far out the camera holds, in meters
+	LeanForwardShare         = 0.35,  -- how much it also carries forward, 0 for none
+	LeanTravelAmplitude      = 6.0,   -- higher gets out there faster
+	LeanHoldAmplitude        = 1.2,   -- lower holds steadier once out
+	LeanPollMs               = 50,    -- how often the hold is corrected
+	LeanShakePeriod          = 8.0,
+	LeanShakeSec             = 20.0,  -- long enough to outlast a held lean
+	LeanReleaseSec           = 0.05,  -- a short shake, so it expires and comes home
 
 	RearReach                = 2.5,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts

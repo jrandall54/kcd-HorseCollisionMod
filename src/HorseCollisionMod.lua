@@ -222,15 +222,22 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearStrikeMs when in the animation the hooves land
 -- @field RearReach how far in front the hooves reach, in meters
 -- @field Lean whether the rider can lean out to see past the horse's head
--- @field LeanLeftKey which key leans left, one of r, q, y, u, o, h
+-- @field LeanLeftKey which key leans left, one of r, q, e, g, y, u, o, h
 -- @field LeanRightKey which key leans right, from the same list
-
--- @field LeanDistance how far out the camera goes, in meters. The amplitude
---   written is this divided by 0.63, which is the measured fraction of the
---   amplitude the camera actually reaches
--- @field LeanOutSec how long it takes to get there. This is the shake's
---   period, because the peak arrives at t = period, and also its duration, so
---   the shake is cut at its peak and returns home in about 160 ms
+-- @field LeanDistance how far out the camera holds, in meters
+-- @field LeanForwardShare how much of the lean also carries the camera
+--   forward, as a fraction of the sideways travel. 0 leans straight out
+-- @field LeanTravelAmplitude how hard the camera is driven on the way out,
+--   which sets how fast it gets there
+-- @field LeanHoldAmplitude the amplitude used once the target is reached.
+--   Lower is a steadier hold, because the residual wobble is the travel speed
+--   times the poll interval
+-- @field LeanPollMs how often the held offset is checked and corrected
+-- @field LeanShakePeriod the period passed to SetViewShake
+-- @field LeanShakeSec how long each shake lives, long enough to outlast a
+--   held lean without expiring under it
+-- @field LeanReleaseSec the short shake fired on release, which expires and
+--   lets the camera return home
 
 -- @field RearArc the arc in front that counts, in degrees
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
@@ -570,7 +577,7 @@ HorseCollisionMod.Config = {
 	RearMaxSpeed             = 0.15,
 	RearCooldownMs           = 2500,
 	RearFragTag              = "hcm_rear_charge",
-	RearOnlyKey              = "q",
+	RearOnlyKey              = "g",
 	RearOnlyFragTag          = "hcm_rear",
 	-- Hooves coming down, not a horse riding into someone. Lighter than a
 	-- charge and led by the hoof rather than by the body.
@@ -617,10 +624,16 @@ HorseCollisionMod.Config = {
 	RearStrikes              = true,
 	RearStrikeMs             = 700,
 	Lean                     = true,
-	LeanLeftKey              = "y",
-	LeanRightKey             = "u",
+	LeanLeftKey              = "q",
+	LeanRightKey             = "e",
 	LeanDistance             = 0.65,
-	LeanOutSec               = 0.40,
+	LeanForwardShare         = 0.35,
+	LeanTravelAmplitude      = 6.0,
+	LeanHoldAmplitude        = 1.2,
+	LeanPollMs               = 50,
+	LeanShakePeriod          = 8.0,
+	LeanShakeSec             = 20.0,
+	LeanReleaseSec           = 0.05,
 	RearReach                = 2.5,
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,

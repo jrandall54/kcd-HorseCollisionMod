@@ -612,7 +612,17 @@ function Test-InstalledFiles {
 			$a = [System.IO.File]::ReadAllText($file.From)
 			$b = [System.IO.File]::ReadAllText($file.To)
 
-			foreach ($key in $script:DevTestValues.Keys) {
+			# -FreeGallop rewrites three more keys in the installed copy, and
+			# they were not normalized here, so every deploy carrying that
+			# switch reported the settings file stale. That is not cosmetic:
+			# the caller treats a stale file as fatal and exits before the
+			# launch block, which is why -Launch looked broken whenever it was
+			# combined with -FreeGallop.
+			$normalize = @()
+			$normalize += $script:DevTestValues.Keys
+			$normalize += $script:DevFreeGallopValues.Keys
+
+			foreach ($key in $normalize) {
 				$pattern = "($key\s*=\s*)([^,
 ]+)"
 				$a = [regex]::Replace($a, $pattern, '${1}X')
