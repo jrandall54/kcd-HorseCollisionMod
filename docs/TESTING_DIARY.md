@@ -18642,3 +18642,24 @@ charge was laid.
 The consequence is that **two rears kill an unarmored civilian**, at a rear base
 of 60 against about 83 health. That is a balance figure rather than a defect,
 and it is better decided than discovered on a merchant.
+
+### Known limit: a very fast turn clips the rider for a moment
+
+Ending a lean is not instant. The camera comes home over about 160 ms as the
+shake expires, and that figure belongs to the engine rather than to any setting
+here. The angle limit therefore governs **when the return starts**, never how
+long it takes.
+
+Leading the limit by the turn rate was added for this and it does fire earlier:
+release angles moved from a 43 to 48 band down to mostly 8 to 36. It does not
+remove the clip, because a rider who can cross the limit in less than the return
+takes is displaced for part of that turn whatever moment the return began.
+
+The only thing that would remove it is leading far enough that ordinary turns
+cancel leans as well, trading a rare cosmetic clip for a constant annoyance.
+Judged in game and accepted as it is.
+
+**Left undone deliberately**: `LeanBack` does not say why a lean ended, so a
+cancel and an ordinary release are indistinguishable in the log. Anyone
+reopening this should add that first, since the angles above cannot be read
+without it.
