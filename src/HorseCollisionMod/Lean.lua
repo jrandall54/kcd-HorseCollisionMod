@@ -355,6 +355,7 @@ function HorseCollisionMod:StartLean(sign)
 	local pollMs = cfg.LeanPollMs or 30
 	local reached = false
 	local last = nil
+	local turns = 0
 
 	self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, cfg.LeanShakeSec or 1.5, true)
 
@@ -397,6 +398,34 @@ function HorseCollisionMod:StartLean(sign)
 			local hold = cfg.LeanHoldAmplitude or 3.0
 			local live = cfg.LeanShakeSec or 20.0
 			local past = (sign > 0 and offset >= target) or (sign < 0 and offset <= target)
+
+			if not reached and last and not past then
+				-- **The press cannot choose a direction, so it is checked.**
+				--
+				-- `SetViewShake` only picks a side when nothing is already
+				-- running; against a live shake it simply reverses. Re-pressing
+				-- inside the shake lifetime therefore sends the camera whichever
+				-- way the last one was not going, and a lean asked for left
+				-- travels right until the runaway ceiling ends it.
+				--
+				-- Measured across eight deliberate double taps, the wrong ones
+				-- alternate perfectly with the right ones and all stop at 1.3,
+				-- which is the ceiling rather than anywhere the lean meant:
+				--
+				--     side=left  from=+1.39    side=right from=-1.37
+				--     side=right from=+0.63    side=left  from=-0.67
+				--
+				-- Two corrections are allowed, because one flip may not have
+				-- reached the camera by the next poll and a third would mean
+				-- something else is wrong.
+				local moving = offset - last
+				local gap = target - offset
+
+				if turns < 2 and (gap * moving) < 0 and math.abs(moving) > 0.001 then
+					turns = turns + 1
+					self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, live, true)
+				end
+			end
 
 			if not reached and past then
 				-- Arrived. Forced, because this is the one-time change down to
