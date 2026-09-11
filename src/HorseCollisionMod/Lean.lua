@@ -257,8 +257,9 @@ function HorseCollisionMod:StartLean(sign)
 	local generation = self.LeanGeneration
 	local timerTick = self.TimerTick
 	local target = (cfg.LeanDistance or 0.65) * sign
-	local pollMs = cfg.LeanPollMs or 50
+	local pollMs = cfg.LeanPollMs or 30
 	local reached = false
+	local last = nil
 
 	self:FlipLean(cfg.LeanTravelAmplitude or 6.0, sign, cfg.LeanShakeSec or 20.0)
 
@@ -274,22 +275,43 @@ function HorseCollisionMod:StartLean(sign)
 		local offset = self:LeanOffset()
 
 		if offset then
-			-- Past the target in the direction of travel, so turn around. The
-			-- first crossing switches to the hold amplitude, which is slower
-			-- and makes the dither small.
+			local hold = cfg.LeanHoldAmplitude or 0.6
+			local live = cfg.LeanShakeSec or 20.0
 			local past = (sign > 0 and offset >= target) or (sign < 0 and offset <= target)
-			local back = (sign > 0 and offset < target) or (sign < 0 and offset > target)
 
 			if not reached and past then
+				-- Arrived. The switch to the hold amplitude makes every
+				-- correction from here small, so the dither is small.
 				reached = true
-				self:FlipLean(cfg.LeanHoldAmplitude or 1.2, sign,
-						cfg.LeanShakeSec or 20.0)
-			elseif reached and ((past and not self.LeanGoingBack)
-					or (back and self.LeanGoingBack)) then
-				self.LeanGoingBack = not self.LeanGoingBack
-				self:FlipLean(cfg.LeanHoldAmplitude or 1.2, sign,
-						cfg.LeanShakeSec or 20.0)
+				self:FlipLean(hold, sign, live)
+			elseif reached and last then
+				-- **Direction is measured, never remembered.**
+				--
+				-- A boolean flipped on each correction cannot work here,
+				-- because it assumes the camera only ever changes direction
+				-- when this loop turns it. A shake's own curve peaks at its
+				-- period and reverses with no flip involved, and a remembered
+				-- direction is wrong from that moment on: the loop then
+				-- "corrects" the way the camera is already going and the lean
+				-- drifts home five or six seconds into a hold. Releases aimed
+				-- at 0.65 landed at 0.11, -0.05 and -0.08, the last two having
+				-- crossed through center to the wrong side.
+				--
+				-- Comparing two samples cannot go stale, whatever moved the
+				-- camera or why.
+				local moving = offset - last
+				local gap = target - offset
+				local band = cfg.LeanDeadband or 0.03
+
+				-- Away from the target, and far enough out to be worth a
+				-- correction. The deadband is what stops a flip every poll
+				-- once the camera is sitting on the target.
+				if math.abs(gap) > band and (gap * moving) < 0 then
+					self:FlipLean(hold, sign, live)
+				end
 			end
+
+			last = offset
 		end
 
 		Script.SetTimer(pollMs, watch)

@@ -233,7 +233,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   Lower is a steadier hold, because the residual wobble is the travel speed
 --   times the poll interval
 -- @field LeanPollMs how often the held offset is checked and corrected
--- @field LeanShakePeriod the period passed to SetViewShake
+-- @field LeanDeadband how far off target the camera may sit before a
+--   correction is spent on it, in meters. Without it the loop flips on every
+--   poll once the camera is on the target
+-- @field LeanShakePeriod the period passed to SetViewShake. A shake's curve
+--   peaks at its period and then reverses by itself, so this is kept long
+--   enough that a hold never reaches that turn, and the amplitudes are scaled
+--   with it because the travel speed is roughly amplitude over period
 -- @field LeanShakeSec how long each shake lives, long enough to outlast a
 --   held lean without expiring under it
 -- @field LeanReleaseSec the short shake fired on release, which expires and
@@ -628,11 +634,12 @@ HorseCollisionMod.Config = {
 	LeanRightKey             = "e",
 	LeanDistance             = 0.65,
 	LeanForwardShare         = 0.35,
-	LeanTravelAmplitude      = 22.0,
-	LeanHoldAmplitude        = 0.6,
+	LeanTravelAmplitude      = 110.0,
+	LeanHoldAmplitude        = 3.0,
 	LeanPollMs               = 30,
+	LeanDeadband             = 0.03,
 	LeanHomeMs               = 220,
-	LeanShakePeriod          = 8.0,
+	LeanShakePeriod          = 40.0,
 	LeanShakeSec             = 20.0,
 	LeanReleaseSec           = 0.05,
 	RearReach                = 2.5,
