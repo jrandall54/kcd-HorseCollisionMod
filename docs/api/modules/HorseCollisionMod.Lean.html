@@ -1,0 +1,395 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Marks.html">HorseCollisionMod.Marks</a></li>
+  <li><a href="../modules/HorseCollisionMod.Sound.html">HorseCollisionMod.Sound</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Retaliation.html">HorseCollisionMod.Retaliation</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><strong>HorseCollisionMod.Lean</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Lean</code></h1>
+<p>Lean: leaning the rider out to see past the horse's head.</p>
+<p> In first person the horse's head and neck sit between the rider and whatever
+ is directly in front, so lining up on someone and watching what happens to
+ them are both guesswork. A person solves this by moving their head to one
+ side and looking along the obstacle, which is parallax rather than rotation.</p>
+
+<p> ### Why this is a shake</p>
+
+<p> The camera cannot be moved any other way from Lua. All 47 <code>cl_cam*</code> CVars,
+ including the <code>cl_camModify</code> family that exists precisely to offset a camera,
+ are inert on the mounted first-person view. No bone is writable, so the head
+ the camera rides cannot be moved either. <code>PlayerSetViewAngles</code> turns the view
+ and holds, but turning the view does not help: the head is still between the
+ rider and the target, and now they are not even facing it.</p>
+
+<p> <code>actor:SetViewShake</code> is the one call that displaces the camera. Its second
+ vector is a positional shake in meters, and vanilla uses it for explosions.</p>
+
+<p> ### What the shake actually does, measured</p>
+
+<p> Polled from <code>System.GetViewCameraPos</code> every 100 ms across a full cycle. At
+ amplitude 2.0 and period 8.0 the camera reaches <strong>1.264 m at 8.0 s</strong> and then
+ falls away again.</p>
+
+
+<pre>
+<span class="number">2000</span>ms <span class="number">0.41</span>   <span class="number">4000</span>ms <span class="number">0.78</span>   <span class="number">6000</span>ms <span class="number">1.02</span>   <span class="number">8064</span>ms <span class="number">1.264</span>   <span class="number">12064</span>ms <span class="number">0.485</span>
+</pre>
+
+<p> Two rules come out of it, and both differ from what the argument names
+ suggest:</p>
+
+<ul>
+    <li><strong>The peak is about 0.63 of the amplitude</strong>, not the amplitude itself.</li>
+    <li><strong>The peak arrives at t = period</strong>, not at a quarter of it.</li>
+</ul>
+
+<p> So the period is the time to full extension and the amplitude sets how far.
+ A shake cut before its peak returns home smoothly in about 160 ms.</p>
+
+<p> Sampling a short window is what makes this mechanism easy to get wrong: over
+ its first eighth the curve is indistinguishable from a straight line, and
+ reading a velocity off it gives an amplitude twenty times too large.</p>
+
+<p> Firing a shake while one is running <strong>reverses the camera's direction of
+ travel</strong>. It neither sums with the running shake nor replaces it from zero.
+ Four identical calls two seconds apart drove the camera out, back through
+ center, out again and back, each flip smooth and continuous.</p>
+
+<p> That is a toggle for an actuator, and <code>System.GetViewCameraPos</code> is a sensor,
+ so the hold is bang-bang control: drive out, then flip on every crossing back
+ over the target. The residual wobble is the travel speed times the poll
+ interval, which at the hold amplitude is under a centimeter.</p>
+
+<p> A shake whose duration expires returns the camera home smoothly in about
+ 160 ms, and that is the release.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:LeanActionFor">HorseCollisionMod:LeanActionFor (key, side)</a></td>
+	<td class="summary">The action name this mod listens to for a lean, for a given key.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:LeanOffset">HorseCollisionMod:LeanOffset ()</a></td>
+	<td class="summary">Where the camera sits across the horse, in meters from its centerline.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:LeanViewAngle">HorseCollisionMod:LeanViewAngle ()</a></td>
+	<td class="summary">How far off the horse's line the rider is looking, in degrees.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:FlipLean">HorseCollisionMod:FlipLean (amplitude, sign, seconds)</a></td>
+	<td class="summary">Flips the camera's direction of travel.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:StartLean">HorseCollisionMod:StartLean (sign)</a></td>
+	<td class="summary">Leans out and holds there until the key is released.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:StopLean">HorseCollisionMod:StopLean ()</a></td>
+	<td class="summary">Releases the lean and lets the camera come home.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HandleLeanAction">HorseCollisionMod:HandleLeanAction (action, activation)</a></td>
+	<td class="summary">Answers a key event, and reports whether it belonged to the lean.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:LeanActionFor"></a>
+    <strong>HorseCollisionMod:LeanActionFor (key, side)</strong>
+    </dt>
+    <dd>
+    The action name this mod listens to for a lean, for a given key. </p>
+
+<p> Each feature is declared once per candidate key in <code>hcm_actionmaps.xml</code>,
+ because Lua cannot write a file and <code>LoadFromXML</code> can only read one, so a
+ key cannot be rebound at runtime. The settings file picks which declaration
+ the mod answers to by naming the key.</p>
+
+<p> Action maps are read once, at startup, so a key added to that file is dead
+ until the game is restarted.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">key</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         one of the candidate keys
+        </li>
+        <li><span class="parameter">side</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "left" or "right"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the action name, or nil when no key is named
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:LeanOffset"></a>
+    <strong>HorseCollisionMod:LeanOffset ()</strong>
+    </dt>
+    <dd>
+    Where the camera sits across the horse, in meters from its centerline. </p>
+
+<p> Measured against the <strong>horse</strong>, not against where the camera happened to be
+ when the lean started, and not against a remembered world position.</p>
+
+<p> A world baseline is only valid standing still: at a walk the horse covers
+ more ground in a second than the whole lean travels, so the controller reads
+ the horse's journey instead of the camera's.</p>
+
+<p> The rider's own resting position is not the right frame either, and that is
+ what made the two sides read differently. Measured, the rider's entity sits
+ on the centerline to within 7 mm but <strong>the camera rests 6 cm to the horse's
+ left</strong>, so a lean of equal travel each way finishes 0.71 m out on the left
+ and 0.59 m on the right. A rider judging against the horse's head sees that
+ as the left reaching further, which is exactly what was reported.</p>
+
+<p> Against the centerline both sides finish the same distance from the head,
+ which is the thing being aimed past. The travel differs slightly instead,
+ and travel is not what anyone is looking at.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types">optional <span class="type">number</span></span>
+        offset across the horse, positive to the horse's right
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:LeanViewAngle"></a>
+    <strong>HorseCollisionMod:LeanViewAngle ()</strong>
+    </dt>
+    <dd>
+    How far off the horse's line the rider is looking, in degrees. </p>
+
+<p> Leaning only makes sense while looking roughly along the horse. Turned far
+ enough to the side the camera travels into the rider's own body and into the
+ horse, because the offset is applied in camera space and the camera is
+ already inside the pair of them once it stops pointing down the horse's line.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types">optional <span class="type">number</span></span>
+        degrees, 0 looking straight ahead, always positive
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:FlipLean"></a>
+    <strong>HorseCollisionMod:FlipLean (amplitude, sign, seconds)</strong>
+    </dt>
+    <dd>
+    Flips the camera's direction of travel. </p>
+
+<p> <code>SetViewShake</code> does not set a position or a speed. Firing it while a shake is
+ running reverses which way the camera is going, measured across four calls
+ at two second intervals. The sign of the amplitude only chooses a direction
+ when nothing is already running.</p>
+
+<p> The forward component rides along on the same call, so a lean carries the
+ camera a little past the horse's shoulder rather than straight out from it.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">amplitude</span>
+            <span class="types"><span class="type">number</span></span>
+         how hard, which sets how fast the camera travels
+        </li>
+        <li><span class="parameter">sign</span>
+            <span class="types"><span class="type">number</span></span>
+         the direction wanted, used only for the first call
+        </li>
+        <li><span class="parameter">seconds</span>
+            <span class="types"><span class="type">number</span></span>
+         how long this shake lives before it expires and
+   returns the camera home
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:StartLean"></a>
+    <strong>HorseCollisionMod:StartLean (sign)</strong>
+    </dt>
+    <dd>
+    Leans out and holds there until the key is released. </p>
+
+<p> Bang-bang control. The camera is driven out at the travel amplitude, and once
+ it has passed the target offset every crossing back over that offset flips it
+ again, so it dithers around the target rather than sailing past. The dither
+ is the travel speed times the poll interval, which at the hold amplitude is
+ under a centimeter.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">sign</span>
+            <span class="types"><span class="type">number</span></span>
+         -1 for left, 1 for right
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:StopLean"></a>
+    <strong>HorseCollisionMod:StopLean ()</strong>
+    </dt>
+    <dd>
+    Releases the lean and lets the camera come home. </p>
+
+<p> A shake whose duration expires returns the camera smoothly in about 160 ms,
+ so the release is a short shake rather than any attempt to drive back.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:HandleLeanAction"></a>
+    <strong>HorseCollisionMod:HandleLeanAction (action, activation)</strong>
+    </dt>
+    <dd>
+    Answers a key event, and reports whether it belonged to the lean.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">action</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the action name from <code>Player:OnAction</code>
+        </li>
+        <li><span class="parameter">activation</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "press", "release" or "hold"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the action was one of this feature's
+    </ol>
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-11 16:47:37 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

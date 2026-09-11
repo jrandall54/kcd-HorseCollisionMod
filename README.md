@@ -142,8 +142,8 @@ breaking the mod. Deleting a line restores its default.
 | `VictimBloodGallop` | 0.45 | The same at a gallop. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
 | `Rear` | true | Whether your horse can be reared on command. Only from a standstill. |
-| `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, y, u, o, h. |
-| `RearOnlyKey` | "q" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
+| `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, e, f, y, u, o, h. |
+| `RearOnlyKey` | "f" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
 | `RearMaxSpeed` | 0.15 | Horizontal speed above which a rear is refused. A rear is a standing attack: a horse still moving when it starts slides about 0.12 m before the animation takes hold. |
 | `RearIdleOnly` | true | Also require the horse's own locomotion state to be idle, which catches slow drift a speed reading misses. |
 | `RearCooldownMs` | 2500 | How long before another rear is accepted. |
@@ -247,6 +247,9 @@ tools/
                           timeline rather than an impression
   probe_api.lua           lists the methods an object actually exposes in the
                           running game, which the written references do not
+  probe_camera.lua        polls the first-person camera through a view shake,
+                          which is the only way to see what that call does
+                          rather than what its arguments suggest
   probe_horse_mass.lua    reports the mass and physics identity of the horse,
                           the player and the nearest NPC, which are the two
                           sides of every collision the mod scores

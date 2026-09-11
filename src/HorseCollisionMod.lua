@@ -272,6 +272,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   while the rider is leaning. Both are SetViewShake, and a second call
 --   reverses the camera rather than adding to it, so a shake mid lean sends
 --   the camera home at the moment the rider leaned out to watch
+-- @field LeanHomeMs how long after a release before another lean may start,
+--   which is the time the camera needs to come home. Without it a re-press
+--   takes its bearings from a camera that is still displaced
 -- @field LeanRunawayFactor how far past the target the camera may get, as a
 --   multiple of LeanDistance, before the lean is ended outright
 -- @field LeanReleaseSec the short shake fired on release, which expires and

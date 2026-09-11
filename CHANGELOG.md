@@ -9,7 +9,26 @@ the reactions a player sees in game. A change that forces a player to redo their
 configuration, or that changes how the mod sits alongside other mods, is a major
 change even when nothing about it looks like an API.
 
-Entries land under `## [Unreleased]
+Entries land under `## [Unreleased]` as the work does, and move under a version
+heading when the branch merges. An entry that breaks an existing install is
+marked **BREAKING**. `tools/version_check.py` derives the next version from
+these sections and refuses a build made at any other number.
+
+Removing a setting forces a major version, because a key a player has in their
+settings file disappearing is a broken install, and so does a `Removed`
+section on its own. An entry marked **NOT BREAKING** overrides both, and is
+only honest for something no released version ever carried: the check compares
+against the last tag, so it cannot tell a key players have from one that only
+ever existed between releases.
+
+Every merge to `main` takes a version and a tag, whether or not that build is
+published, because `main` is always releasable and a merged version is
+therefore stable. A prerelease suffix belongs to a build still being tested on
+a branch, never to one that has landed. Publishing is a separate decision, made
+against whatever version is current at the time, and it does not change the
+number.
+
+## [Unreleased]
 
 ### Added
 
