@@ -18663,3 +18663,129 @@ Judged in game and accepted as it is.
 cancel and an ordinary release are indistinguishable in the log. Anyone
 reopening this should add that first, since the angles above cannot be read
 without it.
+
+# The lean, finished: what SetViewShake actually is
+
+The feature works and the rider's verdict is that it reads as vanilla. What
+follows is the mechanism, because four separate bugs in it came from the same
+misunderstanding and a fifth would too.
+
+## One call, and it is a direction toggle
+
+`actor:SetViewShake(angular, positional, duration, period, randomness)` is the
+only thing in the Lua surface that moves the first-person camera. Everything
+else was tried and ruled out in game: all 47 `cl_cam*` CVars are inert on the
+mounted view, no bone is writable, `PlayerSetViewAngles` turns the view but
+turning does not help, and the whole `ForcedLook` family constrains pitch only.
+
+What it does is not what its arguments suggest.
+
+**Firing it while a shake is running reverses the camera's direction of
+travel.** It does not sum with the running shake and it does not replace it from
+zero. Four identical calls at two second intervals, with the camera polled from
+`System.GetViewCameraPos`:
+
+    fire 1 at 0ms      0.000 -> 0.421   out
+    fire 2 at 2000ms   0.344 -> -0.086  back, through center
+    fire 3 at 4000ms  -0.007 -> 0.313   out
+    fire 4 at 6000ms   0.241 -> -0.186  back
+
+The amplitude's sign chooses a direction only when nothing is already running.
+After that every call simply flips.
+
+A toggle for an actuator and a position sensor is bang-bang control, which is
+what the hold is: drive out, then flip on every crossing back over the target.
+
+## Every shake is an animation queue entry, and the queue holds sixteen
+
+This is the part with teeth. A shake occupies a slot on the character's
+animation queue for its whole duration, so a correction is paid for not when it
+is made but for as long as the shake was given.
+
+The first working hold corrected two or three times a second and gave each shake
+twenty seconds of life. Those were still occupying the queue long after the lean
+that made them had ended. Measured: 176 `Animation-queue overflow` errors
+against one instance, `male.chr`, which is the rider, with no collision anywhere
+near them.
+
+**An overflowed queue rejects further animations rather than only warning.**
+
+The bound is three settings working together: the shake life is 1.5 seconds, the
+deadband is 6 cm, and no correction may follow another inside 200 ms. A lean now
+costs two to five entries against a limit of sixteen.
+
+## Four bugs, one misunderstanding
+
+Each of these was a different symptom of assuming something about this call's
+state instead of measuring it.
+
+- **Direction remembered goes stale.** A boolean flipped on each correction
+  assumes the camera only turns when the loop turns it. A shake's curve peaks at
+  its own period and reverses unaided, and from that moment the boolean is
+  backwards, so the loop drove the lean home. Releases aimed at 0.65 landed at
+  0.11, -0.05 and -0.08, the last two through center to the wrong side.
+- **Direction commanded is ignored.** A press inside the shake lifetime does not
+  choose a side, it reverses whatever is running, so a lean asked for left
+  travels right. Across eight deliberate double taps the wrong ones alternate
+  perfectly with the right ones and every one stops at 1.3, which is the runaway
+  ceiling rather than anywhere the lean intended.
+- **Another system's shake cancels the lean.** The impact camera shake is the
+  same call, so an impact during a lean does not jolt the view, it turns the
+  lean around, at exactly the moment the rider leaned out to watch. It is
+  suppressed while a lean is held, because any amplitude at all flips the
+  direction and there is no small version of it.
+- **The end of a lean is not instant.** The camera comes home over about 160 ms
+  as the shake expires, which no setting here controls.
+
+The controller therefore trusts nothing it did not just measure. Direction comes
+from the difference between two samples, the travel direction is verified after
+the press and turned around if wrong, and a ceiling at twice the commanded
+distance ends the lean outright whatever else failed.
+
+## Three wrong models, each from too small a sample
+
+Worth recording because the shape repeats.
+
+- **"The fourth argument is a period."** Read off the argument list. Behaves
+  like one over short windows.
+- **"The displacement is a velocity."** Fitted to a one second sample of an
+  eight second curve. Over its first eighth the curve is a straight line, so the
+  extrapolation gave an amplitude twenty times too large. It shipped, and threw
+  the rider's camera twenty meters.
+- **"Concurrent shakes sum."** Inferred from the rider reporting that tapping
+  the key sent the camera absurdly far. The runaway was real, the explanation
+  was not.
+
+Each was a plausible reading of a real observation and each was settled only by
+widening the measurement window. `tools/probe_camera.lua` cost less than any one
+of the rides spent guessing with it unbuilt.
+
+## Where the rider is, which is not where the horse is
+
+Measured, mounted and still:
+
+    rider entity  lateral +0.007   on the centerline to within 7 mm
+    camera        lateral -0.060   six centimeters to the horse's left
+
+So the entity is centered and the eye is not. Measuring the lean from where the
+camera rests finished 0.71 m out on the left and 0.59 m on the right for the
+same commanded 0.65, which a rider judging against the horse's head sees as the
+left reaching further, and reported as exactly that.
+
+The offset is therefore taken against **the horse's centerline**, and the target
+is a position rather than a distance traveled. Both sides finish the same
+distance from the head. The travel differs slightly instead, and nobody is
+looking at the travel.
+
+## Keys
+
+`hcm_actionmaps.xml` declares every feature once per candidate key, `r q e f y u
+o h`, and the settings file picks which by naming it. Action maps are read once
+at startup, so a key added there is dead until the game is restarted, with the
+log still reporting `loaded=true` from a cached flag.
+
+**A scan of the shipped action maps does not tell you which keys are free.**
+`surrender` and `draw` are writeable superactions whose keys live in the player
+profile rather than in any pak, so `g` and the number keys are spoken for while
+appearing unbound. The rider's own account settled it: `g` is surrender while
+mounted, `f` is free there, `1` and `2` draw.

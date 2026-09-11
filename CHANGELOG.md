@@ -9,47 +9,44 @@ the reactions a player sees in game. A change that forces a player to redo their
 configuration, or that changes how the mod sits alongside other mods, is a major
 change even when nothing about it looks like an API.
 
-Entries land under `## [Unreleased]` as the work does, and move under a version
-heading when the branch merges. An entry that breaks an existing install is
-marked **BREAKING**. `tools/version_check.py` derives the next version from
-these sections and refuses a build made at any other number.
-
-Removing a setting forces a major version, because a key a player has in their
-settings file disappearing is a broken install, and so does a `Removed`
-section on its own. An entry marked **NOT BREAKING** overrides both, and is
-only honest for something no released version ever carried: the check compares
-against the last tag, so it cannot tell a key players have from one that only
-ever existed between releases.
-
-Every merge to `main` takes a version and a tag, whether or not that build is
-published, because `main` is always releasable and a merged version is
-therefore stable. A prerelease suffix belongs to a build still being tested on
-a branch, never to one that has landed. Publishing is a separate decision, made
-against whatever version is current at the time, and it does not change the
-number.
-
-## [Unreleased]
-
-## [5.4.0-dev.1] - 2026-09-11
+Entries land under `## [Unreleased]
 
 ### Added
-- Leaning, so the rider can see past the horse's head in first person. `Q` and
-  `E` slide the camera out to either side, which looks along the horse's neck
-  rather than into it, and it holds out for as long as the key is held and
-  returns on release. `Lean`, `LeanLeftKey`, `LeanRightKey`, `LeanDistance`,
-  `LeanForwardShare`, `LeanTravelAmplitude`, `LeanHoldAmplitude` and
-  `LeanPollMs` configure it.
 
-  The lean only works while mounted, and only while looking roughly along the
-  horse. `LeanMaxAngleDeg` refuses it past 45 degrees off the horse's line and
-  ends one already running if the rider turns past it, because the camera is
-  displaced in its own space and past that point it travels through the rider
-  and the horse rather than out beside them.
+- **Leaning out to see past the horse's head.** In first person the horse's head
+  and neck sit between the rider and whatever is in front, so lining up on
+  someone and watching what happens to them are both guesswork. Hold `Q` or `E`
+  and the camera slides out to that side and stays there until the key comes up,
+  looking along the neck rather than into it.
+
+  It only works mounted, and only while looking roughly along the horse: past 45
+  degrees to either side, or 55 up or down, the lean is refused, and one already
+  running ends if the rider turns past it. Beyond those angles the camera would
+  travel through the rider and the horse rather than out beside them.
+
+  An impact's camera shake is held back while a lean is held, since seeing who
+  is about to be hit is the point of leaning in the first place.
+
+  Configured by `Lean`, `LeanLeftKey`, `LeanRightKey`, `LeanDistance`,
+  `LeanForwardShare`, `LeanMaxAngleDeg`, `LeanMaxPitchDeg`, `LeanSuppressShake`
+  and `LeanTurnLeadMs`. `LeanTravelAmplitude`, `LeanHoldAmplitude`,
+  `LeanShakePeriod`, `LeanShakeSec`, `LeanReleaseSec`, `LeanPollMs`,
+  `LeanDeadband`, `LeanMinFlipMs`, `LeanHomeMs` and `LeanRunawayFactor` tune the
+  mechanism itself and are better left alone.
 
 ### Changed
-- The rear on the spot moves from `q` to `f`, since the lean takes `q` and `e`.
-  The charge stays on `r`. Neither `f` nor `e` does anything in vanilla while
+
+- The rear on the spot moves from `Q` to `F`, since the lean takes `Q` and `E`.
+  The charge stays on `R`. Neither `F` nor `E` does anything in vanilla while
   mounted.
+
+### Fixed
+
+- Engine warnings and errors never reached `kcd.log`. The file and the console
+  carry separate verbosities and the file's ships at 0, so everything the engine
+  complained about was visible in game and absent from the only record that can
+  be read afterwards. A development install now raises it, along with the
+  animation warnings, which are off entirely at their shipped value.
 
 
 ## [5.3.1] - 2026-09-11
