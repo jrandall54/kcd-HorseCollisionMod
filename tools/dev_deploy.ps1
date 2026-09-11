@@ -37,6 +37,7 @@ param (
 	[switch]$AnimOnly,
 	[switch]$Crime,
 	[switch]$FreeGallop,
+	[switch]$ReleaseSettings,
 	[switch]$SetDevEnvironment,
 	[switch]$SetPlayEnvironment,
 	[switch]$PrepareShippingTest,
@@ -740,7 +741,15 @@ function Sync-LooseFiles {
 	# Gated on $changed.Script, asking for a different world silently did
 	# nothing whenever the scripts happened to be identical, which is exactly
 	# the case when only a switch is being changed. It is idempotent and cheap.
-	Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop
+	# -ReleaseSettings installs the repository's own values untouched, which is
+	# what a branch wants once it stops being tested. Without it the only way
+	# back to a shipping world was to remember every switch that had been used.
+	if ($ReleaseSettings) {
+		Write-Host "[DEPLOY] release settings: the installed world is the shipped one"
+	}
+	else {
+		Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop
+	}
 
 	return $changed
 }

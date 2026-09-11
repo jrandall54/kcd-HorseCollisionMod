@@ -22,3 +22,7 @@ __pycache__/
 # Editor settings
 .idea/
 .vscode/
+
+# Which testing world this machine is riding in. Branch state, not project
+# state: it describes the local install and is cleared when a branch lands.
+/.hcm_testworld

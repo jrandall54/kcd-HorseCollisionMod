@@ -222,7 +222,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearStrikeMs when in the animation the hooves land
 -- @field RearReach how far in front the hooves reach, in meters
 -- @field Lean whether the rider can lean out to see past the horse's head
--- @field LeanLeftKey which key leans left, one of r, q, e, g, y, u, o, h
+-- @field LeanLeftKey which key leans left, one of r, q, e, f, y, u, o, h
 -- @field LeanRightKey which key leans right, from the same list
 -- @field LeanDistance how far out the camera holds, in meters
 -- @field LeanForwardShare how much of the lean also carries the camera
@@ -570,14 +570,14 @@ HorseCollisionMod.Config = {
 	-- Rearing on command. Everything else this mod does needs speed; a rear is
 	-- what a rider has at a standstill.
 	Rear                     = true,
-	RearChargeKey            = "r",
+	RearChargeKey            = "f",
 	RearActionMap            = "hcm_rear",
 	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
 	RearIdleOnly             = true,
 	RearMaxSpeed             = 0.15,
 	RearCooldownMs           = 2500,
 	RearFragTag              = "hcm_rear_charge",
-	RearOnlyKey              = "g",
+	RearOnlyKey              = "r",
 	RearOnlyFragTag          = "hcm_rear",
 	-- Hooves coming down, not a horse riding into someone. Lighter than a
 	-- charge and led by the hoof rather than by the body.

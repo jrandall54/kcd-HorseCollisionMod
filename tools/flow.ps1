@@ -116,6 +116,53 @@ function Working-Tree-Dirty {
 
 # ---------------------------------------------------------------- status
 
+# ------------------------------------------------------- test world state
+
+# What the testing world is, remembered for the life of the branch.
+#
+# The drift this removes: the test values were derived from whatever switches
+# happened to be typed on each deploy, so -FreeGallop evaporated the moment a
+# later deploy left it out. That is not a small annoyance. A rider mid test
+# suddenly has a horse that tires, is dismounted by it, and has no reason to
+# connect that to a deploy they did not run.
+#
+# So the switches are branch state rather than command state. `branch` writes
+# the world a branch starts in, every `test` re-applies it, a switch given on a
+# later `test` is added to it, and `land` clears it and puts the install back
+# to the shipped values.
+#
+# Untracked deliberately: it describes this machine's install, not the project.
+$script:worldFile = Join-Path $repo ".hcm_testworld"
+
+function Read-TestWorld {
+	$world = @{}
+
+	if (Test-Path $script:worldFile) {
+		foreach ($line in (Get-Content $script:worldFile)) {
+			$name = $line.Trim()
+
+			if ($name) {
+				$world[$name] = $true
+			}
+		}
+	}
+
+	return $world
+}
+
+function Write-TestWorld {
+	param ([hashtable]$World)
+
+	Set-Content -Path $script:worldFile -Value ($World.Keys | Sort-Object) -Encoding utf8
+}
+
+function Clear-TestWorld {
+	if (Test-Path $script:worldFile) {
+		Remove-Item $script:worldFile -Force
+	}
+}
+
+
 function Show-Status {
 	$branch = Current-Branch
 	$dirty = Working-Tree-Dirty
@@ -195,6 +242,18 @@ function Show-Status {
 		if ($shown.Count -gt 0) {
 			Say "test world  $($shown -join ' ')"
 		}
+
+		# The remembered switches, which are what make the line above sticky.
+		# Printed because a value that reappears on every deploy without being
+		# asked for is worse than one that never appears at all.
+		$world = Read-TestWorld
+
+		if ($world.Keys.Count -gt 0) {
+			Say "world state $(($world.Keys | Sort-Object) -join ' ')"
+		}
+		else {
+			Say "world state none, shipped values"
+		}
 	}
 }
 
@@ -229,17 +288,25 @@ function Enter-Test {
 	#
 	# A hashtable splats by parameter name, which is the only form that works
 	# for switches.
-	$deployArgs = @{}
+	# Remembered from the branch, plus anything added on this invocation. The
+	# union is written back, so a switch given once stays on until the branch
+	# lands.
+	$world = Read-TestWorld
 
 	if ($Crime) {
-		$deployArgs.Crime = $true
+		$world.Crime = $true
 	}
 
-	# Long tests are slowed by stopping to rest, so this zeroes what a collision
-	# costs the horse. Opt in rather than default: the drain is part of what an
-	# impact does and hiding it would falsify a test that is measuring it.
 	if ($FreeGallop) {
-		$deployArgs.FreeGallop = $true
+		$world.FreeGallop = $true
+	}
+
+	Write-TestWorld -World $world
+
+	$deployArgs = @{}
+
+	foreach ($name in $world.Keys) {
+		$deployArgs[$name] = $true
 	}
 
 	if (Game-Running) {
@@ -290,6 +357,14 @@ function Start-Branch {
 
 	Invoke-Git checkout -b $Argument | Out-Null
 	Say "on $Argument" Green
+
+	# The world a branch starts in. Free gallop is part of it because nearly
+	# every branch here is tested by riding at people repeatedly, and stopping
+	# to rest is not the thing under test. A branch that is measuring what a
+	# collision costs the horse turns it off in the installed settings.
+	Write-TestWorld -World @{ FreeGallop = $true }
+	Say "testing world seeded: FreeGallop"
+
 	Enter-Test
 }
 
@@ -405,9 +480,18 @@ function Land {
 
 	Say "landed v$version" Green
 
-	# Back to a testable state, because the next thing after landing is almost
-	# always testing the next thing.
-	Enter-Test
+	# The branch is over, so its testing world goes with it. Without this the
+	# install keeps whatever the branch was riding with and the next branch
+	# inherits a world nobody chose, which is the drift that had a rider
+	# wondering why their horse never tired.
+	Clear-TestWorld
+	Say "testing world cleared, install back to shipped values"
+	& $deploy -ScriptOnly -ReleaseSettings | Out-Null
+
+	# Deliberately not re-entering the testing world. Landing returns to main,
+	# and main is the shipped world: the next branch seeds its own. Re-entering
+	# here is what left main carrying a branch's test values.
+	Show-Status
 }
 
 # -------------------------------------------------------------- shipping

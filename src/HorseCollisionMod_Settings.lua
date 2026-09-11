@@ -129,8 +129,8 @@ HorseCollisionModSettings = {
 	-- rebind a key at runtime and its action map has to declare each one in
 	-- advance: r, q, y, u, o, h. Vanilla leaves y, u, o and h unbound, and
 	-- uses r and q only in minigame maps that never run while riding.
-	RearChargeKey            = "r",   -- rear, then drive forward
-	RearOnlyKey              = "g",   -- rear on the spot
+	RearChargeKey            = "f",   -- rear, then drive forward
+	RearOnlyKey              = "r",   -- rear on the spot
 	Rear                     = true,
 	RearIdleOnly             = true,  -- also require the horse's idle state
 	RearMaxSpeed             = 0.15,  -- horizontal m/s; above this it slides
