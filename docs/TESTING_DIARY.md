@@ -18315,3 +18315,477 @@ the commit message of the stale branch it came from and never checked against
 this diary. The entry has been corrected. Nothing here should be read as a fix
 for the floating behavior until someone reproduces that behavior and measures
 it.
+
+# Research: seeing past the horse's head in first person
+
+The rider cannot see what is directly in front of the horse from first person,
+which makes lining up on a target and watching an impact both guesswork. The
+question asked was whether the horse's head can be moved aside with a keypress.
+
+## The horse's head cannot be moved, on two independent counts
+
+**No bone can be written from Lua.** `GetBonePos(name, vec)` exists and vanilla
+uses it on `"Bip01 Spine2"` in `BasicActor.lua`, but it reads. Searched the
+whole vanilla Lua tree, the `libKCD1` script bind headers and the cheat mod for
+any setter, `SetBone`, `BoneRot`, `SetJoint`, `PoseModifier`, `SetSkeleton`, and
+there is none. That matches the engine: writing bone transforms means
+registering an `IAnimationPoseModifier` in the animation update, which is a C++
+interface a pure-Lua mod cannot reach. The horse does carry an
+`m_neckPhysPartId` internally, per `C_Horse.h`, and it is not exposed.
+
+**No head-turn animation exists.** The complete vanilla horse clip set is 45
+clips, read out of `kcd_horse_database.adb` in `Animations-part1.pak`. It is
+locomotion, jumps, mounts and dismounts, collision reactions, rearing and
+grazing. Nothing turns the head to either side. The nearest are `grazing_01`,
+where the head goes down to the ground, and `relaxed_gallop_scare_add`, which is
+the only additive clip in the set. The plumbing to play a new horse fragment
+already exists in this mod, since `hcm_rear` and `hcm_rear_charge` are driven
+through `StartInteractiveActionByName` on the horse, so the obstacle is the
+absence of a clip rather than any inability to play one.
+
+## The view can be moved instead, and that is the answer
+
+The rider's reframing is the one that works: rather than moving the horse, move
+where Henry looks from.
+
+    player.actor:PlayerSetViewAngles({ x = 0, y = 0, z = yaw })
+
+Yaw in radians. Vanilla uses it in `SpawnPoint.lua` and `SinglePlayer.lua` to
+point the player's view on spawn, zeroing x and y and passing only z.
+
+**Confirmed in game, mounted and in first person: it moves the view.**
+
+### The camera CVars are inert here, all of them
+
+Tried first and worth recording as ruled out, because the names are inviting.
+`cl_camModify` is a master switch with `cl_camOffsetX/Y/Z`,
+`cl_camRotateX/Y/Z`, `cl_camTranslateX/Y/Z` and `cl_camKeepX/Y/Z` behind it, 47
+`cl_cam*` CVars in total. Set live while mounted: `cl_camModify 1` with
+`cl_camOffsetX 0.4` did nothing, and `cl_camTranslateX 1.0` with `cl_camKeepX 1`
+did nothing either, at a full meter where any effect would have been
+unmissable. They do not reach the mounted first-person view.
+
+### `SetWorldAngles` on the rider is overwritten, and the readback lies
+
+`player:SetWorldAngles` reports `ok=true` and is reverted inside 400 ms: asked
+for a yaw of -0.137, read back -0.755 against an original -0.747. The mount
+reasserts the rider's rotation every frame.
+
+More useful than the failure is the trap beside it. **`GetAngles` on the player
+returns the entity's angles, not the view's.** After `PlayerSetViewAngles`
+visibly moved the rider's view, the entity yaw read -0.743 both before and
+after, unchanged to three decimal places. Reading entity angles to judge whether
+the view moved reports nothing happened while the screen says otherwise, which
+is the same shape as the corpse whose entity position read normal while the
+rendered body hung in the air. The rider's eyes settled this one.
+
+### Still to determine
+
+Whether the view stays where it is put or springs back once mouse input
+resumes, which decides the whole design. A view that holds allows a snap on key
+down and a snap back on release, two calls and no per-frame writes. A view that
+springs back needs reapplication while the key is held, and per-frame writes
+have looked glitchy every time this project has tried them on anything else.
+
+Two further candidates are unexplored and both are on the actor:
+`SetForcedLookDir(dir)`, which takes a direction vector and has a matching
+`ClearForcedLookDir`, and which vanilla drives on the player through
+`SetForcedLookObjectId` during quests, so it is built to hold against input; and
+`SetLookIK(bool)`, which may be a prerequisite for either.
+
+## The whole reachable surface, tested. One primitive works.
+
+Every candidate was tried in game, mounted and in first person, rather than
+argued from the headers.
+
+| primitive | result |
+| --- | --- |
+| bone writes from Lua | do not exist. `GetBonePos` reads, nothing writes |
+| a horse head-turn clip | none in the 45-clip vanilla set |
+| `cl_cam*`, 47 CVars | inert on the mounted first-person view |
+| `SetWorldAngles` on the rider | accepted, reverted inside 400 ms by the mount |
+| `SetForcedLookDir` | **pitch only** |
+| `SetForcedLookObjectId` | **pitch only**, and it tracks the target's height |
+| `SetLookIK` | untested, and it is model IK rather than camera |
+| **`PlayerSetViewAngles`** | **moves the view, holds, mouse still works** |
+
+### The ForcedLook family is a pitch constraint, not a look-at
+
+Three tests agreed. Handed a unit vector, which the call treated as a world
+position near the origin and 81 m below the rider, it forced the view at the
+ground. Handed a proper world point 10 m out at head height and swung 40 to the
+side, it forced the view level and **did not turn it toward the point at all**;
+yaw stayed under the rider's control and looking up or down snapped back to
+level. Pointed at an NPC 4.4 m away with `SetForcedLookObjectId`, it bobbed the
+pitch up and down as she moved and again left yaw free.
+
+So the family constrains where the rider may look vertically. It is what a
+quest uses to stop you looking away from something, and it cannot swing a view
+sideways. Ruled out.
+
+The first result is worth keeping for its own sake: **`SetForcedLookDir` takes a
+world position, not a direction**, despite the name. That was diagnosed from the
+symptom rather than from any documentation, since aiming at the world origin
+from 81 m up is exactly a view pointed at the ground.
+
+### What `PlayerSetViewAngles` gives and what it costs
+
+It writes an absolute view yaw in radians, x and y zeroed, exactly as vanilla
+calls it in `SpawnPoint.lua`. It snapped, it held, and the rider kept mouse
+control from the new angle. That is everything a peek needs.
+
+The cost is that it is absolute rather than relative, so a peek has to read the
+current yaw, add an offset on the way out and subtract it on the way back. Any
+mouse movement made while peeking is preserved by working from the current value
+each time rather than from a remembered one.
+
+### The action map already has the keys, and the open question is release
+
+`hcm_actionmaps.xml` declares each feature once per candidate key, `r q y u o h`,
+and the settings file picks which one the mod listens to. Only `r` and `q` are
+spoken for. Every action currently declares `onPress="1"` and the handler tests
+`activation == "press"`, because a rear is a one-shot.
+
+**Whether a mod-declared action also delivers `release` is untested.** The note
+in `Rear.lua` that a hold is unusable was written about borrowing vanilla's
+`jump`, not about the mod's own actions, so it does not settle this. It decides
+hold-to-peek against press-to-toggle and is the next thing to find out.
+
+## The lean works, and the fourth argument to SetViewShake is a period
+
+The rider's correction reframed the whole feature: rotating the view does not
+help, because turning your eyes in place still leaves the horse's head between
+you and what is in front of it. **The camera has to move sideways**, which is
+parallax rather than rotation, and is how a person actually looks around
+something.
+
+`actor:SetViewShake(angular, positional, duration, period, randomness)` is the
+only call found that translates the first-person camera. The second vector is a
+displacement in meters. All 47 `cl_cam*` CVars are inert on this camera.
+
+### The second vector is an amplitude, not a direction
+
+The first attempts swung the camera left and right rather than holding it to one
+side, because a shake oscillates along the axis by construction. `{x = 0.8}`
+means 0.8 m each way, not 0.8 m to the left.
+
+### The fourth argument is a period in seconds, and this file said otherwise
+
+`Rider.lua` documents it as "oscillations per second", taken from vanilla's
+`1/20` in `SinglePlayer:ViewShake`. Measured across a 2000x spread at a fixed
+amplitude and duration, the rider reported:
+
+    0.01   very quick
+    1.0    natural
+    20.0   not noticed at all
+
+That is only consistent with **seconds per oscillation**. At 0.01 the period is
+a hundredth of a second, which is 100 Hz and reads as a blur. At 20 the period
+is twenty seconds, so a two second duration covers a tenth of one swing and the
+camera barely leaves its position.
+
+### Which is what makes a lean possible
+
+A long period turns the shake into a one-way push, because the duration only
+ever covers the opening sliver of a swing and the return half never arrives. The
+amplitude is therefore much larger than the distance actually traveled: at a 30
+second period a 2 second window reaches roughly 40 per cent of the amplitude.
+
+    amplitude 3.0  period 30  duration 2.0   a moderate lean
+    amplitude 5.0  period 60  duration 3.0   further and slower
+    amplitude -3.0 period 30  duration 2.0   the other side
+
+Judged in game: **"It's looking decent, still need some tuning."**
+
+So the three knobs separate cleanly. Amplitude sets how far, period sets how
+fast it gets there, duration sets how long before it lets go. A held key would
+re-fire before the duration expires so the return never begins.
+
+### Ruled out along the way
+
+`PlayerSetViewAngles` rotates the view cleanly and holds, and is the right call
+for anything that wants to turn the view, but it cannot help here. The whole
+`ForcedLook` family constrains pitch only. `SetWorldAngles` on the rider is
+reverted by the mount inside 400 ms. No bone is writable from Lua and no horse
+clip turns the head.
+
+## SetViewShake is a direction toggle, which is what makes a hold possible
+
+Three wrong models were built on this call before it was measured properly, each
+from too small a sample. It is worth stating what it actually does.
+
+**Firing a shake while one is running reverses the camera's direction of
+travel.** It does not sum with the running shake and it does not replace it from
+zero. Four calls at two second intervals, identical each time, with the camera
+position polled from `System.GetViewCameraPos`:
+
+    fire 1 at 0ms      0.000 -> 0.421   travelling out
+    fire 2 at 2000ms   0.344 -> -0.086  travelling back, through center
+    fire 3 at 4000ms  -0.007 -> 0.313   out again
+    fire 4 at 6000ms   0.241 -> -0.186  back again
+
+Perfectly consistent, and the rate is about 0.2 m/s each way at amplitude 2.0
+and period 8.0. The sign of the amplitude chooses the direction only when
+nothing is already running; after that every call simply flips.
+
+### The three wrong models, and why each survived as long as it did
+
+- **"The fourth argument is a period."** Read from the argument list. It behaves
+  like one over short windows.
+- **"The displacement is a velocity."** Read from a one second sample of an
+  eight second curve. Over its first eighth the curve is indistinguishable from
+  a straight line, so a rate fitted to it extrapolates to an amplitude twenty
+  times too large. That shipped, and threw the rider's camera twenty meters.
+- **"Concurrent shakes sum."** Inferred from the rider's report that tapping the
+  key repeatedly sent the camera absurdly far. The runaway was real; the
+  explanation was not.
+
+Each was a plausible reading of a real observation, and each was settled only by
+widening the measurement window. The instrument that settles it,
+`tools/probe_camera.lua`, cost less than any one of the rides spent guessing.
+
+### What it gives
+
+A toggle for an actuator and `GetViewCameraPos` for a sensor is a bang-bang
+control loop. Drive out until the target offset is reached, then flip each time
+the camera crosses back over it. The residual wobble is the travel speed times
+the poll interval, so a slow hold speed and a fifty millisecond poll put it
+under a centimeter.
+
+Ending a shake is the third element: a shake whose duration expires returns the
+camera home smoothly in about 160 ms, which is the release.
+
+### `GetHeadPos` is not the camera
+
+Worth recording because it was the first thing tried. It reports the head
+**bone**, and a view shake is applied downstream of the skeleton: at amplitude
+2.0 the head bone moved 2.7 cm, which is idle breathing, while the camera moved
+ten times that. `System.GetViewCameraPos` is the camera.
+
+### Keys available for binding, from the vanilla profile
+
+Every literal keyboard binding in `Libs/Config/defaultProfile.xml`, by
+actionmap. Movement and `use` resolve through `_keybinds_ref_` and are not
+listed there, so this catches literal bindings only.
+
+    f   haste, and player -> draw      not usable, a vanilla press cannot be consumed
+    e   haste only                     free while riding, the QTE map does not run
+    q   nothing                        free
+    r   nothing                        free
+    g v x z t i k l n p w              no literal binding
+
+The `horse` actionmap carries twenty actions and **`use` is not among them**,
+which supports the rider's account that nothing needs `e` on horseback.
+
+## A hard PC reset during testing was not the mod, and not the game
+
+Recorded so a future session does not spend a ride on it. The rider's machine
+powered off mid test and restarted. The Windows event log settles it:
+
+    Kernel-Power 41     BugcheckCode 0, PowerButtonTimestamp 0,
+                        LongPowerButtonPressDetected false, WHEABootErrorCount 0
+    EventLog 6008       previous shutdown 13:50:28 was unexpected
+    minidumps           none, and no MEMORY.DMP, and no bugcheck event in 30 days
+    WHEA-Logger         no hardware error in 30 days
+    display TDR         none in 30 days
+    last system event   13:40:44, ten minutes before the cut
+
+**A bugcheck code of zero with no dump means Windows never crashed.** A blue
+screen writes a bugcheck code and a minidump; an application fault kills the
+application. Neither happened. The machine stopped executing between two clock
+ticks with nothing written on the way down, which is what losing power looks
+like from inside the operating system. No Lua script can reach that far down.
+
+It is also not new. Five unexpected shutdowns in ninety days, four of them
+before this work started:
+
+    6/12 21:27    6/17 20:47    7/14 20:07    7/26 00:05    9/11 13:50
+
+The hardware is a Ryzen 7 5800X and an RTX 3080 on a B550 board. That pairing is
+the well known case for a power supply's over-current protection tripping on the
+card's microsecond transient spikes: instantaneous power off, no blue screen,
+nothing logged, under load, intermittent. The absence of any WHEA entry argues
+against memory or the CPU itself, which usually announce themselves.
+
+The mod cannot cause this, but **running the game is a heavy load and therefore
+a trigger**, which is why it happens during testing rather than at idle. That
+distinction matters for the next time it happens mid ride.
+
+## A corpse reared onto fell through the world, and the mod did not push it
+
+The rider reared twice on `rat_ruch`, who fell, died and then vanished.
+
+    rear 1   dealt 56.3   health 83.0 -> 26.8   knocked down
+    rear 2   state=BlendRagdoll, already a ragdoll on the ground
+             fatal, dealing 55.8 against 26.8   -> 0.0
+    corpse   dz=-34.57   then -156.64   then -216.31
+
+**The mod's physical contribution was nothing.** There is no `Impulse`, no
+`Mass` and no `Phase2Grounded` line for him anywhere in the run, so no impulse
+was applied, no ragdoll mass written and no damping set. The rear on the spot
+reaches a victim through damage and a reaction fragment, and that is all it did
+here.
+
+What the second rear did do is bring the horse down on a body already lying
+underneath it. The engine resolved that overlap by ejecting the body downward
+through the terrain. That is the same family as the horse standing on the dog
+and on the merchant, which the entry above establishes as vanilla by testing it
+in full shipping configuration with the mod absent.
+
+### The kill itself was deliberate and is worth a decision
+
+`fatal, dealing 55.8 against 26.8 health` is the preempt: the mod judges a blow
+lethal by anyone's hand and finishes the victim so the engine's trample cannot
+take the kill and the crime with it. It worked, and `attributed=false` means no
+charge was laid.
+
+The consequence is that **two rears kill an unarmored civilian**, at a rear base
+of 60 against about 83 health. That is a balance figure rather than a defect,
+and it is better decided than discovered on a merchant.
+
+### Known limit: a very fast turn clips the rider for a moment
+
+Ending a lean is not instant. The camera comes home over about 160 ms as the
+shake expires, and that figure belongs to the engine rather than to any setting
+here. The angle limit therefore governs **when the return starts**, never how
+long it takes.
+
+Leading the limit by the turn rate was added for this and it does fire earlier:
+release angles moved from a 43 to 48 band down to mostly 8 to 36. It does not
+remove the clip, because a rider who can cross the limit in less than the return
+takes is displaced for part of that turn whatever moment the return began.
+
+The only thing that would remove it is leading far enough that ordinary turns
+cancel leans as well, trading a rare cosmetic clip for a constant annoyance.
+Judged in game and accepted as it is.
+
+**Left undone deliberately**: `LeanBack` does not say why a lean ended, so a
+cancel and an ordinary release are indistinguishable in the log. Anyone
+reopening this should add that first, since the angles above cannot be read
+without it.
+
+# The lean, finished: what SetViewShake actually is
+
+The feature works and the rider's verdict is that it reads as vanilla. What
+follows is the mechanism, because four separate bugs in it came from the same
+misunderstanding and a fifth would too.
+
+## One call, and it is a direction toggle
+
+`actor:SetViewShake(angular, positional, duration, period, randomness)` is the
+only thing in the Lua surface that moves the first-person camera. Everything
+else was tried and ruled out in game: all 47 `cl_cam*` CVars are inert on the
+mounted view, no bone is writable, `PlayerSetViewAngles` turns the view but
+turning does not help, and the whole `ForcedLook` family constrains pitch only.
+
+What it does is not what its arguments suggest.
+
+**Firing it while a shake is running reverses the camera's direction of
+travel.** It does not sum with the running shake and it does not replace it from
+zero. Four identical calls at two second intervals, with the camera polled from
+`System.GetViewCameraPos`:
+
+    fire 1 at 0ms      0.000 -> 0.421   out
+    fire 2 at 2000ms   0.344 -> -0.086  back, through center
+    fire 3 at 4000ms  -0.007 -> 0.313   out
+    fire 4 at 6000ms   0.241 -> -0.186  back
+
+The amplitude's sign chooses a direction only when nothing is already running.
+After that every call simply flips.
+
+A toggle for an actuator and a position sensor is bang-bang control, which is
+what the hold is: drive out, then flip on every crossing back over the target.
+
+## Every shake is an animation queue entry, and the queue holds sixteen
+
+This is the part with teeth. A shake occupies a slot on the character's
+animation queue for its whole duration, so a correction is paid for not when it
+is made but for as long as the shake was given.
+
+The first working hold corrected two or three times a second and gave each shake
+twenty seconds of life. Those were still occupying the queue long after the lean
+that made them had ended. Measured: 176 `Animation-queue overflow` errors
+against one instance, `male.chr`, which is the rider, with no collision anywhere
+near them.
+
+**An overflowed queue rejects further animations rather than only warning.**
+
+The bound is three settings working together: the shake life is 1.5 seconds, the
+deadband is 6 cm, and no correction may follow another inside 200 ms. A lean now
+costs two to five entries against a limit of sixteen.
+
+## Four bugs, one misunderstanding
+
+Each of these was a different symptom of assuming something about this call's
+state instead of measuring it.
+
+- **Direction remembered goes stale.** A boolean flipped on each correction
+  assumes the camera only turns when the loop turns it. A shake's curve peaks at
+  its own period and reverses unaided, and from that moment the boolean is
+  backwards, so the loop drove the lean home. Releases aimed at 0.65 landed at
+  0.11, -0.05 and -0.08, the last two through center to the wrong side.
+- **Direction commanded is ignored.** A press inside the shake lifetime does not
+  choose a side, it reverses whatever is running, so a lean asked for left
+  travels right. Across eight deliberate double taps the wrong ones alternate
+  perfectly with the right ones and every one stops at 1.3, which is the runaway
+  ceiling rather than anywhere the lean intended.
+- **Another system's shake cancels the lean.** The impact camera shake is the
+  same call, so an impact during a lean does not jolt the view, it turns the
+  lean around, at exactly the moment the rider leaned out to watch. It is
+  suppressed while a lean is held, because any amplitude at all flips the
+  direction and there is no small version of it.
+- **The end of a lean is not instant.** The camera comes home over about 160 ms
+  as the shake expires, which no setting here controls.
+
+The controller therefore trusts nothing it did not just measure. Direction comes
+from the difference between two samples, the travel direction is verified after
+the press and turned around if wrong, and a ceiling at twice the commanded
+distance ends the lean outright whatever else failed.
+
+## Three wrong models, each from too small a sample
+
+Worth recording because the shape repeats.
+
+- **"The fourth argument is a period."** Read off the argument list. Behaves
+  like one over short windows.
+- **"The displacement is a velocity."** Fitted to a one second sample of an
+  eight second curve. Over its first eighth the curve is a straight line, so the
+  extrapolation gave an amplitude twenty times too large. It shipped, and threw
+  the rider's camera twenty meters.
+- **"Concurrent shakes sum."** Inferred from the rider reporting that tapping
+  the key sent the camera absurdly far. The runaway was real, the explanation
+  was not.
+
+Each was a plausible reading of a real observation and each was settled only by
+widening the measurement window. `tools/probe_camera.lua` cost less than any one
+of the rides spent guessing with it unbuilt.
+
+## Where the rider is, which is not where the horse is
+
+Measured, mounted and still:
+
+    rider entity  lateral +0.007   on the centerline to within 7 mm
+    camera        lateral -0.060   six centimeters to the horse's left
+
+So the entity is centered and the eye is not. Measuring the lean from where the
+camera rests finished 0.71 m out on the left and 0.59 m on the right for the
+same commanded 0.65, which a rider judging against the horse's head sees as the
+left reaching further, and reported as exactly that.
+
+The offset is therefore taken against **the horse's centerline**, and the target
+is a position rather than a distance traveled. Both sides finish the same
+distance from the head. The travel differs slightly instead, and nobody is
+looking at the travel.
+
+## Keys
+
+`hcm_actionmaps.xml` declares every feature once per candidate key, `r q e f y u
+o h`, and the settings file picks which by naming it. Action maps are read once
+at startup, so a key added there is dead until the game is restarted, with the
+log still reporting `loaded=true` from a cached flag.
+
+**A scan of the shipped action maps does not tell you which keys are free.**
+`surrender` and `draw` are writeable superactions whose keys live in the player
+profile rather than in any pak, so `g` and the number keys are spoken for while
+appearing unbound. The rider's own account settled it: `g` is surrender while
+mounted, `f` is free there, `1` and `2` draw.

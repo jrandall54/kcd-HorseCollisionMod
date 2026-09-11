@@ -30,6 +30,46 @@ number.
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-09-11
+
+### Added
+
+- **Leaning out to see past the horse's head.** In first person the horse's head
+  and neck sit between the rider and whatever is in front, so lining up on
+  someone and watching what happens to them are both guesswork. Hold `Q` or `E`
+  and the camera slides out to that side and stays there until the key comes up,
+  looking along the neck rather than into it.
+
+  It only works mounted, and only while looking roughly along the horse: past 45
+  degrees to either side, or 55 up or down, the lean is refused, and one already
+  running ends if the rider turns past it. Beyond those angles the camera would
+  travel through the rider and the horse rather than out beside them.
+
+  An impact's camera shake is held back while a lean is held, since seeing who
+  is about to be hit is the point of leaning in the first place.
+
+  Configured by `Lean`, `LeanLeftKey`, `LeanRightKey`, `LeanDistance`,
+  `LeanForwardShare`, `LeanMaxAngleDeg`, `LeanMaxPitchDeg`, `LeanSuppressShake`
+  and `LeanTurnLeadMs`. `LeanTravelAmplitude`, `LeanHoldAmplitude`,
+  `LeanShakePeriod`, `LeanShakeSec`, `LeanReleaseSec`, `LeanPollMs`,
+  `LeanDeadband`, `LeanMinFlipMs`, `LeanHomeMs` and `LeanRunawayFactor` tune the
+  mechanism itself and are better left alone.
+
+### Changed
+
+- The rear on the spot moves from `Q` to `F`, since the lean takes `Q` and `E`.
+  The charge stays on `R`. Neither `F` nor `E` does anything in vanilla while
+  mounted.
+
+### Fixed
+
+- Engine warnings and errors never reached `kcd.log`. The file and the console
+  carry separate verbosities and the file's ships at 0, so everything the engine
+  complained about was visible in game and absent from the only record that can
+  be read afterwards. A development install now raises it, along with the
+  animation warnings, which are off entirely at their shipped value.
+
+
 ## [5.3.1] - 2026-09-11
 
 ### Fixed

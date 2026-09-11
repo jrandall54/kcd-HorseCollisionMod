@@ -142,11 +142,16 @@ breaking the mod. Deleting a line restores its default.
 | `VictimBloodGallop` | 0.45 | The same at a gallop. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
 | `Rear` | true | Whether your horse can be reared on command. Only from a standstill. |
-| `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, y, u, o, h. |
-| `RearOnlyKey` | "q" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
+| `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, e, f, y, u, o, h. |
+| `RearOnlyKey` | "f" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
 | `RearMaxSpeed` | 0.15 | Horizontal speed above which a rear is refused. A rear is a standing attack: a horse still moving when it starts slides about 0.12 m before the animation takes hold. |
 | `RearIdleOnly` | true | Also require the horse's own locomotion state to be idle, which catches slow drift a speed reading misses. |
 | `RearCooldownMs` | 2500 | How long before another rear is accepted. |
+| `Lean` | true | Whether Q and E lean the camera out to either side, so you can see past the horse's head in first person. |
+| `LeanLeftKey` | "q" | Which key leans left. One of r, q, e, g, y, u, o, h. |
+| `LeanRightKey` | "e" | Which key leans right. Same list. |
+| `LeanDistance` | 0.65 | How far out the camera goes and holds, in meters. |
+| `LeanForwardShare` | 0.35 | How much the lean also carries the camera forward, as a fraction of the sideways travel. 0 leans straight out. |
 | `RearReach` | 2.5 | How far in front the hooves reach, for the rear on the spot. |
 | `RearArc` | 70 | The arc in front that counts, in degrees. |
 | `RearStaminaCost` | 12.0 | What a landed rear costs the horse. |
@@ -242,6 +247,9 @@ tools/
                           timeline rather than an impression
   probe_api.lua           lists the methods an object actually exposes in the
                           running game, which the written references do not
+  probe_camera.lua        polls the first-person camera through a view shake,
+                          which is the only way to see what that call does
+                          rather than what its arguments suggest
   probe_horse_mass.lua    reports the mass and physics identity of the horse,
                           the player and the nearest NPC, which are the two
                           sides of every collision the mod scores

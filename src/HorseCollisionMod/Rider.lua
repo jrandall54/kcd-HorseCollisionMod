@@ -221,6 +221,26 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 		return false
 	end
 
+	-- Not while the rider is leaning out.
+	--
+	-- Both effects are `SetViewShake`, and a second call does not add to the
+	-- first, it **reverses the camera's direction of travel**. An impact during
+	-- a lean therefore does not jolt the view, it turns the lean around and
+	-- sends the camera home, which is precisely the moment the rider leaned out
+	-- to watch: the feature exists so they can see who they are about to hit.
+	--
+	-- Suppressed rather than scaled, because any amplitude at all flips the
+	-- direction. The shake is feedback and the lean is aim, and the aim wins
+	-- while it is deliberately held.
+	if cfg.LeanSuppressShake ~= false and self.LeanHeld then
+		if cfg.LogTelemetry then
+			self:Log("CameraShake suppressed tier=" .. tostring(tierName)
+					.. " reason=leaning")
+		end
+
+		return false
+	end
+
 	-- A trot is the same kick at a fraction of it, on one number rather than a
 	-- second set of values, for the same reason `BlurRiderView` scales: the
 	-- shape is right and only the weight should differ between the tiers.

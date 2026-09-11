@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.3.1
+-- @release 5.4.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.3.1"
+HorseCollisionMod.Version = "5.4.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -221,6 +221,65 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearStrikes whether the hooves coming down hit anyone in front
 -- @field RearStrikeMs when in the animation the hooves land
 -- @field RearReach how far in front the hooves reach, in meters
+-- @field Lean whether the rider can lean out to see past the horse's head
+-- @field LeanLeftKey which key leans left, one of r, q, e, f, y, u, o, h
+-- @field LeanRightKey which key leans right, from the same list
+-- @field LeanDistance how far across the horse the camera holds, in meters
+--   from the horse's centerline rather than from where the camera rests, so
+--   both sides finish the same distance from the head. The camera sits about
+--   6 cm to the horse's left at rest, so the travel differs slightly between
+--   the two sides while the finishing position does not
+-- @field LeanForwardShare how much of the lean also carries the camera
+--   forward, as a fraction of the sideways travel. 0 leans straight out
+-- @field LeanTravelAmplitude how hard the camera is driven on the way out,
+--   which sets how fast it gets there
+-- @field LeanHoldAmplitude the amplitude used once the target is reached.
+--   Lower is a steadier hold, because the residual wobble is the travel speed
+--   times the poll interval
+-- @field LeanPollMs how often the held offset is checked and corrected
+-- @field LeanMaxAngleDeg how far off the horse's line the rider may be
+--   looking and still lean, in degrees. Past it the camera travels through the
+--   rider and the horse rather than out beside them, because the offset is
+--   applied in camera space. Turning past it mid lean ends the lean. 0 removes
+--   the limit
+
+-- @field LeanDeadband how far off target the camera may sit before a
+--   correction is spent on it, in meters. Wider is fewer corrections, and a
+--   correction costs an animation queue entry for LeanShakeSec
+-- @field LeanShakePeriod the period passed to SetViewShake. A shake's curve
+--   peaks at its period and then reverses by itself, so this is kept long
+--   enough that a hold never reaches that turn, and the amplitudes are scaled
+--   with it because the travel speed is roughly amplitude over period
+-- @field LeanShakeSec how long each shake lives. **Every shake is an entry in
+--   the rider's animation queue and the queue holds sixteen**, so a long life
+--   is paid for long after the lean that made it ended. An overflowed queue
+--   rejects further animations rather than merely warning
+-- @field LeanMinFlipMs the least time between two corrections, which bounds
+--   how fast queue entries can be spent. It applies to corrections only: the
+--   press, the arrival at the target and the release are never throttled,
+--   because dropping any of those leaves the camera traveling
+-- @field LeanMaxPitchDeg how far up or down the rider may be looking and
+--   still lean, in degrees. The yaw limit is flattened so looking up or down
+--   is not treated as looking away, which stops meaning anything once the
+--   horizontal component collapses. Looking down is also where the camera is
+--   nearest the rider's own model
+-- @field LeanTurnLeadMs how far ahead of the angle limit a turn is judged, in
+--   milliseconds. Ending a lean takes about 160 ms, so reacting at the limit
+--   is too late for a fast turn and the camera clips through the rider. The
+--   angle is projected forward at the current turn rate instead, which
+--   tightens the limit only for the turns that need it
+-- @field LeanSuppressShake whether an impact's camera shake is held back
+--   while the rider is leaning. Both are SetViewShake, and a second call
+--   reverses the camera rather than adding to it, so a shake mid lean sends
+--   the camera home at the moment the rider leaned out to watch
+-- @field LeanHomeMs how long after a release before another lean may start,
+--   which is the time the camera needs to come home. Without it a re-press
+--   takes its bearings from a camera that is still displaced
+-- @field LeanRunawayFactor how far past the target the camera may get, as a
+--   multiple of LeanDistance, before the lean is ended outright
+-- @field LeanReleaseSec the short shake fired on release, which expires and
+--   lets the camera return home
+
 -- @field RearArc the arc in front that counts, in degrees
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
@@ -559,7 +618,7 @@ HorseCollisionMod.Config = {
 	RearMaxSpeed             = 0.15,
 	RearCooldownMs           = 2500,
 	RearFragTag              = "hcm_rear_charge",
-	RearOnlyKey              = "q",
+	RearOnlyKey              = "f",
 	RearOnlyFragTag          = "hcm_rear",
 	-- Hooves coming down, not a horse riding into someone. Lighter than a
 	-- charge and led by the hoof rather than by the body.
@@ -605,6 +664,25 @@ HorseCollisionMod.Config = {
 	RearAnimSpeed            = 1.0,
 	RearStrikes              = true,
 	RearStrikeMs             = 700,
+	Lean                     = true,
+	LeanLeftKey              = "q",
+	LeanRightKey             = "e",
+	LeanDistance             = 0.65,
+	LeanForwardShare         = 0.35,
+	LeanTravelAmplitude      = 110.0,
+	LeanHoldAmplitude        = 3.0,
+	LeanPollMs               = 30,
+	LeanDeadband             = 0.06,
+	LeanMinFlipMs            = 200,
+	LeanRunawayFactor        = 2.0,
+	LeanMaxAngleDeg          = 45,
+	LeanMaxPitchDeg          = 55,
+	LeanSuppressShake        = true,
+	LeanTurnLeadMs           = 200,
+	LeanHomeMs               = 220,
+	LeanShakePeriod          = 40.0,
+	LeanShakeSec             = 1.5,
+	LeanReleaseSec           = 0.05,
 	RearReach                = 2.5,
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,
@@ -1632,6 +1710,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Lean.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rear.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 

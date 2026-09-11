@@ -16,7 +16,8 @@
 -- `Libs/Config/hcm_actionmaps.xml` and a key added there and not here is
 -- unusable, while one here and not there names an action that does not exist.
 HorseCollisionMod.RearKeys = {
-	r = true, q = true, y = true, u = true, o = true, h = true
+	r = true, q = true, e = true, f = true,
+	y = true, u = true, o = true, h = true
 }
 
 --- The action name a configured key maps to.
@@ -132,7 +133,13 @@ function HorseCollisionMod:HookRearKey()
 			local mod = HorseCollisionMod
 			local cfg = mod.Config
 
-			if action == mod:RearActionFor(cfg.RearChargeKey) then
+			-- The lean shares this hook rather than wrapping OnAction a
+			-- second time. Two wrappers cannot both survive a reload: this
+			-- one restores `RearOriginalOnAction` before rewrapping, which
+			-- would discard the other.
+			if mod:HandleLeanAction(action, activation) then
+				consumed = true
+			elseif action == mod:RearActionFor(cfg.RearChargeKey) then
 				consumed = true
 
 				if activation == "press" then

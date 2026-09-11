@@ -37,6 +37,7 @@ param (
 	[switch]$AnimOnly,
 	[switch]$Crime,
 	[switch]$FreeGallop,
+	[switch]$ReleaseSettings,
 	[switch]$SetDevEnvironment,
 	[switch]$SetPlayEnvironment,
 	[switch]$PrepareShippingTest,
@@ -177,8 +178,27 @@ $DevEnvironment = @(
 	# in-game console unreadable. The delay collapses repeats of an identical
 	# line; the mod's own telemetry carries changing numbers on every line and
 	# is not affected.
-	@{ Name = "log_SpamDelay"; Dev = "30"; Play = "30"
-	   Why = "the PROS backend fills the console and the log with retries" }
+	# Development wants every repeat. The overflow message is byte identical for
+	# a given character apart from a pointer, so a delay collapses exactly the
+	# evidence a hunt needs, and the cost is more backend noise in a log that is
+	# already verbose.
+	@{ Name = "log_SpamDelay"; Dev = "0"; Play = "30"
+	   Why = "repeats of an identical engine warning are collapsed" },
+	# The file and the console have separate verbosities, and the file ships at
+	# 0. Every engine warning and error therefore renders on the in-game console
+	# and is never written to kcd.log, which is the only thing this project can
+	# read after the fact.
+	#
+	# That gap is not small. An animation queue overflow was hunted across about
+	# 130 impacts and four tiers, reported as not reproducing, and was on the
+	# rider's console the whole time. The instrument was blind and the negative
+	# result was worthless.
+	@{ Name = "log_WriteToFileVerbosity"; Dev = "3"; Play = "0"
+	   Why = "engine warnings and errors never reach kcd.log" },
+	# Gates the animation warnings, including the queue filling up before it
+	# overflows. At the shipped 0 only the hard failure can ever print.
+	@{ Name = "ca_AnimWarningLevel"; Dev = "2"; Play = "0"
+	   Why = "animation warnings are off, including the queue filling" }
 )
 
 function Get-CfgValue {
@@ -612,7 +632,17 @@ function Test-InstalledFiles {
 			$a = [System.IO.File]::ReadAllText($file.From)
 			$b = [System.IO.File]::ReadAllText($file.To)
 
-			foreach ($key in $script:DevTestValues.Keys) {
+			# -FreeGallop rewrites three more keys in the installed copy, and
+			# they were not normalized here, so every deploy carrying that
+			# switch reported the settings file stale. That is not cosmetic:
+			# the caller treats a stale file as fatal and exits before the
+			# launch block, which is why -Launch looked broken whenever it was
+			# combined with -FreeGallop.
+			$normalize = @()
+			$normalize += $script:DevTestValues.Keys
+			$normalize += $script:DevFreeGallopValues.Keys
+
+			foreach ($key in $normalize) {
 				$pattern = "($key\s*=\s*)([^,
 ]+)"
 				$a = [regex]::Replace($a, $pattern, '${1}X')
@@ -690,6 +720,27 @@ function Sync-LooseFiles {
 		Copy-Item $file.From -Destination $file.To -Force
 		Write-Host "[DEPLOY] updated $(Split-Path -Leaf $file.To)"
 		$changed[$file.Half] = $true
+
+		# The action map is read once, at startup, and never again.
+		#
+		# Rear.lua guards ActionMapManager.LoadFromXML behind a flag set the
+		# first time it succeeds, because re-reading a file whose map is already
+		# registered registers every action a second time and one press then
+		# arrives twice over. So a script reload cannot pick up a new action, and
+		# a key added to this file is silently dead until the game is restarted.
+		#
+		# Worth a line rather than a ride: a lean was added on two new keys,
+		# deployed into a running game, reported as doing nothing, and the log
+		# read loaded=true from the flag rather than from the new file.
+		if ((Split-Path -Leaf $file.To) -eq "hcm_actionmaps.xml") {
+			$running = @(Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue).Count -gt 0
+
+			if ($running) {
+				Write-Host "[DEPLOY] hcm_actionmaps.xml changed while the game is running." -ForegroundColor Yellow
+				Write-Host "[DEPLOY] Action maps are read once at startup, so any new key is" -ForegroundColor Yellow
+				Write-Host "[DEPLOY] dead until the game is restarted." -ForegroundColor Yellow
+			}
+		}
 	}
 
 	# A development deploy leaves the world unable to interrupt a test: riding
@@ -709,7 +760,15 @@ function Sync-LooseFiles {
 	# Gated on $changed.Script, asking for a different world silently did
 	# nothing whenever the scripts happened to be identical, which is exactly
 	# the case when only a switch is being changed. It is idempotent and cheap.
-	Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop
+	# -ReleaseSettings installs the repository's own values untouched, which is
+	# what a branch wants once it stops being tested. Without it the only way
+	# back to a shipping world was to remember every switch that had been used.
+	if ($ReleaseSettings) {
+		Write-Host "[DEPLOY] release settings: the installed world is the shipped one"
+	}
+	else {
+		Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop
+	}
 
 	return $changed
 }
