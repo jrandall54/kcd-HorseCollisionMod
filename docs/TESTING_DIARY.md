@@ -18029,3 +18029,122 @@ window. The mod knows when it has just scored an impact, so it can discard or
 clamp the speed samples for a few hundred milliseconds afterwards, which removes
 collision-produced speed without touching acceleration at all. That is the
 targeted fix and it is only worth building once there is a case that needs it.
+
+# Audit: the mass rewrite, what it does, and what the record got wrong
+
+Opened because the diary claims the throw sculpting was measured with mass
+scaling off and every victim at a flat 80 kg, and the shipped build does not
+match that claim. The claim is wrong. Here is the evidence, then the range the
+rewrite actually produces, then why the replacement is possible.
+
+## The setting was never off
+
+`RagdollMassArmorScaled` read `true` in `src/HorseCollisionMod_Settings.lua` at
+every commit of the sculpting work and at every commit since:
+
+    88dddb5  sculpt a thrown body's distance to a commanded figure   true
+    001aa5a  sculpt the throw with articulated lying-mode damping    true
+    1ad96e1  revert lying damping to 6.0                             true
+    d818ea7  three-stage collision physics pipeline                  true
+    259857e  tune visual impact effects                              true
+
+`false` has never been committed to that file. The internal default is also
+`true`, so nothing falls back to flat mass either.
+
+## And the write was reaching the impulse the whole time
+
+This is the part that rules out the charitable reading. There was a real period
+when the mass write did not land before the impulse, recorded earlier in this
+diary as *The impulse meets a body of 80 kg, not the mass the mod writes*: three
+consecutive villagers read `mass 80.0`, the engine's default, because
+`MassVictim` was called and the impulse followed immediately, before the body
+was physicalized.
+
+That was fixed by making `MassVictim` take a callback and running the impulse
+inside it, so the throw waits for the write to succeed. The fix is present at
+`88dddb5`, which is the **first** sculpting commit:
+
+    8e4bd92   MassVictim(npc, impulseScale)          then ImpulseVictim   80 kg
+    88dddb5   MassVictim(npc, armorScale, function() ImpulseVictim ...    written mass
+    HEAD      same
+
+So from the first commit of the sculpting work onward, the impulse met the
+written mass. Every figure in *Sculpting the throw: three actuators, and the one
+that works* was measured with armor-scaled mass live.
+
+Confirmed against a current run rather than argued from history:
+
+    Impulse     rat_guard27  magnitude=58.3  mass=1225.5  dv=0.05
+    Phase1Brake rat_guard27  speed=4.63  keep=0.55  mag=2576.3  mass=1225.5
+
+## Where the wrong claim probably came from
+
+The line in the diary is `RagdollMassArmorScaled false, every victim at a flat
+80 kg`. The number 80 is the tell: 80 kg is not what flat mass would produce,
+because `RagdollMass` is 100. Eighty is the **engine's** default, and it is the
+figure from the older entry about the write not landing. An intended
+configuration was recorded as a measured one, and the two 80s were conflated.
+
+This is the exact failure the project already had a rule for, which is to read
+back one log line that could only be true if the change were live. One `Mass`
+line would have settled it. None was quoted in that entry.
+
+## The range the rewrite actually produces, which is not a scale
+
+`MassVictim` computes `wanted = RagdollMass / armorScale ^ RagdollMassArmorExponent`
+at base 100 and exponent 3.7, **with no clamp of any kind** on the result:
+
+| raw armor scale | written mass |
+| --- | --- |
+| 1.26 unarmored | 43 kg |
+| 1.15 villager | 60 kg |
+| 1.00 | 100 kg |
+| 0.80 | 228 kg |
+| 0.51 mailed guard | 1,208 kg |
+| 0.35 | 4,863 kg |
+| 0.10 | **501,187 kg** |
+
+Armor scale 0.10 is not hypothetical. It appears in the current log:
+`ImpactDamage rat_guard18 tier=Trot base=18.0 armorScale=0.10`. That guard was
+given a ragdoll mass of half a million kilograms.
+
+Dividing by a number raised to 3.7 is a cliff rather than a scale. Between 0.35
+and 0.10 the mass moves by a factor of a hundred, and there is no setting that
+bounds it, so the heaviest victim in any given town is whatever the armor
+tables happen to produce.
+
+### A trap that has now caught two sessions
+
+The `Mass` log line prints `scale=` **after** the exponent has been applied,
+because the same local is reused. `scale=0.04` is not an armor scale of 0.04, it
+is `0.35 ^ 3.7`. An exponent was once calibrated against a range read off that
+field and came out three times too small.
+
+## What the rewrite costs
+
+- **Barding and knockback are inert against anyone in armor.** `magnitude=58.3`
+  against `mass=1225.5` is `dv=0.05`, five centimetres per second. The tuned
+  force settings and the whole barding force bonus do nothing to a guard.
+- **The horse is thrown by the bodies it walks into**, because they outweigh it.
+  A horse is about 480 kg against a guard's 1,208.
+- **Nothing else can be tuned honestly on top of it**, since every impulse the
+  mod applies is divided by a figure that swings by four orders of magnitude.
+
+## Why the brake can replace it, where damping could not
+
+An earlier experiment, unmerged on `experiment/armor-scaled-damping`, asked
+whether *damping* could replace the rewrite and answered no: 1.22x to 1.29x of
+separation against the rewrite's 1.84x, because damping acts only on the tail
+while most of the distance is set in the frame the solver resolves.
+
+**The current brake is not damping and that result does not bind it.** It is a
+counter-impulse of `mass * speed * (1 - keep)` applied against the body's own
+velocity, which removes a commanded *fraction* of speed. Distance scales with
+speed, so the ratio between two victims is the ratio of their keep fractions and
+it is a number that can simply be set. It is also mass-independent by
+construction: the mass appears in the impulse and cancels in the velocity
+change.
+
+At the current endpoints, 0.45 armored against 1.0 unarmored, that is a 2.2x
+separation available with flat mass, which is more than the rewrite's 1.84x and
+under direct control rather than emergent from an armor table raised to 3.7.
