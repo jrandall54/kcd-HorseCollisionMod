@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-09-11
+
 ### Added
 - `RagdollSpeedCapArmorScaled`, `RagdollSpeedCapArmored` and
   `RagdollSpeedCapUnarmored`. The speed ceiling a traveling body is held under

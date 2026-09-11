@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.2.2
+-- @release 5.3.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.2.2"
+HorseCollisionMod.Version = "5.3.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -116,6 +116,10 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field KnockdownRecoveryMs how long a knocked-down victim is left alone,
 --   which is longer than the walk cooldown because they are still on the ground
 -- @field ImpactSpeedSamples ticks of speed history a collision is scored from
+-- @field HorseAirborneVz the upward speed, in meters per second, at which
+--   the mod reports that the horse has left the ground. Nothing is written
+--   at rest, and nothing is sampled that the detection loop was not already
+--   reading
 -- @field MaxImpactSpeed ceiling on the speed a collision is scored at
 -- @field Knockback horizontal ragdoll impulse at full strength
 -- @field Uplift vertical ragdoll impulse at full strength
@@ -253,6 +257,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   tracks how long a body spends above the ceiling
 -- @field RagdollSpeedCapArmored the ceiling for a victim in full mail
 -- @field RagdollSpeedCapUnarmored the ceiling for an unarmored victim
+-- @field RagdollAirDampingArmorScaled whether the drag applied to a
+--   traveling body is scaled by the victim's armor. The ceiling only decides
+--   when the drag starts, and past the ceiling plus the span it saturates, so
+--   without this every victim receives the same drag on the fast throws,
+--   which are the ones where armor should tell them apart
+-- @field RagdollAirDampingArmored the drag for a victim in full mail
+-- @field RagdollAirDampingUnarmored the drag for an unarmored victim
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
