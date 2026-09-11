@@ -17972,3 +17972,27 @@ not hold.
 from what the rider experienced as walking into her. With `CollisionIsCrime`
 on, that is charged as the heavier tier as well. The walk tier's entire contract
 with the player is that it shoves and does not knock down.
+
+### The rear and the charge are clean too, and the hunt is closed
+
+339 `Rear` lines, 30 charges and 40 impacts, with `log_SpamDelay` at 0 and
+`ca_AnimWarningLevel` at 2, produced no animation-queue line. That is the fourth
+tier and the last untested path, and it was the strongest candidate: the horse
+is one character instance that lives for the whole session and is never
+ragdolled.
+
+Across the whole session, roughly 130 impacts at every tier, the count is zero.
+**Not reproduced.** Recorded here so the next sighting starts from what is
+already ruled out rather than from the beginning, and the two instruments are
+written down because finding them again is most of the cost:
+
+    log_SpamDelay 0          the warning is byte-identical per character and
+                             collapses at the deployed value of 30
+    ca_AnimWarningLevel 2    unlocks "filled up to 15 entries", which fires
+                             before the failure rather than at it
+
+The run also recorded `ChargeWindow spent peak=13.18 spike=26.45`, a horse
+reaching 26 m/s during a charge. `MaxImpactSpeed` caps the score at 11.0, so a
+charge leaves the speed history pinned at the cap and the 900 ms peak hold
+carries it. Any impact within 900 ms of a charge is therefore scored as a
+gallop whatever the horse is doing. Same leak as the walk case, one tier wider.
