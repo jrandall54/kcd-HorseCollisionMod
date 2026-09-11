@@ -18576,3 +18576,37 @@ listed there, so this catches literal bindings only.
 
 The `horse` actionmap carries twenty actions and **`use` is not among them**,
 which supports the rider's account that nothing needs `e` on horseback.
+
+## A hard PC reset during testing was not the mod, and not the game
+
+Recorded so a future session does not spend a ride on it. The rider's machine
+powered off mid test and restarted. The Windows event log settles it:
+
+    Kernel-Power 41     BugcheckCode 0, PowerButtonTimestamp 0,
+                        LongPowerButtonPressDetected false, WHEABootErrorCount 0
+    EventLog 6008       previous shutdown 13:50:28 was unexpected
+    minidumps           none, and no MEMORY.DMP, and no bugcheck event in 30 days
+    WHEA-Logger         no hardware error in 30 days
+    display TDR         none in 30 days
+    last system event   13:40:44, ten minutes before the cut
+
+**A bugcheck code of zero with no dump means Windows never crashed.** A blue
+screen writes a bugcheck code and a minidump; an application fault kills the
+application. Neither happened. The machine stopped executing between two clock
+ticks with nothing written on the way down, which is what losing power looks
+like from inside the operating system. No Lua script can reach that far down.
+
+It is also not new. Five unexpected shutdowns in ninety days, four of them
+before this work started:
+
+    6/12 21:27    6/17 20:47    7/14 20:07    7/26 00:05    9/11 13:50
+
+The hardware is a Ryzen 7 5800X and an RTX 3080 on a B550 board. That pairing is
+the well known case for a power supply's over-current protection tripping on the
+card's microsecond transient spikes: instantaneous power off, no blue screen,
+nothing logged, under load, intermittent. The absence of any WHEA entry argues
+against memory or the CPU itself, which usually announce themselves.
+
+The mod cannot cause this, but **running the game is a heavy load and therefore
+a trigger**, which is why it happens during testing rather than at idle. That
+distinction matters for the next time it happens mid ride.
