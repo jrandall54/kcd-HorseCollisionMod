@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.3.1] - 2026-09-11
+
 ### Fixed
 - Corpses could stay frozen in mid-air after being lifted by the horse, falling
   only when struck. When a throw settles the mod hands the body back to the

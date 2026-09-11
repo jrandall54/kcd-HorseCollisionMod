@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.3.0
+-- @release 5.3.1
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
