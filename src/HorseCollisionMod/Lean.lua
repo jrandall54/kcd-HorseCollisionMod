@@ -80,84 +80,62 @@ function HorseCollisionMod:LeanActionFor(key, side)
 end
 
 
---- How far the lean has carried the camera sideways, in meters.
+--- Where the camera sits across the horse, in meters from its centerline.
 --
--- Measured as the camera's offset **from the rider**, not from a remembered
--- world position. A world baseline is only valid while the horse is standing
--- still: at a walk the horse covers more ground in a second than the whole
--- lean travels, so the controller reads the horse's journey instead of the
--- camera's and chases a number that has nothing to do with the lean. That is
--- what made the hold overshoot to 1.19 m against a target of 0.65, and what
--- made it behave differently every time.
+-- Measured against the **horse**, not against where the camera happened to be
+-- when the lean started, and not against a remembered world position.
 --
--- Projected on the camera's **current** right vector rather than the one from
--- when the lean began, because the shake displaces the camera in its own
--- space, so the offset rotates with the view.
+-- A world baseline is only valid standing still: at a walk the horse covers
+-- more ground in a second than the whole lean travels, so the controller reads
+-- the horse's journey instead of the camera's.
 --
--- @treturn ?number sideways offset, positive to the right
+-- The rider's own resting position is not the right frame either, and that is
+-- what made the two sides read differently. Measured, the rider's entity sits
+-- on the centerline to within 7 mm but **the camera rests 6 cm to the horse's
+-- left**, so a lean of equal travel each way finishes 0.71 m out on the left
+-- and 0.59 m on the right. A rider judging against the horse's head sees that
+-- as the left reaching further, which is exactly what was reported.
+--
+-- Against the centerline both sides finish the same distance from the head,
+-- which is the thing being aimed past. The travel differs slightly instead,
+-- and travel is not what anyone is looking at.
+--
+-- @treturn ?number offset across the horse, positive to the horse's right
 function HorseCollisionMod:LeanOffset()
-	local here, dir, rider = nil, nil, nil
 	local playerEnt = rawget(_G, "player")
+	local horse, hp, fwd, cam = nil, nil, nil, nil
 
 	if not playerEnt then
 		return nil
 	end
 
 	pcall(function()
-		here = System.GetViewCameraPos()
-		dir = System.GetViewCameraDir()
-		rider = playerEnt:GetWorldPos()
+		horse = XGenAIModule.GetEntityByWUID(playerEnt.player:GetPlayerHorse())
 	end)
 
-	if not here or not dir or not rider or not self.LeanBaseline then
-		return nil
-	end
-
-	local len = math.sqrt((dir.x * dir.x) + (dir.y * dir.y))
-
-	if len <= 0 then
-		return nil
-	end
-
-	local right = { x = dir.y / len, y = -dir.x / len }
-	local rel = { x = here.x - rider.x, y = here.y - rider.y }
-
-	return ((rel.x * right.x) + (rel.y * right.y)) - self.LeanBaseline
-end
-
-
---- The camera's sideways offset from the rider, with no lean running.
---
--- Captured when a lean starts so everything after is measured against it.
---
--- @treturn ?number
-function HorseCollisionMod:LeanBaselineNow()
-	local here, dir, rider = nil, nil, nil
-	local playerEnt = rawget(_G, "player")
-
-	if not playerEnt then
+	if not horse then
 		return nil
 	end
 
 	pcall(function()
-		here = System.GetViewCameraPos()
-		dir = System.GetViewCameraDir()
-		rider = playerEnt:GetWorldPos()
+		hp = horse:GetWorldPos()
+		fwd = horse:GetDirectionVector(1)
+		cam = System.GetViewCameraPos()
 	end)
 
-	if not here or not dir or not rider then
+	if not hp or not fwd or not cam then
 		return nil
 	end
 
-	local len = math.sqrt((dir.x * dir.x) + (dir.y * dir.y))
+	local len = math.sqrt((fwd.x * fwd.x) + (fwd.y * fwd.y))
 
 	if len <= 0 then
 		return nil
 	end
 
-	local right = { x = dir.y / len, y = -dir.x / len }
+	local right = { x = fwd.y / len, y = -fwd.x / len }
 
-	return ((here.x - rider.x) * right.x) + ((here.y - rider.y) * right.y)
+	return ((cam.x - hp.x) * right.x) + ((cam.y - hp.y) * right.y)
 end
 
 
@@ -313,9 +291,9 @@ function HorseCollisionMod:StartLean(sign)
 		return
 	end
 
-	self.LeanBaseline = self:LeanBaselineNow()
-
-	if not self.LeanBaseline then
+	-- Refused if the offset cannot be read, since the whole hold is closed loop
+	-- on it and an open loop lean would simply travel until the key came up.
+	if not self:LeanOffset() then
 		return
 	end
 
@@ -324,19 +302,9 @@ function HorseCollisionMod:StartLean(sign)
 
 	local generation = self.LeanGeneration
 	local timerTick = self.TimerTick
-	-- The two sides are not quite symmetric to the rider's eye, the left
-	-- reading as slightly further out. The cause is not established, so this is
-	-- a trim rather than a correction: it adds to the left target only and
-	-- defaults to zero, which changes nothing until someone tunes it. The
-	-- `LeanBack` line carries the side and the achieved offset, so whether the
-	-- asymmetry is real can be read off a run rather than argued about.
-	local reach = cfg.LeanDistance or 0.65
-
-	if sign < 0 then
-		reach = reach + (cfg.LeanLeftTrim or 0)
-	end
-
-	local target = reach * sign
+	-- A position across the horse rather than a distance traveled, so both
+	-- sides finish the same distance from the head.
+	local target = (cfg.LeanDistance or 0.65) * sign
 	local pollMs = cfg.LeanPollMs or 30
 	local reached = false
 	local last = nil

@@ -224,7 +224,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field Lean whether the rider can lean out to see past the horse's head
 -- @field LeanLeftKey which key leans left, one of r, q, e, f, y, u, o, h
 -- @field LeanRightKey which key leans right, from the same list
--- @field LeanDistance how far out the camera holds, in meters
+-- @field LeanDistance how far across the horse the camera holds, in meters
+--   from the horse's centerline rather than from where the camera rests, so
+--   both sides finish the same distance from the head. The camera sits about
+--   6 cm to the horse's left at rest, so the travel differs slightly between
+--   the two sides while the finishing position does not
 -- @field LeanForwardShare how much of the lean also carries the camera
 --   forward, as a fraction of the sideways travel. 0 leans straight out
 -- @field LeanTravelAmplitude how hard the camera is driven on the way out,
@@ -238,9 +242,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   rider and the horse rather than out beside them, because the offset is
 --   applied in camera space. Turning past it mid lean ends the lean. 0 removes
 --   the limit
--- @field LeanLeftTrim meters added to the left lean only, for the slight
---   asymmetry between the sides. A trim rather than a correction, since the
---   cause is not established
+
 -- @field LeanDeadband how far off target the camera may sit before a
 --   correction is spent on it, in meters. Without it the loop flips on every
 --   poll once the camera is on the target
@@ -647,7 +649,6 @@ HorseCollisionMod.Config = {
 	LeanPollMs               = 30,
 	LeanDeadband             = 0.03,
 	LeanMaxAngleDeg          = 45,
-	LeanLeftTrim             = 0,
 	LeanHomeMs               = 220,
 	LeanShakePeriod          = 40.0,
 	LeanShakeSec             = 20.0,

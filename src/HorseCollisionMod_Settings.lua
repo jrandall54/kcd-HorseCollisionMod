@@ -221,8 +221,6 @@ HorseCollisionModSettings = {
 	LeanPollMs               = 30,
 	LeanDeadband             = 0.03,
 	LeanMaxAngleDeg          = 45,    -- refuse a lean past this far off the horse's line
-	LeanLeftTrim             = 0,     -- meters added to the left lean only, if the
-	                                  -- two sides do not read as symmetric
 	LeanHomeMs               = 220,    -- how often the hold is corrected
 	LeanShakePeriod          = 40.0,
 	LeanShakeSec             = 20.0,  -- long enough to outlast a held lean
