@@ -178,8 +178,12 @@ $DevEnvironment = @(
 	# in-game console unreadable. The delay collapses repeats of an identical
 	# line; the mod's own telemetry carries changing numbers on every line and
 	# is not affected.
-	@{ Name = "log_SpamDelay"; Dev = "30"; Play = "30"
-	   Why = "the PROS backend fills the console and the log with retries" },
+	# Development wants every repeat. The overflow message is byte identical for
+	# a given character apart from a pointer, so a delay collapses exactly the
+	# evidence a hunt needs, and the cost is more backend noise in a log that is
+	# already verbose.
+	@{ Name = "log_SpamDelay"; Dev = "0"; Play = "30"
+	   Why = "repeats of an identical engine warning are collapsed" },
 	# The file and the console have separate verbosities, and the file ships at
 	# 0. Every engine warning and error therefore renders on the in-game console
 	# and is never written to kcd.log, which is the only thing this project can
