@@ -570,14 +570,14 @@ HorseCollisionMod.Config = {
 	-- Rearing on command. Everything else this mod does needs speed; a rear is
 	-- what a rider has at a standstill.
 	Rear                     = true,
-	RearChargeKey            = "f",
+	RearChargeKey            = "r",
 	RearActionMap            = "hcm_rear",
 	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
 	RearIdleOnly             = true,
 	RearMaxSpeed             = 0.15,
 	RearCooldownMs           = 2500,
 	RearFragTag              = "hcm_rear_charge",
-	RearOnlyKey              = "r",
+	RearOnlyKey              = "f",
 	RearOnlyFragTag          = "hcm_rear",
 	-- Hooves coming down, not a horse riding into someone. Lighter than a
 	-- charge and led by the hoof rather than by the body.

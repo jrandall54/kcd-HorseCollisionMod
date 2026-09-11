@@ -216,10 +216,31 @@ function HorseCollisionMod:StartLean(sign)
 		return
 	end
 
+	-- On foot there is no horse's head in the way, so there is nothing to lean
+	-- around. `player.human:IsMounted` is the same check the rear uses.
+	local mounted = false
+
+	pcall(function()
+		mounted = playerEnt.human:IsMounted()
+	end)
+
+	if not mounted then
+		return
+	end
+
 	-- Refused while the last lean is still on its way home. Re-basing against a
 	-- camera that is still displaced is the pumping bug: each tap took its
 	-- baseline from wherever the camera had got to, so release and re-press
 	-- ratcheted the offset further out every time.
+	--
+	-- `now` was read from a global that does not exist. The first press worked,
+	-- because `LeanHomeUntil` is nil until a lean has been released and the
+	-- `and` short circuits before the comparison. Every press after that
+	-- compared nil against a number, threw, and the error was swallowed by the
+	-- pcall wrapping the action hook, so the lean died silently and stayed dead
+	-- through a save load, since the mod's table survives one.
+	local now = self:TimeMs()
+
 	if self.LeanHomeUntil and now < self.LeanHomeUntil then
 		return
 	end

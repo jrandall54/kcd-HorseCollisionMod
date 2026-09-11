@@ -52,15 +52,11 @@ HorseCollisionModSettings = {
 	RagdollMass              = 80.0,
 	RagdollMassArmorScaled   = false,
 	RagdollMassArmorExponent = 3.7,
-	-- The speed ceiling a traveling body is held under, and the lever that
-	-- decides how far a victim goes. Measured over 24 throws at a flat 80 kg,
-	-- distance tracked how long a body spent above this ceiling and barely
-	-- tracked the brake's keep fraction at all. Lower is shorter.
-	-- How hard a traveling body is dragged, which is the figure that
-	-- actually holds it. The ceiling below only decides when the drag starts:
-	-- past the ceiling plus the span it saturates, so without this every
-	-- victim received the same drag on exactly the fast throws where armor
-	-- was supposed to tell them apart.
+	-- How hard a traveling body is dragged, which is the figure that actually
+	-- holds it, and the lever that decides how far an armored victim goes.
+	-- The ceiling below only decides when the drag starts: past the ceiling
+	-- plus the span it saturates, so without this every victim received the
+	-- same drag on exactly the fast throws where armor should tell them apart.
 	RagdollAirDampingArmorScaled = true,
 	RagdollAirDampingArmored = 20.0,  -- drag on a victim in full mail
 	RagdollAirDampingUnarmored = 4.0,   -- drag on an unarmored victim
@@ -123,14 +119,18 @@ HorseCollisionModSettings = {
 	--
 	-- Only men fight back. The game itself refuses the fight branch to
 	-- women, and nothing this mod sets changes that.
-	-- Rearing on command, on the mod's own key. Default R, changed in
-	-- Libs/Config/hcm_actionmaps.xml inside the mod's pak.
-	-- Which key does what. Only these six are offered, because the mod cannot
-	-- rebind a key at runtime and its action map has to declare each one in
-	-- advance: r, q, y, u, o, h. Vanilla leaves y, u, o and h unbound, and
-	-- uses r and q only in minigame maps that never run while riding.
-	RearChargeKey            = "f",   -- rear, then drive forward
-	RearOnlyKey              = "r",   -- rear on the spot
+	-- Which key does what. Only these eight are offered, because the mod
+	-- cannot rebind a key at runtime and its action map has to declare each
+	-- one in advance: r, q, e, f, y, u, o, h.
+	--
+	-- The lean takes q and e, the usual keys for it. The rears take r and f,
+	-- neither of which does anything in vanilla while mounted. Note that the
+	-- key a vanilla action answers to is not always visible in the game's own
+	-- files: surrender and draw resolve through the player profile rather
+	-- than a pak, so g and the number keys are spoken for without ever
+	-- appearing in a scan of the shipped action maps.
+	RearChargeKey            = "r",   -- rear, then drive forward
+	RearOnlyKey              = "f",   -- rear on the spot
 	Rear                     = true,
 	RearIdleOnly             = true,  -- also require the horse's idle state
 	RearMaxSpeed             = 0.15,  -- horizontal m/s; above this it slides

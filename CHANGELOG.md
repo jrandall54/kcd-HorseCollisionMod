@@ -33,17 +33,20 @@ number.
 ## [5.4.0-dev.1] - 2026-09-11
 
 ### Added
-- Leaning, so the rider can see past the horse's head in first person. Two keys
-  slide the camera out to either side and back, which looks along the horse's
-  neck rather than into it. `Lean`, `LeanLeftKey`, `LeanRightKey`,
-  The camera holds out for as long as the key is held and returns on release.
-  `LeanDistance` sets how far, `LeanForwardShare` how much it also carries
-  forward. Bound to `q` and `e`, the usual lean keys, neither of which vanilla
-  uses while mounted.
+- Leaning, so the rider can see past the horse's head in first person. `Q` and
+  `E` slide the camera out to either side, which looks along the horse's neck
+  rather than into it, and it holds out for as long as the key is held and
+  returns on release. `Lean`, `LeanLeftKey`, `LeanRightKey`, `LeanDistance`,
+  `LeanForwardShare`, `LeanTravelAmplitude`, `LeanHoldAmplitude` and
+  `LeanPollMs` configure it.
+
+  The lean only works while mounted: on foot there is no horse's head to look
+  around.
 
 ### Changed
-- The rear on the spot moves from `q` to `g`, since the lean takes `q` and `e`.
-  The charge stays on `r`.
+- The rear on the spot moves from `q` to `f`, since the lean takes `q` and `e`.
+  The charge stays on `r`. Neither `f` nor `e` does anything in vanilla while
+  mounted.
 
 
 ## [5.3.1] - 2026-09-11
