@@ -219,6 +219,30 @@ function HorseCollisionMod:FlipLean(amplitude, sign, seconds)
 		return
 	end
 
+	-- **Every shake is an entry in the rider's animation queue, and the queue
+	-- holds sixteen.** A shake lives for its whole duration, so the cost of a
+	-- correction is not paid when it is made but for however long the shake
+	-- was given.
+	--
+	-- Unrated, this floods. The controller corrects on every crossing of a
+	-- three centimeter deadband, which at the hold speed is two or three a
+	-- second, and at the twenty second lifetime those were still occupying the
+	-- queue long after the lean that made them had ended. Measured, 176
+	-- `Animation-queue overflow` errors against one instance, `male.chr`,
+	-- which is the rider, with no collision anywhere near them: the burst
+	-- began after a release and ran until the scripts were reloaded.
+	--
+	-- An overflowed queue **rejects** further animations rather than merely
+	-- warning, so this is not only noise.
+	local now = self:TimeMs()
+
+	if self.LeanLastFlip and (now - self.LeanLastFlip) < (cfg.LeanMinFlipMs or 200) then
+		return
+	end
+
+	self.LeanLastFlip = now
+	self.LeanFlips = (self.LeanFlips or 0) + 1
+
 	local forward = amplitude * (cfg.LeanForwardShare or 0.35)
 
 	pcall(function()
@@ -298,6 +322,7 @@ function HorseCollisionMod:StartLean(sign)
 	end
 
 	self.LeanHeld = sign
+	self.LeanFlips = 0
 	self.LeanGeneration = (self.LeanGeneration or 0) + 1
 
 	local generation = self.LeanGeneration
@@ -416,7 +441,8 @@ function HorseCollisionMod:StopLean()
 		self:Log("LeanBack side=" .. ((sign or 1) < 0 and "left" or "right")
 				.. " from=" .. string.format("%.2f", offset or -9)
 				.. " target=" .. string.format("%.2f", cfg.LeanDistance or 0.65)
-				.. " angle=" .. string.format("%.0f", self:LeanViewAngle() or -1))
+				.. " angle=" .. string.format("%.0f", self:LeanViewAngle() or -1)
+				.. " flips=" .. tostring(self.LeanFlips or 0))
 	end
 end
 

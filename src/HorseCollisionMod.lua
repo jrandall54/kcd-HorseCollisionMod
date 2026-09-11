@@ -244,14 +244,18 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   the limit
 
 -- @field LeanDeadband how far off target the camera may sit before a
---   correction is spent on it, in meters. Without it the loop flips on every
---   poll once the camera is on the target
+--   correction is spent on it, in meters. Wider is fewer corrections, and a
+--   correction costs an animation queue entry for LeanShakeSec
 -- @field LeanShakePeriod the period passed to SetViewShake. A shake's curve
 --   peaks at its period and then reverses by itself, so this is kept long
 --   enough that a hold never reaches that turn, and the amplitudes are scaled
 --   with it because the travel speed is roughly amplitude over period
--- @field LeanShakeSec how long each shake lives, long enough to outlast a
---   held lean without expiring under it
+-- @field LeanShakeSec how long each shake lives. **Every shake is an entry in
+--   the rider's animation queue and the queue holds sixteen**, so a long life
+--   is paid for long after the lean that made it ended. An overflowed queue
+--   rejects further animations rather than merely warning
+-- @field LeanMinFlipMs the least time between two corrections, which bounds
+--   how fast queue entries can be spent
 -- @field LeanReleaseSec the short shake fired on release, which expires and
 --   lets the camera return home
 
@@ -647,11 +651,12 @@ HorseCollisionMod.Config = {
 	LeanTravelAmplitude      = 110.0,
 	LeanHoldAmplitude        = 3.0,
 	LeanPollMs               = 30,
-	LeanDeadband             = 0.03,
+	LeanDeadband             = 0.06,
+	LeanMinFlipMs            = 200,
 	LeanMaxAngleDeg          = 45,
 	LeanHomeMs               = 220,
 	LeanShakePeriod          = 40.0,
-	LeanShakeSec             = 20.0,
+	LeanShakeSec             = 1.5,
 	LeanReleaseSec           = 0.05,
 	RearReach                = 2.5,
 	RearArc                  = 70,

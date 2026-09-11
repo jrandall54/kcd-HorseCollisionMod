@@ -219,11 +219,12 @@ HorseCollisionModSettings = {
 	LeanTravelAmplitude      = 110.0,   -- higher gets out there faster
 	LeanHoldAmplitude        = 3.0,   -- lower holds steadier once out
 	LeanPollMs               = 30,
-	LeanDeadband             = 0.03,
+	LeanDeadband             = 0.06,
+	LeanMinFlipMs            = 200,
 	LeanMaxAngleDeg          = 45,    -- refuse a lean past this far off the horse's line
 	LeanHomeMs               = 220,    -- how often the hold is corrected
 	LeanShakePeriod          = 40.0,
-	LeanShakeSec             = 20.0,  -- long enough to outlast a held lean
+	LeanShakeSec             = 1.5,  -- long enough to outlast a held lean
 	LeanReleaseSec           = 0.05,  -- a short shake, so it expires and comes home
 
 	RearReach                = 2.5,   -- how far in front they reach
