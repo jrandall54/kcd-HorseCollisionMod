@@ -255,7 +255,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   is paid for long after the lean that made it ended. An overflowed queue
 --   rejects further animations rather than merely warning
 -- @field LeanMinFlipMs the least time between two corrections, which bounds
---   how fast queue entries can be spent
+--   how fast queue entries can be spent. It applies to corrections only: the
+--   press, the arrival at the target and the release are never throttled,
+--   because dropping any of those leaves the camera traveling
+-- @field LeanRunawayFactor how far past the target the camera may get, as a
+--   multiple of LeanDistance, before the lean is ended outright
 -- @field LeanReleaseSec the short shake fired on release, which expires and
 --   lets the camera return home
 
@@ -653,6 +657,7 @@ HorseCollisionMod.Config = {
 	LeanPollMs               = 30,
 	LeanDeadband             = 0.06,
 	LeanMinFlipMs            = 200,
+	LeanRunawayFactor        = 2.0,
 	LeanMaxAngleDeg          = 45,
 	LeanHomeMs               = 220,
 	LeanShakePeriod          = 40.0,

@@ -221,6 +221,7 @@ HorseCollisionModSettings = {
 	LeanPollMs               = 30,
 	LeanDeadband             = 0.06,
 	LeanMinFlipMs            = 200,
+	LeanRunawayFactor        = 2.0,
 	LeanMaxAngleDeg          = 45,    -- refuse a lean past this far off the horse's line
 	LeanHomeMs               = 220,    -- how often the hold is corrected
 	LeanShakePeriod          = 40.0,

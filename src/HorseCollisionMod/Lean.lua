@@ -211,7 +211,7 @@ end
 -- @tparam number sign the direction wanted, used only for the first call
 -- @tparam number seconds how long this shake lives before it expires and
 --   returns the camera home
-function HorseCollisionMod:FlipLean(amplitude, sign, seconds)
+function HorseCollisionMod:FlipLean(amplitude, sign, seconds, force)
 	local cfg = self.Config
 	local playerEnt = rawget(_G, "player")
 
@@ -234,9 +234,15 @@ function HorseCollisionMod:FlipLean(amplitude, sign, seconds)
 	--
 	-- An overflowed queue **rejects** further animations rather than merely
 	-- warning, so this is not only noise.
+	-- The limit is on **corrections only**. Applied to the press it would drop
+	-- a lean that followed another too closely; applied to the release it
+	-- swallows the call that ends the lean, and the camera then travels on at
+	-- the full 2.75 m/s until the shakes expire. That is a sticky hold, a
+	-- return measured in seconds, and a runaway of ten meters on fast taps.
 	local now = self:TimeMs()
 
-	if self.LeanLastFlip and (now - self.LeanLastFlip) < (cfg.LeanMinFlipMs or 200) then
+	if not force and self.LeanLastFlip
+			and (now - self.LeanLastFlip) < (cfg.LeanMinFlipMs or 200) then
 		return
 	end
 
@@ -334,7 +340,7 @@ function HorseCollisionMod:StartLean(sign)
 	local reached = false
 	local last = nil
 
-	self:FlipLean(cfg.LeanTravelAmplitude or 6.0, sign, cfg.LeanShakeSec or 20.0)
+	self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, cfg.LeanShakeSec or 1.5, true)
 
 	local function watch()
 		if generation ~= self.LeanGeneration or timerTick ~= self.TimerTick then
@@ -358,16 +364,30 @@ function HorseCollisionMod:StartLean(sign)
 
 		local offset = self:LeanOffset()
 
+		-- Nothing may travel far past the target, whatever went wrong. The
+		-- camera moves at nearly three meters a second on the way out, so a
+		-- correction that does not land is ten meters away in a few seconds,
+		-- which the rider has seen. A ceiling costs one comparison a poll and
+		-- bounds every failure in here, including ones not yet found.
+		local ceiling = (cfg.LeanDistance or 0.65) * (cfg.LeanRunawayFactor or 2.0)
+
+		if offset and math.abs(offset) > ceiling then
+			self:StopLean()
+
+			return
+		end
+
 		if offset then
-			local hold = cfg.LeanHoldAmplitude or 0.6
+			local hold = cfg.LeanHoldAmplitude or 3.0
 			local live = cfg.LeanShakeSec or 20.0
 			local past = (sign > 0 and offset >= target) or (sign < 0 and offset <= target)
 
 			if not reached and past then
-				-- Arrived. The switch to the hold amplitude makes every
-				-- correction from here small, so the dither is small.
+				-- Arrived. Forced, because this is the one-time change down to
+				-- the hold speed and delaying it means sailing past the target
+				-- at the full travel speed.
 				reached = true
-				self:FlipLean(hold, sign, live)
+				self:FlipLean(hold, sign, live, true)
 			elseif reached and last then
 				-- **Direction is measured, never remembered.**
 				--
@@ -433,7 +453,7 @@ function HorseCollisionMod:StopLean()
 	-- and nothing may re-base until it has.
 	self.LeanHomeUntil = self:TimeMs() + (cfg.LeanHomeMs or 220)
 
-	self:FlipLean(cfg.LeanHoldAmplitude or 1.2, 1, cfg.LeanReleaseSec or 0.05)
+	self:FlipLean(cfg.LeanHoldAmplitude or 3.0, 1, cfg.LeanReleaseSec or 0.05, true)
 
 	if cfg.LogTelemetry then
 		local offset = self:LeanOffset()
