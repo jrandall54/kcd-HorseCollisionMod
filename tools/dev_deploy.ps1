@@ -179,7 +179,22 @@ $DevEnvironment = @(
 	# line; the mod's own telemetry carries changing numbers on every line and
 	# is not affected.
 	@{ Name = "log_SpamDelay"; Dev = "30"; Play = "30"
-	   Why = "the PROS backend fills the console and the log with retries" }
+	   Why = "the PROS backend fills the console and the log with retries" },
+	# The file and the console have separate verbosities, and the file ships at
+	# 0. Every engine warning and error therefore renders on the in-game console
+	# and is never written to kcd.log, which is the only thing this project can
+	# read after the fact.
+	#
+	# That gap is not small. An animation queue overflow was hunted across about
+	# 130 impacts and four tiers, reported as not reproducing, and was on the
+	# rider's console the whole time. The instrument was blind and the negative
+	# result was worthless.
+	@{ Name = "log_WriteToFileVerbosity"; Dev = "3"; Play = "0"
+	   Why = "engine warnings and errors never reach kcd.log" },
+	# Gates the animation warnings, including the queue filling up before it
+	# overflows. At the shipped 0 only the hard failure can ever print.
+	@{ Name = "ca_AnimWarningLevel"; Dev = "2"; Play = "0"
+	   Why = "animation warnings are off, including the queue filling" }
 )
 
 function Get-CfgValue {

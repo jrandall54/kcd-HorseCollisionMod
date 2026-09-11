@@ -177,8 +177,13 @@ function HorseCollisionMod:LeanViewAngle()
 		return nil
 	end
 
+	-- `GetPlayerHorse` answers with a WUID and not an entity, which is why
+	-- every other call site in this mod pairs it with `GetEntityByWUID`.
+	-- Calling an entity method straight on the WUID throws, and inside a pcall
+	-- that shows up as a silent nil rather than as an error: the angle read
+	-- `-1` on every release and the limit never refused anything.
 	pcall(function()
-		horse = playerEnt.player:GetPlayerHorse()
+		horse = XGenAIModule.GetEntityByWUID(playerEnt.player:GetPlayerHorse())
 	end)
 
 	if not horse then
