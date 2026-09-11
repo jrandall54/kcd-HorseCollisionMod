@@ -53,10 +53,42 @@ function HorseCollisionMod:TrackSpeed(speed)
 	end
 end
 
---- The peak of the last `count` speed samples.
+--- The peak of the last `count` speed samples, ignoring lone spikes.
+--
+-- The peak is held rather than read instantaneously because contact slows the
+-- horse, so the speed on the tick of impact under-rates the blow. A collision
+-- should be scored by the speed the horse carried **into** it.
+--
+-- The flaw that fixes is real and the hold must stay. What it could not do is
+-- tell speed carried into a collision from speed produced by one. Walking a
+-- horse into someone repeatedly kicks it off the body, the kick lands in this
+-- history, and the hold then scores the next impact by it. Measured over one
+-- run of walking shoves, the score climbed while the horse never left walking
+-- pace:
+--
+--     score 3.06  sampled 3.05    agreeing
+--     score 2.90  sampled 2.89    agreeing
+--     score 3.79  sampled 2.24    diverging
+--     score 6.23  sampled 2.05    scored a trot at 2 m/s
+--
+-- The victim took a knockdown, 16 damage and a camera shake from what the
+-- rider experienced as walking into her, and the walk tier's whole contract is
+-- that it shoves and does not knock anyone down.
+--
+-- **A single sample cannot set the peak.** The peak is the larger of each
+-- neighbouring pair, so a figure has to be reached on two consecutive samples
+-- before it counts. Real speed is sustained: a horse at a gallop reads 8.5
+-- across many samples and is scored at 8.5, and one decelerating on contact
+-- still has the samples before the contact to be rated by. A kick is one tick
+-- wide and its neighbour is an ordinary reading, so it never wins.
+--
+-- This is the same rule `WatchLunge` already applies for the same reason,
+-- where one-sample readings of 21.2, 25.5 and 25.8 m/s against 13.0 on the
+-- same move were closing the charge window inside 200 ms. Both are the engine
+-- reporting a speed the horse did not travel at.
 --
 -- @tparam number count how many of the most recent samples to consider
--- @treturn number the highest speed among them, in meters per second
+-- @treturn number the highest speed held across two samples, meters per second
 function HorseCollisionMod:RecentPeak(count)
 	local history = self.SpeedHistory
 	local first = #history - count + 1
@@ -66,9 +98,18 @@ function HorseCollisionMod:RecentPeak(count)
 		first = 1
 	end
 
-	for i = first, #history do
-		if history[i] > peak then
-			peak = history[i]
+	-- One sample is all there is on the first tick after a load or a reload,
+	-- and there is no pair to check it against. Taken at face value, because
+	-- refusing it would score that tick at zero and miss an impact outright.
+	if first >= #history then
+		return history[#history] or 0
+	end
+
+	for i = first + 1, #history do
+		local held = math.min(history[i - 1], history[i])
+
+		if held > peak then
+			peak = held
 		end
 	end
 
