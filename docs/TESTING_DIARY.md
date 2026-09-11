@@ -18268,3 +18268,50 @@ be worth chasing. Two things to pick up from if it is ever worth it: the
 threshold of 2.5 m/s is too low to isolate the visible event and would want
 raising, and one sample reads the horse at 17.50 m/s, which is well above both
 the gallop tier and `MaxImpactSpeed`.
+
+## Gap in the record: floating corpses were investigated twice and written up once
+
+The entry above, *Corpses floated because the mod never took its physics
+parameters back*, attributes the floating to the mod's own `min_energy = 1.0`
+persisting on a corpse, records a fix in 5.0.0, and reports it verified over 110
+throws with no floating bodies.
+
+The rider's account of later testing does not match that:
+
+> "There was no solution found to the floating bodies and [it was] heavily
+> tested and concluding it was vanilla behavior based on the observation that
+> the floating bodies only ever occurred when there were dozens of dead NPCs in
+> the same area and was likely due to the engine not being able to keep up. We
+> tested that for hours so there should be documentation stating we gave up and
+> attributed behavior to base game engine limitations."
+
+**There is no such documentation.** Searched for "dozens", "engine limitation",
+"keep up", "gave up" and "vanilla behaviour" across the diary and the roadmap;
+nothing records a second investigation or that conclusion.
+
+So one of two things is true and this entry does not decide between them:
+
+- the second investigation happened and its findings were never written down,
+  which this project has done before, or
+- the later floating is a different phenomenon from the one 5.0.0 addressed.
+
+The correlation the rider reports, that it appears only with dozens of bodies in
+one place, is the useful part either way. It is not a property of any single
+victim's physics parameters, so it points away from the `min_energy` mechanism
+rather than toward it, and toward something that scales with the number of
+sleeping ragdolls in an area.
+
+### What the 5.3.1 wake does and does not claim
+
+`release()` writes `damping = 0` and `min_energy = 0` to hand the body back to
+the engine. A sleeping physics body discards parameter writes and reports no
+error, which this diary already establishes elsewhere as the reason a victim
+struck while down took a commanded 3.00 m/s and moved eight centimeters. So a
+body asleep before the watch closed kept the mod's values permanently.
+
+Waking it first closes that. **That is the whole claim.** It was landed in 5.3.1
+with a changelog entry asserting it fixed floating corpses, which was taken from
+the commit message of the stale branch it came from and never checked against
+this diary. The entry has been corrected. Nothing here should be read as a fix
+for the floating behavior until someone reproduces that behavior and measures
+it.

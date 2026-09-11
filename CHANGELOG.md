@@ -33,13 +33,17 @@ number.
 ## [5.3.1] - 2026-09-11
 
 ### Fixed
-- Corpses could stay frozen in mid-air after being lifted by the horse, falling
-  only when struck. When a throw settles the mod hands the body back to the
-  engine by clearing `damping` and `min_energy`, but a body that had already
-  reached its sleep threshold ignored that write, because a sleeping physics
-  body discards parameter writes and reports no error. The corpse kept
-  `min_energy` for the rest of its existence and slept the moment it slowed.
-  The body is now woken before the write.
+- A thrown body is woken before the mod releases the physics parameters it set.
+  `DampVictim` writes `damping` and `min_energy` on a victim and clears them
+  once the throw settles, but a sleeping physics body discards parameter writes
+  and reports no error, so a body that reached its sleep threshold before the
+  watch closed kept both values for the rest of its existence.
+
+  This closes a state leak and nothing more is claimed for it. It is **not**
+  known to change the floating-corpse behavior: that was attributed to this
+  mechanism and fixed in 5.0.0, the rider's account of later testing is that
+  floating was seen again and attributed to the engine, and the diary carries
+  no record of the second investigation. See `docs/TESTING_DIARY.md`.
 
 
 ## [5.3.0] - 2026-09-11
