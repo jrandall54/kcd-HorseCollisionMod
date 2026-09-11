@@ -56,6 +56,15 @@ HorseCollisionModSettings = {
 	-- decides how far a victim goes. Measured over 24 throws at a flat 80 kg,
 	-- distance tracked how long a body spent above this ceiling and barely
 	-- tracked the brake's keep fraction at all. Lower is shorter.
+	-- How hard a travelling body is dragged, which is the figure that
+	-- actually holds it. The ceiling below only decides when the drag starts:
+	-- past the ceiling plus the span it saturates, so without this every
+	-- victim received the same drag on exactly the fast throws where armor
+	-- was supposed to tell them apart.
+	RagdollAirDampingArmorScaled = true,
+	RagdollAirDampingArmored = 20.0,  -- drag on a victim in full mail
+	RagdollAirDampingUnarmored = 4.0,   -- drag on an unarmored victim
+
 	RagdollSpeedCapArmorScaled = true,
 	RagdollSpeedCapArmored   = 2.5,   -- the ceiling for a victim in full mail
 	RagdollSpeedCapUnarmored = 6.0,   -- the ceiling for an unarmored victim

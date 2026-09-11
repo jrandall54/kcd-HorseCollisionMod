@@ -571,6 +571,7 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	-- the summary line. The cap is derived per victim, so without it nothing
 	-- in the log says what the figure came out as.
 	local lastCap = 0
+	local lastDrag = 0
 
 	local function apply(why, elapsed, speed, vertical, contact, share)
 		local params = {}
@@ -600,6 +601,7 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 					.. " scale=" .. string.format("%.2f", armorScale or -1)
 					.. " keep=" .. string.format("%.2f", keep)
 					.. " cap=" .. string.format("%.2f", lastCap)
+					.. " drag=" .. string.format("%.1f", lastDrag)
 
 					-- How far the body actually came, against the fraction of
 					-- its speed it was allowed to keep. The pair is what makes
@@ -744,9 +746,49 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 				end
 			end
 
+			-- The drag itself is armor scaled, not only the ceiling.
+			--
+			-- The ceiling alone could not separate anyone on the throws that
+			-- matter. `strength` is `(speed - cap) / span` clamped to 1, so
+			-- past `cap + span`, about 5.5 m/s, it saturates and every victim
+			-- receives the identical figure however their ceiling was set.
+			-- Measured, armored bodies held to a ceiling of 2.50 still reached
+			-- peaks of 11.37, 13.28 and 15.37 m/s, because 8.0 of drag is
+			-- simply not enough to hold a body the engine threw that hard.
+			-- The ceiling moved when the drag started and never moved how much
+			-- there was.
+			--
+			-- Heavy drag was the objection raised against this whole approach
+			-- before it was tested, on the grounds it would read as syrup. The
+			-- rider rode armored victims at a flat 15.0 and reported no syrup
+			-- at all, so the objection is already withdrawn on evidence.
+			local drag = self.Config.RagdollAirDamping or 3.0
+
+			if self.Config.RagdollAirDampingArmorScaled and armorScale then
+				local heavy = self.Config.RagdollAirDampingArmored or 20.0
+				local light = self.Config.RagdollAirDampingUnarmored or 4.0
+				local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+				local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
+				local t = 1.0
+
+				if hi > lo then
+					t = (armorScale - lo) / (hi - lo)
+
+					if t < 0 then
+						t = 0
+					elseif t > 1 then
+						t = 1
+					end
+				end
+
+				drag = heavy + ((light - heavy) * t)
+			end
+
+			lastDrag = drag
+
 			pcall(function()
 				npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
-					damping = (self.Config.RagdollAirDamping or 3.0) * strength
+					damping = drag * strength
 				})
 			end)
 		end
