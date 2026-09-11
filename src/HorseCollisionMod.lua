@@ -263,6 +263,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   is not treated as looking away, which stops meaning anything once the
 --   horizontal component collapses. Looking down is also where the camera is
 --   nearest the rider's own model
+-- @field LeanTurnLeadMs how far ahead of the angle limit a turn is judged, in
+--   milliseconds. Ending a lean takes about 160 ms, so reacting at the limit
+--   is too late for a fast turn and the camera clips through the rider. The
+--   angle is projected forward at the current turn rate instead, which
+--   tightens the limit only for the turns that need it
 -- @field LeanSuppressShake whether an impact's camera shake is held back
 --   while the rider is leaning. Both are SetViewShake, and a second call
 --   reverses the camera rather than adding to it, so a shake mid lean sends
@@ -670,6 +675,7 @@ HorseCollisionMod.Config = {
 	LeanMaxAngleDeg          = 45,
 	LeanMaxPitchDeg          = 55,
 	LeanSuppressShake        = true,
+	LeanTurnLeadMs           = 200,
 	LeanHomeMs               = 220,
 	LeanShakePeriod          = 40.0,
 	LeanShakeSec             = 1.5,

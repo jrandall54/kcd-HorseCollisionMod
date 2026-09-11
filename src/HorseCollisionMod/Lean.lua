@@ -356,6 +356,8 @@ function HorseCollisionMod:StartLean(sign)
 	local reached = false
 	local last = nil
 	local turns = 0
+	local lastAngle = nil
+	local lastAngleAt = nil
 
 	self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, cfg.LeanShakeSec or 1.5, true)
 
@@ -368,15 +370,44 @@ function HorseCollisionMod:StartLean(sign)
 			return
 		end
 
-		-- Turning past the limit mid lean ends it, rather than leaving the
-		-- camera parked inside the horse until the key comes up.
+		-- Turning past the limit mid lean ends it, and the limit is **led by how
+		-- fast the rider is turning**.
+		--
+		-- Ending a lean is not instant: the camera comes home over about 160 ms
+		-- as the shake expires. A slow turn is comfortably inside that, and a
+		-- fast one is not, so the view swings behind the rider while the camera
+		-- is still displaced and clips through Henry's back. Reacting at the
+		-- limit is always too late for the turn that needs it most.
+		--
+		-- Projecting the angle forward by roughly the time the return takes
+		-- makes the limit tighten in proportion to the turn, which is the only
+		-- part of it that varies. A rider turning slowly still gets the full 45
+		-- degrees.
 		local turned = self:LeanViewAngle()
+		local limit = cfg.LeanMaxAngleDeg or 45
 
-		if (cfg.LeanMaxAngleDeg or 45) > 0 and turned
-				and turned > (cfg.LeanMaxAngleDeg or 45) then
-			self:StopLean()
+		if limit > 0 and turned then
+			local now = self:TimeMs()
+			local projected = turned
 
-			return
+			if lastAngle and lastAngleAt and now > lastAngleAt then
+				local rate = (turned - lastAngle) / ((now - lastAngleAt) / 1000)
+
+				-- Only a turn heading toward the limit leads it. Coming back
+				-- toward the horse's line should not cancel anything.
+				if rate > 0 then
+					projected = turned + (rate * ((cfg.LeanTurnLeadMs or 200) / 1000))
+				end
+			end
+
+			lastAngle = turned
+			lastAngleAt = now
+
+			if projected > limit then
+				self:StopLean()
+
+				return
+			end
 		end
 
 		local offset = self:LeanOffset()
