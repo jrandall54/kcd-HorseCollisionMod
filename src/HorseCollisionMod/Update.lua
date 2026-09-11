@@ -191,6 +191,10 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- precisely because it is exempt from everything else.
 	self.LastScoredHit[npcId] = now
 
+	-- When the last impact of any kind landed, so the airborne probe above can
+	-- say whether the horse left the ground off a collision or on its own.
+	self.LastImpactAt = now
+
 	-- What is stamped depends on which wait is running. Counting stamps the
 	-- duration; observing stamps the ceiling and lets the watcher clear it
 	-- early, which is almost always what happens.
@@ -404,6 +408,35 @@ function HorseCollisionMod:SafeUpdate()
 
 	local speed = self:VectorLength(velocity)
 
+	-- The horse leaving the ground, reported when it happens and never
+	-- otherwise.
+	--
+	-- The rider watched the horse thrown about five meters up and away off an
+	-- impact, and nothing in the log had anything to say about it, because the
+	-- mod records the victim's body in detail and the horse's own motion not
+	-- at all. There is no cost to this: the detection loop already reads the
+	-- horse's velocity every hundred milliseconds for the speed history, and
+	-- this only decides whether to write a line about a reading it already
+	-- has.
+	--
+	-- Vertical speed rather than height, because height off a slope is
+	-- ordinary and a horse moving upward at several meters a second is not. A
+	-- gallop up a hill reads well under the threshold.
+	if velocity and self.Config.LogTelemetry then
+		local vz = velocity.z or 0
+		local trigger = self.Config.HorseAirborneVz or 2.5
+		local last = self.HorseAirborneAt or 0
+		local now = self:TimeMs()
+
+		if vz >= trigger and (now - last) >= 1000 then
+			self.HorseAirborneAt = now
+
+			self:Log("HorseAirborne vz=" .. string.format("%.2f", vz)
+					.. " speed=" .. string.format("%.2f", speed)
+					.. " sinceImpactMs=" .. tostring(
+					self.LastImpactAt and (now - self.LastImpactAt) or -1))
+		end
+	end
 
 	self:TrackSpeed(speed)
 

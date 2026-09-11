@@ -39,7 +39,7 @@ number.
   1,208 kg for a mailed guard and 501,187 kg at an armor scale real guards
   score, which left every force the mod applies divided by a figure swinging
   across four orders of magnitude. Knockback, uplift and the barding force
-  bonus moved an armored victim five centimetres per second.
+  bonus moved an armored victim five centimeters per second.
 
 ### Fixed
 - `RagdollMass = 0`, documented as leaving the engine's figure alone, silently

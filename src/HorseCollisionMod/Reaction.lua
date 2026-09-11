@@ -680,7 +680,7 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 			return
 		end
 
-		-- Drag on a body still travelling and not yet settled, and **the lever
+		-- Drag on a body still traveling and not yet settled, and **the lever
 		-- that actually decides how far a victim goes**.
 		--
 		-- Measured over 24 throws with mass flat at 80 kg, the distance a body

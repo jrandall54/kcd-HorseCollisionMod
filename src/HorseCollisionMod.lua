@@ -247,7 +247,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as
 --   unarmored. An endpoint set above the highest scale that actually occurs
 --   silently converts "leave them alone" into "slow everyone"
--- @field RagdollSpeedCapArmorScaled whether the speed ceiling a travelling
+-- @field RagdollSpeedCapArmorScaled whether the speed ceiling a traveling
 --   body is held to is scaled by the victim's armor. This is the lever that
 --   separates an armored victim from an unarmored one, because distance
 --   tracks how long a body spends above the ceiling
@@ -267,7 +267,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDampRampSamples over how many samples the damping reaches its
 --   full value once the body is down, so a fast landing decelerates rather
 --   than being braked
--- @field RagdollSpeedSoftCap the speed past which a travelling body is
+-- @field RagdollSpeedSoftCap the speed past which a traveling body is
 --   dragged down whether it is touching anything or not, in meters per
 --   second. Read off the per-throw speed traces: a long throw runs 8 to 9
 --   for its first three or four samples and a short one never passes 3.9,
@@ -434,6 +434,7 @@ HorseCollisionMod.Config = {
 	-- ceiling on that value, a little above the top of the gallop plateau.
 	-- Nine ticks rather than three, because the tick is a third as long. The
 	-- window a collision is scored over is what matters, and it is unchanged.
+	HorseAirborneVz          = 2.5,
 	ImpactSpeedSamples       = 9,
 	MaxImpactSpeed           = 11.0,
 

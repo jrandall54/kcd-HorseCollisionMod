@@ -42,7 +42,7 @@ HorseCollisionModSettings = {
 	-- scale 0.35 and 0.10 the mass moved by a factor of a hundred. It was a
 	-- cliff rather than a scale, and it made everything stacked on top of it
 	-- meaningless: an impulse of 58 against 1,208 kg moves a guard five
-	-- centimetres per second, so the knockback, the uplift and the whole
+	-- centimeters per second, so the knockback, the uplift and the whole
 	-- barding force bonus did nothing to anyone in armor.
 	--
 	-- The write itself stays, and the value is not zero. It doubles as the
@@ -52,11 +52,11 @@ HorseCollisionModSettings = {
 	RagdollMass              = 80.0,
 	RagdollMassArmorScaled   = false,
 	RagdollMassArmorExponent = 3.7,
-	-- The speed ceiling a travelling body is held under, and the lever that
+	-- The speed ceiling a traveling body is held under, and the lever that
 	-- decides how far a victim goes. Measured over 24 throws at a flat 80 kg,
 	-- distance tracked how long a body spent above this ceiling and barely
 	-- tracked the brake's keep fraction at all. Lower is shorter.
-	-- How hard a travelling body is dragged, which is the figure that
+	-- How hard a traveling body is dragged, which is the figure that
 	-- actually holds it. The ceiling below only decides when the drag starts:
 	-- past the ceiling plus the span it saturates, so without this every
 	-- victim received the same drag on exactly the fast throws where armor

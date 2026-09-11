@@ -17516,7 +17516,7 @@ Airborne, landed, bounced, landed. So it is real but noisy, and a single contact
 sample would damp mid-bounce. A run of three does not.
 
 Contact alone is not enough either. A body skidding along the ground reports
-contact continuously while still travelling, and damping it there brakes it in
+contact continuously while still traveling, and damping it there brakes it in
 front of the rider: measured at 8.61 and 8.59 m/s. Requiring the body to be slow
 as well is worse again, because then damping waits until the slide has ended on
 its own, which is too late to be the thing that ends it: a low throw skidded
@@ -17776,7 +17776,7 @@ a monotonic relationship, and 6.0 is nearer it than 12.0.
 
 Reverted to 6.0. Note also that the unarmored end of the bracket cannot be
 usefully lowered: the mod only ever subtracts, so an unarmored victim is already
-travelling as far as the engine threw them and no setting can extend that. All
+traveling as far as the engine threw them and no setting can extend that. All
 the usable range is at the armored end, and it is smaller than it looks.
 
 
@@ -17850,7 +17850,7 @@ What the stack actually produces, measured:
 ### The consequence for barding
 
 `Knockback`, `Uplift` and the entire barding force bonus move a mailed guard by
-five centimetres per second. They are inert against anyone in armor, because
+five centimeters per second. They are inert against anyone in armor, because
 the mass they are divided by is a hundredfold lie about what a person weighs.
 The counter-impulse, computed from that same mass, is 2576 units against the
 mod's own 58.3 — forty times larger. The largest impulse the mod applies to an
@@ -17930,7 +17930,7 @@ On an ordinary walk impact they agree to two decimal places: 3.06 against 3.05,
 `ImpactSpeed` returns `RecentPeak(ImpactSpeedSamples)`, which is 9 samples at
 the 100 ms reaction poll, so **the score is the highest speed seen in the last
 900 milliseconds**. The trot threshold is 4.5. One spike anywhere in that window
-tiers the impact as a trot however slowly the horse is travelling on contact.
+tiers the impact as a trot however slowly the horse is traveling on contact.
 
 The hold is not a mistake in itself and must not simply be removed: it exists so
 a collision is rated by the speed the horse carried *into* it, since contact
@@ -18123,7 +18123,7 @@ field and came out three times too small.
 ## What the rewrite costs
 
 - **Barding and knockback are inert against anyone in armor.** `magnitude=58.3`
-  against `mass=1225.5` is `dv=0.05`, five centimetres per second. The tuned
+  against `mass=1225.5` is `dv=0.05`, five centimeters per second. The tuned
   force settings and the whole barding force bonus do nothing to a guard.
 - **The horse is thrown by the bodies it walks into**, because they outweigh it.
   A horse is about 480 kg against a guard's 1,208.
