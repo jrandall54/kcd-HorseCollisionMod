@@ -17516,7 +17516,7 @@ Airborne, landed, bounced, landed. So it is real but noisy, and a single contact
 sample would damp mid-bounce. A run of three does not.
 
 Contact alone is not enough either. A body skidding along the ground reports
-contact continuously while still travelling, and damping it there brakes it in
+contact continuously while still traveling, and damping it there brakes it in
 front of the rider: measured at 8.61 and 8.59 m/s. Requiring the body to be slow
 as well is worse again, because then damping waits until the slide has ended on
 its own, which is too late to be the thing that ends it: a low throw skidded
@@ -17776,7 +17776,7 @@ a monotonic relationship, and 6.0 is nearer it than 12.0.
 
 Reverted to 6.0. Note also that the unarmored end of the bracket cannot be
 usefully lowered: the mod only ever subtracts, so an unarmored victim is already
-travelling as far as the engine threw them and no setting can extend that. All
+traveling as far as the engine threw them and no setting can extend that. All
 the usable range is at the armored end, and it is smaller than it looks.
 
 
@@ -17850,7 +17850,7 @@ What the stack actually produces, measured:
 ### The consequence for barding
 
 `Knockback`, `Uplift` and the entire barding force bonus move a mailed guard by
-five centimetres per second. They are inert against anyone in armor, because
+five centimeters per second. They are inert against anyone in armor, because
 the mass they are divided by is a hundredfold lie about what a person weighs.
 The counter-impulse, computed from that same mass, is 2576 units against the
 mod's own 58.3 — forty times larger. The largest impulse the mod applies to an
@@ -17930,7 +17930,7 @@ On an ordinary walk impact they agree to two decimal places: 3.06 against 3.05,
 `ImpactSpeed` returns `RecentPeak(ImpactSpeedSamples)`, which is 9 samples at
 the 100 ms reaction poll, so **the score is the highest speed seen in the last
 900 milliseconds**. The trot threshold is 4.5. One spike anywhere in that window
-tiers the impact as a trot however slowly the horse is travelling on contact.
+tiers the impact as a trot however slowly the horse is traveling on contact.
 
 The hold is not a mistake in itself and must not simply be removed: it exists so
 a collision is rated by the speed the horse carried *into* it, since contact
@@ -18029,3 +18029,242 @@ window. The mod knows when it has just scored an impact, so it can discard or
 clamp the speed samples for a few hundred milliseconds afterwards, which removes
 collision-produced speed without touching acceleration at all. That is the
 targeted fix and it is only worth building once there is a case that needs it.
+
+# Audit: the mass rewrite, what it does, and what the record got wrong
+
+Opened because the diary claims the throw sculpting was measured with mass
+scaling off and every victim at a flat 80 kg, and the shipped build does not
+match that claim. The claim is wrong. Here is the evidence, then the range the
+rewrite actually produces, then why the replacement is possible.
+
+## The setting was never off
+
+`RagdollMassArmorScaled` read `true` in `src/HorseCollisionMod_Settings.lua` at
+every commit of the sculpting work and at every commit since:
+
+    88dddb5  sculpt a thrown body's distance to a commanded figure   true
+    001aa5a  sculpt the throw with articulated lying-mode damping    true
+    1ad96e1  revert lying damping to 6.0                             true
+    d818ea7  three-stage collision physics pipeline                  true
+    259857e  tune visual impact effects                              true
+
+`false` has never been committed to that file. The internal default is also
+`true`, so nothing falls back to flat mass either.
+
+## And the write was reaching the impulse the whole time
+
+This is the part that rules out the charitable reading. There was a real period
+when the mass write did not land before the impulse, recorded earlier in this
+diary as *The impulse meets a body of 80 kg, not the mass the mod writes*: three
+consecutive villagers read `mass 80.0`, the engine's default, because
+`MassVictim` was called and the impulse followed immediately, before the body
+was physicalized.
+
+That was fixed by making `MassVictim` take a callback and running the impulse
+inside it, so the throw waits for the write to succeed. The fix is present at
+`88dddb5`, which is the **first** sculpting commit:
+
+    8e4bd92   MassVictim(npc, impulseScale)          then ImpulseVictim   80 kg
+    88dddb5   MassVictim(npc, armorScale, function() ImpulseVictim ...    written mass
+    HEAD      same
+
+So from the first commit of the sculpting work onward, the impulse met the
+written mass. Every figure in *Sculpting the throw: three actuators, and the one
+that works* was measured with armor-scaled mass live.
+
+Confirmed against a current run rather than argued from history:
+
+    Impulse     rat_guard27  magnitude=58.3  mass=1225.5  dv=0.05
+    Phase1Brake rat_guard27  speed=4.63  keep=0.55  mag=2576.3  mass=1225.5
+
+## Where the wrong claim probably came from
+
+The line in the diary is `RagdollMassArmorScaled false, every victim at a flat
+80 kg`. The number 80 is the tell: 80 kg is not what flat mass would produce,
+because `RagdollMass` is 100. Eighty is the **engine's** default, and it is the
+figure from the older entry about the write not landing. An intended
+configuration was recorded as a measured one, and the two 80s were conflated.
+
+This is the exact failure the project already had a rule for, which is to read
+back one log line that could only be true if the change were live. One `Mass`
+line would have settled it. None was quoted in that entry.
+
+## The range the rewrite actually produces, which is not a scale
+
+`MassVictim` computes `wanted = RagdollMass / armorScale ^ RagdollMassArmorExponent`
+at base 100 and exponent 3.7, **with no clamp of any kind** on the result:
+
+| raw armor scale | written mass |
+| --- | --- |
+| 1.26 unarmored | 43 kg |
+| 1.15 villager | 60 kg |
+| 1.00 | 100 kg |
+| 0.80 | 228 kg |
+| 0.51 mailed guard | 1,208 kg |
+| 0.35 | 4,863 kg |
+| 0.10 | **501,187 kg** |
+
+Armor scale 0.10 is not hypothetical. It appears in the current log:
+`ImpactDamage rat_guard18 tier=Trot base=18.0 armorScale=0.10`. That guard was
+given a ragdoll mass of half a million kilograms.
+
+Dividing by a number raised to 3.7 is a cliff rather than a scale. Between 0.35
+and 0.10 the mass moves by a factor of a hundred, and there is no setting that
+bounds it, so the heaviest victim in any given town is whatever the armor
+tables happen to produce.
+
+### A trap that has now caught two sessions
+
+The `Mass` log line prints `scale=` **after** the exponent has been applied,
+because the same local is reused. `scale=0.04` is not an armor scale of 0.04, it
+is `0.35 ^ 3.7`. An exponent was once calibrated against a range read off that
+field and came out three times too small.
+
+## What the rewrite costs
+
+- **Barding and knockback are inert against anyone in armor.** `magnitude=58.3`
+  against `mass=1225.5` is `dv=0.05`, five centimeters per second. The tuned
+  force settings and the whole barding force bonus do nothing to a guard.
+- **The horse is thrown by the bodies it walks into**, because they outweigh it.
+  A horse is about 480 kg against a guard's 1,208.
+- **Nothing else can be tuned honestly on top of it**, since every impulse the
+  mod applies is divided by a figure that swings by four orders of magnitude.
+
+## Why the brake can replace it, where damping could not
+
+An earlier experiment, unmerged on `experiment/armor-scaled-damping`, asked
+whether *damping* could replace the rewrite and answered no: 1.22x to 1.29x of
+separation against the rewrite's 1.84x, because damping acts only on the tail
+while most of the distance is set in the frame the solver resolves.
+
+**The current brake is not damping and that result does not bind it.** It is a
+counter-impulse of `mass * speed * (1 - keep)` applied against the body's own
+velocity, which removes a commanded *fraction* of speed. Distance scales with
+speed, so the ratio between two victims is the ratio of their keep fractions and
+it is a number that can simply be set. It is also mass-independent by
+construction: the mass appears in the impulse and cancels in the velocity
+change.
+
+At the current endpoints, 0.45 armored against 1.0 unarmored, that is a 2.2x
+separation available with flat mass, which is more than the rewrite's 1.84x and
+under direct control rather than emergent from an armor table raised to 3.7.
+
+## The brake replaces the mass rewrite, at 2.05x, in three steps
+
+Mass flat at the engine's 80 kg for every victim throughout. Each step is one
+change, measured before the next was made.
+
+| configuration | armored | unarmored | separation |
+| --- | --- | --- | --- |
+| brake only, `keep` 0.45 to 1.0 | n=14 mean 2.67 | n=10 mean 2.96 | **1.11x** |
+| + armor-scaled ceiling 2.5 / 6.0 | n=44 mean 2.47 | n=8 mean 3.55 | **1.43x** |
+| + armor-scaled drag 20.0 / 4.0 | n=53 mean 2.07 | n=18 mean 4.24 | **2.05x** |
+
+**2.05x beats the mass rewrite's 1.84x**, and every figure in it is a number
+that was set rather than one that emerged from an armor table raised to 3.7.
+The ordering is correct for the first time as well: the armored maximum, 4.41,
+is now below the unarmored mean of 4.24 rather than above its maximum.
+
+### Why the keep fraction alone did almost nothing
+
+Distance tracked how long a body spent above the speed ceiling and barely
+tracked `keep` at all:
+
+    airBraked 0     0.45  0.55  0.56  0.92  1.03  1.40
+    airBraked 3-4   3.43 ... 5.32
+
+The ceiling was one figure for everyone, so it flattened whatever the brake had
+done onto a single curve.
+
+The counter-impulse also fires before the engine has finished delivering the
+throw at this mass. A guard braked at 10.43 m/s with `keep` 0.45 should have
+been left at 4.7 and his `airPeak` afterwards read 11.17. At 1,208 kg the
+engine had finished by sixty milliseconds, which is exactly why the one-shot
+brake looked sufficient while the mass rewrite was quietly carrying the
+separation. A subtraction taken once cannot hold a body that is still being
+pushed; a ceiling can.
+
+### Why the ceiling alone was not enough either
+
+`strength` is `(speed - cap) / span` clamped to 1, so past `cap + span`, about
+5.5 m/s, it saturates and every victim receives the same drag however their
+ceiling was set. Armored bodies held to a ceiling of 2.50 still reached peaks
+of 11.37, 13.28 and 15.37 m/s. Eight of drag does not hold a body the engine
+threw that hard, and on the fast throws, which are the ones where armor is
+supposed to tell victims apart, the ceiling was doing nothing.
+
+Scaling the drag itself, 20.0 in full mail against 4.0 unarmored, is what moved
+1.43x to 2.05x.
+
+### Open, and visible in these numbers
+
+The unarmored maximum is **7.11 m**, against 4.84 in the previous configuration.
+The long tail this project spent several sessions removing is reappearing at the
+unarmored end, where the drag is now 4.0 rather than the 8.0 everyone used to
+receive. Separation was bought partly by letting unarmored victims travel
+further, which is not the same thing as holding armored ones back.
+
+### Correction: 2.05x was one run. Pooled, it is 1.70x to 1.87x
+
+The 2.05x above came from a single run of 71 throws and does not survive a
+second one. The next run, same settings, measured 1.38x on the same split. Both
+are the same configuration, so they pool:
+
+| | n | mean | median | max |
+| --- | --- | --- | --- | --- |
+| armored | 105 | 2.04 | 1.89 | 4.80 |
+| unarmored | 38 | 3.46 | 3.53 | 7.11 |
+
+    separation on means    1.70x
+    separation on medians  1.87x
+
+Against the mass rewrite's 1.84x that is a **match rather than a win**, and the
+honest claim is that the brake reaches the same separation the mass lie did
+while every figure in it is one that was set. The gain is control, not distance.
+
+The lesson is the one this diary keeps having to relearn: a single run of
+seventy throws does not resolve this question, because the spread inside one
+armor band is wider than the difference between bands. Quote pooled figures or
+quote none.
+
+### The gradient is real but it is a step, not a slope
+
+Mean distance by armor scale, with the ceiling and drag each victim received:
+
+    scale 0.2-0.4   n=21  cap=2.50  drag=20.0   mean=1.99
+    scale 0.4-0.6   n=31  cap=2.76  drag=18.8   mean=2.02
+    scale 0.6-0.8   n=4   cap=4.17  drag=12.4   mean=1.58
+    scale 0.8-1.0   n=2   cap=4.78  drag=9.6    mean=2.73
+    scale 1.0-1.2   n=4   cap=5.60  drag=5.9    mean=2.59
+    scale 1.2-1.4   n=9   cap=6.00  drag=4.0    mean=3.05
+
+The ends are clean and the middle is four samples wide and unreadable. Note the
+first two bands receive almost the same treatment, because the bracket's armored
+endpoint is 0.35 and real guards score from 0.10 up, so everything below 0.35
+clamps to the same figures. That is intended and it is why the heavily armored
+band and the mail band land together.
+
+**The rider's verdict on this build**: "It feels good and I can tell the
+separation between heavily armored and unarmored and feel a difference and the
+animations don't seem odd or buggy." No syrup at drag 20.0, which was the
+objection raised against heavy drag before it was ever tested.
+
+## The horse leaving the ground is collision-linked, and parked
+
+The probe fired five times in about eighty impacts, and the rider saw none of
+them, so these are small lifts rather than the five-meter launch that prompted
+it.
+
+    vz=3.60  speed=12.07  sinceImpactMs=448
+    vz=4.15  speed=17.50  sinceImpactMs=272
+    vz=2.55  speed=8.32   sinceImpactMs=224
+    vz=3.91  speed=4.92   sinceImpactMs=128
+    vz=2.52  speed=10.50  sinceImpactMs=2640
+
+**Four of the five land within 450 ms of an impact**, which is the first
+evidence of any kind that the lift is collision-linked rather than terrain.
+Parked at the rider's direction, since the visible event is rare enough not to
+be worth chasing. Two things to pick up from if it is ever worth it: the
+threshold of 2.5 m/s is too low to isolate the visible event and would want
+raising, and one sample reads the horse at 17.50 m/s, which is well above both
+the gallop tier and `MaxImpactSpeed`.

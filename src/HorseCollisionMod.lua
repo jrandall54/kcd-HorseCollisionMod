@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.2.2
+-- @release 5.3.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.2.2"
+HorseCollisionMod.Version = "5.3.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -116,6 +116,10 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field KnockdownRecoveryMs how long a knocked-down victim is left alone,
 --   which is longer than the walk cooldown because they are still on the ground
 -- @field ImpactSpeedSamples ticks of speed history a collision is scored from
+-- @field HorseAirborneVz the upward speed, in meters per second, at which
+--   the mod reports that the horse has left the ground. Nothing is written
+--   at rest, and nothing is sampled that the detection loop was not already
+--   reading
 -- @field MaxImpactSpeed ceiling on the speed a collision is scored at
 -- @field Knockback horizontal ragdoll impulse at full strength
 -- @field Uplift vertical ragdoll impulse at full strength
@@ -247,6 +251,19 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as
 --   unarmored. An endpoint set above the highest scale that actually occurs
 --   silently converts "leave them alone" into "slow everyone"
+-- @field RagdollSpeedCapArmorScaled whether the speed ceiling a traveling
+--   body is held to is scaled by the victim's armor. This is the lever that
+--   separates an armored victim from an unarmored one, because distance
+--   tracks how long a body spends above the ceiling
+-- @field RagdollSpeedCapArmored the ceiling for a victim in full mail
+-- @field RagdollSpeedCapUnarmored the ceiling for an unarmored victim
+-- @field RagdollAirDampingArmorScaled whether the drag applied to a
+--   traveling body is scaled by the victim's armor. The ceiling only decides
+--   when the drag starts, and past the ceiling plus the span it saturates, so
+--   without this every victim receives the same drag on the fast throws,
+--   which are the ones where armor should tell them apart
+-- @field RagdollAirDampingArmored the drag for a victim in full mail
+-- @field RagdollAirDampingUnarmored the drag for an unarmored victim
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
@@ -261,7 +278,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDampRampSamples over how many samples the damping reaches its
 --   full value once the body is down, so a fast landing decelerates rather
 --   than being braked
--- @field RagdollSpeedSoftCap the speed past which a travelling body is
+-- @field RagdollSpeedSoftCap the speed past which a traveling body is
 --   dragged down whether it is touching anything or not, in meters per
 --   second. Read off the per-throw speed traces: a long throw runs 8 to 9
 --   for its first three or four samples and a short one never passes 3.9,
@@ -428,6 +445,7 @@ HorseCollisionMod.Config = {
 	-- ceiling on that value, a little above the top of the gallop plateau.
 	-- Nine ticks rather than three, because the tick is a third as long. The
 	-- window a collision is scored over is what matters, and it is unchanged.
+	HorseAirborneVz          = 2.5,
 	ImpactSpeedSamples       = 9,
 	MaxImpactSpeed           = 11.0,
 
@@ -439,8 +457,8 @@ HorseCollisionMod.Config = {
 	-- a man in mail is the heavier thing to move. Every human is 80 to the
 	-- physics engine, which is why armor has never been felt in a throw.
 	-- 0 leaves the engine's own figure alone.
-	RagdollMass              = 100.0,
-	RagdollMassArmorScaled   = true,
+	RagdollMass              = 80.0,
+	RagdollMassArmorScaled   = false,
 
 	-- How hard armor is felt as weight. The mass written is the base over the
 	-- armor scale raised to this, so the ratio between an armored victim and
@@ -980,8 +998,14 @@ HorseCollisionMod.Config = {
 	GetupRestPollMs          = 100,
 	GetupRestBand            = 0.02,
 	GetupRestCeilingMs       = 4000,
+	RagdollSpeedCapArmorScaled = true,
+	RagdollSpeedCapArmored   = 2.5,
+	RagdollSpeedCapUnarmored = 6.0,
 	RagdollSpeedSoftCap      = 4.0,
 	RagdollSpeedSoftCapSpan  = 3.0,
+	RagdollAirDampingArmorScaled = true,
+	RagdollAirDampingArmored = 20.0,
+	RagdollAirDampingUnarmored = 4.0,
 	RagdollAirDamping        = 8.0,
 	RagdollDampContactRun    = 3,
 	RagdollDampRampSamples   = 8,

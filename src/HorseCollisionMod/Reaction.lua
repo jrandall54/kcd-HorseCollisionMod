@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.2.2
+-- @release 5.3.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -243,7 +243,56 @@ end
 function HorseCollisionMod:MassVictim(npc, armorScale, onTook)
 	local base = self.Config.RagdollMass or 0
 
+	-- Zero means "do not touch the mass", and it must still hand control on.
+	--
+	-- This returned outright, which reads as harmless and is not: `onTook` is
+	-- what fires the impulse, the brake and the damping, so a zero here
+	-- silently removed every throw in the mod while the settings file
+	-- described the value as leaving the engine's figure alone. Anyone
+	-- turning the mass rewrite off the obvious way got victims who ragdolled
+	-- and then sat there.
+	--
+	-- The wait cannot be skipped either. An impulse applied before the body
+	-- is physicalized is ignored without saying so, which is the whole reason
+	-- the ladder below exists. So the readiness test becomes the mass reading
+	-- back as anything at all, rather than reading back as the figure that
+	-- was written.
 	if base <= 0 then
+		local generation = self.TimerTick
+		local attempts = self.RagdollMassAttemptsMs
+
+		local function wait(index)
+			if generation ~= self.TimerTick then
+				return
+			end
+
+			local ready = false
+
+			pcall(function()
+				ready = (npc:GetMass() or 0) > 0
+			end)
+
+			if ready or index == #attempts then
+				if self.Config.LogTelemetry then
+					self:Log("Mass " .. self:NameOf(npc)
+							.. " untouched, ready=" .. tostring(ready)
+							.. " atMs=" .. tostring(attempts[index]))
+				end
+
+				if onTook then
+					onTook(attempts[index])
+				end
+
+				return
+			end
+
+			Script.SetTimer(attempts[index + 1] - attempts[index], function()
+				wait(index + 1)
+			end)
+		end
+
+		wait(1)
+
 		return
 	end
 
@@ -518,6 +567,12 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	local airSamples = 0
 	local airPeak = 0
 
+	-- The armor-scaled ceiling this victim was actually held to, reported on
+	-- the summary line. The cap is derived per victim, so without it nothing
+	-- in the log says what the figure came out as.
+	local lastCap = 0
+	local lastDrag = 0
+
 	local function apply(why, elapsed, speed, vertical, contact, share)
 		local params = {}
 		local scale = share or 1
@@ -545,6 +600,8 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 					.. " airPeak=" .. string.format("%.2f", airPeak)
 					.. " scale=" .. string.format("%.2f", armorScale or -1)
 					.. " keep=" .. string.format("%.2f", keep)
+					.. " cap=" .. string.format("%.2f", lastCap)
+					.. " drag=" .. string.format("%.1f", lastDrag)
 
 					-- How far the body actually came, against the fraction of
 					-- its speed it was allowed to keep. The pair is what makes
@@ -623,9 +680,58 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 			return
 		end
 
-		-- Bouncing Friction: Binds proportional drag to fast-sliding bodies
-		-- that have not yet settled.
+		-- Drag on a body still traveling and not yet settled, and **the lever
+		-- that actually decides how far a victim goes**.
+		--
+		-- Measured over 24 throws with mass flat at 80 kg, the distance a body
+		-- reached tracked the number of samples it spent above this cap and
+		-- barely tracked `keep` at all:
+		--
+		--     airBraked 0     0.45  0.55  0.56  0.92  1.03  1.40
+		--     airBraked 1-2   1.74  2.08  2.96  3.27  3.39
+		--     airBraked 3-4   3.43 ... 5.32
+		--
+		-- Separation across the whole run was 1.11x, which is nothing, because
+		-- this cap was the same figure for everyone. The counter-impulse
+		-- removes 55 per cent of an armored victim's speed and the cap then
+		-- flattens what is left onto the same curve as an unarmored one.
+		--
+		-- The impulse also fires before the engine has finished delivering the
+		-- throw at this mass. A guard braked at 10.43 m/s with keep 0.45 should
+		-- have been left at 4.7, and his `airPeak` afterwards read 11.17: the
+		-- horse goes on driving a body of 80 kg well past the sixty
+		-- millisecond mark. At 1,208 kg it did not, which is why the one-shot
+		-- brake looked sufficient while the mass rewrite was carrying the
+		-- separation.
+		--
+		-- So the cap is what armor scales. It is a ceiling rather than a
+		-- subtraction, so it does not care when the engine stops pushing: a
+		-- body held under 2.5 m/s cannot travel like one allowed 6.0 however
+		-- it got its speed.
 		local cap = self.Config.RagdollSpeedSoftCap or 0
+
+		if self.Config.RagdollSpeedCapArmorScaled and armorScale then
+			local heavy = self.Config.RagdollSpeedCapArmored or 2.5
+			local light = self.Config.RagdollSpeedCapUnarmored or 6.0
+			local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+			local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
+			local t = 1.0
+
+			if hi > lo then
+				t = (armorScale - lo) / (hi - lo)
+
+				if t < 0 then
+					t = 0
+				elseif t > 1 then
+					t = 1
+				end
+			end
+
+			cap = heavy + ((light - heavy) * t)
+		end
+
+		lastCap = cap
+
 		if cap > 0 and speed and
 				touching < (self.Config.RagdollDampContactRun or 3) then
 			local strength = 0
@@ -640,9 +746,49 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 				end
 			end
 
+			-- The drag itself is armor scaled, not only the ceiling.
+			--
+			-- The ceiling alone could not separate anyone on the throws that
+			-- matter. `strength` is `(speed - cap) / span` clamped to 1, so
+			-- past `cap + span`, about 5.5 m/s, it saturates and every victim
+			-- receives the identical figure however their ceiling was set.
+			-- Measured, armored bodies held to a ceiling of 2.50 still reached
+			-- peaks of 11.37, 13.28 and 15.37 m/s, because 8.0 of drag is
+			-- simply not enough to hold a body the engine threw that hard.
+			-- The ceiling moved when the drag started and never moved how much
+			-- there was.
+			--
+			-- Heavy drag was the objection raised against this whole approach
+			-- before it was tested, on the grounds it would read as syrup. The
+			-- rider rode armored victims at a flat 15.0 and reported no syrup
+			-- at all, so the objection is already withdrawn on evidence.
+			local drag = self.Config.RagdollAirDamping or 3.0
+
+			if self.Config.RagdollAirDampingArmorScaled and armorScale then
+				local heavy = self.Config.RagdollAirDampingArmored or 20.0
+				local light = self.Config.RagdollAirDampingUnarmored or 4.0
+				local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+				local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
+				local t = 1.0
+
+				if hi > lo then
+					t = (armorScale - lo) / (hi - lo)
+
+					if t < 0 then
+						t = 0
+					elseif t > 1 then
+						t = 1
+					end
+				end
+
+				drag = heavy + ((light - heavy) * t)
+			end
+
+			lastDrag = drag
+
 			pcall(function()
 				npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
-					damping = (self.Config.RagdollAirDamping or 3.0) * strength
+					damping = drag * strength
 				})
 			end)
 		end

@@ -27,25 +27,48 @@ HorseCollisionModSettings = {
 	Knockback                = 50.0,  -- horizontal, higher throws further
 	Uplift                   = 30.0,  -- vertical, higher throws upward
 
-	-- What the horse actually collides with, in kilograms. Every human is
-	-- 80 to the physics engine, so a peasant and a knight are the same
-	-- thing to hit, which is why armor has never been felt in a throw.
-	-- This is divided by the armor scale, so mail is heavier to move.
-	-- 0 leaves the engine's figure alone.
+	-- What the horse collides with, in kilograms. The engine gives every
+	-- human 80, and this is written over it.
 	--
-	-- The exponent decides how far apart armored and unarmored victims land,
-	-- and the base decides how far everyone travels. The base cancels out of
-	-- the ratio between the two, so raising it shortens every throw without
-	-- changing which victim resists; only the exponent widens the gap.
+	-- **It is deliberately the engine's own figure, and the armor scaling is
+	-- off.** Armor is separated by the brake instead, which removes a
+	-- commanded fraction of a thrown body's speed rather than lying about
+	-- what a person weighs.
 	--
-	-- At these figures a villager is about 43 kg and a mailed guard about
-	-- 4900, and the measured throws are 4.19 m against 1.92 m. Lowering the
-	-- base to 40 roughly doubles the separation on the ground but launches
-	-- light victims twelve meters and further, which does not read as a
-	-- person being hit by a horse.
-	RagdollMass              = 100.0,
-	RagdollMassArmorScaled   = true,
+	-- The scaling divided the base by the armor scale raised to the exponent,
+	-- with nothing bounding the result. At base 100 and exponent 3.7 that ran
+	-- from 43 kg for an unarmored villager to 1,208 kg for a mailed guard and
+	-- 501,187 kg at an armor scale of 0.10, which real guards score. Between
+	-- scale 0.35 and 0.10 the mass moved by a factor of a hundred. It was a
+	-- cliff rather than a scale, and it made everything stacked on top of it
+	-- meaningless: an impulse of 58 against 1,208 kg moves a guard five
+	-- centimeters per second, so the knockback, the uplift and the whole
+	-- barding force bonus did nothing to anyone in armor.
+	--
+	-- The write itself stays, and the value is not zero. It doubles as the
+	-- signal that the body has physicalized as a ragdoll, which is what the
+	-- impulse waits for, so writing the engine's own 80 keeps the handshake
+	-- while changing nothing about what the horse hits.
+	RagdollMass              = 80.0,
+	RagdollMassArmorScaled   = false,
 	RagdollMassArmorExponent = 3.7,
+	-- The speed ceiling a traveling body is held under, and the lever that
+	-- decides how far a victim goes. Measured over 24 throws at a flat 80 kg,
+	-- distance tracked how long a body spent above this ceiling and barely
+	-- tracked the brake's keep fraction at all. Lower is shorter.
+	-- How hard a traveling body is dragged, which is the figure that
+	-- actually holds it. The ceiling below only decides when the drag starts:
+	-- past the ceiling plus the span it saturates, so without this every
+	-- victim received the same drag on exactly the fast throws where armor
+	-- was supposed to tell them apart.
+	RagdollAirDampingArmorScaled = true,
+	RagdollAirDampingArmored = 20.0,  -- drag on a victim in full mail
+	RagdollAirDampingUnarmored = 4.0,   -- drag on an unarmored victim
+
+	RagdollSpeedCapArmorScaled = true,
+	RagdollSpeedCapArmored   = 2.5,   -- the ceiling for a victim in full mail
+	RagdollSpeedCapUnarmored = 6.0,   -- the ceiling for an unarmored victim
+
 	RagdollDamping           = 5.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 1.0,   -- higher puts it to rest sooner
 	RagdollDampPollMs        = 100,   -- how often to look at a thrown body
