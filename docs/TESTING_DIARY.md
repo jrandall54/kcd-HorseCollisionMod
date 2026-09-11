@@ -18392,3 +18392,61 @@ Two further candidates are unexplored and both are on the actor:
 `ClearForcedLookDir`, and which vanilla drives on the player through
 `SetForcedLookObjectId` during quests, so it is built to hold against input; and
 `SetLookIK(bool)`, which may be a prerequisite for either.
+
+## The whole reachable surface, tested. One primitive works.
+
+Every candidate was tried in game, mounted and in first person, rather than
+argued from the headers.
+
+| primitive | result |
+| --- | --- |
+| bone writes from Lua | do not exist. `GetBonePos` reads, nothing writes |
+| a horse head-turn clip | none in the 45-clip vanilla set |
+| `cl_cam*`, 47 CVars | inert on the mounted first-person view |
+| `SetWorldAngles` on the rider | accepted, reverted inside 400 ms by the mount |
+| `SetForcedLookDir` | **pitch only** |
+| `SetForcedLookObjectId` | **pitch only**, and it tracks the target's height |
+| `SetLookIK` | untested, and it is model IK rather than camera |
+| **`PlayerSetViewAngles`** | **moves the view, holds, mouse still works** |
+
+### The ForcedLook family is a pitch constraint, not a look-at
+
+Three tests agreed. Handed a unit vector, which the call treated as a world
+position near the origin and 81 m below the rider, it forced the view at the
+ground. Handed a proper world point 10 m out at head height and swung 40 to the
+side, it forced the view level and **did not turn it toward the point at all**;
+yaw stayed under the rider's control and looking up or down snapped back to
+level. Pointed at an NPC 4.4 m away with `SetForcedLookObjectId`, it bobbed the
+pitch up and down as she moved and again left yaw free.
+
+So the family constrains where the rider may look vertically. It is what a
+quest uses to stop you looking away from something, and it cannot swing a view
+sideways. Ruled out.
+
+The first result is worth keeping for its own sake: **`SetForcedLookDir` takes a
+world position, not a direction**, despite the name. That was diagnosed from the
+symptom rather than from any documentation, since aiming at the world origin
+from 81 m up is exactly a view pointed at the ground.
+
+### What `PlayerSetViewAngles` gives and what it costs
+
+It writes an absolute view yaw in radians, x and y zeroed, exactly as vanilla
+calls it in `SpawnPoint.lua`. It snapped, it held, and the rider kept mouse
+control from the new angle. That is everything a peek needs.
+
+The cost is that it is absolute rather than relative, so a peek has to read the
+current yaw, add an offset on the way out and subtract it on the way back. Any
+mouse movement made while peeking is preserved by working from the current value
+each time rather than from a remembered one.
+
+### The action map already has the keys, and the open question is release
+
+`hcm_actionmaps.xml` declares each feature once per candidate key, `r q y u o h`,
+and the settings file picks which one the mod listens to. Only `r` and `q` are
+spoken for. Every action currently declares `onPress="1"` and the handler tests
+`activation == "press"`, because a rear is a one-shot.
+
+**Whether a mod-declared action also delivers `release` is untested.** The note
+in `Rear.lua` that a hold is unusable was written about borrowing vanilla's
+`jump`, not about the mod's own actions, so it does not settle this. It decides
+hold-to-peek against press-to-toggle and is the next thing to find out.
