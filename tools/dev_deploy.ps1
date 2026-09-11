@@ -757,6 +757,19 @@ $script:DevTestValues = [ordered]@{
 	CollisionIsCrime          = "false"
 	ThrowRiderOnStaminaEmpty  = "false"
 	HorseBoltsWhenSpent       = "false"
+	# The fight itself, not only its two consequences below.
+	#
+	# `RetaliationPullsRiderDown` and `RetaliationSurrenderHint` were here
+	# without it, which suppressed what a provoked man does to the rider while
+	# leaving the provocation on. Any test that shoves one person repeatedly at
+	# walking pace is the exact input `ProvokeIfAnnoyed` exists to answer, so
+	# the victim draws a weapon partway through and the run ends as a brawl
+	# rather than as the thing being measured.
+	#
+	# Off by the table's own principle: retaliation's job is to interrupt the
+	# rider. Turn it back on in the settings file to test retaliation itself,
+	# the same way crime is turned back on to test crime.
+	Retaliation               = "false"
 	RetaliationPullsRiderDown = "false"
 	RetaliationSurrenderHint  = "false"
 	WomenRaiseAlarm           = "false"

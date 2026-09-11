@@ -123,8 +123,11 @@ breaking the mod. Deleting a line restores its default.
 | `ImpactDamageDelayMs` | 600 | How long the mod waits, in milliseconds, before charging the victim for the impact. The engine applies trample damage of its own for a collision and attributes it to you; waiting lets that land first so the mod delivers the killing blow. That decides whether guards treat a death as murder or as a corpse nobody is blamed for, and so it is what makes `CollisionIsCrime` mean anything. Set to 0 to charge immediately. |
 | `ImpactDust` | true | Whether a collision throws dust off the ground where the victim lands. |
 | `ImpactDustEffect` | "WH_Particels.other.explosion_dust" | The particle library node to spawn. |
+| `ImpactDustEffectRear` | "collisions.destructibles.arrow_soil" | The node a rear spawns instead. A rear is a standing blow, so it gets a short, punchy effect rather than the lingering cloud a gallop throws up. |
 | `ImpactDustScaleGallop` | 0.09 | Size of it at a gallop. |
-| `ImpactDustScaleTrot` | 0 | Size of it at a trot. |
+| `ImpactDustScaleTrot` | 0 | Size of it at a trot. Zero switches trot dust off. |
+| `ImpactDustScaleCharge` | 0.10 | Size of it for a rear charge. |
+| `ImpactDustScaleRear` | 0.6 | Size of it for a rear on the spot. Larger than the others because the effect it scales is a different one. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
 | `ImpactSoundDistance` | 2.0 | Master level for trot and gallop, in meters. Higher is quieter. The listener follows the camera, so a third-person camera mod hears the mix from further away and will want this lower. |
 | `ImpactSoundWalk` | layered | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |

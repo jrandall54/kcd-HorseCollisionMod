@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.2.0
+-- @release 5.2.1
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -407,12 +407,24 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	-- Phase 1: The Impact Parachute (Airborne Counter-Impulse)
 	-- =========================================================================
 	local keep = 1.0
+
 	if self.Config.RagdollBrake then
 		local heavy = self.Config.RagdollBrakeKeepArmored or 0.45
-		-- Handled unarmored default changed from 1.0 to 0.70 to assist stage 1
-		local light = self.Config.RagdollBrakeKeepUnarmored or 0.70
+		local light = self.Config.RagdollBrakeKeepUnarmored or 1.0
 		local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
-		local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.50
+
+		-- The unarmored endpoint, and the reason `keep` in the log is rarely
+		-- the figure the settings name.
+		--
+		-- `keep` is interpolated across this bracket, so a victim only
+		-- receives `RagdollBrakeKeepUnarmored` if their armor scale reaches
+		-- this endpoint exactly. Measured, ordinary villagers score about
+		-- 1.15 against an endpoint of 1.26, so they are braked by six percent
+		-- where the setting reads "untouched". That is wanted here, since the
+		-- engine's throws run long at every armor level, but the setting is
+		-- then describing an endpoint rather than a delivered figure and
+		-- should be read that way.
+		local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
 		local t = 1.0
 
 		if armorScale and hi > lo then
@@ -432,7 +444,18 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 
 	if self.Config.RagdollBrake and keep < 1.0 then
 		local delayMs = (self.Config.ImpulseDelayMs or 50) + 10
+
 		Script.SetTimer(delayMs, function()
+			-- The same generation guard every other timer in this file
+			-- carries. Without it a save load inside this sixty millisecond
+			-- window fires the brake into the reloaded world, and the brake
+			-- is the largest impulse this mod applies to anything: measured
+			-- at 2576 units against an armored guard, forty times the mod's
+			-- own knockback.
+			if generation ~= self.TimerTick then
+				return
+			end
+
 			if not npc.AddImpulse then
 				return
 			end
@@ -490,7 +513,7 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	local moving = false
 	local contactLog = {}
 	local touching = 0
-	local travelled = 0
+	local traveled = 0
 
 	local airSamples = 0
 	local airPeak = 0
@@ -516,11 +539,20 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 					.. " why=" .. why
 					.. " atMs=" .. string.format("%.0f", elapsed)
 					.. " speed=" .. string.format("%.2f", speed or -1)
+					.. " vertical=" .. string.format("%.2f", vertical or -1)
 					.. " contact[" .. table.concat(contactLog, "") .. "]"
 					.. " airBraked=" .. tostring(airSamples)
 					.. " airPeak=" .. string.format("%.2f", airPeak)
 					.. " scale=" .. string.format("%.2f", armorScale or -1)
 					.. " keep=" .. string.format("%.2f", keep)
+
+					-- How far the body actually came, against the fraction of
+					-- its speed it was allowed to keep. The pair is what makes
+					-- a single throw readable: commanded beside achieved,
+					-- with no ratio and no sample size in the way. It was
+					-- computed and then dropped from this line, which left
+					-- `traveled` accumulating every poll for nobody.
+					.. " achieved=" .. string.format("%.2f", traveled)
 					.. " sDamp=" .. string.format("%.2f", damping * scale)
 					.. " ok=" .. tostring(ok)
 					.. " err=" .. tostring(err))
@@ -575,7 +607,7 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 			end
 
 			if origin and here then
-				travelled = self:VectorLength({
+				traveled = self:VectorLength({
 					x = here.x - origin.x,
 					y = here.y - origin.y,
 					z = here.z - origin.z

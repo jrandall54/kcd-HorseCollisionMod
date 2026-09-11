@@ -30,6 +30,31 @@ number.
 
 ## [Unreleased]
 
+## [5.2.1] - 2026-09-11
+
+### Fixed
+- A save load in the sixty milliseconds between a collision and the ragdoll
+  brake no longer fires that brake into the reloaded world.
+- A rear that struck a victim who was removed before the dust spawned no longer
+  aborts the rest of that impact's handling.
+- `ImpactDustScaleGallop`, `ImpactDustScaleTrot`, `ImpactDustScaleCharge`,
+  `ImpactDustScaleRear`, `ImpactDustEffectRear` and `RearReach` now default to
+  the values that ship, so deleting one of those lines restores the tuned
+  figure rather than the pre-5.2.0 one.
+
+### Changed
+- The ragdoll telemetry reports how far the body actually traveled and its
+  vertical speed again, so one throw can be read without a sample of a hundred.
+
+### Removed
+- **NOT BREAKING** Ten internal settings left unread by the 5.1.0 pipeline
+  rewrite: `RagdollThrowSculpt`, `RagdollThrowDistanceArmored`,
+  `RagdollThrowDistanceUnarmored`, `RagdollThrowArmorScaleArmored`,
+  `RagdollThrowArmorScaleUnarmored`, `RagdollThrowOnsetMs`, `RagdollBrakeMs`,
+  `RagdollBrakeDampingArmored`, `RagdollBrakeDampingUnarmored` and
+  `RagdollLyingContacts`. None was ever exposed in the settings file, so no
+  existing install carries any of them.
+
 ## [5.2.0] - 2026-09-10
 
 ### Added
