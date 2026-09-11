@@ -184,6 +184,22 @@ function HorseCollisionMod:LeanViewAngle()
 		return nil
 	end
 
+	-- Steep pitch counts as out of range, reported as a right angle so the
+	-- limit refuses on it.
+	--
+	-- The yaw below is flattened, deliberately, so that looking up or down is
+	-- not treated as looking away. That is right in the middle of the range and
+	-- wrong at the ends: looking straight down collapses the horizontal
+	-- component toward zero and the yaw computed from it stops meaning
+	-- anything, so the limit fires somewhere unpredictable. Looking down is
+	-- also when the camera is nearest the rider's own model, which is why the
+	-- clipping shows up there and nowhere else.
+	local pitch = math.deg(math.asin(math.max(-1, math.min(1, dir.z))))
+
+	if math.abs(pitch) > (self.Config.LeanMaxPitchDeg or 55) then
+		return 90
+	end
+
 	-- Flattened, because looking up or down is not looking away.
 	local dot = ((dir.x / dl) * (heading.x / hl)) + ((dir.y / dl) * (heading.y / hl))
 

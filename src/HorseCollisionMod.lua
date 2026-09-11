@@ -258,6 +258,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   how fast queue entries can be spent. It applies to corrections only: the
 --   press, the arrival at the target and the release are never throttled,
 --   because dropping any of those leaves the camera traveling
+-- @field LeanMaxPitchDeg how far up or down the rider may be looking and
+--   still lean, in degrees. The yaw limit is flattened so looking up or down
+--   is not treated as looking away, which stops meaning anything once the
+--   horizontal component collapses. Looking down is also where the camera is
+--   nearest the rider's own model
 -- @field LeanRunawayFactor how far past the target the camera may get, as a
 --   multiple of LeanDistance, before the lean is ended outright
 -- @field LeanReleaseSec the short shake fired on release, which expires and
@@ -659,6 +664,7 @@ HorseCollisionMod.Config = {
 	LeanMinFlipMs            = 200,
 	LeanRunawayFactor        = 2.0,
 	LeanMaxAngleDeg          = 45,
+	LeanMaxPitchDeg          = 55,
 	LeanHomeMs               = 220,
 	LeanShakePeriod          = 40.0,
 	LeanShakeSec             = 1.5,
