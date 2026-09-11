@@ -80,28 +80,84 @@ function HorseCollisionMod:LeanActionFor(key, side)
 end
 
 
---- The camera's offset from where the lean started, in meters.
+--- How far the lean has carried the camera sideways, in meters.
 --
--- Sideways and forward are reported separately, measured against the camera's
--- own axes at the moment the lean began, so turning the horse mid lean does not
--- read as the camera having moved.
+-- Measured as the camera's offset **from the rider**, not from a remembered
+-- world position. A world baseline is only valid while the horse is standing
+-- still: at a walk the horse covers more ground in a second than the whole
+-- lean travels, so the controller reads the horse's journey instead of the
+-- camera's and chases a number that has nothing to do with the lean. That is
+-- what made the hold overshoot to 1.19 m against a target of 0.65, and what
+-- made it behave differently every time.
+--
+-- Projected on the camera's **current** right vector rather than the one from
+-- when the lean began, because the shake displaces the camera in its own
+-- space, so the offset rotates with the view.
 --
 -- @treturn ?number sideways offset, positive to the right
 function HorseCollisionMod:LeanOffset()
-	local here = nil
+	local here, dir, rider = nil, nil, nil
+	local playerEnt = rawget(_G, "player")
 
-	pcall(function()
-		here = System.GetViewCameraPos()
-	end)
-
-	if not here or not self.LeanBase or not self.LeanRight then
+	if not playerEnt then
 		return nil
 	end
 
-	local dx = here.x - self.LeanBase.x
-	local dy = here.y - self.LeanBase.y
+	pcall(function()
+		here = System.GetViewCameraPos()
+		dir = System.GetViewCameraDir()
+		rider = playerEnt:GetWorldPos()
+	end)
 
-	return (dx * self.LeanRight.x) + (dy * self.LeanRight.y)
+	if not here or not dir or not rider or not self.LeanBaseline then
+		return nil
+	end
+
+	local len = math.sqrt((dir.x * dir.x) + (dir.y * dir.y))
+
+	if len <= 0 then
+		return nil
+	end
+
+	local right = { x = dir.y / len, y = -dir.x / len }
+	local rel = { x = here.x - rider.x, y = here.y - rider.y }
+
+	return ((rel.x * right.x) + (rel.y * right.y)) - self.LeanBaseline
+end
+
+
+--- The camera's sideways offset from the rider, with no lean running.
+--
+-- Captured when a lean starts so everything after is measured against it.
+--
+-- @treturn ?number
+function HorseCollisionMod:LeanBaselineNow()
+	local here, dir, rider = nil, nil, nil
+	local playerEnt = rawget(_G, "player")
+
+	if not playerEnt then
+		return nil
+	end
+
+	pcall(function()
+		here = System.GetViewCameraPos()
+		dir = System.GetViewCameraDir()
+		rider = playerEnt:GetWorldPos()
+	end)
+
+	if not here or not dir or not rider then
+		return nil
+	end
+
+	local len = math.sqrt((dir.x * dir.x) + (dir.y * dir.y))
+
+	if len <= 0 then
+		return nil
+	end
+
+	local right = { x = dir.y / len, y = -dir.x / len }
+
+	return ((here.x - rider.x) * right.x) + ((here.y - rider.y) * right.y)
 end
 
 
@@ -160,18 +216,17 @@ function HorseCollisionMod:StartLean(sign)
 		return
 	end
 
-	pcall(function()
-		self.LeanBase = System.GetViewCameraPos()
+	-- Refused while the last lean is still on its way home. Re-basing against a
+	-- camera that is still displaced is the pumping bug: each tap took its
+	-- baseline from wherever the camera had got to, so release and re-press
+	-- ratcheted the offset further out every time.
+	if self.LeanHomeUntil and now < self.LeanHomeUntil then
+		return
+	end
 
-		local d = System.GetViewCameraDir()
-		local l = math.sqrt((d.x * d.x) + (d.y * d.y))
+	self.LeanBaseline = self:LeanBaselineNow()
 
-		if l > 0 then
-			self.LeanRight = { x = d.y / l, y = -d.x / l }
-		end
-	end)
-
-	if not self.LeanBase or not self.LeanRight then
+	if not self.LeanBaseline then
 		return
 	end
 
@@ -243,12 +298,17 @@ function HorseCollisionMod:StopLean()
 	self.LeanGoingBack = false
 	self.LeanGeneration = (self.LeanGeneration or 0) + 1
 
+	-- A shake whose duration expires returns the camera home in about 160 ms,
+	-- and nothing may re-base until it has.
+	self.LeanHomeUntil = self:TimeMs() + (cfg.LeanHomeMs or 220)
+
 	self:FlipLean(cfg.LeanHoldAmplitude or 1.2, 1, cfg.LeanReleaseSec or 0.05)
 
 	if cfg.LogTelemetry then
 		local offset = self:LeanOffset()
 
-		self:Log("LeanBack from=" .. string.format("%.2f", offset or -9))
+		self:Log("LeanBack from=" .. string.format("%.2f", offset or -9)
+				.. " target=" .. string.format("%.2f", cfg.LeanDistance or 0.65))
 	end
 end
 

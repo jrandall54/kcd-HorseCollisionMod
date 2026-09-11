@@ -16,7 +16,8 @@
 -- `Libs/Config/hcm_actionmaps.xml` and a key added there and not here is
 -- unusable, while one here and not there names an action that does not exist.
 HorseCollisionMod.RearKeys = {
-	r = true, q = true, y = true, u = true, o = true, h = true
+	r = true, q = true, e = true, f = true,
+	y = true, u = true, o = true, h = true
 }
 
 --- The action name a configured key maps to.
