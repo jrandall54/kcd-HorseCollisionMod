@@ -224,18 +224,14 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field Lean whether the rider can lean out to see past the horse's head
 -- @field LeanLeftKey which key leans left, one of r, q, y, u, o, h
 -- @field LeanRightKey which key leans right, from the same list
--- @field LeanAmplitude the shake amplitude in meters. Much larger than the
---   distance traveled, because the duration covers only the opening part of
---   one very slow swing
--- @field LeanPeriod seconds per oscillation. Long, so the camera pushes out
---   and never reaches the return half of the swing
--- @field LeanDurationSec how long one push lasts before it would return
--- @field LeanRefreshShare what fraction of the duration passes before the
---   lean is pushed again while the key is held
--- @field LeanHoldMaxSec the longest a lean is held regardless of the key
--- @field LeanReturnSec how long the camera takes to come back
--- @field LeanReturnPeriod the period of the return, short enough to arrive
---   promptly and long enough not to snap
+
+-- @field LeanDistance how far out the camera goes, in meters. The amplitude
+--   written is this divided by 0.63, which is the measured fraction of the
+--   amplitude the camera actually reaches
+-- @field LeanOutSec how long it takes to get there. This is the shake's
+--   period, because the peak arrives at t = period, and also its duration, so
+--   the shake is cut at its peak and returns home in about 160 ms
+
 -- @field RearArc the arc in front that counts, in degrees
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
@@ -623,13 +619,8 @@ HorseCollisionMod.Config = {
 	Lean                     = true,
 	LeanLeftKey              = "y",
 	LeanRightKey             = "u",
-	LeanAmplitude            = 3.0,
-	LeanPeriod               = 30.0,
-	LeanDurationSec          = 2.0,
-	LeanRefreshShare         = 0.5,
-	LeanHoldMaxSec           = 4.0,
-	LeanReturnSec            = 0.35,
-	LeanReturnPeriod         = 4.0,
+	LeanDistance             = 0.65,
+	LeanOutSec               = 0.40,
 	RearReach                = 2.5,
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,

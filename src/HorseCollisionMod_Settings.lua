@@ -214,11 +214,8 @@ HorseCollisionModSettings = {
 	Lean                     = true,
 	LeanLeftKey              = "y",   -- one of r, q, y, u, o, h
 	LeanRightKey             = "u",
-	LeanAmplitude            = 3.0,   -- higher leans further
-	LeanPeriod               = 30.0,  -- lower leans faster
-	LeanDurationSec          = 2.0,
-	LeanHoldMaxSec           = 4.0,   -- longest a lean is held
-	LeanReturnSec            = 0.35,  -- how long it takes to come back
+	LeanDistance             = 0.65,  -- how far out it goes, in meters
+	LeanOutSec               = 0.40,  -- how long it takes to get there
 
 	RearReach                = 2.5,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts

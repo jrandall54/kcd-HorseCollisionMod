@@ -36,9 +36,8 @@ number.
 - Leaning, so the rider can see past the horse's head in first person. Two keys
   slide the camera out to either side and back, which looks along the horse's
   neck rather than into it. `Lean`, `LeanLeftKey`, `LeanRightKey`,
-  `LeanAmplitude`, `LeanPeriod`, `LeanDurationSec`, `LeanHoldMaxSec` and
-  `LeanReturnSec` configure it. Defaults to `y` and `u`, which vanilla leaves
-  unbound.
+  `LeanSpeed`, `LeanDistance` and `LeanHoldSec` configure it. Defaults to `y`
+  and `u`, which vanilla leaves unbound.
 
 
 ## [5.3.1] - 2026-09-11

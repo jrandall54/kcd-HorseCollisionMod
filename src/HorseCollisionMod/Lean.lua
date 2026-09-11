@@ -17,34 +17,38 @@
 -- `actor:SetViewShake` is the one call that displaces the camera. Its second
 -- vector is a positional shake in meters, and vanilla uses it for explosions.
 --
--- ### How a shake is made to hold still
+-- ### What the shake actually does, measured
 --
--- A shake oscillates, which is the opposite of what a lean wants. The fourth
--- argument is what makes it usable, and it is **a period in seconds rather
--- than a frequency**, which is the reverse of what `Rider.lua` documented.
--- Measured across a 2000x spread at a fixed amplitude, 0.01 read as a blur,
--- 1.0 as a natural shake, and 20.0 was not noticed at all.
+-- Polled from `System.GetViewCameraPos` every 100 ms across a full cycle. At
+-- amplitude 2.0 and period 8.0 the camera reaches **1.264 m at 8.0 s** and then
+-- falls away again.
 --
--- A long period means the duration only ever covers the opening sliver of one
--- swing, so the camera pushes out and the return half never arrives. The
--- amplitude is therefore much larger than the distance traveled: at a 30
--- second period a 2 second window reaches roughly 40 per cent of it.
+--     2000ms 0.41   4000ms 0.78   6000ms 1.02   8064ms 1.264   12064ms 0.485
 --
--- Holding the lean out is then a matter of refreshing it before the duration
--- expires, which is what a held key does.
+-- Two rules come out of it, and both differ from what the argument names
+-- suggest:
 --
--- Attached to the `HorseCollisionMod` table created by the entry point, which
--- pulls this file in with `Script.ReloadScript`.
+-- * **The peak is about 0.63 of the amplitude**, not the amplitude itself.
+-- * **The peak arrives at t = period**, not at a quarter of it.
 --
--- @module HorseCollisionMod.Lean
--- @author jrandall54
-
---- The action name this mod listens to for a lean, for a given key.
+-- So the period is the time to full extension and the amplitude sets how far.
+-- A shake cut before its peak returns home smoothly in about 160 ms.
+--
+-- Sampling a short window is what makes this mechanism easy to get wrong: over
+-- its first eighth the curve is indistinguishable from a straight line, and
+-- reading a velocity off it gives an amplitude twenty times too large.
+--
+-- Concurrent shakes **sum**, which is why tapping the key repeatedly used to
+-- send the camera absurdly far: each press added another curve and nothing
+-- subtracted one. A lean already running is therefore left alone.--- The action name this mod listens to for a lean, for a given key.
 --
 -- Each feature is declared once per candidate key in `hcm_actionmaps.xml`,
 -- because Lua cannot write a file and `LoadFromXML` can only read one, so a
 -- key cannot be rebound at runtime. The settings file picks which declaration
 -- the mod answers to by naming the key.
+--
+-- Action maps are read once, at startup. A key added to that file is dead
+-- until the game is restarted.
 --
 -- @tparam string key one of r, q, y, u, o, h
 -- @tparam string side "left" or "right"
@@ -58,43 +62,14 @@ function HorseCollisionMod:LeanActionFor(key, side)
 end
 
 
---- Pushes the camera out to one side, or refreshes a lean already running.
+--- Leans the camera out, and lets it come back.
 --
--- Called on the key press and then on a timer while the key is held. Each call
--- restarts the shake, so the camera never reaches the point in the swing where
--- it would come back.
+-- One shake, cut at its own peak. The period is the time to full extension and
+-- the amplitude is the distance wanted divided by 0.63, which is the measured
+-- fraction of the amplitude the camera actually reaches.
 --
--- @tparam number sign -1 for left, 1 for right
-function HorseCollisionMod:PushLean(sign)
-	local cfg = self.Config
-	local playerEnt = rawget(_G, "player")
-
-	if not playerEnt or not playerEnt.actor then
-		return
-	end
-
-	local amplitude = (cfg.LeanAmplitude or 3.0) * sign
-	local period = cfg.LeanPeriod or 30.0
-	local duration = cfg.LeanDurationSec or 2.0
-
-	pcall(function()
-		playerEnt.actor:SetViewShake(
-				{ x = 0, y = 0, z = 0 },
-				{ x = amplitude, y = 0, z = 0 },
-				duration, period, 0)
-	end)
-end
-
-
---- Starts a lean and keeps it out until the key is released.
---
--- The refresh interval is a fraction of the duration rather than the whole of
--- it, so the next push lands before the current one has begun its return.
---
--- A ceiling is kept regardless of the key, because whether a mod-declared
--- action delivers `release` at all is not established. If it does not, the
--- lean ends on the ceiling and the feature still works as a glance rather than
--- as a hold.
+-- Cutting at the peak is deliberate: a cut returns the camera home smoothly in
+-- about 160 ms, so the return costs nothing and needs no second call.
 --
 -- @tparam number sign -1 for left, 1 for right
 function HorseCollisionMod:StartLean(sign)
@@ -104,81 +79,42 @@ function HorseCollisionMod:StartLean(sign)
 		return
 	end
 
-	self.LeanGeneration = (self.LeanGeneration or 0) + 1
+	local now = self:TimeMs()
 
-	local generation = self.LeanGeneration
-	local timerTick = self.TimerTick
-	local startedAt = self:TimeMs()
-	local ceiling = (cfg.LeanHoldMaxSec or 4.0) * 1000
-	local every = ((cfg.LeanDurationSec or 2.0) * 1000)
-			* (cfg.LeanRefreshShare or 0.5)
-
-	self.LeanSign = sign
-	self:PushLean(sign)
-
-	local function hold()
-		if generation ~= self.LeanGeneration or timerTick ~= self.TimerTick then
-			return
-		end
-
-		if (self:TimeMs() - startedAt) >= ceiling then
-			self:StopLean("ceiling")
-
-			return
-		end
-
-		self:PushLean(sign)
-		Script.SetTimer(every, hold)
+	-- Concurrent shakes sum, so a second lean on top of a first runs away.
+	if self.LeanBusyUntil and now < self.LeanBusyUntil then
+		return
 	end
 
-	Script.SetTimer(every, hold)
-
-	if cfg.LogTelemetry then
-		self:Log("LeanStart side=" .. (sign < 0 and "left" or "right")
-				.. " amp=" .. string.format("%.1f", cfg.LeanAmplitude or 3.0)
-				.. " period=" .. string.format("%.0f", cfg.LeanPeriod or 30.0)
-				.. " dur=" .. string.format("%.1f", cfg.LeanDurationSec or 2.0))
-	end
-end
-
-
---- Ends a lean and brings the camera back.
---
--- Stopping the refresh alone would leave the camera out until the last shake's
--- duration expired, which is up to a whole duration of nothing happening. A
--- short shake the other way carries it home instead, at a period short enough
--- to arrive promptly and long enough not to read as a snap.
---
--- @tparam string why what ended it, for the log
-function HorseCollisionMod:StopLean(why)
-	self.LeanGeneration = (self.LeanGeneration or 0) + 1
-
-	local cfg = self.Config
 	local playerEnt = rawget(_G, "player")
 
 	if not playerEnt or not playerEnt.actor then
 		return
 	end
 
+	local outSec = cfg.LeanOutSec or 0.4
+	local distance = cfg.LeanDistance or 0.65
+	local amplitude = (distance / 0.63) * sign
+
+	self.LeanBusyUntil = now + (outSec * 1000) + 200
+
 	pcall(function()
 		playerEnt.actor:SetViewShake(
 				{ x = 0, y = 0, z = 0 },
-				{ x = 0, y = 0, z = 0 },
-				cfg.LeanReturnSec or 0.35,
-				cfg.LeanReturnPeriod or 4.0, 0)
+				{ x = amplitude, y = 0, z = 0 },
+				outSec, outSec, 0)
 	end)
 
 	if cfg.LogTelemetry then
-		self:Log("LeanStop why=" .. tostring(why))
+		self:Log("Lean side=" .. (sign < 0 and "left" or "right")
+				.. " distance=" .. string.format("%.2f", distance)
+				.. " amplitude=" .. string.format("%.2f", math.abs(amplitude))
+				.. " outSec=" .. string.format("%.2f", outSec))
 	end
 end
 
 
 --- Answers a key event, and reports whether it belonged to the lean.
---
--- Both activations are logged the first few times, because whether a
--- mod-declared action delivers `release` as well as `press` decides whether
--- this is a hold or a glance and has never been established on this project.
 --
 -- @tparam string action the action name from `Player:OnAction`
 -- @tparam string activation "press", "release" or "hold"
@@ -202,20 +138,8 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 		return false
 	end
 
-	-- Recorded for the first handful of presses only. The question it answers
-	-- is asked once per build, and a line per keypress forever afterwards is
-	-- the kind of noise this project has already paid for.
-	self.LeanSeen = (self.LeanSeen or 0) + 1
-
-	if cfg.LogTelemetry and self.LeanSeen <= 8 then
-		self:Log("LeanKey action=" .. tostring(action)
-				.. " activation=" .. tostring(activation))
-	end
-
 	if activation == "press" then
 		self:StartLean(sign)
-	elseif activation == "release" then
-		self:StopLean("release")
 	end
 
 	return true

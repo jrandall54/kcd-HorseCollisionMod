@@ -18508,3 +18508,71 @@ for anything that wants to turn the view, but it cannot help here. The whole
 `ForcedLook` family constrains pitch only. `SetWorldAngles` on the rider is
 reverted by the mount inside 400 ms. No bone is writable from Lua and no horse
 clip turns the head.
+
+## SetViewShake is a direction toggle, which is what makes a hold possible
+
+Three wrong models were built on this call before it was measured properly, each
+from too small a sample. It is worth stating what it actually does.
+
+**Firing a shake while one is running reverses the camera's direction of
+travel.** It does not sum with the running shake and it does not replace it from
+zero. Four calls at two second intervals, identical each time, with the camera
+position polled from `System.GetViewCameraPos`:
+
+    fire 1 at 0ms      0.000 -> 0.421   travelling out
+    fire 2 at 2000ms   0.344 -> -0.086  travelling back, through center
+    fire 3 at 4000ms  -0.007 -> 0.313   out again
+    fire 4 at 6000ms   0.241 -> -0.186  back again
+
+Perfectly consistent, and the rate is about 0.2 m/s each way at amplitude 2.0
+and period 8.0. The sign of the amplitude chooses the direction only when
+nothing is already running; after that every call simply flips.
+
+### The three wrong models, and why each survived as long as it did
+
+- **"The fourth argument is a period."** Read from the argument list. It behaves
+  like one over short windows.
+- **"The displacement is a velocity."** Read from a one second sample of an
+  eight second curve. Over its first eighth the curve is indistinguishable from
+  a straight line, so a rate fitted to it extrapolates to an amplitude twenty
+  times too large. That shipped, and threw the rider's camera twenty meters.
+- **"Concurrent shakes sum."** Inferred from the rider's report that tapping the
+  key repeatedly sent the camera absurdly far. The runaway was real; the
+  explanation was not.
+
+Each was a plausible reading of a real observation, and each was settled only by
+widening the measurement window. The instrument that settles it,
+`tools/probe_camera.lua`, cost less than any one of the rides spent guessing.
+
+### What it gives
+
+A toggle for an actuator and `GetViewCameraPos` for a sensor is a bang-bang
+control loop. Drive out until the target offset is reached, then flip each time
+the camera crosses back over it. The residual wobble is the travel speed times
+the poll interval, so a slow hold speed and a fifty millisecond poll put it
+under a centimeter.
+
+Ending a shake is the third element: a shake whose duration expires returns the
+camera home smoothly in about 160 ms, which is the release.
+
+### `GetHeadPos` is not the camera
+
+Worth recording because it was the first thing tried. It reports the head
+**bone**, and a view shake is applied downstream of the skeleton: at amplitude
+2.0 the head bone moved 2.7 cm, which is idle breathing, while the camera moved
+ten times that. `System.GetViewCameraPos` is the camera.
+
+### Keys available for binding, from the vanilla profile
+
+Every literal keyboard binding in `Libs/Config/defaultProfile.xml`, by
+actionmap. Movement and `use` resolve through `_keybinds_ref_` and are not
+listed there, so this catches literal bindings only.
+
+    f   haste, and player -> draw      not usable, a vanilla press cannot be consumed
+    e   haste only                     free while riding, the QTE map does not run
+    q   nothing                        free
+    r   nothing                        free
+    g v x z t i k l n p w              no literal binding
+
+The `horse` actionmap carries twenty actions and **`use` is not among them**,
+which supports the rider's account that nothing needs `e` on horseback.
