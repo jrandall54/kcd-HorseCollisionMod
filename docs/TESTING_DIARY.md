@@ -18488,7 +18488,7 @@ camera barely leaves its position.
 
 A long period turns the shake into a one-way push, because the duration only
 ever covers the opening sliver of a swing and the return half never arrives. The
-amplitude is therefore much larger than the distance actually travelled: at a 30
+amplitude is therefore much larger than the distance actually traveled: at a 30
 second period a 2 second window reaches roughly 40 per cent of the amplitude.
 
     amplitude 3.0  period 30  duration 2.0   a moderate lean

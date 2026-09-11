@@ -690,6 +690,27 @@ function Sync-LooseFiles {
 		Copy-Item $file.From -Destination $file.To -Force
 		Write-Host "[DEPLOY] updated $(Split-Path -Leaf $file.To)"
 		$changed[$file.Half] = $true
+
+		# The action map is read once, at startup, and never again.
+		#
+		# Rear.lua guards ActionMapManager.LoadFromXML behind a flag set the
+		# first time it succeeds, because re-reading a file whose map is already
+		# registered registers every action a second time and one press then
+		# arrives twice over. So a script reload cannot pick up a new action, and
+		# a key added to this file is silently dead until the game is restarted.
+		#
+		# Worth a line rather than a ride: a lean was added on two new keys,
+		# deployed into a running game, reported as doing nothing, and the log
+		# read loaded=true from the flag rather than from the new file.
+		if ((Split-Path -Leaf $file.To) -eq "hcm_actionmaps.xml") {
+			$running = @(Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue).Count -gt 0
+
+			if ($running) {
+				Write-Host "[DEPLOY] hcm_actionmaps.xml changed while the game is running." -ForegroundColor Yellow
+				Write-Host "[DEPLOY] Action maps are read once at startup, so any new key is" -ForegroundColor Yellow
+				Write-Host "[DEPLOY] dead until the game is restarted." -ForegroundColor Yellow
+			}
+		}
 	}
 
 	# A development deploy leaves the world unable to interrupt a test: riding

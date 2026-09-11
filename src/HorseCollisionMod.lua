@@ -221,6 +221,21 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearStrikes whether the hooves coming down hit anyone in front
 -- @field RearStrikeMs when in the animation the hooves land
 -- @field RearReach how far in front the hooves reach, in meters
+-- @field Lean whether the rider can lean out to see past the horse's head
+-- @field LeanLeftKey which key leans left, one of r, q, y, u, o, h
+-- @field LeanRightKey which key leans right, from the same list
+-- @field LeanAmplitude the shake amplitude in meters. Much larger than the
+--   distance traveled, because the duration covers only the opening part of
+--   one very slow swing
+-- @field LeanPeriod seconds per oscillation. Long, so the camera pushes out
+--   and never reaches the return half of the swing
+-- @field LeanDurationSec how long one push lasts before it would return
+-- @field LeanRefreshShare what fraction of the duration passes before the
+--   lean is pushed again while the key is held
+-- @field LeanHoldMaxSec the longest a lean is held regardless of the key
+-- @field LeanReturnSec how long the camera takes to come back
+-- @field LeanReturnPeriod the period of the return, short enough to arrive
+--   promptly and long enough not to snap
 -- @field RearArc the arc in front that counts, in degrees
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
@@ -605,6 +620,16 @@ HorseCollisionMod.Config = {
 	RearAnimSpeed            = 1.0,
 	RearStrikes              = true,
 	RearStrikeMs             = 700,
+	Lean                     = true,
+	LeanLeftKey              = "y",
+	LeanRightKey             = "u",
+	LeanAmplitude            = 3.0,
+	LeanPeriod               = 30.0,
+	LeanDurationSec          = 2.0,
+	LeanRefreshShare         = 0.5,
+	LeanHoldMaxSec           = 4.0,
+	LeanReturnSec            = 0.35,
+	LeanReturnPeriod         = 4.0,
 	RearReach                = 2.5,
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,
@@ -1632,6 +1657,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Lean.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rear.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 

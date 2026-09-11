@@ -203,6 +203,23 @@ HorseCollisionModSettings = {
 	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop
 	RearStrikes              = true,  -- the rear on the spot hits who is in front
 	RearStrikeMs             = 700,   -- when in the animation they land
+	-- Leaning out to see past the horse's head, in first person.
+	--
+	-- The camera slides to one side so you can look along the horse's neck
+	-- rather than into it. Amplitude is not the distance traveled: the push
+	-- is the opening part of one very slow swing, so at a period of 30 and a
+	-- duration of 2 the camera reaches roughly 40 per cent of the amplitude.
+	--
+	-- Lower LeanPeriod to lean faster, raise LeanAmplitude to lean further.
+	Lean                     = true,
+	LeanLeftKey              = "y",   -- one of r, q, y, u, o, h
+	LeanRightKey             = "u",
+	LeanAmplitude            = 3.0,   -- higher leans further
+	LeanPeriod               = 30.0,  -- lower leans faster
+	LeanDurationSec          = 2.0,
+	LeanHoldMaxSec           = 4.0,   -- longest a lean is held
+	LeanReturnSec            = 0.35,  -- how long it takes to come back
+
 	RearReach                = 2.5,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse

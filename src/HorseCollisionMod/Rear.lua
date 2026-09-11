@@ -132,7 +132,13 @@ function HorseCollisionMod:HookRearKey()
 			local mod = HorseCollisionMod
 			local cfg = mod.Config
 
-			if action == mod:RearActionFor(cfg.RearChargeKey) then
+			-- The lean shares this hook rather than wrapping OnAction a
+			-- second time. Two wrappers cannot both survive a reload: this
+			-- one restores `RearOriginalOnAction` before rewrapping, which
+			-- would discard the other.
+			if mod:HandleLeanAction(action, activation) then
+				consumed = true
+			elseif action == mod:RearActionFor(cfg.RearChargeKey) then
 				consumed = true
 
 				if activation == "press" then
