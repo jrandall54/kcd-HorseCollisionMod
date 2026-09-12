@@ -5,10 +5,11 @@
 -- every time, no error, no voice line. That was wrong, and two mistakes put it
 -- there. The settling experiment called vanilla's own helper on the player with
 -- `KOLIZE_S_HRACEM_NA_KONI`, a metarole Henry's soul does not hold, so silence
--- was guaranteed whatever the route did. And `monologRequestExecution` in
--- `final/sb_dialog.xml` drops a request outright when the speaker's context
--- carries `suppressMonologs` unless `overrideContextSuppress` is set, which no
--- earlier attempt set.
+-- was guaranteed whatever the route did. `monologRequestExecution` in
+-- `final/sb_dialog.xml` also drops a request outright when the speaker's
+-- context carries `suppressMonologs` unless `overrideContextSuppress` is set,
+-- though the roadmap records that flag as having been tried, so it is a
+-- suspect and not the established cause.
 --
 -- Corrected, it works. Sent to `player.this.id` with `JINDRICH_NARAZIL_NA_MRTVOLY`
 -- and the gates overridden, Henry spoke two lines from that bark set, the
@@ -16,15 +17,24 @@
 -- corpse in sight. Both `DialogUtils.RequestPlayerMonologByMetarole` and a
 -- typed `SendMessageToEntityData` produced it.
 --
--- What remains open is the NPC. Every send to a woman two metres away was
--- silent while Henry talked, and the likely reason is the handle. The mod's own
--- messages that do land on NPCs -- `combat:hit` and `hitReaction` in
--- `Crime.lua` -- all resolve the target as `npc.this.id` and fall back to
--- `npc.id`, and vanilla addresses the player the same way. This probe sends the
--- same metarole both ways to separate the two.
+-- NPCs work too. A townswoman two metres away spoke `RANENY_NA_ZEMI`,
+-- `KOLIZE_S_HRACEM_NA_KONI` and `KOLIZE_S_HRACEM_LEHKA` on request once the
+-- target was resolved as `npc.this.id`, which is what `combat:hit` and
+-- `hitReaction` in `Crime.lua` already use for every message this mod
+-- successfully lands on an NPC. Whether that was the operative change, or
+-- `forceOnMuted`, or simply picking an ordinary townswoman over the merchant,
+-- guard and refugee tried before, was never isolated. Refugee voices in
+-- particular carry no collision topic at all.
+--
+-- What the probe is for now is choosing lines rather than proving the route.
+-- The KOLIZE sets are the ones vanilla already fires on contact, the "Look
+-- where you're going" and "Lout!" lines, so pointing the mod at them adds
+-- nothing a player does not already hear.
 --
 -- Usage, from the repository root:
---   python tools/dev_console.py --file tools/probe_bark.lua --wait 50
+--   python tools/dev_console.py --file tools/probe_bark.lua --wait 60
+--
+-- Switch groups by editing AUDITION below.
 
 -- Long enough for a line to finish. At five seconds Henry's second bark cut off
 -- his first, which is how the interrupt behaviour was noticed.
@@ -147,11 +157,76 @@ if npc then
 			.. " id=" .. tostring(npc.id ~= nil))
 end
 
--- The NPC candidates run first, while the rider's attention is freshest, and
--- the known-good Henry line runs last as an end-to-end marker: if it speaks,
--- the probe reached the end and any NPC silence above it is a real result
--- rather than a probe that died half way.
-local candidates = {
+-- An audition, not a test. The route is settled; what is not known is which
+-- metarole yields which lines, because the join between a metarole and the
+-- slug the localisation text is keyed by is not in any shipped table. Souls
+-- and text are both readable offline, the mapping between them is not, so the
+-- remaining way to find out is to hear them.
+--
+-- Every entry below is held by at least 2200 of the 5025 souls and is **not**
+-- one of the KOLIZE collision sets, which already fire by themselves on every
+-- contact and say "Look where you're going". The point of the feature is lines
+-- vanilla never reaches while mounted.
+--
+-- Set AUDITION to the group to hear. Each runs one metarole at a time against
+-- the nearest NPC, announced in the log before it fires.
+-- One metarole per run when SOLO is set, which is the normal way to use this.
+--
+-- A six candidate run asks the rider to hold six observations until the next
+-- message arrives, and that failed the first time it was tried: four lines
+-- played and all four were forgotten before they could be reported. A single
+-- fire is over in three seconds and can be reported while it is still in the
+-- ear. Set SOLO to a metarole name, or nil to run a whole AUDITION group.
+local SOLO = "VZDAVANI_BARK"
+
+local AUDITION = "panic"
+
+local auditions = {
+	-- A rear in place or a charge: the horse looming, no contact yet.
+	panic = {
+		"NASILI_UTEK",
+		"KDO_TAM_CITOSLOVCE",
+		"SPATRENI_NEPRITELE_-_UTOK",
+		"VOLANI_STRAZE_BITKA",
+		"INTRUZE_LEHKA",
+		"KOMENTAR_NA_JINDRU"
+	},
+	-- A victim on the ground, and whoever is standing next to them.
+	aftermath = {
+		"RANENY_NA_ZEMI",
+		"COMBAT_VICTIM_SCREAM_RECEIVED_HIT",
+		"COMBAT_OPPONENT_DYING",
+		"UVIDI_MRTVOLU",
+		"VOLANI_STRAZE_MRTVOLA",
+		"VZDAVANI_BARK"
+	}
+}
+
+local candidates = {}
+
+if SOLO then
+	candidates[1] = {
+		label = "solo " .. SOLO,
+		npc = true,
+		fire = function()
+			send(brainId(npc), SOLO)
+		end
+	}
+end
+
+for i, metarole in ipairs((not SOLO) and (auditions[AUDITION] or {}) or {}) do
+	candidates[i] = {
+		label = i .. " " .. metarole,
+		npc = true,
+		fire = function()
+			send(brainId(npc), metarole)
+		end
+	}
+end
+
+-- The addressing experiment, kept because it is what made NPC sends work and
+-- the exact cause was never isolated. Selected by name rather than deleted.
+local addressing = {
 	{
 		label = "1 npc via this.id, RANENY_NA_ZEMI",
 		npc = true,
@@ -193,6 +268,12 @@ local candidates = {
 		end
 	}
 }
+
+if #candidates == 0 then
+	log("no audition group named '" .. tostring(AUDITION)
+			.. "', falling back to the addressing experiment")
+	candidates = addressing
+end
 
 local function fireAt(index)
 	local candidate = candidates[index]

@@ -18914,3 +18914,68 @@ so the topics a given voice has recordings for are computable offline from the
 filenames, and `DoMonologue` takes a `TopicId` directly. No Czech audio is
 installed; `Czech_xml.pak` is subtitle text only. A line that sounds Czech is an
 undubbed one shipped inside the English pack, which means it played.
+
+## Which metaroles actually speak, auditioned one at a time
+
+Twelve candidates were fired at a single townswoman, one per run, and judged by
+ear. All were held by at least 2200 of the 5025 souls, and none were the KOLIZE
+collision sets, which already fire by themselves on contact.
+
+    NASILI_UTEK               spoke   "Help!" "Christ almighty!" "Mother of
+                                      God!" "Please, someone! Do something!"
+                                      "Aaaaaaaah!"  topic 12803
+    KDO_TAM_CITOSLOVCE        spoke   "Who's there?" "What in the -?" "Jesus!"
+                                      "Who're you?!" "Well I never!"
+    RANENY_NA_ZEMI            spoke   a pained "owwww", no subtitle at all
+    UVIDI_MRTVOLU             spoke   "Jesus Christ! Murder! Help!"
+    VOLANI_STRAZE_MRTVOLA     spoke   "Over there, my God, there's a corpse"
+    VOLANI_STRAZE_BITKA       spoke   "Mary Mother of God! Do something!
+                                      They're brawling there"  topic 15657
+    INTRUZE_LEHKA             spoke   "Do you want something?"
+
+    SPATRENI_NEPRITELE_-_UTOK  silent
+    COMBAT_VICTIM_SCREAM_RECEIVED_HIT  silent
+    COMBAT_OPPONENT_DYING      silent
+    VZDAVANI_BARK              silent
+    KOMENTAR_NA_JINDRU         silent
+
+### The rule the silences follow
+
+**A metarole that describes a state speaks only from that state.** Every
+`COMBAT_` prefixed candidate was silent on a townswoman going about her day, as
+was `VZDAVANI_BARK`, which is surrender, and `SPATRENI_NEPRITELE_-_UTOK`, which
+is sighting an enemy. None of those situations applied to her. The ones that
+spoke are reactions an ordinary civilian can have at any moment.
+
+This matters for the mod because the victim of a trampling is not in combat.
+`COMBAT_VICTIM_SCREAM_RECEIVED_HIT` looked like the obvious choice for an impact
+and cannot be used, while `RANENY_NA_ZEMI` works and sounds better.
+
+### Not every line has text
+
+`RANENY_NA_ZEMI` produced a pained vocalisation with no subtitle. Those are
+invisible to the `text_ui_dialog.xml` lookup, which means the offline index
+finds spoken *sentences* and cannot enumerate grunts and screams. For impacts
+those are the most useful sounds of all, so **the audition is the only way to
+find them** and the text index is a complement to it, not a replacement.
+
+### The shortlist this leaves
+
+    rear in place, horse looming     NASILI_UTEK          terror, scatter
+    a near miss or a startle         KDO_TAM_CITOSLOVCE   "What in the -?"
+    victim on the ground             RANENY_NA_ZEMI       wordless pain
+    bystander finds the body         UVIDI_MRTVOLU        murder alarm
+    bystander reports it             VOLANI_STRAZE_MRTVOLA
+
+`INTRUZE_LEHKA` and `VOLANI_STRAZE_BITKA` speak but do not fit: one is loitering
+chat, the other reports a brawl between two other people.
+
+### Addressing a line precisely
+
+`dialog:monologRequest` carries `topicId` as well as `metarole`, and vanilla uses
+it directly, `archery_tourney.xml` sending `topicId(11002)`. A line heard in
+game can therefore be pinned exactly: search its text in `text_ui_dialog.xml`,
+which is keyed `t<topic>_s<sentence>_<n>_<slug>_<hash>`, and fire that topic.
+The collision barks already firing on contact are topics 15237 (`p_kolize_s`)
+and 11634 (`p_drcnul_d`), which is what "Look where you're going" and "Lout!"
+come from, and which the mod should therefore avoid.
