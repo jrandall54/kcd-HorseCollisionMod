@@ -881,15 +881,22 @@ Deferred deliberately, and it is the largest item on this document. Three
 numbers govern how hard a collision lands and none of them is where it should
 be:
 
-- **Armor mass scaling.** What a victim's ragdoll weighs, which is the mod's
-  only real lever on how far the horse's collision throws them. An unarmored
-  villager is written down to about 42 kg and flies; a mailed guard goes to
-  several thousand and barely moves. The heavy end is already saturated, so the
-  curve is doing most of its work in a narrow band.
+- **Armor separation through the brake.** Superseded in 5.3.0, and this bullet
+  is kept only so the change is visible. It used to read *armor mass scaling*,
+  a victim's ragdoll weight, which ran from 43 kg for a villager to 1,208 kg
+  for a mailed guard and 501,187 kg at an armor scale real guards score. That
+  is gone: every victim is the engine's own 80 kg and armor is separated by
+  the brake's ceiling and drag instead, measured at 1.70x on means and 1.87x
+  on medians over 143 throws. The lever is now two numbers that were chosen,
+  rather than one that emerged from an armor table raised to an exponent,
+  which is what makes this phase tractable at all.
 - **Armor defense scaling.** What armor takes off the damage. A charge worth
   110 becomes 12 against chainmail, which is a factor of nine across a range
   the player experiences as "wearing armor or not".
-- **Base damage per tier.** The figures the other two scale.
+- **Base damage per tier.** The figures the other two scale. The rear is the
+  live example: at a base of 60 against roughly 83 health, two rears kill an
+  unarmored civilian, which was found by killing a merchant rather than by
+  choosing it.
 
 The three are not separable. Changing any one of them moves what the other two
 are compensating for, which is why this is a single project rather than three
@@ -1033,3 +1040,147 @@ a small change and it has not been tried.
 Note also that the sculpting measurements in the diary were taken with
 `RagdollMassArmorScaled = false`, which is not the shipped configuration, so
 the separation figures quoted for the brake do not describe the shipped build.
+
+
+## Research: making NPCs speak vanilla lines on command
+
+The question: can the mod choose what an NPC says, at a moment of its choosing,
+using lines the game already ships.
+
+**Yes, and the selection is by metarole rather than by line.**
+
+### What speaks
+
+`<DoMonologue>` is the behavior tree node that produces spoken lines, and its
+parameters are visible in the vanilla trees:
+
+    <DoMonologue TopicId="0" TopicLabel="$barkSetup.topicLabel"
+                 Metaroles="$barkSetup.metarole" SoulId=""
+                 ForceSubtitles="false" IsInterruptibleByPlayer="true"
+                 AnimationOverride="$barkSetup.anim" />
+
+For a bark, `TopicId` is `0` and the line is chosen by **`Metaroles`** and
+`TopicLabel`. A metarole is a named bark set, listed in
+`Libs/Tables/rpg/metarole.xml`, 383 of them.
+
+Most are quest specific, `KUNES_BARK` and the like. Sixty-eight are generic
+reaction sets and several map onto this mod's tiers exactly:
+
+    COMBAT_VICTIM_SCREAM_RECEIVED_HIT       being struck
+    COMBAT_VICTIM_SHOUT_AFTER_RECEIVED_HIT  after being struck
+    HIT_REAKCE_SLABA / HIT_REAKCE_SILNA     weak and strong hit reactions
+    COMBAT_OPPONENT_WOUNDED                 a bystander seeing someone hurt
+    COMBAT_OPPONENT_CRITICAL                seeing someone badly hurt
+    COMBAT_OPPONENT_DYING / _DEAD           seeing someone die
+    COMBAT_FLEE / COMBAT_GIVE_UP            running, surrendering
+    COMBAT_TAUNTING_WEAK / _STRONG          taunts
+    COMBAT_TRASH_TALK
+
+A walk stagger reaching for `HIT_REAKCE_SLABA` and a gallop for
+`COMBAT_VICTIM_SCREAM_RECEIVED_HIT` is the shape of it, with bystanders on
+`COMBAT_OPPONENT_CRITICAL` when someone is ridden down beside them.
+
+### Two routes to firing one, and neither is yet tested
+
+**The Lua bind.** `C_ScriptBindDialog` exposes
+`StartMonolog(speakerId, topicId)` and `ForceDialog(speakerId, listenerId)`.
+`ForceDialog` is used in vanilla Lua; **`StartMonolog` is not**, so what it
+accepts as a topic is unknown and is the first thing to probe. If it takes a
+metarole or a topic label, the whole feature is one call.
+
+**A behavior tree of the mod's own.** The mod already sends brain messages that
+the AI acts on, `XGenAIModule.SendMessageToEntityData` with `combat:hit` and
+`hitReaction`, both confirmed live in `Crime.lua`. A small tree that answers a
+custom message with a `DoMonologue` carrying a chosen metarole would work
+without depending on an unproven bind. It is heavier, and `mod_xmls.disabled`
+shows this project has been down the tree route before.
+
+### What is already happening
+
+The vanilla bark on a collision is not the mod speaking. It is the victim's own
+behavior tree answering the `hitReaction` message the mod sends, which is why
+the bark disappeared when an earlier tree change stalled that branch and
+returned when it was fixed. Varying the hit strength already varies what is
+said, and is the cheapest experiment available: it needs no new data at all.
+
+### Unknowns worth naming
+
+Whether a metarole can be spoken by a soul that does not hold it. The Storm
+system assigns roles to souls, `combatBarks.xml` shows roles being added by
+rule, so a villager may simply have nothing to say for a combat metarole. That
+is the risk that decides whether this is a small feature or a large one.
+
+
+## Research: unlocking features through Horsemanship perks
+
+The question: can the rear, the charge and the lean be gated behind perks in
+the Horsemanship tree rather than being available from the start.
+
+**Yes. The whole chain exists in data and the read-back exists in Lua.**
+
+### The chain
+
+    perk.xml                    the perk itself
+      skill_selector = 1        which is horse_riding, from skill.xml
+      level = N                 the skill level it unlocks at
+    perk_soul_ability.xml       perk_id -> soul_ability_id
+    soul_ability.xml            soul_ability_id -> name
+      Lua: soul:HasAbility(name)
+
+`skill.xml` gives `skill_id="1" skill_name="horse_riding"`, so a perk carrying
+`skill_selector="1"` sits in the Horsemanship tree, and `level` is where it
+appears. The vanilla perk *Racing horse* is `level="4" skill_selector="1"`.
+
+`soul_ability.xml` holds 54 abilities numbered to 61, with gaps at 8, 9, 11,
+13, 16, 20, 32 and 34, so there is room. One of them is already
+`HorsePullDown`, which the actor binds pair with `CanHorsePullDown`.
+
+### Why the read-back matters
+
+There is **no `HasPerk` bind**. `HasPerk_18044A298` exists on `C_PerkList` in
+C++ and is not exposed, and vanilla Lua only ever calls `AddPerk`,
+`RemovePerk` and `OnPerkUsed`. So a perk cannot be asked about directly.
+
+`soul:HasAbility(name)` is the way around it, and it is why
+`perk_soul_ability.xml` matters: the perk grants an ability, and the ability is
+readable.
+
+A second route exists and is less clean. `GetDerivedStat(stat, {}, perks)`
+takes an out-parameter table and fills it with the perks that contributed to
+the value; `Negotiation.lua` uses exactly that and then calls `OnPerkUsed` on
+each. It works, but it requires the perk to feed a derived stat, where the
+ability route requires nothing but a name.
+
+### Shipping it without breaking other mods
+
+Row tables merge. Perkaholic ships `perk__perkaholic.xml` beside vanilla's
+`perk.xml` rather than replacing it, and the loader combines rows from every
+matching file. Vanilla ships no `__suffixed` table at all, which is what makes
+it a mod convention the loader supports. So this mod would add:
+
+    Libs/Tables/rpg/perk__horsecollision.xml
+    Libs/Tables/rpg/soul_ability__horsecollision.xml
+    Libs/Tables/rpg/perk_soul_ability__horsecollision.xml
+
+and two perk mods still coexist. This is the opposite of the animation
+database problem, where one file per character type and no row identity means
+the later mod in `mod_order.txt` wins outright.
+
+### What it would look like in the mod
+
+Each pillar gets a gate beside the setting that already switches it off:
+
+    Rear            a perk at a low level
+    Rear charge     higher, since it is the more violent of the two
+    Lean            its own, and arguably the earliest
+
+Read once per feature, not per frame. `HasAbility` is unproven from Lua, so the
+first step is a probe on the player's soul with a known vanilla ability name
+such as `HorsePullDown`, before any table is written.
+
+### Also worth deciding
+
+`AddPerk` is live and, per `C_Effect.h`, the Lua binding **bypasses the perk
+point check**. That makes a debug path for testing trivial, and it also means
+the mod must never call it outside a development tool: handing the player a
+perk they did not buy is not this mod's business.
