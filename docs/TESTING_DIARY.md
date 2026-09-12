@@ -20153,3 +20153,53 @@ on its own terms rather than as a compromise.
   this test and remain untested.
 - Whether the recovery line at `BarkRecoveryDelayMs` is being beaten by the
   crime callout or simply landing before it.
+
+## FALSIFIED: a victim killed by the impact cannot speak
+
+Two predictions from the dispatch model, both tested and both wrong. Recorded
+because a disproven mechanism is worth as much as a confirmed one and costs a
+ride to rediscover.
+
+### `doNotInterruptOnActorDeath(true)` does nothing here
+
+Vanilla pairs this flag with `RANENY_NA_ZEMI` at the one place it fires that set
+for a dying character, so it looked like the missing piece of the gallop tier.
+
+    C   prio=50  finishOnDeath=false   4 kills, 4 requests sent, silent
+    D   prio=50  finishOnDeath=true    4 kills, 4 requests sent, silent
+
+No audible difference.
+
+### Nor does giving the victim time to start the line
+
+The follow-up hypothesis was ordering rather than the flag. On a fatal impact
+the mod applies damage with `delayed=0`, deliberately, so that the engine's own
+trample cannot land the killing blow and take the crime attribution with it.
+That means the victim dies in the same tick the bark is requested, and a flag
+that protects a *running* monolog has nothing to protect.
+
+A `FatalGraceMs` setting was added temporarily to reopen exactly that gap.
+
+    E   prio=50  finishOnDeath=true  FatalGraceMs=400
+
+The log confirms it applied: `delayed=400 ok=true` on all five fatal impacts,
+five requests sent. Still silent. The setting has been removed again rather than
+left in the code, because it buys nothing and weakens a safeguard.
+
+### What rules out the alternatives
+
+It is not the gallop tier, and it is not the impact sound masking a quiet grunt.
+In the priority test a gallop impact on an **armoured guard who survived** played
+the cry normally. The same tier, the same set, the same seven-layer impact sound,
+the only difference being that the victim lived.
+
+So the blocker is death itself, and it is not a timing problem: 400ms is ample
+for a line to begin, and the line never begins.
+
+### Where that leaves the gallop tier
+
+A gallop impact that kills is silent from the victim, and nothing found so far
+can change that. The cry works whenever the victim survives, which is what
+armour decides. This is a real constraint rather than an unexplained gap, and
+any future attempt should start by establishing whether a dying actor can be
+made to speak *at all* by any route, rather than by adding fields to this one.
