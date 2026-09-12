@@ -647,6 +647,18 @@ HorseCollisionMod.Config = {
 	-- recovers quickly is upright while their own cry of pain is still
 	-- playing, and speaking again then cuts the first line off mid-word.
 	BarkGapMs                = 2500,
+	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
+	-- every in-flight request by priority and silently discards one that is
+	-- below the top and cannot be delayed, so a bark sent at the default zero
+	-- loses to anything else the speaker is saying.
+	BarkPriority             = 0,
+	BarkCanBeDelayed         = false,
+	-- Exempts the line from a `suppressMonologs` context, which is the gate
+	-- that silences everything rather than just the collision bark.
+	BarkOverrideSuppress     = false,
+	-- Lets a victim finish the line even if the impact kills them, which is
+	-- what vanilla pairs with this same set when a character dies.
+	BarkFinishOnDeath        = false,
 
 	-- Retaliation. Barging the same person at a walk costs nobody anything,
 	-- which makes it an annoyance rather than an act. These let a victim

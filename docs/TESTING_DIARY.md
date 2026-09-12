@@ -20101,3 +20101,55 @@ nothing while vanilla uses the field 77 times, are inside C++ that the
 decompilation only exposes as unnamed functions. Those two questions are better
 answered by experiment now than by more reading, since the surrounding model is
 solid enough to make sharp predictions.
+
+## CONFIRMED: priority is what decided the crime takeover
+
+The first prediction from the dispatch model, tested as a single-variable A/B in
+one ride with crime, retaliation and the alarm all on, which is the shipped
+configuration.
+
+    A   CollisionIsCrime=true  BarkPriority=0   canBeDelayed=false
+    B   CollisionIsCrime=true  BarkPriority=50  canBeDelayed=false
+
+Nothing else differed. The log shows the same requests going out in both, at the
+same moments, to the same kinds of victim, distinguished only by the `prio`
+field the send now reports.
+
+The outcome, by ear:
+
+    A   impact barks silent, the victim's call for the guards fires immediately
+    B   impact barks play, and the crime callout follows later, at the get-up
+
+The rider's account of B: "Our impact barks fired as they should and then when
+they each got up then the call out for guards happened. For a guard the impact
+bark fired and then they got up and tried to arrest me."
+
+**So the crime takeover was never a state gate, a suppression problem or
+anything about the sets.** The mod was bidding zero into an auction the engine
+resolves by number, and a losing bid that cannot be delayed is discarded with no
+error. At priority 50 the request takes the branch the game itself labels
+"kicking lower priority monologs" and speaks.
+
+This reverses the conclusion recorded when the feature landed, that with crime
+on the spoken reactions reduce to the walk tier and "there is really nothing we
+can do about that". There is: send a priority.
+
+### What the ordering now sounds like
+
+The crime callout is not suppressed, only deferred behind the impact line, so a
+victim cries out as they are hit and calls the guards once they are up. A guard
+does the same and then moves to arrest. The rider judged that sequence correct
+on its own terms rather than as a compromise.
+
+### What this does not yet establish
+
+- The right value. 50 was chosen because vanilla's own most common non-trivial
+  priority is 50, not because anything measured it. Whether a lower number is
+  enough to win, and whether a high one steps on dialogue that should win, is
+  untested.
+- `canBeDelayed` was left false throughout, so the queueing path is still
+  unexercised.
+- `overrideContextSuppress` and `doNotInterruptOnActorDeath` were both false in
+  this test and remain untested.
+- Whether the recovery line at `BarkRecoveryDelayMs` is being beaten by the
+  crime callout or simply landing before it.

@@ -396,12 +396,28 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 	-- succeeded, logged as `tookVanilla=3`, and vanilla barked anyway, which is
 	-- one more confirmation that holding a metarole is not what decides what is
 	-- spoken.
+	-- The message carries thirteen fields and this used to send two of them,
+	-- one of which vanilla itself uses exactly once. The rest are read from
+	-- settings so they can be changed in a running game and compared by ear.
+	--
+	-- `priority` is the one that matters most. Requests register their
+	-- priority in a shared array which `monologRequestProcess` sorts
+	-- descending, and a request below the top either waits, when
+	-- `canBeDelayed` is set, or is discarded with no error. At the default of
+	-- zero this mod loses every contest it enters.
+	local cfg = self.Config
+	local fields = {
+		metarole = metarole,
+		forceOnMuted = true,
+		priority = cfg.BarkPriority or 0,
+		canBeDelayed = cfg.BarkCanBeDelayed == true,
+		overrideContextSuppress = cfg.BarkOverrideSuppress == true,
+		doNotInterruptOnActorDeath = cfg.BarkFinishOnDeath == true
+	}
+
 	local ok, err = pcall(function()
 		XGenAIModule.SendMessageToEntityData(target, "dialog:monologRequest",
-				Utils.makeTable("dialog:monologRequest", {
-					metarole = metarole,
-					forceOnMuted = true
-				}))
+				Utils.makeTable("dialog:monologRequest", fields))
 	end)
 
 	-- `ok` says the send did not raise, and nothing more. Whether a sound
@@ -412,6 +428,9 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 	-- as "the bark fired".
 	self:Log("Bark " .. set .. "=" .. metarole .. " to " .. name
 			.. " target=" .. tostring(target)
+			.. " prio=" .. tostring(fields.priority)
+			.. " delay=" .. tostring(fields.canBeDelayed)
+			.. " override=" .. tostring(fields.overrideContextSuppress)
 			.. " sent=" .. tostring(ok)
 			.. (ok and "" or (" err=" .. tostring(err))))
 
