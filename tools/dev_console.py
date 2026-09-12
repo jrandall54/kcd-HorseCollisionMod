@@ -665,11 +665,10 @@ def main():
                       "from disk instead" % (size, MAX_CHUNK_BYTES))
 
                 console.lua('Script.ReloadScript("Scripts/hcm_dev_scratch.lua")')
-
-                return 0
-
-            print("sending %s, %d lines" % (path, body.count(chr(10)) + 1))
-            console.lua(body)
+            else:
+                print("sending %s, %d lines"
+                      % (path, body.count(chr(10)) + 1))
+                console.lua(body)
     elif args.lua:
         problem = check_lua_syntax(args.lua)
 

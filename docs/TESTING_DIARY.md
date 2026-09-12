@@ -18979,3 +18979,76 @@ which is keyed `t<topic>_s<sentence>_<n>_<slug>_<hash>`, and fire that topic.
 The collision barks already firing on contact are topics 15237 (`p_kolize_s`)
 and 11634 (`p_drcnul_d`), which is what "Look where you're going" and "Lout!"
 come from, and which the mod should therefore avoid.
+
+## topicId does not work from Lua, only metarole does
+
+`dialog:monologRequest` declares a `topicId` alongside `metarole`, and vanilla
+sends it that way itself, `archery_tourney.xml` using `values="topicId(11002)"`.
+From Lua it produces nothing.
+
+Proven by an A/B on one guard, one topic, two addressings, seconds apart:
+
+    metarole = "ZASAH_ZBRANI_IGNOROVANY"   he says "Right, try that one more
+                                           time and see what happens..."
+    topicId  = 22722                       silence
+
+22722 is the topic those very lines belong to, so the audio exists, the voice
+has it recorded, and the character had just spoken it. Only the addressing
+differed. Three other topics tried by id, 18176, 18174 and 28627, were also
+silent.
+
+The likely explanation is that the topic numbers in the ogg and localisation
+filenames are a different key space from what `DoMonologue`'s `TopicId`
+resolves against. Whatever the cause, **the ~11,371 topics are not
+individually addressable from Lua.** The mod is limited to the bark sets a
+metarole names.
+
+This matters because the offline text index made it look as though any line in
+the game could be pointed at. It cannot. The index is still useful for reading
+what a metarole will say before firing it, and for identifying a line heard in
+play, but it is not a way to select one.
+
+### The voice coverage check was wrong and is abandoned
+
+An attempt to predict silence offline, by joining a soul to its voice through
+`v_soul_character_data.xml` and `v_voice_abbreviation.xml` and then looking for
+`<code>_t<topic>_` among the oggs, reported that neither village guard voice
+`gand` nor `ggud` had topic 22722 recorded. A village guard then spoke it.
+
+Whatever the join gets wrong, its answers cannot be trusted, and nothing should
+be built on it. The practical consequence is mild: a character whose voice
+lacks a set is simply silent, with no error and no glitch, which is how vanilla
+behaves too. The mod degrades gracefully on NPCs it cannot reach, so perfect
+coverage data is not needed to ship the feature.
+
+### The corpus, for reference
+
+    text rows        65982
+    unique lines     56955
+    topics           11371
+    sentences        25031
+    voiced oggs      75521
+
+3456 unique lines, 6.1 percent, contain an insult or profanity: `fuck` in 833,
+`hell` 474, `bastard` 380, `shit` 365, `damn` 322, `arse` 169, `whoreson` 53,
+`cunt` 20. Seventy-seven topics read as short second-person abuse. Nearly all
+of them are quest scenes with no metarole holding them, and are therefore
+unreachable given the finding above.
+
+### Targeting the character the rider means
+
+The probe picked by proximity and kept flipping between whoever the rider was
+following and whoever walked past, which the rider could not diagnose because
+their game shows no nametags. It now scores candidates by distance divided by
+alignment with the view axis, so the person being looked at wins over someone
+closer but off to the side, and it reports the target as "man 1.5m away, in
+front of you" rather than by entity name.
+
+### A defect in dev_console.py that hid every large probe
+
+Scripts over the console's 4000 byte limit are written to
+`Data/Scripts/hcm_dev_scratch.lua` and pulled in with `Script.ReloadScript`.
+That path returned 0 immediately after queueing the reload, before the drain
+and wait loop at the end of `main`, so the command was never flushed and no
+output was ever collected. It printed "loading it from disk instead" and did
+nothing. Fixed by letting it fall through instead of returning.
