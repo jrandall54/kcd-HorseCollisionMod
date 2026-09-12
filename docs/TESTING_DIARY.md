@@ -19642,3 +19642,462 @@ hear the lines only at walking pace.
 Not attempted, and the obvious next thing if this is ever revisited: suppressing
 the crime callout the way the collision bark is suppressed, which would need the
 branch it is gated on to be found first. That is a research task, not a tweak.
+
+## How the dialog system actually dispatches a bark
+
+Read out of the shipped brain trees rather than inferred from experiments. The
+files are in `GameData.pak` under `Libs/AI/`, and the whole monolog path lives
+in `final/sb_dialog.xml`, which `final/sb_switch.xml:50` mounts as the handler
+for `dialog:monologRequest`.
+
+### The message has thirteen fields, and the mod was sending two
+
+`Libs/AI/typedefinitions.xml` declares the type. This is the complete list with
+the game's own defaults:
+
+    topicId                     int    0
+    alias                       string
+    metarole                    string
+    forceSubtitles              bool   false
+    priority                    int    0
+    canBeDelayed                bool   false
+    sendAnswer                  bool   false
+    overrideContextSuppress     bool   false
+    lookAtId                    wuid
+    defaultAnimState            enum   userControlled
+    forceOnMuted                bool   false
+    playStandingTransition      bool   false
+    doNotInterruptOnActorDeath  bool   false
+
+Counted across the 1136 shipped brain files, vanilla's own usage is
+`alias` 1008, `priority` 328, `overrideContextSuppress` 203, `forceSubtitles`
+196, `lookAtId` 165, `metarole` 132, `sendAnswer` 99, `topicId` 77,
+`defaultAnimState` 39, `canBeDelayed` 26, `playStandingTransition` 14,
+`forceOnMuted` **1**, `doNotInterruptOnActorDeath` **1**.
+
+The mod sends `metarole` and `forceOnMuted`, which means one of its two fields
+is the rarest flag in the entire game.
+
+### The dispatch chain
+
+    monologRequest -> monologRequestRead -> monologRequestProcess
+                                         -> monologRequestExecution
+
+**Read** takes the message off `DialogMailbox`, pushes this request's `priority`
+onto a shared array and sorts it descending, so `priorities[0]` is the highest
+request in flight. Its own entry is erased when the request finishes.
+
+**Process** applies three gates in order:
+
+1. Two `InstantExternalLock` nodes with `RunLogic="Halt"`, commented "Closed
+   when initiating dialog" and "Closed when running requested dialog". A
+   speaker who is in or entering a conversation is halted here, before priority
+   is considered at all.
+2. The priority auction, commented "Is there another monolog running?":
+
+        if (#priorities > 1) & (priority < priorities[0]):
+            canBeDelayed ? wait on a 1m semaphore : Fail
+
+   A losing request that cannot be delayed is **discarded silently**.
+3. A switch, commented "kicking lower priority monologs": at or above the
+   highest and greater than zero, the request sets the kick lock and runs;
+   above zero it runs under a semaphore; otherwise it just runs.
+
+**Execution** halts if a non-monolog dialog is executing, takes the
+`onRunningDialog` semaphore so one dialog runs per speaker, then applies the
+context gate, then calls `DoMonologue`.
+
+### The context gate, and a correction
+
+    Selector
+      VariableExistsGate  b_context['suppressMonologs']  FailSubtMissing=true
+        Then: IfCondition failOnCondition=true
+              condition=(suppressMonologs) & (overrideContextSuppress == false)
+                Success            <- succeeds, so the Selector skips the monolog
+      FuseBox                      <- the monolog itself
+
+`failOnCondition` names what the node returns when its condition is **false**:
+`true` means fail, `false` means succeed. The child always runs when the
+condition is true. Two unambiguous uses fix this: inside a `Switch`, where
+branches must fail to pass control on, the game writes
+`failOnCondition="true"` on `$setupDialog.skill == -1` guarding
+`$prize = ($random + 1) * 40`; inside a `Sequence`, where a skipped step must
+succeed for the sequence to continue, it writes `failOnCondition="false"` on
+`playStandingTransition` guarding the transition animation.
+
+So the gate reads: suppress the monolog when `suppressMonologs` is set **and**
+this request did not ask to override it. **`overrideContextSuppress(true)`
+exempts a request exactly as its name says.**
+
+An earlier entry recorded the opposite, that "the gate does not exempt
+`overrideContextSuppress` the way its condition reads". That is wrong. The
+experiment behind it set the `suppressMonologs` context and then sent a request
+that did not carry `overrideContextSuppress`, so the mod's own line was
+suppressed along with everything else, exactly as this tree specifies. The
+mechanism was never broken; only two of its thirteen fields were ever used.
+
+### Where the line is finally chosen
+
+    DoMonologue  TopicId=$request.topicId
+                 TopicLabel=$request.alias
+                 Metaroles=$request.metarole
+                 ForceSubtitles | IsInterruptibleByPlayer
+                 DoNotInterruptOnActorDeath | AnimationOverride
+
+All three selectors are passed to one node. `topicId`, `alias` and `metarole`
+are not alternative routes through the brain: they are three arguments to the
+same C++ call. So the recorded finding that `topicId` "does not work at all
+from Lua" is a statement about `DoMonologue`'s internals, not about dispatch,
+and it needs re-testing now that the other twelve fields are understood.
+
+Two smaller mechanisms worth recording:
+
+- `forceOnMuted` is implemented as `AddBuff BuffGUID=18a0bd7c-214f-4107-bbc1-9e9bc09ce9db`,
+  removed again on success.
+- `priority > 1` sets `isMonologInterruptibleByPlayer = false`, under the
+  comment "Only high priority monologs are uninterruptable by player".
+
+### What this predicts for the mod
+
+None of this has been tested in game yet, and it must be before anything is
+claimed:
+
+1. The mod's barks enter every contest at priority 0 with `canBeDelayed` false,
+   which is the worst possible bid. Against any competing line they are dropped
+   rather than queued. This, and not a "state gate", is the likely mechanism
+   behind crime reactions taking over at trot and gallop.
+2. Sending `priority` above the competing request should let the mod's line
+   kick it instead, and `canBeDelayed(true)` should make a losing line wait
+   rather than vanish.
+3. `suppressMonologs` on the victim plus `overrideContextSuppress(true)` on the
+   mod's own request is, on paper, "silence every vanilla line and let only
+   this one through", which is a far broader tool than `suppressCollisionsBark`.
+4. `doNotInterruptOnActorDeath(true)` is what lets a dying victim finish their
+   cry, which is exactly the gallop case where the victim is killed outright.
+   Vanilla pairs it with `RANENY_NA_ZEMI`, the same set the mod uses, and the
+   mod does not send it.
+
+## Inside DoMonologue: what actually decides whether a line exists
+
+Continuing from the dispatch model above. Everything here is read from the
+shipped tables and the decompilation, and **none of it has been tested in
+game**.
+
+### The node takes more than the brain gives it
+
+`DoMonologue`'s attribute schema, from its registration in the binary, is
+`TopicLabel`, `Metaroles`, a topic id slot, `ForceSubtitles`,
+`IsInterruptibleByPlayer`, `UseTwins`, `SendMessage`, `Greeting`, `Ending`,
+`AllowPositioning`, `DisableRotations`, `DisableRestrictions`.
+
+`sb_dialog.xml` sets only the first five plus the death and animation flags, so
+`UseTwins`, `Greeting`, `Ending`, `AllowPositioning`, `DisableRotations` and
+`DisableRestrictions` are unreachable through `dialog:monologRequest`. They are
+node attributes, not message fields; reaching them would need a brain of our
+own rather than a different message.
+
+`C_ScriptBindDialog` declares
+`StartMonolog(pH, EntityId speakerId, const char* topicId)`. The topic is a
+**string**, not an integer, which is consistent with `TopicLabel` being the
+alias and is the likeliest reason earlier attempts to drive it with a number
+did nothing.
+
+### Who can speak what: the engine's own view
+
+`Libs/Tables/rpg/v_soul2role_metarole` joins soul to role to metarole and is
+the authoritative answer to "can this character say this set". Counted over the
+whole table:
+
+    souls in the view                         4240
+    metaroles reachable by at least one soul   231 of 383
+
+So 152 metaroles are speakable by nobody at all, which confirms an earlier note
+that several researched candidates were held by zero souls. Coverage for the
+sets the mod ships is excellent:
+
+    RANENY_NA_ZEMI            3876 souls
+    COMBAT_SHOUT_OPPONENT     3845
+    KOLIZE_S_HRACEM           3434
+    KOLIZE_S_HRACEM_LEHKA     3403
+    KOLIZE_S_HRACEM_NA_KONI   3399
+    COMBAT_IDLE               3381
+
+**This kills role membership as the explanation for the combat silences.**
+`COMBAT_SHOUT_OPPONENT` is held by 3845 souls including Henry, who holds three
+roles under it, and it was still silent. The role hypothesis recorded earlier
+is therefore wrong as a general rule, and only ever coincided with the results.
+
+### The real gate is a per-sequence entry condition
+
+`topic2sequence` carries `entry_condition` and `npc_entry_condition` per
+sequence. If nothing passes, there is no line to play and the request is silent
+with no error. Comparing the sets that work against the ones that do not:
+
+    RANENY_NA_ZEMI               entry: 1
+    KOLIZE_S_HRACEM              entry: 1
+    UNAVA_JINDRICH               entry: 1
+    JINDRICH_NARAZIL_NA_MRTVOLY  entry: 1, and one quest objective check
+
+    COMBAT_SHOUT_OPPONENT        entry: screamAndShout_tauntGlobalCooldownReady_man
+                                        & get_health()[0] >= 75
+                                        & !suppressTournamentCombatShout
+                                 entry: var('hitStrength') <= 3 & get_health()[0] > 0
+
+`1` means unconditional. So "a metarole that describes a state speaks only from
+that state" was the right shape of answer for the wrong reason: the gate is not
+the metarole's name or the speaker's roles, it is ordinary data on each
+sequence, and it is readable offline for any set before spending a ride.
+
+### The condition language
+
+`Libs/Tables/text/dialogue_functions` maps 261 named functions to expressions,
+and the expressions reach most of the game: `IsQuestCompleted`,
+`IsObjectiveStarted`, `HasSoulTag`, `var()`, `gvar()`, `get_health()`,
+`HourOfDay()`, `GetTrueRelationship()`, `GetActorAngriness()`,
+`IsSeqAvailable()`, and `CallScriptFunctionInTable('Table','Fn')`, which calls
+Lua directly.
+
+That last one matters twice over: conditions can call into Lua, and several
+gates are therefore things a mod could in principle satisfy deliberately rather
+than wait for.
+
+`screamAndShout_tauntGlobalCooldownReady_man` resolves to a long conjunction of
+`IsSeqAvailable(...)` over taunt sequences, so it means "no taunt is on
+cooldown".
+
+### Sequences carry their own cooldown, priority and script
+
+`Libs/Tables/text/sequence` has columns `flags`, `group`, `next`, `priority`,
+`reputation`, `script`, `timeout`, `type`, `speech_coef`, `ui_prompt`.
+`timeout` is what `IsSeqAvailable` tests. For the shipped sets:
+
+    RANENY_NA_ZEMI           3 sequences, timeout 0 on all of them
+    KOLIZE_S_HRACEM_NA_KONI  5 sequences, timeout 1 on all
+    ZASAH_ZBRANI_IGNOROVANY  3 sequences, timeout 3 on all
+    KOLIZE_S_HRACEM         10 sequences, five at timeout 1, and five at
+                             timeout 0 carrying priority 0,1,2,3,4 with flags=1
+
+That last group is almost certainly the escalation the rider noticed when the
+same person is shoved repeatedly: an ordered ladder inside one set, climbed by
+`priority` and `next` rather than chosen at random.
+
+`RANENY_NA_ZEMI` having timeout 0 throughout explains why the cry of pain is
+the most reliable line in the mod: it can never be on cooldown.
+
+The unit of `timeout` is not established. The values are small integers and no
+column documents them, so nothing should be concluded about how long a set
+stays unavailable until it is measured.
+
+### Still unexplained
+
+`UNAVA_JINDRICH` has entry condition `1` on both its sequences, Henry holds its
+role, and it has seven recorded Henry lines, yet it was silent when auditioned.
+Nothing found so far accounts for that, and it is recorded here as an open
+contradiction rather than explained away. Any account of the gating has to
+cover it, together with the townswoman who spoke sets `HasMetaRoleByName`
+denied.
+
+## Topics, sequences, cooldowns and escalation ladders
+
+The layer below the metarole, and the one that decides which line plays and
+when a speaker runs dry. `tools/bark_chain.py` walks it.
+
+    topictorole     (metarole, role) -> topic
+    topic2sequence  topic -> sequences, each with an entry_condition
+    sequence        priority, timeout, next, flags, script
+
+Within a topic the sequences are ordered by `priority`. Each carries a
+`timeout`, which is the cooldown `IsSeqAvailable()` tests, and a `next`, which
+names the **topic** reached afterwards.
+
+### `timeout` is in seconds, with two special values
+
+Over all 52,415 sequences the values are human round numbers, which settles the
+unit: 5, 10, 15, 20, 30, 45, 60, 120, 180, 240, 300, 600.
+
+    timeout = 0     46174 sequences (88%)   no cooldown, reusable immediately
+    timeout = -1     2584 sequences (5%)    usable once, ever
+
+The `-1` reading is confirmed by content rather than inferred: those sequences
+are the player's own conversation choices, such as "My name's Henry. Thank you
+for taking care of me here." and "Master Feyfar, Sir Radzig sent me to you."
+Lines a playthrough says once.
+
+### An escalation ladder is a chain of topics
+
+The set the rider noticed getting angrier under repeated shoving is built
+exactly this way:
+
+    topic 22722  seq 43682  prio 0  timeout 3s   "What the fuck!?"
+                 next -> topic 27935
+    topic 27935  seq 43683  prio 1  timeout 20s  "What the fuck are you doing!?"
+                 seq 43684  prio 2  timeout 20s  "Shit, what's this?"
+                 seq 43685  prio 3  timeout 20s  "Have you lost your mind?"
+                 seq 43686  prio 4  timeout 20s  "Watch out!"
+                 seq 45662  prio 5  timeout 20s  "Right, try that one more time..."
+                 seq 45663  prio 6  timeout 20s  "Now you've got me fucking mad!"
+                 seq 45664  prio 7  timeout 20s  "That was the last straw!"
+
+Eight rungs, each on a twenty second cooldown. Repeated provocation climbs the
+ladder as the lower rungs become unavailable, which is the escalation heard in
+play, and it is data rather than anything the mod arranged.
+
+It also means this set **can be exhausted**: shove the same person eight times
+inside twenty seconds and every rung is on cooldown, so the topic has nothing
+available and the victim falls silent until the timers expire.
+
+### The silence that this does not explain
+
+`RANENY_NA_ZEMI`, the trot and gallop cry of pain, has **timeout 0 on every one
+of its sequences**, entry sequence and all seven rungs. It can never be on
+cooldown and can never be exhausted.
+
+So when a guard was struck five times and made no sound while the log showed a
+request going out each time, cooldown is not the reason. Neither is damage,
+which was tested and disproven, nor role membership, which the coverage table
+rules out. That silence remains unexplained.
+
+`KOLIZE_S_HRACEM_NA_KONI` is similarly cheap: a one second entry sequence and
+five rungs at four seconds each.
+
+### The earlier contradiction, resolved
+
+`UNAVA_JINDRICH` was recorded as an unexplained silence: unconditional entry
+condition, role held by Henry, seven recorded lines. Its sequence carries
+`timeout=180`. A three minute cooldown, on a set whose purpose is an
+occasional remark about being tired, is an ordinary design choice and entirely
+sufficient to explain one silent audition. It was never a state gate.
+
+The lesson is that "unconditional entry condition" is not the same as
+"available": entry conditions and cooldowns are separate gates, and a set can
+pass the first while failing the second.
+
+## Vanilla's own hit-reaction barks, and the context switches available
+
+### The collision bark branch the mod suppresses
+
+`sb_switch_hitreactions.xml:293` gates the whole branch on
+
+    !$b_inCombat & !$b_context['suppressCollisionsBark']
+
+so vanilla fires no collision bark at all in combat, and `HushVanillaBark`
+closes it the rest of the time exactly as intended. Inside, the choice is:
+
+    rider == player & player is Male & hitStrength > Healing  -> KOLIZE_S_HRACEM_NA_KONI
+    attacker == player & hitStrength >= MinorInjury           -> KOLIZE_S_HRACEM
+    attacker == player & hitStrength >= Unpleasant            -> KOLIZE_S_HRACEM_LEHKA
+
+The mounted line is gated on a `HasGenderCheck Gender="Male" SoulWUID="__player"`,
+which is Theresa's half of the game being excluded rather than anything about
+the victim.
+
+### RANENY_NA_ZEMI is vanilla's *dying* bark, not a pain bark
+
+At line 425 the send sits inside `IsDeadCheck -> Then`, guarded by
+`!$dyingBarkUsed` and setting `$dyingBarkUsed = true` immediately after:
+
+    metarole('RANENY_NA_ZEMI'), forceOnMuted(true),
+        overrideContextSuppress(true), doNotInterruptOnActorDeath(true)
+
+So in vanilla this set plays **once, as a character dies**. The mod uses it for
+every trot and gallop impact, which is why it reads as a generic cry of pain in
+play. That is not necessarily wrong, but it is worth knowing it is being used
+against its authored purpose, and it explains why its sequences carry no
+cooldown: a death happens once anyway.
+
+It is also the one place vanilla sends `doNotInterruptOnActorDeath(true)` and
+one of only two sends of `forceOnMuted`, which is presumably why an earlier
+session copied those two flags without the third.
+
+### The context switches
+
+`b_context` carries 87 named options across the shipped brains. The ones
+bearing on this mod:
+
+    suppressCollisionsBark          already used by HushVanillaBark
+    suppressMonologs                everything, exempted by overrideContextSuppress
+    suppressDudeProxBark            proximity barks at the player
+    suppressDudeProxBark_greet      the greeting heard near impacts
+    suppressDudeProxBark_weapon     drawn-weapon comment
+    suppressDudeProxBark_torch      torch comment
+    suppressDudeProxBark_stealth    sneaking comment
+    suppressGreeting                greetings
+    suppressFarewell                farewells
+    suppressHitReactions            hit reactions wholesale
+    suppressNearMissReactions       near misses
+    holdUpCombatSubbrainStart       delays the combat subbrain starting
+    alwaysFightWhenHit              forces the fight branch
+    disableChangeHostilityOnHit     stops a hit making them hostile
+    suppressReputationHitOnDudeHit  reputation cost of hitting them
+    suppressAutoCure                already used by the mod
+
+`suppressDudeProxBark_greet` is the direct answer to the greetings the rider
+heard around impacts, which were attributed to coincidence at the time. They
+were vanilla proximity barks, and there is a switch for them.
+
+`holdUpCombatSubbrainStart` and `disableChangeHostilityOnHit` are the first
+plausible levers found for the crime and combat takeover at trot and gallop,
+though neither has been tried.
+
+### Still unexplained
+
+The guard struck five times who made no sound. Cooldown is excluded, because
+`RANENY_NA_ZEMI` carries timeout 0 throughout. Damage was tested and excluded.
+Role membership is excluded by the coverage table. The remaining candidates are
+the priority auction, in which the mod bids 0 and cannot be delayed, and the
+two halt locks for a speaker already in a dialog. Neither has been tested.
+
+## How much of the dialogue is actually conditional
+
+Measured over every row of `topic2sequence` rather than sampled:
+
+    sequences                                   49404
+    carrying any condition beyond "1"           13947   (28.2%)
+
+So **72% of all dialogue sequences in the game are unconditional.** The
+vocabulary of the conditions that do exist is dominated by quest state rather
+than by anything resembling a character's mood or situation:
+
+    IsObjectiveCompleted  4786     gvar                2800
+    IsObjectiveStarted    3638     var                  888
+    IsQuestStarted        2219     HasSoulTag           665
+    IsSeqAvailable         583     IsObjectiveUnchanged 582
+    IsQuestCompleted       427     CountOfActorItems    265
+    GetActorMoney          212     HourOfDay            184
+    IsActor                183     GetActorAngriness     87
+    DistanceToEntity        79     HasBehaviorTag        60
+
+This is the final word on the "state gate" idea that several sessions leaned
+on. There is no general mechanism by which a metarole is gated on a character's
+state. There are entry conditions, most sequences have none, and the ones that
+do are mostly asking about quests. Where a bark set appeared state-gated, the
+real cause was either a cooldown (`UNAVA_JINDRICH` at 180 seconds) or specific
+conditions written on that particular set (`COMBAT_SHOUT_OPPONENT` asking for a
+taunt cooldown and health bands).
+
+`HasSoulTag` is readable from conditions but no setter for soul tags appears in
+`C_ScriptBindSoul` or anywhere else in the recovered binds, so tags are not a
+lever a mod can pull.
+
+### Table structures confirmed
+
+`libKCD1` carries the row structs, which confirm the column meanings read out
+of the XML. The dialogue sequence table is `S_SequenceTableRow_2`:
+
+    sequence_id, next (alias), script, priority, ui_prompt, group, type,
+    skill_check_difficulty_id, flags, timeout, speech_coef, reputation
+
+and `S_SequenceTableRow_3` is the topic-to-sequence view carrying
+`entry_condition` and `npc_entry_condition`. Several tables share the name
+`sequence`, and the quest one, with `objective_id` and `action`, is unrelated
+to dialogue.
+
+### What is still not known
+
+The internals of `DoMonologue` itself. The node's parameter registration is
+readable and its dispatch is fully mapped, but which line it picks among the
+variants of an available sequence, and why a `topicId` passed from Lua produces
+nothing while vanilla uses the field 77 times, are inside C++ that the
+decompilation only exposes as unnamed functions. Those two questions are better
+answered by experiment now than by more reading, since the surrounding model is
+solid enough to make sharp predictions.
