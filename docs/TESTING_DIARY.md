@@ -20203,3 +20203,26 @@ can change that. The cry works whenever the victim survives, which is what
 armour decides. This is a real constraint rather than an unexplained gap, and
 any future attempt should start by establishing whether a dying actor can be
 made to speak *at all* by any route, rather than by adding fields to this one.
+
+## Parked: the mod may be reporting the wrong crime
+
+Noticed in play and set aside deliberately, not investigated.
+
+Riding someone down currently reports as a brawl. The rider observed that
+drawing a sword and swinging without connecting produces a different crime, and
+that the guards' surrender dialogue for **that** one talks about hurting people
+rather than about brawling:
+
+> "I noticed the crime I get when I pull a sword out and swing but don't hit
+> anyone has the guards mentioning hurting people instead of brawling in their
+> surrender dialogs which better match our mod than getting crime for brawling
+> from hitting someone with the horse. we should look into setting up our hits
+> for whatever crime message that is instead of the brawling one we currently
+> send."
+
+So the work is to identify which crime that swing reports, and whether the mod
+can report the same one for a collision. The guards' spoken reaction is the
+observable that distinguishes them, and it already reads as a better fit for
+being trampled by a horse than "brawling" does.
+
+Not started. `Crime.lua` is where the report is raised.
