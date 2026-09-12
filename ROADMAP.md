@@ -712,9 +712,45 @@ rather than missing.
       Composes with the item above: silence vanilla's bark at the impact and
       send the chosen line once the victim is upright.
 
-      **Both are parked. A spoken line cannot be raised from Lua, but the
-      data route is unbuilt rather than impossible.** Five approaches were
-      tried, all accepted without error and all silent.
+      **Solved. A spoken line can be raised from Lua, on an NPC and on the
+      player.** Henry speaks two lines from
+      `JINDRICH_NARAZIL_NA_MRTVOLY` in a street with no corpse in sight, and a
+      woman two meters away spoke `RANENY_NA_ZEMI`, `KOLIZE_S_HRACEM_NA_KONI`
+      and `KOLIZE_S_HRACEM_LEHKA` on request. The working call:
+
+          local target = npc.id
+          if npc.this and npc.this.id then
+              target = npc.this.id
+          end
+
+          local msg = Utils.makeTable("dialog:monologRequest", {
+              metarole = "KOLIZE_S_HRACEM_NA_KONI",
+              overrideContextSuppress = true,
+              forceOnMuted = true,
+              forceSubtitles = true
+          })
+
+          XGenAIModule.SendMessageToEntityData(target,
+                  "dialog:monologRequest", msg)
+
+      **Which single difference unstuck it has not been isolated**, and the
+      account below should be read with that in mind rather than trusted. The
+      candidates are `forceOnMuted`, which no earlier attempt records setting;
+      addressing the NPC as `npc.this.id`, which is what every message this mod
+      successfully lands on an NPC uses; and the target, an ordinary Rattay
+      townswoman rather than the merchant, guard and refugee tried before.
+      The refugee at least is explained: the note further down records that
+      refugee voices carry no collision topic at all.
+
+      **The lesson that generalises is that holding a metarole is necessary and
+      not sufficient.** The soul must hold it, *and* that character's voice must
+      have the topic recorded. Both are checkable offline, the first in
+      `soul2metarole.xml`, the second in the ogg filenames.
+
+      What follows is the superseded account of why this was thought
+      impossible, kept because the reasoning errors in it are worth not
+      repeating. Five approaches are accepted without error and all
+      silent.
 
       Sending `dialog:monologRequest` the way vanilla's own
       `DialogUtils.RequestPlayerMonologByMetarole` sends it, with
@@ -732,13 +768,20 @@ rather than missing.
       field with correct defaults. Nor is victim state: `actor:CanTalk()`
       returns false for every NPC nearby, including ones that plainly converse.
 
-      What settles it is that vanilla's own helper fails the same way.
-      `DialogUtils.RequestPlayerMonologByMetarole`, called unmodified on the
-      player with a valid metarole, produces nothing, and that helper is
-      **defined in the shipped scripts and never called by any of them**.
-      Warhorse wrote a Lua entry point for this and never used it. Every bark
-      in the game is raised inside a behavior tree, sent by the speaker to
-      itself.
+      This was taken as settled because vanilla's own helper seemed to fail
+      the same way: `DialogUtils.RequestPlayerMonologByMetarole`, called
+      unmodified on the player, produced nothing. **That experiment was not
+      sound.** It passed `KOLIZE_S_HRACEM_NA_KONI`, and Henry's soul `dude`
+      holds 25 metaroles, none of them that one. A speaker with no recording is
+      silent whether or not the route works, so it could not distinguish the
+      two. Called with a metarole Henry does hold, the same helper speaks.
+
+      The accompanying model, that a message is dropped unless its
+      `ProcessMessage` node happens to be running and that a dialog subbrain on
+      an idle townsman is not, was also wrong. `monologRequest` is mounted in
+      `final/sb_switch.xml` inside `<While condition="true">` in the top level
+      always-running Parallel, a sibling of `combatSubbrainStarter`, the very
+      listener that entry cites as always live.
 
       `DialogModule.StartMonolog(entity.id, topicId)` is the real API and it
       does drive the dialog system: `IsSoulInDialog` goes false, true, then
@@ -1063,8 +1106,15 @@ For a bark, `TopicId` is `0` and the line is chosen by **`Metaroles`** and
 `TopicLabel`. A metarole is a named bark set, listed in
 `Libs/Tables/rpg/metarole.xml`, 383 of them.
 
-Most are quest specific, `KUNES_BARK` and the like. Sixty-eight are generic
-reaction sets and several map onto this mod's tiers exactly:
+Most are quest specific, `KUNES_BARK` and the like.
+
+**The list below was wrong and is kept only to mark the mistake.** It was read
+out of `metarole.xml`, which names metaroles without saying whether any soul can
+speak them. Checked afterwards against `soul2metarole.xml` and the resolved view
+`v_soul2role_metarole.xml`, `HIT_REAKCE_SLABA`, `HIT_REAKCE_SILNA`,
+`COMBAT_FLEE`, `COMBAT_TRASH_TALK`, `COMBAT_TAUNTING_WEAK`,
+`COMBAT_OPPONENT_WOUNDED` and `COMBAT_OPPONENT_CRITICAL` are held by **zero**
+of the 5025 souls in the game. They are dead rows.
 
     COMBAT_VICTIM_SCREAM_RECEIVED_HIT       being struck
     COMBAT_VICTIM_SHOUT_AFTER_RECEIVED_HIT  after being struck
@@ -1076,9 +1126,22 @@ reaction sets and several map onto this mod's tiers exactly:
     COMBAT_TAUNTING_WEAK / _STRONG          taunts
     COMBAT_TRASH_TALK
 
-A walk stagger reaching for `HIT_REAKCE_SLABA` and a gallop for
-`COMBAT_VICTIM_SCREAM_RECEIVED_HIT` is the shape of it, with bystanders on
-`COMBAT_OPPONENT_CRITICAL` when someone is ridden down beside them.
+The metaroles that are actually held, counted across all 5025 souls, and which
+fit this mod better than the guesses above did:
+
+    RANENY_NA_ZEMI                      3876   wounded on the ground
+    COMBAT_VICTIM_SCREAM_RECEIVED_HIT   3516   struck
+    COMBAT_OPPONENT_DYING               3446   seeing someone die
+    KOLIZE_S_HRACEM                     3434   collided with by the player
+    KOLIZE_S_HRACEM_LEHKA               3403   collided with lightly
+    KOLIZE_S_HRACEM_NA_KONI             3399   collided with by a mounted player
+
+Warhorse shipped a bark set for being ridden into by the player and another for
+being ridden into lightly, which is the mod's own subject matter. `NA_KONI` and
+`LEHKA` are held by exactly the same 3399 souls.
+
+**A metarole name in `metarole.xml` is not evidence anyone can say it.** Check
+the holding tables before building on one.
 
 ### Two routes to firing one, and neither is yet tested
 

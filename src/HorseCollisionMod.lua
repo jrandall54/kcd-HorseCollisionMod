@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.4.0
+-- @release 5.5.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.4.0"
+HorseCollisionMod.Version = "5.5.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -146,6 +146,17 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ThrowRiderOnStaminaEmpty dismount Henry when the horse is spent
 -- @field CombatStaminaMultiplier stamina cost multiplier while in a fight
 -- @field SuppressStaggerInCombat skip the stagger animation during a fight
+-- @field Barks whether the mod gives its moments spoken vanilla lines at all
+-- @field CollisionBarks whether victims of an impact speak
+-- @field RearBarks whether whoever a rear is aimed at speaks
+-- @field RiderBarks whether Henry remarks over a body
+-- @field BarkCooldownMs least time between two lines from one speaker; keep at
+--   or below HitCooldownMs or whole impacts fall silent
+-- @field BarkSuppressMs how long vanilla's own collision bark is held off
+-- @field BarkOnRecovery whether a knocked-down victim speaks again once up
+-- @field BarkRecoveryDelayMs how long after the impact that second line comes,
+--   timed to land during the get-up
+-- @field BarkGapMs least silence between a victim's cry and their recovery line
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
@@ -596,6 +607,46 @@ HorseCollisionMod.Config = {
 	-- Combat.
 	CombatStaminaMultiplier  = 2.2,
 	SuppressStaggerInCombat  = true,
+
+	-- Spoken reactions. Every line is vanilla, spoken by the character's own
+	-- voice actor and selected by naming a metarole, so no new audio ships.
+	-- `Bark.lua` carries the sets and the reasoning behind each one.
+	--
+	-- The pillars have separate switches on purpose: the collision reactions
+	-- and the rear are independent mechanics, and neither may carry the
+	-- other's setting. `Barks` is the master over both.
+	Barks                    = true,
+	CollisionBarks           = true,
+	RearBarks                = true,
+	RiderBarks               = true,
+	-- Per speaker, so a crowd reacting to one impact is not a choir, and a
+	-- victim struck twice does not talk over their own first line.
+	--
+	-- **Keep this at or below `HitCooldownMs`.** It was 6000 against a hit
+	-- cooldown of 3000, which meant every second impact the mod acted on was
+	-- silent, exactly and arithmetically: the log showed two `Impact` lines
+	-- per `Bark` line for a whole ride. The rider read that as barks randomly
+	-- failing to fire. A victim cannot be struck again until the hit cooldown
+	-- expires, so that cooldown is already the guard against talking over
+	-- themselves and a longer one here only deletes reactions.
+	BarkCooldownMs           = 3000,
+	-- How long vanilla's own collision bark is held off, which is the window
+	-- HushVanillaBark opens ahead of contact so the mod's line is not talked over.
+	BarkSuppressMs           = 2500,
+	-- Whether a victim knocked down at trot or gallop says something once
+	-- they are back on their feet. The cry of pain at the moment of impact is
+	-- wordless, so without this they stand up and walk off having never
+	-- remarked on being ridden down.
+	BarkOnRecovery           = true,
+	-- How long after the impact the victim's recovery line is spoken, timed so
+	-- it lands *during* the get-up rather than after it. Tuned by ear: a
+	-- state-driven trigger fires only once the get-up has finished, which
+	-- leaves an audible hole between standing and speaking.
+	BarkRecoveryDelayMs      = 3200,
+	-- The least silence between two lines from the same speaker. A victim who
+	-- recovers quickly is upright while their own cry of pain is still
+	-- playing, and speaking again then cuts the first line off mid-word.
+	BarkGapMs                = 2500,
 
 	-- Retaliation. Barging the same person at a walk costs nobody anything,
 	-- which makes it an annoyance rather than an act. These let a victim
@@ -1203,6 +1254,20 @@ HorseCollisionMod.SphereCacheMaxAgeMs = 150
 
 HorseCollisionMod.RecentRejections = {}
 
+--- When each speaker last said something, keyed by entity id.
+--
+-- Per speaker rather than global so two people can react to one event,
+-- which is what lets a bystander answer a victim instead of the street
+-- shouting in chorus.
+HorseCollisionMod.RecentBarks = {}
+
+--- When vanilla's collision bark was last switched off, by entity id.
+--
+-- Separate from `RecentBarks` because the two have different jobs: one
+-- throttles how often somebody speaks, the other throttles how often a
+-- context option is written while the horse bears down on them.
+HorseCollisionMod.RecentHushes = {}
+
 --- Recent horse speeds, newest last, for spotting deceleration on impact.
 --
 -- Speed is sampled once per tick at the top of the loop. A collision slows the
@@ -1628,6 +1693,8 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		self.LastScoredHit = {}
 		self.LockedUntil = {}
 		self.RecentRejections = {}
+		self.RecentBarks = {}
+		self.RecentHushes = {}
 		self.SphereCache = { pos = nil, ents = nil, at = 0 }
 
 		-- The rear's cooldown is stamped the same way and was missed, which is
@@ -1706,6 +1773,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Marks.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Sound.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Bark.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")

@@ -1,0 +1,566 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Marks.html">HorseCollisionMod.Marks</a></li>
+  <li><a href="../modules/HorseCollisionMod.Sound.html">HorseCollisionMod.Sound</a></li>
+  <li><strong>HorseCollisionMod.Bark</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Retaliation.html">HorseCollisionMod.Retaliation</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Bark</code></h1>
+<p>Spoken reactions to what the horse does.</p>
+<p> Makes a victim, a bystander or Henry say a vanilla line at a moment the mod
+ causes. No new audio ships: every line is already in the game, spoken by the
+ character's own voice actor, and is selected by naming a <strong>metarole</strong>, which
+ is a named bark set.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+
+<p> ## Why metarole and not anything else</p>
+
+<p> <code>dialog:monologRequest</code> accepts four ways of naming what to say and only one
+ of them is usable here. Measured in game, not assumed:</p>
+
+
+<pre>
+metarole      works, <span class="keyword">and</span> reaches the generic reaction sets
+alias         works, but every label vanilla exposes is quest scoped
+topicId       does <span class="keyword">not</span> work at all from Lua
+StartMonolog  does <span class="keyword">not</span> work, proven against alias on one speaker
+</pre>
+
+<p> The consequence to keep in mind while reading the tables below is that <strong>the
+ set is chosen, not the line</strong>. The dialog system picks which line of a set
+ plays, so every entry here has to be acceptable in all of its variants.</p>
+
+<p> ## What a set has to pass to be used here</p>
+
+<p> Four tests, each of which has already cost a wrong choice:</p>
+
+<ol>
+    <li><strong>It must be able to play.</strong> Anything named <code>COMBAT_</code> speaks only from
+
+<pre>
+combat, <span class="keyword">and</span> a trampled townsman is <span class="keyword">not</span> <span class="keyword">in</span> combat. More generally, a
+metarole that describes a state is silent outside that state.
+</pre>
+</li>
+    <li><strong>Every member must be bark-length.</strong> The set is chosen and the dialog
+
+<pre>
+system picks the line, so one story monolog <span class="keyword">in</span> an otherwise good set
+poisons every firing.
+</pre>
+</li>
+    <li><strong>Most members must carry a word.</strong> Vanilla's lightest sets are mostly
+
+<pre>
+the wordless marker <span class="backtick"><code>&amp;lt;...&amp;gt;</code></span>, which reads as the mod mumbling.
+</pre>
+</li>
+    <li><strong>Vanilla must not couple the line to a behavior.</strong> The corpse sets are
+
+<pre>
+the audible part of a scripted flee-<span class="keyword">and</span>-fetch-a-guard reaction, <span class="keyword">and</span>
+firing the audio alone produces an NPC who announces a body <span class="keyword">and</span> strolls
+on.
+</pre>
+
+<code>tools/bark_lines.py</code> answers 2 and 3 offline. Only an audition answers 1,
+and only watching vanilla answers 4.</li>
+</ol>
+
+<p> The vanilla <code>KOLIZE_*</code> collision sets <strong>are</strong> used, which reverses an earlier
+ decision. They were excluded while vanilla still fired its own collision bark
+ on every contact, because driving them would have duplicated what the player
+ already heard. <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:HushVanillaBark">HushVanillaBark</a> now closes that branch, so they no longer
+ play on their own and excluding them would simply delete the game's most
+ directly descriptive writing for this exact situation.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 5.5.0</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarksEnabled">HorseCollisionMod:BarksEnabled (pillar)</a></td>
+	<td class="summary">Whether a bark may be raised at all right now.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PickFromPool">HorseCollisionMod:PickFromPool (entry)</a></td>
+	<td class="summary">Draws one metarole from a bark set entry.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkOnCooldown">HorseCollisionMod:BarkOnCooldown (entity)</a></td>
+	<td class="summary">Whether this speaker has said something recently enough to stay quiet.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:Bark">HorseCollisionMod:Bark (entity, set, rider, ignoreCooldown)</a></td>
+	<td class="summary">Asks a character to speak one of a named bark set.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkForTier">HorseCollisionMod:BarkForTier (tier)</a></td>
+	<td class="summary">The bark set an impact at this speed should raise.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkCollision">HorseCollisionMod:BarkCollision (npc, tier)</a></td>
+	<td class="summary">Speaks for a collision, and for whoever saw it.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkRecovered">HorseCollisionMod:BarkRecovered (npc, tier)</a></td>
+	<td class="summary">Speaks for a victim who is getting back to their feet.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkRear">HorseCollisionMod:BarkRear (npc, struck)</a></td>
+	<td class="summary">Speaks for a rear, its own pillar with its own switch.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkDeath">HorseCollisionMod:BarkDeath (npc)</a></td>
+	<td class="summary">Speaks when the mod's own actions have killed somebody.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HushVanillaBark">HorseCollisionMod:HushVanillaBark (npc)</a></td>
+	<td class="summary">Switches off vanilla's collision bark on somebody the horse is approaching.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:BarksEnabled"></a>
+    <strong>HorseCollisionMod:BarksEnabled (pillar)</strong>
+    </dt>
+    <dd>
+    Whether a bark may be raised at all right now. </p>
+
+<p> Two gates, deliberately separate. The feature has its own switch so it can
+ be turned off without touching anything else, and each pillar has its own,
+ because the collision reactions and the rear are independent mechanics and
+ one must never silently carry the other's setting.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">pillar</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Collision" or "Rear"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when barks are allowed for that pillar
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:PickFromPool"></a>
+    <strong>HorseCollisionMod:PickFromPool (entry)</strong>
+    </dt>
+    <dd>
+    Draws one metarole from a bark set entry. </p>
+
+<p> An entry is either a plain metarole name, which is returned as it stands, or
+ a weighted pool written as <code>{ { name, weight }, ... }</code>. Weights are relative
+ and need not sum to anything; a pool of <code>{a,3},{b,1}</code> speaks <code>a</code> three times
+ as often as <code>b</code>.</p>
+
+<p> Kept separate from <a href="../modules/HorseCollisionMod.Bark.html">Bark</a> so that a pool can be drawn from and inspected
+ without sending anything, and because the weighting is the part most likely
+ to be tuned once the rider reports which lines they actually hear.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entry</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a> or <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a metarole name, a weighted pool, or nil
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the metarole to speak, or nil when the entry is empty
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BarkOnCooldown"></a>
+    <strong>HorseCollisionMod:BarkOnCooldown (entity)</strong>
+    </dt>
+    <dd>
+    Whether this speaker has said something recently enough to stay quiet. </p>
+
+<p> Without this a rider working through a crowd produces a chorus, and a single
+ victim struck twice talks over their own first line. Tracked per entity
+ rather than globally so two different people can react to the same event,
+ which is the point of having a bystander set at all.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the prospective speaker
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when they are still inside their cooldown
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:Bark"></a>
+    <strong>HorseCollisionMod:Bark (entity, set, rider, ignoreCooldown)</strong>
+    </dt>
+    <dd>
+    Asks a character to speak one of a named bark set. </p>
+
+<p> The shape of this call is the whole finding of the investigation behind this
+ file, so it is worth stating precisely why each part is here.</p>
+
+<p> <code>Utils.makeTable</code> builds the message from its declared type, filling every
+ member. A hand-built table leaves the receiving node with nothing to match
+ on and is accepted in silence.</p>
+
+<p> The target is <code>npc.this.id</code> where it exists. That is what every message this
+ mod successfully lands on an NPC already uses, and vanilla addresses the
+ player the same way in <code>DialogUtils.RequestPlayerMonologByMetarole</code>.</p>
+
+<p> <code>overrideContextSuppress</code> clears the <code>suppressMonologs</code> gate that
+ <code>monologRequestExecution</code> checks in <code>final/sb_dialog.xml</code>, which otherwise
+ discards the request outright. <code>forceOnMuted</code> covers a muted speaker.</p>
+
+<p> Subtitles are deliberately <strong>not</strong> forced. Vanilla barks do not carry them
+ unless the player has them on, and forcing them would make the mod's lines
+ look different from the game's own.</p>
+
+<p> Failure is silent by design: a character whose voice never recorded the set
+ simply says nothing, with no error and no glitch, exactly as in vanilla.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         who should speak
+        </li>
+        <li><span class="parameter">set</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         a key of <code>BarkSets</code> or <code>RiderBarkSets</code>
+        </li>
+        <li><span class="parameter">rider</span>
+            <span class="types">optional <span class="type">boolean</span></span>
+         true to read from the rider's table instead
+        </li>
+        <li><span class="parameter">ignoreCooldown</span>
+            <span class="types">optional <span class="type">boolean</span></span>
+         true to speak even inside the speaker's
+   cooldown, used only for the recovery line that follows a cry of pain
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a request was sent
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BarkForTier"></a>
+    <strong>HorseCollisionMod:BarkForTier (tier)</strong>
+    </dt>
+    <dd>
+    The bark set an impact at this speed should raise. </p>
+
+<p> Mirrors <code>GetSpeedTier</code> rather than inventing a second set of thresholds, so
+ that what is said always agrees with what the body does.</p>
+
+<p> A walk shoves, which does not hurt, so the victim goes straight to words.
+ Anything harder knocks them down, and what comes out at the moment of
+ impact is a wordless cry graded by how hard they were hit. Their words come
+ later, from <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:BarkRecovered">BarkRecovered</a>, once they are back on their feet.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">tier</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot" or "Gallop"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        a key of <code>BarkSets</code>, or nil when nothing should be said
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BarkCollision"></a>
+    <strong>HorseCollisionMod:BarkCollision (npc, tier)</strong>
+    </dt>
+    <dd>
+    Speaks for a collision, and for whoever saw it. </p>
+
+<p> The victim reacts first. A bystander is asked separately and only for the
+ harder tiers, because someone being shoved aside at a walk is not an event
+ worth a stranger shouting about, and because the bystander sets are all
+ about bodies.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim
+        </li>
+        <li><span class="parameter">tier</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the speed tier the impact was scored at
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BarkRecovered"></a>
+    <strong>HorseCollisionMod:BarkRecovered (npc, tier)</strong>
+    </dt>
+    <dd>
+    Speaks for a victim who is getting back to their feet. </p>
+
+<p> The gap this closes: a trot or gallop victim cried out on impact, lay there,
+ stood up and walked off without ever saying a word about what had happened,
+ which reads as the game forgetting rather than as a person recovering.</p>
+
+<p> <strong>Timed from the impact rather than triggered by standing up.</strong> Two earlier
+ attempts were driven by state and both landed late. <code>WatchHitReady</code> requires
+ <code>HitReadySettleMs</code> of stillness before it reports, so it could not fire until
+ two seconds after the victim was already upright; and waiting for the
+ animation state to leave <code>BlendRagdoll</code> fires only once the get-up has
+ finished. Both left an audible hole, which the rider described as "a large
+ gap between when they actually stand up and then the 2nd line plays".</p>
+
+<p> A timer is the right instrument here and not a shortcut, because the target
+ is a moment <em>inside</em> an animation rather than its end, and no readable state
+ marks it. <code>BarkRecoveryDelayMs</code> is tuned by ear against the get-up so the
+ line lands while the victim is rising.</p>
+
+<p> Walk is excluded: a shove has no knockdown to recover from and already spoke
+ at the moment of contact.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim
+        </li>
+        <li><span class="parameter">tier</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the speed tier the impact was scored at
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BarkRear"></a>
+    <strong>HorseCollisionMod:BarkRear (npc, struck)</strong>
+    </dt>
+    <dd>
+    Speaks for a rear, its own pillar with its own switch.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         whoever the rear was aimed at or struck, may be nil
+        </li>
+        <li><span class="parameter">struck</span>
+            <span class="types"><span class="type">boolean</span></span>
+         true when contact was actually made
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:BarkDeath"></a>
+    <strong>HorseCollisionMod:BarkDeath (npc)</strong>
+    </dt>
+    <dd>
+    Speaks when the mod's own actions have killed somebody. </p>
+
+<p> Henry only. The bystander raising the alarm used to fire from here and has
+ been removed: vanilla couples that line to a whole flee-and-fetch-a-guard
+ reaction that the mod cannot reproduce, and it already fires it correctly on
+ its own when a body is found.</p>
+
+<p> Henry's own set is empty pending an audition, so in practice this currently
+ logs the death and says nothing.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim who died
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:HushVanillaBark"></a>
+    <strong>HorseCollisionMod:HushVanillaBark (npc)</strong>
+    </dt>
+    <dd>
+    Switches off vanilla's collision bark on somebody the horse is approaching. </p>
+
+<p> Per impact suppression loses a race it cannot win. The mod's detection loop
+ runs about ten times a second, while the engine raises its own hit reaction
+ the instant bodies touch, so vanilla's line can already be playing before the
+ tick that would have silenced it. The rider heard the result as "a vanilla
+ interrupted by the mod's".</p>
+
+<p> Setting the option while the victim is still in front of the horse removes
+ the race: by the time contact happens the branch is already closed. It is
+ refreshed rather than set every tick, because a context write twenty times a
+ second per nearby person is not free.</p>
+
+<p> Cleared on a timer well after the impact, so an NPC the rider passes without
+ touching gets their own bark back a moment later and nothing is permanently
+ changed. Non-persistent, so a save cannot carry it.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         somebody inside the horse's footprint
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-12 15:19:04 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

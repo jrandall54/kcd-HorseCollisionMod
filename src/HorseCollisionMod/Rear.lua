@@ -994,6 +994,11 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 		horsePos = horseEnt:GetWorldPos()
 	end)
 
+	-- The rear's own voice. Its own pillar and its own switch: the collision
+	-- reactions and the rear are independent mechanics and neither may carry
+	-- the other's setting.
+	self:BarkRear(npc, true)
+
 	local horseWuid = nil
 
 	pcall(function()

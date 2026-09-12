@@ -30,6 +30,43 @@ number.
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-09-12
+
+### Added
+
+- **Spoken reactions to being ridden down.** Victims, and Henry's horse's
+  handiwork, now get words. No new audio ships: every line is already in the
+  game, spoken by that character's own voice actor, and is chosen by naming a
+  vanilla bark set.
+
+  A walk stagger draws a complaint: "Be a bit more careful!", "Hey! Watch
+  it!", or the mod's own escalating set that gets angrier the more often you
+  shove the same person. A knockdown at trot or gallop speaks twice: a wordless
+  cry at the moment of impact, then actual words a moment later while the
+  victim is getting back to their feet, weighted towards the only lines in the
+  game that name the horse: "Learn how to ride a horse, idiot!", "That horse
+  of yours nearly trampled me to death!"
+
+  Each moment draws from a weighted pool rather than one fixed set, so the same
+  impact does not produce the same sentence every time.
+
+  **This works fully only with `CollisionIsCrime` off.** With crime on, which
+  is the default, a trot or gallop impact is a crime, and the victim's crime
+  and combat reactions take over their voice immediately, so you hear them
+  call for the guards instead. The walk tier is unaffected, because a stagger
+  is deliberately not a crime, so walking-pace reactions work in every
+  configuration.
+
+  Vanilla's own collision bark is held off so it does not talk over the mod's
+  line. Settings: `Barks`, `CollisionBarks`, `RearBarks`, `RiderBarks`,
+  `BarkCooldownMs`, `BarkSuppressMs`, `BarkRecoveryDelayMs`, `BarkGapMs`,
+  `BarkOnRecovery`.
+
+- `tools/bark_lines.py`, which prints the English text of any vanilla bark set
+  without starting the game, and searches by remembered words to find which set
+  holds a line. Used to choose the sets above by reading every one of their
+  members rather than guessing from a Czech name.
+
 ## [5.4.0] - 2026-09-11
 
 ### Added

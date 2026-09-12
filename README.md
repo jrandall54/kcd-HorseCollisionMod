@@ -214,6 +214,9 @@ tools/
   build_adb.py            generates the animation data from a game install
   flow.ps1                the session's states: test, branch, land, shipping
   dev_deploy.ps1          installs into the game without Vortex
+  bark_lines.py           prints the English text of any vanilla bark set, and
+                          searches by remembered words for the set holding a
+                          line, without starting the game
   dev_console.py          talks to the running game over its remote console
   dev_subject.lua         spawns a test subject in front of the horse
   typed_message_probe.lua a Lua probe run in the game through dev_console.py
@@ -247,6 +250,12 @@ tools/
                           timeline rather than an impression
   probe_api.lua           lists the methods an object actually exposes in the
                           running game, which the written references do not
+  probe_bark.lua          asks whether a vanilla spoken line can be triggered
+                          from Lua, using metaroles the speaker provably holds
+  probe_forcedialog.lua   asks whether a conversation can be opened on a chosen
+                          target from Lua
+  probe_metaroles.lua     reports which metaroles and roles a soul holds, which
+                          is what decides the lines it can be asked for
   probe_camera.lua        polls the first-person camera through a view shake,
                           which is the only way to see what that call does
                           rather than what its arguments suggest

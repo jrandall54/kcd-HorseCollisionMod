@@ -538,6 +538,114 @@ the merchant's booth changed nothing about him at all; the night that cleaned
 him was one he spent elsewhere. Why that is so is untested, so a routine-driven
 effect should be checked the way this one was rather than by waiting in place.
 
+## Spoken reactions
+
+`Bark.lua` asks a character to say a vanilla line. Nothing is recorded and no
+audio ships.
+
+### How a line is addressed
+
+    XGenAIModule.SendMessageToEntityData(target, "dialog:monologRequest",
+            Utils.makeTable("dialog:monologRequest", {
+                metarole = name, forceOnMuted = true }))
+
+`monologRequest` accepts four ways of naming what to say and only one is usable,
+each measured in game rather than assumed:
+
+| Field | Result |
+| --- | --- |
+| `metarole` | Works, and reaches the generic reaction sets. What the mod uses |
+| `alias` | Works, but every label vanilla exposes is quest scoped |
+| `topicId` | Does nothing from Lua |
+| `StartMonolog` | Does nothing, proven by A/B against `alias` on one speaker |
+
+The target is `entity.this.id` rather than `entity.id`, for NPCs and for the
+player alike.
+
+### The set is chosen, not the line
+
+A metarole names a *set*, and the dialog system decides which member plays. So a
+set is only usable when every one of its lines is acceptable at the moment it
+fires, which is a stronger condition than it looks and has caused three wrong
+choices:
+
+- **Length.** `JINDRICH_NARAZIL_NA_MRTVOLY` fits Henry finding a body, and the
+  bodies it was recorded for are the Skalitz massacre. Its longest line runs 139
+  characters and names his parents.
+- **Content.** `KOLIZE_S_HRACEM_LEHKA` is vanilla's lightest bump set and 23 of
+  its 36 entries carry no word at all, being the wordless marker `<...>` or a
+  Hungarian interjection recorded for Cuman speakers.
+- **Coupling.** `UVIDI_MRTVOLU` is the audible part of a scripted reaction where
+  the NPC panics, flees and fetches a guard. `monologRequest` reaches only the
+  audio, so firing it produces somebody who announces a corpse and strolls on.
+
+`tools/bark_lines.py` reads any set's English text offline, which is how the
+shipped sets were chosen. It walks `metarole.xml` to `topictorole.xml` to
+`text_ui_dialog.xml`, whose localization keys carry the topic id in their first
+field (`t<topic>_s<sentence>_<n>_<speaker>_<hash>`), so no sequence table is
+needed. `--grep` runs it backwards, from remembered words to the set that holds
+them.
+
+### What decides whether a request is heard
+
+Nothing is reported back. A request that produces no sound is indistinguishable
+from one that does, because the log line is written straight after the `pcall`.
+Three separate conditions have been observed to matter:
+
+1. **Recording.** A speaker whose voice never recorded the set is silent, with
+   no error. This is per character and is vanilla's own casting.
+2. **Role membership.** A soul holds *roles*, not metaroles:
+   `role.xml` maps `role_id` to `(metarole_id, role_name)`, `soul2role.xml` says
+   who holds each, and `soul:GetRoles()` enumerates them. Henry returns 32.
+   `AddMetaRoleByName` returns true and changes nothing, and there is no
+   `AddRole`, so a speaker's palette is fixed.
+3. **State.** A metarole describing a state appears to be silent outside it;
+   `COMBAT_` sets do not speak out of combat even on a soul holding their roles.
+
+The second and third are **hypotheses supported by a handful of observations and
+not proven**, and the third has never been tested by inducing a state. Neither
+should be quoted as fact. `docs/TESTING_DIARY.md` carries the evidence and the
+open questions.
+
+### Crime takes the victim's voice
+
+With `CollisionIsCrime` on, a trot or gallop impact reports a crime, and the
+victim's crime and combat reaction fires immediately in place of the mod's
+line, which is the call for the guards. `HushVanillaBark` does not prevent it and was
+never meant to: it sets the `suppressCollisionsBark` context option, which gates
+vanilla's *collision* bark branch in `sb_switch_hitreactions.xml:293`, and the
+crime callout is a different branch. Suppressing that would require finding the
+option it is gated on.
+
+The walk tier is unaffected because a stagger is not a crime, so the spoken
+reactions reduce to walking pace in the default configuration and work at every
+tier with `CollisionIsCrime` off.
+
+### Sequencing the two lines of a knockdown
+
+A knockdown speaks twice: a wordless cry at impact, then words during the
+get-up. The second is timed from the impact by `BarkRecoveryDelayMs` rather than
+triggered by the victim standing, because both state-driven attempts landed
+late. `WatchHitReady` requires `HitReadySettleMs` of stillness before reporting,
+so it cannot fire until two seconds after the victim is already up; and waiting
+for the animation state to leave `BlendRagdoll` fires only once the get-up has
+finished. The target is a moment *inside* an animation, and nothing readable
+marks it, so a tuned timer is the correct instrument here.
+
+`BarkGapMs` keeps the two apart: a victim who recovers quickly would otherwise
+speak over their own cry, and the second request cuts the first off mid-word.
+
+`BarkCooldownMs` must stay at or below `HitCooldownMs`. At 6000 against a hit
+cooldown of 3000 it silenced exactly every second impact the mod acted on, which
+reads as barks randomly failing rather than as a cooldown.
+
+### Never request a generic metarole
+
+`NPC` and `PLAYER` are conversation roles. Requesting one does not speak a line;
+it opens a dialogue scene with its own camera, headed by an unlocalised topic
+id. The exit is a save reload. See the diary for what that implies as a
+capability.
+
 ## The sound a collision makes
 
 `Sound.lua` plays it, from Lua, at the moment of impact. Vanilla's own helper

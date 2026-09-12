@@ -30,6 +30,7 @@ file = {
 	"src/HorseCollisionMod/Reaction.lua",
 	"src/HorseCollisionMod/Marks.lua",
 	"src/HorseCollisionMod/Sound.lua",
+	"src/HorseCollisionMod/Bark.lua",
 	"src/HorseCollisionMod/Recovery.lua",
 	"src/HorseCollisionMod/Crime.lua",
 	"src/HorseCollisionMod/Retaliation.lua",

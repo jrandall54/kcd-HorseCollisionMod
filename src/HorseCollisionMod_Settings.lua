@@ -633,6 +633,43 @@ HorseCollisionModSettings = {
 	ReplanAfterReaction      = true,  -- sends them back to their stall or
 	                                  -- whatever they were leaning on
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
+
+	-- Spoken reactions. Every line is vanilla, spoken by the character's own
+	-- voice actor, chosen by naming a bark set. Nothing new ships.
+	--
+	-- Deliberately not the sets vanilla already fires on contact, the "Look
+	-- where you're going!" lines, which the player hears anyway. These are
+	-- moments the game has no line for: a horse shoving somebody, rearing in
+	-- their face, or leaving them in the road.
+	--
+	-- A character whose voice never recorded a set simply stays silent, with
+	-- no error, exactly as in vanilla, so this is safe on every NPC.
+	--
+	-- A knockdown speaks twice: a wordless cry at the moment of impact, graded
+	-- by how hard the hit was, and then actual words once the victim is back
+	-- on their feet. Each draws from a weighted pool holding both the mod's
+	-- own finds and vanilla's collision lines, so the same impact does not
+	-- produce the same sentence every time.
+	Barks                    = true,  -- the feature as a whole
+	CollisionBarks           = true,  -- victims and bystanders of an impact
+	RearBarks                = true,  -- whoever a rear is aimed at
+	RiderBarks               = true,  -- Henry's own remark over a body
+	BarkCooldownMs           = 3000,  -- per speaker, so a crowd is not a choir.
+	                                  -- Keep at or below HitCooldownMs: a
+	                                  -- longer value silences whole impacts,
+	                                  -- it does not just thin them out
+	BarkSuppressMs           = 2500,  -- how long vanilla's own bark is held
+	                                  -- off so the mod's line is not talked over
+	BarkGapMs                = 2500,  -- least silence between two lines from
+	                                  -- the same speaker, so a recovery line
+	                                  -- cannot cut off the cry of pain
+	BarkRecoveryDelayMs      = 3200,  -- how long after the impact the victim's
+	                                  -- second line is spoken; tuned so it
+	                                  -- lands while they are getting up
+	BarkOnRecovery           = true,  -- victims say something once they are
+	                                  -- back on their feet, rather than
+	                                  -- walking off without a word
+
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
 	                                  -- around on his back

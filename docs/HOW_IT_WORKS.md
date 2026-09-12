@@ -70,6 +70,48 @@ settling, a trot leads with a blunt impact, and a gallop stacks that impact
 four times over a dull heavy thud. What the impact sounds like depends on what
 the victim is wearing, from the same armor the collision already weighs.
 
+### What people say about it
+
+Vanilla's answer to a horse walking into someone is one shout. The mod gives
+the moment words, and every one of them is already in the game, spoken by that
+character's own voice actor. No new audio ships and nothing is recorded: a
+vanilla bark set is named and the game chooses a line from it.
+
+A shove at walking pace draws a complaint: "Be a bit more careful!", "Hey!
+Watch it!", "Jesus! Look where you're going!". Or a set that gets angrier the
+more often the same person is shoved, which turns repeatedly barging somebody
+into an argument rather than a repeated noise.
+
+A knockdown speaks twice. The victim cries out at the moment of impact,
+wordlessly, and then says something a few seconds later while getting back to
+their feet, so they no longer stand up and walk off as though nothing had
+happened. What they say then leans on the only lines the game has that mention
+a horse: "Learn how to ride a horse, idiot!", "Watch where you're going, you
+lout! You nearly killed me!", "That horse of yours nearly trampled me to
+death!"
+
+Each moment draws from a pool rather than a single set, so the same collision
+does not produce the same sentence twice running, and vanilla's own collision
+bark is held off for a moment so the two do not talk over each other.
+
+**With `CollisionIsCrime` on, which is the default, this is a walking-pace
+feature.** A trot or gallop impact is a crime, and a victim of a crime is taken
+over by the game's own crime and combat reactions: they call for the guards,
+immediately, and that is what you hear instead. The mod cannot reach that, because it
+suppresses the collision bark, which is a different branch of the game's
+dialogue than the call for help. A stagger is deliberately not a crime, so the
+walking-pace reactions are unaffected and work in every configuration. Turning
+`CollisionIsCrime` off gives the spoken reactions at every speed.
+
+A character whose voice never recorded a set simply says nothing, with no error
+and no glitch, exactly as in vanilla. So some individuals are quieter than
+others, and that is the game's own casting rather than a fault.
+
+Henry himself says nothing. His own vocabulary is fixed by the game and every
+line in it that would suit having just ridden somebody down is either unusable
+or far too long, so he is deliberately silent rather than saying something
+wrong.
+
 ### Losing patience
 
 Barging the same man at walking pace costs nobody anything: no damage, no
