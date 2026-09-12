@@ -19209,3 +19209,73 @@ scheme and the integer `topicId` that failed is not. One attempt was made with
 a guessed label, `kolize_s_hracem`, and was silent, but a guessed name proves
 nothing. Testing it properly needs a real alias from vanilla's list, and nearly
 all of those are quest scoped, so it may not reach ordinary townspeople at all.
+
+## alias works, StartMonolog does not, ForceDialog opens a conversation
+
+Three routes tested after the holding model collapsed. Together they settle how
+a line can and cannot be chosen from Lua.
+
+### alias is the working string route
+
+`dialog:monologRequest` carries an `alias` field, a topic label, which nothing
+in this project had ever set. Vanilla uses it 861 distinct times across its AI,
+`alias('monastery_amen')` and the like, and `player.xml` raises Henry's own
+barks as `alias($barkAlias)`.
+
+Sent to `player.this.id` with `alias = "dudeSurrender_combat"`, taken from
+`player.xml` itself, Henry said "Shit, leave me be, enough". It works.
+
+The hint that led there is in the script bind: `StartMonolog` takes its topic as
+a `const char*`, not an integer, which suggested the string key was the real
+addressing scheme and the integer `topicId` that failed never was.
+
+An earlier attempt at `alias` used an invented label, `kolize_s_hracem`, and was
+silent. That proved nothing and wasted a ride. **Only ever test an addressing
+scheme with a value taken from shipped data.**
+
+### StartMonolog is dead, now proven rather than assumed
+
+The same label, the same speaker, seconds apart:
+
+    dialog:monologRequest with alias="dudeSurrender_combat"   Henry speaks
+    DialogModule.StartMonolog(player.id, "dudeSurrender_combat")   silent
+
+Both returned cleanly. Earlier attempts at StartMonolog passed numbers and were
+inconclusive because the signature wants a string; passing the right type does
+not help either. It drives the dialog system and produces no audio, which is
+what the diary said, and this is the controlled version of that test.
+
+### ForceDialog works, and is not a bark
+
+`DialogModule.ForceDialog(speakerId, listenerId)` starts a real conversation.
+Fired at a guard it did nothing, fired at a beggar it opened dialogue with him.
+The rider's account: "the guard didn't have the option but the beggar did so it
+started dialog with him".
+
+So it is gated on the target actually having dialogue available, and it takes
+control away from the player rather than producing a line in passing. That
+rules it out for impact reactions, but it is a live capability worth knowing
+about for anything that wants a real conversation.
+
+### What the alias route is worth
+
+Less than it first appears. The 861 known labels are almost entirely quest and
+scene scoped: `hitByCuman`, `shootmaster_finishedPlayerWon`,
+`combatTutorial_negativeMonologues`, `cizekFoundYouBark`. None is a generic
+reaction set of the kind this mod wants, and generic sets are reached by
+metarole, which already works.
+
+Nor can more labels be recovered. The slug in a dialog key is not the alias:
+`dudeSurrender_combat` lives under slug `vzdavani_`, a Czech description,
+and the two are independent. Of 2708 distinct slugs, 1414 are exactly ten
+characters, so the slug is a truncated *description*, and the alias namespace is
+only visible where vanilla's XML happens to reference it.
+
+### Where that leaves selection
+
+    metarole   works, reaches the generic reaction sets, what the mod will use
+    alias      works, but only quest labels are known, so not useful here
+    topicId    does not work at all
+    StartMonolog  does not work, proven by controlled A/B
+    ForceDialog   works, opens a conversation, wrong tool for a bark
+    AddMetaRoleByName  returns true, changes nothing, holding is not the gate

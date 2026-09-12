@@ -27,7 +27,7 @@
 --
 --   python tools/dev_console.py --file tools/probe_bark.lua --wait 14
 
-local SOLO = "@kolize_s_hracem"
+local SOLO = "@dudeSurrender_combat"
 
 -- Grant the metarole to the target before asking for it, then take it back.
 --
@@ -42,6 +42,16 @@ local SOLO = "@kolize_s_hracem"
 -- among others. The removal here matters: leaving a townsman holding a combat
 -- taunt set would change his behaviour for the rest of the save.
 local GRANT = false
+
+-- Send to Henry instead of an NPC.
+--
+-- The alias test needs this. Vanilla's own player barks are raised in
+-- `player.xml` as `alias($barkAlias)` with values like `dudeSurrender_combat`
+-- and `activity_advanceTutorial_henryEnd`, which are Henry's lines. Sending a
+-- real label to the speaker it was written for is the only fair test of the
+-- `alias` field: an invented label proves nothing when it is silent, which is
+-- how the first attempt at this was wasted.
+local AT_PLAYER = true
 
 local SEARCH = 15
 
@@ -135,6 +145,13 @@ local function pick()
 	end
 
 	return best, bestDist, bestFacing
+end
+
+if AT_PLAYER then
+	log("target: Henry")
+	log("firing " .. tostring(SOLO))
+	send(player.this.id, SOLO)
+	return
 end
 
 local npc, dist, facing = pick()
