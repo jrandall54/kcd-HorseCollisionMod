@@ -15,10 +15,10 @@
 -- `RANENY_NA_ZEMI`, `UVIDI_MRTVOLU`, `VOLANI_STRAZE_MRTVOLA` and
 -- `ZASAH_ZBRANI_IGNOROVANY` on request.
 --
--- Two things decide whether a request is heard. The soul must hold the
--- metarole, which is in `soul2metarole.xml`, and that character's voice must
--- have the topic recorded, which is in the ogg filenames in `English.pak`. A
--- request that fails either is accepted and silent, which is what made
+-- What decides whether a request is heard is audio, not holding. `GetMetaRoles`
+-- on a townswoman returns five conversational sets and `HasMetaRoleByName` is
+-- false for sets she had already spoken, so the holding tables are not a gate.
+-- The speaker.s voice must simply have the topic recorded, which is what made
 -- refugees look like proof the whole route was broken.
 --
 -- SOLO takes a metarole name or a topic id. One per run: a six candidate run
@@ -27,7 +27,7 @@
 --
 --   python tools/dev_console.py --file tools/probe_bark.lua --wait 14
 
-local SOLO = "REAKCE_NA_VRAZDU"
+local SOLO = "@kolize_s_hracem"
 
 -- Grant the metarole to the target before asking for it, then take it back.
 --
@@ -66,8 +66,16 @@ local function send(targetId, what)
 		forceSubtitles = true
 	}
 
+	-- A number is a topic id, which does not work. A string beginning with "@"
+	-- is a topic label, the `alias` field, which vanilla uses heavily:
+	-- `alias('monastery_amen')` and 860 others across its AI. `StartMonolog`
+	-- on the dialog script bind takes its topic as a `const char*` too, which
+	-- is the hint that the string key is the real addressing scheme and the
+	-- integer one is not. Anything else is a metarole.
 	if type(what) == "number" then
 		fields.topicId = what
+	elseif string.sub(what, 1, 1) == "@" then
+		fields.alias = string.sub(what, 2)
 	else
 		fields.metarole = what
 	end

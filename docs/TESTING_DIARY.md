@@ -19136,3 +19136,76 @@ shoving somebody more than once better than anything chosen from the tables.
 Reading Czech metarole names and guessing produced three duds out of six on the
 first pass; a line heard in play is ground truth, and the text index turns it
 into a topic and a set in seconds.
+
+## Correction: holding a metarole is not what decides whether a line plays
+
+Earlier entries state that a request is heard only if "the soul must hold the
+metarole, which is in `soul2metarole.xml`". **That is wrong**, and it was
+inferred from offline tables rather than measured.
+
+`soul:GetMetaRoles` and `soul:HasMetaRoleByName` are live binds. Asked of a
+townswoman standing in front of the rider:
+
+    GetMetaRoles returned a table
+      1=2  2=272  3=277  4=287  5=331
+      5 entries
+
+    has ZASAH_ZBRANI_IGNOROVANY    false
+    has NASILI_UTEK                false
+    has REAKCE_NA_VRAZDU           false
+
+Those five are `NPC`, `POZDRAV`, `ODMITNUTI_ROZHOVORU`, `GOSSIP` and
+`ROZLOUCENI`, all conversational. Yet townswomen of exactly this kind had
+already spoken `ZASAH_ZBRANI_IGNOROVANY`, `NASILI_UTEK` and `REAKCE_NA_VRAZDU`
+on request, minutes earlier, in this same session.
+
+So a character speaks sets they do not hold. `GetMetaRoles` returns only the
+**directly assigned** metaroles, the handful in `soul2metarole.xml`; the
+thousands in `v_soul2role_metarole.xml` come through the role system and are
+resolved when the request is made, not stored on the soul.
+
+### What this changes
+
+**The holding tables are not a gate and must not be used as one.** They
+describe role-derived availability, which is resolved elsewhere, and the
+runtime reader only sees direct assignments. Neither predicts silence.
+
+It also explains the grant result. `AddMetaRoleByName` returned true because it
+appended to the direct list, and nothing played because the direct list was
+never the barrier. Granting a set whose audio does not exist cannot help.
+
+**The gate that remains is audio.** A request resolves to topics, and the
+speaking character's voice must have oggs recorded for them. That fits every
+observation: refugee voices carry no collision topic and were silent, the cut
+`HIT_REAKCE_*` sets still carry the placeholder `Překlad PDG 6` and were
+silent, and `COMBAT_` prefixed sets need their state on top of that.
+
+The practical consequence is good news. There is no per-character eligibility
+to compute before asking, and no table to consult. Ask, and either it plays or
+the character stays silent, which is how vanilla behaves anyway.
+
+### Not a route: making the player speak another character's lines
+
+A line is recorded once, by one actor, for one voice. The speaker's soul
+selects the voice, so asking Henry for a line recorded by somebody else cannot
+produce it: that audio does not exist in his voice. The same holds in reverse
+for giving an NPC Henry's lines.
+
+Reaching arbitrary recordings would mean playing the oggs directly rather than
+through the dialog system. `Sound.GetAudioTriggerID` plus
+`entity:ExecuteAudioTrigger`, which this mod already uses, resolves **named
+FMOD events**, and the 75,521 dialogue oggs are streamed by the dialog system
+with no trigger name. That is the FMOD bank plus `Libs/GameAudio/*.xml` route
+noted before: a real project, not a probe, and it raises a redistribution
+question the rest of this mod does not.
+
+### Still untested
+
+`alias`, the topic label field on `dialog:monologRequest`. Vanilla uses it 861
+distinct times across its AI, `alias('monastery_amen')` and the like, and
+`StartMonolog` on the dialog script bind takes its topic as a `const char*`
+rather than an integer, which suggests the string key is the real addressing
+scheme and the integer `topicId` that failed is not. One attempt was made with
+a guessed label, `kolize_s_hracem`, and was silent, but a guessed name proves
+nothing. Testing it properly needs a real alias from vanilla's list, and nearly
+all of those are quest scoped, so it may not reach ordinary townspeople at all.
