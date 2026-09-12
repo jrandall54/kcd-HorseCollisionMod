@@ -368,18 +368,32 @@ end
 -- close. `ImpactDamageVariance` is what makes "usually" mean anything, and a
 -- roll that decides death directly would be a different and much cruder thing.
 --
--- Applied through `soul:DealDamage(stamina, health, attacker, ...)`, which is
--- vanilla's own call: `deadBody.xml` and `questUtils.xml` use it to kill an
--- entity outright and `npc_roebuck.xml` to wound one. Stamina is left at zero
--- because the horse's side of the impact already debits the rider and the
--- victim's stamina is not what this models.
+-- Applied through `soul:DealDamage`, which is vanilla's own call:
+-- `deadBody.xml` and `questUtils.xml` use it to kill an entity outright and
+-- `npc_roebuck.xml` to wound one. Stamina is left at zero because the horse's
+-- side of the impact already debits the rider and the victim's stamina is not
+-- what this models.
 --
--- **Attribution follows `CollisionIsCrime`.** Named as the player's doing, a
--- death is the player's murder, which is what riding someone down at a gallop
--- ought to be. With the crime switch off the damage lands unattributed, so a
--- collision test is not interrupted by guards. This does not make a trampling
--- death crime free on its own: the engine attributes the trample itself, and
--- that is not reachable from here.
+-- **It takes two arguments and no more.** `C_ScriptBindSoul` declares
+-- `DealDamage(float stamina, float health)`, so an attacker passed as a third
+-- argument is accepted by Lua and discarded by the engine. This call is a raw
+-- subtraction on the soul: no attacker, no hit type, no hit data, and nothing
+-- the victim's behavior tree ever sees.
+--
+-- That has a consequence beyond tidiness. Vanilla's death cry is raised inside
+-- `IsDeadCheck -> Then` in `sb_switch_hitreactions.xml`, while a hit is being
+-- processed, because the engine applies damage as part of resolving that hit.
+-- Here the only hit the victim's brain receives is the one sent at the moment
+-- of impact, when they are still alive, so the check finds them alive and
+-- nothing looks again. A victim the mod kills therefore dies silently, and
+-- that is a property of this call rather than of the bark system.
+--
+-- Attribution is handled separately, by the `combat:hit` that `Crime.lua`
+-- sends, and by the ordering that makes this damage land last. With the crime
+-- switch off the damage lands unattributed, so a collision test is not
+-- interrupted by guards. This does not make a trampling death crime free on
+-- its own: the engine attributes the trample itself, and that is not reachable
+-- from here.
 --
 -- @tparam table npc victim entity
 -- @tparam string tierName the tier the impact scored
@@ -707,7 +721,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		end
 
 		local ok, err = pcall(function()
-			npc.soul:DealDamage(0, damage, attacker, false)
+			npc.soul:DealDamage(0, damage)
 		end)
 
 		-- Read back rather than subtracted, because whether this call emptied

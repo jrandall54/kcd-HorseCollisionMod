@@ -20226,3 +20226,87 @@ observable that distinguishes them, and it already reads as a better fit for
 being trampled by a horse than "brawling" does.
 
 Not started. `Crime.lua` is where the report is raised.
+
+## Why a victim the mod kills dies silently
+
+The rider rejected the earlier conclusion that a dying actor cannot speak, and
+was right to:
+
+> "in vanilla when people die they still make sound so we should be able to
+> create the same thing as the engine clearly allows it. When I cut someone
+> down with a sword, they don't instantly go silent. So whats the real
+> difference here between when we kill them with gallop instead? ... What TYPE
+> of damage are we sending and to whom are we sending it to exactly?"
+
+That question found it.
+
+### `DealDamage` takes two arguments, and the mod was passing four
+
+`C_ScriptBindSoul` declares:
+
+    int DealDamage(IFunctionHandler* pH, float stamina, float health);
+
+The mod called `npc.soul:DealDamage(0, damage, attacker, false)`. Lua accepts
+the extra arguments and the engine discards them, so **the attacker and the
+flag were never delivered**. What the mod applies is a raw subtraction on the
+soul: no attacker, no hit type, no hit data, and nothing the victim's behavior
+tree observes.
+
+The call has been corrected to two arguments and the comment above it, which
+documented the four-argument form as though it were real, has been rewritten.
+The behavior is unchanged, because the arguments were already being thrown
+away; what changes is that the code no longer claims something false.
+
+### Which explains the silence
+
+Vanilla raises its death cry inside `IsDeadCheck -> Then` in
+`sb_switch_hitreactions.xml`, **while a hit is being processed**, and in vanilla
+the engine applies damage as part of resolving that hit, so the check sees a
+corpse. The mod's only hit reaches the victim at the moment of impact, while
+they are still alive, by design: `Update.lua` sends `combat:hit` first and
+`ApplyImpactDamage` deliberately lands last so the mod owns the kill and the
+crime attribution. The check therefore runs against a living victim, finds them
+alive, and nothing ever looks again. The blow that actually kills them is
+invisible to the brain.
+
+So the silence is a property of how the mod deals damage, not of the bark
+system, and not of death.
+
+### Re-sending the hit after death does not work, and is dangerous
+
+The obvious repair was to send a second `combat:hit` once the lethal damage had
+landed, carrying `real = false`, so the tree would re-evaluate against a corpse
+without touching reputation.
+
+Two failed attempts before the test ran at all, both caught by the absence of
+the `DeathHit` telemetry line rather than by ears: the guard tested
+`type(attacker) == "table"` when `GetMyWUID` returns a WUID, and `attacker` is
+only populated when `CollisionIsCrime` is on, which the test had switched off.
+Neither run was evidence of anything, and both were nearly reported as though
+they were.
+
+With it genuinely running, `DeathHit rat_woman35 sent=true err=nil`:
+
+- **No death cry.** The hypothesis is falsified.
+- **An instant murder charge, with `CollisionIsCrime` off.**
+
+That second result matters on its own. The retaliation work recorded that
+`real = false` "drives the victim's decision without reaching the reputation
+system, so no fine is levied and no guard is summoned". Against an **already
+dead** victim that does not hold: the hit registered as murder regardless. So
+`real = false` is not a general exemption from the crime system, and anything
+built on that assumption needs re-checking.
+
+The experiment has been removed rather than left behind a default-off setting,
+because a code path that can hand the player a murder charge is not worth
+keeping for a result that was negative anyway.
+
+### What would still be worth trying
+
+Not attempted, and the honest next step rather than another field on the
+message: let the **engine** apply the killing damage as part of a hit it
+resolves itself, instead of the mod subtracting health afterwards. That is what
+vanilla does and it is the only route observed to produce the cry. It collides
+head-on with the attribution ordering in `ApplyImpactDamage`, so it is a
+redesign of how the mod kills rather than an addition, and it should not be
+started without deciding whether the death cry is worth that risk.
