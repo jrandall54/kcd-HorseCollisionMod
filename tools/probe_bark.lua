@@ -27,7 +27,21 @@
 --
 --   python tools/dev_console.py --file tools/probe_bark.lua --wait 14
 
-local SOLO = 22722
+local SOLO = "REAKCE_NA_VRAZDU"
+
+-- Grant the metarole to the target before asking for it, then take it back.
+--
+-- The interesting case is a set no soul in the game holds. `COMBAT_TAUNTING_WEAK`
+-- and `_STRONG` are held by zero of the 5025 souls, yet their topic carries
+-- "I'll slay you, you scum!", "Come on then, whoreson!" and the rest. If a
+-- grant makes those reachable, every dead metarole opens up and the palette
+-- stops being limited to what Warhorse happened to assign.
+--
+-- `entity.soul:AddMetaRoleByName` is live and vanilla pairs it with
+-- `RemoveMetaRoleByName` on exit, in `sa_bathhouse.xml` and `archery_tourney.xml`
+-- among others. The removal here matters: leaving a townsman holding a combat
+-- taunt set would change his behaviour for the rest of the save.
+local GRANT = false
 
 local SEARCH = 15
 
@@ -128,6 +142,27 @@ local who = (npc.class == "NPC_Female") and "woman" or "man"
 
 log(string.format("target: %s %.1fm away, %s", who, dist,
 		facing and "in front of you" or "NOT in view, nearest instead"))
+
+if GRANT and type(SOLO) == "string" then
+	local ok, err = pcall(function()
+		npc.soul:AddMetaRoleByName(SOLO)
+	end)
+
+	log("granted " .. SOLO .. ": " .. tostring(ok)
+			.. (ok and "" or (" " .. tostring(err))))
+end
+
 log("firing " .. tostring(SOLO))
 
 send((npc.this and npc.this.id) or npc.id, SOLO)
+
+-- Taken back once the line has had time to play. Vanilla always pairs the two.
+if GRANT and type(SOLO) == "string" then
+	Script.SetTimer(9000, function()
+		pcall(function()
+			npc.soul:RemoveMetaRoleByName(SOLO)
+		end)
+
+		log("revoked " .. SOLO)
+	end)
+end

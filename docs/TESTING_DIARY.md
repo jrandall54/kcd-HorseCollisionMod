@@ -19052,3 +19052,87 @@ That path returned 0 immediately after queueing the reload, before the drain
 and wait loop at the end of `main`, so the command was never flushed and no
 output was ever collected. It printed "loading it from disk instead" and did
 nothing. Fixed by letting it fall through instead of returning.
+
+## Granting a metarole does not make its lines speakable
+
+`entity.soul:AddMetaRoleByName` is live, returns true, and vanilla pairs it with
+`RemoveMetaRoleByName` on exit in `sa_bathhouse.xml` and `archery_tourney.xml`.
+Granting a set the soul does not hold and then asking for it produces nothing.
+
+    COMBAT_TAUNTING_STRONG   granted true on a guard      silent
+    HIT_REAKCE_SILNA         granted true on a guard      silent
+    HIT_REAKCE_SILNA         granted true on a woman      silent
+
+The first of those was a bad experiment and the rider said so: a `COMBAT_`
+prefixed set needs combat state whoever holds it, so a silence cannot be
+attributed to the grant. `HIT_REAKCE_SILNA` is the corrected test, held by zero
+souls and carrying no combat prefix, and it was silent on two different people.
+
+**The 152 metaroles no soul holds are very likely cut content.** The giveaway is
+in their text: `HIT_REAKCE_SILNA` includes the line `Překlad PDG 6`, which is
+Czech for "Translation PDG 6", a placeholder that was never replaced. Nobody
+holds them because they were never finished, and granting cannot conjure a
+recording that was never made.
+
+So the palette is exactly what souls already hold, and it cannot be widened.
+
+## The full audition result
+
+Nineteen metaroles judged by ear, one per run, each fired at whoever the rider
+was looking at.
+
+Reachable and useful:
+
+    ZASAH_ZBRANI_IGNOROVANY   "What the fuck are you doing!?"
+                              "Have you lost your mind?"
+                              "Now you've got me fucking mad!"
+                              "That was the last straw!"
+                              "Right, try that one more time and see what
+                              happens..."
+    NASILI_UTEK               "Christ almighty!" "Mother of God!"
+                              "Please, someone! Do something!" "Aaaaaaaah!"
+    KDO_TAM_CITOSLOVCE        "What in the -?" "Who's there?" "Jesus!"
+    RANENY_NA_ZEMI            a wordless "owwww", no subtitle
+    UVIDI_MRTVOLU             "Jesus Christ! Murder! Help!"
+    VOLANI_STRAZE_MRTVOLA     "Over there, my God, there's a corpse"
+    REAKCE_NA_VRAZDU          "Oh my God. Help. Murderer"
+    ODHALENI_PICKPOCKETU      "Mary Mother of God, what are you doing, thief"
+    KOMENTAR_NA_INTRUZI       "Hey, what are you doing here? Clear off quick
+                              or I'll throw you out"
+
+Reachable and wrong for this mod:
+
+    VOLANI_STRAZE_BITKA       reports a brawl between two other people
+    INTRUZE_LEHKA             "Do you want something?", loitering chat
+    KONEC_PATRANI_KOLEM_ZVUKU "Probably some animal", dismissing a noise
+
+Silent:
+
+    SPATRENI_NEPRITELE_-_UTOK    COMBAT_VICTIM_SCREAM_RECEIVED_HIT
+    COMBAT_OPPONENT_DYING        VZDAVANI_BARK
+    KOMENTAR_NA_JINDRU           HIT_REAKCE_SILNA (granted)
+    COMBAT_TAUNTING_STRONG (granted)
+
+The rule the silences follow still holds: a metarole describing a state speaks
+only from that state, and every `COMBAT_` prefixed one was silent on a civilian
+going about their day. `VZDAVANI_BARK` is surrender and `SPATRENI_NEPRITELE` is
+sighting an enemy, neither of which applied.
+
+`KOMENTAR_NA_JINDRU` is silent while `KOMENTAR_NA_INTRUZI` speaks, although the
+slug join maps both to the same topics. That join is a truncation match and
+cannot separate metaroles sharing a prefix, so it should be read as a hint about
+content and never as a mapping.
+
+### The best line came from the rider, not the tables
+
+`ZASAH_ZBRANI_IGNOROVANY` was found by the rider punching the air next to a
+guard and reporting what was said. Nothing in the metarole names suggested it:
+the Czech reads "weapon hit ignored", which sounds like a combat state and would
+have been skipped. It is the only reachable set that swears directly at Henry
+and the only one that escalates across repeated provocation, which suits a horse
+shoving somebody more than once better than anything chosen from the tables.
+
+**Ask the rider to trigger lines they like and work backwards from the text.**
+Reading Czech metarole names and guessing produced three duds out of six on the
+first pass; a line heard in play is ground truth, and the text index turns it
+into a topic and a set in seconds.
