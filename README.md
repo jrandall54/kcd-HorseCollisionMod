@@ -247,6 +247,8 @@ tools/
                           timeline rather than an impression
   probe_api.lua           lists the methods an object actually exposes in the
                           running game, which the written references do not
+  probe_bark.lua          asks whether a vanilla spoken line can be triggered
+                          from Lua, using metaroles the speaker provably holds
   probe_camera.lua        polls the first-person camera through a view shake,
                           which is the only way to see what that call does
                           rather than what its arguments suggest

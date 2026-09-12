@@ -18789,3 +18789,128 @@ log still reporting `loaded=true` from a cached flag.
 profile rather than in any pak, so `g` and the number keys are spoken for while
 appearing unbound. The rider's own account settled it: `g` is surrender while
 mounted, `f` is free there, `1` and `2` draw.
+
+## Barks can be driven from Lua after all, on NPCs and on the player
+
+The project had recorded this as impossible. It is not. A `dialog:monologRequest`
+built with `Utils.makeTable` and sent with `XGenAIModule.SendMessageToEntityData`
+makes a chosen character speak a chosen vanilla bark set, on demand, with no new
+audio and no behavior tree of our own.
+
+Confirmed by ear across two runs: Henry spoke two lines from
+`JINDRICH_NARAZIL_NA_MRTVOLY` while standing in a Rattay street with no corpse in
+sight, the Skalitz line and the one over Bianca's body. A woman two metres away
+then spoke `RANENY_NA_ZEMI`, `KOLIZE_S_HRACEM_NA_KONI` and `KOLIZE_S_HRACEM_LEHKA`
+on request. The rider's verdict on the final run was "I heard every line you said
+was going to play".
+
+### What the working call looks like
+
+    local target = npc.id
+    if npc.this and npc.this.id then
+        target = npc.this.id
+    end
+
+    local msg = Utils.makeTable("dialog:monologRequest", {
+        metarole = "KOLIZE_S_HRACEM_NA_KONI",
+        overrideContextSuppress = true,
+        forceOnMuted = true,
+        forceSubtitles = true
+    })
+
+    XGenAIModule.SendMessageToEntityData(target, "dialog:monologRequest", msg)
+
+The player is addressed as `player.this.id`, which is what
+`DialogUtils.RequestPlayerMonologByMetarole` does. That helper also works
+unmodified; it is defined in vanilla and called by no shipped script.
+
+### Why it was recorded as impossible
+
+Three separate faults, each sufficient on its own to produce silence.
+
+**The settling experiment asked for a line the speaker cannot say.** It called
+vanilla's helper on the player with `KOLIZE_S_HRACEM_NA_KONI`. Henry's soul,
+`dude`, `43144483-f3bb-fab8-9ceb-f77e3020598a`, holds 25 metaroles and that is
+not one of them. A speaker with no recording is silent whether or not the route
+works, so the experiment could not distinguish the two and was read as proof the
+route was dead.
+
+**Two gate fields were never set.** `monologRequestExecution` in
+`final/sb_dialog.xml` discards a request when the speaker's context carries
+`suppressMonologs` unless `overrideContextSuppress` is true, and `forceOnMuted`
+wraps the line in a buff for a muted speaker. Both default to false.
+
+**The model of why it failed was wrong.** The diary concluded that a message is
+dropped unless its `ProcessMessage` node happens to be running, and that a dialog
+subbrain on an idle townsman is not. `monologRequest` is mounted in
+`final/sb_switch.xml` inside `<While condition="true">` in the top level
+always-running Parallel, a direct sibling of `combatSubbrainStarter`, which the
+same entry cites as its example of an always-live listener that does receive
+messages. It listens on every NPC that is not cryofrozen.
+
+### Which metaroles are real
+
+`Libs/Tables/rpg/metarole.xml` lists 383, but holding is what matters, and that
+is in `soul2metarole.xml` and the resolved view `v_soul2role_metarole.xml`.
+Counted across 5025 souls:
+
+    RANENY_NA_ZEMI                      3876   wounded on the ground
+    COMBAT_VICTIM_SCREAM_RECEIVED_HIT   3516   struck
+    KOLIZE_S_HRACEM                     3434   collided with by the player
+    KOLIZE_S_HRACEM_LEHKA               3403   collided with lightly
+    KOLIZE_S_HRACEM_NA_KONI             3399   collided with by a mounted player
+    COMBAT_OPPONENT_DYING               3446   seeing someone die
+
+Warhorse shipped a bark set specifically for being ridden into by the player, and
+another for being ridden into lightly. `NA_KONI` and `LEHKA` are held by exactly
+the same 3399 souls, so any valid speaker can say both.
+
+An earlier research note in `ROADMAP.md` recommended `HIT_REAKCE_SLABA`,
+`HIT_REAKCE_SILNA`, `COMBAT_FLEE`, `COMBAT_TRASH_TALK`, `COMBAT_OPPONENT_WOUNDED`
+and `COMBAT_OPPONENT_CRITICAL`. **Every one of those is held by zero souls.** They
+are dead rows in the table. That note was written from `metarole.xml` alone,
+which lists names without saying whether anyone can speak them.
+
+Of the 1626 souls that cannot say `KOLIZE_S_HRACEM_NA_KONI`, 234 are horses, 18
+are dogs, 11 are livestock and 159 are quest or cinematic one-offs, with most of
+the remainder being the Pribyslavitz battle extras. Ordinary villagers, townsfolk
+and guards all hold it. The probe must therefore filter by class, `NPC` and
+`NPC_Female` as `Update.lua` does, and not by "actor with a soul": a mounted
+rider's own horse is the nearest match to that test and can never say the line.
+
+### Timing, and an instrument that misleads
+
+Candidates five seconds apart interrupt each other; Henry's second corpse line
+cut off his first. Eight seconds was enough for every line to finish.
+
+`entity.human:IsInDialog()` reads true while a character is speaking and false
+otherwise, so it witnesses *currently speaking* and not *spoke*. Sampled on an
+eight second cadence it misses a two second bark entirely, which is why every NPC
+slot logged `npc inDialog=false` on the run where the rider heard all of them. It
+read true for Henry only because his monolog was long and the gap was short. It
+is a usable witness only when sampled far faster than a line lasts.
+
+Do not call `human:InterruptDialog()` between candidates. An earlier version
+cleared a "stuck" dialog before each send and truncated the line the probe had
+just successfully started.
+
+### What is still unknown
+
+Whether `overrideContextSuppress` and `forceOnMuted` are actually required, or
+merely harmless: every successful run set both, and neither has been tested off.
+Whether a bark set that has just played is suppressed as a repeat, which is the
+most likely explanation for three silent runs that re-fired one metarole within
+ten minutes, but was never isolated.
+
+### The precision route, if metaroles prove too coarse
+
+`Localization/English.pak` holds 75,521 oggs, all under `Dialog/`, named
+
+    Dialog/000158/bada_t18781_s35241_0_reakce_na__1Nrg.ogg
+                  ^^^^ voice    ^^^^^ topic id
+                                     ^^^^^ sentence id
+
+so the topics a given voice has recordings for are computable offline from the
+filenames, and `DoMonologue` takes a `TopicId` directly. No Czech audio is
+installed; `Czech_xml.pak` is subtitle text only. A line that sounds Czech is an
+undubbed one shipped inside the English pack, which means it played.
