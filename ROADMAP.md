@@ -713,9 +713,9 @@ rather than missing.
       send the chosen line once the victim is upright.
 
       **Solved. A spoken line can be raised from Lua, on an NPC and on the
-      player.** Confirmed by ear: Henry spoke two lines from
+      player.** Henry speaks two lines from
       `JINDRICH_NARAZIL_NA_MRTVOLY` in a street with no corpse in sight, and a
-      woman two metres away spoke `RANENY_NA_ZEMI`, `KOLIZE_S_HRACEM_NA_KONI`
+      woman two meters away spoke `RANENY_NA_ZEMI`, `KOLIZE_S_HRACEM_NA_KONI`
       and `KOLIZE_S_HRACEM_LEHKA` on request. The working call:
 
           local target = npc.id
@@ -749,7 +749,7 @@ rather than missing.
 
       What follows is the superseded account of why this was thought
       impossible, kept because the reasoning errors in it are worth not
-      repeating. Five approaches were tried, all accepted without error and all
+      repeating. Five approaches are accepted without error and all
       silent.
 
       Sending `dialog:monologRequest` the way vanilla's own
@@ -780,7 +780,7 @@ rather than missing.
       `ProcessMessage` node happens to be running and that a dialog subbrain on
       an idle townsman is not, was also wrong. `monologRequest` is mounted in
       `final/sb_switch.xml` inside `<While condition="true">` in the top level
-      always-running Parallel, a sibling of `combatSubbrainStarter` — the very
+      always-running Parallel, a sibling of `combatSubbrainStarter`, the very
       listener that entry cites as always live.
 
       `DialogModule.StartMonolog(entity.id, topicId)` is the real API and it

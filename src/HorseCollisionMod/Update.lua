@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.4.0
+-- @release 5.5.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -250,6 +250,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- Before the tier branches, so the request goes out ahead of the
 	-- reaction animation rather than behind it.
 	self:PlayImpactSound(npc, tierName, armor)
+
+	-- Spoken alongside the impact sound and for the same reason: it belongs
+	-- to the moment of contact. The victim answers for themselves, and a
+	-- bystander only for a gallop, where there is a body to react to.
+	self:BarkCollision(npc, tierName)
 
 	-- The rider's own half of the impact, and gallop only. Sent here for the
 	-- same reason as the sound: it belongs to the moment of contact, not to
@@ -543,6 +548,11 @@ function HorseCollisionMod:SafeUpdate()
 				end
 
 				if isHuman and ent.actor then
+					-- Ahead of contact, while they are still in front of the
+					-- horse, so vanilla's collision bark is already closed off
+					-- by the time bodies touch.
+					self:HushVanillaBark(ent)
+
 					local isDead = false
 
 					-- Corpses are already ragdolls. Reacting to them would

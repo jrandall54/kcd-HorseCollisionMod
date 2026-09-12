@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.4.0
+-- @release 5.5.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -736,6 +736,11 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		-- forcing a ragdoll onto it would override whatever the game chose.
 		if type(before) == "number" and before > 0
 				and type(after) == "number" and after <= 0 then
+			-- The moment the mod's own damage killed somebody, which is the
+			-- only place the death is attributable to the mod rather than to
+			-- anything else that might have finished them.
+			self:BarkDeath(npc)
+
 			local state = "?"
 
 			pcall(function()

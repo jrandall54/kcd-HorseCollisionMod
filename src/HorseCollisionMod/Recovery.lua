@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.4.0
+-- @release 5.5.0
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -692,6 +692,13 @@ function HorseCollisionMod:WatchHitReady(npc, npcId, tierName)
 						.. " state=" .. tostring(state)
 						.. " on=" .. (settled and "settled" or "ceiling"))
 			end
+
+			-- The recovery bark is deliberately **not** raised from here. This
+			-- watcher requires `HitReadySettleMs` of stillness before it
+			-- reports, so it cannot fire until two seconds after the victim is
+			-- already standing, which the rider heard as a long silence
+			-- between getting up and speaking. The bark pillar times its own
+			-- line from the moment of impact instead.
 
 			return
 		end

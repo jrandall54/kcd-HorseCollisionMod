@@ -19279,3 +19279,366 @@ only visible where vanilla's XML happens to reference it.
     StartMonolog  does not work, proven by controlled A/B
     ForceDialog   works, opens a conversation, wrong tool for a bark
     AddMetaRoleByName  returns true, changes nothing, holding is not the gate
+
+## The bark settings never reached Config, so the feature was dead on load
+
+Seven bark settings were declared in `HorseCollisionMod_Settings.lua` and none
+of them existed in the `Config` defaults table. `ApplySettings` rejects any key
+that is not already in `Config`, and it said so, seven times, on every load:
+
+    [HorseCollisionMod] Setting 'Barks' is not a setting, ignored
+
+Because `BarksEnabled` gates all five bark call sites on `cfg.Barks`, and that
+was `nil`, **the entire feature was off on a fresh save load**. It had only
+ever been seen working because the session that built it set the values with
+
+    python tools/dev_console.py --lua 'local c=HorseCollisionMod.Config; c.Barks=true ...'
+
+which writes straight into `Config` and bypasses the settings path completely.
+The keys are now in the defaults table and the probe reads them back from the
+settings file.
+
+This is the second time a deploy has looked healthy while delivering nothing,
+and the check that catches it is unchanged: read one value back out of the
+running game before asking for a verdict.
+
+## An offline index from metarole to English lines
+
+`tools/bark_lines.py` prints every line of a bark set without entering the
+game. The chain is all in shipped tables:
+
+    metarole.xml        metarole_name -> metarole_id
+    topictorole.xml     metarole_id   -> topic_id (many)
+    text_ui_dialog.xml  key "t<topic_id>_s<sentence>_<n>_<speaker>_<hash>"
+
+The localization key carries the topic id in its first field, so no sequence or
+sentence table is needed. `--grep` goes the other way, from remembered words to
+the set that holds them, which is what turns the rider's "I heard this line"
+into an identifier.
+
+Two caveats found while building it. The paks store entries with backslashes in
+the local file header and forward slashes in the central directory, which
+`zipfile` rejects until `orig_filename` is rewritten. And the speaker slug is
+truncated to ten characters and is often derived from the *set* rather than the
+character, so it cannot be used to count how many voices recorded a set.
+
+## Why gallop victims were silent and Henry monologued
+
+Both symptoms are one event. Gallop deals 95 base damage, which kills an
+unarmoured victim outright, and six of twelve gallop impacts in one ride were
+fatal:
+
+    ImpactDamage rat_woman23 tier=Gallop dealt=101.0 health=100.0 fatal=true
+    Bark Killed=JINDRICH_NARAZIL_NA_MRTVOLY to Dude
+
+A dead victim has no bark, and their death is what raises Henry's line. The one
+gallop victim who survived, an armoured guard at `armorScale=0.08`, spoke
+normally.
+
+`JINDRICH_NARAZIL_NA_MRTVOLY` is the Skalitz massacre set. Read offline, its
+nine lines name Bianca, the Bailiff, Deutsch and Henry's parents, and the
+longest runs 139 characters:
+
+    "No, no, no... why? Not you... It wasn't supposed to be you... Bianca..."
+
+An earlier session heard exactly this, recorded it as "grim, and exactly right",
+and wired it in. The rider's verdict was the opposite: full monologs from a
+different scene, with no relevance to riding someone down. The general lesson is
+that `monologRequest` selects a **set** and the dialog system picks the line, so
+a set is only usable when *every* member is bark-length. Theme is not enough.
+
+## Barks are now weighted pools, and a knockdown speaks twice
+
+`RANENY_NA_ZEMI`, the set used for trot and gallop, turns out to be wordless:
+fourteen lines, longest sixteen characters, several of them the bare marker
+`<...>`. So the victim cried out and then stood up and walked away having never
+said anything about being trampled, which the rider reported as "it does seem
+odd when they get up and go back to normal with no words about what happened".
+
+The rework splits a knockdown into two moments:
+
+    impact     a wordless cry, graded by tier
+               Trot   ZASAH_ZBRANI_SILNY   "Aaaaah!"  "Yow!"  "Enhhhh!"
+               Gallop RANENY_NA_ZEMI       "Aaaah... dear God..."  "Christ!"
+    recovery   words, fired from WatchHitReady the moment the reaction
+               animation settles, so it lands when they are actually upright
+
+A walk is unchanged and still speaks at the moment of contact, because a shove
+has no knockdown to recover from.
+
+Every entry is now a weighted pool rather than one set, and the vanilla
+`KOLIZE_*` collision sets are deliberately back in those pools. They were
+excluded when the mod did not yet suppress vanilla's own bark; now that
+`HushVanillaBark` closes that branch they never play on their own, so excluding
+them only deleted the most directly descriptive writing the game has:
+
+    "Learn how to ride a horse, idiot!"
+    "That horse of yours nearly trampled me to death!"
+
+The recovery line bypasses the speaker cooldown, because the cry of pain it is
+sequenced behind is what started that cooldown.
+
+## Roles, not metaroles, are what a speaker holds
+
+Ten bark sets were auditioned on Henry and every one was silent while a single
+set spoke. That looked like a constraint and was not; it was a missing
+mechanism. The rider refused the result:
+
+> "How is it possible only one metarole for skalitz corpses fires on henry? we
+> are definitely missing something here"
+
+The column being ignored was `role_id` in `topictorole.xml`. The real chain is:
+
+    metarole.xml      the situation        metarole_id -> metarole_name
+    role.xml          the PART in it       role_id -> (metarole_id, role_name)
+    soul2role.xml     who can play it      role_id -> soul_id
+    topictorole.xml   what the part says   (metarole_id, role_id) -> topic_id
+
+A metarole is a *situation*; the roles beneath it are the parts — male variant,
+female variant, a named character's variant. `monologRequest` is given the
+metarole and the engine resolves which role the speaker holds within it. A soul
+holds roles, and `soul2role` is the table that says which.
+
+**This is a hypothesis with five observations behind it, not a proven rule, and
+it does not fit all five.** It is recorded here as the best current account and
+must not be quoted as fact. Two things it fails to explain:
+
+- Henry *holds* `JINDRICH___UNAVA` (role 1714) and the set was still silent.
+  That was waved away as a state gate, which is itself untested.
+- An earlier entry records a townswoman speaking sets that `HasMetaRoleByName`
+  returned false for. Whether she held the underlying *roles* was never
+  checked, so that case is unresolved rather than consistent.
+
+Resolving both is the job of the follow-up branch, not something to assume.
+
+This corrects the earlier entry "holding a metarole is not what decides whether
+a line plays" without contradicting it. `HasMetaRoleByName` genuinely is not the
+gate. The conclusion drawn from that — that audio alone decides — was wrong.
+
+    player.soul:GetRoles()           -- array of role ids
+    player.soul:HasRoleByName(name)  -- one role by name
+
+Henry returns **32 role ids**, and they predicted every audition result:
+
+    JINDRICH_NARAZIL_NA_MRTVOLY (2341)        held      spoke
+    JINDRICH___UNAVA (1714)                   held      silent, state gated
+    KONFRONTACE_ZLOCINCE_(MUZ) (927)          not held  silent
+    KOSTKY_HENRY_BUST_HIGH_SCORE_(MUZ) (2703) not held  silent
+    JANIK_FORCED1 (822)                       not held  silent
+
+Nine of the ten sets auditioned were ones Henry structurally could not speak.
+One console call would have removed all ten before a single ride was spent.
+
+It also explains `AddMetaRoleByName` returning true and changing nothing: the
+metarole was never the gate, and the thing that is has no setter. There is no
+`AddRole` on `C_ScriptBindSoul`, only `HasRoleByName`, `GetRoles`,
+`GetMetaRoles` and the four metarole mutators. **A speaker's palette is fixed.**
+
+### Holding is necessary, not sufficient
+
+Henry holds `ZASAH_ZBRANI_SLABY_(MUZ)` and `ZASAH_ZBRANI_SILNY_(MUZ)` under
+`COMBAT_VICTIM_SCREAM_RECEIVED_HIT`, which is the grunt bank — "Ow!" "Ech!"
+"Uff!" "Yow!" "Aaah!" "Enhhhh!". Fired three times on Henry, out of combat:
+silent. He also holds three roles under `COMBAT_SHOUT_OPPONENT`: silent.
+
+So the state gate applies on top of role membership, and both must pass.
+
+A past silence can still be wrong, though: `COMBAT_VICTIM_SCREAM_RECEIVED_HIT`
+was recorded silent after a test on a **townswoman, who does not hold its
+roles**. That measured the wrong thing. Check which soul a silence was measured
+on before treating it as a property of the set.
+
+### Never request a generic metarole
+
+`NPC` and `PLAYER` are conversation roles, not bark sets. Requesting `NPC` on
+Henry opened three **dialogue windows** — a topic headed `@ui_undefined_22805`
+with an "(End dialog)" option — rather than speaking a line. It takes control
+from the player and shows an unlocalised topic id, because nothing was ever
+meant to be addressed that way.
+
+Choosing the option made it worse: selecting it entered what the rider
+described as a **cutscene**, so the request does not merely draw a window, it
+enters a real dialogue scene with its own camera. The exit is a save reload.
+Nothing persists, since it is all runtime state, but a generic metarole is an
+outright hazard to the rider's session and must never be fired again.
+
+Henry holds only two roles under `NPC` (`JINDRICH_VYHRAVA_KOSTKY`, "Yes! / Did
+you see that? / That's the way to do it!", and a Necronomicon comment), which is
+what made it look like a safe four-line pool. It is not. Requesting a metarole
+whose roles are conversational opens a conversation.
+
+### Where this leaves Henry
+
+Of his 32 roles: most have no recorded lines at all, several are gated on a
+state he is not in while riding (hunger, tiredness, combat, deep water, leaving
+the map), two are generic conversation roles that open dialogue, and one speaks
+freely — `JINDRICH_NARAZIL_NA_MRTVOLY`, whose lines are the Skalitz monologs the
+rider rejected.
+
+## A dialogue can be raised on demand, and its contents chosen
+
+Filed first as a misfire and corrected by the rider, who was right:
+
+> "We can forcefully bring up a dialog and place things inside of it. I think
+> that's a pretty interesting find even though it's not directly related to our
+> goal for this branch."
+
+### What was fired
+
+The mod's ordinary bark call, unchanged, with a **generic** metarole as the
+argument:
+
+    XGenAIModule.SendMessageToEntityData(player.this.id, "dialog:monologRequest",
+            Utils.makeTable("dialog:monologRequest", {
+                metarole = "NPC", forceOnMuted = true }))
+
+Three of these were sent three seconds apart.
+
+### What happened
+
+Three dialogue windows appeared, stacked, each headed `@ui_undefined_22805`
+with a single `(End dialog)` option. Choosing the option did not merely dismiss
+the window: it entered what the rider described as a **cutscene**, a full
+dialogue scene with its own camera. A save reload is the exit. Nothing
+persisted, so the cost is an interrupted session rather than a damaged save.
+
+### Why it happened
+
+`NPC` and `PLAYER` are conversation metaroles rather than bark sets. Henry holds
+two roles under `NPC` — `JINDRICH_VYHRAVA_KOSTKY` and a Necronomicon comment —
+which is what made it look like a safe four-line pool. The engine did not treat
+the request as a bark at all; it resolved a conversational topic and started the
+conversation. The unlocalised `@ui_undefined_22805` is the topic's raw id, shown
+because that topic was never meant to be reached this way and has no UI string.
+
+### Why it matters beyond this branch
+
+`monologRequest` is not only a bark channel. Handed a conversational metarole it
+becomes **a way to open a dialogue on demand, from Lua, with no quest and no
+dialogue trigger in the world** — and the metarole argument is what selects what
+appears inside it. That is a general capability the mod has never had, and it
+was reached with the code already shipping.
+
+Open questions for the follow-up branch, none of them answered:
+
+- Which metarole selects *which* conversation, and how precisely can it be
+  aimed? `@ui_undefined_22805` was whatever the engine picked, not a choice.
+- Can the dialogue be pointed at an NPC rather than the player, producing a
+  real conversation with a chosen target?
+- Can useful content be placed in it deliberately — a confrontation after a
+  trampling, a surrender, an apology — rather than an undefined topic?
+- Does `forceOnMuted`, or any other field of the message, change the behaviour?
+
+### The standing warning
+
+Until those are answered, **never fire a generic metarole at any speaker**. It
+takes control of the rider's session and needs a save reload to clear.
+
+## Open investigations parked for the next branch
+
+Recorded so they are not lost and not silently assumed in the meantime.
+
+1. **Is the "state gate" real at all?** It has been asserted for several
+   sessions and never tested. The test is to *induce* the state and then ask:
+   make Henry tired and request `UNAVA_JINDRICH`; put him in combat and request
+   `COMBAT_SHOUT_OPPONENT`, which he holds three roles under. Until that is run,
+   every "state gated" note in this diary is a guess.
+
+2. **Reconcile the townswoman.** She spoke sets `HasMetaRoleByName` reported
+   false for. Check `HasRoleByName` and `GetRoles` on that same soul for those
+   same sets. Either roles explain it, or the role hypothesis is wrong too.
+
+3. **Does role membership actually gate anything?** Correlation over five sets
+   is not proof. Enumerate an NPC's roles, then request a set whose role they do
+   not hold and one they do, on the same soul in the same state.
+
+4. **The forced dialogue**, per the section above.
+
+5. **The glitching ragdoll**: a guard's body kept moving for eight seconds after
+   `Phase2Grounded` declared it at rest, drifting a metre back toward the impact
+   point and sinking 0.86m, while `HitReady` never saw it settle. The diary
+   already records that the horse drags a victim it stays in contact with and
+   that `ColliderMode` cannot reach it. The cheap first question is whether
+   backing the horse away stops it.
+
+## Damage does not silence a victim's barks — tested and disproven
+
+A guard was hit five times in a row and made no sound, while the log showed a
+`dialog:monologRequest` going out on every impact. The proposed explanation was
+that damage accumulates the victim into a wounded state whose reaction sets are
+no longer available — plausible, because the mod's own `SuppressAutoCure` exists
+precisely because "a collision puts its victim into a wounded state whose exit is
+gated on health", and vanilla carries a `VOJAK_ZRANENY` ("wounded soldier")
+metarole implying wounded is a distinct dialogue state.
+
+The rider tested it directly rather than accepting it:
+
+> "just hit a guard over and over and he never went silent until he died"
+
+**So damage is not the gate.** A victim barks on every impact all the way down
+to zero health. The hypothesis is dead and should not be revived.
+
+Note also that a first attempt at an A/B for this was invalid and nearly
+produced a false positive: the "wounded" target was selected by health alone and
+picked a body at `hp=0`. A corpse is silent for an obvious and uninteresting
+reason. Any comparison of this kind must exclude the dead explicitly.
+
+### What remains unexplained
+
+One guard silent across five hits while another barks on every hit until death.
+Since damage is ruled out, the leading candidate is the one the feature has
+documented from the start: **a character whose voice never recorded a set is
+silent, with no error**, exactly as in vanilla. That is a per-character
+property, which fits a specific named guard being reliably silent while other
+guards are reliably audible.
+
+That prediction is falsifiable and has not been run: fire the same set at
+`rat_guardJanik` and at a different guard, repeatedly, and see whether the
+silence follows the character every time. Until that is done this is a
+hypothesis, not a finding.
+
+## With crime on, only the walk barks survive
+
+Every bark test in this session ran in the testing world, where
+`CollisionIsCrime`, `Retaliation` and `WomenRaiseAlarm` are all false. Those
+three default to **true** in the shipped settings, so the feature had been
+validated only in a configuration no default player runs. Installing the
+shipped values and riding the same tests gave a different answer:
+
+    walk stagger    barks fire, and retaliation behaves as it should
+    trot            the victim's call for the guards fires immediately on
+                    impact, from the engine's own combat hit reaction
+    gallop, victim survives   the crime reaction takes over the same way
+
+The rider's account:
+
+> "the moment I impact someone at trot, the bark calling for help from the
+> guards immediately fires from the combathit I presume ... Same thing for
+> gallop impacts that victims survive, it goes into crime reactions. it seems
+> most of this work we've done will be unaccessible to people who play the mod
+> with crime on beside the walk stagger barks which work."
+
+### Why the walk tier is the exception
+
+A walk stagger is deliberately not a crime — the tier does no damage and raises
+no crime report — so the victim stays a civilian and their civilian reaction
+sets remain available. Trot and gallop report a crime, which puts the victim
+into the crime or combat state, and a state owns its speaker. This is the same
+rule that makes `COMBAT_` sets silent outside combat, seen from the other side:
+outside that state they cannot speak it, and inside it they cannot speak
+anything else.
+
+`HushVanillaBark` does not help here and was never meant to. It sets
+`suppressCollisionsBark`, which gates vanilla's *collision* bark branch only.
+The crime callout is a different branch entirely.
+
+### What this means for the feature
+
+With crime on, which is the default, the spoken reactions reduce to the walk
+tier. With crime off they work at every tier. That is worth stating plainly in
+the player-facing documentation rather than leaving a player to wonder why they
+hear the lines only at walking pace.
+
+Not attempted, and the obvious next thing if this is ever revisited: suppressing
+the crime callout the way the collision bark is suppressed, which would need the
+branch it is gated on to be found first. That is a research task, not a tweak.

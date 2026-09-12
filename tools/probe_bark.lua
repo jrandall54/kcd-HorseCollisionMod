@@ -9,7 +9,7 @@
 -- `final/sb_switch.xml` inside `<While condition="true">` in the always-running
 -- Parallel, a sibling of `combatSubbrainStarter`.
 --
--- Corrected, it works on the player and on NPCs. Confirmed by ear: Henry spoke
+-- Corrected, it works on the player and on NPCs. By ear, Henry speaks
 -- two lines from `JINDRICH_NARAZIL_NA_MRTVOLY` in a street with no corpse in
 -- sight, and townspeople spoke `NASILI_UTEK`, `KDO_TAM_CITOSLOVCE`,
 -- `RANENY_NA_ZEMI`, `UVIDI_MRTVOLU`, `VOLANI_STRAZE_MRTVOLA` and
@@ -22,8 +22,8 @@
 -- refugees look like proof the whole route was broken.
 --
 -- SOLO takes a metarole name or a topic id. One per run: a six candidate run
--- asks the rider to hold six observations while I reply, and four lines were
--- lost that way.
+-- asks the rider to hold six observations while the reply is written, and four
+-- lines were lost that way.
 --
 --   python tools/dev_console.py --file tools/probe_bark.lua --wait 14
 
@@ -33,14 +33,14 @@ local SOLO = "@dudeSurrender_combat"
 --
 -- The interesting case is a set no soul in the game holds. `COMBAT_TAUNTING_WEAK`
 -- and `_STRONG` are held by zero of the 5025 souls, yet their topic carries
--- "I'll slay you, you scum!", "Come on then, whoreson!" and the rest. If a
+-- "Come on then, whoreson!" and the rest. If a
 -- grant makes those reachable, every dead metarole opens up and the palette
 -- stops being limited to what Warhorse happened to assign.
 --
 -- `entity.soul:AddMetaRoleByName` is live and vanilla pairs it with
 -- `RemoveMetaRoleByName` on exit, in `sa_bathhouse.xml` and `archery_tourney.xml`
 -- among others. The removal here matters: leaving a townsman holding a combat
--- taunt set would change his behaviour for the rest of the save.
+-- taunt set would change his behavior for the rest of the save.
 local GRANT = false
 
 -- Send to Henry instead of an NPC.
