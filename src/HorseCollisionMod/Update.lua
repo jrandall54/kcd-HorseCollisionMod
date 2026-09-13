@@ -285,7 +285,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- body has come to rest and the deferred damage lands, and a line chosen
 	-- from that arrives a second and a half after the collision it is about.
 	self:BarkRiderOnImpact(playerEnt, tierName,
-			self:PredictImpactFatal(npc, tierName, armor, horseEnt))
+			self:PredictImpactFatal(npc, tierName, armor, horseEnt), npc)
 	self:PlayRiderVocal(playerEnt, tierName)
 
 	-- The ground's half. Spawned at the victim's feet, where they are struck

@@ -288,15 +288,20 @@ HorseCollisionMod.RiderBarkSets = {
 -- was fired individually in game and kept only on the rider's word that they
 -- heard it. `tools/make_audition.py` fires one by number for that purpose.
 --
--- One caution for anyone auditioning more: the dialog system degrades over a
--- long session. Lines that were silent through hundreds of requests played
--- immediately in a fresh process, so an audition result only counts against a
--- recently launched game.
+-- One caution for anyone auditioning more: a silence observed during that
+-- audition turned out not to be reliable, and several lines recorded silent
+-- played perfectly when fired again. The cause was never established. So fire a
+-- candidate again and hear it before adding it here.
 --
 -- @table RiderBarkAliases
 HorseCollisionMod.RiderBarkAliases = {}
 
 -- Henry's lines for an impact that killed, drawn on instead of the impact pool.
+--
+-- A third column restricts a line to one gender of victim, `"m"` or `"f"`, and
+-- is absent on a line that fits either. Some of these name the body: "he was
+-- only a boy", "shameless hussy". Played over the wrong victim they read as the
+-- mod talking about someone who is not there.
 --
 -- An ordinary comment rather than an LDoc block, for the same reason as
 -- ImpactProbeSamples above: LDoc reads an annotated table as a set of named
@@ -308,25 +313,26 @@ HorseCollisionMod.RiderBarkAliases = {}
 -- filters described above the impact pool, which apply here identically.
 --
 HorseCollisionMod.RiderBarkKillAliases = {
-	{ "revelation_murderer_ohfuck", 1 },               -- "Oh fuck!"
-	{ "q_rides_traitor_henry_trail_skirt", 1 },        -- "Shameless hussy!"
-	{ "q_massacre_deadPeasasnt", 1 },                  -- "How could anyone be so cruel?"
-	{ "revelation_murderer_smell", 1 },                -- "Jesus, something stinks here!"
-	{ "q_counterfeiters_crimeScene_area", 1 },         -- "Good God, what a bloody mess."
+	{ "revelation_murderer_ohfuck", 1 },                   -- "Oh fuck!"
+	{ "q_rides_traitor_henry_trail_skirt", 1, "f" },       -- "Shameless hussy!"
+	-- "How could anyone be so cruel?"
+	{ "q_massacre_deadPeasasnt", 1 },
+	-- "Jesus, something stinks here!"
+	{ "revelation_murderer_smell", 1 },
+	-- "Good God, what a bloody mess."
+	{ "q_counterfeiters_crimeScene_area", 1 },
 	-- "Fuck, the alarm's been sounded!"
 	{ "q_night_rescue_alarmHenry", 1 },
 	-- "It started getting interesting here."
 	{ "q_rides_traitor_henry_trail_shirt", 1 },
 	-- "Jesus Christ, he was only a boy."
-	{ "revelation_murderer_trigger_caveBody4", 1 },
-	-- "Grind those whoresons into the dirt! / At them! Chaaaarge!"
-	{ "q_istvans_reinforcements_henryAttack", 1 },
+	{ "revelation_murderer_trigger_caveBody4", 1, "m" },
 	-- "Poor wretch. What did he do to deserve such a fate?"
 	{ "revelation_murderer_trigger_caveBody5", 1 },
 	-- "This one won't be going anywhere any time soon."
 	{ "q_counterfeiters_crimeScene_brokenWheel", 1 },
 	-- "He's still breathing but he probably won't wake up again."
-	{ "player_examineInjuredWorker", 1 },
+	{ "player_examineInjuredWorker", 1, "m" },
 	-- "...no better than that bastard Zbyshek."
 	{ "q_returnToSkalitz_butcher_stolenGoods", 1 },
 	-- "And now to get away quickly before anyone catches me here."
@@ -334,6 +340,57 @@ HorseCollisionMod.RiderBarkKillAliases = {
 	-- "There! They won't be pulling anything for a few days. Except long faces!"
 	{ "q_execExec_troughBarkDone", 1 },
 }
+
+--- The subset of a pool whose lines suit this victim.
+--
+-- A pool entry may carry a third field naming the only gender of victim the line
+-- fits, `"m"` or `"f"`. Lines that name the body -- "he was only a boy",
+-- "shameless hussy" -- read as the mod describing someone who is not there when
+-- they land on the wrong victim, which is what this removes.
+--
+-- Returns the pool unchanged when the victim's gender cannot be read, because a
+-- line is better than silence and an unreadable soul is not evidence of anything.
+--
+-- @tparam table pool a `{ name, weight, gender }` list
+-- @tparam ?table npc the victim
+-- @treturn table a pool holding only the entries that fit
+function HorseCollisionMod:PoolForVictim(pool, npc)
+	if type(pool) ~= "table" then
+		return pool
+	end
+
+	local gender = nil
+
+	if npc and npc.soul then
+		pcall(function()
+			gender = npc.soul:GetGender()
+		end)
+	end
+
+	local wanted = nil
+
+	if gender == self.GenderMale then
+		wanted = "m"
+	elseif gender == self.GenderFemale then
+		wanted = "f"
+	else
+		return pool
+	end
+
+	local fits = {}
+
+	for _, entry in ipairs(pool) do
+		if entry[3] == nil or entry[3] == wanted then
+			fits[#fits + 1] = entry
+		end
+	end
+
+	if #fits == 0 then
+		return pool
+	end
+
+	return fits
+end
 
 --- Whether Henry is free to speak, or still inside a hold from his last sound.
 --
@@ -497,8 +554,9 @@ end
 -- @tparam table playerEnt the player entity
 -- @tparam string tierName the impact tier, for the telemetry
 -- @tparam boolean fatal whether this impact is expected to kill
+-- @tparam ?table npc the victim, so a gendered line is not misplaced
 -- @treturn boolean true when a request was sent
-function HorseCollisionMod:BarkRiderOnImpact(playerEnt, tierName, fatal)
+function HorseCollisionMod:BarkRiderOnImpact(playerEnt, tierName, fatal, npc)
 	if not fatal then
 		return self:BarkRiderImpact(playerEnt, tierName)
 	end
@@ -511,7 +569,8 @@ function HorseCollisionMod:BarkRiderOnImpact(playerEnt, tierName, fatal)
 		return false
 	end
 
-	return self:SendRiderAlias(playerEnt, self.RiderBarkKillAliases, "Killed",
+	return self:SendRiderAlias(playerEnt,
+			self:PoolForVictim(self.RiderBarkKillAliases, npc), "Killed",
 			self.RiderVoiceRanks.Killed)
 end
 
