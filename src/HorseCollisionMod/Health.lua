@@ -412,7 +412,7 @@ end
 -- a line whatsoever.
 --
 -- The arithmetic is `ApplyImpactDamage`'s own, taken at the **top** of the
--- variance roll rather than at its centre. Predicting from the centre reads the
+-- variance roll rather than at its center. Predicting from the center reads the
 -- average outcome as the whole outcome and misses the most ordinary kill in the
 -- game: a gallop into a healthy villager intends 95 * 1.00 * 1.02 = 96.9 against
 -- 100 health, which is survivable on average and fatal on most rolls once the
