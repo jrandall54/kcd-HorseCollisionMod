@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -252,9 +252,9 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	self:PlayImpactSound(npc, tierName, armor)
 
 	-- Spoken alongside the impact sound and for the same reason: it belongs
-	-- to the moment of contact. The victim answers for themselves, and a
-	-- bystander only for a gallop, where there is a body to react to.
-	self:BarkCollision(npc, tierName)
+	-- to the moment of contact. The combat state is passed because vanilla
+	-- refuses a collision bark during a fight and so should this.
+	self:BarkCollision(npc, tierName, isCombat)
 
 	-- The rider's own half of the impact, and gallop only. Sent here for the
 	-- same reason as the sound: it belongs to the moment of contact, not to
@@ -582,6 +582,13 @@ function HorseCollisionMod:SafeUpdate()
 										self:FootprintDetail(ent, horsePos,
 												horseForward, speed))
 							else
+						-- Only for somebody the horse is actually striking, so
+						-- nobody uninvolved is ever made immortal. Reaching a
+						-- tick ahead of contact shields bystanders the horse then
+						-- misses, and buys nothing: the buff takes effect in the
+						-- call that applies it, measured directly over the
+						-- console.
+						self:ShieldFromEngineDamage(ent)
 								self:LogRejection(ent, "below-walk-speed",
 										string.format("impact=%.2f sampled=%.2f",
 												impactSpeed, speed))

@@ -763,6 +763,45 @@ Suppression therefore follows the killing blow rather than the setting. An
 armored victim finished by repeated trampling, where the mod's contribution is
 not what ends them, still raises a flag with the switch off.
 
+`ShieldFromEngineDamage` removes the engine's ability to land that blow rather
+than trying to beat it to one. A victim the horse strikes is given the game's
+`immortality_nonpersistent` buff, GUID
+`730503bf-735a-4f47-baae-c2d84ee77524`, at the moment of contact.
+
+Three properties of that buff decide the design:
+
+- **It clamps death, it does not block damage.** Measured over the console: a
+  shielded soul dealt 999 damage goes from 100 health to 1, never to 0. So
+  telemetry showing a shielded victim losing health is the mechanism working,
+  not failing.
+- **It takes effect in the call that applies it.** Measured directly, which
+  removed an earlier look-ahead that shielded anyone the horse was about to
+  strike a tick before contact and caught bystanders it then missed.
+- **`AddBuff` returns an instance handle**, and `RemoveBuff(instance)` removes
+  only that instance. `RemoveAllBuffsByGuid` would strip every instance,
+  including immortality a quest granted a story character, so the handle is
+  kept in a record and handed back.
+
+The record is closed over by the backstop timer rather than looked up in
+`ShieldedVictims`, because a script reload replaces the whole
+`HorseCollisionMod` table and with it that map. The timer is deliberately not
+generation guarded for the same reason: every other timer in the mod stops on a
+reload, and this one removing immortality must not.
+
+`LiftCollisionShield` is called synchronously at the top of the damage path, so
+the shield ends exactly where the mod's own damage begins. A timed lift cannot
+do this: it has to outlast the trample and end before the damage, and missing
+on either side is silent. At a 700 ms shield against a 1100 ms delay victims
+came out clamped at 1 health, because the removal had not taken effect.
+
+**Known gap.** The shield ends when the mod applies its damage, around 600 ms
+after contact, while the body is often still moving. A victim who survives the
+impact and takes further collision damage after that point can still be killed
+by the engine. Observed once: a guard at 5 health survived to `t+3000ms` and
+was dead by `t+6000ms`, having traveled a further half meter after `Shield
+off` was logged. Holding the shield until the body's velocity has settled is
+the fix.
+
 `ApplyImpactDamage` normally waits for the trample to settle so its own damage
 lands last. That is not sufficient on its own, because a victim already hurt
 can be finished by the trample during the wait. So the question is answered

@@ -203,6 +203,42 @@ ANIM_RELOAD_COMMANDS = [
     "wh_am_ReloadDB",
 ]
 
+# The data tables the mod overrides, re-read from disk.
+#
+# `Database.LoadTable` is a real bind on the Lua `Database` table, alongside
+# `GetTableInfo`, `GetColumnInfo`, `GetTableLine` and `GetTableColumnData`. It
+# re-reads the named table from disk, so a loose override under
+# Data/Libs/Tables reaches a running game the same way the Mannequin databases
+# do, without a restart.
+#
+# Verified rather than assumed: after the override landed,
+# `GetTableInfo("rpg_param").LineCount` went from 0 to 182 and the changed row
+# read back its new value.
+#
+# **Loading the table is not the same as the game using it.** Several systems
+# copy their values into their own structures at startup, and the RPG
+# parameters are one of them: `S_RpgParams` is a flat array the engine reads,
+# not the table. So a reload here proves the file on disk is what the game can
+# see, and a restart is still what makes a parameter take effect. Treat this as
+# verification, not as a substitute for restarting.
+TABLE_RELOAD_NAMES = [
+    "rpg_param",
+]
+
+
+def table_reload_commands(names=None):
+    """Lua to re-read each table and report the row count it ended up with."""
+    out = []
+
+    for name in (names or TABLE_RELOAD_NAMES):
+        out.append(
+            "#local ok = pcall(function() Database.LoadTable('%s') end);"
+            " local i = Database.GetTableInfo('%s');"
+            " System.LogAlways('[table] %s loaded=' .. tostring(ok)"
+            " .. ' lines=' .. tostring(i and i.LineCount))" % (name, name, name))
+
+    return out
+
 # The console refuses cheat-flagged commands unless the game was launched with
 # -devmode. Seeing this text back is the signal that the flag did not take.
 CHEAT_REFUSAL = "VF_CHEAT"
@@ -571,6 +607,11 @@ def main():
         # against databases that are already current.
         if args.anim_reload:
             for command in ANIM_RELOAD_COMMANDS:
+                console.queue(command)
+
+            # Data tables ride along with the animation half, because both are
+            # the non-script side of a deploy and both come from mod_assets.
+            for command in table_reload_commands():
                 console.queue(command)
 
         if args.reload:

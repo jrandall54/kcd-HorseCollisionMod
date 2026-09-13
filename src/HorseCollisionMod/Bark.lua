@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -396,12 +396,27 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 	-- succeeded, logged as `tookVanilla=3`, and vanilla barked anyway, which is
 	-- one more confirmation that holding a metarole is not what decides what is
 	-- spoken.
+	-- The message carries thirteen fields and this used to send two of them,
+	-- one of which vanilla itself uses exactly once. The rest are read from
+	-- settings so they can be changed in a running game and compared by ear.
+	--
+	-- `priority` is the one that matters most. Requests register their
+	-- priority in a shared array which `monologRequestProcess` sorts
+	-- descending, and a request below the top either waits, when
+	-- `canBeDelayed` is set, or is discarded with no error. At the default of
+	-- zero this mod loses every contest it enters.
+	local cfg = self.Config
+	local fields = {
+		metarole = metarole,
+		forceOnMuted = true,
+		priority = cfg.BarkPriority or 0,
+		canBeDelayed = cfg.BarkCanBeDelayed == true,
+		overrideContextSuppress = cfg.BarkOverrideSuppress == true
+	}
+
 	local ok, err = pcall(function()
 		XGenAIModule.SendMessageToEntityData(target, "dialog:monologRequest",
-				Utils.makeTable("dialog:monologRequest", {
-					metarole = metarole,
-					forceOnMuted = true
-				}))
+				Utils.makeTable("dialog:monologRequest", fields))
 	end)
 
 	-- `ok` says the send did not raise, and nothing more. Whether a sound
@@ -412,6 +427,9 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 	-- as "the bark fired".
 	self:Log("Bark " .. set .. "=" .. metarole .. " to " .. name
 			.. " target=" .. tostring(target)
+			.. " prio=" .. tostring(fields.priority)
+			.. " delay=" .. tostring(fields.canBeDelayed)
+			.. " override=" .. tostring(fields.overrideContextSuppress)
 			.. " sent=" .. tostring(ok)
 			.. (ok and "" or (" err=" .. tostring(err))))
 
@@ -438,17 +456,37 @@ function HorseCollisionMod:BarkForTier(tier)
 	return self.PainByTier[tier]
 end
 
---- Speaks for a collision, and for whoever saw it.
+--- Speaks for a collision, at the moment of contact.
 --
--- The victim reacts first. A bystander is asked separately and only for the
--- harder tiers, because someone being shoved aside at a walk is not an event
--- worth a stranger shouting about, and because the bystander sets are all
--- about bodies.
+-- A walk speaks words straight away. A knockdown cries out here and says
+-- something later, from `BarkRecovered`, which this schedules.
+--
+-- Refused outright during a fight, matching vanilla.
 --
 -- @tparam table npc the victim
 -- @tparam string tier the speed tier the impact was scored at
-function HorseCollisionMod:BarkCollision(npc, tier)
+-- @tparam ?boolean inCombat true when the player is in combat, which silences
+--   the whole moment unless `BarkInCombat` says otherwise
+function HorseCollisionMod:BarkCollision(npc, tier, inCombat)
 	if not self:BarksEnabled("Collision") then
+		return
+	end
+
+	-- Vanilla gates its entire collision bark branch on
+	-- `!$b_inCombat & !$b_context['suppressCollisionsBark']`, at
+	-- `sb_switch_hitreactions.xml:293`. `HushVanillaBark` supplies the second
+	-- half, which is how the mod takes the line over outside a fight; this is
+	-- the first half, which the mod had no counterpart for.
+	--
+	-- The rider heard the gap: a guard already fighting them still stopped to
+	-- complain about being ridden into. Vanilla's judgment is that a man in a
+	-- fight does not remark on being bumped, and it is followed here rather
+	-- than second-guessed.
+	if inCombat and self.Config.BarkInCombat ~= true then
+		if self.Config.LogTelemetry then
+			self:Log("BarkCollision " .. self:NameOf(npc) .. " skipped, in combat")
+		end
+
 		return
 	end
 
@@ -582,6 +620,138 @@ function HorseCollisionMod:BarkDeath(npc)
 	if not self:Bark(player, "Killed", true) and self.Config.LogTelemetry then
 		self:Log("BarkDeath " .. self:NameOf(npc) .. " no rider set wired")
 	end
+end
+
+--- Makes a victim briefly immortal so the engine's collision damage lands on
+-- nothing.
+--
+-- The engine charges a victim health for being struck by a moving physical
+-- body and the mod cannot stop it. Five separate levers leave it unchanged.
+-- `BasicActor`'s collision multipliers belong to CryEngine's legacy damage
+-- path rather than to the RPG layer that charges `soul` health, and the
+-- one parameter that does work, `CollisionVelocityDeltaToDmgR`, is global and
+-- also governs arrows.
+--
+-- So rather than stop the damage, this stops it **landing**. `imm=1` is the
+-- parameter behind the game's own `immortality` and `death_protection` buffs,
+-- and `immortality_nonpersistent` carries it without being able to survive a
+-- save. Applied ahead of contact and removed once the engine has settled, the
+-- victim is untouchable for exactly the window the trample occupies, and the
+-- mod's own damage lands afterwards on a mortal target.
+--
+-- **This is deliberately narrow.** It is one buff, on one victim, for a few
+-- hundred milliseconds, and it is removed by GUID so nothing of it persists.
+--
+-- @tparam table npc somebody in front of the horse
+function HorseCollisionMod:ShieldFromEngineDamage(npc)
+	if not self.Config.ShieldVictimFromEngineDamage or not npc or not npc.soul then
+		return
+	end
+
+	local id = tostring(npc.id or "?")
+
+	if self.ShieldedVictims[id] then
+		return
+	end
+
+	-- The instance handle, not the GUID, is what gets handed back later.
+	--
+	-- `RemoveAllBuffsByGuid` would strip **every** instance of this buff from
+	-- the victim, and immortality is exactly what a quest uses to keep a story
+	-- character alive. Shielding such a character and then clearing by GUID
+	-- would quietly remove protection this mod never granted. Removing the
+	-- single instance that was added cannot.
+	local ok, instance = pcall(function()
+		return npc.soul:AddBuff(self.ImmortalityBuffGuid)
+	end)
+
+	if not ok or instance == nil then
+		self.ShieldedVictims[id] = nil
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield failed on " .. self:NameOf(npc))
+		end
+
+		return
+	end
+
+	-- Held in a record rather than bare, so the backstop timer can close over
+	-- it. A script reload replaces the whole `HorseCollisionMod` table and with
+	-- it this map, and the one thing that must survive a reload is the removal.
+	-- A closure survives; a table lookup does not.
+	local state = { instance = instance, removed = false }
+	self.ShieldedVictims[id] = state
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield on " .. self:NameOf(npc) .. " ok=true")
+	end
+
+	-- Every shielded victim is one the horse is striking, so
+	-- `ApplyImpactDamage` lifts this synchronously and the timer should never
+	-- be what ends it. It exists because immortality that is never lifted is
+	-- the worst failure this code could have: if the damage call is skipped for
+	-- any reason, nobody is left permanently unkillable.
+	--
+	-- **Deliberately not generation guarded.** Every other timer in this mod
+	-- returns early when a script reload has bumped the generation, so a stale
+	-- loop stops doing work. This one must not: the work it does is removing
+	-- immortality, and skipping it would leave a victim unkillable for the rest
+	-- of the session. A reload happens on every deploy, so that is not remote.
+	Script.SetTimer(self.Config.ShieldWindowMs or 400, function()
+		if state.removed then
+			return
+		end
+
+		state.removed = true
+
+		if self.ShieldedVictims[id] == state then
+			self.ShieldedVictims[id] = nil
+		end
+
+		local lifted = pcall(function()
+			npc.soul:RemoveBuff(state.instance)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield off " .. self:NameOf(npc) .. " ok=" .. tostring(lifted))
+		end
+	end)
+end
+
+--- Takes the collision shield off a victim, now.
+--
+-- Called from `ApplyImpactDamage` immediately before it charges the victim, so
+-- the immortality that swallowed the engine's trample cannot also swallow the
+-- mod's own damage. Safe to call on somebody who was never shielded.
+--
+-- @tparam table npc the victim
+-- @treturn boolean true when a removal was attempted
+function HorseCollisionMod:LiftCollisionShield(npc)
+	if not npc or not npc.soul then
+		return false
+	end
+
+	local id = tostring(npc.id or "?")
+	local state = self.ShieldedVictims[id]
+
+	if state == nil or state.removed then
+		return false
+	end
+
+	state.removed = true
+	self.ShieldedVictims[id] = nil
+
+	-- The instance this mod added, never every instance by GUID, so a quest's
+	-- own immortality on the same victim is untouched.
+	local ok = pcall(function()
+		npc.soul:RemoveBuff(state.instance)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield lifted on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
+	end
+
+	return ok
 end
 
 --- Switches off vanilla's collision bark on somebody the horse is approaching.

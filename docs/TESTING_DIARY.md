@@ -19642,3 +19642,1355 @@ hear the lines only at walking pace.
 Not attempted, and the obvious next thing if this is ever revisited: suppressing
 the crime callout the way the collision bark is suppressed, which would need the
 branch it is gated on to be found first. That is a research task, not a tweak.
+
+## How the dialog system actually dispatches a bark
+
+Read out of the shipped brain trees rather than inferred from experiments. The
+files are in `GameData.pak` under `Libs/AI/`, and the whole monolog path lives
+in `final/sb_dialog.xml`, which `final/sb_switch.xml:50` mounts as the handler
+for `dialog:monologRequest`.
+
+### The message has thirteen fields, and the mod was sending two
+
+`Libs/AI/typedefinitions.xml` declares the type. This is the complete list with
+the game's own defaults:
+
+    topicId                     int    0
+    alias                       string
+    metarole                    string
+    forceSubtitles              bool   false
+    priority                    int    0
+    canBeDelayed                bool   false
+    sendAnswer                  bool   false
+    overrideContextSuppress     bool   false
+    lookAtId                    wuid
+    defaultAnimState            enum   userControlled
+    forceOnMuted                bool   false
+    playStandingTransition      bool   false
+    doNotInterruptOnActorDeath  bool   false
+
+Counted across the 1136 shipped brain files, vanilla's own usage is
+`alias` 1008, `priority` 328, `overrideContextSuppress` 203, `forceSubtitles`
+196, `lookAtId` 165, `metarole` 132, `sendAnswer` 99, `topicId` 77,
+`defaultAnimState` 39, `canBeDelayed` 26, `playStandingTransition` 14,
+`forceOnMuted` **1**, `doNotInterruptOnActorDeath` **1**.
+
+The mod sends `metarole` and `forceOnMuted`, which means one of its two fields
+is the rarest flag in the entire game.
+
+### The dispatch chain
+
+    monologRequest -> monologRequestRead -> monologRequestProcess
+                                         -> monologRequestExecution
+
+**Read** takes the message off `DialogMailbox`, pushes this request's `priority`
+onto a shared array and sorts it descending, so `priorities[0]` is the highest
+request in flight. Its own entry is erased when the request finishes.
+
+**Process** applies three gates in order:
+
+1. Two `InstantExternalLock` nodes with `RunLogic="Halt"`, commented "Closed
+   when initiating dialog" and "Closed when running requested dialog". A
+   speaker who is in or entering a conversation is halted here, before priority
+   is considered at all.
+2. The priority auction, commented "Is there another monolog running?":
+
+        if (#priorities > 1) & (priority < priorities[0]):
+            canBeDelayed ? wait on a 1m semaphore : Fail
+
+   A losing request that cannot be delayed is **discarded silently**.
+3. A switch, commented "kicking lower priority monologs": at or above the
+   highest and greater than zero, the request sets the kick lock and runs;
+   above zero it runs under a semaphore; otherwise it just runs.
+
+**Execution** halts if a non-monolog dialog is executing, takes the
+`onRunningDialog` semaphore so one dialog runs per speaker, then applies the
+context gate, then calls `DoMonologue`.
+
+### The context gate, and a correction
+
+    Selector
+      VariableExistsGate  b_context['suppressMonologs']  FailSubtMissing=true
+        Then: IfCondition failOnCondition=true
+              condition=(suppressMonologs) & (overrideContextSuppress == false)
+                Success            <- succeeds, so the Selector skips the monolog
+      FuseBox                      <- the monolog itself
+
+`failOnCondition` names what the node returns when its condition is **false**:
+`true` means fail, `false` means succeed. The child always runs when the
+condition is true. Two unambiguous uses fix this: inside a `Switch`, where
+branches must fail to pass control on, the game writes
+`failOnCondition="true"` on `$setupDialog.skill == -1` guarding
+`$prize = ($random + 1) * 40`; inside a `Sequence`, where a skipped step must
+succeed for the sequence to continue, it writes `failOnCondition="false"` on
+`playStandingTransition` guarding the transition animation.
+
+So the gate reads: suppress the monolog when `suppressMonologs` is set **and**
+this request did not ask to override it. **`overrideContextSuppress(true)`
+exempts a request exactly as its name says.**
+
+An earlier entry recorded the opposite, that "the gate does not exempt
+`overrideContextSuppress` the way its condition reads". That is wrong. The
+experiment behind it set the `suppressMonologs` context and then sent a request
+that did not carry `overrideContextSuppress`, so the mod's own line was
+suppressed along with everything else, exactly as this tree specifies. The
+mechanism was never broken; only two of its thirteen fields were ever used.
+
+### Where the line is finally chosen
+
+    DoMonologue  TopicId=$request.topicId
+                 TopicLabel=$request.alias
+                 Metaroles=$request.metarole
+                 ForceSubtitles | IsInterruptibleByPlayer
+                 DoNotInterruptOnActorDeath | AnimationOverride
+
+All three selectors are passed to one node. `topicId`, `alias` and `metarole`
+are not alternative routes through the brain: they are three arguments to the
+same C++ call. So the recorded finding that `topicId` "does not work at all
+from Lua" is a statement about `DoMonologue`'s internals, not about dispatch,
+and it needs re-testing now that the other twelve fields are understood.
+
+Two smaller mechanisms worth recording:
+
+- `forceOnMuted` is implemented as `AddBuff BuffGUID=18a0bd7c-214f-4107-bbc1-9e9bc09ce9db`,
+  removed again on success.
+- `priority > 1` sets `isMonologInterruptibleByPlayer = false`, under the
+  comment "Only high priority monologs are uninterruptable by player".
+
+### What this predicts for the mod
+
+None of this has been tested in game yet, and it must be before anything is
+claimed:
+
+1. The mod's barks enter every contest at priority 0 with `canBeDelayed` false,
+   which is the worst possible bid. Against any competing line they are dropped
+   rather than queued. This, and not a "state gate", is the likely mechanism
+   behind crime reactions taking over at trot and gallop.
+2. Sending `priority` above the competing request should let the mod's line
+   kick it instead, and `canBeDelayed(true)` should make a losing line wait
+   rather than vanish.
+3. `suppressMonologs` on the victim plus `overrideContextSuppress(true)` on the
+   mod's own request is, on paper, "silence every vanilla line and let only
+   this one through", which is a far broader tool than `suppressCollisionsBark`.
+4. `doNotInterruptOnActorDeath(true)` is what lets a dying victim finish their
+   cry, which is exactly the gallop case where the victim is killed outright.
+   Vanilla pairs it with `RANENY_NA_ZEMI`, the same set the mod uses, and the
+   mod does not send it.
+
+## Inside DoMonologue: what actually decides whether a line exists
+
+Continuing from the dispatch model above. Everything here is read from the
+shipped tables and the decompilation, and **none of it has been tested in
+game**.
+
+### The node takes more than the brain gives it
+
+`DoMonologue`'s attribute schema, from its registration in the binary, is
+`TopicLabel`, `Metaroles`, a topic id slot, `ForceSubtitles`,
+`IsInterruptibleByPlayer`, `UseTwins`, `SendMessage`, `Greeting`, `Ending`,
+`AllowPositioning`, `DisableRotations`, `DisableRestrictions`.
+
+`sb_dialog.xml` sets only the first five plus the death and animation flags, so
+`UseTwins`, `Greeting`, `Ending`, `AllowPositioning`, `DisableRotations` and
+`DisableRestrictions` are unreachable through `dialog:monologRequest`. They are
+node attributes, not message fields; reaching them would need a brain of our
+own rather than a different message.
+
+`C_ScriptBindDialog` declares
+`StartMonolog(pH, EntityId speakerId, const char* topicId)`. The topic is a
+**string**, not an integer, which is consistent with `TopicLabel` being the
+alias and is the likeliest reason earlier attempts to drive it with a number
+did nothing.
+
+### Who can speak what: the engine's own view
+
+`Libs/Tables/rpg/v_soul2role_metarole` joins soul to role to metarole and is
+the authoritative answer to "can this character say this set". Counted over the
+whole table:
+
+    souls in the view                         4240
+    metaroles reachable by at least one soul   231 of 383
+
+So 152 metaroles are speakable by nobody at all, which confirms an earlier note
+that several researched candidates were held by zero souls. Coverage for the
+sets the mod ships is excellent:
+
+    RANENY_NA_ZEMI            3876 souls
+    COMBAT_SHOUT_OPPONENT     3845
+    KOLIZE_S_HRACEM           3434
+    KOLIZE_S_HRACEM_LEHKA     3403
+    KOLIZE_S_HRACEM_NA_KONI   3399
+    COMBAT_IDLE               3381
+
+**This kills role membership as the explanation for the combat silences.**
+`COMBAT_SHOUT_OPPONENT` is held by 3845 souls including Henry, who holds three
+roles under it, and it was still silent. The role hypothesis recorded earlier
+is therefore wrong as a general rule, and only ever coincided with the results.
+
+### The real gate is a per-sequence entry condition
+
+`topic2sequence` carries `entry_condition` and `npc_entry_condition` per
+sequence. If nothing passes, there is no line to play and the request is silent
+with no error. Comparing the sets that work against the ones that do not:
+
+    RANENY_NA_ZEMI               entry: 1
+    KOLIZE_S_HRACEM              entry: 1
+    UNAVA_JINDRICH               entry: 1
+    JINDRICH_NARAZIL_NA_MRTVOLY  entry: 1, and one quest objective check
+
+    COMBAT_SHOUT_OPPONENT        entry: screamAndShout_tauntGlobalCooldownReady_man
+                                        & get_health()[0] >= 75
+                                        & !suppressTournamentCombatShout
+                                 entry: var('hitStrength') <= 3 & get_health()[0] > 0
+
+`1` means unconditional. So "a metarole that describes a state speaks only from
+that state" was the right shape of answer for the wrong reason: the gate is not
+the metarole's name or the speaker's roles, it is ordinary data on each
+sequence, and it is readable offline for any set before spending a ride.
+
+### The condition language
+
+`Libs/Tables/text/dialogue_functions` maps 261 named functions to expressions,
+and the expressions reach most of the game: `IsQuestCompleted`,
+`IsObjectiveStarted`, `HasSoulTag`, `var()`, `gvar()`, `get_health()`,
+`HourOfDay()`, `GetTrueRelationship()`, `GetActorAngriness()`,
+`IsSeqAvailable()`, and `CallScriptFunctionInTable('Table','Fn')`, which calls
+Lua directly.
+
+That last one matters twice over: conditions can call into Lua, and several
+gates are therefore things a mod could in principle satisfy deliberately rather
+than wait for.
+
+`screamAndShout_tauntGlobalCooldownReady_man` resolves to a long conjunction of
+`IsSeqAvailable(...)` over taunt sequences, so it means "no taunt is on
+cooldown".
+
+### Sequences carry their own cooldown, priority and script
+
+`Libs/Tables/text/sequence` has columns `flags`, `group`, `next`, `priority`,
+`reputation`, `script`, `timeout`, `type`, `speech_coef`, `ui_prompt`.
+`timeout` is what `IsSeqAvailable` tests. For the shipped sets:
+
+    RANENY_NA_ZEMI           3 sequences, timeout 0 on all of them
+    KOLIZE_S_HRACEM_NA_KONI  5 sequences, timeout 1 on all
+    ZASAH_ZBRANI_IGNOROVANY  3 sequences, timeout 3 on all
+    KOLIZE_S_HRACEM         10 sequences, five at timeout 1, and five at
+                             timeout 0 carrying priority 0,1,2,3,4 with flags=1
+
+That last group is almost certainly the escalation the rider noticed when the
+same person is shoved repeatedly: an ordered ladder inside one set, climbed by
+`priority` and `next` rather than chosen at random.
+
+`RANENY_NA_ZEMI` having timeout 0 throughout explains why the cry of pain is
+the most reliable line in the mod: it can never be on cooldown.
+
+The unit of `timeout` is not established. The values are small integers and no
+column documents them, so nothing should be concluded about how long a set
+stays unavailable until it is measured.
+
+### Still unexplained
+
+`UNAVA_JINDRICH` has entry condition `1` on both its sequences, Henry holds its
+role, and it has seven recorded Henry lines, yet it was silent when auditioned.
+Nothing found so far accounts for that, and it is recorded here as an open
+contradiction rather than explained away. Any account of the gating has to
+cover it, together with the townswoman who spoke sets `HasMetaRoleByName`
+denied.
+
+## Topics, sequences, cooldowns and escalation ladders
+
+The layer below the metarole, and the one that decides which line plays and
+when a speaker runs dry. `tools/bark_chain.py` walks it.
+
+    topictorole     (metarole, role) -> topic
+    topic2sequence  topic -> sequences, each with an entry_condition
+    sequence        priority, timeout, next, flags, script
+
+Within a topic the sequences are ordered by `priority`. Each carries a
+`timeout`, which is the cooldown `IsSeqAvailable()` tests, and a `next`, which
+names the **topic** reached afterwards.
+
+### `timeout` is in seconds, with two special values
+
+Over all 52,415 sequences the values are human round numbers, which settles the
+unit: 5, 10, 15, 20, 30, 45, 60, 120, 180, 240, 300, 600.
+
+    timeout = 0     46174 sequences (88%)   no cooldown, reusable immediately
+    timeout = -1     2584 sequences (5%)    usable once, ever
+
+The `-1` reading is confirmed by content rather than inferred: those sequences
+are the player's own conversation choices, such as "My name's Henry. Thank you
+for taking care of me here." and "Master Feyfar, Sir Radzig sent me to you."
+Lines a playthrough says once.
+
+### An escalation ladder is a chain of topics
+
+The set the rider noticed getting angrier under repeated shoving is built
+exactly this way:
+
+    topic 22722  seq 43682  prio 0  timeout 3s   "What the fuck!?"
+                 next -> topic 27935
+    topic 27935  seq 43683  prio 1  timeout 20s  "What the fuck are you doing!?"
+                 seq 43684  prio 2  timeout 20s  "Shit, what's this?"
+                 seq 43685  prio 3  timeout 20s  "Have you lost your mind?"
+                 seq 43686  prio 4  timeout 20s  "Watch out!"
+                 seq 45662  prio 5  timeout 20s  "Right, try that one more time..."
+                 seq 45663  prio 6  timeout 20s  "Now you've got me fucking mad!"
+                 seq 45664  prio 7  timeout 20s  "That was the last straw!"
+
+Eight rungs, each on a twenty second cooldown. Repeated provocation climbs the
+ladder as the lower rungs become unavailable, which is the escalation heard in
+play, and it is data rather than anything the mod arranged.
+
+It also means this set **can be exhausted**: shove the same person eight times
+inside twenty seconds and every rung is on cooldown, so the topic has nothing
+available and the victim falls silent until the timers expire.
+
+### The silence that this does not explain
+
+`RANENY_NA_ZEMI`, the trot and gallop cry of pain, has **timeout 0 on every one
+of its sequences**, entry sequence and all seven rungs. It can never be on
+cooldown and can never be exhausted.
+
+So when a guard was struck five times and made no sound while the log showed a
+request going out each time, cooldown is not the reason. Neither is damage,
+which was tested and disproven, nor role membership, which the coverage table
+rules out. That silence remains unexplained.
+
+`KOLIZE_S_HRACEM_NA_KONI` is similarly cheap: a one second entry sequence and
+five rungs at four seconds each.
+
+### The earlier contradiction, resolved
+
+`UNAVA_JINDRICH` was recorded as an unexplained silence: unconditional entry
+condition, role held by Henry, seven recorded lines. Its sequence carries
+`timeout=180`. A three minute cooldown, on a set whose purpose is an
+occasional remark about being tired, is an ordinary design choice and entirely
+sufficient to explain one silent audition. It was never a state gate.
+
+The lesson is that "unconditional entry condition" is not the same as
+"available": entry conditions and cooldowns are separate gates, and a set can
+pass the first while failing the second.
+
+## Vanilla's own hit-reaction barks, and the context switches available
+
+### The collision bark branch the mod suppresses
+
+`sb_switch_hitreactions.xml:293` gates the whole branch on
+
+    !$b_inCombat & !$b_context['suppressCollisionsBark']
+
+so vanilla fires no collision bark at all in combat, and `HushVanillaBark`
+closes it the rest of the time exactly as intended. Inside, the choice is:
+
+    rider == player & player is Male & hitStrength > Healing  -> KOLIZE_S_HRACEM_NA_KONI
+    attacker == player & hitStrength >= MinorInjury           -> KOLIZE_S_HRACEM
+    attacker == player & hitStrength >= Unpleasant            -> KOLIZE_S_HRACEM_LEHKA
+
+The mounted line is gated on a `HasGenderCheck Gender="Male" SoulWUID="__player"`,
+which is Theresa's half of the game being excluded rather than anything about
+the victim.
+
+### RANENY_NA_ZEMI is vanilla's *dying* bark, not a pain bark
+
+At line 425 the send sits inside `IsDeadCheck -> Then`, guarded by
+`!$dyingBarkUsed` and setting `$dyingBarkUsed = true` immediately after:
+
+    metarole('RANENY_NA_ZEMI'), forceOnMuted(true),
+        overrideContextSuppress(true), doNotInterruptOnActorDeath(true)
+
+So in vanilla this set plays **once, as a character dies**. The mod uses it for
+every trot and gallop impact, which is why it reads as a generic cry of pain in
+play. That is not necessarily wrong, but it is worth knowing it is being used
+against its authored purpose, and it explains why its sequences carry no
+cooldown: a death happens once anyway.
+
+It is also the one place vanilla sends `doNotInterruptOnActorDeath(true)` and
+one of only two sends of `forceOnMuted`, which is presumably why an earlier
+session copied those two flags without the third.
+
+### The context switches
+
+`b_context` carries 87 named options across the shipped brains. The ones
+bearing on this mod:
+
+    suppressCollisionsBark          already used by HushVanillaBark
+    suppressMonologs                everything, exempted by overrideContextSuppress
+    suppressDudeProxBark            proximity barks at the player
+    suppressDudeProxBark_greet      the greeting heard near impacts
+    suppressDudeProxBark_weapon     drawn-weapon comment
+    suppressDudeProxBark_torch      torch comment
+    suppressDudeProxBark_stealth    sneaking comment
+    suppressGreeting                greetings
+    suppressFarewell                farewells
+    suppressHitReactions            hit reactions wholesale
+    suppressNearMissReactions       near misses
+    holdUpCombatSubbrainStart       delays the combat subbrain starting
+    alwaysFightWhenHit              forces the fight branch
+    disableChangeHostilityOnHit     stops a hit making them hostile
+    suppressReputationHitOnDudeHit  reputation cost of hitting them
+    suppressAutoCure                already used by the mod
+
+`suppressDudeProxBark_greet` is the direct answer to the greetings the rider
+heard around impacts, which were attributed to coincidence at the time. They
+were vanilla proximity barks, and there is a switch for them.
+
+`holdUpCombatSubbrainStart` and `disableChangeHostilityOnHit` are the first
+plausible levers found for the crime and combat takeover at trot and gallop,
+though neither has been tried.
+
+### Still unexplained
+
+The guard struck five times who made no sound. Cooldown is excluded, because
+`RANENY_NA_ZEMI` carries timeout 0 throughout. Damage was tested and excluded.
+Role membership is excluded by the coverage table. The remaining candidates are
+the priority auction, in which the mod bids 0 and cannot be delayed, and the
+two halt locks for a speaker already in a dialog. Neither has been tested.
+
+## How much of the dialogue is actually conditional
+
+Measured over every row of `topic2sequence` rather than sampled:
+
+    sequences                                   49404
+    carrying any condition beyond "1"           13947   (28.2%)
+
+So **72% of all dialogue sequences in the game are unconditional.** The
+vocabulary of the conditions that do exist is dominated by quest state rather
+than by anything resembling a character's mood or situation:
+
+    IsObjectiveCompleted  4786     gvar                2800
+    IsObjectiveStarted    3638     var                  888
+    IsQuestStarted        2219     HasSoulTag           665
+    IsSeqAvailable         583     IsObjectiveUnchanged 582
+    IsQuestCompleted       427     CountOfActorItems    265
+    GetActorMoney          212     HourOfDay            184
+    IsActor                183     GetActorAngriness     87
+    DistanceToEntity        79     HasBehaviorTag        60
+
+This is the final word on the "state gate" idea that several sessions leaned
+on. There is no general mechanism by which a metarole is gated on a character's
+state. There are entry conditions, most sequences have none, and the ones that
+do are mostly asking about quests. Where a bark set appeared state-gated, the
+real cause was either a cooldown (`UNAVA_JINDRICH` at 180 seconds) or specific
+conditions written on that particular set (`COMBAT_SHOUT_OPPONENT` asking for a
+taunt cooldown and health bands).
+
+`HasSoulTag` is readable from conditions but no setter for soul tags appears in
+`C_ScriptBindSoul` or anywhere else in the recovered binds, so tags are not a
+lever a mod can pull.
+
+### Table structures confirmed
+
+`libKCD1` carries the row structs, which confirm the column meanings read out
+of the XML. The dialogue sequence table is `S_SequenceTableRow_2`:
+
+    sequence_id, next (alias), script, priority, ui_prompt, group, type,
+    skill_check_difficulty_id, flags, timeout, speech_coef, reputation
+
+and `S_SequenceTableRow_3` is the topic-to-sequence view carrying
+`entry_condition` and `npc_entry_condition`. Several tables share the name
+`sequence`, and the quest one, with `objective_id` and `action`, is unrelated
+to dialogue.
+
+### What is still not known
+
+The internals of `DoMonologue` itself. The node's parameter registration is
+readable and its dispatch is fully mapped, but which line it picks among the
+variants of an available sequence, and why a `topicId` passed from Lua produces
+nothing while vanilla uses the field 77 times, are inside C++ that the
+decompilation only exposes as unnamed functions. Those two questions are better
+answered by experiment now than by more reading, since the surrounding model is
+solid enough to make sharp predictions.
+
+## CONFIRMED: priority is what decided the crime takeover
+
+The first prediction from the dispatch model, tested as a single-variable A/B in
+one ride with crime, retaliation and the alarm all on, which is the shipped
+configuration.
+
+    A   CollisionIsCrime=true  BarkPriority=0   canBeDelayed=false
+    B   CollisionIsCrime=true  BarkPriority=50  canBeDelayed=false
+
+Nothing else differed. The log shows the same requests going out in both, at the
+same moments, to the same kinds of victim, distinguished only by the `prio`
+field the send now reports.
+
+The outcome, by ear:
+
+    A   impact barks silent, the victim's call for the guards fires immediately
+    B   impact barks play, and the crime callout follows later, at the get-up
+
+The rider's account of B: "Our impact barks fired as they should and then when
+they each got up then the call out for guards happened. For a guard the impact
+bark fired and then they got up and tried to arrest me."
+
+**So the crime takeover was never a state gate, a suppression problem or
+anything about the sets.** The mod was bidding zero into an auction the engine
+resolves by number, and a losing bid that cannot be delayed is discarded with no
+error. At priority 50 the request takes the branch the game itself labels
+"kicking lower priority monologs" and speaks.
+
+This reverses the conclusion recorded when the feature landed, that with crime
+on the spoken reactions reduce to the walk tier and "there is really nothing we
+can do about that". There is: send a priority.
+
+### What the ordering now sounds like
+
+The crime callout is not suppressed, only deferred behind the impact line, so a
+victim cries out as they are hit and calls the guards once they are up. A guard
+does the same and then moves to arrest. The rider judged that sequence correct
+on its own terms rather than as a compromise.
+
+### What this does not yet establish
+
+- The right value. 50 was chosen because vanilla's own most common non-trivial
+  priority is 50, not because anything measured it. Whether a lower number is
+  enough to win, and whether a high one steps on dialogue that should win, is
+  untested.
+- `canBeDelayed` was left false throughout, so the queueing path is still
+  unexercised.
+- `overrideContextSuppress` and `doNotInterruptOnActorDeath` were both false in
+  this test and remain untested.
+- Whether the recovery line at `BarkRecoveryDelayMs` is being beaten by the
+  crime callout or simply landing before it.
+
+## FALSIFIED: a victim killed by the impact cannot speak
+
+Two predictions from the dispatch model, both tested and both wrong. Recorded
+because a disproven mechanism is worth as much as a confirmed one and costs a
+ride to rediscover.
+
+### `doNotInterruptOnActorDeath(true)` does nothing here
+
+Vanilla pairs this flag with `RANENY_NA_ZEMI` at the one place it fires that set
+for a dying character, so it looked like the missing piece of the gallop tier.
+
+    C   prio=50  finishOnDeath=false   4 kills, 4 requests sent, silent
+    D   prio=50  finishOnDeath=true    4 kills, 4 requests sent, silent
+
+No audible difference.
+
+### Nor does giving the victim time to start the line
+
+The follow-up hypothesis was ordering rather than the flag. On a fatal impact
+the mod applies damage with `delayed=0`, deliberately, so that the engine's own
+trample cannot land the killing blow and take the crime attribution with it.
+That means the victim dies in the same tick the bark is requested, and a flag
+that protects a *running* monolog has nothing to protect.
+
+A `FatalGraceMs` setting was added temporarily to reopen exactly that gap.
+
+    E   prio=50  finishOnDeath=true  FatalGraceMs=400
+
+The log confirms it applied: `delayed=400 ok=true` on all five fatal impacts,
+five requests sent. Still silent. The setting has been removed again rather than
+left in the code, because it buys nothing and weakens a safeguard.
+
+### What rules out the alternatives
+
+It is not the gallop tier, and it is not the impact sound masking a quiet grunt.
+In the priority test a gallop impact on an **armoured guard who survived** played
+the cry normally. The same tier, the same set, the same seven-layer impact sound,
+the only difference being that the victim lived.
+
+So the blocker is death itself, and it is not a timing problem: 400ms is ample
+for a line to begin, and the line never begins.
+
+### Where that leaves the gallop tier
+
+A gallop impact that kills is silent from the victim, and nothing found so far
+can change that. The cry works whenever the victim survives, which is what
+armour decides. This is a real constraint rather than an unexplained gap, and
+any future attempt should start by establishing whether a dying actor can be
+made to speak *at all* by any route, rather than by adding fields to this one.
+
+## Parked: the mod may be reporting the wrong crime
+
+Noticed in play and set aside deliberately, not investigated.
+
+Riding someone down currently reports as a brawl. The rider observed that
+drawing a sword and swinging without connecting produces a different crime, and
+that the guards' surrender dialogue for **that** one talks about hurting people
+rather than about brawling:
+
+> "I noticed the crime I get when I pull a sword out and swing but don't hit
+> anyone has the guards mentioning hurting people instead of brawling in their
+> surrender dialogs which better match our mod than getting crime for brawling
+> from hitting someone with the horse. we should look into setting up our hits
+> for whatever crime message that is instead of the brawling one we currently
+> send."
+
+So the work is to identify which crime that swing reports, and whether the mod
+can report the same one for a collision. The guards' spoken reaction is the
+observable that distinguishes them, and it already reads as a better fit for
+being trampled by a horse than "brawling" does.
+
+Not started. `Crime.lua` is where the report is raised.
+
+## Why a victim the mod kills dies silently
+
+The rider rejected the earlier conclusion that a dying actor cannot speak, and
+was right to:
+
+> "in vanilla when people die they still make sound so we should be able to
+> create the same thing as the engine clearly allows it. When I cut someone
+> down with a sword, they don't instantly go silent. So whats the real
+> difference here between when we kill them with gallop instead? ... What TYPE
+> of damage are we sending and to whom are we sending it to exactly?"
+
+That question found it.
+
+### `DealDamage` takes two arguments, and the mod was passing four
+
+`C_ScriptBindSoul` declares:
+
+    int DealDamage(IFunctionHandler* pH, float stamina, float health);
+
+The mod called `npc.soul:DealDamage(0, damage, attacker, false)`. Lua accepts
+the extra arguments and the engine discards them, so **the attacker and the
+flag were never delivered**. What the mod applies is a raw subtraction on the
+soul: no attacker, no hit type, no hit data, and nothing the victim's behavior
+tree observes.
+
+The call has been corrected to two arguments and the comment above it, which
+documented the four-argument form as though it were real, has been rewritten.
+The behavior is unchanged, because the arguments were already being thrown
+away; what changes is that the code no longer claims something false.
+
+### Which explains the silence
+
+Vanilla raises its death cry inside `IsDeadCheck -> Then` in
+`sb_switch_hitreactions.xml`, **while a hit is being processed**, and in vanilla
+the engine applies damage as part of resolving that hit, so the check sees a
+corpse. The mod's only hit reaches the victim at the moment of impact, while
+they are still alive, by design: `Update.lua` sends `combat:hit` first and
+`ApplyImpactDamage` deliberately lands last so the mod owns the kill and the
+crime attribution. The check therefore runs against a living victim, finds them
+alive, and nothing ever looks again. The blow that actually kills them is
+invisible to the brain.
+
+So the silence is a property of how the mod deals damage, not of the bark
+system, and not of death.
+
+### Re-sending the hit after death does not work, and is dangerous
+
+The obvious repair was to send a second `combat:hit` once the lethal damage had
+landed, carrying `real = false`, so the tree would re-evaluate against a corpse
+without touching reputation.
+
+Two failed attempts before the test ran at all, both caught by the absence of
+the `DeathHit` telemetry line rather than by ears: the guard tested
+`type(attacker) == "table"` when `GetMyWUID` returns a WUID, and `attacker` is
+only populated when `CollisionIsCrime` is on, which the test had switched off.
+Neither run was evidence of anything, and both were nearly reported as though
+they were.
+
+With it genuinely running, `DeathHit rat_woman35 sent=true err=nil`:
+
+- **No death cry.** The hypothesis is falsified.
+- **An instant murder charge, with `CollisionIsCrime` off.**
+
+That second result matters on its own. The retaliation work recorded that
+`real = false` "drives the victim's decision without reaching the reputation
+system, so no fine is levied and no guard is summoned". Against an **already
+dead** victim that does not hold: the hit registered as murder regardless. So
+`real = false` is not a general exemption from the crime system, and anything
+built on that assumption needs re-checking.
+
+The experiment has been removed rather than left behind a default-off setting,
+because a code path that can hand the player a murder charge is not worth
+keeping for a result that was negative anyway.
+
+### What would still be worth trying
+
+Not attempted, and the honest next step rather than another field on the
+message: let the **engine** apply the killing damage as part of a hit it
+resolves itself, instead of the mod subtracting health afterwards. That is what
+vanilla does and it is the only route observed to produce the cry. It collides
+head-on with the attribution ordering in `ApplyImpactDamage`, so it is a
+redesign of how the mod kills rather than an addition, and it should not be
+started without deciding whether the death cry is worth that risk.
+
+## Death sounds are dialogue, and a dead victim will not take a request
+
+Two results that together close off the message-based approach.
+
+### The decisive control: `wh_dlg_Enable 0`
+
+The dialog debug CVars are useless for this. With `wh_dlg_Enable 1`,
+`wh_dlg_Verbosity 2`, `wh_dlg_RecordDialog 1` and `wh_dlg_DialogDebug 1` all
+set, and a death bark audibly firing on a sword kill, `kcd.log` received not one
+line from the dialog system. Monologs do not report through those facilities.
+
+`wh_dlg_Enable 0` needs no logging, and it answered the question outright. The
+rider killed several people with a sword:
+
+> "I didn't hear any sounds, no death sounds, no barks, nothing"
+
+**So the death sounds are the dialog system**, not a separate combat audio path.
+The prediction recorded before the test was the opposite, that the sounds would
+survive and only the barks would stop. That was wrong, and being wrong was
+useful: it means the bark system has been the right target all along.
+
+Note also that the death *bark* does not fire on every vanilla kill, only some,
+so its absence in any single trial proves nothing on its own.
+
+### Raising the cry after death does not work either
+
+Every earlier attempt sent `RANENY_NA_ZEMI` at the moment of contact, while the
+victim was alive, and then killed them. Vanilla sends it from inside
+`IsDeadCheck -> Then`, once death is confirmed. That difference in timing had
+never been tested.
+
+`BarkDeath` already runs when a victim dies, so the cry was raised from there
+with every vanilla flag and a winning priority:
+
+    J   DeathCry=true  prio=50  overrideContextSuppress=true
+        doNotInterruptOnActorDeath=true
+
+Two kills, two `DeathCry ... requested=true` lines, silent. The experiment has
+been removed again.
+
+### What the whole set of results now says
+
+    death sounds are dialogue                        proven, wh_dlg_Enable 0
+    vanilla sword kills produce them                 observed repeatedly
+    an external monologRequest to a LIVING npc works routinely, all session
+    an external monologRequest to a DEAD npc         never once produced sound,
+                                                     at impact or after death,
+                                                     with any flag combination
+    the mod's damage carries no hit                  DealDamage takes two args
+
+The consistent reading is that a dead entity stops processing messages: its
+subbrain is gone, so a `dialog:monologRequest` arriving afterwards has nothing
+to receive it. Vanilla's works because its request is raised **by the victim's
+own tree while that tree is still running**, mid hit-resolution, in the frame
+where the engine applies lethal damage. The brain is alive at the moment the
+request is made and dead immediately after.
+
+The engine's own context options point the same way: `b_context` carries
+`keepCombatSubbrainActiveWhileUnconscious` and
+`keepRunningDaycycleActivitiesWhileUnconscious`, which only make sense if
+subbrains are otherwise torn down when a character stops being conscious.
+
+### The one route left
+
+Let the engine resolve the killing hit, so its own hit-reaction tree runs the
+death branch and raises the cry itself. That is the only mechanism ever observed
+to produce the sound, and it cannot be reached by sending messages from outside.
+
+It costs the attribution ordering in `ApplyImpactDamage`, which exists so the
+mod's damage lands last and owns the kill. That is a redesign of how the mod
+kills rather than an addition, and it should be weighed as such rather than
+attempted casually.
+
+## Why the debug CVars do nothing, and which ones will
+
+Asked after a long run of debug CVars across this project accepting a value and
+producing no output:
+
+> "there seems to be a consistent issue with dozens of cvars over the course of
+> this project not working, mostly ones involved in debugging ... Why would they
+> even exist if they don't do anything?"
+
+**The retail build registers the CVars and compiles their implementation out.**
+
+The evidence is in the binary's string table. Ninety-seven dialog-related
+strings survive, including every CVar name and every help string, because those
+are arguments to the registration call. What does not survive is any of the text
+those debug switches would print: searching for the output of
+`wh_dlg_DialogDebug` ("prints list of active dialogs") or `wh_dlg_RecordDialog`
+("list of topics used during this dialog will be printed") finds nothing at all.
+The registration is compiled in; the code behind it is not.
+
+That predicts exactly the pattern seen all session:
+
+    wh_dlg_Enable        changes gameplay logic      works, silenced everything
+    wh_dlg_DialogDebug   prints debug output         inert
+    wh_dlg_RecordDialog  prints debug output         inert
+    wh_dlg_Verbosity     controls debug output       inert
+
+So the rule for this project is: **a CVar that changes what the game does can be
+expected to work; a CVar whose only job is to print or draw debug information
+cannot.** No launch flag changes this, `-devmode` included, because the code is
+absent from the shipping executable rather than gated at runtime.
+
+Before spending time on any debug CVar, check whether the strings it would print
+exist in the binary. If they do not, the switch is a shell.
+
+## Our barks fire during combat; vanilla's do not
+
+Noticed in play:
+
+> "during the last fight I just had in game with a guard, I noticed our barks
+> where firing when I was gallopping him while in combat/crime which probably
+> shouldn't happen"
+
+Vanilla gates its entire collision bark branch on this, at
+`sb_switch_hitreactions.xml:293`:
+
+    !$b_inCombat & !$b_context['suppressCollisionsBark']
+
+Both halves matter. `HushVanillaBark` supplies the second, which is why the mod
+can take over the line outside combat. The **first** has no counterpart in the
+mod: `BarkCollision` asks only whether barks are enabled and what the tier is,
+so a victim already fighting the player still gets a collision complaint.
+
+That is a real gap rather than a matter of taste. Vanilla's judgement is that a
+man in a fight does not stop to complain about being bumped, and the mod should
+follow it. `Update.lua` already reads a combat state for the stamina multiplier
+and `SuppressStaggerInCombat`, so the signal is at hand.
+
+Not yet fixed.
+
+## The gallop death cry: what is reachable and what is not
+
+Continuing after the rider rejected "a dying actor cannot speak" and asked what
+was different about the damage. That line of questions produced the `DealDamage`
+finding, and this is where it ends up.
+
+### Timing was part of it after all
+
+Sending the cry at the moment of contact and killing the victim in the same tick
+gives the dialog system no time to start the line. Dispatch passes two halt
+locks, a priority auction and two semaphores first. With `FatalGraceMs` holding
+the lethal damage back:
+
+    grace 400    silent
+    grace 1500   the cry starts, then cuts off partway
+    grace 3000   the cry completes
+
+So the earlier conclusion that timing was not the obstacle was wrong, and the
+rider's objection to it was right. It was measured at 400ms, which is simply too
+short, and a negative at one value was generalised into a negative at all.
+
+**Death is what cuts the line**, and `doNotInterruptOnActorDeath(true)` does not
+prevent it, despite being set in all of these runs.
+
+### But a grace long enough to finish looks broken
+
+At 3000ms the victim barks, begins to get up, and then dies:
+
+> "the people do their bark and then they attempt to get up and then go limp
+> back down on the ground"
+
+The ragdoll grounds at roughly 1.5 to 1.7 seconds and recovery follows, so any
+delay long enough for the cry to finish is also long enough to be seen. The
+window is not narrow, it is closed.
+
+### The set is wrong as well, and the right one is unreachable
+
+The rider heard it:
+
+> "the 'dying' sounds we are using are not like the dying sounds used when I
+> actual kill someone with my sword. Ours seems tamer?"
+
+Correct, and the tables agree. `RANENY_NA_ZEMI` is "wounded on the ground", a
+man lying hurt: "Aaaah... dear God...". The screams of a man being struck are
+`ZASAH_ZBRANI_SILNY`, which is both harder and shorter: "Aaaah!", "Yow!",
+"Enhhhh!" A shorter line might have finished inside an invisible grace, solving
+both problems at once.
+
+It cannot be driven. Three kills, three requests sent at priority 50 with all
+three vanilla flags and `delayed=1000` confirmed applied: silent.
+
+That is consistent with the corpus. **No brain file anywhere sends
+`ZASAH_ZBRANI_SILNY` or `ZASAH_ZBRANI_SLABY` as a metarole.** The only
+references are four `addRole` assignments in `libs/storm/roles/`, granting the
+roles to Henry and to combat NPCs. The engine plays these internally while
+resolving a hit; they are not part of the message-driven bark surface at all.
+
+### Where this leaves it
+
+    reachable, wrong register, needs a visible delay   RANENY_NA_ZEMI
+    right register, unreachable by message             ZASAH_ZBRANI_SILNY
+    reachable and correct                              nothing found
+
+The only remaining route is still the one identified earlier: let the engine
+resolve the killing hit, so its own code plays the scream and its own tree runs
+the death branch. That is what a sword does. It costs the attribution ordering
+in `ApplyImpactDamage` and is a redesign rather than a setting.
+
+`FatalGraceMs` is left in the code at 0, which is the shipped behavior
+unchanged, because it is the instrument that measured this and the numbers above
+are only meaningful with it present.
+
+## Collision damage is Lua, and it has knobs
+
+Two questions from the rider, both of which turn out to have been resting on an
+assumption nobody had checked:
+
+> "why can't we have the engine resolve the hit so it goes into it's death flow
+> but not attribute the death to us?"
+
+> "we've been operating on the assumption that when physical collision kills the
+> NPC that it's a given that it's attributed to the player. Is it possible we
+> can set that? ... KCD's entire system is built to avoid the actual cry engine
+> as much as possible so they can control everything."
+
+That reading of the game is right, and it pointed at the answer.
+
+### Why `g_debugCollisionDamage` prints nothing
+
+Not a stripped implementation this time. `SinglePlayer.lua` contains:
+
+    --if (self.game:DebugCollisionDamage()>0) then
+
+**The logging is commented out in the shipped Lua.** `DebugCollisionDamage` is
+a real registered script bind with a live function pointer, sitting in the
+registration table beside `IsInvulnerable` and `SetInvulnerability`; it is the
+caller that was disabled. So the earlier rule needs a second clause: a debug
+CVar can also be inert because vanilla's own script stopped asking.
+
+### The collision damage path is script-driven
+
+`Scripts/Entities/actor/BasicActor.lua` exposes the values the engine's
+collision damage uses, as getters the C++ calls back into:
+
+    GetCollisionDamageThreshold()  -> self.collisionDamageThreshold or 0
+    GetSelfCollisionMult(collider) -> selfCollisionDamageMult    (static geometry)
+                                      vehicleCollisionDamageMult (collider.vehicle)
+                                      entityCollisionDamageMult  (everything else)
+    GetForeignCollisionMult()      -> foreignCollisionDamageMult or 1
+    GetColliderEnergyScale()       -> colliderEnergyScale or 1
+
+and the shipped values are per archetype:
+
+    NPC_x.lua    collisionDamageThreshold = 2
+    player.lua   foreignCollisionDamageMult = 0.1, vehicleCollisionDamageMult = 7.5
+
+The resulting damage arrives at `BasicActor.Server:OnHit(hit)` as an ordinary
+hit carrying `shooterId`, `targetId`, `damage` and `weaponId`. So the engine's
+trample is not an unreachable physics event: it is a hit, built from values the
+scripts supply, delivered to a Lua handler.
+
+**This has never been tested from the mod**, and none of it is confirmed to
+apply to a horse-on-NPC collision specifically. It is a lead, not a finding.
+
+### The fork it exposes
+
+The two goals pull in opposite directions, and this is the choice rather than a
+problem to solve:
+
+- **Zero the engine's contribution.** Setting the victim's
+  `entityCollisionDamageMult` to 0, or raising `collisionDamageThreshold`, would
+  mean the engine deals no collision damage at all. Nothing to attribute, and
+  the whole deferred-damage ordering in `ApplyImpactDamage` that exists to win
+  the race could go. Clean, and it makes the mod the only source of damage.
+  It also guarantees no engine death flow and therefore no death cry, ever.
+
+- **Let the engine land the killing blow.** Its own hit resolution runs, which
+  is the only mechanism ever observed to produce the death scream and the
+  `IsDeadCheck` bark branch. The mod stops owning the kill, and attribution
+  becomes whatever the engine decides, which is the thing the current design was
+  built to prevent.
+
+The interesting possibility the rider raised is that these need not be
+exclusive: if the attribution on the engine's hit can be cleared or redirected,
+the engine could resolve the kill while the blame is set separately. Whether
+`shooterId` can be influenced from script is unknown and is the first thing to
+establish if this is pursued.
+
+## The engine's collision damage is not reachable from script
+
+Four attempts, each a single variable, each verified as having actually run.
+All negative.
+
+The question being tested was the rider's: the game deliberately routes
+everything through its RPG and combat systems rather than letting CryEngine
+physics decide outcomes, so "a physical collision is automatically the player's
+doing" ought to be a rule somewhere rather than a law of nature.
+
+### What was tried
+
+    N   entityCollisionDamageMult = 0 on nearby NPCs        engineTook unchanged
+    O   same, applied by the mod ahead of contact           engineTook unchanged
+    P   all four multipliers = 0, threshold = 9999          engineTook unchanged
+    Q   the mod sends the victim nothing at all             engineTook unchanged
+        (no combat:hit, crime off; no hitReaction)
+    R   Knockback = 0, Uplift = 0                           engineTook unchanged
+
+Test O was verified rather than assumed: a probe found 27 of 30 nearby NPCs
+carrying `entityCollisionDamageMult = 0` and the mod's own table marking 32
+entities, so the suppression was genuinely in place when the impacts happened.
+
+`engineTook` stayed in its usual band throughout, 6 to 54 health, on every
+non-fatal impact. The zeros in every sample are `fatal=true` rows, where the
+mod's own damage lands first with `delayed=0`.
+
+### Test R was badly designed, and says less than it looks
+
+Setting `Knockback` and `Uplift` to zero did not stop victims being thrown:
+`thrown=0.82` through `thrown=5.11` in the same run. **The throw is the engine's
+physical collision, not the mod's impulse**, which this diary already records as
+settled. The test was built on an assumption that contradicts a known finding,
+and because the victims still flew and still landed, it cannot separate "damage
+from being struck" from "damage from landing". That question remains open.
+
+### Where the `BasicActor` lead ends
+
+`Scripts/Entities/actor/BasicActor.lua` really does expose the collision damage
+values as getters the engine calls into, and the horse really does take the
+`entityCollisionDamageMult` branch, having no `vehicle` table and an `actor`.
+Zeroing them changes nothing about a horse-on-NPC collision, so whatever charges
+the victim does not come through that path.
+
+So the answer to "is there a setting" is: **not in the actor scripts, and not
+via anything the mod sends.** The charge happens with the mod silent and every
+script-visible multiplier at zero.
+
+### What this settles for the design
+
+The mod cannot stop the engine charging a collision victim, and therefore cannot
+stop the engine being in the race. The deferred-damage ordering in
+`ApplyImpactDamage` is not a workaround for something unexplored; it is a
+response to a force that four separate levers failed to touch.
+
+That makes the crime question a genuine design decision rather than a stopgap,
+which is what the rider wanted established before deciding it.
+
+Still open, and the one thing test R was meant to answer: how much of
+`engineTook` is the strike and how much is the landing. Separating them needs a
+victim who is struck but does not fall, or a fall with no strike.
+
+## What the collision damage actually is
+
+Prompted by the rider refusing the "mysterious engine force" framing and asking
+whether the assumption underneath it was wrong:
+
+> "Can we even say for sure the damage the NPCs are enduring is in fact damage
+> from physics level collisions or is that some fundamentally flawed assumption
+> we've been operating on this entire project."
+
+Partly flawed, and the correction matters.
+
+### It is KCD's own system, not physics leaking through
+
+KCD enumerates its damage reasons, recovered from the binary:
+
+    0 DR_ReasonUnknown    5 DR_FallDamage
+    1 DR_Combat           6 DR_Poisoning
+    2 DR_Starvation       7 DR_Bleeding
+    3 DR_Collision        8 DR_SelfHarm
+    4 DR_ScriptedHit      9 DR_Last
+
+`DR_Collision` is a first-class damage reason, distinct from `DR_FallDamage`
+and from `DR_ScriptedHit`, which is presumably what the mod's own `DealDamage`
+produces. The RPG module carries a matching cause class,
+`wh::rpgmodule::C_CollisionHitCause`, alongside `C_CombatHitCause` and
+`C_FallDamageCause`.
+
+So the rider's reading of the game was right and the framing this project has
+used was wrong. Physics is not deciding the damage. Physics supplies a
+**velocity**, and KCD's RPG system converts it into damage on purpose, through
+a parameter it ships:
+
+    Libs/Tables/rpg/rpg_param.xml
+        CollisionVelocityDeltaToDmgR = 0.25
+        MaxDmgR                      = 4
+        MaxDamage                    = 200
+
+`CollisionVelocityDeltaToDmgR` is the coefficient from collision velocity delta
+to damage rating. That is the whole mechanism the mod has been calling an
+unreachable engine force and building a deferred-damage race against.
+
+### Why the earlier levers all failed
+
+`BasicActor.lua`'s `collisionDamageThreshold` and the four collision damage
+multipliers are **CryEngine's** collision damage, the legacy Crysis path in
+`Scripts/GameRules/SinglePlayer.lua`. That path writes
+`target.actor:SetHealth(...)`, the CryEngine actor health, and its only
+collision-specific branch applies when the target is the player.
+
+The mod measures `npc.soul:GetState("health")`, which is the RPG soul health.
+Those are different numbers maintained by different systems, which is exactly
+why zeroing every multiplier changed nothing: the knobs belong to a system that
+is not the one charging the victim.
+
+### Which also explains the debug CVars
+
+`g_debugCollisionDamage` logs nothing because the line that would print it is
+commented out in `SinglePlayer.lua`, and that file is the legacy path anyway.
+`pl_fallDamage_*` and `wh_player_SlidingDistanceMultForDamage` are the CVars
+that do relate to the RPG system, and the latter names it outright: "Multiplies
+distance passed to RPG fall damage computation when sliding ends."
+
+### What can be done about it
+
+`rpg_param` is a shipped table, and KCD mods override tables. The mod already
+ships data overrides through `mod_assets`, including `Libs/Config/hcm_actionmaps.xml`
+and several animation databases, so the mechanism is in place.
+
+Setting `CollisionVelocityDeltaToDmgR` to 0 should remove collision damage
+entirely. **This is inference from the parameter's name and the enum, not a
+measurement**, and the test is direct: override the table, restart, and see
+whether `engineTook` falls to zero.
+
+The cost, if it works, is that the parameter is global. Every collision in the
+game changes, for the player as well as for NPCs, so a rider thrown from a horse
+or caught by a cart would stop taking that damage too. Whether that is
+acceptable is a design question and not a technical one, and it is close to
+what the rider already suspected: vanilla may barely use this, in which case
+turning it down may be nearly invisible.
+
+There is no Lua setter. `S_RpgParams` is a flat array of 640 values at a fixed
+address with a metadata table beside it, and `I_Soul::GetRpgParamByState` only
+reads. So this is a shipped table override rather than something the mod can
+toggle at runtime.
+
+## CONFIRMED: one RPG parameter removes the engine's collision damage
+
+    Libs/Tables/rpg/rpg_param.xml
+        CollisionVelocityDeltaToDmgR   0.25 -> 0
+
+Shipped as a table override under `mod_assets/Libs/Tables/rpg/`, verified on
+disk, verified read back from the game's own table at runtime through
+`Database.GetTableLine`, and then measured over 25 impacts after a restart:
+
+    before   engineTook 6 to 54 on every non-fatal impact
+    after    engineTook 0.0 on all 25, fatal and non-fatal alike
+
+The mod's own damage is unaffected and still lands, so a victim goes from 100 to
+84.4 with the engine contributing nothing.
+
+### What this overturns
+
+The engine's trample has been treated as an unreachable force for the life of
+this project. It is one coefficient in a shipped table, converting collision
+velocity delta into a damage rating, and it can be set to zero.
+
+Five earlier attempts failed because they were aimed at the wrong system.
+`BasicActor.lua`'s `collisionDamageThreshold` and its four multipliers belong to
+CryEngine's legacy collision damage, which writes `actor:SetHealth`. KCD's own
+RPG layer charges `soul` health through `DR_Collision` and tunes it here.
+
+### What it unlocks
+
+`ApplyImpactDamage` sets `delay = 0` on any fatal impact, with the reason
+recorded in the code: waiting would give the engine's trample a head start on a
+victim it was always going to kill, and whichever system lands the killing blow
+takes the crime attribution with it.
+
+**With the engine contributing nothing there is no head start to give.** The
+race the deferred-damage ordering exists to win no longer has another runner, so
+a fatal impact can wait as long as it likes without risking attribution.
+
+That matters because the fatal path's zero delay is exactly what makes the mod's
+kills silent: the cry of pain is requested at contact and the victim dies in the
+same tick, before the dialog system can start the line. Measured earlier, a
+grace of 1500ms starts the cry and 3000ms completes it.
+
+So the death cry and the attribution are no longer in tension. They were only in
+tension because of a force that turns out to be a table value.
+
+### What is still unresolved
+
+A grace long enough to complete the cry is long enough to see: at 3000ms the
+victim barks, begins to rise, and then dies. The ragdoll grounds around 1.5 to
+1.7 seconds. That is a separate problem from attribution and is not solved by
+this.
+
+The parameter is global. Nothing has been tested about what else reads it.
+Whether a rider thrown from a horse takes `DR_Collision` or `DR_FallDamage` is
+unknown, and they are separate enum values with separate tuning, so the earlier
+claim in this diary that the player would stop taking that damage was unfounded
+and is withdrawn. It needs measuring, not assuming.
+
+## Parked: hot-reloading data tables in the dev tools
+
+`Database.LoadTable(name)` is a real Lua bind, alongside `GetTableInfo`,
+`GetColumnInfo`, `GetTableLine` and `GetTableColumnData`. `dev_console.py` now
+fires it for `rpg_param` on the animation half of a deploy and reports the row
+count back, which is how the override above was verified without inference.
+
+**It is verification, not hot-reload.** Loading the table repopulates the
+database interface, but systems that copy values into their own structures at
+startup, the RPG parameters among them, do not pick the new value up. A restart
+is still required for the parameter to take effect.
+
+Parked for a later look at whether the tooling can go further: whether any
+system re-reads its tables on demand, whether `wh_db_ReloadObjectDatabase`
+reaches more than object databases, and whether the flat `S_RpgParams` array
+can be refreshed. Worth doing because a restart per table change is the slowest
+loop in the project.
+
+## FALSIFIED: the collision parameter cannot be zeroed. It governs arrows.
+
+`CollisionVelocityDeltaToDmgR` was set to **25**, a hundred times its shipped
+0.25, in a clean vanilla install. The rider played normally and an arrow killed
+him outright on the first hit.
+
+**Arrows read this parameter.** Obvious in hindsight: an arrow striking someone
+is a collision at velocity, resolved through the same physics-velocity-to-damage
+path as a horse striking someone.
+
+So the earlier plan, zeroing it to remove the engine's contribution to horse
+collisions, would have removed archery damage as well. That is a silent,
+catastrophic break, and it would have shipped. The idea is dead.
+
+The amplification design is what caught it. Setting the value to **0** cannot
+distinguish "nothing reads this" from "something reads it and now gets zero";
+setting it **high** makes every reader announce itself. Prefer amplifying a
+suspect parameter over nulling it.
+
+### The earlier "it works" result was real but undeliverable
+
+The 25-impact run where `engineTook` fell to zero was measured with the override
+as a **loose file**, which only wins because the development `system.cfg` sets
+`sys_PakPriority = 0`. A vanilla install ignores loose files entirely, so that
+configuration could never have reached a player. Two separate mistakes were
+stacked there: testing "vanilla" with a mechanism that requires dev mode, and
+not noticing that the mechanism was the dev mode.
+
+### How to override a table properly
+
+Established by copying what a working mod does. Perkaholic ships
+`Data/perkaholic.pak` containing `Libs/Tables/rpg/perk__perkaholic.xml`.
+
+    Mods/<name>/Data/<anything>.pak
+        Libs/Tables/<group>/<table>__<modid>.xml
+
+The file carries only the rows to change, with the same header as the base
+table. The suffix must equal the **ModId from `mod.manifest`**, and the game
+refuses a ModId that is not lowercase letters and underscores:
+
+    Mod mods/CollisionParamTest/mod.manifest has invalid ModId.
+    ModId accepts only lowercase letters and underscore.
+
+That line sat in the log through a whole failed attempt before it was read.
+
+### How to verify a table override, and how not to
+
+`Database.LoadTable(name)` **cannot** verify a patch. It re-reads the base table
+file and bypasses the startup merge, so it reported 0.25 while a correct patch
+was loaded. It only appeared to work earlier because a loose file had replaced
+the base file outright.
+
+The real proof is written by the game at startup:
+
+    Table 'rpg_param' is patched by 'rpg_param__collisiontest',
+        lines added: 0, modified: 1, equal: 0
+
+## CONFIRMED: a brief immortality removes the engine's collision damage
+
+The engine charges a collision victim health through `DR_Collision`, and five
+separate levers failed to change it: the four `BasicActor` collision
+multipliers, the collision damage threshold, suppressing every message the mod
+sends, and removing the mod's impulse. The one parameter that does work,
+`CollisionVelocityDeltaToDmgR`, is global and governs arrows.
+
+Rather than stop the damage, stop it landing.
+
+`soul:AddBuff` and `soul:RemoveAllBuffsByGuid` are Lua binds on the soul, and
+the game ships `immortality_nonpersistent`
+(`730503bf-735a-4f47-baae-c2d84ee77524`, `imm=1`). Applied from the detection
+loop ahead of contact, the engine's trample lands on an immortal victim and does
+nothing.
+
+### The timing has to be event driven, not timed
+
+Two timed attempts both failed, and failed silently in a way worth recording:
+
+    shield 1200ms, damage delay  600ms   -> after=1.0 on every shielded victim
+    shield  700ms, damage delay 1100ms   -> after=1.0 on most of them
+
+`imm=1` prevents death outright, so whenever the shield was still up as the
+mod's damage landed, the victim was clamped to 1 health instead of dying. A
+timer has to be long enough to cover the engine's trample and short enough to
+end before the mod charges the victim, and missing on either side produces no
+error at all.
+
+The rider proposed removing the guess:
+
+> "Why wouldn't we immediately lift immortality as soon as the damage is dealt.
+> I'm going to assume if it works like the physics for throw distance, it's
+> given immediately to the NPC upon impact."
+
+`LiftCollisionShield` is now the first line of `deal()` in `ApplyImpactDamage`,
+so the shield ends where the mod's damage begins, in the same call. The timer
+survives only as a safety net.
+
+### Measured
+
+    engineTook=0.0  health=100.0  after=0.0  fatal=true
+    engineTook=0.0  health=100.0  after=0.0  fatal=true
+    engineTook=0.0  health= 83.0  after=0.0  fatal=true
+
+A victim at full health, killed entirely by the mod, with the engine
+contributing nothing. Rows still showing `engineTook` in the teens and forties
+are victims the detection loop did not see before contact, so they were never
+shielded.
+
+### What this changes
+
+`ApplyImpactDamage` defers its damage so it lands last and owns the kill, and
+that deferral is why a victim the mod kills dies silently: the cry of pain is
+requested at contact and the victim dies in the same tick. With the engine
+contributing nothing there is no race to win, so the ordering is free to change.
+
+### The side effect that must be fixed before this ships
+
+Of 44 shields applied, 19 were lifted synchronously. The shield goes on
+everyone the horse approaches, and only those actually struck have it lifted at
+the moment of damage; the rest wait for the safety net. So a bystander near the
+rider's horse is briefly immortal, and an arrow or a sword aimed at them in that
+window would do nothing.
+
+Narrowing the window, or shielding only at the moment contact is scored rather
+than on approach, is the obvious fix and is not yet done.
+
+## CORRECTION: the collision shield was never confirmed, and does not work
+
+The section above titled "CONFIRMED: a brief immortality removes the engine's
+collision damage" is **wrong** and should not be built on.
+
+It cited these rows as proof:
+
+    engineTook=0.0  health=100.0  after=0.0  fatal=true
+    engineTook=0.0  health= 83.0  after=0.0  fatal=true
+
+Every one of them is `fatal=true`. On a fatal impact `ApplyImpactDamage` sets
+`delay = 0` and charges the victim in the same tick, so there is no window for
+the engine to take anything and `engineTook` is zero **whether or not anything
+shielded the victim**. That behaviour predates the shield by the whole life of
+the crime-attribution work. It is not evidence of anything.
+
+The measurement that matters is a **non-fatal** impact, where the 600ms delay
+leaves the engine a real window. Re-read from the same run:
+
+    test 3, shield in the sweep, non-fatal impacts
+        22.3  13.1  45.5  22.9  15.2  15.6  17.3  18.7
+
+Not one blocked. The shield was never working. Later placements did no better:
+
+    test 4  short renewing window        2 of 8 non-fatal at zero
+    test 5  shield at the scored impact  0 of 8
+    test 6  look-ahead 0.6m              1 of 10
+    test 6b look-ahead 3.0m              0 of 5
+
+The two zeros in test 4 are as likely to be victims who took no engine damage
+that tick as they are to be the shield.
+
+### What is actually established
+
+`imm=1` does reach the victim: the first attempts clamped them at 1 health
+instead of killing them, which only the buff can explain. So `AddBuff` works and
+immortality applies. What it does **not** do is stop the engine's collision
+damage, which lands regardless and is measured as `engineTook` afterwards.
+
+So `imm` prevents death, not damage, and the engine's collision charge is not
+death. Zeroing it needs something that blocks the damage itself, and nothing
+found so far does.
+
+### The process failure, which matters more than the result
+
+A section was titled CONFIRMED, written up in detail, and committed, on a
+misreading of telemetry whose meaning had already been established earlier in
+the same session. The rule that was broken is the one recorded in
+`a-sent-request-is-not-a-spoken-line`: a number the mod writes about its own
+behaviour proves only what it measures, and `engineTook` on a fatal impact
+measures nothing.
+
+**Before calling any result confirmed, state which rows would look different if
+the mechanism did nothing, and check that those specific rows changed.** Here
+that was the non-fatal impacts, and they never changed at all.

@@ -134,7 +134,7 @@ and only watching vanilla answers 4.</li>
  directly descriptive writing for this exact situation.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 5.5.0</li>
+        <li><strong>Release</strong>: 5.6.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -162,8 +162,8 @@ and only watching vanilla answers 4.</li>
 	<td class="summary">The bark set an impact at this speed should raise.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:BarkCollision">HorseCollisionMod:BarkCollision (npc, tier)</a></td>
-	<td class="summary">Speaks for a collision, and for whoever saw it.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkCollision">HorseCollisionMod:BarkCollision (npc, tier, inCombat)</a></td>
+	<td class="summary">Speaks for a collision, at the moment of contact.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BarkRecovered">HorseCollisionMod:BarkRecovered (npc, tier)</a></td>
@@ -176,6 +176,15 @@ and only watching vanilla answers 4.</li>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BarkDeath">HorseCollisionMod:BarkDeath (npc)</a></td>
 	<td class="summary">Speaks when the mod's own actions have killed somebody.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ShieldFromEngineDamage">HorseCollisionMod:ShieldFromEngineDamage (npc)</a></td>
+	<td class="summary">Makes a victim briefly immortal so the engine's collision damage lands on
+ nothing.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:LiftCollisionShield">HorseCollisionMod:LiftCollisionShield (npc)</a></td>
+	<td class="summary">Takes the collision shield off a victim, now.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:HushVanillaBark">HorseCollisionMod:HushVanillaBark (npc)</a></td>
@@ -389,15 +398,15 @@ and only watching vanilla answers 4.</li>
 </dd>
     <dt>
     <a name = "HorseCollisionMod:BarkCollision"></a>
-    <strong>HorseCollisionMod:BarkCollision (npc, tier)</strong>
+    <strong>HorseCollisionMod:BarkCollision (npc, tier, inCombat)</strong>
     </dt>
     <dd>
-    Speaks for a collision, and for whoever saw it. </p>
+    Speaks for a collision, at the moment of contact. </p>
 
-<p> The victim reacts first. A bystander is asked separately and only for the
- harder tiers, because someone being shoved aside at a walk is not an event
- worth a stranger shouting about, and because the bystander sets are all
- about bodies.
+<p> A walk speaks words straight away. A knockdown cries out here and says
+ something later, from <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:BarkRecovered">BarkRecovered</a>, which this schedules.</p>
+
+<p> Refused outright during a fight, matching vanilla.
 
 
     <h3>Parameters:</h3>
@@ -409,6 +418,11 @@ and only watching vanilla answers 4.</li>
         <li><span class="parameter">tier</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
          the speed tier the impact was scored at
+        </li>
+        <li><span class="parameter">inCombat</span>
+            <span class="types">optional <span class="type">boolean</span></span>
+         true when the player is in combat, which silences
+   the whole moment unless <code>BarkInCombat</code> says otherwise
         </li>
     </ul>
 
@@ -517,6 +531,76 @@ and only watching vanilla answers 4.</li>
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:ShieldFromEngineDamage"></a>
+    <strong>HorseCollisionMod:ShieldFromEngineDamage (npc)</strong>
+    </dt>
+    <dd>
+    Makes a victim briefly immortal so the engine's collision damage lands on
+ nothing. </p>
+
+<p> The engine charges a victim health for being struck by a moving physical
+ body and the mod cannot stop it. Five separate levers leave it unchanged.
+ <code>BasicActor</code>'s collision multipliers belong to CryEngine's legacy damage
+ path rather than to the RPG layer that charges <code>soul</code> health, and the
+ one parameter that does work, <code>CollisionVelocityDeltaToDmgR</code>, is global and
+ also governs arrows.</p>
+
+<p> So rather than stop the damage, this stops it <strong>landing</strong>. <code>imm=1</code> is the
+ parameter behind the game's own <code>immortality</code> and <code>death_protection</code> buffs,
+ and <code>immortality_nonpersistent</code> carries it without being able to survive a
+ save. Applied ahead of contact and removed once the engine has settled, the
+ victim is untouchable for exactly the window the trample occupies, and the
+ mod's own damage lands afterwards on a mortal target.</p>
+
+<p> <strong>This is deliberately narrow.</strong> It is one buff, on one victim, for a few
+ hundred milliseconds, and it is removed by GUID so nothing of it persists.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         somebody in front of the horse
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:LiftCollisionShield"></a>
+    <strong>HorseCollisionMod:LiftCollisionShield (npc)</strong>
+    </dt>
+    <dd>
+    Takes the collision shield off a victim, now. </p>
+
+<p> Called from <code>ApplyImpactDamage</code> immediately before it charges the victim, so
+ the immortality that swallowed the engine's trample cannot also swallow the
+ mod's own damage. Safe to call on somebody who was never shielded.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a removal was attempted
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:HushVanillaBark"></a>
     <strong>HorseCollisionMod:HushVanillaBark (npc)</strong>
     </dt>
@@ -559,7 +643,7 @@ and only watching vanilla answers 4.</li>
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-12 15:19:04 </i>
+<i style="float:right;">Last updated 2026-09-12 21:54:24 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

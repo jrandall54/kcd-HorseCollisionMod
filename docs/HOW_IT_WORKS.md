@@ -29,22 +29,29 @@ full gallop costs a great deal. Because the game attributes a rider's collision
 to the rider, it is a crime like any other, and guards respond to it.
 
 Which is only true if the mod is the one that kills them. The game applies
-trample damage of its own for a collision, the mod can neither see nor stop it,
-and guards blame whoever lands the killing blow. So the mod waits for the
-trample to settle before charging the victim: the trample hits someone at full
-health, where it cannot kill, and the mod finishes them. Without that wait the
-mod charged first, fell a little short about two times in three, and let the
-game's trample decide. The same collision was then ignored on one villager and
-an instant hanging offence on the next, whatever `CollisionIsCrime` was set to.
+trample damage of its own for a collision, and guards blame whoever lands the
+killing blow, so a victim the trample happened to finish was charged to the
+player as murder whatever `CollisionIsCrime` was set to. The same collision was
+ignored on one villager and an instant hanging offence on the next.
 
-Waiting is not enough on its own, because a victim already hurt can be finished
-by the trample while the mod is still waiting. So the mod asks one question
-before the wait rather than during it: is this impact going to be lethal at
-all, by anyone's hand. If the victim is close enough to death that the game's
-trample could finish them, the mod does not wait and finishes them itself. How
-close counts is measured per tier, from the most the trample has been seen to
-take, rather than chosen: a rear takes nothing, a trot up to twelve, a gallop
-up to thirty-six, a charge up to sixty-two.
+So the mod stops the trample from being able to kill at all. Anyone the horse
+strikes is made briefly immortal at the moment of contact, and the immortality
+is lifted the instant the mod applies its own damage. The trample still hurts,
+and hurts exactly as much as before, but it can no longer take the last point
+of health from anybody. Across roughly two hundred test impacts the mod landed
+every kill and none was attributed to the player.
+
+One gap remains. The immortality ends when the mod deals its damage, about
+half a second after contact, while a body is often still tumbling. A victim who
+survives the impact and then takes more collision damage, most likely by being
+pinned between the horse and a wall, can still be killed by the game.
+
+The mod also waits a moment before charging a victim it did not kill outright,
+so the trample resolves first and the two are not competing. A victim already
+close to death is finished by the mod immediately instead, rather than left for
+the trample to reach. How close counts is measured per tier, from the most the
+trample has been seen to take: a rear takes nothing, a trot up to twelve, a
+gallop up to thirty-six, a charge up to sixty-two.
 
 The same reasoning covers the mod's own damage roll. Impacts vary a little so
 that two identical collisions are not identical, but a roll that turns a fatal

@@ -670,6 +670,14 @@ HorseCollisionModSettings = {
 	                                  -- back on their feet, rather than
 	                                  -- walking off without a word
 
+	-- Makes a victim the horse strikes immortal for the instant of contact, so
+	-- the engine's own collision damage cannot kill them and this mod is the
+	-- only thing that can. Lifted the moment the mod deals its damage. Without
+	-- it, a victim the trample happens to kill is charged to you as murder even
+	-- with CollisionIsCrime off.
+	ShieldVictimFromEngineDamage = true,
+	ShieldWindowMs           = 2000,  -- backstop only; the lift is synchronous
+
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
 	                                  -- around on his back

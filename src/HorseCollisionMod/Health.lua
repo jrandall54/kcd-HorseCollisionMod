@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -368,18 +368,32 @@ end
 -- close. `ImpactDamageVariance` is what makes "usually" mean anything, and a
 -- roll that decides death directly would be a different and much cruder thing.
 --
--- Applied through `soul:DealDamage(stamina, health, attacker, ...)`, which is
--- vanilla's own call: `deadBody.xml` and `questUtils.xml` use it to kill an
--- entity outright and `npc_roebuck.xml` to wound one. Stamina is left at zero
--- because the horse's side of the impact already debits the rider and the
--- victim's stamina is not what this models.
+-- Applied through `soul:DealDamage`, which is vanilla's own call:
+-- `deadBody.xml` and `questUtils.xml` use it to kill an entity outright and
+-- `npc_roebuck.xml` to wound one. Stamina is left at zero because the horse's
+-- side of the impact already debits the rider and the victim's stamina is not
+-- what this models.
 --
--- **Attribution follows `CollisionIsCrime`.** Named as the player's doing, a
--- death is the player's murder, which is what riding someone down at a gallop
--- ought to be. With the crime switch off the damage lands unattributed, so a
--- collision test is not interrupted by guards. This does not make a trampling
--- death crime free on its own: the engine attributes the trample itself, and
--- that is not reachable from here.
+-- **It takes two arguments and no more.** `C_ScriptBindSoul` declares
+-- `DealDamage(float stamina, float health)`, so an attacker passed as a third
+-- argument is accepted by Lua and discarded by the engine. This call is a raw
+-- subtraction on the soul: no attacker, no hit type, no hit data, and nothing
+-- the victim's behavior tree ever sees.
+--
+-- That has a consequence beyond tidiness. Vanilla's death cry is raised inside
+-- `IsDeadCheck -> Then` in `sb_switch_hitreactions.xml`, while a hit is being
+-- processed, because the engine applies damage as part of resolving that hit.
+-- Here the only hit the victim's brain receives is the one sent at the moment
+-- of impact, when they are still alive, so the check finds them alive and
+-- nothing looks again. A victim the mod kills therefore dies silently, and
+-- that is a property of this call rather than of the bark system.
+--
+-- Attribution is handled separately, by the `combat:hit` that `Crime.lua`
+-- sends, and by the ordering that makes this damage land last. With the crime
+-- switch off the damage lands unattributed, so a collision test is not
+-- interrupted by guards. This does not make a trampling death crime free on
+-- its own: the engine attributes the trample itself, and that is not reachable
+-- from here.
 --
 -- @tparam table npc victim entity
 -- @tparam string tierName the tier the impact scored
@@ -648,6 +662,13 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		-- Left alone otherwise: a victim who would have survived both is not
 		-- killed to tidy up attribution.
 		if why then
+			-- Zero by design: waiting hands the engine's trample a head start
+			-- on a victim this was always going to kill, and whichever system
+			-- lands the killing blow is the one the crime is attributed to.
+			--
+			-- Delaying the fatal blow to let the cry of pain begin does not
+			-- work at any value: a dying victim cannot speak, so the grace
+			-- period that stood here bought silence and a head start.
 			delay = 0
 
 			if self.Config.LogTelemetry then
@@ -661,6 +682,18 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 	end
 
 	local function deal()
+		-- Lift the collision shield first, synchronously, so the victim is
+		-- mortal by the time the line below charges them.
+		--
+		-- A timer cannot do this reliably: it has to be long enough to cover
+		-- the engine's trample and short enough to end before this runs, and
+		-- missing on either side is silent. Measured at a 700ms shield against
+		-- a 1100ms delay, victims still came out clamped at 1 health, because
+		-- `imm=1` prevents death and the removal had not taken effect. Doing it
+		-- here removes the guess: the shield ends where the mod's own damage
+		-- begins, in the same call.
+		self:LiftCollisionShield(npc)
+
 		local before = nil
 
 		pcall(function()
@@ -707,7 +740,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		end
 
 		local ok, err = pcall(function()
-			npc.soul:DealDamage(0, damage, attacker, false)
+			npc.soul:DealDamage(0, damage)
 		end)
 
 		-- Read back rather than subtracted, because whether this call emptied

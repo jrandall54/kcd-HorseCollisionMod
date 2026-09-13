@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.5.0"
+HorseCollisionMod.Version = "5.6.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -647,6 +647,28 @@ HorseCollisionMod.Config = {
 	-- recovers quickly is upright while their own cry of pain is still
 	-- playing, and speaking again then cuts the first line off mid-word.
 	BarkGapMs                = 2500,
+	-- Whether a victim already fighting the player still complains about being
+	-- ridden into. Vanilla refuses this outright and so does the mod; the
+	-- setting exists so the behavior can be compared rather than assumed.
+	BarkInCombat             = false,
+	-- Make a victim briefly immortal across the moment of contact, so the
+	-- engine's own collision damage lands on nothing and the mod is the only
+	-- thing that charges them. Research setting.
+	ShieldVictimFromEngineDamage = false,
+	-- A backstop, not a mechanism. The shield goes on only where an impact is
+	-- scored and `ApplyImpactDamage` lifts it synchronously, so this should
+	-- never be what ends it. It exists so that a victim cannot be left
+	-- permanently immortal if the damage call is skipped.
+	ShieldWindowMs           = 2000,
+	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
+	-- every in-flight request by priority and silently discards one that is
+	-- below the top and cannot be delayed, so a bark sent at the default zero
+	-- loses to anything else the speaker is saying.
+	BarkPriority             = 0,
+	BarkCanBeDelayed         = false,
+	-- Exempts the line from a `suppressMonologs` context, which is the gate
+	-- that silences everything rather than just the collision bark.
+	BarkOverrideSuppress     = false,
 
 	-- Retaliation. Barging the same person at a walk costs nobody anything,
 	-- which makes it an annoyance rather than an act. These let a victim
@@ -1260,6 +1282,15 @@ HorseCollisionMod.RecentRejections = {}
 -- which is what lets a bystander answer a victim instead of the street
 -- shouting in chorus.
 HorseCollisionMod.RecentBarks = {}
+
+--- Victims whose engine collision damage has been switched off.
+HorseCollisionMod.ShieldedVictims = {}
+
+--- The game's own non-persistent immortality buff, `imm=1`.
+--
+-- Non-persistent deliberately: it cannot be written into a save, so a victim
+-- cannot be left permanently unkillable by a crash or a reload mid-window.
+HorseCollisionMod.ImmortalityBuffGuid = "730503bf-735a-4f47-baae-c2d84ee77524"
 
 --- When vanilla's collision bark was last switched off, by entity id.
 --

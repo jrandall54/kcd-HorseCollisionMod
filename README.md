@@ -214,6 +214,10 @@ tools/
   build_adb.py            generates the animation data from a game install
   flow.ps1                the session's states: test, branch, land, shipping
   dev_deploy.ps1          installs into the game without Vortex
+  bark_chain.py           walks a bark set from metarole to role to topic to
+                          sequences, showing each line with its cooldown, so
+                          what a speaker will say and when they run dry is
+                          readable without the game
   bark_lines.py           prints the English text of any vanilla bark set, and
                           searches by remembered words for the set holding a
                           line, without starting the game
