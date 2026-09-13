@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.8.2
+-- @release 5.8.3
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.8.2"
+HorseCollisionMod.Version = "5.8.3"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1115,7 +1115,7 @@ HorseCollisionMod.Config = {
 	ImpactDustEffectRear     = "collisions.destructibles.arrow_soil",
 	ImpactDustScaleTrot      = 0,
 	ImpactDustScaleGallop    = 0.09,
-	ImpactDustHeight         = 0.15,
+	ImpactDustHeight         = 0.05,
 	ImpactDustSampleMs       = 50,
 	ImpactDustFallVz         = -0.5,
 	ImpactDustLandVz         = -0.15,
