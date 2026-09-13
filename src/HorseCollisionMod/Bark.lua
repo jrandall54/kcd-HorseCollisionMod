@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.6.0
+-- @release 5.7.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -649,8 +649,15 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 	end
 
 	local id = tostring(npc.id or "?")
+	local existing = self.ShieldedVictims[id]
 
-	if self.ShieldedVictims[id] then
+	-- Only a **live** shield blocks a second one. Testing the entry alone was
+	-- wrong: a record whose buff has already been removed still reads truthy,
+	-- and every later impact on that victim then skipped the shield silently,
+	-- with no log line to say so. A victim left at low health by an earlier
+	-- impact is exactly who cannot afford that, and one was killed by the
+	-- engine on a second gallop having never been shielded for it.
+	if existing and not existing.removed then
 		return
 	end
 
@@ -686,18 +693,21 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 		self:Log("Shield on " .. self:NameOf(npc) .. " ok=true")
 	end
 
-	-- Every shielded victim is one the horse is striking, so
-	-- `ApplyImpactDamage` lifts this synchronously and the timer should never
-	-- be what ends it. It exists because immortality that is never lifted is
-	-- the worst failure this code could have: if the damage call is skipped for
-	-- any reason, nobody is left permanently unkillable.
+	-- Nothing here decides when the shield ends. `ApplyImpactDamage` lifts it as
+	-- the first thing it does, and that call is itself fired by the victim's
+	-- ragdoll resolving, so the shield covers exactly the window the engine can
+	-- charge the body for and not a millisecond that has to be guessed at.
+	--
+	-- This timer is a crash backstop and nothing else: if the damage call never
+	-- happens, nobody is left permanently unkillable. Reaching it means
+	-- something else went wrong, which is why it says so.
 	--
 	-- **Deliberately not generation guarded.** Every other timer in this mod
 	-- returns early when a script reload has bumped the generation, so a stale
 	-- loop stops doing work. This one must not: the work it does is removing
 	-- immortality, and skipping it would leave a victim unkillable for the rest
 	-- of the session. A reload happens on every deploy, so that is not remote.
-	Script.SetTimer(self.Config.ShieldWindowMs or 400, function()
+	Script.SetTimer(self.Config.ShieldWindowMs or 6000, function()
 		if state.removed then
 			return
 		end
@@ -713,7 +723,9 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 		end)
 
 		if self.Config.LogTelemetry then
-			self:Log("Shield off " .. self:NameOf(npc) .. " ok=" .. tostring(lifted))
+			self:Log("Shield backstop fired on " .. self:NameOf(npc)
+					.. " ok=" .. tostring(lifted)
+					.. " (the damage call never lifted it)")
 		end
 	end)
 end

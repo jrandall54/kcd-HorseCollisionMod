@@ -20994,3 +20994,142 @@ measures nothing.
 **Before calling any result confirmed, state which rows would look different if
 the mechanism did nothing, and check that those specific rows changed.** Here
 that was the non-fatal impacts, and they never changed at all.
+
+## The mod owns every kill: prediction out, shield pinned to state
+
+Branch `fix/mod-owns-every-kill`. The fatal-impact prediction was removed and
+the collision shield made to cover the window it was guessing about.
+
+### The shield in 5.6.0 was never running
+
+Its call had been moved during the previous branch's audit and landed inside
+the diagnostics-only rejection branch, behind `DiagnoseMisses`. It executed on
+no real impact. The runs that appeared to validate the shield were taken before
+that move, on the earlier look-ahead call site.
+
+The evidence was an absence and sat unread for several rides: not one `Shield
+lifted` line across twenty impacts, while `Shield on` appeared far less often
+than there were impacts. An edit landed by text replacement had matched the
+wrong `else`.
+
+### Speed thresholds are not states
+
+The first attempt at ending the shield polled velocity and called a body
+settled after consecutive readings below a threshold. It failed twice:
+
+- A thrown ragdoll passes through near-zero velocity at the top of its arc and
+  again on first ground contact, so two samples 250ms apart caught a bounce.
+  Bodies were released at 500ms while `Phase2Grounded` did not call them
+  grounded until around 1400ms.
+- A victim who survived, stood up and walked away is also "moving", so the
+  shield held them unkillable to its cap. Two people in one ride were immortal
+  for fifteen seconds at 0.96 and 2.90 m/s, which is walking and running pace.
+
+### Landing is the state, and it is much later than 600ms
+
+`WhenRagdollLands` waits for the ragdoll state and loss of ground contact, then
+for `IsColliding` to return true. Measured over sixteen gallop impacts:
+
+    landing reported   min 1936ms   median 2352ms   max 2864ms
+
+The mod's damage had been firing on a fixed 600ms delay, so for roughly 1.8
+seconds of every gallop the body was still being thrown, which is the window
+the engine was free to kill in.
+
+`WhenRagdollResolves` is the wrong state for this and was tried first: it
+reports the character blended back and standing, so the damage arrived as the
+victim stood up and dropped them again.
+
+The airborne half of the test needs its own ceiling. A victim who crumples or
+slides never breaks ground contact, and on the shared 15 second ceiling one
+such victim waited out the shield's 6 second backstop and spent nine seconds
+unprotected. `RagdollLandCeilingMs` is 3000, inside the backstop.
+
+### Removing the prediction changed what a gallop does
+
+The finishing rule was doing undocumented double duty. A gallop on an unarmored
+villager deals `95 * 1.00 * 1.02 = 96.9` against 100 health, so it was never
+lethal on its own; what killed them was the rule upgrading any remainder under
+36 into a kill. With it gone, unarmored victims survive a single gallop about
+seven times in ten:
+
+    dealt 96.2 -> survived at 3.8      dealt 101.4 -> died
+    dealt 88.3 -> survived at 11.7     dealt 104.1 -> died
+    dealt 96.8 -> survived at 3.2      dealt 106.6 -> died
+
+The rider prefers this to the near-certain death it replaced, and damage tuning
+is deferred to its own phase. Recorded here because the figure, not the shield,
+is what decides lethality now.
+
+### Parked: the damage application twitches a settled body
+
+`soul:DealDamage` on a victim whose ragdoll has come to rest produces a visible
+twitch, because the engine plays a hit response on the body. The rider noticed
+it, called it interesting rather than objectionable, and it is left alone. It
+is a separate concern from attribution and belongs to whichever branch takes up
+ragdoll presentation.
+
+### The final shape, and the four signals that are not it
+
+The design landed on one event doing everything: the victim's body coming to
+rest triggers the shield lift and the mod's damage together.
+
+    impact -> shield on -> body at rest -> lift -> damage
+
+Getting there cost several rides because the question "when has the collision
+finished happening to this victim" has four plausible answers and three of them
+are wrong.
+
+**A fixed 600ms delay** was the original. A gallop settles between 1200ms and
+2048ms, so the mod charged victims while they were still in the air.
+
+**A velocity threshold** fails twice. A thrown ragdoll passes through near-zero
+speed at the apex and on first ground contact, so consecutive slow samples read
+as rest when they are a bounce; bodies were released at 500ms. And a victim who
+survived and walked off also reads as moving, so two were held unkillable to a
+fifteen second cap at 0.96 and 2.90 m/s, which is walking and running pace.
+
+**Exact position equality** is stricter than rest and therefore later. A body
+returns identical coordinates only once physics has slept, and a settled body
+micro-jitters past the point it has visibly stopped. Measured against the
+throw's own reading it fired 400ms to 1150ms late, which the rider saw directly
+as the damage landing well after the body stopped.
+
+**`WhenRagdollResolves`** is later still: it reports the character blended back
+and standing, so the damage arrived as the victim stood up and dropped them
+again.
+
+What works is the measure already in the file. `ImpactThrow` decides rest by
+position moved under 0.05m across 200ms polls. Those two figures are now shared
+constants used by both, and the readings agree to the millisecond: 1424/1424,
+1440/1440, 1408/1408, 1472/1472, 1040/1040, 1216/1216.
+
+`BlendRagdoll` cannot be the signal, for a reason that is easy to miss twice:
+it never appears on a victim the impact killed, so a state test reports
+`neverRagdolled` on exactly the impacts that threw someone hardest.
+
+### Two shield leaks, both from where it was granted
+
+Granted in the detection loop, the shield reached victims still inside their
+per-victim cooldown whose impact was then dropped by an early return in
+`TriggerCollision`. Nothing lifted it and they stood unkillable until the
+backstop fired six seconds later, having taken no impact: two of fifteen
+shields in one ride. It is granted inside `TriggerCollision` now, past every
+return.
+
+A walk stagger took a shield it had no use for. A stagger is an animation and
+never makes the victim a physical object, and `ApplyImpactDamage` returns early
+on a tier worth no damage, so nothing took the shield off again.
+
+### Result
+
+Fifteen impacts, fifteen shields, fifteen lifts, no backstop, no failures, no
+preempts, eight kills and none attributed to the rider. Every release came from
+the rest reading rather than a ceiling. The rider confirmed no twitch on the
+damage application and no interrupted barks.
+
+`engineTook` reads non-zero again (13 to 31 per impact) because there is a real
+window between impact and rest for `ImpactDamageOwnsTheHit` to measure across.
+It had been silently dead while the damage was applied at the moment of
+contact, which would have made engine damage additive and quietly wrong every
+figure in `ImpactDamageByTier`.

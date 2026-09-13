@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.6.0
+-- @release 5.7.0
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -109,6 +109,79 @@ function HorseCollisionMod:WhenRagdollResolves(npc, fn)
 	end
 
 	Script.SetTimer(self.ReactionPollMs, poll)
+end
+
+--- Runs something the moment a victim's body stops moving.
+--
+-- Rest is the same thing `ImpactThrow` already means by it: the body has moved
+-- less than `RestStillMeters` since the last poll. Read from position rather
+-- than from `GetVelocity`, and rather than from the animation state, because
+-- `BlendRagdoll` never appears on a victim the impact killed.
+--
+-- Exact position equality is the stricter test and is the wrong one. A body
+-- only returns identical coordinates once the physics has fully slept, and a
+-- settled body keeps micro-jittering well past the point it has visibly
+-- stopped: measured against the throw's own reading, equality fired between
+-- 400ms and 1150ms late, which the rider saw as the damage landing long after
+-- the body came to rest.
+--
+-- The body has to be seen moving before stillness counts, or a victim struck
+-- while standing still is reported at rest on the first poll, before the
+-- collision has moved them at all.
+--
+-- The irreducible cost is the poll interval: Lua is given no physics event, so
+-- this is observed rather than signaled and lands within one poll of the
+-- moment it happens.
+--
+-- @tparam table npc victim entity
+-- @tparam function fn called with the reason and the wait in milliseconds
+function HorseCollisionMod:WhenBodyStops(npc, fn)
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local deadline = startedAt + self.RagdollLandCeilingMs
+	local step = self.RestPollMs
+	local moved = false
+	local last = nil
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local here = nil
+
+		pcall(function()
+			here = npc:GetWorldPos()
+		end)
+
+		local elapsed = self:TimeMs() - startedAt
+
+		if here and last then
+			local shift = math.sqrt((here.x - last.x) ^ 2
+					+ (here.y - last.y) ^ 2
+					+ (here.z - last.z) ^ 2)
+
+			if shift >= self.RestStillMeters then
+				moved = true
+			elseif moved then
+				fn("stopped", elapsed)
+
+				return
+			end
+		end
+
+		last = here
+
+		if self:TimeMs() >= deadline then
+			fn(moved and "ceiling" or "neverMoved", elapsed)
+
+			return
+		end
+
+		Script.SetTimer(step, poll)
+	end
+
+	Script.SetTimer(step, poll)
 end
 
 --- Rebuilds a victim and sends them back to their activity.

@@ -41,17 +41,17 @@ and hurts exactly as much as before, but it can no longer take the last point
 of health from anybody. Across roughly two hundred test impacts the mod landed
 every kill and none was attributed to the player.
 
-One gap remains. The immortality ends when the mod deals its damage, about
-half a second after contact, while a body is often still tumbling. A victim who
-survives the impact and then takes more collision damage, most likely by being
-pinned between the horse and a wall, can still be killed by the game.
+The immortality lasts until the victim's body has stopped moving, and the mod
+charges them at that same moment. The game bills a thrown body for as long as
+it is moving, which at a gallop is a little over a second, so waiting for the
+body to come to rest is what makes the protection cover the whole collision and
+the mod's own blow land last.
 
-The mod also waits a moment before charging a victim it did not kill outright,
-so the trample resolves first and the two are not competing. A victim already
-close to death is finished by the mod immediately instead, rather than left for
-the trample to reach. How close counts is measured per tier, from the most the
-trample has been seen to take: a rear takes nothing, a trot up to twelve, a
-gallop up to thirty-six, a charge up to sixty-two.
+The mod waits a moment before charging a victim, so the trample resolves first
+and the two are not competing. It no longer tries to work out in advance
+whether an impact will be fatal, or kill a victim early to keep the death its
+own: there is nothing to race any more, so the damage is simply what the speed
+and the armor say it is.
 
 The same reasoning covers the mod's own damage roll. Impacts vary a little so
 that two identical collisions are not identical, but a roll that turns a fatal

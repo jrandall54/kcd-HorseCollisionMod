@@ -14,12 +14,12 @@ heading when the branch merges. An entry that breaks an existing install is
 marked **BREAKING**. `tools/version_check.py` derives the next version from
 these sections and refuses a build made at any other number.
 
-Removing a setting forces a major version, because a key a player has in their
-settings file disappearing is a broken install, and so does a `Removed`
-section on its own. An entry marked **NOT BREAKING** overrides both, and is
-only honest for something no released version ever carried: the check compares
-against the last tag, so it cannot tell a key players have from one that only
-ever existed between releases.
+Removing a setting is not a major version by itself. A key that disappears is
+ignored by the settings loader and its default takes over, so an installed mod
+keeps working and the cost to a player is a dead line in their file. Removals
+are still reported by `tools/version_check.py` so they are visible, and an
+entry marked **BREAKING** is what raises one to a major when it genuinely
+breaks something.
 
 Every merge to `main` takes a version and a tag, whether or not that build is
 published, because `main` is always releasable and a merged version is
@@ -29,6 +29,58 @@ against whatever version is current at the time, and it does not change the
 number.
 
 ## [Unreleased]
+
+## [5.7.0] - 2026-09-12
+
+### Changed
+
+- **The mod no longer guesses which impacts will be fatal.** It used to ask,
+  before every collision, whether the game's own trample could finish what the
+  mod was about to leave behind, and if so kill the victim immediately to keep
+  the death its own. That guess could not be made reliable, because it had to
+  be right about a number the mod does not control, and when it was wrong you
+  were charged with murder at random.
+
+  The collision shield replaces it. A victim the horse strikes cannot be killed
+  by the game at all, so there is nothing to race and nothing to predict.
+  Removed with it: the rounding-up that turned a near-fatal blow into a certain
+  one, and the rule that overruled the damage roll whenever it happened to
+  leave a victim alive. Damage is now simply what the tier and the armor say it
+  is.
+
+  Settings `ImpactDamageEngineCeiling` and `ImpactDamageOverkill` are gone.
+  Leaving them in a settings file is harmless; they no longer do anything.
+
+- **The shield is now held until the victim's body comes to rest**, and the
+  mod's damage lands at that same moment rather than on a fixed delay. The game
+  charges a thrown body for as long as it is moving, which is a little over a
+  second at a gallop rather than the 600 milliseconds the mod used to wait, so
+  victims were being charged while still in the air and the damage arrived long
+  after they had stopped.
+
+  Rest is read from the body's own position, using the same measure the mod
+  already applies to a throw, so there is one definition of a body having
+  stopped rather than two. `ShieldWindowMs` is now purely a crash backstop and
+  says so in the log if it ever fires.
+
+### Fixed
+
+- **The collision shield was not being applied.** In 5.6.0 its call sat inside
+  a diagnostics-only branch, so it ran on no real impact and the protection
+  that release describes was not in effect. Anyone who saw an occasional murder
+  charge from riding someone down on 5.6.0 was seeing this.
+
+- **A victim could be left permanently unshielded.** A spent shield record
+  still counted as an active one, so every later collision with that same
+  person skipped the shield silently, with nothing in the log to say so.
+
+- **The shield could end before the mod's own damage landed.** It now ends
+  exactly where that damage begins, because the same event triggers both.
+
+- **A walk stagger no longer takes a shield.** A stagger is an animation and
+  never makes the victim a physical object, so there was nothing to protect
+  against, and nothing to take the shield off again either: the victim stood
+  there unkillable until the backstop fired.
 
 ## [5.6.0] - 2026-09-12
 

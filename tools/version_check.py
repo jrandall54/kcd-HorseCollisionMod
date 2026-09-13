@@ -26,17 +26,10 @@ USER_FACING = ("src/",)
 
 BREAKING = "**BREAKING**"
 
-# The counterpart, and the only way to drop a setting without forcing a major.
-# The rule below is deliberately strict because removing a key a player has in
-# their settings file breaks their install, and prose saying otherwise is not
-# something a script can check. This marker is the author saying otherwise on
-# the record, in the entry itself, where a reader of the changelog sees the
-# claim next to the removal it excuses.
-#
-# It exists because the strict rule compares against the last **tag**, not
-# against what players actually have. A setting added and removed between two
-# releases never reached anybody, so removing it breaks nothing, and the check
-# has no way to know that on its own.
+# Kept as a way to say on the record that a removal breaks nothing, for a
+# reader of the changelog rather than for the check. Dropping a setting no
+# longer forces a major on its own, so this marker no longer excuses anything;
+# it is documentation.
 NOT_BREAKING = "**NOT BREAKING**"
 
 
@@ -96,14 +89,10 @@ def config_keys(text):
 def dropped_settings(last_tag):
     """Settings present at the last release and gone now.
 
-    This is the check that was missing. The changelog's own definition of the
-    public interface covers the settings file, and this project's rules make
-    removing or renaming a `Config` key a major change. Reading that off the
-    prose is not reliable: the removals behind an earlier release were written
-    up under `Changed` rather than `Removed`, which left nothing for a
-    heading-based rule to see, and the release went out numbered as a minor.
-
-    Comparing the source against the tag answers it mechanically.
+    Reported so a removal is visible rather than silent, not to force a
+    version. A key that disappears is ignored by the settings loader and its
+    default takes over, so an installed mod keeps working; what the reader
+    wants is to be told which keys went, which is what this provides.
     """
     if not last_tag:
         return set()
@@ -126,31 +115,28 @@ def dropped_settings(last_tag):
 def implied_bump(body, dropped=None):
     """Which part of the version the entries in one block call for.
 
-    Removing something, or an entry marked BREAKING, forces a major. A new
-    capability is a minor. Anything else is a patch.
+    An entry marked BREAKING is a major. A new capability is a minor. Anything
+    else is a patch.
 
-    A setting that existed at the last release and no longer does forces a
-    major too, whatever the prose says about it, unless the entry carries
-    `NOT_BREAKING`. That marker is for a setting that never reached a player:
-    the comparison is against the last tag, and a key added and removed
-    between two releases was only ever visible to whoever built them.
+    Dropping a setting is **not** a major on its own. A key disappearing from
+    the settings file does not break an installed mod: an unknown key is
+    ignored and the default takes over, so the cost to a player is a line in
+    their file that no longer does anything. Judging that as severe as a change
+    that forces everyone to redo their configuration overstates it, and made
+    ordinary cleanup expensive. `dropped` is still reported, so a removal is
+    visible in the check's output and can be called BREAKING deliberately when
+    it really does break something.
     """
     parts = sections(body)
-
-    if dropped and NOT_BREAKING not in body:
-        return "major"
 
     if BREAKING in body:
         return "major"
 
-    # A Removed section is a major by default, on the assumption that whatever
-    # went was something a player had. `NOT_BREAKING` is the same escape hatch
-    # the dropped-setting rule above uses, and for the same reason: a thing
-    # added and removed between two releases was only ever visible to whoever
-    # built them, and calling that a major overstates what changed for anyone
-    # who has the mod installed.
-    if "Removed" in parts and NOT_BREAKING not in body:
-        return "major"
+    # A dropped setting is a minor: nothing about an install breaks, but the
+    # mod's documented surface changed and a reader comparing two settings
+    # files will see it, which is more than a patch describes.
+    if dropped:
+        return "minor"
 
     if "Added" in parts:
         return "minor"

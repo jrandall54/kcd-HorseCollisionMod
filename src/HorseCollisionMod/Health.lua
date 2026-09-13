@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.6.0
+-- @release 5.7.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -303,8 +303,8 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	-- state. `BlendRagdoll` never appears on a victim the impact killed, so a
 	-- state test reports `neverRagdolled` on exactly the impacts that threw
 	-- someone hardest and waits out its ceiling instead of measuring them.
-	local restPoll = 200
-	local restStill = 0.05
+	local restPoll = self.RestPollMs
+	local restStill = self.RestStillMeters
 	local restCeiling = 8000
 	local restStart = self:TimeMs()
 	local restLast = nil
@@ -555,143 +555,25 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 
 	-- Waiting is right only while the engine cannot land the killing blow.
 	--
-	-- The delay exists so the engine charges its collision first and this mod
-	-- finishes the victim, which is what puts the death under the mod's
-	-- attribution and lets `CollisionIsCrime` decide it. That reasoning holds
-	-- at full health and fails at low health, where the engine's own charge is
-	-- enough on its own: measured, it takes between 7 and 21, and a victim left
-	-- on 3.7 by a previous impact was killed by it inside the window. The mod
-	-- logged `preempted=true`, the kill belonged to the engine, and the rider
-	-- was charged with murder.
+	-- The delay exists so the engine's collision resolves first and the mod
+	-- lands last, which puts the death under the mod's attribution and lets
+	-- `CollisionIsCrime` govern it.
 	--
-	-- So when the victim cannot survive what the engine might take, the order
-	-- reverses and this lands immediately. The mod still delivers the killing
-	-- blow; it just has to be first rather than last to do it.
-	local overkill = self.Config.ImpactDamageOverkill or 1.0
-
-	-- Variance may change the number. It may not change the outcome.
+	-- Nothing here tries to work out whether this impact will be lethal any
+	-- more. That prediction, and the rushing and rounding-up it drove, existed
+	-- because the engine could take a victim during the wait and the crime went
+	-- to whoever landed the last blow. It could not be made reliable: it had to
+	-- be right about a number it does not control, and when it was wrong the
+	-- rider was charged with murder at random.
 	--
-	-- A charge on an unarmored villager intends 110 x 1.00 x 1.02 = 112.2,
-	-- which kills her twice over. The roll turned it into 96.0 against 96.6
-	-- health and she got up with 0.57 left. Nothing about that was a decision:
-	-- the tier and the armor curve had already said this blow was fatal, and a
-	-- flavor multiplier overruled them by six tenths of a point.
-	--
-	-- So the roll is free to move the damage anywhere except across the line
-	-- between living and dying. A blow that was never lethal to begin with is
-	-- untouched by this, which is what keeps an armored victim's survival the
-	-- armor's doing.
-	if type(atImpact) == "number" and atImpact > 0
-			and intended >= atImpact and damage < atImpact then
-		if self.Config.LogTelemetry then
-			self:Log(string.format(
-					"ImpactDamage %s tier=%s variance undercut a fatal blow,"
-							.. " %.1f -> %.1f against %.1f health",
-					self:NameOf(npc), tostring(tierName), damage,
-					atImpact + overkill, atImpact))
-		end
-
-		damage = atImpact + overkill
-	end
-
-	-- Who lands the killing blow, decided before the wait rather than by it.
-	--
-	-- The delay exists so the engine charges its collision first and this mod
-	-- lands last, which is what puts a death under the mod's attribution and
-	-- lets `CollisionIsCrime` govern it. That reasoning holds in exactly one
-	-- case: when this damage cannot kill and what it leaves is out of the
-	-- engine's reach. Every other case has to be settled here, because once
-	-- the wait has started the race is already lost.
-	--
-	-- Two ways to lose it, both measured with the switch off and both charging
-	-- the rider with murder:
-	--
-	--   A charge on an unarmored woman at full health. The engine took her from
-	--   100 to 0 inside the 600 ms window on its own; this damage arrived to
-	--   find her dead and logged `preempted=true`. The mod's figure was 112
-	--   against her 100, so it would have killed her cleanly.
-	--
-	--   A charge on a chainmail guard on 51.8 health. Armor cut 110 down to
-	--   16.6, so the blow was not fatal and the old health-based rush band of
-	--   35 did not cover him. It waited, and the engine took all 51.8.
-	--
-	-- So the question is not how much health the victim has. It is whether this
-	-- impact is going to be lethal at all, by anyone's hand. When it is, the
-	-- mod makes sure the hand is its own.
-	--
-	-- The ceiling is per tier, and it has to be. The engine's trample scales
-	-- with the collision, and one figure across all of them is wrong in both
-	-- directions: 58 is right for a charge and would have the mod executing
-	-- anyone under 58 health for a trot that does two damage. From the log,
-	-- largest seen over 136 impacts: rear 0.0, trot 9.2, gallop 33.1, charge
-	-- 58.5. `ImpactDamageEngineCeiling` carries those with a little headroom,
-	-- because a sample maximum is not a bound.
-	--
-	-- A rear reads zero because the horse is not moving, so nothing on that
-	-- tier is ever finished early.
-	-- The settings file wins and the table on the module is the fallback, the
-	-- same way `ImpactDamageByTier` is read, so a settings file written before
-	-- this existed still gets the measured figures rather than zero.
-	local ceilings = self.Config.ImpactDamageEngineCeiling
-
-	if type(ceilings) ~= "table" then
-		ceilings = self.ImpactDamageEngineCeiling
-	end
-
-	local ceiling = 0
-
-	if type(ceilings) == "table" and type(ceilings[tierName]) == "number" then
-		ceiling = ceilings[tierName]
-	end
-
-	if type(atImpact) == "number" and atImpact > 0 then
-		local why = nil
-
-		if damage >= atImpact then
-			-- Already fatal. Waiting only gives the engine a head start on a
-			-- victim this was always going to kill.
-			why = "fatal"
-		elseif ceiling > 0 and (atImpact - damage) <= ceiling then
-			-- Not fatal, but what it leaves is inside what the engine takes on
-			-- this tier. The victim dies either way, so nothing changes for
-			-- the player except which system is credited.
-			damage = atImpact + overkill
-			why = "finishing"
-		end
-
-		-- Left alone otherwise: a victim who would have survived both is not
-		-- killed to tidy up attribution.
-		if why then
-			-- Zero by design: waiting hands the engine's trample a head start
-			-- on a victim this was always going to kill, and whichever system
-			-- lands the killing blow is the one the crime is attributed to.
-			--
-			-- Delaying the fatal blow to let the cry of pain begin does not
-			-- work at any value: a dying victim cannot speak, so the grace
-			-- period that stood here bought silence and a head start.
-			delay = 0
-
-			if self.Config.LogTelemetry then
-				self:Log(string.format(
-						"ImpactDamage %s tier=%s %s, dealing %.1f against"
-								.. " %.1f health, engine reaches %.1f",
-						self:NameOf(npc), tostring(tierName), why, damage,
-						atImpact, ceiling))
-			end
-		end
-	end
+	-- The shield settles it instead of predicting it. A victim the horse strikes
+	-- is immortal from the moment of contact until this call lifts it, so the
+	-- engine cannot reach them during the wait however hurt they are, and the
+	-- blow below is always the one that kills.
 
 	local function deal()
-		-- Lift the collision shield first, synchronously, so the victim is
-		-- mortal by the time the line below charges them.
-		--
-		-- A timer cannot do this reliably: it has to be long enough to cover
-		-- the engine's trample and short enough to end before this runs, and
-		-- missing on either side is silent. Measured at a 700ms shield against
-		-- a 1100ms delay, victims still came out clamped at 1 health, because
-		-- `imm=1` prevents death and the removal had not taken effect. Doing it
-		-- here removes the guess: the shield ends where the mod's own damage
-		-- begins, in the same call.
+		-- The shield goes on at the top of this call and comes off here, so
+		-- the victim is mortal by the time the line below charges them.
 		self:LiftCollisionShield(npc)
 
 		local before = nil
@@ -804,16 +686,34 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 					.. " fatal=" .. tostring(after ~= nil and after <= 0
 							and (before == nil or before > 0))
 					.. " attributed=" .. tostring(attacker ~= nil)
-					.. " delayed=" .. tostring(delay)
-					.. " ok=" .. tostring(ok)
+										.. " ok=" .. tostring(ok)
 					.. " err=" .. tostring(err))
 		end
 	end
 
-	if delay > 0 then
-		Script.SetTimer(delay, deal)
-	else
+	-- Fired by the victim's own state, not by a clock.
+	--
+	-- Shield, then lift and damage the moment the body stops moving.
+	--
+	-- The shield goes on at the impact and has to span everything the engine
+	-- charges the victim for, which is the whole time the body is being thrown:
+	-- measured between the impact and the body coming to rest, victims lost
+	-- between 6 and 32 health, and six of ten were driven onto the clamp. Lift
+	-- it before that is over and those are engine kills, charged to the rider.
+	--
+	-- A walk stagger never moves the body, so it deals immediately.
+	if tierName == "Walk" then
 		deal()
+	else
+		self:WhenBodyStops(npc, function(why, waited)
+			if self.Config.LogTelemetry then
+				self:Log("BodyStopped " .. self:NameOf(npc)
+						.. " why=" .. tostring(why)
+						.. " waited=" .. tostring(waited) .. "ms")
+			end
+
+			deal()
+		end)
 	end
 
 	return damage
