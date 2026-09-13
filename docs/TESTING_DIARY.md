@@ -20938,3 +20938,59 @@ window would do nothing.
 
 Narrowing the window, or shielding only at the moment contact is scored rather
 than on approach, is the obvious fix and is not yet done.
+
+## CORRECTION: the collision shield was never confirmed, and does not work
+
+The section above titled "CONFIRMED: a brief immortality removes the engine's
+collision damage" is **wrong** and should not be built on.
+
+It cited these rows as proof:
+
+    engineTook=0.0  health=100.0  after=0.0  fatal=true
+    engineTook=0.0  health= 83.0  after=0.0  fatal=true
+
+Every one of them is `fatal=true`. On a fatal impact `ApplyImpactDamage` sets
+`delay = 0` and charges the victim in the same tick, so there is no window for
+the engine to take anything and `engineTook` is zero **whether or not anything
+shielded the victim**. That behaviour predates the shield by the whole life of
+the crime-attribution work. It is not evidence of anything.
+
+The measurement that matters is a **non-fatal** impact, where the 600ms delay
+leaves the engine a real window. Re-read from the same run:
+
+    test 3, shield in the sweep, non-fatal impacts
+        22.3  13.1  45.5  22.9  15.2  15.6  17.3  18.7
+
+Not one blocked. The shield was never working. Later placements did no better:
+
+    test 4  short renewing window        2 of 8 non-fatal at zero
+    test 5  shield at the scored impact  0 of 8
+    test 6  look-ahead 0.6m              1 of 10
+    test 6b look-ahead 3.0m              0 of 5
+
+The two zeros in test 4 are as likely to be victims who took no engine damage
+that tick as they are to be the shield.
+
+### What is actually established
+
+`imm=1` does reach the victim: the first attempts clamped them at 1 health
+instead of killing them, which only the buff can explain. So `AddBuff` works and
+immortality applies. What it does **not** do is stop the engine's collision
+damage, which lands regardless and is measured as `engineTook` afterwards.
+
+So `imm` prevents death, not damage, and the engine's collision charge is not
+death. Zeroing it needs something that blocks the damage itself, and nothing
+found so far does.
+
+### The process failure, which matters more than the result
+
+A section was titled CONFIRMED, written up in detail, and committed, on a
+misreading of telemetry whose meaning had already been established earlier in
+the same session. The rule that was broken is the one recorded in
+`a-sent-request-is-not-a-spoken-line`: a number the mod writes about its own
+behaviour proves only what it measures, and `engineTook` on a fatal impact
+measures nothing.
+
+**Before calling any result confirmed, state which rows would look different if
+the mechanism did nothing, and check that those specific rows changed.** Here
+that was the non-fatal impacts, and they never changed at all.

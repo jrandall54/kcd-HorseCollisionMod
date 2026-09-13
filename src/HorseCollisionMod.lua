@@ -655,10 +655,16 @@ HorseCollisionMod.Config = {
 	-- engine's own collision damage lands on nothing and the mod is the only
 	-- thing that charges them. Research setting.
 	ShieldVictimFromEngineDamage = false,
-	-- How long that immortality lasts. Long enough to cover the engine's
-	-- trample, short enough that the mod's own damage still lands on a mortal
-	-- victim: `ImpactDamageDelayMs` is 600.
-	ShieldWindowMs           = 1200,
+	-- A backstop, not a mechanism. The shield goes on only where an impact is
+	-- scored and `ApplyImpactDamage` lifts it synchronously, so this should
+	-- never be what ends it. It exists so that a victim cannot be left
+	-- permanently immortal if the damage call is skipped.
+	ShieldWindowMs           = 2000,
+	-- How far beyond the collision footprint the shield reaches, in meters, so
+	-- it lands a tick before contact rather than in the same tick. Wider
+	-- catches more of the engine's damage and shields more people who are
+	-- never actually hit.
+	ShieldLookAhead          = 0.6,
 	-- How long a fatal impact waits before applying its damage, so the cry of
 	-- pain has time to begin. Zero is the shipped behavior and protects crime
 	-- attribution; see the comment on the fatal path in Health.lua.

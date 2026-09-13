@@ -552,7 +552,18 @@ function HorseCollisionMod:SafeUpdate()
 					-- horse, so vanilla's collision bark is already closed off
 					-- by the time bodies touch.
 					self:HushVanillaBark(ent)
-					self:ShieldFromEngineDamage(ent)
+
+					-- A tick before contact, and only for somebody the horse
+					-- is actually about to hit. The buff needs a tick to take
+					-- effect: applied in the same tick the impact is scored it
+					-- is not active yet when the engine charges the victim,
+					-- measured as every non-fatal impact still losing health.
+					if self.Config.ShieldVictimFromEngineDamage
+							and impactSpeed >= self.Config.SpeedWalk
+							and self:IsInHorseFootprint(ent, horsePos, horseForward,
+									speed, false, self.Config.ShieldLookAhead or 0.6) then
+						self:ShieldFromEngineDamage(ent)
+					end
 
 					local isDead = false
 

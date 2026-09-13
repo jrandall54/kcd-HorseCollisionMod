@@ -665,11 +665,16 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 		self:Log("Shield on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
 	end
 
-	-- Lifted well after the impact, and on a generation check so a script
-	-- reload cannot leave somebody permanently unkillable.
+	-- Every shielded victim is one the horse is striking, so
+	-- `ApplyImpactDamage` lifts this synchronously and the timer should never
+	-- be what ends it. It exists because immortality that is never lifted is
+	-- the worst failure this code could have: if the damage call is skipped for
+	-- any reason, nobody is left permanently unkillable.
+	--
+	-- Generation checked for the same reason, against a script reload.
 	local generation = self.TimerTick
 
-	Script.SetTimer(self.Config.ShieldWindowMs or 1200, function()
+	Script.SetTimer(self.Config.ShieldWindowMs or 400, function()
 		if generation ~= self.TimerTick then
 			return
 		end
