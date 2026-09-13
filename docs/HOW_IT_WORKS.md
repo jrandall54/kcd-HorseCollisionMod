@@ -85,6 +85,14 @@ second and a grunt for each reads as broken audio rather than as a man being
 jolted. A heavier impact still gets through that silence, so a gallop is never
 swallowed by the shove that happened just before it.
 
+Sometimes he says something instead. Roughly one impact in three draws a line
+rather than a grunt — "Oh, shit!", "Had enough?", "Good God, what a bloody
+mess.", "Jesus Christ, he was only a boy." — and it is never both at once,
+because two voices out of one man is a mistake rather than a richer moment. The
+lines are the game's own, recorded by Henry's voice actor for quests you may
+never have played, and every impact draws from the same pool whatever speed it
+happened at.
+
 ### What people say about it
 
 Vanilla's answer to a horse walking into someone is one shout. The mod gives
