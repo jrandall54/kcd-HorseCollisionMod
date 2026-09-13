@@ -269,11 +269,14 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- refuses a collision bark during a fight and so should this.
 	self:BarkCollision(npc, tierName, isCombat)
 
-	-- The rider's own half of the impact, and gallop only. Sent here for the
-	-- same reason as the sound: it belongs to the moment of contact, not to
-	-- whatever the victim does afterwards.
+	-- The rider's own half of the impact. Sent here for the same reason as the
+	-- sound: it belongs to the moment of contact, not to whatever the victim
+	-- does afterwards. Each of these scales or chooses by tier itself, and
+	-- returns false for a tier it has nothing for, so the tier is passed rather
+	-- than branched on here.
 	self:ShakeRiderCamera(playerEnt, tierName)
 	self:BlurRiderView(playerEnt, tierName)
+	self:PlayRiderVocal(playerEnt, tierName)
 
 	-- The ground's half. Spawned at the victim's feet, where they are struck
 	-- rather than where they land, because a gallop throws them several

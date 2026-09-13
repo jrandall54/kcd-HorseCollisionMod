@@ -77,6 +77,14 @@ settling, a trot leads with a blunt impact, and a gallop stacks that impact
 four times over a dull heavy thud. What the impact sounds like depends on what
 the victim is wearing, from the same armor the collision already weighs.
 
+Henry makes a noise too. The game records him taking a hit at three severities
+and each speed uses one, so a shove at walking pace draws a small grunt and a
+body taken at a gallop knocks the wind out of him. He stays quiet for a moment
+and a half afterwards, because riding into a crowd lands several collisions in a
+second and a grunt for each reads as broken audio rather than as a man being
+jolted. A heavier impact still gets through that silence, so a gallop is never
+swallowed by the shove that happened just before it.
+
 ### What people say about it
 
 Vanilla's answer to a horse walking into someone is one shout. The mod gives

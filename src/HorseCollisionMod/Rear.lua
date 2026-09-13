@@ -1017,6 +1017,7 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	self:PlayImpactSound(npc, tier, armor)
 	self:ShakeRiderCamera(playerEnt, tier)
 	self:BlurRiderView(playerEnt, tier)
+	self:PlayRiderVocal(playerEnt, tier)
 	self:ImpactDust(npc, tier)
 
 	-- A victim already inside a reaction is not given another one.

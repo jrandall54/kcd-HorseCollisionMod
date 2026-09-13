@@ -699,6 +699,52 @@ about a meter, and past roughly 1.5 the sound is gone, so adjustments are
 fractional and are applied to one copy of a layer rather than to all of them.
 Upward there is only repetition: naming a sample twice lifts it.
 
+### The rider's own grunt, which is not a bark
+
+`PlayRiderVocal` fires one FMOD event on the player per impact, from the same
+`{ trigger, delay, distance, chance }` layer format as above. The triggers are
+vanilla's, declared in `Libs/GameAudio/voices.xml`:
+
+```
+v_henry_hit_soft     Walk
+v_henry_hit_medium   Trot, Rear
+v_henry_hit_heavy    Gallop, Charge
+```
+
+This is deliberately not routed through the dialog system, and the distinction
+matters because every earlier attempt at giving Henry something to say went that
+way and produced full monologs. A `dialog:monologRequest` names a bark *set* and
+the dialog system chooses which member plays, so the mod cannot ask for a grunt
+and be certain of getting one. An audio trigger names the event outright: there
+is no selection, no priority auction and no cooldown of the system's own, so a
+crime reaction cannot take it the way it takes a collision bark.
+
+The cost is that the vocabulary is non-verbal. All fourteen human-voice events
+in `Libs/GameAudio` are grunts, sighs and cries; none is a line of dialogue, so
+words remain the dialog system's alone.
+
+`RiderVocalCooldownMs` holds off repeats, with severity allowed to break it:
+Walk ranks 1, Trot and Rear 2, Gallop and Charge 3, and an impact whose rank
+exceeds the one that set the cooldown speaks anyway. The stamp is taken when the
+grunt is scheduled rather than when it plays, so collisions arriving inside the
+tier's own delay are still caught, and a stamp in the future is discarded
+because `System.GetCurrTime` is persisted in the save and loading an earlier one
+moves the clock backwards.
+
+### An audio trigger plays on a corpse, which dialogue does not
+
+Worth recording next to the above, because it removes a constraint the project
+had accepted. A dead entity's subbrain is torn down, so a `dialog:monologRequest`
+sent to it has no recipient and is silently dropped; that is why the mod's kills
+were silent where vanilla's are not. `ExecuteAudioTrigger` is not a message. It
+is a direct call on the entity's audio proxy, which is a rendering attachment
+rather than a brain, and a body two seconds dead plays
+`v_stealth_stealthkill_man` normally.
+
+So death sounds do not require letting the engine resolve the killing hit, which
+was the only route the diary had left and would have cost the attribution
+ordering in `ApplyImpactDamage`. Not yet implemented; the mechanism is proven.
+
 ### Levels can only be judged from the saddle
 
 Every sample is clearly audible standing still, and most disappear under the

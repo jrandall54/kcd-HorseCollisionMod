@@ -30,6 +30,21 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- **Henry grunts when the collision goes through him.** The game records him
+  taking a hit at three severities and each speed now uses one, so a shove at
+  walking pace is a small grunt and a body taken at a gallop knocks the wind out
+  of him. Vanilla audio, nothing recorded.
+- `RiderVocal`, `RiderVocalWalk`, `RiderVocalTrot`, `RiderVocalGallop`,
+  `RiderVocalCharge`, `RiderVocalRear` and `RiderVocalCooldownMs` settings. Each
+  tier reads as an impact layer, `{ trigger, delay, distance, chance }`, so a
+  tier is silenced on its own with an empty trigger and the grunt is pushed back
+  with distance. The cooldown keeps Henry quiet for 1.5 seconds after speaking,
+  because riding into a group lands several collisions in a second; a heavier
+  impact is still allowed through, so a gallop is never swallowed by the shove
+  before it.
+
 ## [5.7.0] - 2026-09-12
 
 ### Changed

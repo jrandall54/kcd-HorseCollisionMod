@@ -318,6 +318,188 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	return played > 0
 end
 
+--- Henry's own grunt as the collision goes through him.
+--
+-- The victim makes a noise and the camera kicks, and until now the rider was
+-- silent through both. The game authors him three severities of taking a hit:
+--
+--     v_henry_hit_soft     event:/voice/henry_hit_soft
+--     v_henry_hit_medium   event:/voice/henry_hit_medium
+--     v_henry_hit_heavy    event:/voice/henry_hit_heavy
+--
+-- which is the same shape as the tiers, so each tier names one.
+--
+-- ### Why this is not a bark
+--
+-- Every earlier attempt at giving Henry something to say went through
+-- `dialog:monologRequest`, and the sets available to him answered with full
+-- Skalitz monologs rather than a grunt, because the mod chooses a set and the
+-- dialog system chooses the line out of it. `Bark.lua` still carries that
+-- constraint and it is real.
+--
+-- These are not dialogue. They are FMOD events fired straight at the entity's
+-- audio proxy, the same call the impact foley above uses, so the mod names the
+-- exact event and the dialog system is not consulted. A named event cannot
+-- answer with a monolog, which removes the only thing that made Henry's half
+-- unusable. It also means no priority auction and no cooldown: this cannot be
+-- taken by a crime reaction the way a collision bark is.
+--
+-- What it does not give is a choice of sample. An FMOD event may hold several
+-- takes and randomize inside them, and that is internal to FMOD. The severity
+-- is chosen; the variation within a severity is not.
+--
+-- ### The layer format is the impact layers'
+--
+-- `{ trigger, delayMs, distance, chance }`, read exactly as `PlayImpactSound`
+-- reads a layer, so the knobs learned there transfer. `distance` is the only
+-- volume control the engine offers and `PlayAtDistance` documents why. A tier
+-- whose trigger is `""` is silent, which is how a tier is switched off without
+-- switching off the others.
+--
+-- The delays are short and fall as the tier rises. The grunt belongs just
+-- behind the thud rather than under it, and a heavier blow knocks the air out
+-- sooner.
+--
+-- ### Why there is a cooldown
+--
+-- Riding into a group lands several collisions inside a second, and one grunt
+-- per collision does not read as a man being jolted repeatedly, it reads as
+-- broken audio. The rider's verdict on the first build:
+--
+-- > "Henry only needs to grunt or make sound once within a short period as
+-- > with multiple impacts happening within a short interval sounds weird."
+--
+-- So `RiderVocalCooldownMs` holds the next one off. One exception: a **harder**
+-- impact is still allowed through, because a gallop silenced by the walk shove
+-- that happened just before it is a worse fault than the one being fixed. Ranks
+-- are the mod's own reading of severity rather than config, so changing a
+-- trigger cannot scramble them.
+--
+-- The worst case is therefore three grunts in one window, soft then medium then
+-- heavy, which needs three impacts of rising tier inside the cooldown. Riding
+-- through a crowd is all one tier and gets one grunt.
+--
+-- The stamp is taken when the grunt is *scheduled* rather than when it plays,
+-- so collisions arriving inside the tier's own delay are still caught.
+--
+-- @tparam table playerEnt the player entity, as `ShakeRiderCamera` takes it
+-- @tparam string tierName "Walk", "Trot", "Gallop", "Charge" or "Rear"
+-- @treturn boolean true when a trigger resolved and was played
+function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
+	local cfg = self.Config
+
+	if not cfg.RiderVocal or not playerEnt then
+		return false
+	end
+
+	local layer = cfg.RiderVocalWalk
+	local rank = 1
+
+	if tierName == "Charge" then
+		layer = cfg.RiderVocalCharge
+		rank = 3
+	elseif tierName == "Rear" then
+		layer = cfg.RiderVocalRear
+		rank = 2
+	elseif tierName == "Trot" then
+		layer = cfg.RiderVocalTrot
+		rank = 2
+	elseif tierName == "Gallop" then
+		layer = cfg.RiderVocalGallop
+		rank = 3
+	end
+
+	if type(layer) ~= "table" then
+		return false
+	end
+
+	local trigger = layer[1]
+	local delay = layer[2] or 0
+	local distance = layer[3] or 0
+	local chance = layer[4] or 1
+
+	if type(trigger) ~= "string" or trigger == "" then
+		return false
+	end
+
+	-- The global is vanilla's, declared in Scripts/Utils/SoundUtils.lua, and is
+	-- absent if that file has not loaded yet. Checked for the same reason
+	-- `PlayImpactSound` checks it, and before the telemetry below so a line
+	-- cannot claim a play that had nothing to play it.
+	if type(PlayAudioTrigger) ~= "function" then
+		return false
+	end
+
+	local now = self:TimeMs()
+	local cooldown = cfg.RiderVocalCooldownMs or 0
+	local last = self.RiderVocalAt
+
+	-- No stamp yet reads as long elapsed, which is what -1 stands in for below.
+	local elapsed = last and (now - last) or -1
+
+	-- A *negative* gap means the stamp is in the future. That happens because
+	-- `System.GetCurrTime` is persisted in the save, so loading an earlier one
+	-- moves the clock backwards; trusting the stamp would mute the rider until
+	-- the rewind had been ridden back through. Falling through the test below
+	-- treats it as no stamp at all. The hit cooldown in `Update.lua` guards the
+	-- same hazard for the same reason.
+	if cooldown > 0 and elapsed >= 0 and elapsed < cooldown
+			and rank <= (self.RiderVocalRank or 0) then
+		if cfg.LogTelemetry then
+			self:Log("RiderVocal tier=" .. tostring(tierName)
+					.. " trigger=" .. trigger .. " skipped=cooldown"
+					.. " since=" .. string.format("%.0f", elapsed) .. "ms"
+					.. " of=" .. tostring(cooldown) .. "ms"
+					.. " rank=" .. tostring(rank)
+					.. " held=" .. tostring(self.RiderVocalRank))
+		end
+
+		return false
+	end
+
+	-- Rolled before the timer is set, so the telemetry line says what the
+	-- collision actually did rather than what it intended.
+	--
+	-- After the cooldown, not before it: a roll that loses should not also
+	-- start a cooldown, or a lost roll would silence the next impact too.
+	if chance < 1 and math.random() >= chance then
+		if cfg.LogTelemetry then
+			self:Log("RiderVocal tier=" .. tostring(tierName)
+					.. " trigger=" .. trigger .. " skipped=chance")
+		end
+
+		return false
+	end
+
+	self.RiderVocalAt = now
+	self.RiderVocalRank = rank
+
+	local function fire()
+		pcall(function()
+			if distance > 0 then
+				self:PlayAtDistance(playerEnt, trigger, distance)
+			else
+				PlayAudioTrigger(playerEnt, trigger)
+			end
+		end)
+	end
+
+	if delay <= 0 then
+		fire()
+	else
+		Script.SetTimer(delay, fire)
+	end
+
+	if cfg.LogTelemetry then
+		self:Log("RiderVocal tier=" .. tostring(tierName)
+				.. " trigger=" .. trigger
+				.. " delay=" .. tostring(delay) .. "ms"
+				.. " distance=" .. tostring(distance))
+	end
+
+	return true
+end
+
 --- Plays a trigger as if it came from further away, which is the only volume
 -- control the engine offers.
 --
