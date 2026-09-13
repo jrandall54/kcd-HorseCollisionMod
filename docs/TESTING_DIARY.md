@@ -20813,3 +20813,60 @@ system re-reads its tables on demand, whether `wh_db_ReloadObjectDatabase`
 reaches more than object databases, and whether the flat `S_RpgParams` array
 can be refreshed. Worth doing because a restart per table change is the slowest
 loop in the project.
+
+## FALSIFIED: the collision parameter cannot be zeroed. It governs arrows.
+
+`CollisionVelocityDeltaToDmgR` was set to **25**, a hundred times its shipped
+0.25, in a clean vanilla install. The rider played normally and an arrow killed
+him outright on the first hit.
+
+**Arrows read this parameter.** Obvious in hindsight: an arrow striking someone
+is a collision at velocity, resolved through the same physics-velocity-to-damage
+path as a horse striking someone.
+
+So the earlier plan, zeroing it to remove the engine's contribution to horse
+collisions, would have removed archery damage as well. That is a silent,
+catastrophic break, and it would have shipped. The idea is dead.
+
+The amplification design is what caught it. Setting the value to **0** cannot
+distinguish "nothing reads this" from "something reads it and now gets zero";
+setting it **high** makes every reader announce itself. Prefer amplifying a
+suspect parameter over nulling it.
+
+### The earlier "it works" result was real but undeliverable
+
+The 25-impact run where `engineTook` fell to zero was measured with the override
+as a **loose file**, which only wins because the development `system.cfg` sets
+`sys_PakPriority = 0`. A vanilla install ignores loose files entirely, so that
+configuration could never have reached a player. Two separate mistakes were
+stacked there: testing "vanilla" with a mechanism that requires dev mode, and
+not noticing that the mechanism was the dev mode.
+
+### How to override a table properly
+
+Established by copying what a working mod does. Perkaholic ships
+`Data/perkaholic.pak` containing `Libs/Tables/rpg/perk__perkaholic.xml`.
+
+    Mods/<name>/Data/<anything>.pak
+        Libs/Tables/<group>/<table>__<modid>.xml
+
+The file carries only the rows to change, with the same header as the base
+table. The suffix must equal the **ModId from `mod.manifest`**, and the game
+refuses a ModId that is not lowercase letters and underscores:
+
+    Mod mods/CollisionParamTest/mod.manifest has invalid ModId.
+    ModId accepts only lowercase letters and underscore.
+
+That line sat in the log through a whole failed attempt before it was read.
+
+### How to verify a table override, and how not to
+
+`Database.LoadTable(name)` **cannot** verify a patch. It re-reads the base table
+file and bypasses the startup merge, so it reported 0.25 while a correct patch
+was loaded. It only appeared to work earlier because a loose file had replaced
+the base file outright.
+
+The real proof is written by the game at startup:
+
+    Table 'rpg_param' is patched by 'rpg_param__collisiontest',
+        lines added: 0, modified: 1, equal: 0
