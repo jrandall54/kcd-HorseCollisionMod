@@ -936,10 +936,18 @@ be:
 - **Armor defense scaling.** What armor takes off the damage. A charge worth
   110 becomes 12 against chainmail, which is a factor of nine across a range
   the player experiences as "wearing armor or not".
-- **Base damage per tier.** The figures the other two scale. The rear is the
+- **Base damage per tier.** The figures the other two scale. The rear is one
   live example: at a base of 60 against roughly 83 health, two rears kill an
   unarmored civilian, which was found by killing a merchant rather than by
   choosing it.
+
+  The gallop is the other, and it became visible in 5.7.0. A gallop on an
+  unarmored villager deals `95 * 1.00 * 1.02 = 96.9` against 100 health, so it
+  is not lethal on its own and never was. What killed them was the prediction
+  logic upgrading any near-fatal remainder into a kill, which read as a gallop
+  being reliably deadly. With that removed, seven in ten survive. The rider
+  prefers it to the near-certain death it replaced, so this is a starting
+  position rather than a defect to correct.
 
 The three are not separable. Changing any one of them moves what the other two
 are compensating for, which is why this is a single project rather than three
@@ -976,11 +984,16 @@ Nothing here is a defect. The mod is playable at these values and they are
 deliberate placeholders.
 
 
-## Phase 7: The crime the mod cannot see
+## Open issue: the crime the mod cannot see
 
-The damage ownership work in 5.0.0 closed every path where the mod's own
-collision handling let the engine land the killing blow. One hole remains and it
-is different in kind, because the mod is not involved in it at all.
+A phase heading until 5.7.0, and demoted because it is one issue rather than a
+body of work.
+
+The collision shield closes every path where the engine lands the killing blow:
+a victim the horse strikes cannot be killed by the game at all, and the mod's
+own damage is the only thing that takes their life. **This is not that, and the
+shield does not reach it**, because the crime here is raised by the hit event
+rather than by the death. The mod is not involved in it at any point.
 
 A victim knocked down by a trot read 68.7 health, and 17.7 when the next impact
 landed: fifty-one health gone with no damage line of the mod's between them, on
@@ -997,10 +1010,10 @@ moves for ten seconds. It was not a save reload either, which would have
 restored the victim to the save's figure.
 
 So it is the engine charging its own collision repeatedly against a body that
-cannot get out from under the horse. **None of the damage ownership work reaches
-this**, because the mod never sends that hit and so has nothing to attribute or
-withhold. Reclaiming the health afterwards would not help either: the crime is
-raised by the hit event, not by the death.
+cannot get out from under the horse. The mod never sends that hit and so has
+nothing to attribute or withhold, and reclaiming the health afterwards would not
+help: the crime is raised by the hit event, not by the death. It is the same
+overlap that ejects a body through the terrain, seen from the other side.
 
 Nothing has been tried. The obvious first question is whether the victim can be
 moved, unphysicalized, or made non-collidable for as long as the horse is
@@ -1174,10 +1187,10 @@ rule, so a villager may simply have nothing to say for a combat metarole. That
 is the risk that decides whether this is a small feature or a large one.
 
 
-## Research: unlocking features through Horsemanship perks
+## Phase 7: Horsemanship perks
 
-The question: can the rear, the charge and the lean be gated behind perks in
-the Horsemanship tree rather than being available from the start.
+Gating the rear, the charge and the lean behind perks in the Horsemanship tree
+rather than having them available from the start.
 
 **Yes. The whole chain exists in data and the read-back exists in Lua.**
 
