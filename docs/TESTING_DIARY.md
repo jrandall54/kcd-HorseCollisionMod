@@ -20514,3 +20514,79 @@ in `ApplyImpactDamage` and is a redesign rather than a setting.
 `FatalGraceMs` is left in the code at 0, which is the shipped behavior
 unchanged, because it is the instrument that measured this and the numbers above
 are only meaningful with it present.
+
+## Collision damage is Lua, and it has knobs
+
+Two questions from the rider, both of which turn out to have been resting on an
+assumption nobody had checked:
+
+> "why can't we have the engine resolve the hit so it goes into it's death flow
+> but not attribute the death to us?"
+
+> "we've been operating on the assumption that when physical collision kills the
+> NPC that it's a given that it's attributed to the player. Is it possible we
+> can set that? ... KCD's entire system is built to avoid the actual cry engine
+> as much as possible so they can control everything."
+
+That reading of the game is right, and it pointed at the answer.
+
+### Why `g_debugCollisionDamage` prints nothing
+
+Not a stripped implementation this time. `SinglePlayer.lua` contains:
+
+    --if (self.game:DebugCollisionDamage()>0) then
+
+**The logging is commented out in the shipped Lua.** `DebugCollisionDamage` is
+a real registered script bind with a live function pointer, sitting in the
+registration table beside `IsInvulnerable` and `SetInvulnerability`; it is the
+caller that was disabled. So the earlier rule needs a second clause: a debug
+CVar can also be inert because vanilla's own script stopped asking.
+
+### The collision damage path is script-driven
+
+`Scripts/Entities/actor/BasicActor.lua` exposes the values the engine's
+collision damage uses, as getters the C++ calls back into:
+
+    GetCollisionDamageThreshold()  -> self.collisionDamageThreshold or 0
+    GetSelfCollisionMult(collider) -> selfCollisionDamageMult    (static geometry)
+                                      vehicleCollisionDamageMult (collider.vehicle)
+                                      entityCollisionDamageMult  (everything else)
+    GetForeignCollisionMult()      -> foreignCollisionDamageMult or 1
+    GetColliderEnergyScale()       -> colliderEnergyScale or 1
+
+and the shipped values are per archetype:
+
+    NPC_x.lua    collisionDamageThreshold = 2
+    player.lua   foreignCollisionDamageMult = 0.1, vehicleCollisionDamageMult = 7.5
+
+The resulting damage arrives at `BasicActor.Server:OnHit(hit)` as an ordinary
+hit carrying `shooterId`, `targetId`, `damage` and `weaponId`. So the engine's
+trample is not an unreachable physics event: it is a hit, built from values the
+scripts supply, delivered to a Lua handler.
+
+**This has never been tested from the mod**, and none of it is confirmed to
+apply to a horse-on-NPC collision specifically. It is a lead, not a finding.
+
+### The fork it exposes
+
+The two goals pull in opposite directions, and this is the choice rather than a
+problem to solve:
+
+- **Zero the engine's contribution.** Setting the victim's
+  `entityCollisionDamageMult` to 0, or raising `collisionDamageThreshold`, would
+  mean the engine deals no collision damage at all. Nothing to attribute, and
+  the whole deferred-damage ordering in `ApplyImpactDamage` that exists to win
+  the race could go. Clean, and it makes the mod the only source of damage.
+  It also guarantees no engine death flow and therefore no death cry, ever.
+
+- **Let the engine land the killing blow.** Its own hit resolution runs, which
+  is the only mechanism ever observed to produce the death scream and the
+  `IsDeadCheck` bark branch. The mod stops owning the kill, and attribution
+  becomes whatever the engine decides, which is the thing the current design was
+  built to prevent.
+
+The interesting possibility the rider raised is that these need not be
+exclusive: if the attribution on the engine's hit can be cleared or redirected,
+the engine could resolve the kill while the blame is set separately. Whether
+`shooterId` can be influenced from script is unknown and is the first thing to
+establish if this is pursued.
