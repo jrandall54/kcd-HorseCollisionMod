@@ -1,4 +1,4 @@
--- Finds out what the dialog system will tell us about a refused request.
+-- Finds out what the dialog system reports about a refused request.
 --
 --     python tools/dev_console.py --file tools/probe_dialog_state.lua
 --

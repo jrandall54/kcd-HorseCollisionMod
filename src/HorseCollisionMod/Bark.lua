@@ -229,8 +229,8 @@ HorseCollisionMod.RiderBarkSets = {
 -- having the audio is the gate.
 --
 -- That produced 1076 lines Henry can be asked for, of which the rider chose
--- these. **Their judgement, not a filter of mine** -- the survey they picked from
--- was narrowed only by what is mechanically possible.
+-- these. **Theirs to judge, not a filter applied here** -- the survey they picked
+-- from was narrowed only by what is mechanically possible.
 --
 -- ### One flat pool, by instruction
 --
@@ -327,7 +327,7 @@ HorseCollisionMod.RiderBarkKillAliases = {
 	{ "q_counterfeiters_crimeScene_brokenWheel", 1 },
 	-- "He's still breathing but he probably won't wake up again."
 	{ "player_examineInjuredWorker", 1 },
-	-- "My God, I'm no better than that bastard Zbyshek."
+	-- "...no better than that bastard Zbyshek."
 	{ "q_returnToSkalitz_butcher_stolenGoods", 1 },
 	-- "And now to get away quickly before anyone catches me here."
 	{ "q_libri_prohibiti_henry_shouldBeLeaving", 1 },
