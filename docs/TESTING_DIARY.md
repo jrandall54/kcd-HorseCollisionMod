@@ -20652,3 +20652,88 @@ which is what the rider wanted established before deciding it.
 Still open, and the one thing test R was meant to answer: how much of
 `engineTook` is the strike and how much is the landing. Separating them needs a
 victim who is struck but does not fall, or a fall with no strike.
+
+## What the collision damage actually is
+
+Prompted by the rider refusing the "mysterious engine force" framing and asking
+whether the assumption underneath it was wrong:
+
+> "Can we even say for sure the damage the NPCs are enduring is in fact damage
+> from physics level collisions or is that some fundamentally flawed assumption
+> we've been operating on this entire project."
+
+Partly flawed, and the correction matters.
+
+### It is KCD's own system, not physics leaking through
+
+KCD enumerates its damage reasons, recovered from the binary:
+
+    0 DR_ReasonUnknown    5 DR_FallDamage
+    1 DR_Combat           6 DR_Poisoning
+    2 DR_Starvation       7 DR_Bleeding
+    3 DR_Collision        8 DR_SelfHarm
+    4 DR_ScriptedHit      9 DR_Last
+
+`DR_Collision` is a first-class damage reason, distinct from `DR_FallDamage`
+and from `DR_ScriptedHit`, which is presumably what the mod's own `DealDamage`
+produces. The RPG module carries a matching cause class,
+`wh::rpgmodule::C_CollisionHitCause`, alongside `C_CombatHitCause` and
+`C_FallDamageCause`.
+
+So the rider's reading of the game was right and the framing this project has
+used was wrong. Physics is not deciding the damage. Physics supplies a
+**velocity**, and KCD's RPG system converts it into damage on purpose, through
+a parameter it ships:
+
+    Libs/Tables/rpg/rpg_param.xml
+        CollisionVelocityDeltaToDmgR = 0.25
+        MaxDmgR                      = 4
+        MaxDamage                    = 200
+
+`CollisionVelocityDeltaToDmgR` is the coefficient from collision velocity delta
+to damage rating. That is the whole mechanism the mod has been calling an
+unreachable engine force and building a deferred-damage race against.
+
+### Why the earlier levers all failed
+
+`BasicActor.lua`'s `collisionDamageThreshold` and the four collision damage
+multipliers are **CryEngine's** collision damage, the legacy Crysis path in
+`Scripts/GameRules/SinglePlayer.lua`. That path writes
+`target.actor:SetHealth(...)`, the CryEngine actor health, and its only
+collision-specific branch applies when the target is the player.
+
+The mod measures `npc.soul:GetState("health")`, which is the RPG soul health.
+Those are different numbers maintained by different systems, which is exactly
+why zeroing every multiplier changed nothing: the knobs belong to a system that
+is not the one charging the victim.
+
+### Which also explains the debug CVars
+
+`g_debugCollisionDamage` logs nothing because the line that would print it is
+commented out in `SinglePlayer.lua`, and that file is the legacy path anyway.
+`pl_fallDamage_*` and `wh_player_SlidingDistanceMultForDamage` are the CVars
+that do relate to the RPG system, and the latter names it outright: "Multiplies
+distance passed to RPG fall damage computation when sliding ends."
+
+### What can be done about it
+
+`rpg_param` is a shipped table, and KCD mods override tables. The mod already
+ships data overrides through `mod_assets`, including `Libs/Config/hcm_actionmaps.xml`
+and several animation databases, so the mechanism is in place.
+
+Setting `CollisionVelocityDeltaToDmgR` to 0 should remove collision damage
+entirely. **This is inference from the parameter's name and the enum, not a
+measurement**, and the test is direct: override the table, restart, and see
+whether `engineTook` falls to zero.
+
+The cost, if it works, is that the parameter is global. Every collision in the
+game changes, for the player as well as for NPCs, so a rider thrown from a horse
+or caught by a cart would stop taking that damage too. Whether that is
+acceptable is a design question and not a technical one, and it is close to
+what the rider already suspected: vanilla may barely use this, in which case
+turning it down may be nearly invisible.
+
+There is no Lua setter. `S_RpgParams` is a flat array of 640 values at a fixed
+address with a metadata table beside it, and `I_Soul::GetRpgParamByState` only
+reads. So this is a shipped table override rather than something the mod can
+toggle at runtime.
