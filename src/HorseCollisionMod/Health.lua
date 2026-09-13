@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -666,13 +666,10 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 			-- on a victim this was always going to kill, and whichever system
 			-- lands the killing blow is the one the crime is attributed to.
 			--
-			-- `FatalGraceMs` reopens exactly that much of the gap. The cry of
-			-- pain is requested at the moment of contact, and a victim killed
-			-- in the same tick appears to have no time for the dialog system
-			-- to start it: dispatch passes two halt locks, a priority auction
-			-- and two semaphores before a line begins. Ships at 0, which is
-			-- the behavior above unchanged.
-			delay = self.Config.FatalGraceMs or 0
+			-- Delaying the fatal blow to let the cry of pain begin does not
+			-- work at any value: a dying victim cannot speak, so the grace
+			-- period that stood here bought silence and a head start.
+			delay = 0
 
 			if self.Config.LogTelemetry then
 				self:Log(string.format(

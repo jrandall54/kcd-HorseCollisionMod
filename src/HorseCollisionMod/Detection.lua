@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Detection
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 --- Tests whether a victim is actually under the horse.
 --
 -- The sphere search is a broad-phase cull and nothing more. A horse is about
@@ -40,7 +40,7 @@
 -- @treturn boolean true when the victim is inside the footprint
 -- @treturn string the measurements, or nil when they were not asked for
 function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed,
-		wantDetail, lookAhead)
+		wantDetail)
 	local cfg = self.Config
 	local npcPos = nil
 
@@ -74,22 +74,9 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 		sweepExtra = cfg.MaxSweepExtra
 	end
 
-	local reach = cfg.HorseFrontReach + sweepExtra
-	local width = cfg.HorseHalfWidth
-
-	-- `lookAhead` widens the same footprint rather than inventing a second
-	-- shape, so "about to be hit" is the same geometry as "being hit" and the
-	-- two cannot drift apart. It exists for the collision shield, which has to
-	-- be applied a tick before contact to have taken effect by the time the
-	-- engine charges the victim.
-	if lookAhead and lookAhead > 0 then
-		reach = reach + (speed * cfg.TickSeconds) + lookAhead
-		width = width + lookAhead
-	end
-
 	local inside = forwardDistance >= -cfg.HorseRearReach
-			and forwardDistance <= reach
-			and lateralDistance <= width
+			and forwardDistance <= (cfg.HorseFrontReach + sweepExtra)
+			and lateralDistance <= cfg.HorseHalfWidth
 
 	-- Formatted only when it will be read. `DiagnoseMisses` is the switch that
 	-- turns the loop's diagnostics on, and the footprint line is one of them:
@@ -102,7 +89,7 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 	local detail = string.format(
 			"fwd=%.2f lat=%.2f dz=%.2f sweep=%.2f limits=%.2f/%.2f/%.2f",
 			forwardDistance, lateralDistance, dz, sweepExtra,
-			reach, width,
+			cfg.HorseFrontReach + sweepExtra, cfg.HorseHalfWidth,
 			cfg.HorseMaxVerticalDiff)
 
 	if inside and cfg.DiagnoseMisses then

@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -411,8 +411,7 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 		forceOnMuted = true,
 		priority = cfg.BarkPriority or 0,
 		canBeDelayed = cfg.BarkCanBeDelayed == true,
-		overrideContextSuppress = cfg.BarkOverrideSuppress == true,
-		doNotInterruptOnActorDeath = cfg.BarkFinishOnDeath == true
+		overrideContextSuppress = cfg.BarkOverrideSuppress == true
 	}
 
 	local ok, err = pcall(function()
@@ -655,14 +654,36 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 		return
 	end
 
-	self.ShieldedVictims[id] = true
-
-	local ok = pcall(function()
-		npc.soul:AddBuff(self.ImmortalityBuffGuid)
+	-- The instance handle, not the GUID, is what gets handed back later.
+	--
+	-- `RemoveAllBuffsByGuid` would strip **every** instance of this buff from
+	-- the victim, and immortality is exactly what a quest uses to keep a story
+	-- character alive. Shielding such a character and then clearing by GUID
+	-- would quietly remove protection this mod never granted. Removing the
+	-- single instance that was added cannot.
+	local ok, instance = pcall(function()
+		return npc.soul:AddBuff(self.ImmortalityBuffGuid)
 	end)
 
+	if not ok or instance == nil then
+		self.ShieldedVictims[id] = nil
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield failed on " .. self:NameOf(npc))
+		end
+
+		return
+	end
+
+	-- Held in a record rather than bare, so the backstop timer can close over
+	-- it. A script reload replaces the whole `HorseCollisionMod` table and with
+	-- it this map, and the one thing that must survive a reload is the removal.
+	-- A closure survives; a table lookup does not.
+	local state = { instance = instance, removed = false }
+	self.ShieldedVictims[id] = state
+
 	if self.Config.LogTelemetry then
-		self:Log("Shield on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
+		self:Log("Shield on " .. self:NameOf(npc) .. " ok=true")
 	end
 
 	-- Every shielded victim is one the horse is striking, so
@@ -671,18 +692,24 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 	-- the worst failure this code could have: if the damage call is skipped for
 	-- any reason, nobody is left permanently unkillable.
 	--
-	-- Generation checked for the same reason, against a script reload.
-	local generation = self.TimerTick
-
+	-- **Deliberately not generation guarded.** Every other timer in this mod
+	-- returns early when a script reload has bumped the generation, so a stale
+	-- loop stops doing work. This one must not: the work it does is removing
+	-- immortality, and skipping it would leave a victim unkillable for the rest
+	-- of the session. A reload happens on every deploy, so that is not remote.
 	Script.SetTimer(self.Config.ShieldWindowMs or 400, function()
-		if generation ~= self.TimerTick then
+		if state.removed then
 			return
 		end
 
-		self.ShieldedVictims[id] = nil
+		state.removed = true
+
+		if self.ShieldedVictims[id] == state then
+			self.ShieldedVictims[id] = nil
+		end
 
 		local lifted = pcall(function()
-			npc.soul:RemoveAllBuffsByGuid(self.ImmortalityBuffGuid)
+			npc.soul:RemoveBuff(state.instance)
 		end)
 
 		if self.Config.LogTelemetry then
@@ -705,15 +732,19 @@ function HorseCollisionMod:LiftCollisionShield(npc)
 	end
 
 	local id = tostring(npc.id or "?")
+	local state = self.ShieldedVictims[id]
 
-	if not self.ShieldedVictims[id] then
+	if state == nil or state.removed then
 		return false
 	end
 
+	state.removed = true
 	self.ShieldedVictims[id] = nil
 
+	-- The instance this mod added, never every instance by GUID, so a quest's
+	-- own immortality on the same victim is untouched.
 	local ok = pcall(function()
-		npc.soul:RemoveAllBuffsByGuid(self.ImmortalityBuffGuid)
+		npc.soul:RemoveBuff(state.instance)
 	end)
 
 	if self.Config.LogTelemetry then

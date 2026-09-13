@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -553,18 +553,6 @@ function HorseCollisionMod:SafeUpdate()
 					-- by the time bodies touch.
 					self:HushVanillaBark(ent)
 
-					-- A tick before contact, and only for somebody the horse
-					-- is actually about to hit. The buff needs a tick to take
-					-- effect: applied in the same tick the impact is scored it
-					-- is not active yet when the engine charges the victim,
-					-- measured as every non-fatal impact still losing health.
-					if self.Config.ShieldVictimFromEngineDamage
-							and impactSpeed >= self.Config.SpeedWalk
-							and self:IsInHorseFootprint(ent, horsePos, horseForward,
-									speed, false, self.Config.ShieldLookAhead or 0.6) then
-						self:ShieldFromEngineDamage(ent)
-					end
-
 					local isDead = false
 
 					-- Corpses are already ragdolls. Reacting to them would
@@ -594,6 +582,13 @@ function HorseCollisionMod:SafeUpdate()
 										self:FootprintDetail(ent, horsePos,
 												horseForward, speed))
 							else
+						-- Only for somebody the horse is actually striking, so
+						-- nobody uninvolved is ever made immortal. Reaching a
+						-- tick ahead of contact shields bystanders the horse then
+						-- misses, and buys nothing: the buff takes effect in the
+						-- call that applies it, measured directly over the
+						-- console.
+						self:ShieldFromEngineDamage(ent)
 								self:LogRejection(ent, "below-walk-speed",
 										string.format("impact=%.2f sampled=%.2f",
 												impactSpeed, speed))

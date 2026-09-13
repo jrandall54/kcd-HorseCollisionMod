@@ -30,6 +30,40 @@ number.
 
 ## [Unreleased]
 
+### Added
+
+- **The mod now takes the killing blow when a horse rides somebody down.** A
+  victim the horse strikes is made briefly immortal at the moment of contact,
+  so the engine's own collision damage cannot kill them, and the immortality is
+  lifted the instant the mod applies its own damage.
+
+  This exists because of where the blame lands. The engine attributes a
+  collision death to the player, so a victim killed by the trample rather than
+  by the mod produced a murder charge even with `CollisionIsCrime` off. That
+  was rare, random and impossible to predict, and the mod previously tried to
+  beat it by guessing which impacts would be fatal and racing to land the blow
+  first. The shield removes the race instead of trying to win it.
+
+  Measured over roughly two hundred impacts: with every victim reduced to five
+  health and the mod dealing no damage at all, fifty-nine trample impacts
+  produced no deaths, every victim clamped at one health and stood back up. In
+  ordinary play across two runs of a hundred and thirty-one and twenty impacts,
+  the mod took every one of the forty-two kills and none was attributed to the
+  player.
+
+  Settings: `ShieldVictimFromEngineDamage`, `ShieldWindowMs`.
+
+### Known issues
+
+- **A victim can still be killed by the engine after the shield lifts.** The
+  shield ends when the mod applies its damage, around six hundred milliseconds
+  after contact, while the body is often still tumbling. A victim who survives
+  the impact and then takes further collision damage, most likely by being
+  wedged between the horse and a wall, can be killed by the engine and produce
+  a murder charge. Observed once in testing, on a guard who survived to three
+  seconds and died by six. Holding the shield until the body has come to rest
+  is the fix and is deliberately left to its own change.
+
 ## [5.5.0] - 2026-09-12
 
 ### Added

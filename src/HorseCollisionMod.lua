@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.5.0
+-- @release 5.6.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.5.0"
+HorseCollisionMod.Version = "5.6.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -660,15 +660,6 @@ HorseCollisionMod.Config = {
 	-- never be what ends it. It exists so that a victim cannot be left
 	-- permanently immortal if the damage call is skipped.
 	ShieldWindowMs           = 2000,
-	-- How far beyond the collision footprint the shield reaches, in meters, so
-	-- it lands a tick before contact rather than in the same tick. Wider
-	-- catches more of the engine's damage and shields more people who are
-	-- never actually hit.
-	ShieldLookAhead          = 0.6,
-	-- How long a fatal impact waits before applying its damage, so the cry of
-	-- pain has time to begin. Zero is the shipped behavior and protects crime
-	-- attribution; see the comment on the fatal path in Health.lua.
-	FatalGraceMs             = 0,
 	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
 	-- every in-flight request by priority and silently discards one that is
 	-- below the top and cannot be delayed, so a bark sent at the default zero
@@ -678,9 +669,6 @@ HorseCollisionMod.Config = {
 	-- Exempts the line from a `suppressMonologs` context, which is the gate
 	-- that silences everything rather than just the collision bark.
 	BarkOverrideSuppress     = false,
-	-- Lets a victim finish the line even if the impact kills them, which is
-	-- what vanilla pairs with this same set when a character dies.
-	BarkFinishOnDeath        = false,
 
 	-- Retaliation. Barging the same person at a walk costs nobody anything,
 	-- which makes it an annoyance rather than an act. These let a victim

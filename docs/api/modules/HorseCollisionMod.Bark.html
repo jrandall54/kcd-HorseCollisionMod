@@ -134,7 +134,7 @@ and only watching vanilla answers 4.</li>
  directly descriptive writing for this exact situation.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 5.5.0</li>
+        <li><strong>Release</strong>: 5.6.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -178,9 +178,13 @@ and only watching vanilla answers 4.</li>
 	<td class="summary">Speaks when the mod's own actions have killed somebody.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:HushEngineCollisionDamage">HorseCollisionMod:HushEngineCollisionDamage (npc)</a></td>
-	<td class="summary">Switches off the engine's own collision damage on somebody the horse is
- approaching.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ShieldFromEngineDamage">HorseCollisionMod:ShieldFromEngineDamage (npc)</a></td>
+	<td class="summary">Makes a victim briefly immortal so the engine's collision damage lands on
+ nothing.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:LiftCollisionShield">HorseCollisionMod:LiftCollisionShield (npc)</a></td>
+	<td class="summary">Takes the collision shield off a victim, now.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:HushVanillaBark">HorseCollisionMod:HushVanillaBark (npc)</a></td>
@@ -527,36 +531,29 @@ and only watching vanilla answers 4.</li>
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:HushEngineCollisionDamage"></a>
-    <strong>HorseCollisionMod:HushEngineCollisionDamage (npc)</strong>
+    <a name = "HorseCollisionMod:ShieldFromEngineDamage"></a>
+    <strong>HorseCollisionMod:ShieldFromEngineDamage (npc)</strong>
     </dt>
     <dd>
-    Switches off the engine's own collision damage on somebody the horse is
- approaching. </p>
+    Makes a victim briefly immortal so the engine's collision damage lands on
+ nothing. </p>
 
 <p> The engine charges a victim health for being struck by a moving physical
- body, and attributes it to the rider. That is the whole reason
- <code>ApplyImpactDamage</code> defers its own damage: it has to land last to own the
- kill and the crime with it, which in turn is why a victim the mod kills
- dies without a sound.</p>
+ body and the mod cannot stop it. Five separate levers leave it unchanged.
+ <code>BasicActor</code>'s collision multipliers belong to CryEngine's legacy damage
+ path rather than to the RPG layer that charges <code>soul</code> health, and the
+ one parameter that does work, <code>CollisionVelocityDeltaToDmgR</code>, is global and
+ also governs arrows.</p>
 
-<p> The charge is not an unreachable physics event. <code>BasicActor.lua</code> asks the
- entity for the numbers through <code>GetSelfCollisionMult</code>, which returns
- <code>vehicleCollisionDamageMult</code> when the collider is a vehicle and
- <code>entityCollisionDamageMult</code> otherwise. The horse has no <code>vehicle</code> table and
- does have an <code>actor</code>, so an NPC struck by it takes the entity path.</p>
+<p> So rather than stop the damage, this stops it <strong>landing</strong>. <code>imm=1</code> is the
+ parameter behind the game's own <code>immortality</code> and <code>death_protection</code> buffs,
+ and <code>immortality_nonpersistent</code> carries it without being able to survive a
+ save. Applied ahead of contact and removed once the engine has settled, the
+ victim is untouchable for exactly the window the trample occupies, and the
+ mod's own damage lands afterwards on a mortal target.</p>
 
-<p> Setting that multiplier to zero should therefore remove the engine's
- contribution entirely, leaving the mod as the only source of collision
- damage. Zero is deliberate rather than a small number, and it survives the
- getter's <code>or 1</code> fallback because zero is truthy in Lua.</p>
-
-<p> <code>collisionDamageThreshold</code> is raised as well, which is the shipped 2 on
- <code>NPC_x</code>, as a second gate in case the multiplier is applied somewhere this
- reasoning has not found.</p>
-
-<p> Called from the detection loop ahead of contact, for the same reason the
- bark hush is: by the time bodies touch it has to already be in place.
+<p> <strong>This is deliberately narrow.</strong> It is one buff, on one victim, for a few
+ hundred milliseconds, and it is removed by GUID so nothing of it persists.
 
 
     <h3>Parameters:</h3>
@@ -567,6 +564,37 @@ and only watching vanilla answers 4.</li>
         </li>
     </ul>
 
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:LiftCollisionShield"></a>
+    <strong>HorseCollisionMod:LiftCollisionShield (npc)</strong>
+    </dt>
+    <dd>
+    Takes the collision shield off a victim, now. </p>
+
+<p> Called from <code>ApplyImpactDamage</code> immediately before it charges the victim, so
+ the immortality that swallowed the engine's trample cannot also swallow the
+ mod's own damage. Safe to call on somebody who was never shielded.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a removal was attempted
+    </ol>
 
 
 
@@ -615,7 +643,7 @@ and only watching vanilla answers 4.</li>
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-12 18:22:25 </i>
+<i style="float:right;">Last updated 2026-09-12 21:54:24 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

@@ -670,10 +670,11 @@ HorseCollisionModSettings = {
 	                                  -- back on their feet, rather than
 	                                  -- walking off without a word
 
-	-- Research: make a collision victim immortal for the instant of contact so
-	-- the engine's own collision damage lands on nothing, leaving this mod as
-	-- the only thing that charges them. Lifted again the moment the mod deals
-	-- its damage.
+	-- Makes a victim the horse strikes immortal for the instant of contact, so
+	-- the engine's own collision damage cannot kill them and this mod is the
+	-- only thing that can. Lifted the moment the mod deals its damage. Without
+	-- it, a victim the trample happens to kill is charged to you as murder even
+	-- with CollisionIsCrime off.
 	ShieldVictimFromEngineDamage = true,
 	ShieldWindowMs           = 2000,  -- backstop only; the lift is synchronous
 
