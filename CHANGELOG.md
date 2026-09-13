@@ -30,6 +30,17 @@ number.
 
 ## [Unreleased]
 
+## [5.8.2] - 2026-09-13
+
+### Fixed
+
+- **"Poor wretch. What did he do to deserve such a fate?" is kept for male
+  victims.** Its second sentence names the victim, so it belongs with the other
+  gendered lines.
+- A death that produces no spoken line now says why in the log, distinguishing
+  the voice cooldown and an empty gender-filtered pool from a death the mod did
+  not see coming.
+
 ## [5.8.1] - 2026-09-13
 
 ### Fixed
