@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.8.1] - 2026-09-13
+
 ### Fixed
 
 - **A line that names the victim no longer lands on the wrong one.** "Shameless
