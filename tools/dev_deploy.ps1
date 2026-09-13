@@ -570,20 +570,29 @@ function Get-LooseFileMap {
 		}
 	}
 
-	# The action map the rear key needs. It lives outside the ADB folder, so
-	# would otherwise never reach a loose install and the key would silently
-	# keep whatever the pak was built with.
+	# Everything else under mod_assets\Libs, mirrored by its own relative path.
+	#
+	# This used to name `Libs\Config` alone, for the action map the rear key
+	# needs, and so a data override anywhere else was written into the build and
+	# never into a loose install. A table override sat in the repository,
+	# deployed without complaint, and was simply absent from the running game.
+	# Walking the tree keeps the two in step whatever is added next.
+	#
+	# Note that tables are read once at startup, so a file that lands here still
+	# needs the game restarted before it means anything.
 	if ($Anim) {
-		$cfgSrc = Join-Path $repoRoot "mod_assets\Libs\Config"
+		$libsSrc = Join-Path $repoRoot "mod_assets\Libs"
 
-		if (Test-Path $cfgSrc) {
-			$cfgDest = Join-Path $Root "Data\Libs\Config"
+		if (Test-Path $libsSrc) {
+			$prefix = (Resolve-Path $libsSrc).Path
 
-			foreach ($file in Get-ChildItem -Path $cfgSrc -File) {
+			foreach ($file in Get-ChildItem -Path $libsSrc -File -Recurse) {
+				$relative = $file.FullName.Substring($prefix.Length).TrimStart('')
+
 				$files += @{
 					Half = "Anim"
 					From = $file.FullName
-					To   = Join-Path $cfgDest $file.Name
+					To   = Join-Path $Root (Join-Path "Data\Libs" $relative)
 				}
 			}
 		}

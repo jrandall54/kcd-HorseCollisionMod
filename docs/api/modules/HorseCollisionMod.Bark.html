@@ -162,8 +162,8 @@ and only watching vanilla answers 4.</li>
 	<td class="summary">The bark set an impact at this speed should raise.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:BarkCollision">HorseCollisionMod:BarkCollision (npc, tier)</a></td>
-	<td class="summary">Speaks for a collision, and for whoever saw it.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:BarkCollision">HorseCollisionMod:BarkCollision (npc, tier, inCombat)</a></td>
+	<td class="summary">Speaks for a collision, at the moment of contact.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BarkRecovered">HorseCollisionMod:BarkRecovered (npc, tier)</a></td>
@@ -176,6 +176,11 @@ and only watching vanilla answers 4.</li>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BarkDeath">HorseCollisionMod:BarkDeath (npc)</a></td>
 	<td class="summary">Speaks when the mod's own actions have killed somebody.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HushEngineCollisionDamage">HorseCollisionMod:HushEngineCollisionDamage (npc)</a></td>
+	<td class="summary">Switches off the engine's own collision damage on somebody the horse is
+ approaching.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:HushVanillaBark">HorseCollisionMod:HushVanillaBark (npc)</a></td>
@@ -389,15 +394,15 @@ and only watching vanilla answers 4.</li>
 </dd>
     <dt>
     <a name = "HorseCollisionMod:BarkCollision"></a>
-    <strong>HorseCollisionMod:BarkCollision (npc, tier)</strong>
+    <strong>HorseCollisionMod:BarkCollision (npc, tier, inCombat)</strong>
     </dt>
     <dd>
-    Speaks for a collision, and for whoever saw it. </p>
+    Speaks for a collision, at the moment of contact. </p>
 
-<p> The victim reacts first. A bystander is asked separately and only for the
- harder tiers, because someone being shoved aside at a walk is not an event
- worth a stranger shouting about, and because the bystander sets are all
- about bodies.
+<p> A walk speaks words straight away. A knockdown cries out here and says
+ something later, from <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:BarkRecovered">BarkRecovered</a>, which this schedules.</p>
+
+<p> Refused outright during a fight, matching vanilla.
 
 
     <h3>Parameters:</h3>
@@ -409,6 +414,11 @@ and only watching vanilla answers 4.</li>
         <li><span class="parameter">tier</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
          the speed tier the impact was scored at
+        </li>
+        <li><span class="parameter">inCombat</span>
+            <span class="types">optional <span class="type">boolean</span></span>
+         true when the player is in combat, which silences
+   the whole moment unless <code>BarkInCombat</code> says otherwise
         </li>
     </ul>
 
@@ -517,6 +527,52 @@ and only watching vanilla answers 4.</li>
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:HushEngineCollisionDamage"></a>
+    <strong>HorseCollisionMod:HushEngineCollisionDamage (npc)</strong>
+    </dt>
+    <dd>
+    Switches off the engine's own collision damage on somebody the horse is
+ approaching. </p>
+
+<p> The engine charges a victim health for being struck by a moving physical
+ body, and attributes it to the rider. That is the whole reason
+ <code>ApplyImpactDamage</code> defers its own damage: it has to land last to own the
+ kill and the crime with it, which in turn is why a victim the mod kills
+ dies without a sound.</p>
+
+<p> The charge is not an unreachable physics event. <code>BasicActor.lua</code> asks the
+ entity for the numbers through <code>GetSelfCollisionMult</code>, which returns
+ <code>vehicleCollisionDamageMult</code> when the collider is a vehicle and
+ <code>entityCollisionDamageMult</code> otherwise. The horse has no <code>vehicle</code> table and
+ does have an <code>actor</code>, so an NPC struck by it takes the entity path.</p>
+
+<p> Setting that multiplier to zero should therefore remove the engine's
+ contribution entirely, leaving the mod as the only source of collision
+ damage. Zero is deliberate rather than a small number, and it survives the
+ getter's <code>or 1</code> fallback because zero is truthy in Lua.</p>
+
+<p> <code>collisionDamageThreshold</code> is raised as well, which is the shipped 2 on
+ <code>NPC_x</code>, as a second gate in case the multiplier is applied somewhere this
+ reasoning has not found.</p>
+
+<p> Called from the detection loop ahead of contact, for the same reason the
+ bark hush is: by the time bodies touch it has to already be in place.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         somebody in front of the horse
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:HushVanillaBark"></a>
     <strong>HorseCollisionMod:HushVanillaBark (npc)</strong>
     </dt>
@@ -559,7 +615,7 @@ and only watching vanilla answers 4.</li>
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-12 15:19:04 </i>
+<i style="float:right;">Last updated 2026-09-12 18:22:25 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

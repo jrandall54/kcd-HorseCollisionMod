@@ -20737,3 +20737,79 @@ There is no Lua setter. `S_RpgParams` is a flat array of 640 values at a fixed
 address with a metadata table beside it, and `I_Soul::GetRpgParamByState` only
 reads. So this is a shipped table override rather than something the mod can
 toggle at runtime.
+
+## CONFIRMED: one RPG parameter removes the engine's collision damage
+
+    Libs/Tables/rpg/rpg_param.xml
+        CollisionVelocityDeltaToDmgR   0.25 -> 0
+
+Shipped as a table override under `mod_assets/Libs/Tables/rpg/`, verified on
+disk, verified read back from the game's own table at runtime through
+`Database.GetTableLine`, and then measured over 25 impacts after a restart:
+
+    before   engineTook 6 to 54 on every non-fatal impact
+    after    engineTook 0.0 on all 25, fatal and non-fatal alike
+
+The mod's own damage is unaffected and still lands, so a victim goes from 100 to
+84.4 with the engine contributing nothing.
+
+### What this overturns
+
+The engine's trample has been treated as an unreachable force for the life of
+this project. It is one coefficient in a shipped table, converting collision
+velocity delta into a damage rating, and it can be set to zero.
+
+Five earlier attempts failed because they were aimed at the wrong system.
+`BasicActor.lua`'s `collisionDamageThreshold` and its four multipliers belong to
+CryEngine's legacy collision damage, which writes `actor:SetHealth`. KCD's own
+RPG layer charges `soul` health through `DR_Collision` and tunes it here.
+
+### What it unlocks
+
+`ApplyImpactDamage` sets `delay = 0` on any fatal impact, with the reason
+recorded in the code: waiting would give the engine's trample a head start on a
+victim it was always going to kill, and whichever system lands the killing blow
+takes the crime attribution with it.
+
+**With the engine contributing nothing there is no head start to give.** The
+race the deferred-damage ordering exists to win no longer has another runner, so
+a fatal impact can wait as long as it likes without risking attribution.
+
+That matters because the fatal path's zero delay is exactly what makes the mod's
+kills silent: the cry of pain is requested at contact and the victim dies in the
+same tick, before the dialog system can start the line. Measured earlier, a
+grace of 1500ms starts the cry and 3000ms completes it.
+
+So the death cry and the attribution are no longer in tension. They were only in
+tension because of a force that turns out to be a table value.
+
+### What is still unresolved
+
+A grace long enough to complete the cry is long enough to see: at 3000ms the
+victim barks, begins to rise, and then dies. The ragdoll grounds around 1.5 to
+1.7 seconds. That is a separate problem from attribution and is not solved by
+this.
+
+The parameter is global. Nothing has been tested about what else reads it.
+Whether a rider thrown from a horse takes `DR_Collision` or `DR_FallDamage` is
+unknown, and they are separate enum values with separate tuning, so the earlier
+claim in this diary that the player would stop taking that damage was unfounded
+and is withdrawn. It needs measuring, not assuming.
+
+## Parked: hot-reloading data tables in the dev tools
+
+`Database.LoadTable(name)` is a real Lua bind, alongside `GetTableInfo`,
+`GetColumnInfo`, `GetTableLine` and `GetTableColumnData`. `dev_console.py` now
+fires it for `rpg_param` on the animation half of a deploy and reports the row
+count back, which is how the override above was verified without inference.
+
+**It is verification, not hot-reload.** Loading the table repopulates the
+database interface, but systems that copy values into their own structures at
+startup, the RPG parameters among them, do not pick the new value up. A restart
+is still required for the parameter to take effect.
+
+Parked for a later look at whether the tooling can go further: whether any
+system re-reads its tables on demand, whether `wh_db_ReloadObjectDatabase`
+reaches more than object databases, and whether the flat `S_RpgParams` array
+can be refreshed. Worth doing because a restart per table change is the slowest
+loop in the project.
