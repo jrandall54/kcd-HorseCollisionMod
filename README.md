@@ -221,6 +221,30 @@ tools/
   bark_lines.py           prints the English text of any vanilla bark set, and
                           searches by remembered words for the set holding a
                           line, without starting the game
+  bark_alias.py           prints any topic addressable by alias with its lines,
+                          speakers and word counts, the alias namespace being
+                          the label column of topic.xml
+  henry_impact_lines.py   every line Henry can actually be made to say, with the
+                          full text of every member of each set, filtered to
+                          those whose sequence is always-true, repeatable, and
+                          recorded by his actor alone
+  henry_quips.py          the same inventory grouped by alias against metarole,
+                          flagging each set's worst member
+  make_audition.py        writes a console script that speaks one numbered line,
+                          for auditioning them one at a time; a result only
+                          counts against a recently launched game
+  make_voice_probe.py     writes a console script that fires one named audio
+                          trigger, validating the name before firing so a
+                          missing trigger reads differently from a silent one
+  audition_batch.lua      speaks ten lines five seconds apart, superseded by
+                          make_audition.py and kept for a bulk pass
+  dev_riderbark.lua       walks the rider's own bark pool one line per run
+  probe_dialog_state.lua  asks the dialog bind what it knows about a refused
+                          request; every reader on it returns nil
+  probe_voice.lua         auditions one vocal trigger on an NPC, the player or a
+                          corpse
+  probe_voice_dead.lua    kills the nearest NPC and fires a cry on the body, the
+                          test that showed an audio trigger outlives a subbrain
   dev_console.py          talks to the running game over its remote console
   dev_subject.lua         spawns a test subject in front of the horse
   typed_message_probe.lua a Lua probe run in the game through dev_console.py

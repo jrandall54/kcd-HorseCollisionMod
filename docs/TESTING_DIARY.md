@@ -21134,6 +21134,397 @@ It had been silently dead while the damage was applied at the moment of
 contact, which would have made engine damage additive and quietly wrong every
 figure in `ImpactDamageByTier`.
 
+# A corpse still plays an audio trigger, so the mod can own its death sounds
+
+This overturns the conclusion recorded above under "Death sounds are dialogue,
+and a dead victim will not take a request". That section ends by naming one
+remaining route — let the engine resolve the killing hit, so its own tree plays
+the scream — and warns that it costs the attribution ordering in
+`ApplyImpactDamage` and is "a redesign rather than a setting". No redesign is
+needed. The reasoning was sound but it was carried out entirely inside the
+dialog system, and the sound does not have to come from there.
+
+## What was missed
+
+Everything above treats "a death sound" and "a dialogue line" as the same
+object, because `wh_dlg_Enable 0` silenced vanilla's death sounds and that
+proved vanilla routes them through dialogue. It does prove that. It does not
+prove that dialogue is the only way to make a voice come out of a character.
+
+`Sound.lua` has been firing FMOD events by name since the impact foley was
+written, through `Libs/GameAudio/*.xml` and the 1803-trigger vocabulary already
+indexed in `references/audio_triggers.tsv`. Fourteen of those triggers are
+human voice, and the dialog system offers none of them:
+
+    v_stealth_stealthkill_man       event:/voice/stealth_stealthkill_man
+    v_stealth_stealthkill_woman     event:/voice/stealth_stealthkill_woman
+    v_stealth_takedown_man          event:/voice/stealth_takedown_man
+    v_stealth_takedown_man_short    event:/voice/stealth_takedown_man_short
+    v_stealth_takedown_woman        event:/voice/stealth_takedown_woman
+    v_stealth_takedown_woman_short  event:/voice/stealth_takedown_woman_short
+    v_henry_hit_heavy               event:/voice/henry_hit_heavy
+    v_henry_hit_medium              event:/voice/henry_hit_medium
+    v_henry_hit_soft                event:/voice/henry_hit_soft
+    v_henry_nostamina_sigh          event:/voice/henry_nostamina_sigh
+    v_henry_hyje                    event:/voice/henry_hyje
+    v_player_death                  declared with no event mapped
+    v_player_drunked                event:/voice/player/player_drunked
+    v_henry_deer_luring             event:/voice/deer_luring
+
+All eleven tested resolve to real handles under `Sound.GetAudioTriggerID`.
+`v_player_death` is declared in `voices.xml` with no FMOD event behind it, which
+is worth knowing before anybody reaches for the obvious name.
+
+## The two results
+
+`tools/probe_voice.lua` fires one named trigger on the player, on the nearest
+living person, or on the nearest corpse. One trigger per run, for the reason
+`probe_bark.lua` already records.
+
+**On a living NPC**, `v_stealth_stealthkill_man` on a refugee 2.9 m away:
+
+> "I did hear the stealth kill sound"
+
+**On a corpse** is the result that matters. `tools/probe_voice_dead.lua` kills
+the nearest person with `soul:DealDamage(0, 9999)` and fires the cry on the body
+two seconds later, long after the brain is gone:
+
+    VOICEDEAD killed=rat_refugee_kunes at 5.4 m, firing in 2000ms
+    VOICEDEAD fired=true isDead=true target=rat_refugee_kunes
+
+> "he died and then I heard the stealth kill sound"
+
+A `dialog:monologRequest` sent into that same state has never once produced
+sound, at any delay, with any flag combination. An `ExecuteAudioTrigger` on the
+same entity, two seconds dead, plays normally.
+
+## Why the difference, and why it was predictable
+
+A monologRequest is a **message**. It is delivered to the character's behaviour
+tree, and the diary's own reading of the teardown is correct: no subbrain, no
+recipient. `ExecuteAudioTrigger` is not a message. It is a direct call on the
+entity's audio proxy, which is a rendering attachment rather than a brain, and
+nothing about being dead removes it. The corpse is still an entity with a
+position and a proxy, which is all an FMOD event needs.
+
+That also explains the shape of every earlier negative. `FatalGraceMs` measured
+400 ms silent, 1500 ms cut off, 3000 ms complete, because dispatch had to pass
+two halt locks, a priority auction and two semaphores while the speaker stayed
+alive. A trigger has no dispatch to pass, so it has no grace requirement and no
+window to keep open. The "window is not narrow, it is closed" finding is about
+dialogue and does not apply here.
+
+## What this unblocks
+
+The three problems that closed off the dialogue route all dissolve rather than
+being solved:
+
+    needs the speaker alive           no: a corpse plays it
+    needs a visible 3000ms grace      no: no dispatch, so no grace
+    right register unreachable        no: the stealth-kill cry is the register,
+                                          and ZASAH_ZBRANI_SILNY is not needed
+
+And it costs nothing that 5.6.0 and 5.7.0 bought. The shield stays, the
+attribution ordering in `ApplyImpactDamage` stays, the mod still owns every
+kill. The sound is fired by the mod at the moment the mod chooses, which is what
+`the mod owns what it does` asks for: an effect with a switch and a shipped
+default rather than one the engine resolves.
+
+`ZASAH_ZBRANI_SILNY` being unreachable as a metarole is still true and still
+correctly recorded. It stops mattering.
+
+# Four filters decide whether Henry's line can be heard at all
+
+The rider chose twenty-four spoken lines for the impacts, the mod sent fifty-seven
+requests in a single ride, and they heard perhaps eight. Every request logged
+`sent=true`, because `SendMessageToEntityData` reports that the message was
+posted and nothing else. So the whole problem was invisible from the mod's side.
+
+It resolved into four separate gates, each found because lines that passed the
+previous ones still would not speak.
+
+## 1. The entry condition must be always-true
+
+`topic2sequence.entry_condition` gates the sequence. `'1'` means always-true.
+Eleven of the twenty-four picks sat behind quest state instead --
+`IsQuestStarted('q_disguise')`, `IsObjectiveCompleted(...)`,
+`IsActorInside('sas_church')` -- and those refuse silently.
+
+## 2. `timeout = -1` means once per playthrough, ever
+
+`sequence.timeout` is normally a cooldown in seconds, `0` meaning none. `-1` is
+different in kind: the sequence may be used once and never again. Three picks
+were silent for this reason alone, their quests having spent them many hours
+earlier. Nothing in the topic tables marks this as special; it is only visible
+by reading the value.
+
+## 3. The shipped audio names its actors, and there must be exactly one
+
+This is the filter that actually explained the pattern, and it lives outside the
+tables entirely. Every file in the English localization paks is named
+
+    Dialog/<nnnnnn>/<actor>_t<topic>_s<sequence>_<n>_<slug>_<hash>.ogg
+
+so the actor prefixes on a sequence's files are a direct record of who speaks in
+it. `tmck` is Tom McKay, Henry. Reading 162,060 entries across seven paks gives
+the speaker set for 20,305 sequences.
+
+Against the rider's own confirmed observations:
+
+| what they reported | actors on the sequence |
+| --- | --- |
+| heard, eight aliases | `{tmck}` on seven of eight |
+| never heard, nine aliases | two actors on four, no audio at all on one |
+
+A sequence with two actors is a conversation, not a monolog. Every one tried as
+a bark was refused, except one -- `q_skalitz_kunesLost_henryBarks` -- which
+opened a cutscene, which is the same finding from the other direction. A
+sequence with no audio can never be heard however reachable it looks:
+`event_chase_thiefDown` has a localized line and no recording.
+
+## 4. Every member of the topic must fit, not just the first
+
+A topic is a set and the dialog system picks the member, so a choice made from
+one line is a guess about the others. `q_rides_bacchus_ringIsStolenFromHenry`
+was chosen from a label reading "Oh, shit!" and holds "Shit, where's that damned
+ring?"; `q_raubritter_playerBloodTrack` holds seven lines about following a
+blood trail.
+
+## What this leaves, and how far it was checked
+
+Of 1,656 aliases, 173 have a Henry line on an always-true sequence, and 124
+survive all of filters 1 to 3. Validated against the rider's ear: seven of eight
+heard lines pass, and the eighth is the cutscene; seven of nine never-heard lines
+are rejected. The two survivors among the never-heard are "Jesus..." and "Oh,
+God.", one and two words, where a report either way is not conclusive.
+
+`tools/henry_impact_lines.py` applies all four and prints every member in full.
+
+## What the engine will not tell you
+
+`C_ScriptBindDialog` exposes `IsSequenceAvailable`, `IsSequenceUsed`,
+`IsSoulInDialog` and `AnalyzeRequest`. All four are present on the `DialogModule`
+table and all four returned `nil` for every argument shape tried -- bare
+sequence id, soul id, entity id, WUID, and nothing at all. `AnalyzeRequest()`
+returns `0`. So there is no engine-side signal for a refused request, and the
+classification has to be done offline from the shipped data. That is why the
+filters above are worth the trouble.
+
+# Two timings, and why the line has to be predicted
+
+The rider reported the spoken lines arriving late and death lines almost never
+arriving. Both came from the same cause.
+
+The mod's impact damage is deliberately deferred until the thrown body comes to
+rest, so that it lands last and owns the kill. Choosing the rider's line from
+the resolved death therefore put the words up to a second and a half after the
+collision, and a walk stagger -- whose tier is worth no damage, so the damage
+path returns before dealing any -- never reached the decision at all.
+
+`PredictImpactFatal` answers the question at the moment of contact instead,
+using `ApplyImpactDamage`'s own arithmetic minus the variance roll: `base *
+armorScale * bardingDamage` against the victim's current health. On the ride it
+was built from, no impact was near the margin -- 96.9 intended against 83.0
+health on the kills, 11.6 against 58.4 on the survivals.
+
+The second half is that the voice gate was rank-blind. Four fatal gallops in one
+ride produced one death line, because the grunt at each contact had already
+taken the gate. `RiderVoiceRanks` now orders them -- grunt 3, impact line 4,
+death line 5 -- and a higher rank passes a hold that a lower one set. Equal rank
+still loses, so two death lines never overlap.
+
+# Henry's short exclamations are not reachable as words
+
+The question was how to fire a short spoken reaction -- "Oh", "Hey", "Christ" --
+on an impact. The answer, after auditioning all 124 reachable aliases one at a
+time and then researching every other route, is that short spoken lines are not
+available to the mod at all. What is available is a small set of wordless
+vocalisations on the audio-trigger path.
+
+## The dialogue route, exhausted
+
+Of 124 aliases that pass every static filter, roughly one in four was audible
+when fired, and the audible ones are mostly full sentences. Every short one
+tried -- "Jesus...", "Oh, God.", "Done.", "That's it!", "Hey!", "So...", "What?",
+"Now then..." -- was silent, repeatedly, while sitting still in a quiet place.
+Nothing in the shipped tables separates them from the ones that speak:
+`q_returnToSkalitz_butcher_stolenGoods` plays and `q_returnToSkalitz_deadPeople`
+does not, and their rows are identical -- topic priority 7, `flags=1`,
+`type=0`, `timeout=0`, no entry condition, one actor.
+
+Levers tried on a known-silent short line, all with no sound:
+
+- `priority` raised to 255
+- `canBeDelayed = true`
+- `forceSubtitles = true` -- no subtitle appeared either, so the line is not
+  merely inaudible, it is never started
+- `ResetSequenceTimer` in all three argument shapes first
+
+The full field list for the message, read from `Utils.makeTable`, is `alias`,
+`canBeDelayed`, `defaultAnimState`, `doNotInterruptOnActorDeath`, `forceOnMuted`,
+`forceSubtitles`, `lookAtId`, `metarole`, `overrideContextSuppress`,
+`playStandingTransition`, `priority`, `sendAnswer`, `topicId`. There is nothing
+left in it to try.
+
+## What vanilla does for the player, and what it does not
+
+`Scripts/Utils/DialogUtils.lua` defines
+
+    function DialogUtils.RequestPlayerMonologByMetarole(metaroleName)
+
+which sends the message with `metarole` and no other field. It is defined and
+**never called anywhere in the shipped paks**, so it is an unused helper rather
+than a route the game exercises.
+
+`player.soul:GetRoles()` returns 32 roles, which reach 25 metaroles through
+`role.xml`. Only three carry usable Henry content, and all three are
+quest-specific: `JINDRICH_NARAZIL_NA_MRTVOLY` (the Skalitz corpse reactions,
+already tried and rejected many times for being long and out of context),
+`JINDRICH_NEMUZE_ZE_SKALICE`, and `NPC_IS_BUSY` (the Cuman treasure-hunt
+prompts).
+
+The important negative is `COMBAT_VICTIM_SCREAM_RECEIVED_HIT` and
+`COMBAT_ACTOR_SCREAM_ATTACK`: Henry holds both metaroles, but none of their
+sequences carry `tmck` audio -- only NPC actors. **The engine does not use
+dialogue for the player's own impact vocals.** It uses audio triggers, which is
+what the mod already does.
+
+## What the audio-trigger path actually holds
+
+`voices.xml` declares sixteen triggers and `cinematics.xml` a further set
+recorded by `tmck`. Audited one at a time:
+
+| trigger | result |
+| --- | --- |
+| `v_henry_hyje` | plays, Henry urging the horse |
+| `v_henry_nostamina_sigh` | plays, breathy |
+| `v_henry_hit_soft` / `_medium` / `_heavy` | already shipped |
+| `v_stealth_stealthkill_man` / `_woman` | play, including on a corpse |
+| `33487_henry_surprised` | resolves, silent |
+| `41745_tmck_ambush_voice_1` | resolves, silent |
+
+The cinematic ones resolve to a trigger id and make no sound, which is
+consistent with their FMOD events being tied to a cutscene's own mix.
+
+Also on this path: `Sound.SetAudioRtpcValue` and `entity:SetAudioRtpcValue` exist
+and `volume_voice` is a real RTPC, set successfully on the player's proxy. It did
+not audibly change the sigh. `standalone_file_purpose` with states `sfp_dialog`
+and `sfp_bark` exists in the audio data, which is how the engine plays a loose
+audio file on the dialogue bus, but there is **no Lua bind for it** -- `Sound`
+exposes only `GetAudioEnvironmentID`, `GetAudioRtpcID`, `GetAudioSwitchID`,
+`GetAudioSwitchStateID`, `GetAudioTriggerID` and `SetAudioRtpcValue`. So the
+36,000 shipped line recordings cannot be played as files.
+
+## The probe bug that cost two false negatives
+
+The first version of the trigger probe called
+`entity:ExecuteAudioTrigger(id, entity.id)`, passing the entity id where an audio
+proxy id belongs. It reported `fired=true` and produced no sound for anything.
+It was caught by firing `v_henry_hyje`, which lives in the same `voices.xml` as
+the three grunts the mod plays successfully: a trigger from a known-working file
+going silent means the probe is wrong, not the trigger. Vanilla's own helper is
+the correct form:
+
+    PlayAudioTrigger(entity, name)   -- Scripts/Utils/SoundUtils.lua
+
+Always include a control from a known-working source in an audition of this kind.
+
+# The dialog system degrades over a session, which invalidates most of a day's negatives
+
+The single most expensive finding of the session, and it came last.
+
+"Done." and "That's it!" were fired during the alias audition and reported
+silent. Both are `PLAYER`-held, always-true, Henry-alone, two words long. Hours
+later, after the game had been restarted for an unrelated reason, both spoke
+immediately -- on foot and then mounted, including with the exact field set that
+had been silent before. So did "That could be it.", "And now to blunt it!" and
+the "Hmmm, nothing here." set, all of which had been logged as silent.
+
+The earlier session had been running for hours and had sent several hundred
+`dialog:monologRequest` messages across many rides. The fresh process answered
+requests the old one had been dropping.
+
+## What this invalidates
+
+Of 124 auditioned aliases roughly ninety were recorded silent. An unknown
+fraction of those were measured in the degraded session and may be perfectly
+usable. The fifteen kept are safe -- a positive cannot be produced by a wedged
+system -- but the negatives are not evidence.
+
+It also explains an anomaly noted earlier and left unexplained:
+`q_rides_bacchus_ringIsStolenFromHenry` spoke early in a session and was silent
+when fired again later, which had looked like per-sequence consumption.
+`ResetSequenceTimer` was tried in all three argument shapes and changed nothing,
+which fits: the exhaustion is not per-sequence.
+
+## The rule this produces
+
+**An audition result only counts against a recently launched game.** Restart
+before a run of them, and treat a silence recorded late in a long session as no
+result at all. The mod's own bark traffic is a plausible cause of the
+degradation, which is worth knowing before raising `RiderBarkChance`.
+
+# Two clips that are genuinely unreachable, and the mechanism that proved it
+
+"Oh, God." (`q_returnToSkalitz_deadHangman`) and "Jesus..."
+(`q_returnToSkalitz_deadPeople`) are the two shortest usable-looking lines Henry
+has, and neither can be played. Tried in a fresh session, on foot and mounted:
+by `alias`; at priority 255; with `canBeDelayed`; with `forceSubtitles = true`,
+which produced no subtitle either and so shows the line is never started rather
+than merely inaudible; and after `ResetSequenceTimer`.
+
+Their distinguishing feature is that `topictorole.xml` gives them exactly one
+holder, `JINDRICH_NARAZIL_NA_MRTVOLY`, and no `PLAYER` membership at all. Every
+short line that does play is `PLAYER`-held.
+
+Requesting that metarole works and produces one of its nine topics, but all nine
+sit at topic priority 7 so the pick is effectively random and five are long
+Skalitz monologues.
+
+## The private metarole, which does work
+
+`topictorole.xml` is 810 KB and 13,426 rows, and a mod can override it. Two
+mechanisms were tested:
+
+- **Additive.** `JINDRICH_FORCED` is a metarole Henry holds via role 2194 with
+  no topics of its own. Adding two rows pointing it at the two short topics
+  changes nothing vanilla uses. Requesting it produced silence.
+- **Subtractive.** Removing the seven long topics from
+  `JINDRICH_NARAZIL_NA_MRTVOLY` left only those two. The same request that had
+  produced a fourteen-word line then produced silence.
+
+The second is the useful result: **the override is read and it does change
+selection**, since the long line stopped playing. So routing a topic into a
+private metarole is a working technique for controlling which member of a set
+can be chosen. It simply cannot rescue these two lines, which are unplayable by
+any route.
+
+The override was reverted rather than shipped, since it bought nothing and
+subtracting rows costs vanilla its Skalitz corpse reactions.
+
+## What the dialog bind will and will not tell you
+
+`DialogModule` exposes `AnalyzeRequest`, `ForceDialog`,
+`IsDialogInterruptibleByPlayer`, `IsSequenceAvailable`, `IsSequenceUsed`,
+`IsSoulInDialog`, `ResetHaggle`, `ResetHaveDialogCache`, `ResetSequenceTimer`,
+`SetAIInteractionState`, `SetPlayerInteractiveState` and `StartMonolog`. Every
+reader among them returned `nil` for every argument shape tried -- bare sequence
+id, soul id, entity id, WUID, and no argument -- except `AnalyzeRequest()`, which
+returns `0`. There is no engine-side signal for a refused request.
+
+The full `dialog:monologRequest` field list, read from `Utils.makeTable`, is
+`alias`, `canBeDelayed`, `defaultAnimState`, `doNotInterruptOnActorDeath`,
+`forceOnMuted`, `forceSubtitles`, `lookAtId`, `metarole`,
+`overrideContextSuppress`, `playStandingTransition`, `priority`, `sendAnswer`,
+`topicId`.
+
+`Sound` exposes only `GetAudioEnvironmentID`, `GetAudioRtpcID`,
+`GetAudioSwitchID`, `GetAudioSwitchStateID`, `GetAudioTriggerID` and
+`SetAudioRtpcValue`. There is no standalone-file playback, so although the audio
+data declares `standalone_file_purpose` with `sfp_dialog` and `sfp_bark` states
+-- the engine's own route for playing a loose file on the dialogue bus -- the
+36,000 shipped line recordings cannot be played as files from Lua.
+
 # Index: what is known about the dialog system
 
 Roughly 1,700 lines above cover this, written across one long session and easy
@@ -21173,7 +21564,14 @@ to miss. This is the map, not a summary: each line names where the work is.
 - **With crime on, only the walk barks survive.** A trot or gallop is a crime,
   and the victim's crime and combat reaction takes their voice immediately.
 - **Our barks fire during combat; vanilla's do not**, and the gate added for it.
-- **Death sounds are dialogue, and a dead victim will not take a request.**
+- **Death sounds are dialogue, and a dead victim will not take a request** --
+  true of dialogue, and **superseded as a conclusion** by the entry below.
+- **A corpse still plays an audio trigger, so the mod can own its death
+  sounds.** `ExecuteAudioTrigger` is not a message and never reaches the torn
+  down subbrain, so the stealth-kill cry plays on a body two seconds dead. This
+  removes the "redesign how the mod kills" route entirely. It also names the
+  fourteen human-voice triggers the dialog system never offers, Henry's three
+  hit severities among them.
 - **Damage does not silence a victim's barks** — tested and disproven, so the
   silence has another cause.
 - **RANENY_NA_ZEMI is vanilla's dying bark, not a pain bark.**

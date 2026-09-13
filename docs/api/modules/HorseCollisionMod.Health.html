@@ -77,7 +77,7 @@
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  5.7.0
+        <li><strong>Release</strong>:  5.8.0
  When the impact probe samples, in milliseconds after the hit.</p>
 
 <p> 500 catches what the impact cost, since the engine applies damage after the
@@ -102,7 +102,7 @@
 	<td class="summary">Samples the victim's health across an impact.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ApplyImpactDamage">HorseCollisionMod:ApplyImpactDamage (npc, tierName, armor[, playerEnt[, horseEnt]])</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PredictImpactFatal">HorseCollisionMod:PredictImpactFatal (npc, tierName, armor[, playerEnt][, horseEnt], npc, tierName, armor, horseEnt)</a></td>
 	<td class="summary">Charges a victim for being ridden down, on top of what the engine charged.</td>
 	</tr>
 </table>
@@ -203,8 +203,8 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:ApplyImpactDamage"></a>
-    <strong>HorseCollisionMod:ApplyImpactDamage (npc, tierName, armor[, playerEnt[, horseEnt]])</strong>
+    <a name = "HorseCollisionMod:PredictImpactFatal"></a>
+    <strong>HorseCollisionMod:PredictImpactFatal (npc, tierName, armor[, playerEnt][, horseEnt], npc, tierName, armor, horseEnt)</strong>
     </dt>
     <dd>
     Charges a victim for being ridden down, on top of what the engine charged. </p>
@@ -258,15 +258,15 @@
     <ul>
         <li><span class="parameter">npc</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
+         the victim
         </li>
         <li><span class="parameter">tierName</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the tier the impact scored
+         the impact tier
         </li>
         <li><span class="parameter">armor</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         totals from <code>ArmorOf</code>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim's armor reading, as <code>ApplyImpactDamage</code> takes it
         </li>
         <li><span class="parameter">playerEnt</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
@@ -274,17 +274,55 @@
          (<em>optional</em>)
         </li>
         <li><span class="parameter">horseEnt</span>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the horse, for its barding
+        </li>
+        <li><span class="parameter">npc</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the player's horse, for the barding bonus
-         (<em>optional</em>)
+         the victim
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the impact tier
+        </li>
+        <li><span class="parameter">armor</span>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim's armor reading, as <code>ApplyImpactDamage</code> takes it
+        </li>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the horse, for its barding
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
-
+        <li>
            <span class="types"><span class="type">number</span></span>
-        the damage dealt, or 0 when nothing was
+         the damage dealt, or 0 when nothing was
+ Whether this impact is about to kill, worked out at the moment of contact.</p>
+
+<p> Exists so Henry can react on time. <code>ApplyImpactDamage</code> cannot answer this: it
+ defers its damage until the thrown body comes to rest, up to a second after
+ contact, deliberately, so that the mod's blow lands last and owns the kill.
+ Choosing the rider's line from that resolved state produced words a second
+ and a half after the collision, detached from it, and a walk stagger -- whose
+ tier is worth no damage at all and so returns before dealing any -- never got
+ a line whatsoever.</p>
+
+<p> The arithmetic is <code>ApplyImpactDamage</code>'s own, minus the variance roll. That
+ roll is symmetric about the intended figure, so the prediction is the average
+ outcome rather than a bound, and a collision landing within one roll's spread
+ of the victim's remaining health can be called either way. On the ride this
+ was built from, every impact was far from that margin: 96.9 intended against
+ 83.0 health on the kills, and 11.6 against 58.4 on the survivals.</p>
+
+<p> The engine's own trample damage is not added in. The mod reclaims it and
+ restores the health the victim had at impact, so the mod's own figure is what
+ decides the death.</li>
+        <li>
+           <span class="types"><span class="type">boolean</span></span>
+        true when this impact is expected to be fatal</li>
     </ol>
 
 
@@ -298,7 +336,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-12 23:46:51 </i>
+<i style="float:right;">Last updated 2026-09-13 16:04:02 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

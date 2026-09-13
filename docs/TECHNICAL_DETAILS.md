@@ -699,6 +699,88 @@ about a meter, and past roughly 1.5 the sound is gone, so adjustments are
 fractional and are applied to one copy of a layer rather than to all of them.
 Upward there is only repetition: naming a sample twice lifts it.
 
+### The rider's own grunt, which is not a bark
+
+`PlayRiderVocal` fires one FMOD event on the player per impact, from the same
+`{ trigger, delay, distance, chance }` layer format as above. The triggers are
+vanilla's, declared in `Libs/GameAudio/voices.xml`:
+
+```
+v_henry_hit_soft     Walk
+v_henry_hit_medium   Trot, Rear
+v_henry_hit_heavy    Gallop, Charge
+```
+
+This is deliberately not routed through the dialog system, and the distinction
+matters because every earlier attempt at giving Henry something to say went that
+way and produced full monologs. A `dialog:monologRequest` names a bark *set* and
+the dialog system chooses which member plays, so the mod cannot ask for a grunt
+and be certain of getting one. An audio trigger names the event outright: there
+is no selection, no priority auction and no cooldown of the system's own, so a
+crime reaction cannot take it the way it takes a collision bark.
+
+The cost is that the vocabulary is non-verbal. All fourteen human-voice events
+in `Libs/GameAudio` are grunts, sighs and cries; none is a line of dialogue, so
+words remain the dialog system's alone. Two further Henry events were found and
+confirmed audible and may be worth adding, `v_henry_hyje` and
+`v_henry_nostamina_sigh`; the cinematic ones recorded by his actor resolve to a
+valid trigger id and make no sound, their FMOD events being tied to a cutscene's
+own mix.
+
+This division is also the engine's. Henry holds the
+`COMBAT_VICTIM_SCREAM_RECEIVED_HIT` and `COMBAT_ACTOR_SCREAM_ATTACK` metaroles,
+but not one of their sequences carries audio recorded by his actor -- only NPCs'
+-- so vanilla does not use dialogue for the player's own impact vocals either.
+That is why the mod's ordinary impacts are wordless and its spoken lines fire
+only on a kill.
+
+`RiderVocalCooldownMs` holds off repeats, with severity allowed to break it:
+Walk ranks 1, Trot and Rear 2, Gallop and Charge 3, and an impact whose rank
+exceeds the one that set the cooldown speaks anyway. The stamp is taken when the
+grunt is scheduled rather than when it plays, so collisions arriving inside the
+tier's own delay are still caught, and a stamp in the future is discarded
+because `System.GetCurrTime` is persisted in the save and loading an earlier one
+moves the clock backwards.
+
+### An audio trigger plays on a corpse, which dialogue does not
+
+Worth recording next to the above, because it removes a constraint the project
+had accepted. A dead entity's subbrain is torn down, so a `dialog:monologRequest`
+sent to it has no recipient and is silently dropped; that is why the mod's kills
+were silent where vanilla's are not. `ExecuteAudioTrigger` is not a message. It
+is a direct call on the entity's audio proxy, which is a rendering attachment
+rather than a brain, and a body two seconds dead plays
+`v_stealth_stealthkill_man` normally.
+
+So death sounds do not require letting the engine resolve the killing hit, which
+was the only route the diary had left and would have cost the attribution
+ordering in `ApplyImpactDamage`. Not yet implemented; the mechanism is proven.
+
+### The spoken line has to be predicted, not observed
+
+`BarkRiderOnImpact` chooses between the impact pool and the kill pool at the
+moment of contact, from `PredictImpactFatal` rather than from the victim's actual
+state. It has to. `ApplyImpactDamage` defers its damage until the thrown body
+comes to rest so that the mod's blow lands last and owns the kill, which is up to
+a second and a half after contact; a line chosen from the settled death arrives
+detached from the collision it is about, and a walk stagger never reaches the
+decision at all because its tier is worth no damage and the damage path returns
+before dealing any.
+
+The prediction is `ApplyImpactDamage`'s own arithmetic minus the variance roll:
+`base * armorScale * bardingDamage` against the victim's current health. The roll
+is symmetric about that figure, so an impact landing within one roll's spread of
+the remaining health can go either way; in practice nothing is near the margin,
+measured at 96.9 intended against 83.0 health on kills and 11.6 against 58.4 on
+survivals. The engine's own trample is not added in, because the mod reclaims it
+and restores the health the victim had at impact.
+
+`RiderVoiceRanks` orders the three sounds -- grunt 3, impact line 4, death line
+5 -- and a request outranking the hold that is running passes it. Before that the
+gate was rank-blind and four fatal gallops in one ride produced one death line,
+the grunt at each contact having already claimed it. Equal rank still loses, so
+two death lines never overlap.
+
 ### Levels can only be judged from the saddle
 
 Every sample is clearly audible standing still, and most disappear under the

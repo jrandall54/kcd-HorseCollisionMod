@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.7.0
+-- @release 5.8.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.7.0"
+HorseCollisionMod.Version = "5.8.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -487,6 +487,18 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpactSoundGallop layers played by a gallop impact
 -- @field ImpactSoundCrack the occasional bone crack layer
 -- @field ImpactSoundCrackChance how often a gallop adds it
+-- @field RiderVocal whether Henry grunts as the collision goes through him
+-- @field RiderVocalWalk the vocal layer a walk impact plays on the rider
+-- @field RiderVocalTrot the vocal layer a trot impact plays on the rider
+-- @field RiderVocalGallop the vocal layer a gallop impact plays on the rider
+-- @field RiderVocalCharge the vocal layer a charge plays on the rider
+-- @field RiderVocalRear the vocal layer a rear plays on the rider
+-- @field RiderVocalCooldownMs how long the rider stays quiet after grunting
+-- @field RiderBark whether Henry says something about the impact
+-- @field RiderBarkChance how often an impact produces a line instead of a grunt
+-- @field RiderBarkCooldownMs how long Henry stays quiet after speaking
+-- @field RiderBarkKill whether a kill gets its own line from the kill pool
+-- @field RiderBarkPriority the priority Henry's own line is sent at
 -- @field VictimMarks whether a collision leaves dirt and blood on the victim
 -- @field VictimDirtTrot dirt added by a trot impact, 0 to 1
 -- @field VictimDirtGallop dirt added by a gallop impact, 0 to 1
@@ -1019,6 +1031,49 @@ HorseCollisionMod.Config = {
 	-- at cartoon volume whatever was done to it.
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
+
+	-- Henry's own grunt, one authored severity per tier. `Sound.lua` documents
+	-- why these are FMOD events rather than barks: the mod names the exact
+	-- event, so the dialog system cannot answer a request for a grunt with a
+	-- monolog, which is what made every earlier attempt at Henry's half
+	-- unusable.
+	--
+	-- Read as an impact layer: `{ trigger, delayMs, distance, chance }`. A
+	-- trigger of `""` silences that tier alone.
+	RiderVocal               = true,
+	RiderVocalWalk           = { "v_henry_hit_soft", 140, 0, 1 },
+	RiderVocalTrot           = { "v_henry_hit_medium", 110, 0, 1 },
+	RiderVocalGallop         = { "v_henry_hit_heavy", 90, 0, 1 },
+	RiderVocalCharge         = { "v_henry_hit_heavy", 90, 0, 1 },
+	RiderVocalRear           = { "v_henry_hit_medium", 110, 0, 1 },
+
+	-- How long the rider stays quiet after grunting. Riding into a group lands
+	-- several collisions inside a second and one grunt each reads as broken
+	-- audio rather than as a man being jolted. A harder impact is still let
+	-- through, so a gallop is never silenced by the walk shove before it.
+	RiderVocalCooldownMs     = 1500,
+
+	-- Henry saying something about the impact, rather than only grunting. The
+	-- lines are vanilla's, addressed by `alias` so the mod names one topic
+	-- instead of a whole bark set; `Bark.lua` carries the list and why these
+	-- ones. Every impact draws from the same pool regardless of tier.
+	--
+	-- Words and breath share one gate, because both come out of Henry and two
+	-- at once is a defect. So the chance below is how often an impact produces a
+	-- line *instead of* a grunt, and a line holds the grunt off for its own
+	-- cooldown, which is longer because a line takes longer to say.
+	RiderBark                = false,
+	RiderBarkChance          = 0.35,
+	RiderBarkCooldownMs      = 5000,
+	RiderBarkKill            = true,
+
+	-- Henry's own line gets its own priority rather than sharing the victims'.
+	-- Requests register in a shared array which the dialog system sorts
+	-- descending, and a request below the top is discarded with no error, so at
+	-- the default of zero a line loses every contest it enters. Both aliases
+	-- that were confirmed audible in testing were sent at 50, so that is the
+	-- shipped value: it makes the tested configuration the default one.
+	RiderBarkPriority        = 50,
 
 	-- How long a victim is left alone after being hit. The knockdown tiers
 	-- read the victim's own state rather than counting: a fall, the ragdoll

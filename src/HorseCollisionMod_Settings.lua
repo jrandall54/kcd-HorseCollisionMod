@@ -529,6 +529,56 @@ HorseCollisionModSettings = {
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
 
+	-- Henry's own grunt as the collision goes through him. The game authors
+	-- him three severities of taking a hit and each tier names one, so a shove
+	-- at a walk and a body taken at a gallop do not sound alike.
+	--
+	-- These are sound events, not dialogue, which is why they are short: the
+	-- mod names the exact event instead of asking the dialog system for a line
+	-- and being given a speech.
+	--
+	-- Read as an impact layer: `{ trigger, delayMs, distance, chance }`.
+	-- `distance` is the only volume control the game has, so raise it to push
+	-- the grunt back. `chance` below 1 makes it occasional. A trigger of `""`
+	-- silences that one tier and leaves the others alone.
+	--
+	-- The three triggers available are `v_henry_hit_soft`,
+	-- `v_henry_hit_medium` and `v_henry_hit_heavy`.
+	RiderVocal               = true,
+	RiderVocalWalk           = { "v_henry_hit_soft", 140, 0, 1 },
+	RiderVocalTrot           = { "v_henry_hit_medium", 110, 0, 1 },
+	RiderVocalGallop         = { "v_henry_hit_heavy", 90, 0, 1 },
+	RiderVocalCharge         = { "v_henry_hit_heavy", 90, 0, 1 },
+	RiderVocalRear           = { "v_henry_hit_medium", 110, 0, 1 },
+
+	-- How long the rider stays quiet after grunting. Riding into a group lands
+	-- several collisions inside a second and one grunt each reads as broken
+	-- audio rather than as a man being jolted. A harder impact is still let
+	-- through, so a gallop is never silenced by the walk shove before it.
+	RiderVocalCooldownMs     = 1500,
+
+	-- Henry saying something about the impact, rather than only grunting. The
+	-- lines are vanilla's, addressed by `alias` so the mod names one topic
+	-- instead of a whole bark set; `Bark.lua` carries the list and why these
+	-- ones. Every impact draws from the same pool regardless of tier.
+	--
+	-- Words and breath share one gate, because both come out of Henry and two
+	-- at once is a defect. So the chance below is how often an impact produces a
+	-- line *instead of* a grunt, and a line holds the grunt off for its own
+	-- cooldown, which is longer because a line takes longer to say.
+	RiderBark                = false,
+	RiderBarkChance          = 0.35,
+	RiderBarkCooldownMs      = 5000,
+	RiderBarkKill            = true,
+
+	-- Henry's own line gets its own priority rather than sharing the victims'.
+	-- Requests register in a shared array which the dialog system sorts
+	-- descending, and a request below the top is discarded with no error, so at
+	-- the default of zero a line loses every contest it enters. Both aliases
+	-- that were confirmed audible in testing were sent at 50, so that is the
+	-- shipped value: it makes the tested configuration the default one.
+	RiderBarkPriority        = 50,
+
 	-- How long a victim is left alone after being hit. The knockdown tiers
 	-- read the victim's own state rather than counting. The victim is busy
 	-- while an animation the mod started or a ragdoll owns their body, and

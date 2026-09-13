@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.7.0
+-- @release 5.8.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -269,11 +269,24 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- refuses a collision bark during a fight and so should this.
 	self:BarkCollision(npc, tierName, isCombat)
 
-	-- The rider's own half of the impact, and gallop only. Sent here for the
-	-- same reason as the sound: it belongs to the moment of contact, not to
-	-- whatever the victim does afterwards.
+	-- The rider's own half of the impact. Sent here for the same reason as the
+	-- sound: it belongs to the moment of contact, not to whatever the victim
+	-- does afterwards. Each of these scales or chooses by tier itself, and
+	-- returns false for a tier it has nothing for, so the tier is passed rather
+	-- than branched on here.
 	self:ShakeRiderCamera(playerEnt, tierName)
 	self:BlurRiderView(playerEnt, tierName)
+
+	-- Words before breath, both at the moment of contact, and only one of them
+	-- heard because they share a ranked voice gate.
+	--
+	-- Which words depends on whether this impact is about to kill, and that is
+	-- predicted rather than observed. The real answer is not settled until the
+	-- body has come to rest and the deferred damage lands, and a line chosen
+	-- from that arrives a second and a half after the collision it is about.
+	self:BarkRiderOnImpact(playerEnt, tierName,
+			self:PredictImpactFatal(npc, tierName, armor, horseEnt))
+	self:PlayRiderVocal(playerEnt, tierName)
 
 	-- The ground's half. Spawned at the victim's feet, where they are struck
 	-- rather than where they land, because a gallop throws them several
