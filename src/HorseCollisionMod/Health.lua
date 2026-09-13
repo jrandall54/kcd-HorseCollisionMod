@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.8.1
+-- @release 5.8.2
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -411,12 +411,20 @@ end
 -- tier is worth no damage at all and so returns before dealing any -- never got
 -- a line whatsoever.
 --
--- The arithmetic is `ApplyImpactDamage`'s own, minus the variance roll. That
--- roll is symmetric about the intended figure, so the prediction is the average
--- outcome rather than a bound, and a collision landing within one roll's spread
--- of the victim's remaining health can be called either way. On the ride this
--- was built from, every impact was far from that margin: 96.9 intended against
--- 83.0 health on the kills, and 11.6 against 58.4 on the survivals.
+-- The arithmetic is `ApplyImpactDamage`'s own, taken at the **top** of the
+-- variance roll rather than at its centre. Predicting from the centre reads the
+-- average outcome as the whole outcome and misses the most ordinary kill in the
+-- game: a gallop into a healthy villager intends 95 * 1.00 * 1.02 = 96.9 against
+-- 100 health, which is survivable on average and fatal on most rolls once the
+-- spread is applied. Three of seven kills in one ride got no line for exactly
+-- that reason, and the error was invisible in an earlier check because those
+-- victims were already hurt.
+--
+-- So the question asked here is "can this impact kill", not "will it on
+-- average". The cost of being wrong in this direction is a death line on a
+-- victim who survives, which reads as Henry misjudging a blow; the cost in the
+-- other direction is silence on a kill, which reads as the feature being
+-- broken.
 --
 -- The engine's own trample damage is not added in. The mod reclaims it and
 -- restores the health the victim had at impact, so the mod's own figure is what
