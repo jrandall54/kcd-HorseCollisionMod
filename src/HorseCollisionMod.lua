@@ -651,6 +651,9 @@ HorseCollisionMod.Config = {
 	-- ridden into. Vanilla refuses this outright and so does the mod; the
 	-- setting exists so the behavior can be compared rather than assumed.
 	BarkInCombat             = false,
+	-- Remove the engine's own collision damage from anyone the horse is about
+	-- to hit, so the mod is the only thing charging them. Research setting.
+	SuppressEngineCollisionDamage = false,
 	-- How long a fatal impact waits before applying its damage, so the cry of
 	-- pain has time to begin. Zero is the shipped behavior and protects crime
 	-- attribution; see the comment on the fatal path in Health.lua.
@@ -1280,6 +1283,9 @@ HorseCollisionMod.RecentRejections = {}
 -- which is what lets a bystander answer a victim instead of the street
 -- shouting in chorus.
 HorseCollisionMod.RecentBarks = {}
+
+--- Victims whose engine collision damage has been switched off.
+HorseCollisionMod.HushedCollisionDamage = {}
 
 --- When vanilla's collision bark was last switched off, by entity id.
 --

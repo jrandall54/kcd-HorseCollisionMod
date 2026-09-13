@@ -20590,3 +20590,65 @@ exclusive: if the attribution on the engine's hit can be cleared or redirected,
 the engine could resolve the kill while the blame is set separately. Whether
 `shooterId` can be influenced from script is unknown and is the first thing to
 establish if this is pursued.
+
+## The engine's collision damage is not reachable from script
+
+Four attempts, each a single variable, each verified as having actually run.
+All negative.
+
+The question being tested was the rider's: the game deliberately routes
+everything through its RPG and combat systems rather than letting CryEngine
+physics decide outcomes, so "a physical collision is automatically the player's
+doing" ought to be a rule somewhere rather than a law of nature.
+
+### What was tried
+
+    N   entityCollisionDamageMult = 0 on nearby NPCs        engineTook unchanged
+    O   same, applied by the mod ahead of contact           engineTook unchanged
+    P   all four multipliers = 0, threshold = 9999          engineTook unchanged
+    Q   the mod sends the victim nothing at all             engineTook unchanged
+        (no combat:hit, crime off; no hitReaction)
+    R   Knockback = 0, Uplift = 0                           engineTook unchanged
+
+Test O was verified rather than assumed: a probe found 27 of 30 nearby NPCs
+carrying `entityCollisionDamageMult = 0` and the mod's own table marking 32
+entities, so the suppression was genuinely in place when the impacts happened.
+
+`engineTook` stayed in its usual band throughout, 6 to 54 health, on every
+non-fatal impact. The zeros in every sample are `fatal=true` rows, where the
+mod's own damage lands first with `delayed=0`.
+
+### Test R was badly designed, and says less than it looks
+
+Setting `Knockback` and `Uplift` to zero did not stop victims being thrown:
+`thrown=0.82` through `thrown=5.11` in the same run. **The throw is the engine's
+physical collision, not the mod's impulse**, which this diary already records as
+settled. The test was built on an assumption that contradicts a known finding,
+and because the victims still flew and still landed, it cannot separate "damage
+from being struck" from "damage from landing". That question remains open.
+
+### Where the `BasicActor` lead ends
+
+`Scripts/Entities/actor/BasicActor.lua` really does expose the collision damage
+values as getters the engine calls into, and the horse really does take the
+`entityCollisionDamageMult` branch, having no `vehicle` table and an `actor`.
+Zeroing them changes nothing about a horse-on-NPC collision, so whatever charges
+the victim does not come through that path.
+
+So the answer to "is there a setting" is: **not in the actor scripts, and not
+via anything the mod sends.** The charge happens with the mod silent and every
+script-visible multiplier at zero.
+
+### What this settles for the design
+
+The mod cannot stop the engine charging a collision victim, and therefore cannot
+stop the engine being in the race. The deferred-damage ordering in
+`ApplyImpactDamage` is not a workaround for something unexplored; it is a
+response to a force that four separate levers failed to touch.
+
+That makes the crime question a genuine design decision rather than a stopgap,
+which is what the rider wanted established before deciding it.
+
+Still open, and the one thing test R was meant to answer: how much of
+`engineTook` is the strike and how much is the landing. Separating them needs a
+victim who is struck but does not fall, or a fall with no strike.

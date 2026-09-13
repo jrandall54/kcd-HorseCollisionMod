@@ -552,6 +552,7 @@ function HorseCollisionMod:SafeUpdate()
 					-- horse, so vanilla's collision bark is already closed off
 					-- by the time bodies touch.
 					self:HushVanillaBark(ent)
+					self:HushEngineCollisionDamage(ent)
 
 					local isDead = false
 
