@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-09-12
+
 ### Added
 
 - **The mod now takes the killing blow when a horse rides somebody down.** A
