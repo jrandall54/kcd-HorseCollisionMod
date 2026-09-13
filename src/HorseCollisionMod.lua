@@ -157,6 +157,20 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field BarkRecoveryDelayMs how long after the impact that second line comes,
 --   timed to land during the get-up
 -- @field BarkGapMs least silence between a victim's cry and their recovery line
+-- @field BarkInCombat whether a victim already fighting still speaks, which
+--   vanilla refuses
+-- @field BarkPriority the request's rank in the dialog system's auction; a
+--   line below the top that cannot be delayed is silently discarded
+-- @field BarkCanBeDelayed whether a line that loses the auction is queued
+--   rather than dropped
+-- @field BarkOverrideSuppress whether the line ignores a `suppressMonologs`
+--   context, which otherwise silences everything rather than just this
+-- @field ShieldVictimFromEngineDamage whether a victim the horse strikes is
+--   made briefly immortal so the engine's trample cannot land the killing
+--   blow, which the game would charge to the player as murder
+-- @field ShieldWindowMs backstop only, in milliseconds: the shield is lifted
+--   synchronously when the mod deals its damage, and this bounds the case
+--   where that call never happens
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
