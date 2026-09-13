@@ -276,6 +276,12 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- than branched on here.
 	self:ShakeRiderCamera(playerEnt, tierName)
 	self:BlurRiderView(playerEnt, tierName)
+
+	-- Words before breath. Both come out of Henry and they share one gate, so
+	-- whichever is asked first wins the impact; a line that goes out holds the
+	-- grunt off, and on the impacts where Henry has nothing to say the grunt
+	-- runs as normal.
+	self:BarkRiderImpact(playerEnt, tierName)
 	self:PlayRiderVocal(playerEnt, tierName)
 
 	-- The ground's half. Spawned at the victim's feet, where they are struck

@@ -432,26 +432,32 @@ function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
 
 	local now = self:TimeMs()
 	local cooldown = cfg.RiderVocalCooldownMs or 0
-	local last = self.RiderVocalAt
 
-	-- No stamp yet reads as long elapsed, which is what -1 stands in for below.
-	local elapsed = last and (now - last) or -1
+	-- One gate for everything that comes out of Henry's mouth, shared with
+	-- `BarkRiderImpact`. A spoken line and a grunt on the same impact is two
+	-- voices at once, so whichever goes out first holds the other off.
+	local until_ = self.RiderVoiceUntil or 0
+	local longest = math.max(cooldown, cfg.RiderBarkCooldownMs or 0)
 
-	-- A *negative* gap means the stamp is in the future. That happens because
-	-- `System.GetCurrTime` is persisted in the save, so loading an earlier one
-	-- moves the clock backwards; trusting the stamp would mute the rider until
-	-- the rewind had been ridden back through. Falling through the test below
-	-- treats it as no stamp at all. The hit cooldown in `Update.lua` guards the
-	-- same hazard for the same reason.
-	if cooldown > 0 and elapsed >= 0 and elapsed < cooldown
-			and rank <= (self.RiderVocalRank or 0) then
+	-- A hold further out than any cooldown that can be written was not written
+	-- against this clock. `System.GetCurrTime` is persisted in the save, so
+	-- loading an earlier one moves it backwards, and trusting the stamp would
+	-- mute the rider until the rewind had been ridden back through. The hit
+	-- cooldown in `Update.lua` guards the same hazard for the same reason.
+	if (until_ - now) > longest then
+		until_ = 0
+	end
+
+	-- A harder impact still speaks: a gallop silenced by the walk shove just
+	-- before it is a worse fault than the repetition this prevents. A spoken
+	-- line stamps rank 3, which nothing outranks.
+	if now < until_ and rank <= (self.RiderVoiceRank or 0) then
 		if cfg.LogTelemetry then
 			self:Log("RiderVocal tier=" .. tostring(tierName)
 					.. " trigger=" .. trigger .. " skipped=cooldown"
-					.. " since=" .. string.format("%.0f", elapsed) .. "ms"
-					.. " of=" .. tostring(cooldown) .. "ms"
+					.. " for=" .. string.format("%.0f", until_ - now) .. "ms more"
 					.. " rank=" .. tostring(rank)
-					.. " held=" .. tostring(self.RiderVocalRank))
+					.. " held=" .. tostring(self.RiderVoiceRank))
 		end
 
 		return false
@@ -471,8 +477,8 @@ function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
 		return false
 	end
 
-	self.RiderVocalAt = now
-	self.RiderVocalRank = rank
+	self.RiderVoiceUntil = now + cooldown
+	self.RiderVoiceRank = rank
 
 	local function fire()
 		pcall(function()

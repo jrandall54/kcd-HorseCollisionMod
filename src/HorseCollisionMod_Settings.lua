@@ -557,6 +557,27 @@ HorseCollisionModSettings = {
 	-- through, so a gallop is never silenced by the walk shove before it.
 	RiderVocalCooldownMs     = 1500,
 
+	-- Henry saying something about the impact, rather than only grunting. The
+	-- lines are vanilla's, addressed by `alias` so the mod names one topic
+	-- instead of a whole bark set; `Bark.lua` carries the list and why these
+	-- ones. Every impact draws from the same pool regardless of tier.
+	--
+	-- Words and breath share one gate, because both come out of Henry and two
+	-- at once is a defect. So the chance below is how often an impact produces a
+	-- line *instead of* a grunt, and a line holds the grunt off for its own
+	-- cooldown, which is longer because a line takes longer to say.
+	RiderBark                = true,
+	RiderBarkChance          = 0.35,
+	RiderBarkCooldownMs      = 5000,
+
+	-- Henry's own line gets its own priority rather than sharing the victims'.
+	-- Requests register in a shared array which the dialog system sorts
+	-- descending, and a request below the top is discarded with no error, so at
+	-- the default of zero a line loses every contest it enters. Both aliases
+	-- that were confirmed audible in testing were sent at 50, so that is the
+	-- shipped value: it makes the tested configuration the default one.
+	RiderBarkPriority        = 50,
+
 	-- How long a victim is left alone after being hit. The knockdown tiers
 	-- read the victim's own state rather than counting. The victim is busy
 	-- while an animation the mod started or a ragdoll owns their body, and

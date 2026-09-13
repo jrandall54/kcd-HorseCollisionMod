@@ -44,6 +44,14 @@ number.
   because riding into a group lands several collisions in a second; a heavier
   impact is still allowed through, so a gallop is never swallowed by the shove
   before it.
+- **Henry says something about the impact.** Twenty-two vanilla lines the rider
+  chose, addressed by `alias` so the mod names one topic rather than a bark set
+  and is not handed a monolog instead. Every impact draws from the same pool
+  regardless of speed.
+- `RiderBark`, `RiderBarkChance`, `RiderBarkCooldownMs` and `RiderBarkPriority`
+  settings. Words and breath share one gate, because both come out of Henry and
+  two at once is a defect, so the chance is how often an impact produces a line
+  *instead of* a grunt.
 
 ## [5.7.0] - 2026-09-12
 

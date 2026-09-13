@@ -208,6 +208,167 @@ HorseCollisionMod.RiderBarkSets = {
 	-- differently, Henry's palette may be much larger than this comment says.
 }
 
+--- Lines Henry can be made to say on an impact, addressed by `alias`.
+--
+-- This is the answer to the table above, and it works because the addressing
+-- scheme is different rather than because anything about Henry changed.
+--
+-- `RiderBarkSets` is empty because a **metarole** names a whole bark set and
+-- lets the dialog system choose the member, and the only set Henry speaks
+-- freely is the Skalitz monologs. An **alias** names one topic, so the wording
+-- is nearly pinned: a topic holding a single short line is effectively a line
+-- the mod chose.
+--
+-- ### Where these came from
+--
+-- The alias namespace was recorded as unrecoverable, on the grounds that a
+-- label is only visible where vanilla's AI files happen to reference one. It is
+-- a shipped column: `label` in `Libs/Tables/text/topic.xml`, 1656 of them
+-- against the 861 those files mention. `tools/bark_alias.py` reads it and
+-- `tools/henry_quips.py` cross-references it with who recorded each line, since
+-- having the audio is the gate.
+--
+-- That produced 1076 lines Henry can be asked for, of which the rider chose
+-- these. **Their judgement, not a filter of mine** — the survey they picked from
+-- was narrowed only by what is mechanically possible.
+--
+-- ### One flat pool, by instruction
+--
+-- Every impact draws from the whole list regardless of tier. Per-tier pools were
+-- offered and declined:
+--
+-- > "Just wire them as a random pool that every impact calls from."
+--
+-- Weights are all 1 for now. `PickFromPool` reads the same
+-- `{ name, weight }` shape as the victim pools, so any line can be made rarer
+-- without restructuring anything.
+--
+-- Note that `NPC` and `PLAYER` are absent for a reason given at length above:
+-- they are conversation roles, they open a dialogue scene rather than speaking,
+-- and 58 further lines the rider liked are reachable by nothing else and so are
+-- not reachable at all.
+--
+-- @table RiderBarkAliases
+HorseCollisionMod.RiderBarkAliases = {
+	{ "q_theresa_village_m_henryTraining", 1 },        -- "Ha!" / "Take that!"
+	{ "q_disguise_ondrejDialog_dealDiscussion", 1 },   -- "What!?"
+	{ "q_superstition_startPhase3", 1 },               -- "Alright."
+	{ "q_dlc_revelation_henry_chapel_common", 1 },     -- "Amen."
+	{ "q_returnToSkalitz_deadPeople", 1 },             -- "Jesus..."
+	{ "event_chase_thiefDown", 1 },                    -- "Had enough?"
+	{ "revelation_murderer_ohfuck", 1 },               -- "Oh fuck!"
+	{ "q_dlc_revelation_gambler_diceFail", 1 },        -- "Oh, shit!"
+	{ "q_rides_traitor_kubajsUntied", 1 },             -- "Jesus Christ!"
+	{ "q_returnToSkalitz_deadHangman", 1 },            -- "Oh, God."
+	{ "bowlNotReturned", 1 },                          -- "What the...?"
+	{ "q_charlatan_petrDialog", 1 },                   -- "My condolences."
+	{ "q_rides_traitor_henry_trail_skirt", 1 },        -- "Shameless hussy!"
+	{ "q_raubritter_playerBloodTrack", 1 },            -- "That looks like blood."
+	{ "revelation_murderer_smell", 1 },                -- "Jesus, something stinks here!"
+	{ "q_dlc_newhomes_judgement_butcher", 1 },         -- "What is it this time?"
+	{ "q_gallowsBrothers_endQuestBark", 1 },           -- "So many plots and intrigues..."
+	{ "q_counterfeiters_crimeScene_area", 1 },         -- "Good God, what a bloody mess."
+	{ "q_theresa_henryLevel_questResult", 1 },         -- "I don't know what to say."
+	{ "q_dlc_revelation_gambler_round2", 1 },          -- "Jesus! How did I manage that?"
+	{ "q_rides_bacchus_ringIsStolenFromHenry", 1 },    -- "And what the fuck is this?"
+	{ "revelation_murderer_trigger_caveBody4", 1 },    -- "Jesus Christ, he was only a boy."
+}
+
+--- Henry says something about the impact, drawn from `RiderBarkAliases`.
+--
+-- Sent on the same message as every other bark, with `alias` in place of
+-- `metarole`. Nothing else about the dispatch differs, so the priority and
+-- suppression settings that were tuned for the victim's lines apply unchanged.
+--
+-- ### Why this cannot run alongside the grunt
+--
+-- `PlayRiderVocal` already puts a wordless grunt on every impact, and two Henry
+-- voices at once is a defect rather than a richer moment. So the two share one
+-- gate: a line that goes out stamps the rider's voice clock at the top rank,
+-- which suppresses the grunt for the length of `RiderBarkCooldownMs`. The two
+-- are therefore alternatives on any given impact, and `RiderBarkChance` decides
+-- how often Henry uses words instead of breath.
+--
+-- The stamp is taken when the request is *sent*, not when a sound arrives,
+-- because the dialog system reports nothing back. That is the same caution the
+-- log line below carries: a mod-written line is evidence the mod asked, never
+-- evidence the game answered.
+--
+-- @tparam table playerEnt the player entity
+-- @tparam string tierName the impact tier, for the telemetry only
+-- @treturn boolean true when a request was sent
+function HorseCollisionMod:BarkRiderImpact(playerEnt, tierName)
+	local cfg = self.Config
+
+	if not cfg.RiderBark or not playerEnt then
+		return false
+	end
+
+	local now = self:TimeMs()
+	local until_ = self.RiderVoiceUntil or 0
+	local longest = math.max(cfg.RiderBarkCooldownMs or 0,
+			cfg.RiderVocalCooldownMs or 0)
+
+	-- A hold further out than any cooldown that can be written was not written
+	-- against this clock: `System.GetCurrTime` is persisted in the save, so
+	-- loading an earlier one moves it backwards and would otherwise mute Henry
+	-- until the rewind had been ridden back through.
+	if (until_ - now) > longest then
+		until_ = 0
+	end
+
+	if now < until_ then
+		return false
+	end
+
+	-- Rolled after the cooldown so a losing roll does not start one, which
+	-- would silence the following impact as well.
+	if math.random() >= (cfg.RiderBarkChance or 0) then
+		return false
+	end
+
+	local alias = self:PickFromPool(self.RiderBarkAliases)
+
+	if not alias then
+		return false
+	end
+
+	local target = playerEnt.id
+
+	if playerEnt.this and playerEnt.this.id then
+		target = playerEnt.this.id
+	end
+
+	local fields = {
+		alias = alias,
+		forceOnMuted = true,
+		priority = cfg.RiderBarkPriority or cfg.BarkPriority or 0,
+		canBeDelayed = cfg.BarkCanBeDelayed == true,
+		overrideContextSuppress = cfg.BarkOverrideSuppress == true
+	}
+
+	local ok, err = pcall(function()
+		XGenAIModule.SendMessageToEntityData(target, "dialog:monologRequest",
+				Utils.makeTable("dialog:monologRequest", fields))
+	end)
+
+	if ok then
+		-- Rank 3 is the ceiling `PlayRiderVocal` compares against, so nothing
+		-- outranks a spoken line and no grunt follows inside the hold.
+		self.RiderVoiceUntil = now + (cfg.RiderBarkCooldownMs or 0)
+		self.RiderVoiceRank = 3
+	end
+
+	self:Log("RiderBark tier=" .. tostring(tierName)
+			.. " alias=" .. alias
+			.. " target=" .. tostring(target)
+			.. " prio=" .. tostring(fields.priority)
+			.. " sent=" .. tostring(ok)
+			.. (ok and "" or (" err=" .. tostring(err))))
+
+	return ok
+end
+
 -- The wordless pain grade an impact at this tier should make.
 --
 -- Walk is absent on purpose. A shove at walking pace does not hurt, and the
