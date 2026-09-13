@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.7.0] - 2026-09-12
+
 ### Changed
 
 - **The mod no longer guesses which impacts will be fatal.** It used to ask,
