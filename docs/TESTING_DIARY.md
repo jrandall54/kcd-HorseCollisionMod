@@ -21429,40 +21429,38 @@ the correct form:
 
 Always include a control from a known-working source in an audition of this kind.
 
-# The dialog system degrades over a session, which invalidates most of a day's negatives
+# Most of a day's silent audition results were measurement error, cause unknown
 
-The single most expensive finding of the session, and it came last.
+Auditioning the 124 reachable aliases produced roughly ninety reported silent.
+Those results are not trustworthy, and the reason is not established.
 
-"Done." and "That's it!" were fired during the alias audition and reported
-silent. Both are `PLAYER`-held, always-true, Henry-alone, two words long. Hours
-later, after the game had been restarted for an unrelated reason, both spoke
-immediately -- on foot and then mounted, including with the exact field set that
-had been silent before. So did "That could be it.", "And now to blunt it!" and
-the "Hmmm, nothing here." set, all of which had been logged as silent.
+What is known:
 
-The earlier session had been running for hours and had sent several hundred
-`dialog:monologRequest` messages across many rides. The fresh process answered
-requests the old one had been dropping.
+- Several lines reported silent during the audition played immediately when
+  fired again later, in a fresh process, on foot and mounted, with the identical
+  field set. Among them "Done.", "That's it!", "That could be it." and "And now
+  to blunt it!".
+- Three more silent ones -- "Tracks! Someone fled to the north!", "I could try
+  listening from here.", "This must be it. May she rest in peace, Lord." -- were
+  re-fired and all three played, and the rider recognised them and said they had
+  never been silent.
 
-## What this invalidates
+A session-degradation mechanism was written up here and is withdrawn. It was
+built from the negatives alone and does not survive testing: one known-good line
+fired thirty times at two-second spacing played thirty times, and forty requests
+for an unplayable line followed by three controls left all three controls
+audible. So neither request volume nor refused requests exhaust anything.
 
-Of 124 auditioned aliases roughly ninety were recorded silent. An unknown
-fraction of those were measured in the degraded session and may be perfectly
-usable. The fifteen kept are safe -- a positive cannot be produced by a wedged
-system -- but the negatives are not evidence.
+The likeliest remaining explanation is the audition tooling itself rather than
+the game. This was not pursued, at the rider's direction, and it does not need to
+be for the shipped feature: `RiderBark` is off, so requests go out only on a kill,
+and every line in `RiderBarkKillAliases` was confirmed audible by ear.
 
-It also explains an anomaly noted earlier and left unexplained:
-`q_rides_bacchus_ringIsStolenFromHenry` spoke early in a session and was silent
-when fired again later, which had looked like per-sequence consumption.
-`ResetSequenceTimer` was tried in all three argument shapes and changed nothing,
-which fits: the exhaustion is not per-sequence.
-
-## The rule this produces
-
-**An audition result only counts against a recently launched game.** Restart
-before a run of them, and treat a silence recorded late in a long session as no
-result at all. The mod's own bark traffic is a plausible cause of the
-degradation, which is worth knowing before raising `RiderBarkChance`.
+**What to take from this:** a silence recorded during that audition is not
+evidence. Anything worth adding to a pool should be fired again and heard before
+it goes in. And a mechanism should not be written into this document until it has
+been tested against a prediction of its own -- thirty repeats of one line would
+have killed this one in two minutes.
 
 # Two clips that are genuinely unreachable, and the mechanism that proved it
 

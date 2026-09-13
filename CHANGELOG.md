@@ -30,6 +30,19 @@ number.
 
 ## [Unreleased]
 
+## [5.8.1] - 2026-09-13
+
+### Fixed
+
+- **A line that names the victim no longer lands on the wrong one.** "Shameless
+  hussy!" is kept for women, and "Jesus Christ, he was only a boy." and "He's
+  still breathing but he probably won't wake up again." for men; a pool entry
+  carries the gender it fits and the rest play over either. When a victim's
+  gender cannot be read the whole pool is used, because a line is better than
+  silence.
+- Dropped "Grind those whoresons into the dirt! / At them! Chaaaarge!" from the
+  kill pool. Too long, and a battle cry does not fit standing over one body.
+
 ## [5.8.0] - 2026-09-13
 
 ### Added
