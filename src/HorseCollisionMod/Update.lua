@@ -582,19 +582,18 @@ function HorseCollisionMod:SafeUpdate()
 										self:FootprintDetail(ent, horsePos,
 												horseForward, speed))
 							else
-						-- Only for somebody the horse is actually striking, so
-						-- nobody uninvolved is ever made immortal. Reaching a
-						-- tick ahead of contact shields bystanders the horse then
-						-- misses, and buys nothing: the buff takes effect in the
-						-- call that applies it, measured directly over the
-						-- console.
-						self:ShieldFromEngineDamage(ent)
 								self:LogRejection(ent, "below-walk-speed",
 										string.format("impact=%.2f sampled=%.2f",
 												impactSpeed, speed))
 							end
 						end
 					else
+						-- Only for somebody the horse is actually striking, so
+						-- nobody uninvolved is ever made immortal. Reaching a
+						-- tick ahead of contact shields bystanders the horse
+						-- then misses and buys nothing: the buff takes effect
+						-- in the call that applies it, measured directly.
+						self:ShieldFromEngineDamage(ent)
 						self:TriggerCollision(ent, velocity, impactSpeed, horseEnt,
 								player, horseWuid, speed)
 					end

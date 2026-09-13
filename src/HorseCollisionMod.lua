@@ -168,9 +168,16 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ShieldVictimFromEngineDamage whether a victim the horse strikes is
 --   made briefly immortal so the engine's trample cannot land the killing
 --   blow, which the game would charge to the player as murder
--- @field ShieldWindowMs backstop only, in milliseconds: the shield is lifted
---   synchronously when the mod deals its damage, and this bounds the case
---   where that call never happens
+-- @field ShieldWindowMs backstop only, in milliseconds: the shield ends when
+--   the victim's body comes to rest, and this bounds a body that never does
+-- @field ShieldPollMs how often the victim's velocity is sampled while
+--   shielded, in milliseconds
+-- @field ShieldSettleSpeed speed at or below which a body counts as at rest,
+--   in meters per second
+-- @field ShieldSettleSamples consecutive samples at rest before the shield
+--   is lifted
+-- @field ShieldMinHoldMs how long past `ImpactDamageDelayMs` the shield is
+--   held at minimum, so it always outlives the mod's own damage call
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
@@ -418,13 +425,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpactDamageIgnoredArmor `smash_def` that does not count as armor,
 --   covering the shoes and shirt every villager wears
 -- @field ImpactDamageByTier what each kind of collision is worth before armor
--- @field ImpactDamageEngineCeiling a table, tier name to the most the
---   engine's own trample takes on that tier. Measured, not chosen: largest
---   seen over 136 impacts was rear 0.0, trot 9.2, gallop 33.1, charge 58.5.
---   A remainder this size or smaller is finished by the mod, so the engine
---   cannot take the killing blow and the crime attribution with it
--- @field ImpactDamageOverkill how far past zero the mod aims when it finishes
---   a victim, so rounding cannot leave a sliver behind
 -- @field ImpactDamageOwnsTheHit give back what the engine charged for a
 --   collision, so the mod's figure is the whole cost rather than an addition
 --   to an unknown one
@@ -672,8 +672,18 @@ HorseCollisionMod.Config = {
 	-- A backstop, not a mechanism. The shield goes on only where an impact is
 	-- scored and `ApplyImpactDamage` lifts it synchronously, so this should
 	-- never be what ends it. It exists so that a victim cannot be left
-	-- permanently immortal if the damage call is skipped.
-	ShieldWindowMs           = 2000,
+	-- permanently immortal if the damage call is skipped, and to bound a body
+	-- that never comes to rest.
+	ShieldWindowMs           = 15000,
+	-- How the shield ends: when the victim's body has stopped moving, rather
+	-- than after a fixed time. The engine charges a ragdoll for as long as it
+	-- tumbles, and a clock expires while the body is still traveling.
+	ShieldPollMs             = 250,
+	ShieldSettleSpeed        = 0.15,
+	ShieldSettleSamples      = 4,
+	-- Held at least this long past `ImpactDamageDelayMs`, so the shield
+	-- always outlives the mod's own damage call rather than racing it.
+	ShieldMinHoldMs          = 400,
 	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
 	-- every in-flight request by priority and silently discards one that is
 	-- below the top and cannot be delayed, so a bark sent at the default zero
@@ -804,12 +814,7 @@ HorseCollisionMod.Config = {
 		Walk = 0, Trot = 18, Gallop = 95, Rear = 60, Charge = 110
 	},
 
-	ImpactDamageEngineCeiling = {
-		Walk = 0.0, Rear = 0.0, Trot = 12.0, Gallop = 36.0, Charge = 62.0
-	},
-
 	ImpactDamageOwnsTheHit   = true,
-	ImpactDamageOverkill     = 1.0,
 	ImpactDamageReclaimCeiling = 60,
 
 	ImpactDamageArmorScale   = 0.6,
@@ -1394,29 +1399,6 @@ HorseCollisionMod.ReplanHaltSpeed = 1
 -- meters per second it covers a centimeter every millisecond, so a mass that
 -- arrives late arrives after the collision it was meant to change.
 HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
-
---- The most the engine's own trample takes on each tier.
---
--- Not a setting the mod chooses, a measurement of the game. The engine charges
--- its own damage for a horse collision, at `CollisionVelocityDeltaToDmgR`,
--- which is neither readable nor overridable from Lua. What it takes scales with
--- the collision, so one figure across every tier is wrong in both directions.
---
--- Largest seen over 136 logged impacts: rear 0.0, trot 9.2, gallop 33.1,
--- charge 58.5. These carry a little headroom above that, because a sample
--- maximum is not a bound. A rear is zero because the horse is not moving.
---
--- `ApplyImpactDamage` uses them to answer one question: could the engine kill
--- this victim with what the mod is about to leave behind. When it could, the
--- mod finishes them instead, so the death is attributed to the mod and
--- `CollisionIsCrime` governs it.
---
--- Documented as an ordinary comment rather than an LDoc block, as
--- `ImpactProbeSamples` is, because LDoc reads an annotated table as named
--- fields.
-HorseCollisionMod.ImpactDamageEngineCeiling = {
-	Walk = 0.0, Rear = 0.0, Trot = 12.0, Gallop = 36.0, Charge = 62.0
-}
 
 --- How often a provoked victim is sampled while the incident is open.
 --
