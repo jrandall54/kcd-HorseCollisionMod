@@ -66,10 +66,10 @@ number.
 
 ### Fixed
 
-- **The line now arrives with the collision and knows whether it killed.** It
-  used to be chosen at the moment of contact, before the mod's deferred damage
-  had landed, so an impact line always took the voice gate and the death line
-  behind it was nearly always suppressed; choosing it from the settled death
+- **The line now arrives with the collision and knows whether it killed.**
+  Chosen at the moment of contact but before the mod's deferred damage lands, an
+  impact line always took the voice gate and the death line behind it was nearly
+  always suppressed; choosing it from the settled death
   instead put the words up to a second and a half late, and a walk stagger
   never got one at all because its tier deals no damage and the damage path
   returns early. `PredictImpactFatal` answers the question at contact using the

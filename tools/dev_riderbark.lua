@@ -6,8 +6,8 @@
 -- its place on the mod table, and reports which line it just asked for so the
 -- log says what should have been heard even if the moment was missed.
 --
--- This exists because auditioning by firing on my timing and asking "did you
--- hear it" does not work: a report of silence from a rider who was mid-ride or
+-- This exists because auditioning by firing on someone else's timing and asking
+-- "did you hear it" does not work: a report of silence from a rider who was mid-ride or
 -- looking elsewhere is a missed observation, not a negative result, and a theory
 -- was built on three of them before that came out. Running it yourself removes
 -- the attention problem entirely -- you fire when you are listening.

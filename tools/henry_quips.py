@@ -35,7 +35,7 @@ import sys
 
 import bark_lines as B
 
-# Henry's recorded slugs, from a tally of who records labelled topics:
+# Henry's recorded slugs, from a tally of who records labeled topics:
 # henry_0 through henry_4 and p_henry_he. Matched as a prefix rather than a
 # fixed list so a slug this project has not seen is not silently dropped.
 HENRY = re.compile(r"^(p_)?henry")
