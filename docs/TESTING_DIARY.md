@@ -21133,3 +21133,65 @@ window between impact and rest for `ImpactDamageOwnsTheHit` to measure across.
 It had been silently dead while the damage was applied at the moment of
 contact, which would have made engine damage additive and quietly wrong every
 figure in `ImpactDamageByTier`.
+
+# Index: what is known about the dialog system
+
+Roughly 1,700 lines above cover this, written across one long session and easy
+to miss. This is the map, not a summary: each line names where the work is.
+
+## How a bark is dispatched
+
+- **How the dialog system actually dispatches a bark.** The 13-field
+  `dialog:monologRequest` message, its defaults, and the path from Lua to a
+  played line.
+- **Inside DoMonologue: what actually decides whether a line exists.** The
+  metarole to role to topic to sequence chain, read out of the shipped tables
+  rather than inferred.
+- **Topics, sequences, cooldowns and escalation ladders.** `timeout` is
+  seconds, `0` means no cooldown and `-1` means once ever; `next` points at a
+  follow-on topic, which is where repeat provocation escalates.
+- **How much of the dialogue is actually conditional.** Only 28% of 49,404
+  sequences carry any entry condition, which is the real state gate.
+
+## What can and cannot be asked for
+
+- **topicId does not work from Lua, only metarole does.**
+- **alias works, StartMonolog does not, ForceDialog opens a conversation.**
+- **Granting a metarole does not make its lines speakable**, and the
+  **Correction** that follows it: holding a metarole is not the gate.
+- **Roles, not metaroles, are what a speaker holds.** `soul:GetRoles()` is the
+  definitive list, and auditioning without checking it wastes rides.
+- **Which metaroles actually speak**, auditioned one at a time, and **Which
+  metaroles are real** — 231 of 383 are reachable by any of the 4,240 souls.
+- **Never request a generic metarole.**
+
+## Crime, combat and death
+
+- **CONFIRMED: priority is what decided the crime takeover.** A single-variable
+  A/B, and the one confirmation in this body of work that was earned rather
+  than assumed.
+- **With crime on, only the walk barks survive.** A trot or gallop is a crime,
+  and the victim's crime and combat reaction takes their voice immediately.
+- **Our barks fire during combat; vanilla's do not**, and the gate added for it.
+- **Death sounds are dialogue, and a dead victim will not take a request.**
+- **Damage does not silence a victim's barks** — tested and disproven, so the
+  silence has another cause.
+- **RANENY_NA_ZEMI is vanilla's dying bark, not a pain bark.**
+- **Vanilla's own hit-reaction barks, and the context switches available**,
+  including the collision branch the mod suppresses.
+
+## Choosing lines
+
+- **Why gallop victims were silent and Henry monologued.**
+- **Barks are now weighted pools, and a knockdown speaks twice.**
+- **The bark settings never reached Config, so the feature was dead on load.**
+- **An offline index from metarole to English lines** — `tools/bark_lines.py`
+  prints any set's lines without launching the game, and `tools/bark_chain.py`
+  walks metarole to role to topic to sequences showing cooldowns.
+
+## The capability nobody asked for
+
+- **A dialogue can be raised on demand, and its contents chosen.** `ForceDialog`
+  opens a real conversation with chosen options. It is not a bark and was found
+  by accident; it is written up because the capability is worth more than the
+  accident.
