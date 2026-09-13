@@ -20442,3 +20442,75 @@ follow it. `Update.lua` already reads a combat state for the stamina multiplier
 and `SuppressStaggerInCombat`, so the signal is at hand.
 
 Not yet fixed.
+
+## The gallop death cry: what is reachable and what is not
+
+Continuing after the rider rejected "a dying actor cannot speak" and asked what
+was different about the damage. That line of questions produced the `DealDamage`
+finding, and this is where it ends up.
+
+### Timing was part of it after all
+
+Sending the cry at the moment of contact and killing the victim in the same tick
+gives the dialog system no time to start the line. Dispatch passes two halt
+locks, a priority auction and two semaphores first. With `FatalGraceMs` holding
+the lethal damage back:
+
+    grace 400    silent
+    grace 1500   the cry starts, then cuts off partway
+    grace 3000   the cry completes
+
+So the earlier conclusion that timing was not the obstacle was wrong, and the
+rider's objection to it was right. It was measured at 400ms, which is simply too
+short, and a negative at one value was generalised into a negative at all.
+
+**Death is what cuts the line**, and `doNotInterruptOnActorDeath(true)` does not
+prevent it, despite being set in all of these runs.
+
+### But a grace long enough to finish looks broken
+
+At 3000ms the victim barks, begins to get up, and then dies:
+
+> "the people do their bark and then they attempt to get up and then go limp
+> back down on the ground"
+
+The ragdoll grounds at roughly 1.5 to 1.7 seconds and recovery follows, so any
+delay long enough for the cry to finish is also long enough to be seen. The
+window is not narrow, it is closed.
+
+### The set is wrong as well, and the right one is unreachable
+
+The rider heard it:
+
+> "the 'dying' sounds we are using are not like the dying sounds used when I
+> actual kill someone with my sword. Ours seems tamer?"
+
+Correct, and the tables agree. `RANENY_NA_ZEMI` is "wounded on the ground", a
+man lying hurt: "Aaaah... dear God...". The screams of a man being struck are
+`ZASAH_ZBRANI_SILNY`, which is both harder and shorter: "Aaaah!", "Yow!",
+"Enhhhh!" A shorter line might have finished inside an invisible grace, solving
+both problems at once.
+
+It cannot be driven. Three kills, three requests sent at priority 50 with all
+three vanilla flags and `delayed=1000` confirmed applied: silent.
+
+That is consistent with the corpus. **No brain file anywhere sends
+`ZASAH_ZBRANI_SILNY` or `ZASAH_ZBRANI_SLABY` as a metarole.** The only
+references are four `addRole` assignments in `libs/storm/roles/`, granting the
+roles to Henry and to combat NPCs. The engine plays these internally while
+resolving a hit; they are not part of the message-driven bark surface at all.
+
+### Where this leaves it
+
+    reachable, wrong register, needs a visible delay   RANENY_NA_ZEMI
+    right register, unreachable by message             ZASAH_ZBRANI_SILNY
+    reachable and correct                              nothing found
+
+The only remaining route is still the one identified earlier: let the engine
+resolve the killing hit, so its own code plays the scream and its own tree runs
+the death branch. That is what a sword does. It costs the attribution ordering
+in `ApplyImpactDamage` and is a redesign rather than a setting.
+
+`FatalGraceMs` is left in the code at 0, which is the shipped behavior
+unchanged, because it is the instrument that measured this and the numbers above
+are only meaningful with it present.

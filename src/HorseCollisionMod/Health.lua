@@ -662,7 +662,17 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		-- Left alone otherwise: a victim who would have survived both is not
 		-- killed to tidy up attribution.
 		if why then
-			delay = 0
+			-- Zero by design: waiting hands the engine's trample a head start
+			-- on a victim this was always going to kill, and whichever system
+			-- lands the killing blow is the one the crime is attributed to.
+			--
+			-- `FatalGraceMs` reopens exactly that much of the gap. The cry of
+			-- pain is requested at the moment of contact, and a victim killed
+			-- in the same tick appears to have no time for the dialog system
+			-- to start it: dispatch passes two halt locks, a priority auction
+			-- and two semaphores before a line begins. Ships at 0, which is
+			-- the behavior above unchanged.
+			delay = self.Config.FatalGraceMs or 0
 
 			if self.Config.LogTelemetry then
 				self:Log(string.format(

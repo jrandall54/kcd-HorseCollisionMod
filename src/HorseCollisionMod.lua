@@ -651,6 +651,10 @@ HorseCollisionMod.Config = {
 	-- ridden into. Vanilla refuses this outright and so does the mod; the
 	-- setting exists so the behavior can be compared rather than assumed.
 	BarkInCombat             = false,
+	-- How long a fatal impact waits before applying its damage, so the cry of
+	-- pain has time to begin. Zero is the shipped behavior and protects crime
+	-- attribution; see the comment on the fatal path in Health.lua.
+	FatalGraceMs             = 0,
 	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
 	-- every in-flight request by priority and silently discards one that is
 	-- below the top and cannot be delayed, so a bark sent at the default zero
