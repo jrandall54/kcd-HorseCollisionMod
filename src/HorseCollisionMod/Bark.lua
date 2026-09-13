@@ -565,12 +565,27 @@ function HorseCollisionMod:BarkRiderOnImpact(playerEnt, tierName, fatal, npc)
 		return false
 	end
 
+	-- Logged rather than returned silently, because every way a death can fail
+	-- to produce a line looks identical from the saddle. A kill with no line in
+	-- the log at all means the death was not predicted; this names the other two
+	-- reasons.
 	if not self:RiderVoiceReady(self.RiderVoiceRanks.Killed) then
+		self:Log("RiderBark tier=Killed skipped=cooldown"
+				.. " held=" .. tostring(self.RiderVoiceRank or 0)
+				.. " forMs=" .. tostring((self.RiderVoiceUntil or 0) - self:TimeMs()))
+
 		return false
 	end
 
-	return self:SendRiderAlias(playerEnt,
-			self:PoolForVictim(self.RiderBarkKillAliases, npc), "Killed",
+	local pool = self:PoolForVictim(self.RiderBarkKillAliases, npc)
+
+	if #pool == 0 then
+		self:Log("RiderBark tier=Killed skipped=no-line-fits-this-victim")
+
+		return false
+	end
+
+	return self:SendRiderAlias(playerEnt, pool, "Killed",
 			self.RiderVoiceRanks.Killed)
 end
 
