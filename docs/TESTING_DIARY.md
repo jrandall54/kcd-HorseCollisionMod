@@ -20383,3 +20383,62 @@ It costs the attribution ordering in `ApplyImpactDamage`, which exists so the
 mod's damage lands last and owns the kill. That is a redesign of how the mod
 kills rather than an addition, and it should be weighed as such rather than
 attempted casually.
+
+## Why the debug CVars do nothing, and which ones will
+
+Asked after a long run of debug CVars across this project accepting a value and
+producing no output:
+
+> "there seems to be a consistent issue with dozens of cvars over the course of
+> this project not working, mostly ones involved in debugging ... Why would they
+> even exist if they don't do anything?"
+
+**The retail build registers the CVars and compiles their implementation out.**
+
+The evidence is in the binary's string table. Ninety-seven dialog-related
+strings survive, including every CVar name and every help string, because those
+are arguments to the registration call. What does not survive is any of the text
+those debug switches would print: searching for the output of
+`wh_dlg_DialogDebug` ("prints list of active dialogs") or `wh_dlg_RecordDialog`
+("list of topics used during this dialog will be printed") finds nothing at all.
+The registration is compiled in; the code behind it is not.
+
+That predicts exactly the pattern seen all session:
+
+    wh_dlg_Enable        changes gameplay logic      works, silenced everything
+    wh_dlg_DialogDebug   prints debug output         inert
+    wh_dlg_RecordDialog  prints debug output         inert
+    wh_dlg_Verbosity     controls debug output       inert
+
+So the rule for this project is: **a CVar that changes what the game does can be
+expected to work; a CVar whose only job is to print or draw debug information
+cannot.** No launch flag changes this, `-devmode` included, because the code is
+absent from the shipping executable rather than gated at runtime.
+
+Before spending time on any debug CVar, check whether the strings it would print
+exist in the binary. If they do not, the switch is a shell.
+
+## Our barks fire during combat; vanilla's do not
+
+Noticed in play:
+
+> "during the last fight I just had in game with a guard, I noticed our barks
+> where firing when I was gallopping him while in combat/crime which probably
+> shouldn't happen"
+
+Vanilla gates its entire collision bark branch on this, at
+`sb_switch_hitreactions.xml:293`:
+
+    !$b_inCombat & !$b_context['suppressCollisionsBark']
+
+Both halves matter. `HushVanillaBark` supplies the second, which is why the mod
+can take over the line outside combat. The **first** has no counterpart in the
+mod: `BarkCollision` asks only whether barks are enabled and what the tier is,
+so a victim already fighting the player still gets a collision complaint.
+
+That is a real gap rather than a matter of taste. Vanilla's judgement is that a
+man in a fight does not stop to complain about being bumped, and the mod should
+follow it. `Update.lua` already reads a combat state for the stamina multiplier
+and `SuppressStaggerInCombat`, so the signal is at hand.
+
+Not yet fixed.
