@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.6.0
+-- @release 5.7.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -303,8 +303,8 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	-- state. `BlendRagdoll` never appears on a victim the impact killed, so a
 	-- state test reports `neverRagdolled` on exactly the impacts that threw
 	-- someone hardest and waits out its ceiling instead of measuring them.
-	local restPoll = 200
-	local restStill = 0.05
+	local restPoll = self.RestPollMs
+	local restStill = self.RestStillMeters
 	local restCeiling = 8000
 	local restStart = self:TimeMs()
 	local restLast = nil
@@ -572,16 +572,8 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 	-- blow below is always the one that kills.
 
 	local function deal()
-		-- Lift the collision shield first, synchronously, so the victim is
-		-- mortal by the time the line below charges them.
-		--
-		-- A timer cannot do this reliably: it has to be long enough to cover
-		-- the engine's trample and short enough to end before this runs, and
-		-- missing on either side is silent. Measured at a 700ms shield against
-		-- a 1100ms delay, victims still came out clamped at 1 health, because
-		-- `imm=1` prevents death and the removal had not taken effect. Doing it
-		-- here removes the guess: the shield ends where the mod's own damage
-		-- begins, in the same call.
+		-- The shield goes on at the top of this call and comes off here, so
+		-- the victim is mortal by the time the line below charges them.
 		self:LiftCollisionShield(npc)
 
 		local before = nil
@@ -681,16 +673,6 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 			end
 		end
 
-		-- The shield came off a moment ago so this damage could land. If the
-		-- victim lived through it, put it straight back: the body is usually
-		-- still moving, and the engine charges it for as long as it does. A
-		-- kill in that gap is the engine's, which is the murder charge this
-		-- whole mechanism exists to prevent. The second shield ends on settle
-		-- like the first.
-		if after ~= nil and after > 0 then
-			self:ShieldFromEngineDamage(npc)
-		end
-
 		if self.Config.LogTelemetry then
 			self:Log("ImpactDamage " .. self:NameOf(npc)
 					.. " tier=" .. tostring(tierName)
@@ -704,16 +686,34 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 					.. " fatal=" .. tostring(after ~= nil and after <= 0
 							and (before == nil or before > 0))
 					.. " attributed=" .. tostring(attacker ~= nil)
-					.. " delayed=" .. tostring(delay)
-					.. " ok=" .. tostring(ok)
+										.. " ok=" .. tostring(ok)
 					.. " err=" .. tostring(err))
 		end
 	end
 
-	if delay > 0 then
-		Script.SetTimer(delay, deal)
-	else
+	-- Fired by the victim's own state, not by a clock.
+	--
+	-- Shield, then lift and damage the moment the body stops moving.
+	--
+	-- The shield goes on at the impact and has to span everything the engine
+	-- charges the victim for, which is the whole time the body is being thrown:
+	-- measured between the impact and the body coming to rest, victims lost
+	-- between 6 and 32 health, and six of ten were driven onto the clamp. Lift
+	-- it before that is over and those are engine kills, charged to the rider.
+	--
+	-- A walk stagger never moves the body, so it deals immediately.
+	if tierName == "Walk" then
 		deal()
+	else
+		self:WhenBodyStops(npc, function(why, waited)
+			if self.Config.LogTelemetry then
+				self:Log("BodyStopped " .. self:NameOf(npc)
+						.. " why=" .. tostring(why)
+						.. " waited=" .. tostring(waited) .. "ms")
+			end
+
+			deal()
+		end)
 	end
 
 	return damage

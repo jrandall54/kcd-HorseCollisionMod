@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.6.0
+-- @release 5.7.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -202,6 +202,19 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		self.RecentHits[npcId] = now + (cfg.HitReadyCeilingMs or recovery)
 	else
 		self.RecentHits[npcId] = now + recovery
+	end
+
+	-- Past every early return, so only a victim this impact is resolved for is
+	-- ever made immortal. `ApplyImpactDamage` lifts it once the body is at
+	-- rest, before it charges them.
+	--
+	-- Never at a walk. A stagger is an animation and never makes the victim a
+	-- physical object, so there is no engine collision damage to shield from,
+	-- and `ApplyImpactDamage` returns early on a tier worth no damage: the
+	-- shield would go on with nothing left to take it off, and the victim
+	-- would stand there immortal until the backstop fired.
+	if tierName ~= "Walk" then
+		self:ShieldFromEngineDamage(npc)
 	end
 
 	-- What actually prevents the lockup. A victim under 40 health carrying a
@@ -588,12 +601,6 @@ function HorseCollisionMod:SafeUpdate()
 							end
 						end
 					else
-						-- Only for somebody the horse is actually striking, so
-						-- nobody uninvolved is ever made immortal. Reaching a
-						-- tick ahead of contact shields bystanders the horse
-						-- then misses and buys nothing: the buff takes effect
-						-- in the call that applies it, measured directly.
-						self:ShieldFromEngineDamage(ent)
 						self:TriggerCollision(ent, velocity, impactSpeed, horseEnt,
 								player, horseWuid, speed)
 					end

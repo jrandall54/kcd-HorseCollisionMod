@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.6.0
+-- @release 5.7.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.6.0"
+HorseCollisionMod.Version = "5.7.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -168,16 +168,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ShieldVictimFromEngineDamage whether a victim the horse strikes is
 --   made briefly immortal so the engine's trample cannot land the killing
 --   blow, which the game would charge to the player as murder
--- @field ShieldWindowMs backstop only, in milliseconds: the shield ends when
---   the victim's body comes to rest, and this bounds a body that never does
--- @field ShieldPollMs how often the victim's velocity is sampled while
---   shielded, in milliseconds
--- @field ShieldSettleSpeed speed at or below which a body counts as at rest,
---   in meters per second
--- @field ShieldSettleSamples consecutive samples at rest before the shield
---   is lifted
--- @field ShieldMinHoldMs how long past `ImpactDamageDelayMs` the shield is
---   held at minimum, so it always outlives the mod's own damage call
+-- @field ShieldWindowMs crash backstop only, in milliseconds: the shield is
+--   lifted when the victim's body lands, and this bounds the case where that
+--   never happens
+-- @field FinishClampedVictims whether a victim the shield caught is killed by
+--   the mod on release, so the engine's trample still costs them their life
+--   without costing the rider a murder charge
+-- @field ShieldClampFloor health at or below which a victim counts as clamped
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
@@ -671,19 +668,18 @@ HorseCollisionMod.Config = {
 	ShieldVictimFromEngineDamage = false,
 	-- A backstop, not a mechanism. The shield goes on only where an impact is
 	-- scored and `ApplyImpactDamage` lifts it synchronously, so this should
-	-- never be what ends it. It exists so that a victim cannot be left
-	-- permanently immortal if the damage call is skipped, and to bound a body
-	-- that never comes to rest.
-	ShieldWindowMs           = 15000,
-	-- How the shield ends: when the victim's body has stopped moving, rather
-	-- than after a fixed time. The engine charges a ragdoll for as long as it
-	-- tumbles, and a clock expires while the body is still traveling.
-	ShieldPollMs             = 250,
-	ShieldSettleSpeed        = 0.15,
-	ShieldSettleSamples      = 4,
-	-- Held at least this long past `ImpactDamageDelayMs`, so the shield
-	-- always outlives the mod's own damage call rather than racing it.
-	ShieldMinHoldMs          = 400,
+	-- A crash backstop, in milliseconds, and nothing else. The shield is lifted
+	-- by the mod's own damage call, which the victim's ragdoll resolving fires,
+	-- so reaching this means that call never happened.
+	ShieldWindowMs           = 6000,
+	-- Kills a victim the shield caught. Immortality clamps health at 1 instead
+	-- of refusing the damage, so a victim resting on that floor when the shield
+	-- comes off is one the engine's trample killed. Without this the mod quietly
+	-- saves people it has no business saving, and they stand up on one health.
+	FinishClampedVictims     = true,
+	-- The health at or below which a victim counts as having been clamped. The
+	-- floor is exactly 1; the margin is for the comparison, not for the rule.
+	ShieldClampFloor         = 1.01,
 	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
 	-- every in-flight request by priority and silently discards one that is
 	-- below the top and cannot be delayed, so a bark sent at the default zero
@@ -1535,6 +1531,27 @@ HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 HorseCollisionMod.SurrenderHintId = 4771
 
 HorseCollisionMod.RagdollResolveCeilingMs = 15000
+
+-- How long `WhenRagdollLands` waits for a thrown body to come to rest before
+-- giving up and firing anyway.
+--
+-- Its own rather than the resolve ceiling above, because it is waiting for a
+-- much earlier and much shorter event. Measured across sixteen gallop impacts,
+-- landing was reported between 1936ms and 2864ms, so three seconds covers
+-- every real case with room to spare.
+--
+-- What the ceiling is actually for is the victim who never leaves the ground:
+-- somebody who crumples or slides instead of flying keeps ground contact the
+-- whole way, so the airborne half of the test never becomes true. On the
+-- fifteen second ceiling that victim waited out the shield's own backstop and
+-- spent nine seconds unprotected before their damage landed.
+HorseCollisionMod.RagdollLandCeilingMs = 3000
+
+-- What counts as a body having stopped, in meters moved between two polls, and
+-- how often that is read. Shared by `ImpactThrow` and `WhenBodyStops` so the
+-- mod has one definition of rest rather than two that disagree.
+HorseCollisionMod.RestStillMeters = 0.05
+HorseCollisionMod.RestPollMs = 200
 
 -- The state an actor reports while one of this mod's reaction clips owns the
 -- body. `WatchHitReady` treats it and the ragdoll state as the two ways a

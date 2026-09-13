@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.6.0
+-- @release 5.7.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -693,80 +693,22 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 		self:Log("Shield on " .. self:NameOf(npc) .. " ok=true")
 	end
 
-	-- The shield ends when the body has stopped moving, not on a clock.
+	-- Nothing here decides when the shield ends. `ApplyImpactDamage` lifts it as
+	-- the first thing it does, and that call is itself fired by the victim's
+	-- ragdoll resolving, so the shield covers exactly the window the engine can
+	-- charge the body for and not a millisecond that has to be guessed at.
 	--
-	-- A fixed window was the first attempt and it does not hold. The engine goes
-	-- on charging a ragdoll for the whole time it tumbles, and a two second
-	-- clock expires while the body is still traveling: a guard on 5 health
-	-- survived the trample, survived to `t+3000ms`, then died at `t+6000ms`
-	-- having moved another half meter after `Shield off` was logged. That death
-	-- is the engine's, and it is the murder charge this exists to prevent.
+	-- This timer is a crash backstop and nothing else: if the damage call never
+	-- happens, nobody is left permanently unkillable. Reaching it means
+	-- something else went wrong, which is why it says so.
 	--
-	-- `ShieldWindowMs` is the backstop against a body that never settles, not
-	-- the ordinary way out.
-	self:PollShieldUntilSettled(npc, id, state, 0, 0)
-end
-
---- Holds a victim's shield until their body comes to rest, then lifts it.
---
--- **Deliberately not generation guarded.** Every other timer in this mod
--- returns early when a script reload has bumped the generation, so a stale
--- loop stops doing work. This one must not: the work it does is removing
--- immortality, and skipping it would leave a victim unkillable for the rest of
--- the session. A reload happens on every deploy, so that is not remote.
---
--- @tparam table npc the shielded victim
--- @tparam string id the victim's entity id, as `ShieldedVictims` is keyed
--- @tparam table state the shield record, carrying the buff instance
--- @tparam number elapsed milliseconds polled so far
--- @tparam number still consecutive samples already below the settle speed
-function HorseCollisionMod:PollShieldUntilSettled(npc, id, state, elapsed, still)
-	local step = self.Config.ShieldPollMs or 250
-
-	Script.SetTimer(step, function()
+	-- **Deliberately not generation guarded.** Every other timer in this mod
+	-- returns early when a script reload has bumped the generation, so a stale
+	-- loop stops doing work. This one must not: the work it does is removing
+	-- immortality, and skipping it would leave a victim unkillable for the rest
+	-- of the session. A reload happens on every deploy, so that is not remote.
+	Script.SetTimer(self.Config.ShieldWindowMs or 6000, function()
 		if state.removed then
-			return
-		end
-
-		local now = elapsed + step
-		local speed = nil
-
-		-- A floor, so the shield always outlives the mod's own damage call.
-		-- Without it the two race: the damage waits `ImpactDamageDelayMs` and
-		-- the poll was releasing bodies at 500ms, so `LiftCollisionShield`
-		-- found nothing to lift and the victim was mortal for the very window
-		-- the shield exists to cover. Measured: not one `Shield lifted` line
-		-- in a run of twenty impacts, and two victims killed by the engine.
-		local floor = (self.Config.ImpactDamageDelayMs or 600)
-				+ (self.Config.ShieldMinHoldMs or 400)
-
-		pcall(function()
-			local vel = npc:GetVelocity()
-
-			if vel then
-				speed = math.sqrt((vel.x * vel.x) + (vel.y * vel.y)
-						+ (vel.z * vel.z))
-			end
-		end)
-
-		-- A body whose velocity cannot be read counts as settled, because the
-		-- alternative is holding immortality on something this code can no
-		-- longer see.
-		-- A thrown ragdoll passes through near-zero velocity on the way up and
-		-- again on first ground contact, so a couple of slow samples is not
-		-- rest. The count is what separates a body that has stopped from one
-		-- that is merely between bounces; the mod's own throw code does not
-		-- call a body grounded until around 1400ms.
-		local settled = (speed == nil)
-				or (speed <= (self.Config.ShieldSettleSpeed or 0.15))
-		local runs = settled and (still + 1) or 0
-		local enough = runs >= (self.Config.ShieldSettleSamples or 4)
-				and now >= floor
-		local expired = now >= (self.Config.ShieldWindowMs or 15000)
-
-		if not enough and not expired then
-			self:PollShieldUntilSettled(npc, id, state, now, runs)
-
 			return
 		end
 
@@ -781,11 +723,9 @@ function HorseCollisionMod:PollShieldUntilSettled(npc, id, state, elapsed, still
 		end)
 
 		if self.Config.LogTelemetry then
-			self:Log("Shield off " .. self:NameOf(npc)
-					.. " why=" .. (enough and "settled" or "capped")
-					.. " atMs=" .. tostring(now)
-					.. " speed=" .. string.format("%.2f", speed or 0)
-					.. " ok=" .. tostring(lifted))
+			self:Log("Shield backstop fired on " .. self:NameOf(npc)
+					.. " ok=" .. tostring(lifted)
+					.. " (the damage call never lifted it)")
 		end
 	end)
 end

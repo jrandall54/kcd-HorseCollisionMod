@@ -664,11 +664,8 @@ HorseCollisionModSettings = {
 	-- it, a victim the trample happens to kill is charged to you as murder even
 	-- with CollisionIsCrime off.
 	ShieldVictimFromEngineDamage = true,
-	ShieldWindowMs           = 15000, -- backstop only; the lift is on settle
-	ShieldPollMs             = 250,   -- how often the body's speed is sampled
-	ShieldSettleSpeed        = 0.15,  -- m/s at or below which it counts as at rest
-	ShieldSettleSamples      = 4,     -- consecutive samples at rest before lifting
-	ShieldMinHoldMs          = 400,   -- held at least this long past the damage delay
+	ShieldWindowMs           = 6000,  -- crash backstop only; the damage call lifts it
+	FinishClampedVictims     = true,  -- kill whoever the shield caught, so it saves nobody
 
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune

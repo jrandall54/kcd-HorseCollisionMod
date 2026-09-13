@@ -794,19 +794,56 @@ do this: it has to outlast the trample and end before the damage, and missing
 on either side is silent. At a 700 ms shield against a 1100 ms delay victims
 came out clamped at 1 health, because the removal had not taken effect.
 
-**Known gap.** The shield ends when the mod applies its damage, around 600 ms
-after contact, while the body is often still moving. A victim who survives the
-impact and takes further collision damage after that point can still be killed
-by the engine. Observed once: a guard at 5 health survived to `t+3000ms` and
-was dead by `t+6000ms`, having traveled a further half meter after `Shield
-off` was logged. Holding the shield until the body's velocity has settled is
-the fix.
+The shield ends when the victim's body comes to rest, and the mod's damage
+lands at that same moment: `ApplyImpactDamage` shields the victim, waits on
+`WhenBodyStops`, lifts the shield and charges them, in that order.
 
-`ApplyImpactDamage` normally waits for the trample to settle so its own damage
-lands last. That is not sufficient on its own, because a victim already hurt
-can be finished by the trample during the wait. So the question is answered
-before the wait rather than during it: is this impact going to be lethal at
-all, by anyone's hand.
+That single event is what makes the whole thing simple. The engine charges a
+body for as long as it is being thrown, so the shield has to span exactly that
+and no more, and the mod's damage has to land the instant it ends. Two
+mechanisms watching two different signals is what produced every defect below.
+
+**Rest is read from position, not velocity, and shares one definition.**
+`RestStillMeters` (0.05) and `RestPollMs` (200) are used by both `ImpactThrow`
+and `WhenBodyStops`, so the mod cannot hold two disagreeing opinions about
+whether a body has stopped. Measured after unifying them, the two readings
+agree to the millisecond: 1424/1424, 1440/1440, 1408/1408, 1472/1472.
+
+Four other signals are wrong for this, each for a reason worth keeping:
+
+- **A fixed delay.** 600 ms, against a real settle time of 1200 to 2000 ms at a
+  gallop. The victim was charged while still in the air, and the engine had the
+  rest of the throw to kill them in.
+- **A velocity threshold.** A thrown ragdoll passes through near-zero speed at
+  the top of its arc and again on first ground contact, so a couple of slow
+  samples is a bounce, not rest. Worse, a victim who survived and walked away
+  reads as moving: two were held unkillable for a fifteen second cap at 0.96
+  and 2.90 m/s, which is walking and running pace.
+- **Exact position equality.** Stricter than rest and therefore later. A body
+  returns identical coordinates only once the physics has fully slept, and a
+  settled body micro-jitters well past the point it has visibly stopped, so
+  this fired 400 ms to 1150 ms after the throw's own reading.
+- **`WhenRagdollResolves`.** Reports the character blended back and standing,
+  which is later still: the damage arrived as the victim stood up and dropped
+  them again.
+
+`BlendRagdoll` is unusable as the signal for this, for a reason that is easy to
+miss: it never appears on a victim the impact killed, so a state test reports
+`neverRagdolled` on exactly the impacts that threw someone hardest.
+
+**A walk stagger is never shielded.** It is an animation and never makes the
+victim a physical object, so there is no engine damage to protect against, and
+`ApplyImpactDamage` returns early on a tier worth no damage, which left the
+shield on with nothing to take it off.
+
+**The shield must be granted past every early return.** Applied in the
+detection loop it reached victims still inside their per-victim cooldown, whose
+impact was then dropped, so nothing lifted it and they stood unkillable until
+the backstop. It is granted inside `TriggerCollision` instead.
+
+**The prediction this replaced.** `ApplyImpactDamage` used to decide who would
+land the killing blow before the wait started, by asking whether the engine's
+trample could finish whatever the mod's damage left behind:
 
 ```
 if damage >= atImpact then          -- already fatal, do not wait
@@ -815,16 +852,22 @@ elseif (atImpact - damage) <= ceiling[tier] then
 end
 ```
 
-`ImpactDamageEngineCeiling` is a table rather than a single number, because the
-engine's trample scales with the collision and one figure is wrong in both
-directions. The values are the largest seen over 136 logged impacts, rounded
-up: rear 0.0, trot 9.2, gallop 33.1, charge 58.5, carried as
-`Walk 0, Rear 0, Trot 12, Gallop 36, Charge 62`.
-
-Damage variance is overruled in the same spirit. The dealt figure is
-`intended * spread`, and a roll that turns a fatal blow non-fatal hands the
-kill back to the engine, so when `intended` would have killed the roll does not
+`ImpactDamageEngineCeiling` carried the largest trample seen per tier over 136
+logged impacts. Damage variance was overruled in the same spirit: a roll that
+turned a fatal blow non-fatal handed the kill back to the engine, so it did not
 stand.
+
+All of it is gone. It had to be right about a number the mod does not control,
+and when it was wrong the rider was charged with murder at random. The shield
+removes the race rather than trying to win it.
+
+It also had a second effect nobody intended. A gallop on an unarmored villager
+deals `95 * 1.00 * 1.02 = 96.9` against 100 health, so it was never lethal on
+its own; what killed them was the finishing rule upgrading any remainder under
+36. Removing it made unarmored victims survive a single gallop about seven
+times in ten. That is the damage figure being honest rather than a regression
+in the shield, and it is left for damage tuning rather than corrected by
+rounding outcomes up.
 
 An earlier setting, `ImpactDamageRushBelow`, asked instead how hurt the victim
 already was. What matters instead is the size of the remainder against what
