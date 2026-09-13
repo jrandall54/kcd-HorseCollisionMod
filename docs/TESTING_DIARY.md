@@ -21134,6 +21134,105 @@ It had been silently dead while the damage was applied at the moment of
 contact, which would have made engine damage additive and quietly wrong every
 figure in `ImpactDamageByTier`.
 
+# A corpse still plays an audio trigger, so the mod can own its death sounds
+
+This overturns the conclusion recorded above under "Death sounds are dialogue,
+and a dead victim will not take a request". That section ends by naming one
+remaining route — let the engine resolve the killing hit, so its own tree plays
+the scream — and warns that it costs the attribution ordering in
+`ApplyImpactDamage` and is "a redesign rather than a setting". No redesign is
+needed. The reasoning was sound but it was carried out entirely inside the
+dialog system, and the sound does not have to come from there.
+
+## What was missed
+
+Everything above treats "a death sound" and "a dialogue line" as the same
+object, because `wh_dlg_Enable 0` silenced vanilla's death sounds and that
+proved vanilla routes them through dialogue. It does prove that. It does not
+prove that dialogue is the only way to make a voice come out of a character.
+
+`Sound.lua` has been firing FMOD events by name since the impact foley was
+written, through `Libs/GameAudio/*.xml` and the 1803-trigger vocabulary already
+indexed in `references/audio_triggers.tsv`. Fourteen of those triggers are
+human voice, and the dialog system offers none of them:
+
+    v_stealth_stealthkill_man       event:/voice/stealth_stealthkill_man
+    v_stealth_stealthkill_woman     event:/voice/stealth_stealthkill_woman
+    v_stealth_takedown_man          event:/voice/stealth_takedown_man
+    v_stealth_takedown_man_short    event:/voice/stealth_takedown_man_short
+    v_stealth_takedown_woman        event:/voice/stealth_takedown_woman
+    v_stealth_takedown_woman_short  event:/voice/stealth_takedown_woman_short
+    v_henry_hit_heavy               event:/voice/henry_hit_heavy
+    v_henry_hit_medium              event:/voice/henry_hit_medium
+    v_henry_hit_soft                event:/voice/henry_hit_soft
+    v_henry_nostamina_sigh          event:/voice/henry_nostamina_sigh
+    v_henry_hyje                    event:/voice/henry_hyje
+    v_player_death                  declared with no event mapped
+    v_player_drunked                event:/voice/player/player_drunked
+    v_henry_deer_luring             event:/voice/deer_luring
+
+All eleven tested resolve to real handles under `Sound.GetAudioTriggerID`.
+`v_player_death` is declared in `voices.xml` with no FMOD event behind it, which
+is worth knowing before anybody reaches for the obvious name.
+
+## The two results
+
+`tools/probe_voice.lua` fires one named trigger on the player, on the nearest
+living person, or on the nearest corpse. One trigger per run, for the reason
+`probe_bark.lua` already records.
+
+**On a living NPC**, `v_stealth_stealthkill_man` on a refugee 2.9 m away:
+
+> "I did hear the stealth kill sound"
+
+**On a corpse** is the result that matters. `tools/probe_voice_dead.lua` kills
+the nearest person with `soul:DealDamage(0, 9999)` and fires the cry on the body
+two seconds later, long after the brain is gone:
+
+    VOICEDEAD killed=rat_refugee_kunes at 5.4 m, firing in 2000ms
+    VOICEDEAD fired=true isDead=true target=rat_refugee_kunes
+
+> "he died and then I heard the stealth kill sound"
+
+A `dialog:monologRequest` sent into that same state has never once produced
+sound, at any delay, with any flag combination. An `ExecuteAudioTrigger` on the
+same entity, two seconds dead, plays normally.
+
+## Why the difference, and why it was predictable
+
+A monologRequest is a **message**. It is delivered to the character's behaviour
+tree, and the diary's own reading of the teardown is correct: no subbrain, no
+recipient. `ExecuteAudioTrigger` is not a message. It is a direct call on the
+entity's audio proxy, which is a rendering attachment rather than a brain, and
+nothing about being dead removes it. The corpse is still an entity with a
+position and a proxy, which is all an FMOD event needs.
+
+That also explains the shape of every earlier negative. `FatalGraceMs` measured
+400 ms silent, 1500 ms cut off, 3000 ms complete, because dispatch had to pass
+two halt locks, a priority auction and two semaphores while the speaker stayed
+alive. A trigger has no dispatch to pass, so it has no grace requirement and no
+window to keep open. The "window is not narrow, it is closed" finding is about
+dialogue and does not apply here.
+
+## What this unblocks
+
+The three problems that closed off the dialogue route all dissolve rather than
+being solved:
+
+    needs the speaker alive           no: a corpse plays it
+    needs a visible 3000ms grace      no: no dispatch, so no grace
+    right register unreachable        no: the stealth-kill cry is the register,
+                                          and ZASAH_ZBRANI_SILNY is not needed
+
+And it costs nothing that 5.6.0 and 5.7.0 bought. The shield stays, the
+attribution ordering in `ApplyImpactDamage` stays, the mod still owns every
+kill. The sound is fired by the mod at the moment the mod chooses, which is what
+`the mod owns what it does` asks for: an effect with a switch and a shipped
+default rather than one the engine resolves.
+
+`ZASAH_ZBRANI_SILNY` being unreachable as a metarole is still true and still
+correctly recorded. It stops mattering.
+
 # Index: what is known about the dialog system
 
 Roughly 1,700 lines above cover this, written across one long session and easy
@@ -21173,7 +21272,14 @@ to miss. This is the map, not a summary: each line names where the work is.
 - **With crime on, only the walk barks survive.** A trot or gallop is a crime,
   and the victim's crime and combat reaction takes their voice immediately.
 - **Our barks fire during combat; vanilla's do not**, and the gate added for it.
-- **Death sounds are dialogue, and a dead victim will not take a request.**
+- **Death sounds are dialogue, and a dead victim will not take a request** --
+  true of dialogue, and **superseded as a conclusion** by the entry below.
+- **A corpse still plays an audio trigger, so the mod can own its death
+  sounds.** `ExecuteAudioTrigger` is not a message and never reaches the torn
+  down subbrain, so the stealth-kill cry plays on a body two seconds dead. This
+  removes the "redesign how the mod kills" route entirely. It also names the
+  fourteen human-voice triggers the dialog system never offers, Henry's three
+  hit severities among them.
 - **Damage does not silence a victim's barks** — tested and disproven, so the
   silence has another cause.
 - **RANENY_NA_ZEMI is vanilla's dying bark, not a pain bark.**
