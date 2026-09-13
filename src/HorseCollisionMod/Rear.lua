@@ -1017,7 +1017,8 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	self:PlayImpactSound(npc, tier, armor)
 	self:ShakeRiderCamera(playerEnt, tier)
 	self:BlurRiderView(playerEnt, tier)
-	self:BarkRiderImpact(playerEnt, tier)
+	self:BarkRiderOnImpact(playerEnt, tier,
+			self:PredictImpactFatal(npc, tier, armor, horseEnt))
 	self:PlayRiderVocal(playerEnt, tier)
 	self:ImpactDust(npc, tier)
 

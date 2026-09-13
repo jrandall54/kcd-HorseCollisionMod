@@ -85,13 +85,18 @@ second and a grunt for each reads as broken audio rather than as a man being
 jolted. A heavier impact still gets through that silence, so a gallop is never
 swallowed by the shove that happened just before it.
 
-Sometimes he says something instead. Roughly one impact in three draws a line
-rather than a grunt — "Oh, shit!", "Had enough?", "Good God, what a bloody
-mess.", "Jesus Christ, he was only a boy." — and it is never both at once,
-because two voices out of one man is a mistake rather than a richer moment. The
-lines are the game's own, recorded by Henry's voice actor for quests you may
-never have played, and every impact draws from the same pool whatever speed it
-happened at.
+When a collision kills somebody, he says something. "Oh fuck!", "Good God, what
+a bloody mess.", "Jesus Christ, he was only a boy.", "He's still breathing but
+he probably won't wake up again." Fifteen lines, all the game's own, recorded by
+Henry's voice actor for quests you may never have played. A death always gets
+one, and never a grunt as well, because two voices out of one man is a mistake
+rather than a richer moment.
+
+An ordinary impact stays wordless. The lines Henry has are sentences, which suit
+standing over a body and not a shove at walking pace, and the short exclamations
+that would have suited a shove are the ones the game will not play on request.
+The game itself works the same way round: for Henry's own reaction to being
+jolted it reaches for a recorded grunt, not for dialogue.
 
 ### What people say about it
 

@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.7.0
+-- @release 5.8.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.7.0"
+HorseCollisionMod.Version = "5.8.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -497,6 +497,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RiderBark whether Henry says something about the impact
 -- @field RiderBarkChance how often an impact produces a line instead of a grunt
 -- @field RiderBarkCooldownMs how long Henry stays quiet after speaking
+-- @field RiderBarkKill whether a kill gets its own line from the kill pool
 -- @field RiderBarkPriority the priority Henry's own line is sent at
 -- @field VictimMarks whether a collision leaves dirt and blood on the victim
 -- @field VictimDirtTrot dirt added by a trot impact, 0 to 1
@@ -1061,9 +1062,10 @@ HorseCollisionMod.Config = {
 	-- at once is a defect. So the chance below is how often an impact produces a
 	-- line *instead of* a grunt, and a line holds the grunt off for its own
 	-- cooldown, which is longer because a line takes longer to say.
-	RiderBark                = true,
+	RiderBark                = false,
 	RiderBarkChance          = 0.35,
 	RiderBarkCooldownMs      = 5000,
+	RiderBarkKill            = true,
 
 	-- Henry's own line gets its own priority rather than sharing the victims'.
 	-- Requests register in a shared array which the dialog system sorts

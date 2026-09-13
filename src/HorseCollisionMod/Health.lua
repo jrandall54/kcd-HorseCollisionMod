@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.7.0
+-- @release 5.8.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -401,6 +401,69 @@ end
 -- @tparam[opt] table playerEnt the player, named as the attacker when crime is on
 -- @tparam[opt] table horseEnt the player's horse, for the barding bonus
 -- @treturn number the damage dealt, or 0 when nothing was
+--- Whether this impact is about to kill, worked out at the moment of contact.
+--
+-- Exists so Henry can react on time. `ApplyImpactDamage` cannot answer this: it
+-- defers its damage until the thrown body comes to rest, up to a second after
+-- contact, deliberately, so that the mod's blow lands last and owns the kill.
+-- Choosing the rider's line from that resolved state produced words a second
+-- and a half after the collision, detached from it, and a walk stagger -- whose
+-- tier is worth no damage at all and so returns before dealing any -- never got
+-- a line whatsoever.
+--
+-- The arithmetic is `ApplyImpactDamage`'s own, minus the variance roll. That
+-- roll is symmetric about the intended figure, so the prediction is the average
+-- outcome rather than a bound, and a collision landing within one roll's spread
+-- of the victim's remaining health can be called either way. On the ride this
+-- was built from, every impact was far from that margin: 96.9 intended against
+-- 83.0 health on the kills, and 11.6 against 58.4 on the survivals.
+--
+-- The engine's own trample damage is not added in. The mod reclaims it and
+-- restores the health the victim had at impact, so the mod's own figure is what
+-- decides the death.
+--
+-- @tparam table npc the victim
+-- @tparam string tierName the impact tier
+-- @tparam ?table armor the victim's armor reading, as `ApplyImpactDamage` takes it
+-- @tparam ?table horseEnt the horse, for its barding
+-- @treturn boolean true when this impact is expected to be fatal
+function HorseCollisionMod:PredictImpactFatal(npc, tierName, armor, horseEnt)
+	if not self.Config.ImpactDamage or not npc or not npc.soul then
+		return false
+	end
+
+	local byTier = self.Config.ImpactDamageByTier
+
+	if type(byTier) ~= "table" then
+		byTier = self.ImpactDamageByTier
+	end
+
+	local base = byTier[tierName]
+
+	if type(base) ~= "number" then
+		base = self.ImpactDamageByTier[tierName]
+	end
+
+	if type(base) ~= "number" or base <= 0 then
+		return false
+	end
+
+	local health = nil
+
+	pcall(function()
+		health = npc.soul:GetState("health")
+	end)
+
+	if type(health) ~= "number" then
+		return false
+	end
+
+	local intended = base * self:ImpactDamageScale(armor)
+			* self:BardingDamageScale(horseEnt)
+
+	return intended >= health
+end
+
 function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt)
 	if not self.Config.ImpactDamage or not npc or not npc.soul then
 		return 0
@@ -649,8 +712,10 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		-- which is where the engine's own death handling would have put them.
 		-- Only then: an ordinary death outside an action already works, and
 		-- forcing a ragdoll onto it would override whatever the game chose.
-		if type(before) == "number" and before > 0
-				and type(after) == "number" and after <= 0 then
+		local fatal = type(before) == "number" and before > 0
+				and type(after) == "number" and after <= 0
+
+		if fatal then
 			-- The moment the mod's own damage killed somebody, which is the
 			-- only place the death is attributable to the mod rather than to
 			-- anything else that might have finished them.

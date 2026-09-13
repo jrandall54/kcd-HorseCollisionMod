@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.7.0
+-- @release 5.8.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -229,7 +229,7 @@ HorseCollisionMod.RiderBarkSets = {
 -- having the audio is the gate.
 --
 -- That produced 1076 lines Henry can be asked for, of which the rider chose
--- these. **Their judgement, not a filter of mine** — the survey they picked from
+-- these. **Their judgement, not a filter of mine** -- the survey they picked from
 -- was narrowed only by what is mechanically possible.
 --
 -- ### One flat pool, by instruction
@@ -248,31 +248,135 @@ HorseCollisionMod.RiderBarkSets = {
 -- and 58 further lines the rider liked are reachable by nothing else and so are
 -- not reachable at all.
 --
+-- ### Empty on purpose: an impact is breath, not words
+--
+-- Every spoken line the mod has belongs to `RiderBarkKillAliases` and fires only
+-- when the collision killed somebody. An ordinary impact gets `PlayRiderVocal`'s
+-- wordless grunt instead, which is also what the engine itself does for the
+-- player: Henry holds the `COMBAT_VICTIM_SCREAM_RECEIVED_HIT` and
+-- `COMBAT_ACTOR_SCREAM_ATTACK` metaroles, but neither carries any audio recorded
+-- by his actor -- only NPCs' -- so vanilla reaches for an audio trigger for the
+-- player's own impact vocals, exactly as this mod does.
+--
+-- The reason is the length of what is available. Of 1,656 aliases, 173 hold a
+-- Henry line on an always-true sequence and 124 survive every usability filter,
+-- and the ones that actually speak are sentences. A sentence is right over a
+-- body and wrong for a shove, and the short exclamations that would have suited
+-- a shove are the ones that do not play.
+--
+-- The pool and its switch are kept rather than deleted so a line can be put back
+-- here without restructuring anything. `RiderBark` defaults to false to match.
+--
+-- ### What makes a line usable, and why listening was not optional
+--
+-- Four filters, applied by `tools/henry_impact_lines.py`:
+--
+-- 1. **`topic2sequence.entry_condition` must be `'1'`**, always-true. A quest
+--    condition refuses silently while the mod still logs `sent=true`.
+-- 2. **`sequence.timeout` must not be `-1`**, which means usable once per
+--    playthrough and then never again.
+-- 3. **The shipped audio must exist and carry exactly one actor, Henry's.** The
+--    localization paks name every file
+--    `<actor>_t<topic>_s<sequence>_<n>_<slug>_<hash>.ogg`, so this is a matter of
+--    record. Two actors means a conversation, which is refused or opens a
+--    cutscene; no audio at all means a line that has text and no recording.
+-- 4. **Every member of the topic must fit**, since the dialog system picks which
+--    member plays. A label reading "Oh, shit!" fronted "Shit, where's that
+--    damned ring?".
+--
+-- Passing all four is still not proof a line is audible, so every alias below
+-- was fired individually in game and kept only on the rider's word that they
+-- heard it. `tools/make_audition.py` fires one by number for that purpose.
+--
+-- One caution for anyone auditioning more: the dialog system degrades over a
+-- long session. Lines that were silent through hundreds of requests played
+-- immediately in a fresh process, so an audition result only counts against a
+-- recently launched game.
+--
 -- @table RiderBarkAliases
-HorseCollisionMod.RiderBarkAliases = {
-	{ "q_theresa_village_m_henryTraining", 1 },        -- "Ha!" / "Take that!"
-	{ "q_disguise_ondrejDialog_dealDiscussion", 1 },   -- "What!?"
-	{ "q_superstition_startPhase3", 1 },               -- "Alright."
-	{ "q_dlc_revelation_henry_chapel_common", 1 },     -- "Amen."
-	{ "q_returnToSkalitz_deadPeople", 1 },             -- "Jesus..."
-	{ "event_chase_thiefDown", 1 },                    -- "Had enough?"
+HorseCollisionMod.RiderBarkAliases = {}
+
+-- Henry's lines for an impact that killed, drawn on instead of the impact pool.
+--
+-- An ordinary comment rather than an LDoc block, for the same reason as
+-- ImpactProbeSamples above: LDoc reads an annotated table as a set of named
+-- fields and refuses an array of entries.
+--
+-- A death is the one moment in the mod worth a distinct reaction, so it gets a
+-- distinct pool rather than a weight inside the ordinary one. Every member is an
+-- ungated single-line topic whose full text is printed beside it -- see the two
+-- filters described above the impact pool, which apply here identically.
+--
+HorseCollisionMod.RiderBarkKillAliases = {
 	{ "revelation_murderer_ohfuck", 1 },               -- "Oh fuck!"
-	{ "q_dlc_revelation_gambler_diceFail", 1 },        -- "Oh, shit!"
-	{ "q_rides_traitor_kubajsUntied", 1 },             -- "Jesus Christ!"
-	{ "q_returnToSkalitz_deadHangman", 1 },            -- "Oh, God."
-	{ "bowlNotReturned", 1 },                          -- "What the...?"
-	{ "q_charlatan_petrDialog", 1 },                   -- "My condolences."
 	{ "q_rides_traitor_henry_trail_skirt", 1 },        -- "Shameless hussy!"
-	{ "q_raubritter_playerBloodTrack", 1 },            -- "That looks like blood."
+	{ "q_massacre_deadPeasasnt", 1 },                  -- "How could anyone be so cruel?"
 	{ "revelation_murderer_smell", 1 },                -- "Jesus, something stinks here!"
-	{ "q_dlc_newhomes_judgement_butcher", 1 },         -- "What is it this time?"
-	{ "q_gallowsBrothers_endQuestBark", 1 },           -- "So many plots and intrigues..."
 	{ "q_counterfeiters_crimeScene_area", 1 },         -- "Good God, what a bloody mess."
-	{ "q_theresa_henryLevel_questResult", 1 },         -- "I don't know what to say."
-	{ "q_dlc_revelation_gambler_round2", 1 },          -- "Jesus! How did I manage that?"
-	{ "q_rides_bacchus_ringIsStolenFromHenry", 1 },    -- "And what the fuck is this?"
-	{ "revelation_murderer_trigger_caveBody4", 1 },    -- "Jesus Christ, he was only a boy."
+	-- "Fuck, the alarm's been sounded!"
+	{ "q_night_rescue_alarmHenry", 1 },
+	-- "It started getting interesting here."
+	{ "q_rides_traitor_henry_trail_shirt", 1 },
+	-- "Jesus Christ, he was only a boy."
+	{ "revelation_murderer_trigger_caveBody4", 1 },
+	-- "Grind those whoresons into the dirt! / At them! Chaaaarge!"
+	{ "q_istvans_reinforcements_henryAttack", 1 },
+	-- "Poor wretch. What did he do to deserve such a fate?"
+	{ "revelation_murderer_trigger_caveBody5", 1 },
+	-- "This one won't be going anywhere any time soon."
+	{ "q_counterfeiters_crimeScene_brokenWheel", 1 },
+	-- "He's still breathing but he probably won't wake up again."
+	{ "player_examineInjuredWorker", 1 },
+	-- "My God, I'm no better than that bastard Zbyshek."
+	{ "q_returnToSkalitz_butcher_stolenGoods", 1 },
+	-- "And now to get away quickly before anyone catches me here."
+	{ "q_libri_prohibiti_henry_shouldBeLeaving", 1 },
+	-- "There! They won't be pulling anything for a few days. Except long faces!"
+	{ "q_execExec_troughBarkDone", 1 },
 }
+
+--- Whether Henry is free to speak, or still inside a hold from his last sound.
+--
+-- One gate for words and breath alike, because both come out of the same man
+-- and two at once is a defect rather than a richer moment.
+--
+-- A hold further out than any cooldown that can be written was not written
+-- against this clock: `System.GetCurrTime` is persisted in the save, so loading
+-- an earlier one moves it backwards, and without this the rewind would mute
+-- Henry until it had been ridden back through.
+--
+-- Ranked, so that the more important sound wins a contest rather than whichever
+-- was asked first. A grunt is `RiderVoiceGrunt`, an impact line outranks it, and
+-- a line about a death outranks both: four gallop kills in quick succession
+-- produced one death line and three silences when the gate was rank-blind,
+-- because the grunt at each contact had already taken it.
+--
+-- Equal rank still loses, so two death lines do not talk over each other.
+--
+-- @tparam ?number rank what is asking, defaulting to the lowest
+-- @treturn boolean true when nothing of equal or greater weight is holding him
+function HorseCollisionMod:RiderVoiceReady(rank)
+	local cfg = self.Config
+	local now = self:TimeMs()
+	local until_ = self.RiderVoiceUntil or 0
+	local longest = math.max(cfg.RiderBarkCooldownMs or 0,
+			cfg.RiderVocalCooldownMs or 0)
+
+	if (until_ - now) > longest then
+		return true
+	end
+
+	if now >= until_ then
+		return true
+	end
+
+	return (rank or 0) > (self.RiderVoiceRank or 0)
+end
+
+--- What each kind of sound out of Henry is worth against the others.
+--
+-- @table RiderVoiceRanks
+HorseCollisionMod.RiderVoiceRanks = { Grunt = 3, Impact = 4, Killed = 5 }
 
 --- Henry says something about the impact, drawn from `RiderBarkAliases`.
 --
@@ -304,20 +408,7 @@ function HorseCollisionMod:BarkRiderImpact(playerEnt, tierName)
 		return false
 	end
 
-	local now = self:TimeMs()
-	local until_ = self.RiderVoiceUntil or 0
-	local longest = math.max(cfg.RiderBarkCooldownMs or 0,
-			cfg.RiderVocalCooldownMs or 0)
-
-	-- A hold further out than any cooldown that can be written was not written
-	-- against this clock: `System.GetCurrTime` is persisted in the save, so
-	-- loading an earlier one moves it backwards and would otherwise mute Henry
-	-- until the rewind had been ridden back through.
-	if (until_ - now) > longest then
-		until_ = 0
-	end
-
-	if now < until_ then
+	if not self:RiderVoiceReady(self.RiderVoiceRanks.Impact) then
 		return false
 	end
 
@@ -327,7 +418,28 @@ function HorseCollisionMod:BarkRiderImpact(playerEnt, tierName)
 		return false
 	end
 
-	local alias = self:PickFromPool(self.RiderBarkAliases)
+	return self:SendRiderAlias(playerEnt, self.RiderBarkAliases, tierName,
+			self.RiderVoiceRanks.Impact)
+end
+
+--- Sends one line from a pool as Henry, and takes the voice gate on success.
+--
+-- The dispatch shared by every spoken line the rider has: the impact pool and
+-- the kill pool differ only in which pool they draw from and what the telemetry
+-- calls the moment. Both stamp the same clock, because there is one Henry.
+--
+-- Deliberately does not test the cooldown or the chance. Those belong to the
+-- caller: an ordinary impact rolls against `RiderBarkChance` and a kill does
+-- not, since a death is rare enough to be worth a line every time.
+--
+-- @tparam table playerEnt the player entity
+-- @tparam table pool a `{ name, weight }` list for `PickFromPool`
+-- @tparam string tag what to call this in the log
+-- @tparam number rank what this sound is worth, from `RiderVoiceRanks`
+-- @treturn boolean true when a request was sent
+function HorseCollisionMod:SendRiderAlias(playerEnt, pool, tag, rank)
+	local cfg = self.Config
+	local alias = self:PickFromPool(pool)
 
 	if not alias then
 		return false
@@ -353,13 +465,13 @@ function HorseCollisionMod:BarkRiderImpact(playerEnt, tierName)
 	end)
 
 	if ok then
-		-- Rank 3 is the ceiling `PlayRiderVocal` compares against, so nothing
-		-- outranks a spoken line and no grunt follows inside the hold.
-		self.RiderVoiceUntil = now + (cfg.RiderBarkCooldownMs or 0)
-		self.RiderVoiceRank = 3
+		-- Both spoken ranks sit above every grunt, so no breath follows a line
+		-- inside the hold, and a death line can still cut across an impact one.
+		self.RiderVoiceUntil = self:TimeMs() + (cfg.RiderBarkCooldownMs or 0)
+		self.RiderVoiceRank = rank or self.RiderVoiceRanks.Impact
 	end
 
-	self:Log("RiderBark tier=" .. tostring(tierName)
+	self:Log("RiderBark tier=" .. tostring(tag)
 			.. " alias=" .. alias
 			.. " target=" .. tostring(target)
 			.. " prio=" .. tostring(fields.priority)
@@ -367,6 +479,40 @@ function HorseCollisionMod:BarkRiderImpact(playerEnt, tierName)
 			.. (ok and "" or (" err=" .. tostring(err))))
 
 	return ok
+end
+
+--- Chooses Henry's spoken line at the moment of contact.
+--
+-- `fatal` comes from `PredictImpactFatal` rather than from the victim's actual
+-- state, and that is the point. The real death is not settled until the thrown
+-- body has come to rest and the mod's deferred damage lands, up to a second and
+-- a half later, so a line chosen from it arrives long after the collision it is
+-- about. Predicting the outcome from the same arithmetic lets the words land
+-- with the impact.
+--
+-- A death always gets a line and never rolls against `RiderBarkChance`: a
+-- collision that kills is rare enough to be worth hearing every time, and the
+-- ordinary impact line is skipped rather than competing with it.
+--
+-- @tparam table playerEnt the player entity
+-- @tparam string tierName the impact tier, for the telemetry
+-- @tparam boolean fatal whether this impact is expected to kill
+-- @treturn boolean true when a request was sent
+function HorseCollisionMod:BarkRiderOnImpact(playerEnt, tierName, fatal)
+	if not fatal then
+		return self:BarkRiderImpact(playerEnt, tierName)
+	end
+
+	if not self.Config.RiderBarkKill then
+		return false
+	end
+
+	if not self:RiderVoiceReady(self.RiderVoiceRanks.Killed) then
+		return false
+	end
+
+	return self:SendRiderAlias(playerEnt, self.RiderBarkKillAliases, "Killed",
+			self.RiderVoiceRanks.Killed)
 end
 
 -- The wordless pain grade an impact at this tier should make.
@@ -765,7 +911,7 @@ end
 -- reaction that the mod cannot reproduce, and it already fires it correctly on
 -- its own when a body is found.
 --
--- Henry's own set is empty pending an audition, so in practice this currently
+-- Henry speaks from `RiderBarkKillAliases` here, chosen in `BarkRiderOnImpact`.
 -- logs the death and says nothing.
 --
 -- @tparam table npc the victim who died

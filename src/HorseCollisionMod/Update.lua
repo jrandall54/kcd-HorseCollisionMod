@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.7.0
+-- @release 5.8.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -277,11 +277,15 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	self:ShakeRiderCamera(playerEnt, tierName)
 	self:BlurRiderView(playerEnt, tierName)
 
-	-- Words before breath. Both come out of Henry and they share one gate, so
-	-- whichever is asked first wins the impact; a line that goes out holds the
-	-- grunt off, and on the impacts where Henry has nothing to say the grunt
-	-- runs as normal.
-	self:BarkRiderImpact(playerEnt, tierName)
+	-- Words before breath, both at the moment of contact, and only one of them
+	-- heard because they share a ranked voice gate.
+	--
+	-- Which words depends on whether this impact is about to kill, and that is
+	-- predicted rather than observed. The real answer is not settled until the
+	-- body has come to rest and the deferred damage lands, and a line chosen
+	-- from that arrives a second and a half after the collision it is about.
+	self:BarkRiderOnImpact(playerEnt, tierName,
+			self:PredictImpactFatal(npc, tierName, armor, horseEnt))
 	self:PlayRiderVocal(playerEnt, tierName)
 
 	-- The ground's half. Spawned at the victim's feet, where they are struck

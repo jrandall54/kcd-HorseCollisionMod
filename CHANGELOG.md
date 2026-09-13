@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-09-13
+
 ### Added
 
 - **Henry grunts when the collision goes through him.** The game records him
@@ -44,14 +46,34 @@ number.
   because riding into a group lands several collisions in a second; a heavier
   impact is still allowed through, so a gallop is never swallowed by the shove
   before it.
-- **Henry says something about the impact.** Twenty-two vanilla lines the rider
-  chose, addressed by `alias` so the mod names one topic rather than a bark set
-  and is not handed a monolog instead. Every impact draws from the same pool
-  regardless of speed.
-- `RiderBark`, `RiderBarkChance`, `RiderBarkCooldownMs` and `RiderBarkPriority`
-  settings. Words and breath share one gate, because both come out of Henry and
-  two at once is a defect, so the chance is how often an impact produces a line
-  *instead of* a grunt.
+- **Henry says something when a collision kills somebody.** Fifteen vanilla
+  lines, addressed by `alias` so the mod names one topic rather than a bark set
+  and is not handed a monolog instead. Every one was fired individually in game
+  and kept only on confirmation that it could be heard, because passing every
+  check the shipped data offers does not make a line audible.
+- `RiderBarkKill`, `RiderBark`, `RiderBarkChance`, `RiderBarkCooldownMs` and
+  `RiderBarkPriority` settings. Words and breath share one ranked gate, because
+  both come out of Henry and two at once is a defect: a death line outranks an
+  impact line, which outranks a grunt, so a kill is never swallowed by the shove
+  that carried it.
+- An ordinary impact is wordless on purpose and `RiderBark` ships off. The
+  spoken lines that exist are sentences, which suit standing over a body and not
+  a shove, and the short exclamations that would have suited a shove do not
+  play. This is also what the engine does for the player: Henry holds the combat
+  scream metaroles but they carry no audio recorded by his actor, so vanilla
+  uses an audio trigger for his impact vocals too. The pool and its switch are
+  kept so a line can be put back without restructuring anything.
+
+### Fixed
+
+- **The line now arrives with the collision and knows whether it killed.** It
+  used to be chosen at the moment of contact, before the mod's deferred damage
+  had landed, so an impact line always took the voice gate and the death line
+  behind it was nearly always suppressed; choosing it from the settled death
+  instead put the words up to a second and a half late, and a walk stagger
+  never got one at all because its tier deals no damage and the damage path
+  returns early. `PredictImpactFatal` answers the question at contact using the
+  damage arithmetic itself.
 
 ## [5.7.0] - 2026-09-12
 

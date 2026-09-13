@@ -102,7 +102,7 @@
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 5.7.0</li>
+        <li><strong>Release</strong>: 5.8.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -124,6 +124,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:PlayImpactSound">HorseCollisionMod:PlayImpactSound (npc, tierName[, armor])</a></td>
 	<td class="summary">Plays the impact sound for one collision.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayRiderVocal">HorseCollisionMod:PlayRiderVocal (playerEnt, tierName)</a></td>
+	<td class="summary">Henry's own grunt as the collision goes through him.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:PlayAtDistance">HorseCollisionMod:PlayAtDistance (entity, trigger, distance)</a></td>
@@ -337,6 +341,100 @@
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:PlayRiderVocal"></a>
+    <strong>HorseCollisionMod:PlayRiderVocal (playerEnt, tierName)</strong>
+    </dt>
+    <dd>
+    Henry's own grunt as the collision goes through him. </p>
+
+<p> The victim makes a noise and the camera kicks, and until now the rider was
+ silent through both. The game authors him three severities of taking a hit:</p>
+
+<pre><code> v_henry_hit_soft     event:/voice/henry_hit_soft
+ v_henry_hit_medium   event:/voice/henry_hit_medium
+ v_henry_hit_heavy    event:/voice/henry_hit_heavy
+</code></pre>
+
+<p> which is the same shape as the tiers, so each tier names one.</p>
+
+<p> ### Why this is not a bark</p>
+
+<p> Every earlier attempt at giving Henry something to say went through
+ <code>dialog:monologRequest</code>, and the sets available to him answered with full
+ Skalitz monologs rather than a grunt, because the mod chooses a set and the
+ dialog system chooses the line out of it. <code>Bark.lua</code> still carries that
+ constraint and it is real.</p>
+
+<p> These are not dialogue. They are FMOD events fired straight at the entity's
+ audio proxy, the same call the impact foley above uses, so the mod names the
+ exact event and the dialog system is not consulted. A named event cannot
+ answer with a monolog, which removes the only thing that made Henry's half
+ unusable. It also means no priority auction and no cooldown: this cannot be
+ taken by a crime reaction the way a collision bark is.</p>
+
+<p> What it does not give is a choice of sample. An FMOD event may hold several
+ takes and randomize inside them, and that is internal to FMOD. The severity
+ is chosen; the variation within a severity is not.</p>
+
+<p> ### The layer format is the impact layers'</p>
+
+<p> <code>{ trigger, delayMs, distance, chance }</code>, read exactly as <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayImpactSound">PlayImpactSound</a>
+ reads a layer, so the knobs learned there transfer. <code>distance</code> is the only
+ volume control the engine offers and <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayAtDistance">PlayAtDistance</a> documents why. A tier
+ whose trigger is <code>&quot;&quot;</code> is silent, which is how a tier is switched off without
+ switching off the others.</p>
+
+<p> The delays are short and fall as the tier rises. The grunt belongs just
+ behind the thud rather than under it, and a heavier blow knocks the air out
+ sooner.</p>
+
+<p> ### Why there is a cooldown</p>
+
+<p> Riding into a group lands several collisions inside a second, and one grunt
+ per collision does not read as a man being jolted repeatedly, it reads as
+ broken audio. The rider's verdict on the first build:</p>
+
+<p> > "Henry only needs to grunt or make sound once within a short period as
+ > with multiple impacts happening within a short interval sounds weird."</p>
+
+<p> So <code>RiderVocalCooldownMs</code> holds the next one off. One exception: a <strong>harder</strong>
+ impact is still allowed through, because a gallop silenced by the walk shove
+ that happened just before it is a worse fault than the one being fixed. Ranks
+ are the mod's own reading of severity rather than config, so changing a
+ trigger cannot scramble them.</p>
+
+<p> The worst case is therefore three grunts in one window, soft then medium then
+ heavy, which needs three impacts of rising tier inside the cooldown. Riding
+ through a crowd is all one tier and gets one grunt.</p>
+
+<p> The stamp is taken when the grunt is <em>scheduled</em> rather than when it plays,
+ so collisions arriving inside the tier's own delay are still caught.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity, as <code>ShakeRiderCamera</code> takes it
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot", "Gallop", "Charge" or "Rear"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a trigger resolved and was played
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:PlayAtDistance"></a>
     <strong>HorseCollisionMod:PlayAtDistance (entity, trigger, distance)</strong>
     </dt>
@@ -531,7 +629,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-12 23:46:51 </i>
+<i style="float:right;">Last updated 2026-09-13 16:04:02 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

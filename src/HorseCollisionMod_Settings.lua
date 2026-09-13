@@ -566,9 +566,10 @@ HorseCollisionModSettings = {
 	-- at once is a defect. So the chance below is how often an impact produces a
 	-- line *instead of* a grunt, and a line holds the grunt off for its own
 	-- cooldown, which is longer because a line takes longer to say.
-	RiderBark                = true,
+	RiderBark                = false,
 	RiderBarkChance          = 0.35,
 	RiderBarkCooldownMs      = 5000,
+	RiderBarkKill            = true,
 
 	-- Henry's own line gets its own priority rather than sharing the victims'.
 	-- Requests register in a shared array which the dialog system sorts
