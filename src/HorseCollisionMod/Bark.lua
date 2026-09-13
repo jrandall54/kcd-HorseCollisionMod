@@ -328,7 +328,7 @@ HorseCollisionMod.RiderBarkKillAliases = {
 	-- "Jesus Christ, he was only a boy."
 	{ "revelation_murderer_trigger_caveBody4", 1, "m" },
 	-- "Poor wretch. What did he do to deserve such a fate?"
-	{ "revelation_murderer_trigger_caveBody5", 1 },
+	{ "revelation_murderer_trigger_caveBody5", 1, "m" },
 	-- "This one won't be going anywhere any time soon."
 	{ "q_counterfeiters_crimeScene_brokenWheel", 1 },
 	-- "He's still breathing but he probably won't wake up again."
