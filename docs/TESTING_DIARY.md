@@ -20310,3 +20310,76 @@ vanilla does and it is the only route observed to produce the cry. It collides
 head-on with the attribution ordering in `ApplyImpactDamage`, so it is a
 redesign of how the mod kills rather than an addition, and it should not be
 started without deciding whether the death cry is worth that risk.
+
+## Death sounds are dialogue, and a dead victim will not take a request
+
+Two results that together close off the message-based approach.
+
+### The decisive control: `wh_dlg_Enable 0`
+
+The dialog debug CVars are useless for this. With `wh_dlg_Enable 1`,
+`wh_dlg_Verbosity 2`, `wh_dlg_RecordDialog 1` and `wh_dlg_DialogDebug 1` all
+set, and a death bark audibly firing on a sword kill, `kcd.log` received not one
+line from the dialog system. Monologs do not report through those facilities.
+
+`wh_dlg_Enable 0` needs no logging, and it answered the question outright. The
+rider killed several people with a sword:
+
+> "I didn't hear any sounds, no death sounds, no barks, nothing"
+
+**So the death sounds are the dialog system**, not a separate combat audio path.
+The prediction recorded before the test was the opposite, that the sounds would
+survive and only the barks would stop. That was wrong, and being wrong was
+useful: it means the bark system has been the right target all along.
+
+Note also that the death *bark* does not fire on every vanilla kill, only some,
+so its absence in any single trial proves nothing on its own.
+
+### Raising the cry after death does not work either
+
+Every earlier attempt sent `RANENY_NA_ZEMI` at the moment of contact, while the
+victim was alive, and then killed them. Vanilla sends it from inside
+`IsDeadCheck -> Then`, once death is confirmed. That difference in timing had
+never been tested.
+
+`BarkDeath` already runs when a victim dies, so the cry was raised from there
+with every vanilla flag and a winning priority:
+
+    J   DeathCry=true  prio=50  overrideContextSuppress=true
+        doNotInterruptOnActorDeath=true
+
+Two kills, two `DeathCry ... requested=true` lines, silent. The experiment has
+been removed again.
+
+### What the whole set of results now says
+
+    death sounds are dialogue                        proven, wh_dlg_Enable 0
+    vanilla sword kills produce them                 observed repeatedly
+    an external monologRequest to a LIVING npc works routinely, all session
+    an external monologRequest to a DEAD npc         never once produced sound,
+                                                     at impact or after death,
+                                                     with any flag combination
+    the mod's damage carries no hit                  DealDamage takes two args
+
+The consistent reading is that a dead entity stops processing messages: its
+subbrain is gone, so a `dialog:monologRequest` arriving afterwards has nothing
+to receive it. Vanilla's works because its request is raised **by the victim's
+own tree while that tree is still running**, mid hit-resolution, in the frame
+where the engine applies lethal damage. The brain is alive at the moment the
+request is made and dead immediately after.
+
+The engine's own context options point the same way: `b_context` carries
+`keepCombatSubbrainActiveWhileUnconscious` and
+`keepRunningDaycycleActivitiesWhileUnconscious`, which only make sense if
+subbrains are otherwise torn down when a character stops being conscious.
+
+### The one route left
+
+Let the engine resolve the killing hit, so its own hit-reaction tree runs the
+death branch and raises the cry itself. That is the only mechanism ever observed
+to produce the sound, and it cannot be reached by sending messages from outside.
+
+It costs the attribution ordering in `ApplyImpactDamage`, which exists so the
+mod's damage lands last and owns the kill. That is a redesign of how the mod
+kills rather than an addition, and it should be weighed as such rather than
+attempted casually.
