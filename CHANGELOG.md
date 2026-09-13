@@ -30,6 +30,14 @@ number.
 
 ## [Unreleased]
 
+## [5.8.3] - 2026-09-13
+
+### Changed
+
+- The dust raised when a body lands now spawns closer to the ground. `ImpactDustHeight` drops from 0.15 to
+  0.05, so the effect sits on the surface rather than floating above the
+  corpse.
+
 ## [5.8.2] - 2026-09-13
 
 ### Fixed
