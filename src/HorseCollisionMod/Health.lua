@@ -685,6 +685,18 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 	end
 
 	local function deal()
+		-- Lift the collision shield first, synchronously, so the victim is
+		-- mortal by the time the line below charges them.
+		--
+		-- A timer cannot do this reliably: it has to be long enough to cover
+		-- the engine's trample and short enough to end before this runs, and
+		-- missing on either side is silent. Measured at a 700ms shield against
+		-- a 1100ms delay, victims still came out clamped at 1 health, because
+		-- `imm=1` prevents death and the removal had not taken effect. Doing it
+		-- here removes the guess: the shield ends where the mod's own damage
+		-- begins, in the same call.
+		self:LiftCollisionShield(npc)
+
 		local before = nil
 
 		pcall(function()

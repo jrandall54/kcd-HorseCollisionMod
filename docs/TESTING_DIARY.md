@@ -20870,3 +20870,71 @@ The real proof is written by the game at startup:
 
     Table 'rpg_param' is patched by 'rpg_param__collisiontest',
         lines added: 0, modified: 1, equal: 0
+
+## CONFIRMED: a brief immortality removes the engine's collision damage
+
+The engine charges a collision victim health through `DR_Collision`, and five
+separate levers failed to change it: the four `BasicActor` collision
+multipliers, the collision damage threshold, suppressing every message the mod
+sends, and removing the mod's impulse. The one parameter that does work,
+`CollisionVelocityDeltaToDmgR`, is global and governs arrows.
+
+Rather than stop the damage, stop it landing.
+
+`soul:AddBuff` and `soul:RemoveAllBuffsByGuid` are Lua binds on the soul, and
+the game ships `immortality_nonpersistent`
+(`730503bf-735a-4f47-baae-c2d84ee77524`, `imm=1`). Applied from the detection
+loop ahead of contact, the engine's trample lands on an immortal victim and does
+nothing.
+
+### The timing has to be event driven, not timed
+
+Two timed attempts both failed, and failed silently in a way worth recording:
+
+    shield 1200ms, damage delay  600ms   -> after=1.0 on every shielded victim
+    shield  700ms, damage delay 1100ms   -> after=1.0 on most of them
+
+`imm=1` prevents death outright, so whenever the shield was still up as the
+mod's damage landed, the victim was clamped to 1 health instead of dying. A
+timer has to be long enough to cover the engine's trample and short enough to
+end before the mod charges the victim, and missing on either side produces no
+error at all.
+
+The rider proposed removing the guess:
+
+> "Why wouldn't we immediately lift immortality as soon as the damage is dealt.
+> I'm going to assume if it works like the physics for throw distance, it's
+> given immediately to the NPC upon impact."
+
+`LiftCollisionShield` is now the first line of `deal()` in `ApplyImpactDamage`,
+so the shield ends where the mod's damage begins, in the same call. The timer
+survives only as a safety net.
+
+### Measured
+
+    engineTook=0.0  health=100.0  after=0.0  fatal=true
+    engineTook=0.0  health=100.0  after=0.0  fatal=true
+    engineTook=0.0  health= 83.0  after=0.0  fatal=true
+
+A victim at full health, killed entirely by the mod, with the engine
+contributing nothing. Rows still showing `engineTook` in the teens and forties
+are victims the detection loop did not see before contact, so they were never
+shielded.
+
+### What this changes
+
+`ApplyImpactDamage` defers its damage so it lands last and owns the kill, and
+that deferral is why a victim the mod kills dies silently: the cry of pain is
+requested at contact and the victim dies in the same tick. With the engine
+contributing nothing there is no race to win, so the ordering is free to change.
+
+### The side effect that must be fixed before this ships
+
+Of 44 shields applied, 19 were lifted synchronously. The shield goes on
+everyone the horse approaches, and only those actually struck have it lifted at
+the moment of damage; the rest wait for the safety net. So a bystander near the
+rider's horse is briefly immortal, and an arrow or a sword aimed at them in that
+window would do nothing.
+
+Narrowing the window, or shielding only at the moment contact is scored rather
+than on approach, is the obvious fix and is not yet done.

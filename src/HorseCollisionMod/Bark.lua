@@ -623,60 +623,99 @@ function HorseCollisionMod:BarkDeath(npc)
 	end
 end
 
---- Switches off the engine's own collision damage on somebody the horse is
--- approaching.
+--- Makes a victim briefly immortal so the engine's collision damage lands on
+-- nothing.
 --
 -- The engine charges a victim health for being struck by a moving physical
--- body, and attributes it to the rider. That is the whole reason
--- `ApplyImpactDamage` defers its own damage: it has to land last to own the
--- kill and the crime with it, which in turn is why a victim the mod kills
--- dies without a sound.
+-- body and the mod cannot stop it. Five separate levers leave it unchanged.
+-- `BasicActor`'s collision multipliers belong to CryEngine's legacy damage
+-- path rather than to the RPG layer that charges `soul` health, and the
+-- one parameter that does work, `CollisionVelocityDeltaToDmgR`, is global and
+-- also governs arrows.
 --
--- The charge is not an unreachable physics event. `BasicActor.lua` asks the
--- entity for the numbers through `GetSelfCollisionMult`, which returns
--- `vehicleCollisionDamageMult` when the collider is a vehicle and
--- `entityCollisionDamageMult` otherwise. The horse has no `vehicle` table and
--- does have an `actor`, so an NPC struck by it takes the entity path.
+-- So rather than stop the damage, this stops it **landing**. `imm=1` is the
+-- parameter behind the game's own `immortality` and `death_protection` buffs,
+-- and `immortality_nonpersistent` carries it without being able to survive a
+-- save. Applied ahead of contact and removed once the engine has settled, the
+-- victim is untouchable for exactly the window the trample occupies, and the
+-- mod's own damage lands afterwards on a mortal target.
 --
--- Setting that multiplier to zero should therefore remove the engine's
--- contribution entirely, leaving the mod as the only source of collision
--- damage. Zero is deliberate rather than a small number, and it survives the
--- getter's `or 1` fallback because zero is truthy in Lua.
---
--- `collisionDamageThreshold` is raised as well, which is the shipped 2 on
--- `NPC_x`, as a second gate in case the multiplier is applied somewhere this
--- reasoning has not found.
---
--- Called from the detection loop ahead of contact, for the same reason the
--- bark hush is: by the time bodies touch it has to already be in place.
+-- **This is deliberately narrow.** It is one buff, on one victim, for a few
+-- hundred milliseconds, and it is removed by GUID so nothing of it persists.
 --
 -- @tparam table npc somebody in front of the horse
-function HorseCollisionMod:HushEngineCollisionDamage(npc)
-	if not self.Config.SuppressEngineCollisionDamage or not npc then
+function HorseCollisionMod:ShieldFromEngineDamage(npc)
+	if not self.Config.ShieldVictimFromEngineDamage or not npc or not npc.soul then
 		return
 	end
 
 	local id = tostring(npc.id or "?")
 
-	if self.HushedCollisionDamage[id] then
+	if self.ShieldedVictims[id] then
 		return
 	end
 
-	self.HushedCollisionDamage[id] = true
+	self.ShieldedVictims[id] = true
 
-	-- All three multipliers, because `GetSelfCollisionMult` picks between them
-	-- by what was collided with: static geometry takes `selfCollisionDamageMult`,
-	-- a vehicle takes `vehicleCollisionDamageMult`, and anything else takes
-	-- `entityCollisionDamageMult`. A ragdolled victim thrown by a gallop hits
-	-- the **ground** on the way down, which is the static branch, so zeroing
-	-- only the entity one leaves the landing charged.
-	pcall(function()
-		npc.entityCollisionDamageMult = 0
-		npc.selfCollisionDamageMult = 0
-		npc.vehicleCollisionDamageMult = 0
-		npc.foreignCollisionDamageMult = 0
-		npc.collisionDamageThreshold = 9999
+	local ok = pcall(function()
+		npc.soul:AddBuff(self.ImmortalityBuffGuid)
 	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
+	end
+
+	-- Lifted well after the impact, and on a generation check so a script
+	-- reload cannot leave somebody permanently unkillable.
+	local generation = self.TimerTick
+
+	Script.SetTimer(self.Config.ShieldWindowMs or 1200, function()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		self.ShieldedVictims[id] = nil
+
+		local lifted = pcall(function()
+			npc.soul:RemoveAllBuffsByGuid(self.ImmortalityBuffGuid)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield off " .. self:NameOf(npc) .. " ok=" .. tostring(lifted))
+		end
+	end)
+end
+
+--- Takes the collision shield off a victim, now.
+--
+-- Called from `ApplyImpactDamage` immediately before it charges the victim, so
+-- the immortality that swallowed the engine's trample cannot also swallow the
+-- mod's own damage. Safe to call on somebody who was never shielded.
+--
+-- @tparam table npc the victim
+-- @treturn boolean true when a removal was attempted
+function HorseCollisionMod:LiftCollisionShield(npc)
+	if not npc or not npc.soul then
+		return false
+	end
+
+	local id = tostring(npc.id or "?")
+
+	if not self.ShieldedVictims[id] then
+		return false
+	end
+
+	self.ShieldedVictims[id] = nil
+
+	local ok = pcall(function()
+		npc.soul:RemoveAllBuffsByGuid(self.ImmortalityBuffGuid)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield lifted on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
+	end
+
+	return ok
 end
 
 --- Switches off vanilla's collision bark on somebody the horse is approaching.

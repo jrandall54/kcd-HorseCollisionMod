@@ -651,9 +651,14 @@ HorseCollisionMod.Config = {
 	-- ridden into. Vanilla refuses this outright and so does the mod; the
 	-- setting exists so the behavior can be compared rather than assumed.
 	BarkInCombat             = false,
-	-- Remove the engine's own collision damage from anyone the horse is about
-	-- to hit, so the mod is the only thing charging them. Research setting.
-	SuppressEngineCollisionDamage = false,
+	-- Make a victim briefly immortal across the moment of contact, so the
+	-- engine's own collision damage lands on nothing and the mod is the only
+	-- thing that charges them. Research setting.
+	ShieldVictimFromEngineDamage = false,
+	-- How long that immortality lasts. Long enough to cover the engine's
+	-- trample, short enough that the mod's own damage still lands on a mortal
+	-- victim: `ImpactDamageDelayMs` is 600.
+	ShieldWindowMs           = 1200,
 	-- How long a fatal impact waits before applying its damage, so the cry of
 	-- pain has time to begin. Zero is the shipped behavior and protects crime
 	-- attribution; see the comment on the fatal path in Health.lua.
@@ -1285,7 +1290,13 @@ HorseCollisionMod.RecentRejections = {}
 HorseCollisionMod.RecentBarks = {}
 
 --- Victims whose engine collision damage has been switched off.
-HorseCollisionMod.HushedCollisionDamage = {}
+HorseCollisionMod.ShieldedVictims = {}
+
+--- The game's own non-persistent immortality buff, `imm=1`.
+--
+-- Non-persistent deliberately: it cannot be written into a save, so a victim
+-- cannot be left permanently unkillable by a crash or a reload mid-window.
+HorseCollisionMod.ImmortalityBuffGuid = "730503bf-735a-4f47-baae-c2d84ee77524"
 
 --- When vanilla's collision bark was last switched off, by entity id.
 --
