@@ -457,17 +457,37 @@ function HorseCollisionMod:BarkForTier(tier)
 	return self.PainByTier[tier]
 end
 
---- Speaks for a collision, and for whoever saw it.
+--- Speaks for a collision, at the moment of contact.
 --
--- The victim reacts first. A bystander is asked separately and only for the
--- harder tiers, because someone being shoved aside at a walk is not an event
--- worth a stranger shouting about, and because the bystander sets are all
--- about bodies.
+-- A walk speaks words straight away. A knockdown cries out here and says
+-- something later, from `BarkRecovered`, which this schedules.
+--
+-- Refused outright during a fight, matching vanilla.
 --
 -- @tparam table npc the victim
 -- @tparam string tier the speed tier the impact was scored at
-function HorseCollisionMod:BarkCollision(npc, tier)
+-- @tparam ?boolean inCombat true when the player is in combat, which silences
+--   the whole moment unless `BarkInCombat` says otherwise
+function HorseCollisionMod:BarkCollision(npc, tier, inCombat)
 	if not self:BarksEnabled("Collision") then
+		return
+	end
+
+	-- Vanilla gates its entire collision bark branch on
+	-- `!$b_inCombat & !$b_context['suppressCollisionsBark']`, at
+	-- `sb_switch_hitreactions.xml:293`. `HushVanillaBark` supplies the second
+	-- half, which is how the mod takes the line over outside a fight; this is
+	-- the first half, which the mod had no counterpart for.
+	--
+	-- The rider heard the gap: a guard already fighting them still stopped to
+	-- complain about being ridden into. Vanilla's judgment is that a man in a
+	-- fight does not remark on being bumped, and it is followed here rather
+	-- than second-guessed.
+	if inCombat and self.Config.BarkInCombat ~= true then
+		if self.Config.LogTelemetry then
+			self:Log("BarkCollision " .. self:NameOf(npc) .. " skipped, in combat")
+		end
+
 		return
 	end
 

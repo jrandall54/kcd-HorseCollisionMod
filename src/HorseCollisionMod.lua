@@ -647,6 +647,10 @@ HorseCollisionMod.Config = {
 	-- recovers quickly is upright while their own cry of pain is still
 	-- playing, and speaking again then cuts the first line off mid-word.
 	BarkGapMs                = 2500,
+	-- Whether a victim already fighting the player still complains about being
+	-- ridden into. Vanilla refuses this outright and so does the mod; the
+	-- setting exists so the behavior can be compared rather than assumed.
+	BarkInCombat             = false,
 	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
 	-- every in-flight request by priority and silently discards one that is
 	-- below the top and cannot be delayed, so a bark sent at the default zero
