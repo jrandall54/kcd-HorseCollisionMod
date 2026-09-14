@@ -30,6 +30,17 @@ number.
 
 ## [Unreleased]
 
+## [5.12.1] - 2026-09-14
+
+### Fixed
+
+- The protection added in 5.12.0 matched every victim, not only the characters
+  the game protects, so nobody took collision damage at all. The check read the
+  generic immortality flag alongside the attack-protection one, and the mod's own
+  collision shield grants that immortality to every victim at the moment of
+  contact. It now reads only the attack-protection flag, which nothing in the mod
+  writes.
+
 ## [5.12.0] - 2026-09-14
 
 ### Fixed

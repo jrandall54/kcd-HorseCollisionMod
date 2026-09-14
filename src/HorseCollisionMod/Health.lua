@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.12.0
+-- @release 5.12.1
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -494,10 +494,19 @@ end
 --     rat_bernard  apr=1 imm=1 upr=1 ppr=1
 --     villageGuard apr=0 imm=0 upr=0 ppr=0
 --
--- `apr` is attack protection, granted by the `vip_attackprot` buff, and `imm`
--- is immortality, which a quest applies to keep a story character alive through
--- a scripted fight. Either one is reason enough to leave a victim's health
--- alone.
+-- `apr` is the one read, and the distinction from `imm` matters.
+--
+-- `apr` is attack protection, granted by the `vip_attackprot` buff. It is the
+-- flag the game marks a story character with, and nothing in this mod writes
+-- it. `imm` is generic immortality, and it is the same flag
+-- `ShieldFromEngineDamage` grants **every** victim at the moment of contact, so
+-- it cannot be used to recognize anybody: reading it here reported every victim
+-- as protected, and a villager survived six gallops logging `protected=true`
+-- while reading `apr=0 imm=0` at rest.
+--
+-- The cost of reading `apr` alone is a character a quest has made immortal
+-- without also granting attack protection. That combination has not been seen,
+-- and covering it would mean reintroducing the flag this mod contaminates.
 --
 -- Reading the flag rather than keeping a list of names is what makes this
 -- cover every character the game protects, including the ones protected only
@@ -512,16 +521,13 @@ function HorseCollisionMod:IsProtectedFromHarm(npc)
 
 	local protected = false
 
-	-- Both are read, because they are granted independently: a quest can make
-	-- an otherwise ordinary character immortal for a scene without ever giving
-	-- them attack protection.
+	-- `apr` is read unconditionally. Nothing this mod does touches it, so it is
+	-- always somebody else's mark.
 	pcall(function()
-		for _, code in ipairs({ "apr", "imm" }) do
-			local value = npc.soul:GetDerivedStat(code)
+		local value = npc.soul:GetDerivedStat("apr")
 
-			if type(value) == "number" and value > 0 then
-				protected = true
-			end
+		if type(value) == "number" and value > 0 then
+			protected = true
 		end
 	end)
 

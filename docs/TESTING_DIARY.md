@@ -17166,7 +17166,7 @@ The wildcard branch was verified rather than assumed, on a 1.9.7 install:
     [Mod] 'HorseCollisionMod_dev' supports game version '1.9.7' by wildcard
     '1.9.*', it will be enabled
 
-Verification mattered here more than usual. An unrecognised wildcard would name
+Verification mattered here more than usual. An unrecognized wildcard would name
 a version matching nothing and disable the mod for everyone, which is worse
 than the fault being fixed.
 
@@ -21442,7 +21442,7 @@ What is known:
   to blunt it!".
 - Three more silent ones -- "Tracks! Someone fled to the north!", "I could try
   listening from here.", "This must be it. May she rest in peace, Lord." -- were
-  re-fired and all three played, and the rider recognised them and said they had
+  re-fired and all three played, and the rider recognized them and said they had
   never been silent.
 
 A session-degradation mechanism was written up here and is withdrawn. It was
@@ -21740,3 +21740,39 @@ give it back. Verified on the same character:
 
 He is still knocked down, still gets the reaction, the sound and the bark. That
 is the engine's physical collision and no exclusion in this mod could prevent it.
+
+## The protection check read a flag the mod sets itself
+
+The story-character protection shipped in 5.12.0 and stopped all collision
+damage. The rider found it immediately, galloping a villager woman six times
+without killing her, and the log said why on every pass:
+
+    ImpactDamage rat_woman24 tier=Gallop protected=true health=70.0 restoredTo=91.1
+
+She was not protected. Probed at rest she read `apr=0 imm=0`.
+
+The check read `apr` **or** `imm`, and `imm` is the generic immortality flag that
+`ShieldFromEngineDamage` grants to every victim at the moment of contact so the
+engine's trample lands on nothing. The shield goes on before `ApplyImpactDamage`
+reads the flag, so every victim was immortal by the time they were examined.
+
+The first attempt at a fix recorded the victim's `imm` before the shield was
+granted and consulted that snapshot afterwards. It worked, and it was the wrong
+shape. The rider went at the design instead of the symptom, asking whether the
+special-NPC flag was not simply a different flag from the one the damage system
+uses. It is:
+
+  * `apr`, from `vip_attackprot`, is what the game marks a story character with,
+    and nothing in this mod writes it.
+  * `imm` is what this mod writes on everybody.
+
+So `apr` alone is read, and the snapshot bookkeeping is gone. The cost is a
+character a quest has made immortal without also granting attack protection,
+which has not been observed. Verified afterwards in one pass of each kind:
+
+    ImpactDamage rat_woman3  dealt=101.7 health=100.0 after=0.0 fatal=true
+    ImpactDamage rat_bernard protected=true health=80.0 restoredTo=100.0
+
+The general lesson is worth more than the fix: a flag the mod writes cannot be
+used to recognize anything, and a check that needs bookkeeping to stay correct
+is usually reading the wrong thing.

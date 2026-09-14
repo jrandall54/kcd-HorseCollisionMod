@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.12.0
+-- @release 5.12.1
 
 -- The bark sets, by the moment that causes them.
 --
@@ -740,6 +740,7 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 	if not entity then
 		return false
 	end
+
 
 	local table_ = rider and self.RiderBarkSets or self.BarkSets
 	local metarole = self:PickFromPool(table_[set])
