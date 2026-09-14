@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.13.2] - 2026-09-14
+
 ### Fixed
 
 - A man knocked down sideways no longer lies still for an extra second before
