@@ -30,6 +30,15 @@ number.
 
 ## [Unreleased]
 
+## [5.11.3] - 2026-09-13
+
+### Documentation
+
+- Corrected two of the reported issues in `ROADMAP.md`. The barks one is about a
+  speaker being in a position that makes the line absurd, not about interruption;
+  the truncated line is one specific line, not a priority conflict. An invented
+  tension between the two was removed.
+
 ## [5.11.2] - 2026-09-13
 
 ### Documentation

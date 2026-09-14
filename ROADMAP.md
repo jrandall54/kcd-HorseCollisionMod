@@ -97,10 +97,9 @@ bypasses, or whether riding one down can hurt or kill them.
 A mod that can kill a quest-critical character is worse than a mod that misses an
 impact, so this outranks everything else on the list.
 
-### 2. Barks run through animations, ragdolls and state changes
+### 2. Barks play from bodies in positions that make the line absurd
 
-The rider's own framing, and it appears in three separate places, which is why it
-is one issue rather than three:
+The rider's own framing, across three cases they grouped themselves:
 
 > "sometimes they are crying out somebody help as they are still literally flying
 > through the air and it breaks immersion"
@@ -108,25 +107,39 @@ is one issue rather than three:
 > "henry's barks continue even when he's thrown from the horse and getting his
 > shit rocked by the guards"
 
-> "That seems to be a theme where barks run through animations or state changes or
-> rag dolls or whatever when they really shouldn't."
+> "2 is about people being in impossible positions, like being in midair or being
+> knocked on the ground crying for the guards or that there's a body or when henry
+> is being pulled off a horse he shouldn't be able to continue his kill bark
+> because he's literally being ripped off a horse."
 
-Three observed cases:
+**The defect is the speaker's physical state, not the interruption.** These are
+not lines that are too long or badly prioritized. They are lines nobody in that
+position could be delivering:
 
-  * A witness or crime-reporting bark finishes uninterrupted while the speaker is
-    airborne from the impact that started it.
-  * A victim on the ground after being hit carries on reporting the crime.
-  * Henry keeps speaking after being thrown from the horse and while being beaten.
+  * A victim in midair, thrown by the impact, calling the guards.
+  * A victim flat on the ground calling for help or announcing a body.
+  * Henry finishing a kill line while being dragged off the horse and beaten.
 
-The mod sends `dialog:monologRequest` and the dialog system owns playback from
-there. Whether a request can be cut off once it is playing, and whether the mod
-can do the cutting, is unknown. `doNotInterruptOnActorDeath` exists as a field, so
-interruption on state change is clearly a concept the system has.
+So the question is what the speaker is doing when the line starts, and whether it
+still holds while the line runs, rather than which line wins an auction. Both
+halves are open:
 
-- [ ] Find out whether a playing line can be stopped, and by what call.
-- [ ] Decide the rule per speaker rather than globally: a victim being hit should
-      lose the line they are in the middle of, and Henry should lose his when he
-      comes off the horse.
+- [ ] **Refuse the line at the point of sending.** Read whether the intended
+      speaker is ragdolled, airborne or on the ground, and do not send at all if
+      they are. This is the cheaper half and may cover most of it, since a witness
+      bark raised by the impact is raised at the moment the victim is thrown.
+- [ ] **Stop a line already playing when the speaker's state changes.** Needed for
+      Henry, whose kill line is correct when it starts and becomes absurd a second
+      later when he is pulled down. Whether a playing line can be stopped at all,
+      and by what call, is unknown; `doNotInterruptOnActorDeath` exists as a
+      message field, so interruption on a state change is a concept the dialog
+      system has.
+
+Note that the witness and crime-reporting barks are **vanilla's**, raised by the
+crime the mod reports rather than sent by the mod. Suppressing those may mean
+reaching them through a context option rather than through the mod's own sending
+path. `suppressMonologs` and the `suppressDudeProxBark*` family are recorded in
+the diary and are the first place to look.
 
 ### 3. The crime the mod reports is the wrong one
 
@@ -178,21 +191,30 @@ other tiers.
 - [ ] Compare the charge's throw against a gallop's, and bring it down to
       something that reads as a horse hitting a man rather than a cannon.
 
-### 7. The provoked NPC's last bark is cut off entering combat
+### 7. The victim's "now you've made me angry" line is truncated
 
-> "when provoking an NPC, the last bark that fires when the NPC is transitioning
-> to combat gets eaten and cut off."
+A specific line, not a general priority problem:
 
-Two shapes, and it is not known which: the mod's line loses the priority auction
-to the combat bark, or the combat state change interrupts a line already playing.
+> "7 is a specific case where usually the NPC when finally provoked to fight says
+> something like 'ok now you've made me fucking mad' but then it's being cut off
+> before it can finish so it comes across as jank."
 
-- [ ] Establish which, then either raise the mod's priority or stop sending that
-      last line so the combat bark has the room.
+This is the line a provoked victim speaks as they commit to the fight, and it is
+the payoff of the whole retaliation sequence: the moment the shoving turns into a
+brawl. Hearing two thirds of it reads as a bug in a way that hearing none of it
+would not.
 
-Note the tension with issue 2. There, a bark surviving a state change is the
-defect; here, a bark being cut off is. The rule wanted is presumably that the
-line matching the speaker's current situation wins, which is a judgment about
-each case rather than one global priority.
+It is cut off rather than refused, so something starts playing and then stops.
+Candidates, none tested:
+
+  * The combat state change the victim is entering ends the line.
+  * A later request from the mod or from vanilla replaces it mid-playback.
+  * The retaliation sequence moves the victim into an animation that stops it.
+
+- [ ] Identify which line it is and which set it comes from, so it can be watched
+      in the log rather than only heard.
+- [ ] Find what stops it, then give it room: delay the state change, hold the
+      line until the transition is done, or send it earlier in the sequence.
 
 ### 8. Controller players cannot reach the mod's features
 
