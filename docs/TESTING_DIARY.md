@@ -21776,3 +21776,90 @@ which has not been observed. Verified afterwards in one pass of each kind:
 The general lesson is worth more than the fix: a flag the mod writes cannot be
 used to recognize anything, and a check that needs bookkeeping to stay correct
 is usually reading the wrong thing.
+
+# Interrupting a line an NPC is already speaking
+
+Two branches were spent on stopping vanilla's crime barks playing during a
+collision, and both were deleted without landing anything. What survives is the
+measurement, which is worth keeping because it contradicts what the behaviour
+trees suggest and because it cost a lot of rides to get.
+
+## A monolog in progress can be stopped, from Lua
+
+`final/sb_dialog.xml` runs `DoMonologue` inside a single-count semaphore with an
+infinite outside wait:
+
+    <Semaphore SemaphoreCount="1" OutsideTimerValue="-1"
+               SemaphoreName="dialogSynchronization_onRunningDialog">
+
+That means a second `dialog:monologRequest` **queues behind** the running line
+rather than replacing it, whatever priority it carries. Priority orders the
+queue and nothing more, so there is no way to displace a playing line by
+sending another request, and no blank or silent request to send either:
+`topicId` does not work from Lua and every metarole resolves to real
+recordings.
+
+`human:InterruptDialog` does stop one. It is registered on the Human script
+bind table alongside `IsInDialog` and `CanTalk`. This was written off early in
+the session on the strength of `ok=true` with nothing audible, which proved
+nothing: it had been fired at the moment of contact on a victim who was not
+speaking yet.
+
+## The timing, measured
+
+Fired against a line the mod itself requested (`Ridden`, on a townswoman two
+metres away), with the delay counted from the moment `human:IsInDialog` first
+reads true:
+
+    up to ~460 ms   nothing reaches the player at all
+    ~475 to 500 ms  the subtitle renders, no audio
+    from ~550 ms    the voice has started and is cut off mid-word
+    1200 ms         cut off mid-word, unmistakably
+
+So `IsInDialog` going true is **not** the line starting. It is the request
+being accepted, roughly 225 ms before the subtitle and 300 ms before the voice.
+That leaves about a 200 ms window in which a line can be cancelled with no
+subtitle, no sound and no trace at all.
+
+Also from `sb_dialog.xml`: a request whose `priority` is greater than 1 sets
+`isMonologInterruptibleByPlayer` false, so priority has a second meaning beyond
+the auction.
+
+## What was never established
+
+**Whether `InterruptDialog` reaches a vanilla crime bark.** Every successful cut
+above was against a line the mod had requested itself. Wired into the impact it
+did not stop a bystander's call for the guards: the log read
+`speaking=true cut=true` and the line finished through the knockdown anyway.
+A hand-fired sweep over everyone speaking nearby was run repeatedly and the
+session ended before the result was confirmed by ear.
+
+That is the first thing to settle before building anything else here. Until it
+is answered, an impact-time interrupt is unproven against the only line it
+exists to stop.
+
+## Other findings from the same work
+
+  * The crime the mod reports is `assault`, and `sb_combat.xml:3556` picks the
+    report bark from it. With `kind == unarmed` and the speaker not being the
+    victim, that resolves to `VOLANI_STRAZE_BITKA` -- the *brawl* set, "Guards!
+    Help! Stop that brawl before they beat each other to death!" -- which is
+    also why the charge reads as brawling. The attack kind picks both.
+  * Vanilla already blanks the report bark when the reporter is the victim
+    (`perceivedWuid == this.id` sets `metaroleFirstBark` to empty), so a victim
+    shouting about their own trampling is not something vanilla does.
+  * The mod sends victim barks at `BarkPriority = 0` and vanilla's crime barks
+    carry no priority either, so the two tie and the later arrival wins. Raising
+    the mod's to 1 was measured winning that contest.
+  * A refused `dialog:monologRequest` after a clean reload almost always means
+    the speaker has no recording for that metarole. Holding it is not the gate.
+    Ten sets were refused in a row on one townswoman while a merchant ten metres
+    away spoke the first one tried.
+
+## What the rider wants, recorded so it is not re-derived
+
+Every line an NPC speaks between being hit and getting back up should be the
+mod's. Vanilla may have them call for help once they are on their feet and
+moving again. The recovery bark is a complaint and does not belong when the
+collision was a crime, because somebody fleeing in terror does not stop to say
+"learn how to ride a horse".
