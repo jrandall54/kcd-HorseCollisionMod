@@ -30,6 +30,14 @@ number.
 
 ## [Unreleased]
 
+## [5.9.2] - 2026-09-13
+
+### Fixed
+
+- `tools/flow.ps1 land` no longer aborts when the work is already
+  committed. A clean tree is a normal way to arrive at landing, and the
+  merge, tag and push still have to happen.
+
 ## [5.9.1] - 2026-09-13
 
 ### Changed

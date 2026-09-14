@@ -444,8 +444,23 @@ function Land {
 	}
 
 	Invoke-Git add -A | Out-Null
-	Invoke-Git commit -q -m $Argument | Out-Null
-	Say "committed"
+
+	# A clean tree is a normal way to arrive here, not a failure. The work may
+	# already be committed, by hand or by an earlier run that got as far as the
+	# commit and no further, and in that case landing still has a merge, a tag
+	# and a push to do. `git commit` exits non-zero on an empty commit, so
+	# asking first is what keeps that from aborting the whole landing.
+	$ErrorActionPreference = "Continue"
+	& git.exe -C $repo diff --cached --quiet
+	$staged = $LASTEXITCODE
+	$ErrorActionPreference = "Stop"
+
+	if ($staged -ne 0) {
+		Invoke-Git commit -q -m $Argument | Out-Null
+		Say "committed"
+	} else {
+		Say "nothing to commit, the tree is already clean"
+	}
 
 	$branch = Current-Branch
 
