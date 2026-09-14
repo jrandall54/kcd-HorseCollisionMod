@@ -715,7 +715,6 @@ HorseCollisionModSettings = {
 	-- with CollisionIsCrime off.
 	ShieldVictimFromEngineDamage = true,
 	ShieldWindowMs           = 6000,  -- crash backstop only; the damage call lifts it
-	FinishClampedVictims     = true,  -- kill whoever the shield caught, so it saves nobody
 
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
@@ -726,6 +725,94 @@ HorseCollisionModSettings = {
 	-- every entity near the horse, including doors and audio areas, which is
 	-- thousands per session. Only useful while investigating why a specific
 	-- impact did nothing. `build.ps1` refuses a release build with this on.
-	DiagnoseMisses           = false
+	DiagnoseMisses           = false,
+
+	-- ======================================================================
+	-- Everything below is exposed for completeness. It was tuned by riding at
+	-- people repeatedly and the shipped values are the ones that felt right,
+	-- so treat each group's warning as the real guidance rather than an
+	-- invitation. A key removed from this file falls back to its built-in
+	-- default, so deleting a line is always a safe way back.
+	-- ======================================================================
+
+	-- Detection and scoring. The safest group to experiment with: these decide
+	-- what counts as a hit and how fast the horse is judged to have been going,
+	-- so a wrong value shows up as impacts that do not land or land when you
+	-- rode past, which is obvious and harmless.
+	HitRadius                = 2.5,   -- broad-phase sphere around the horse
+	HorseMaxVerticalDiff     = 2.35,  -- height difference above which a hit is
+	                                  -- ignored, so you do not strike someone
+	                                  -- on a floor above or below you
+	HorseAirborneVz          = 2.5,   -- upward speed counted as a jump
+	MaxImpactSpeed           = 11.0,  -- ceiling on the speed a hit is scored at
+	ImpactSpeedSamples       = 9,     -- ticks of speed history a hit is scored
+	                                  -- from, which is what stops a single
+	                                  -- stuttering frame deciding the tier
+	SweepMultiplier          = 0.50,  -- how far ahead to sweep per m/s
+	MaxSweepExtra            = 0.35,  -- cap on that forward sweep, in meters
+	TickSeconds              = 0.033, -- detection interval
+
+	-- Ragdoll motion after the throw. Raise the risk here: these shape how a
+	-- thrown body travels and comes to rest, and the settled look at a gallop
+	-- came out of tuning them together. Changing one alone usually reads as a
+	-- body that slides, floats or stops dead.
+	ImpulseDelayMs           = 50,    -- wait before the ragdoll impulse
+	LateralImpulse           = 0.0,   -- sideways share of the impulse; the
+	                                  -- throw direction is the engine's, and
+	                                  -- adding to it fought that
+	RagdollBrake             = true,  -- whether a thrown body is braked at all
+	RagdollBrakeKeepArmored  = 0.45,  -- fraction of its speed a victim in full
+	                                  -- armor keeps
+	RagdollBrakeKeepUnarmored = 1.0,  -- and an unarmored one
+	RagdollBrakeArmorScaleArmored = 0.35,
+	RagdollBrakeArmorScaleUnarmored = 1.26,
+	RagdollAirDamping        = 8.0,   -- damping at full strength in the air
+	RagdollDampContactRun    = 3,     -- samples of contact in a row before the
+	                                  -- body counts as down
+	RagdollDampRampSamples   = 8,     -- samples over which damping ramps up
+	RagdollSpeedSoftCap      = 4.0,   -- speed past which drag begins
+	RagdollSpeedSoftCapSpan  = 3.0,   -- how far above it drag reaches full
+
+	-- The rear and the charge. Timings measured against the animation, so a
+	-- value out of step with the clip shows as a strike that misses or lands
+	-- after the horse has come down.
+	RearImpactSpeed          = 6.0,   -- the speed a rear is scored at, since
+	                                  -- the horse is barely moving
+	RearAnimSpeed            = 1.0,   -- how fast the rear plays
+	RearChargeLungePeakMin   = 3.0,   -- top speed a lunge must reach to count
+	RearChargeLungeSpentAt   = 0.5,   -- fraction of its peak at which the
+	                                  -- lunge is treated as spent
+	RearChargeStrikeBehind   = 0.2,   -- how far behind the horse still counts
+	RearChargeStrikeMs       = 1600,  -- how long the strike sweeps for
+	RearChargeStrikePollMs   = 50,    -- how often it sweeps
+	RearChargeVictimLockMs   = 2600,  -- how long a charge victim is closed to
+	                                  -- further hits
+	RearChargeWaitMs         = 400,   -- when the mod starts watching for the
+	                                  -- rear to end
+	RearChargeWaitPollMs     = 30,    -- how often it looks
+	RearChargeWaitCeilingMs  = 3000,  -- push anyway by this point
+
+	-- How a spoken line is submitted to the dialog system. The system runs an
+	-- auction and silently discards a losing request, so these decide whether
+	-- a line is heard at all rather than how it sounds. Documented in full in
+	-- docs/TECHNICAL_DETAILS.md.
+	BarkPriority             = 0,     -- rank in the dialog system's auction
+	BarkCanBeDelayed         = false, -- queue a line that loses, instead of
+	                                  -- dropping it
+	BarkOverrideSuppress     = false, -- ignore a suppressMonologs context
+	BarkInCombat             = false, -- whether a victim already fighting still
+	                                  -- remarks on being ridden into; vanilla's
+	                                  -- judgment is that they do not
+
+	-- Internals. These name files and animation tags the mod ships, or switch
+	-- off machinery other features depend on. There is no useful value other
+	-- than the one here; they are listed so nothing is hidden.
+	RearActionMap            = "hcm_rear",
+	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
+	SettleFragTag            = "hcm_settle",
+	SendHitReaction          = true,  -- posting this is what makes vanilla's
+	                                  -- own barks fire on an impact
+	TraceRecovery            = false  -- times every animation state during a
+	                                  -- recovery; diagnostic only
 
 }

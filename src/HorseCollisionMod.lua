@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.9.2
+-- @release 5.10.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.9.2"
+HorseCollisionMod.Version = "5.10.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -171,10 +171,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ShieldWindowMs crash backstop only, in milliseconds: the shield is
 --   lifted when the victim's body lands, and this bounds the case where that
 --   never happens
--- @field FinishClampedVictims whether a victim the shield caught is killed by
---   the mod on release, so the engine's trample still costs them their life
---   without costing the rider a murder charge
--- @field ShieldClampFloor health at or below which a victim counts as clamped
 -- @field SendHitReaction post the native brain message so barks still fire
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
@@ -358,9 +354,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDampPollMs how often a thrown body is looked at, milliseconds
 -- @field RagdollDampSettleSpeed the speed it must fall under before the
 --   damping is applied, meters per second
--- @field GetupRestPollMs how often a forced ragdoll is checked for rest
--- @field GetupRestBand how little movement between samples counts as rest
--- @field GetupRestCeilingMs stand the victim anyway by this point
 -- @field SettleFragTag the empty fragment played to take a victim out of a
 --   ragdoll without imposing a pose or a facing on them
 -- @field RagdollDampRampSamples over how many samples the damping reaches its
@@ -684,14 +677,6 @@ HorseCollisionMod.Config = {
 	-- by the mod's own damage call, which the victim's ragdoll resolving fires,
 	-- so reaching this means that call never happened.
 	ShieldWindowMs           = 6000,
-	-- Kills a victim the shield caught. Immortality clamps health at 1 instead
-	-- of refusing the damage, so a victim resting on that floor when the shield
-	-- comes off is one the engine's trample killed. Without this the mod quietly
-	-- saves people it has no business saving, and they stand up on one health.
-	FinishClampedVictims     = true,
-	-- The health at or below which a victim counts as having been clamped. The
-	-- floor is exactly 1; the margin is for the comparison, not for the rule.
-	ShieldClampFloor         = 1.01,
 	-- The rest of the `dialog:monologRequest` message. The dispatch tree sorts
 	-- every in-flight request by priority and silently discards one that is
 	-- below the top and cannot be delayed, so a bark sent at the default zero
@@ -1195,17 +1180,6 @@ HorseCollisionMod.Config = {
 	-- fraction of its speed is proportional rather than absolute, so the
 	-- engine's own variation between one contact and the next passes through
 	-- intact and what is controlled is how much is taken away.
-	--
-	-- Ten settings were removed from here in the audit of the pipeline
-	-- rewrite: `RagdollThrowSculpt`, `RagdollThrowDistanceArmored` and
-	-- `RagdollThrowDistanceUnarmored`, `RagdollThrowArmorScaleArmored` and
-	-- `RagdollThrowArmorScaleUnarmored`, `RagdollThrowOnsetMs`,
-	-- `RagdollBrakeMs`, `RagdollBrakeDampingArmored` and
-	-- `RagdollBrakeDampingUnarmored`, and `RagdollLyingContacts`. All of them
-	-- belonged to the distance-targeting and lying-mode damping mechanisms
-	-- the rewrite replaced, and every one had been unread since. None was
-	-- ever exposed in the settings file, so no install is broken by their
-	-- going.
 	RagdollBrake             = true,
 	RagdollBrakeKeepArmored  = 0.45,
 	RagdollBrakeKeepUnarmored = 1.0,
@@ -1216,9 +1190,6 @@ HorseCollisionMod.Config = {
 	RagdollDampPollMs        = 100,
 	RagdollDampSettleSpeed   = 0.5,
 	SettleFragTag            = "hcm_settle",
-	GetupRestPollMs          = 100,
-	GetupRestBand            = 0.02,
-	GetupRestCeilingMs       = 4000,
 	RagdollSpeedCapArmorScaled = true,
 	RagdollSpeedCapArmored   = 2.5,
 	RagdollSpeedCapUnarmored = 6.0,

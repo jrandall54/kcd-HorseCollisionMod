@@ -231,9 +231,20 @@ def check_nexus_page(version):
     # from column zero collected every heading and no setting, which reported
     # the page as missing all twenty-nine keys it actually documents.
     listed = set(re.findall(r"^[ 	]{2,}(\w+)\s{2,}", block.group(1), re.M))
-    shipped = set(re.findall(
-        r"^	(\w+)\s*=",
-        read(os.path.join("src", "HorseCollisionMod_Settings.lua")), re.M))
+
+    # Only the player-facing half of the settings file is the page's business.
+    # Everything after the banner is exposed for completeness: internals, tuning
+    # measured against an animation, and switches whose only sensible value is
+    # the shipped one. Demanding those on a page a player reads before
+    # downloading would bury the settings that actually matter, so the
+    # comparison stops at the banner.
+    settings = read(os.path.join("src", "HorseCollisionMod_Settings.lua"))
+    banner = settings.find("	-- =====")
+
+    if banner != -1:
+        settings = settings[:banner]
+
+    shipped = set(re.findall(r"^	(\w+)\s*=", settings, re.M))
 
     for key in sorted(listed - shipped):
         found.append((page_path, 0, key, "page documents a setting that does "
