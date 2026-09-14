@@ -21694,3 +21694,49 @@ Four things about it, all observed rather than assumed:
 Cost is 490 bytes for one row against a 5.7 MB whole-table override, and it
 conflicts with nothing. Any future gate that lives in a table column is now
 reachable this way, and dialogue is full of them.
+
+## Story characters were not protected from the mod's damage, and the marker is a derived stat
+
+Reported from the 5.11.1 shipping test as the highest-stakes item on the list:
+the mod might be able to kill somebody a playthrough needs alive. Vanilla never
+offers the option of swinging at Captain Bernard, and the mod does not use the
+path that refusal lives in. It calls `soul:DealDamage` directly.
+
+Three gallops into Bernard, with the mod's own telemetry reading his health
+either side of each:
+
+    ImpactDamage rat_bernard dealt=10.9 engineTook=19.9 health=100.0 after=89.1
+    ImpactDamage rat_bernard dealt=11.9 engineTook=12.3 health=78.2 after=66.3
+
+The damage stuck. Ten more passes would have killed him.
+
+The marker turned out to be readable, and it is a flag rather than a list of
+names. `references/libKCD1/include/rpgmodule/E_DerivedStat.h` documents four VIP
+protection flags in the derived stat table, and reading them on Bernard and on an
+ordinary guard standing nearby separates them cleanly:
+
+    rat_bernard  apr=1 imm=1 upr=1 ppr=1 sur=0
+    villageGuard apr=0 imm=0 upr=0 ppr=0 sur=0
+
+`apr` is attack protection, granted by the `vip_attackprot` buff, and `imm` is
+immortality, which a quest applies to keep a character alive through a scripted
+scene. Either is enough to refuse the damage, and reading the flag covers every
+character the game protects in any quest state without the mod knowing who they
+are.
+
+**`soul:DealDamage` ignores `imm`.** Bernard carried the immortality flag through
+every one of those impacts and lost health anyway. Nothing downstream in the
+engine was going to catch this, which is worth remembering before assuming any
+other engine-side protection applies to a call this mod makes.
+
+The fix reads the flags in `IsProtectedFromHarm` and, for a protected victim,
+skips the damage and restores the health they had at the impact once the body
+has stopped. Restoring matters as much as skipping: the engine charges a
+collision whatever the mod does, and the mod is the only thing positioned to
+give it back. Verified on the same character:
+
+    ImpactDamage rat_bernard tier=Gallop protected=true health=1.0 restoredTo=3.0
+    ImpactCost   rat_bernard t+6000ms from=3.0000 health=3.0000 delta=+0.0000
+
+He is still knocked down, still gets the reaction, the sound and the bark. That
+is the engine's physical collision and no exclusion in this mod could prevent it.

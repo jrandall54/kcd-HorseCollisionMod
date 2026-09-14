@@ -97,6 +97,17 @@ bypasses, or whether riding one down can hurt or kill them.
 A mod that can kill a quest-critical character is worse than a mod that misses an
 impact, so this outranks everything else on the list.
 
+### 1b. Parked idea: a protected character unhorses you instead
+
+Raised by the rider once issue 1 was fixed, and explicitly parked rather than
+scheduled: a protected character could throw the rider from the saddle when the
+horse tries to make contact with them.
+
+The pieces exist. `IsProtectedFromHarm` already identifies them at the moment of
+impact, and the mod already has a path that pulls Henry off the horse, used by
+the retaliation sequence. It would read as the man simply being too solid to ride
+down.
+
 ### 2. Barks play from bodies in positions that make the line absurd
 
 The rider's own framing, across three cases they grouped themselves:

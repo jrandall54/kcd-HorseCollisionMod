@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.11.3
+-- @release 5.12.0
 
 -- The bark sets, by the moment that causes them.
 --

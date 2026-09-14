@@ -30,6 +30,22 @@ number.
 
 ## [Unreleased]
 
+## [5.12.0] - 2026-09-14
+
+### Fixed
+
+- Characters the game will not let you attack no longer take damage from a
+  collision. Captain Bernard was measured going from 100 health to 66 over three
+  gallops, because the mod charges health directly rather than through the attack
+  path vanilla refuses, and that path ignores the game's own immortality flag.
+  Such characters are still knocked down, which is the engine's physics rather
+  than anything the mod applies, but the impact now costs them nothing.
+
+### Added
+
+- `ProtectStoryCharacters`, on by default. Turning it off lets a horse kill a
+  quest-critical character.
+
 ## [5.11.3] - 2026-09-13
 
 ### Documentation

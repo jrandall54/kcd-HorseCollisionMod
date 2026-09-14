@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.11.3
+-- @release 5.12.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -440,6 +440,12 @@ function HorseCollisionMod:PredictImpactFatal(npc, tierName, armor, horseEnt)
 		return false
 	end
 
+	-- Nothing this mod does can kill somebody the game protects, so nothing
+	-- downstream should be told to expect it.
+	if self:IsProtectedFromHarm(npc) then
+		return false
+	end
+
 	local byTier = self.Config.ImpactDamageByTier
 
 	if type(byTier) ~= "table" then
@@ -470,6 +476,56 @@ function HorseCollisionMod:PredictImpactFatal(npc, tierName, armor, horseEnt)
 			* self:BardingDamageScale(horseEnt)
 
 	return intended >= health
+end
+
+--- Whether the game itself marks somebody as not to be harmed.
+--
+-- Vanilla never offers the option of swinging at Captain Bernard or the Lord of
+-- Leipa: the refusal lives in the attack path, and this mod does not use that
+-- path. `soul:DealDamage` charges health directly, and was measured taking
+-- Bernard from 100 down to 66 over three gallops. It ignores the game's own
+-- immortality flag while doing it, so nothing downstream was going to catch
+-- this either.
+--
+-- The marker is readable, and it is a flag rather than a name. Such characters
+-- carry the VIP protection derived stats; an ordinary guard carries none of
+-- them. Measured on the pair, side by side:
+--
+--     rat_bernard  apr=1 imm=1 upr=1 ppr=1
+--     villageGuard apr=0 imm=0 upr=0 ppr=0
+--
+-- `apr` is attack protection, granted by the `vip_attackprot` buff, and `imm`
+-- is immortality, which a quest applies to keep a story character alive through
+-- a scripted fight. Either one is reason enough to leave a victim's health
+-- alone.
+--
+-- Reading the flag rather than keeping a list of names is what makes this
+-- cover every character the game protects, including the ones protected only
+-- for the span of one quest, without the mod having to know who they are.
+--
+-- @tparam table npc the victim
+-- @treturn boolean true when the game marks this character as protected
+function HorseCollisionMod:IsProtectedFromHarm(npc)
+	if not self.Config.ProtectStoryCharacters or not npc or not npc.soul then
+		return false
+	end
+
+	local protected = false
+
+	-- Both are read, because they are granted independently: a quest can make
+	-- an otherwise ordinary character immortal for a scene without ever giving
+	-- them attack protection.
+	pcall(function()
+		for _, code in ipairs({ "apr", "imm" }) do
+			local value = npc.soul:GetDerivedStat(code)
+
+			if type(value) == "number" and value > 0 then
+				protected = true
+			end
+		end
+	end)
+
+	return protected
 end
 
 function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt)
@@ -589,6 +645,13 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 	local exempt = self.ImmortalSubjects and npc.id
 			and self.ImmortalSubjects[tostring(npc.id)]
 
+	-- Story characters the game protects are handled further down instead of
+	-- here, inside `deal`. Returning early would skip the shield lift and the
+	-- reclaim, and the reclaim is most of what keeps them whole: the engine
+	-- charges a collision whatever this mod does, and the mod is the only thing
+	-- in a position to give it back.
+	local protected = self:IsProtectedFromHarm(npc)
+
 	if exempt then
 		-- Skipping the mod's own damage is not enough on its own. The engine
 		-- charges a collision too, at about 18 a pass, and that accumulates
@@ -652,6 +715,41 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		pcall(function()
 			before = npc.soul:GetState("health")
 		end)
+
+		-- A protected character is put straight back to the health they had at
+		-- the impact and charged nothing, so the collision leaves no mark on
+		-- them at all.
+		--
+		-- Restored without the ceiling the ordinary reclaim below applies. That
+		-- ceiling exists so a horse walking past cannot heal somebody an archer
+		-- shot in the meantime, and it is a sensible bound on handing back an
+		-- unknown. Here there is nothing to bound: this character is not to be
+		-- harmed, and a large loss during the window is far more likely to be
+		-- this collision than a coincidence.
+		--
+		-- Done here rather than at the top of the call so that the shield has
+		-- already come off and the body has already stopped moving, which is
+		-- the point after which the engine has finished charging them.
+		if protected then
+			local restored = false
+
+			if type(atImpact) == "number" then
+				restored = pcall(function()
+					npc.soul:SetState("health", atImpact)
+				end)
+			end
+
+			if self.Config.LogTelemetry then
+				self:Log("ImpactDamage " .. self:NameOf(npc)
+						.. " tier=" .. tostring(tierName)
+						.. " protected=true"
+						.. " health=" .. string.format("%.1f", before or -1)
+						.. " restoredTo=" .. string.format("%.1f", atImpact or -1)
+						.. " ok=" .. tostring(restored))
+			end
+
+			return
+		end
 
 		-- Give back whatever the engine took, so the only damage on this
 		-- victim's account for this impact is the mod's.
