@@ -106,7 +106,8 @@ breaking the mod. Deleting a line restores its default.
 | `StaminaDrainByTier` | Walk 0, Trot 14, Gallop 22, Rear 12, Charge 22 | What each kind of impact costs the horse. Raise a figure to be thrown sooner. A rear and a charge are charged once for the move rather than once per person. |
 | `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
-| `TrotReaction` | "fall" | What a trot impact does. `"fall"` plays an animated fall the game recovers from, `"knockdown"` adds an animated get-up, `"ragdoll"` is the physics knockdown. |
+| `ReactionByTier` | Walk stagger, Trot fall, Gallop ragdoll, Rear fall, Charge ragdoll | What each impact does to the victim's body. `"stagger"` and `"knockdown"` play an animation, `"fall"` plays one that hands the body to physics partway through and is the only one that gives a victim their activity back, `"ragdoll"` drops them on contact. |
+| `ThrowByTier` | Gallop 1.0, Charge 0.7 | How hard each ragdoll tier throws. Only tiers set to `"ragdoll"` above use it. |
 | `CollisionIsCrime` | true | Whether riding someone down is a crime. Applies at trot and gallop, never at a walk. |
 | `ReleaseAnimationMovement` | true | Keeps a reacting victim out of walls and out of sloped ground. False restores the behavior before 4.0.0. |
 | `ReplanAfterReaction` | true | Whether a victim walks back to whatever they were using, which is what puts them straight with it again. |

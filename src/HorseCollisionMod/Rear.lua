@@ -1048,19 +1048,9 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	if busy then
 		self:Log("RearHit " .. self:NameOf(npc)
 				.. " already reacting, damage only")
-	elseif tier == "Charge" then
-		-- The throw is its own figure rather than a full gallop's. A charge
-		-- was launching people cartoonishly far at 1.0: the horse is also
-		-- moving under physics by then, so its collider shoves the ragdoll on
-		-- top of whatever this applies.
-		self:Ragdoll(npc, velocity, speed, cfg.RearChargeThrow or 0.7,
-				armorImpulse, horsePos, horseEnt)
-	elseif (cfg.RearReaction or cfg.TrotReaction) == "knockdown" then
-		self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
-	elseif (cfg.RearReaction or cfg.TrotReaction) == "fall" then
-		self:PlayReaction(npc, velocity, speed, "hcm_fall_")
 	else
-		self:Ragdoll(npc, velocity, speed, 0.6, armorImpulse, horsePos, horseEnt)
+		self:PlayTierReaction(npc, tier, velocity, speed,
+				armorImpulse, horsePos, horseEnt)
 	end
 
 	self:MarkVictim(npc, tier, velocity, speed)

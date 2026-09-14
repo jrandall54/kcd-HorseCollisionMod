@@ -191,6 +191,65 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	return ok
 end
 
+--- What a tier does to the victim's body, dispatched from `ReactionByTier`.
+--
+-- The one place a tier is turned into a reaction. Every tier used to decide
+-- this at its own call site, and two of those sites carried a throw scalar on
+-- a branch the shipped settings never reached, so a live-looking number sat in
+-- the code doing nothing. Reading the style from a table means a tier that does
+-- not ragdoll cannot carry a throw figure at all.
+--
+-- The caller still owns whether a reaction happens. A walk is suppressed during
+-- a fight and a victim already reacting is left alone; those are the caller's
+-- policy about this impact, not a property of the tier.
+--
+-- @tparam table npc victim entity
+-- @tparam string tierName "Walk", "Trot", "Gallop", "Rear" or "Charge"
+-- @tparam table velocity horse velocity vector
+-- @tparam number speed horse speed in meters per second
+-- @tparam number armorScale the victim's armor impulse scale
+-- @tparam table horsePos the horse's world position
+-- @tparam table horseEnt the player's horse
+-- @treturn boolean true when a reaction was started
+function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
+										   armorScale, horsePos, horseEnt)
+	local style = self:TierValue("ReactionByTier", tierName)
+
+	if style == "stagger" then
+		return self:PlayReaction(npc, velocity, speed, "hcm_stagger_")
+	end
+
+	if style == "knockdown" then
+		return self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
+	end
+
+	if style == "fall" then
+		return self:PlayReaction(npc, velocity, speed, "hcm_fall_")
+	end
+
+	if style ~= "ragdoll" then
+		self:Log("PlayTierReaction tier=" .. tostring(tierName)
+				.. " has no reaction style, nothing played")
+
+		return false
+	end
+
+	local throw = self:TierValue("ThrowByTier", tierName)
+
+	-- A ragdoll tier with no throw figure still goes down; it is simply not
+	-- pushed. Said out loud rather than defaulted silently, because the only
+	-- way to reach it is a player editing one table and not the other.
+	if type(throw) ~= "number" then
+		self:Log("PlayTierReaction tier=" .. tostring(tierName)
+				.. " ragdolls with no ThrowByTier figure, dropping unpushed")
+
+		throw = 0
+	end
+
+	return self:Ragdoll(npc, velocity, speed, throw, armorScale,
+			horsePos, horseEnt)
+end
+
 --- Sets a ragdolled victim's physical mass, so the horse's own collision
 --- does the work.
 --

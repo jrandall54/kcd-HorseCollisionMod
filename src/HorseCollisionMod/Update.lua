@@ -292,7 +292,8 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		local suppressed = cfg.SuppressStaggerInCombat and playerInDanger
 
 		if cfg.WalkStagger and not suppressed then
-			self:PlayReaction(npc, velocity, speed, "hcm_stagger_")
+			self:PlayTierReaction(npc, "Walk", velocity, speed,
+					armorImpulse, horsePos, horseEnt)
 		end
 
 		self:ProbeImpactCost(npc, "Walk", strength.Tickle, armor)
@@ -320,13 +321,8 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- something other than the trample is charging for it. The
 		-- ragdoll is kept because it is what shipped, and because an
 		-- animation does not carry the impact's momentum.
-		if cfg.TrotReaction == "knockdown" then
-			self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
-		elseif cfg.TrotReaction == "fall" then
-			self:PlayReaction(npc, velocity, speed, "hcm_fall_")
-		else
-			self:Ragdoll(npc, velocity, speed, 0.6, armorImpulse, horsePos, horseEnt)
-		end
+		self:PlayTierReaction(npc, "Trot", velocity, speed,
+				armorImpulse, horsePos, horseEnt)
 		self:MarkVictim(npc, "Trot", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
@@ -346,7 +342,8 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- victim health of its own, and a probe that reads afterwards
 		-- folds that into the starting figure instead of the delta.
 		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
-		self:Ragdoll(npc, velocity, speed, 1.0, armorImpulse, horsePos, horseEnt)
+		self:PlayTierReaction(npc, "Gallop", velocity, speed,
+				armorImpulse, horsePos, horseEnt)
 		self:MarkVictim(npc, "Gallop", velocity, speed)
 		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
 		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)

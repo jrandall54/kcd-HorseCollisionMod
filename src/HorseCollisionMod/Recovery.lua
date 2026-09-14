@@ -653,13 +653,7 @@ end
 -- @tparam string tierName the tier the impact scored as
 -- @treturn boolean true when this tier waits
 function HorseCollisionMod:HitReadyApplies(tierName)
-	local byTier = self.Config.HitReadyByTier
-
-	if type(byTier) ~= "table" then
-		return true
-	end
-
-	local applies = byTier[tierName]
+	local applies = self:TierValue("HitReadyByTier", tierName)
 
 	-- A tier nobody has decided about waits, because that is the older and
 	-- more cautious behavior, but it says so rather than deciding silently.

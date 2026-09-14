@@ -118,19 +118,9 @@ end
 -- @tparam[opt] table armor the victim's armor from `ArmorOf`, where this
 --   impact has a single victim to read it from
 function HorseCollisionMod:DrainImpactStamina(horseEnt, playerEnt, tierName, armor)
-	local byTier = self.Config.StaminaDrainByTier
+	local base = self:TierValue("StaminaDrainByTier", tierName)
 
-	if type(byTier) ~= "table" then
-		byTier = self.StaminaDrainByTier
-	end
-
-	local base = byTier[tierName]
-
-	if type(base) ~= "number" then
-		base = self.StaminaDrainByTier[tierName]
-	end
-
-	if not base or base <= 0 then
+	if type(base) ~= "number" or base <= 0 then
 		return
 	end
 

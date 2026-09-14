@@ -446,17 +446,7 @@ function HorseCollisionMod:PredictImpactFatal(npc, tierName, armor, horseEnt)
 		return false
 	end
 
-	local byTier = self.Config.ImpactDamageByTier
-
-	if type(byTier) ~= "table" then
-		byTier = self.ImpactDamageByTier
-	end
-
-	local base = byTier[tierName]
-
-	if type(base) ~= "number" then
-		base = self.ImpactDamageByTier[tierName]
-	end
+	local base = self:TierValue("ImpactDamageByTier", tierName)
 
 	if type(base) ~= "number" or base <= 0 then
 		return false
@@ -543,17 +533,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 	-- These figures are the mod's account of what each kind of collision is
 	-- worth, so they belong where a player or a test can reach them rather
 	-- than compiled in.
-	local byTier = self.Config.ImpactDamageByTier
-
-	if type(byTier) ~= "table" then
-		byTier = self.ImpactDamageByTier
-	end
-
-	local base = byTier[tierName]
-
-	if type(base) ~= "number" then
-		base = self.ImpactDamageByTier[tierName]
-	end
+	local base = self:TierValue("ImpactDamageByTier", tierName)
 
 	if type(base) ~= "number" or base <= 0 then
 		return 0

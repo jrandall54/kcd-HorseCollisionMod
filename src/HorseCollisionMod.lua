@@ -176,9 +176,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
 --   in seconds, or 0 to leave victims in the daycycle
--- @field TrotReaction what a trot impact does: "knockdown" for an animated
---   fall and get-up, "fall" for an animated fall the game recovers from, or
---   "ragdoll" for the physics knockdown
 -- @field AutoCureHealthLimit health at or above which the auto-cure exemption
 --   is dropped, matching vanilla's own limit
 -- @field CollisionIsCrime whether riding someone down is reported to the
@@ -211,18 +208,12 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field CameraShakeRearScale how hard a rear shakes the rider's camera
 -- @field RiderBlurRearScale how much a rear blurs the rider's view
 -- @field RiderBlurRearLength how long that blur lasts
--- @field RearReaction what a rear does to its victim: "fall", "knockdown"
---   or a ragdoll, the same choices the trot tier offers. Only "fall" carries
---   the recovery that restores a victim's facing and re-plans their activity,
---   which is why both tiers default to it
 -- @field ImpactSoundCharge the layers a charge plays. Its own set, so the
 --   charge can be tuned without touching an ordinary gallop collision
 -- @field ImpactDustScaleCharge how much dust a charge raises
 -- @field CameraShakeChargeScale how hard a charge shakes the rider's camera
 -- @field RiderBlurChargeScale how much a charge blurs the rider's view
 -- @field RiderBlurChargeLength how long that blur lasts
--- @field RearChargeThrow how hard a charge throws, as a scalar. The horse is
---   moving under physics as well, so its collider adds to this
 -- @field RearChargeImpulse the physical push that carries the charge, applied
 --   once the rear animation has ended so the horse collides normally
 -- @field RearChargeLift how much of that push is upward
@@ -411,6 +402,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   which a victim takes half the tier's damage; higher means armor matters less
 -- @field ImpactDamageIgnoredArmor `smash_def` that does not count as armor,
 --   covering the shoes and shirt every villager wears
+-- @field ReactionByTier what each tier does to the victim's body: "stagger",
+--   "knockdown", "fall" or "ragdoll"
+-- @field ThrowByTier how hard each ragdoll tier throws, as a scalar
 -- @field ImpactDamageByTier what each kind of collision is worth before armor
 -- @field ImpactDamageOwnsTheHit give back what the engine charged for a
 --   collision, so the mod's figure is the whole cost rather than an addition
@@ -588,7 +582,6 @@ HorseCollisionMod.Config = {
 	--
 	-- "ragdoll" is the physics knockdown the mod shipped before, created at
 	-- the moment of impact.
-	TrotReaction             = "fall",
 
 	-- Whether riding someone down is a crime.
 	--
@@ -719,7 +712,6 @@ HorseCollisionMod.Config = {
 	CameraShakeRearScale     = 0.8,
 	RiderBlurRearScale       = 0.6,
 	RiderBlurRearLength      = 0.4,
-	RearReaction             = "fall",
 	ImpactSoundCharge        = { { "body", 0, 0.6 },
 	                             { "hs_hp_soil", 3, 0.8 },
 	                             { "body_armed", 0, 0.9 },
@@ -738,7 +730,6 @@ HorseCollisionMod.Config = {
 	RearChargeStrikeMs       = 1600,
 	RearChargeStrikePollMs   = 50,
 	RearChargeImpactSpeed    = 7.5,
-	RearChargeThrow          = 0.7,
 	RearChargeImpulse        = 6000,
 	RearChargeLift           = 0.2,
 	RearChargeWaitMs         = 400,
@@ -799,6 +790,13 @@ HorseCollisionMod.Config = {
 	-- are the whole damage model and are meant to be read together: this table
 	-- says what the blow is, the armor pair says how much of it survives what
 	-- the victim is wearing, and the floor says how little armor can refuse.
+	ReactionByTier           = {
+		Walk = "stagger", Trot = "fall", Gallop = "ragdoll",
+		Rear = "fall", Charge = "ragdoll"
+	},
+
+	ThrowByTier              = { Gallop = 1.0, Charge = 0.7 },
+
 	ImpactDamageByTier       = {
 		Walk = 0, Trot = 18, Gallop = 95, Rear = 60, Charge = 110
 	},
@@ -1425,51 +1423,8 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- fight has ended, never how long the fight is allowed to last. One second is
 -- fine for a state that changes on the scale of a scuffle, and it keeps the
 -- telemetry readable rather than a wall of lines.
--- What a tier costs an unarmored victim before armor scales it down, in
--- health. A gallop into someone in a shirt usually kills and sometimes does
--- not, which is the outcome asked for rather than a certainty either way.
---
--- The trot figure is set the same way. At 25 an unarmored villager lost about
--- a third of their health to a knockdown, 31 and 32 across two impacts, which
--- kills in three. 18 makes it about a quarter and four impacts, which is the
--- weight the rider wanted a trotting horse to carry.
---
--- The gallop figure is set from measurement rather than picked. At 90 the
--- soft end killed six of eight, and both survivors finished on 3.5 and 0.5
--- health, having been dealt 81.0 and 80.6 against a villager's 100. The
--- engine's own trample adds a further 15 to 20 on top in most impacts but
--- varies from nothing to 28, and that variation is what leaves any survivors
--- at all. 95 carries those two over and lands the rate near the nine in ten
--- asked for.
---
--- Documented as an ordinary comment rather than an LDoc block: LDoc reads an
--- annotated table as a set of named fields and refuses one holding an array.
-HorseCollisionMod.ImpactDamageByTier = {
-	Walk = 0,
-	Trot = 18,
-	Gallop = 95,
-	Rear = 60,
-	Charge = 110,
-}
-
---- What each tier costs the horse, as the fallback behind the settings file.
---
--- The rear and the charge carry figures of their own rather than borrowing a
--- loop tier's. They are separate moves with separate costs: a rear is hooves
--- coming down from a standstill and is charged near a trot, while a charge is
--- the heaviest thing the mod does and is charged a gallop's.
---
--- A charge is charged once for the whole lunge rather than once per victim,
--- which is decided at the call site, because riding down a group is the move
--- and a crowd should not empty the horse for standing close together.
-HorseCollisionMod.StaminaDrainByTier = {
-	Walk = 0.0,
-	Trot = 14.0,
-	Gallop = 22.0,
-	Rear = 12.0,
-	Charge = 22.0,
-}
-
+-- The per-tier tables live in HorseCollisionMod/Tiers.lua, which owns the tier
+-- concept and the single accessor every one of them is read through.
 HorseCollisionMod.RetaliationPollMs = 1000
 
 --- Consecutive samples out of the fight before the incident is closed.
@@ -1864,6 +1819,7 @@ end
 -- to the table above and carries no top-level statements, so the reload the
 -- dev console fires cascades through them harmlessly.
 Script.ReloadScript("Scripts/HorseCollisionMod/Enums.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Tiers.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Log.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Armor.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")

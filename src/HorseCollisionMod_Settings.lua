@@ -113,9 +113,6 @@ HorseCollisionModSettings = {
 	-- Set it to 0 to restore the behavior 3.0.0 shipped with, lockup
 	-- included.
 	SuppressAutoCureSec      = 30,   -- exempt victims from the auto-cure daycycle
-	TrotReaction             = "fall",
-	         -- "fall" is an animated fall the game recovers from,
-	         -- "knockdown" adds an animated get-up, "ragdoll" is physics
 	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
 	-- Losing patience. Barging the same person at a walk costs nobody
@@ -174,12 +171,6 @@ HorseCollisionModSettings = {
 	CameraShakeRearScale     = 0.8,   -- how hard it shakes the camera
 	RiderBlurRearScale       = 0.6,   -- how much it blurs the view
 	RiderBlurRearLength      = 0.4,   -- how long that lasts
-	RearReaction             = "fall",
-	         -- "fall" is an animated fall the game recovers from,
-	         -- "knockdown" adds an animated get-up, "ragdoll" is physics.
-	         -- Only "fall" restores a victim's facing and gives them their
-	         -- activity back afterwards; the others leave them standing where
-	         -- they landed, facing wherever they finished
 
 	-- The charge is its own tier, not a gallop. It has its own damage, sound,
 	-- dust, camera shake and view blur, so it can be tuned without touching
@@ -206,7 +197,6 @@ HorseCollisionModSettings = {
 	RearChargeStrikeReach    = 1.8,   -- how far ahead it reaches
 	RearChargeStrikeWidth    = 0.9,   -- how wide, either side
 	RearChargeImpactSpeed    = 7.5,   -- the speed it is scored at
-	RearChargeThrow          = 0.7,   -- how hard it throws, lower is gentler
 	RearChargeImpulse        = 6000,  -- how hard the charge is pushed
 	RearChargeLift           = 0.2,   -- how much of that is upward
 	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop
@@ -287,6 +277,33 @@ HorseCollisionModSettings = {
 	-- Worked example at the defaults: a town guard reads smash_def about 6, so
 	-- worn is 5.5, the falloff is 1/(1+5.5/0.6) = 0.10, and a charge's 110
 	-- becomes 11. Raise ArmorFloor to 0.25 and the same charge lands 27.
+	-- What a tier does to the victim's body.
+	--
+	-- "stagger" and "knockdown" play an animation and nothing else. "fall"
+	-- plays an animation whose own timing hands the body to physics partway
+	-- through, and is the only one that restores a victim's facing and gives
+	-- them their activity back afterwards. "ragdoll" drops them at the moment
+	-- of contact and this mod drives the throw.
+	ReactionByTier           = {
+		Walk   = "stagger",
+		Trot   = "fall",
+		Gallop = "ragdoll",
+		Rear   = "fall",   -- a rear is a trot-class blow, not a gallop's
+		Charge = "ragdoll",
+	},
+
+	-- How hard each ragdoll tier throws. Only the tiers set to "ragdoll" above
+	-- appear: the others hand the body to physics through the animation and
+	-- this mod never pushes them, so a figure for them would do nothing.
+	--
+	-- The charge is below a gallop rather than above it. The horse is still
+	-- driving forward when the victim goes down in front of it, so its own
+	-- collider shoves the ragdoll on top of whatever this applies.
+	ThrowByTier              = {
+		Gallop = 1.0,
+		Charge = 0.7,
+	},
+
 	ImpactDamageByTier       = {
 		Walk   = 0,     -- a walk staggers, it does not wound
 		Trot   = 18,

@@ -48,6 +48,13 @@ number.
 - The settings block on the mod page lists a table setting's members instead of
   an empty `{`, which also repairs the rows for `ImpactDamageByTier` and
   `HitReadyByTier`.
+- `TrotReaction` and `RearReaction` are replaced by `ReactionByTier`, which says
+  what all five tiers do in one place instead of two settings and two hardcoded
+  branches. The rear no longer falls back to the trot's value, so changing what
+  a trot does cannot silently change the rear.
+- `RearChargeThrow` is replaced by `ThrowByTier`. Only the tiers that actually
+  ragdoll carry a throw figure now; the trot and the rear each had one sitting
+  on a branch the shipped settings never reached, doing nothing.
 
 ## [5.12.2] - 2026-09-14
 
