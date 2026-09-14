@@ -305,17 +305,7 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 	-- A trot is the same kick at a fraction of it, on one number rather than a
 	-- second set of values, for the same reason `BlurRiderView` scales: the
 	-- shape is right and only the weight should differ between the tiers.
-	local tier = 0
-
-	if tierName == "Rear" then
-		tier = cfg.CameraShakeRearScale or cfg.CameraShakeTrotScale or 0
-	elseif tierName == "Charge" then
-		tier = cfg.CameraShakeChargeScale or cfg.CameraShakeGallopScale or 0
-	elseif tierName == "Gallop" then
-		tier = 1
-	elseif tierName == "Trot" then
-		tier = cfg.CameraShakeTrotScale or 0
-	end
+	local tier = self:TierValue("CameraShakeByTier", tierName) or 0
 
 	if tier <= 0 then
 		return false
@@ -417,20 +407,8 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 	-- a second set of five: one for how heavy it is and one for how long it
 	-- lasts. They came apart in tuning, because a trot wanted the strength
 	-- kept and the length cut, and a single scale could not do both.
-	local tier, length = 0, 1
-
-	if tierName == "Rear" then
-		tier = cfg.RiderBlurRearScale or cfg.RiderBlurTrotScale or 0
-		length = cfg.RiderBlurRearLength or tier
-	elseif tierName == "Charge" then
-		tier = cfg.RiderBlurChargeScale or cfg.RiderBlurGallopScale or 0
-		length = cfg.RiderBlurChargeLength or tier
-	elseif tierName == "Gallop" then
-		tier = 1
-	elseif tierName == "Trot" then
-		tier = cfg.RiderBlurTrotScale or 0
-		length = cfg.RiderBlurTrotLength or tier
-	end
+	local tier = self:TierValue("RiderBlurByTier", tierName) or 0
+	local length = self:TierValue("RiderBlurLengthByTier", tierName) or tier
 
 	if tier <= 0 then
 		return false

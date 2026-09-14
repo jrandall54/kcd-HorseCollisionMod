@@ -161,16 +161,7 @@ HorseCollisionModSettings = {
 	-- armored target they were masking the hoof entirely, while on an
 	-- unarmored one the balance was right. Both were confirmed playing in the
 	-- log, so this is a mix rather than a missing trigger.
-	ImpactSoundRear          = { { "a_o_jump_landing", 0, 0, 0.6 },
-	                             { "hs_hp_soil", 2, 0.6 },
-	                             { "body", 0, 1.6 },
-	                             { "blunt", 0, 2.0 },
-	                             { "f_bodyfall1", 0, 1.3 } },
 	ImpactDustEffectRear     = "collisions.destructibles.arrow_soil",
-	ImpactDustScaleRear      = 0.6,   -- how much dust it raises
-	CameraShakeRearScale     = 0.8,   -- how hard it shakes the camera
-	RiderBlurRearScale       = 0.6,   -- how much it blurs the view
-	RiderBlurRearLength      = 0.4,   -- how long that lasts
 
 	-- The charge is its own tier, not a gallop. It has its own damage, sound,
 	-- dust, camera shake and view blur, so it can be tuned without touching
@@ -182,17 +173,6 @@ HorseCollisionModSettings = {
 	-- so a charge sounds like a horse coming down on someone rather than like
 	-- riding into them. `hs_hp_soil` ignores position and plays at a fixed
 	-- level, so it is set back from the ear rather than sitting on top.
-	ImpactSoundCharge        = { { "body", 0, 0.6 },
-	                             { "hs_hp_soil", 3, 0.8 },
-	                             { "body_armed", 0, 0.9 },
-	                             { "blunt", 0, 1.0 },
-	                             { "hs_hp_soil", 6, 0.7 },
-	                             { "face_armed", 0, 0.9 },
-	                             { "f_bodyfall1", 0, 0.7 } },
-	ImpactDustScaleCharge    = 0.10,   -- how much dust it raises
-	CameraShakeChargeScale   = 1.2,   -- how hard it shakes the camera
-	RiderBlurChargeScale     = 1.1,   -- how much it blurs the view
-	RiderBlurChargeLength    = 1.1,   -- how long that lasts
 	RearChargeStrikes        = true,  -- whether the charge knocks people down
 	RearChargeStrikeReach    = 1.8,   -- how far ahead it reaches
 	RearChargeStrikeWidth    = 0.9,   -- how wide, either side
@@ -284,6 +264,109 @@ HorseCollisionModSettings = {
 	-- through, and is the only one that restores a victim's facing and gives
 	-- them their activity back afterwards. "ragdoll" drops them at the moment
 	-- of contact and this mod drives the throw.
+	-- Impact audio, one layer list per tier. Each layer is
+	-- { event, delay in milliseconds, volume, optional pitch }.
+	ImpactSoundByTier        = {
+		-- Movement foley rather than an impact: a shove is a scuff and a
+		-- stumble, spread out so it does not read as one hit.
+		Walk   = { { "f_n_mat_foleyal_cl", 0 },
+		           { "hs_hp_soil", 4 },
+		           { "f_n_mat_foleyal_cl", 5 },
+		           { "f_n_mat_foleyam_cl", 8 },
+		           { "f_bodyfall1", 12 },
+		           { "f_n_mat_foleyam_cl", 13 },
+		           { "f_bodyfall1", 18 } },
+
+		-- A trot puts someone on the ground, so the blunt impact leads,
+		-- doubled with the second copy taken back a fraction to shade it
+		-- down. Both copies sit back from the ear: at zero distance the lead
+		-- impact is louder from the saddle than a trot deserves.
+		Trot   = { { "body", 0, 1.3 },
+		           { "body", 0, 1.65 },
+		           { "f_bodyfall1", 0, 1.5 } },
+
+		-- A gallop stacks four different blunt impacts rather than repeats of
+		-- one, so it reads as a collision instead of a flam, with the body
+		-- settling underneath. Every impact layer is a token, so a mailed
+		-- guard and a peasant in cloth sound different on all four.
+		--
+		-- No hoofstep. `hs_hp_soil` is `hoofsteps_player`, the same family as
+		-- `a_o_jump_landing`, and those events ignore position: it played at a
+		-- fixed full level under every other layer and was the loudest thing
+		-- in the mix with no way down. The horse is already making that noise
+		-- at a gallop on its own.
+		Gallop = { { "body", 0, 0.5 },
+		           { "n_lu_log_ground", 0, 1.0 },
+		           { "body_armed", 0, 0.85 },
+		           { "blunt", 0, 1.0 },
+		           { "face_armed", 0, 0.9 },
+		           { "f_bodyfall1", 0, 0.7 } },
+
+		-- The rear leads with the horse's own landing, because that is what
+		-- the victim is hit by.
+		Rear   = { { "a_o_jump_landing", 0, 0, 0.6 },
+		           { "hs_hp_soil", 2, 0.6 },
+		           { "body", 0, 1.6 },
+		           { "blunt", 0, 2.0 },
+		           { "f_bodyfall1", 0, 1.3 } },
+
+		Charge = { { "body", 0, 0.6 },
+		           { "hs_hp_soil", 3, 0.8 },
+		           { "body_armed", 0, 0.9 },
+		           { "blunt", 0, 1.0 },
+		           { "hs_hp_soil", 6, 0.7 },
+		           { "face_armed", 0, 0.9 },
+		           { "f_bodyfall1", 0, 0.7 } },
+	},
+
+	-- Henry's own grunt as the collision goes through him, as
+	-- { event, delay in milliseconds, pitch, volume }.
+	RiderVocalByTier         = {
+		Walk   = { "v_henry_hit_soft", 140, 0, 1 },
+		Trot   = { "v_henry_hit_medium", 110, 0, 1 },
+		Gallop = { "v_henry_hit_heavy", 90, 0, 1 },
+		Rear   = { "v_henry_hit_medium", 110, 0, 1 },
+		Charge = { "v_henry_hit_heavy", 90, 0, 1 },
+	},
+
+	-- Where each tier's grunt sits in the shared voice gate, so a heavier
+	-- impact is never talked over by a lighter one.
+	RiderVocalRankByTier     = {
+		Walk = 1, Trot = 2, Gallop = 3, Rear = 2, Charge = 3,
+	},
+
+	-- How hard each tier kicks the camera. A tier with no entry does not
+	-- shake it at all, which is why the walk is absent.
+	CameraShakeByTier        = {
+		Trot = 0.6, Gallop = 1.0, Rear = 0.8, Charge = 1.2,
+	},
+
+	-- How much each tier blurs the view, and how long that lasts. They are
+	-- two tables rather than one pair per tier because they came apart in
+	-- tuning: a trot wanted the strength kept and the length cut.
+	RiderBlurByTier          = {
+		Trot = 0.7, Gallop = 1.0, Rear = 0.6, Charge = 1.1,
+	},
+
+	RiderBlurLengthByTier    = {
+		Trot = 0.3, Gallop = 1.0, Rear = 0.4, Charge = 1.1,
+	},
+
+	-- How much dust each tier raises where the victim is struck.
+	ImpactDustScaleByTier    = {
+		Trot = 0, Gallop = 0.09, Rear = 0.6, Charge = 0.10,
+	},
+
+	-- The marks left on the victim. Dirt is where they landed, blood is what
+	-- the impact opened.
+	VictimDirtByTier         = {
+		Trot = 0.35, Gallop = 0.60, Rear = 0.35, Charge = 0.60,
+	},
+
+	VictimBloodByTier        = {
+		Trot = 0.15, Gallop = 0.45, Rear = 0.15, Charge = 0.45,
+	},
+
 	ReactionByTier           = {
 		Walk   = "stagger",
 		Trot   = "fall",
@@ -342,7 +425,6 @@ HorseCollisionModSettings = {
 	CameraShakeShift         = 0.08,
 	CameraShakeDurationSec   = 0.5,
 	CameraShakeFrequency     = 0.05,
-	CameraShakeTrotScale     = 0.6,
 	CameraShakeRandomness    = 0.5,
 
 	-- What a gallop impact does to the rider's own view in first person. The
@@ -361,8 +443,6 @@ HorseCollisionModSettings = {
 	RiderBlurHoldMs          = 260,
 	RiderBlurChroma          = 0.2,
 	RiderBlurMs              = 480,
-	RiderBlurTrotScale       = 0.7,
-	RiderBlurTrotLength      = 0.3,
 	RiderBlurSteps           = 7,
 	RiderBlurFirstPersonOnly = true,
 	RiderBlurFirstPersonRange = 1.5,
@@ -514,21 +594,11 @@ HorseCollisionModSettings = {
 	-- walk tier carries no impact at all: two cloth foleys and a body
 	-- settling, each doubled because those samples are very quiet, over a
 	-- single hoofstep.
-	ImpactSoundWalk          = { { "f_n_mat_foleyal_cl", 0 },
-	                             { "hs_hp_soil", 4 },
-	                             { "f_n_mat_foleyal_cl", 5 },
-	                             { "f_n_mat_foleyam_cl", 8 },
-	                             { "f_bodyfall1", 12 },
-	                             { "f_n_mat_foleyam_cl", 13 },
-	                             { "f_bodyfall1", 18 } },
 
 	-- A trot puts someone on the ground, so the blunt impact leads, doubled
 	-- with the second copy taken back a fraction to shade it down. Both
 	-- copies sit back from the ear: at zero distance the lead impact is
 	-- louder from the saddle than a trot deserves.
-	ImpactSoundTrot          = { { "body", 0, 1.3 },
-	                             { "body", 0, 1.65 },
-	                             { "f_bodyfall1", 0, 1.5 } },
 
 	-- A gallop stacks four different blunt impacts rather than repeats of one,
 	-- so it reads as a collision instead of a flam, with the body settling
@@ -540,12 +610,6 @@ HorseCollisionModSettings = {
 	-- fixed full level under every other layer and was the loudest thing in
 	-- the mix with no way down. The horse is already making that noise at a
 	-- gallop on its own.
-	ImpactSoundGallop        = { { "body", 0, 0.5 },
-	                             { "n_lu_log_ground", 0, 1.0 },
-	                             { "body_armed", 0, 0.85 },
-	                             { "blunt", 0, 1.0 },
-	                             { "face_armed", 0, 0.9 },
-	                             { "f_bodyfall1", 0, 0.7 } },
 
 	-- The occasional injury, gallop only. A foley event, so unlike
 	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out
@@ -569,11 +633,6 @@ HorseCollisionModSettings = {
 	-- The three triggers available are `v_henry_hit_soft`,
 	-- `v_henry_hit_medium` and `v_henry_hit_heavy`.
 	RiderVocal               = true,
-	RiderVocalWalk           = { "v_henry_hit_soft", 140, 0, 1 },
-	RiderVocalTrot           = { "v_henry_hit_medium", 110, 0, 1 },
-	RiderVocalGallop         = { "v_henry_hit_heavy", 90, 0, 1 },
-	RiderVocalCharge         = { "v_henry_hit_heavy", 90, 0, 1 },
-	RiderVocalRear           = { "v_henry_hit_medium", 110, 0, 1 },
 
 	-- How long the rider stays quiet after grunting. Riding into a group lands
 	-- several collisions inside a second and one grunt each reads as broken
@@ -665,8 +724,6 @@ HorseCollisionModSettings = {
 	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
 	ImpactDust               = true,
 	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
-	ImpactDustScaleTrot      = 0,
-	ImpactDustScaleGallop    = 0.09,
 	ImpactDustHeight         = 0.05,
 	ImpactDustSampleMs       = 50,
 	ImpactDustFallVz         = -0.5,
@@ -681,10 +738,6 @@ HorseCollisionModSettings = {
 	-- repeatedly gets steadily filthier. Setting either to 0 switches that
 	-- half off. Nothing is applied at a walk, where nobody hits the ground.
 	VictimMarks              = true,
-	VictimDirtTrot           = 0.35,
-	VictimDirtGallop         = 0.60,
-	VictimBloodTrot          = 0.15,
-	VictimBloodGallop        = 0.45,
 
 	-- Switches.
 	CollisionIsCrime         = true,  -- riding someone down is a crime at trot

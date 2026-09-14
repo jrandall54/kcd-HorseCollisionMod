@@ -203,29 +203,18 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 		return false
 	end
 
-	local layers = cfg.ImpactSoundWalk
+	local layers = self:TierValue("ImpactSoundByTier", tierName)
 
 	-- The master level control, added to every layer of the tier so the mix
 	-- comes down as a whole and the balance between the layers is left alone.
 	--
-	-- The walk tier does not take it. Walk is movement foley rather than an
-	-- impact, its samples are the quietest in use and are already doubled to
-	-- be audible at all, so there is no headroom in them to give away; taking
-	-- three meters off a shove leaves nothing behind.
+	-- Only the two loop tiers that ride into someone take it. Walk is movement
+	-- foley rather than an impact, its samples are the quietest in use and are
+	-- already doubled to be audible at all, so there is no headroom in them to
+	-- give away. The rear and the charge are tuned as their own moves.
 	local master = 0
 
-	-- The charge is its own tier, not a gallop. It carries a deliberate rear
-	-- and a horse driving forward under its own weight, and it is tuned
-	-- separately from a collision the rider merely rode into.
-	if tierName == "Charge" then
-		layers = cfg.ImpactSoundCharge
-	elseif tierName == "Rear" then
-		layers = cfg.ImpactSoundRear
-	elseif tierName == "Trot" then
-		layers = cfg.ImpactSoundTrot
-		master = cfg.ImpactSoundDistance or 0
-	elseif tierName == "Gallop" then
-		layers = cfg.ImpactSoundGallop
+	if tierName == "Trot" or tierName == "Gallop" then
 		master = cfg.ImpactSoundDistance or 0
 	end
 
@@ -392,22 +381,8 @@ function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
 		return false
 	end
 
-	local layer = cfg.RiderVocalWalk
-	local rank = 1
-
-	if tierName == "Charge" then
-		layer = cfg.RiderVocalCharge
-		rank = 3
-	elseif tierName == "Rear" then
-		layer = cfg.RiderVocalRear
-		rank = 2
-	elseif tierName == "Trot" then
-		layer = cfg.RiderVocalTrot
-		rank = 2
-	elseif tierName == "Gallop" then
-		layer = cfg.RiderVocalGallop
-		rank = 3
-	end
+	local layer = self:TierValue("RiderVocalByTier", tierName)
+	local rank = self:TierValue("RiderVocalRankByTier", tierName) or 1
 
 	if type(layer) ~= "table" then
 		return false

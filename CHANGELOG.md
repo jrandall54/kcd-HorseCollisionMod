@@ -55,6 +55,13 @@ number.
 - `RearChargeThrow` is replaced by `ThrowByTier`. Only the tiers that actually
   ragdoll carry a throw figure now; the trot and the rear each had one sitting
   on a branch the shipped settings never reached, doing nothing.
+- The remaining per-tier settings families follow the same shape: `ImpactSoundByTier`,
+  `RiderVocalByTier`, `RiderVocalRankByTier`, `CameraShakeByTier`, `RiderBlurByTier`,
+  `RiderBlurLengthByTier`, `ImpactDustScaleByTier`, `VictimDirtByTier` and
+  `VictimBloodByTier` replace twenty-seven loose keys. Every figure is unchanged,
+  and the rear and the charge now state their own values rather than falling back
+  to the trot's and the gallop's, so tuning one tier can no longer move another.
+  Anyone who tuned one of the old keys needs to move their figure into the table.
 
 ## [5.12.2] - 2026-09-14
 

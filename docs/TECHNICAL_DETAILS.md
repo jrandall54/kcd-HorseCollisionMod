@@ -1399,7 +1399,7 @@ per charge.
 
 `Charge` is a tier in its own right rather than a gallop wearing another name.
 It has its own damage in `ImpactDamageByTier`, its own sound in
-`ImpactSoundCharge`, its own stamina figure in `StaminaDrainByTier`, its own victim
+`ImpactSoundByTier`, its own stamina figure in `StaminaDrainByTier`, its own victim
 lockout in `RearChargeVictimLockMs`, and its own dust, camera shake, view blur
 and throw scalar. Nothing about it can be tuned by changing what an ordinary
 collision does, or the reverse.

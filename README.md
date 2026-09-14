@@ -133,34 +133,27 @@ breaking the mod. Deleting a line restores its default.
 | `CameraShakeShift` | 0.08 | Meters of shake at a gallop. |
 | `CameraShakeDurationSec` | 0.5 | How long it lasts at a gallop. |
 | `CameraShakeFrequency` | 0.05 | Shake period. Vanilla's own shakes use 1/20 to 0.5; large values do nothing. |
-| `CameraShakeTrotScale` | 0.6 | The fraction of all of that a trot gets. 0 turns the trot shake off. |
+| `CameraShakeByTier` | Trot 0.6, Gallop 1.0, Rear 0.8, Charge 1.2 | The fraction of the shake each impact gets. A tier left out does not shake the camera at all. |
 | `RiderBlur` | true | Whether an impact blurs the rider's view. First person only, because third person can already see the collision. |
 | `RiderBlurAmount` | 1.0 | How heavy the blur is. Values above about 1.0 are discarded by the engine. |
 | `RiderBlurHoldMs` | 260 | How long it holds before decaying. |
 | `RiderBlurChroma` | 0.2 | A chromatic shift on the same envelope. Past about 0.5 it tints the screen red. |
 | `RiderBlurMs` | 480 | How long the decay takes. |
-| `RiderBlurTrotScale` | 0.7 | The fraction of the strength a trot gets. |
-| `RiderBlurTrotLength` | 0.3 | The fraction of the timing a trot gets. |
+| `RiderBlurByTier` | Trot 0.7, Gallop 1.0, Rear 0.6, Charge 1.1 | The fraction of the blur strength each impact gets. |
+| `RiderBlurLengthByTier` | Trot 0.3, Gallop 1.0, Rear 0.4, Charge 1.1 | The fraction of the blur timing each impact gets. |
 | `ImpactDamageDelayMs` | 600 | How long the mod waits, in milliseconds, before charging the victim for the impact. The engine applies trample damage of its own for a collision and attributes it to you; waiting lets that land first so the mod delivers the killing blow. That decides whether guards treat a death as murder or as a corpse nobody is blamed for, and so it is what makes `CollisionIsCrime` mean anything. Set to 0 to charge immediately. |
 | `ImpactDust` | true | Whether a collision throws dust off the ground where the victim lands. |
 | `ImpactDustEffect` | "WH_Particels.other.explosion_dust" | The particle library node to spawn. |
 | `ImpactDustEffectRear` | "collisions.destructibles.arrow_soil" | The node a rear spawns instead. A rear is a standing blow, so it gets a short, punchy effect rather than the lingering cloud a gallop throws up. |
-| `ImpactDustScaleGallop` | 0.09 | Size of it at a gallop. |
-| `ImpactDustScaleTrot` | 0 | Size of it at a trot. Zero switches trot dust off. |
-| `ImpactDustScaleCharge` | 0.10 | Size of it for a rear charge. |
-| `ImpactDustScaleRear` | 0.6 | Size of it for a rear on the spot. Larger than the others because the effect it scales is a different one. |
+| `ImpactDustScaleByTier` | Trot 0, Gallop 0.09, Rear 0.6, Charge 0.10 | Size of the dust each impact raises. Zero switches that tier's dust off. The rear figure is larger because the effect it scales is a different one. |
 | `ImpactSound` | true | Whether a collision makes a noise. |
 | `ImpactSoundDistance` | 2.0 | Master level for trot and gallop, in meters. Higher is quieter. The listener follows the camera, so a third-person camera mod hears the mix from further away and will want this lower. |
-| `ImpactSoundWalk` | layered | The sound a walk impact makes, as a list of `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
-| `ImpactSoundTrot` | layered | The same for a trot. |
-| `ImpactSoundGallop` | layered | The same for a gallop. |
+| `ImpactSoundByTier` | layered | The sound each impact makes, one list per tier, each layer `{ trigger, delay ms, distance, chance }`. Distance is the volume control: higher is quieter. |
 | `ImpactSoundCrack` | layered | An occasional injury layer, gallop only. |
 | `ImpactSoundCrackChance` | 0.12 | How often a gallop adds it. |
 | `VictimMarks` | true | Whether a knockdown leaves dirt and blood on the victim. Nothing is applied at walking pace. |
-| `VictimDirtTrot` | 0.35 | Dirt added to everything a trot victim is wearing, 0 to 1. 0 switches it off. |
-| `VictimDirtGallop` | 0.60 | The same at a gallop. |
-| `VictimBloodTrot` | 0.15 | Blood added to the side of the body a trot impact struck, 0 to 1. 0 switches it off. |
-| `VictimBloodGallop` | 0.45 | The same at a gallop. |
+| `VictimDirtByTier` | Trot 0.35, Gallop 0.60, Rear 0.35, Charge 0.60 | Dirt added to everything the victim is wearing, 0 to 1. 0 switches it off. |
+| `VictimBloodByTier` | Trot 0.15, Gallop 0.45, Rear 0.15, Charge 0.45 | Blood added to the side of the body the impact struck, 0 to 1. 0 switches it off. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
 | `Rear` | true | Whether your horse can be reared on command. Only from a standstill. |
 | `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, e, f, y, u, o, h. |

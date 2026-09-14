@@ -107,13 +107,8 @@ function HorseCollisionMod:MarkVictim(npc, tierName, velocity, speed)
 		return false
 	end
 
-	local dirt = cfg.VictimDirtTrot
-	local blood = cfg.VictimBloodTrot
-
-	if tierName == "Gallop" or tierName == "Charge" then
-		dirt = cfg.VictimDirtGallop
-		blood = cfg.VictimBloodGallop
-	end
+	local dirt = self:TierValue("VictimDirtByTier", tierName)
+	local blood = self:TierValue("VictimBloodByTier", tierName)
 
 	local direction = self:GetImpactDir(npc, velocity, speed)
 	local zones = self.BloodZones[direction] or self.BloodZones.so_forward
@@ -198,16 +193,7 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 		return false
 	end
 
-	local scale = 0
-	if tierName == "Charge" then
-		scale = cfg.ImpactDustScaleCharge or cfg.ImpactDustScaleGallop or 0
-	elseif tierName == "Rear" then
-		scale = cfg.ImpactDustScaleRear or cfg.ImpactDustScaleTrot or 0
-	elseif tierName == "Gallop" then
-		scale = cfg.ImpactDustScaleGallop or 0
-	elseif tierName == "Trot" then
-		scale = cfg.ImpactDustScaleTrot or 0
-	end
+	local scale = self:TierValue("ImpactDustScaleByTier", tierName) or 0
 
 	if scale <= 0 then
 		return false
