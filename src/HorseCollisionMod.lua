@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.13.0
+-- @release 5.13.1
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.13.0"
+HorseCollisionMod.Version = "5.13.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1504,7 +1504,10 @@ HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 -- enough to stay clear of the ones vanilla raises for its own hints.
 HorseCollisionMod.SurrenderHintId = 4771
 
-HorseCollisionMod.RagdollResolveCeilingMs = 15000
+-- How long `WhenVictimIsUp` waits for a victim to finish getting up before
+-- firing anyway. A backstop for a victim never seen in the get-up at all,
+-- because the reaction was suppressed or the impact killed them.
+HorseCollisionMod.GetUpCeilingMs = 15000
 
 -- How long `WhenRagdollLands` waits for a thrown body to come to rest before
 -- giving up and firing anyway.
