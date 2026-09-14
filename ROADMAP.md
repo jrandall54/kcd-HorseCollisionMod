@@ -68,6 +68,145 @@ Known gaps carried into later phases:
 - [x] Reactions firing at the wrong tier. Tracked under Reaction reliability
       below.
 
+## Reported from play: the 5.11.1 shipping test
+
+Nine issues, all found in one session playing the packaged build through Vortex
+rather than the development install. Recorded in the rider's terms first, with any
+explanation marked as untested, because none of these has been investigated yet.
+
+Ordered by severity. The first could break somebody's playthrough; the last is a
+whole input method with no access to half the mod.
+
+### 1. Story characters may be losing their invincibility
+
+**Untested, and the highest-stakes item here.** Vanilla refuses to let the player
+attack Captain Bernard, the Lord of Leipa and others like them; the game does not
+present the option at all. This mod does not go through that path. It calls
+`soul:DealDamage` directly with the player as the attacker, which is how it owns
+the kill.
+
+Nothing has been checked. It is not known whether those characters carry a flag
+`DealDamage` honors, whether the protection lives in the attack path the mod
+bypasses, or whether riding one down can hurt or kill them.
+
+- [ ] Ride into a protected story character and read what happens to their health.
+      If the mod can damage them, it needs the same exclusion `ProtectMutt` gives
+      the dog, driven off whatever the game uses to mark them rather than off a
+      list of names.
+
+A mod that can kill a quest-critical character is worse than a mod that misses an
+impact, so this outranks everything else on the list.
+
+### 2. Barks run through animations, ragdolls and state changes
+
+The rider's own framing, and it appears in three separate places, which is why it
+is one issue rather than three:
+
+> "sometimes they are crying out somebody help as they are still literally flying
+> through the air and it breaks immersion"
+
+> "henry's barks continue even when he's thrown from the horse and getting his
+> shit rocked by the guards"
+
+> "That seems to be a theme where barks run through animations or state changes or
+> rag dolls or whatever when they really shouldn't."
+
+Three observed cases:
+
+  * A witness or crime-reporting bark finishes uninterrupted while the speaker is
+    airborne from the impact that started it.
+  * A victim on the ground after being hit carries on reporting the crime.
+  * Henry keeps speaking after being thrown from the horse and while being beaten.
+
+The mod sends `dialog:monologRequest` and the dialog system owns playback from
+there. Whether a request can be cut off once it is playing, and whether the mod
+can do the cutting, is unknown. `doNotInterruptOnActorDeath` exists as a field, so
+interruption on state change is clearly a concept the system has.
+
+- [ ] Find out whether a playing line can be stopped, and by what call.
+- [ ] Decide the rule per speaker rather than globally: a victim being hit should
+      lose the line they are in the middle of, and Henry should lose his when he
+      comes off the horse.
+
+### 3. The crime the mod reports is the wrong one
+
+The mod's hit currently produces "you were seen brawling". The rider wants the
+crime the game raises when you swing a weapon at somebody, or at a guard, without
+connecting, because its surrender cutscene description reads better for what has
+actually happened.
+
+- [ ] The rider reproduces the crime they want in game. Read the log to identify
+      which crime it is, then send that one from the mod's hit instead.
+
+This is a swap of one identifier, not a redesign, and the identification is the
+whole job.
+
+### 4. The rear and charge have no sound or bark of their own
+
+Never finished. Both moves were added as impacts and inherited whatever the
+collision tiers do.
+
+- [ ] Give the rear on the spot and the charge their own impact audio. The rear
+      already leads with the horse's landing; the charge has nothing specific.
+- [ ] Decide what a victim says to each, and what Henry says. Neither has been
+      chosen, so both currently fall through to the collision sets.
+
+### 5. The lean keys stop working after a save reload
+
+> "...the lean buttons not working after save reload or taking some time to
+> reregister or something."
+
+The action map is loaded once per session and `Rear.lua` guards that behind a
+flag, which the diary already records as the reason a newly added key is dead
+until the game restarts while the log still reports `loaded=true` from the cached
+flag. Whether a save load hits the same cache is **untested**, and the reported
+symptom includes the keys coming back after a delay, which a dead action map would
+not explain.
+
+- [ ] Reload a save, try the lean immediately, and time how long until it answers.
+- [ ] Read whether the action map is re-registered on a save load and whether the
+      flag is cleared.
+
+### 6. The lunge throws victims too far
+
+> "the launch distance on rear lunges seems really far."
+
+The charge is its own tier with its own force settings, so this is a tuning
+question rather than a defect, but it has never been tuned by eye against the
+other tiers.
+
+- [ ] Compare the charge's throw against a gallop's, and bring it down to
+      something that reads as a horse hitting a man rather than a cannon.
+
+### 7. The provoked NPC's last bark is cut off entering combat
+
+> "when provoking an NPC, the last bark that fires when the NPC is transitioning
+> to combat gets eaten and cut off."
+
+Two shapes, and it is not known which: the mod's line loses the priority auction
+to the combat bark, or the combat state change interrupts a line already playing.
+
+- [ ] Establish which, then either raise the mod's priority or stop sending that
+      last line so the combat bark has the room.
+
+Note the tension with issue 2. There, a bark surviving a state change is the
+defect; here, a bark being cut off is. The rule wanted is presumably that the
+line matching the speaker's current situation wins, which is a judgment about
+each case rather than one global priority.
+
+### 8. Controller players cannot reach the mod's features
+
+Leaning, the rear on the spot and the charge are all bound to keyboard keys.
+Nothing is bound for a controller, so a controller player has no access to any of
+them.
+
+- [ ] Find out how vanilla binds an action for both, and whether the mod's action
+      map can carry a controller binding alongside the keyboard one.
+- [ ] Choose bindings that do not fight anything a mounted player already needs.
+
+This is the only item on the list that removes a feature entirely rather than
+making one worse, so it ranks above the tuning work.
+
 ## Start here
 
 Two separate defects, found by testing rather than reading, and neither is what
