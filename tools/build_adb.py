@@ -439,17 +439,35 @@ FALL_SETTLE_SLEEP = 1
 # timing, and the mod stops running a timer against a clip whose length it has
 # to know.
 #
-# Male hands over at 0.68 of its clip, female at 0.50. The fractions differ
-# because the falls do. Female clips reach the ground sooner relative to their
-# length, and at 0.68 physics took over well after the body had settled, which
-# read as the animation finishing and then the victim going limp a second time.
+# These were fractions of clip length, 0.68 for male and 0.50 for female,
+# because nothing could measure when a body actually reached the ground. That
+# is wrong in principle: landing time is a property of the fall, not of how
+# long the clip runs on afterwards, so scaling by clip length stretches the
+# handover on exactly the longest clips.
 #
-# The value is honored: forced to 0.30 for every direction, victims collapse a
-# third of a second into the fall and the reactions are, in the player's words,
-# borderline pure ragdoll. It does not, however, change how long the victim
-# then lies there. That is `BlendRagdoll`, and it is the engine's.
+# Measured directly, with `tools/probe_fall_landing.lua`, by watching the head
+# stop descending. `GetHeadPos().z` minus the entity origin reads about 1.55
+# standing and about 0.15 flat:
+#
+#   male    right 1440, 1504    back 1344, 976    left ~1650
+#   female  forward 1824  right 1232  back 1056, 1056  left 1040
+#
+# The female set and male back were already within noise of their landings. The
+# two long male clips were not: left ran 2.80 against a body down at 1.65, and
+# right 2.08 against 1.47, which is a second or more of a victim lying still
+# while the clip plays on. Both now carry their measured landing.
+#
+# Male forward is left at its old figure. It was never measured, and 1.65 is
+# the same value male left measured at, so it is the better guess of the two
+# available rather than a reading.
+#
+# This does not touch the long lie-down. That is roughly a second of
+# `MotionIdle` after the clip ends plus the get-up itself, and
+# docs/TESTING_DIARY.md records the get-up as vanilla's, proven on a path that
+# reads none of this data. Handover timing was tested against it and moved it
+# by tens of milliseconds.
 FALL_SETTLE_AT = {
-    "male": {"forward": 1.65, "back": 1.16, "left": 2.80, "right": 2.08},
+    "male": {"forward": 1.65, "back": 1.16, "left": 1.65, "right": 1.47},
     "female": {"forward": 1.67, "back": 0.95, "left": 1.01, "right": 1.17}
 }
 

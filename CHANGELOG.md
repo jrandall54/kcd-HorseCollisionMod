@@ -30,6 +30,18 @@ number.
 
 ## [Unreleased]
 
+## [5.13.2] - 2026-09-14
+
+### Fixed
+
+- A man knocked down sideways no longer lies still for an extra second before
+  physics takes his body. The moment each fall hands over was set as a fraction
+  of the clip's length, which has nothing to do with when the body reaches the
+  ground, so it stretched on the two longest male clips: falling left handed over
+  at 2.80 seconds against a body down at 1.65, and falling right at 2.08 against
+  1.47. Both now use their measured landing. The other six falls were already
+  close and are unchanged.
+
 ## [5.13.1] - 2026-09-14
 
 ### Changed
