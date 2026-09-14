@@ -478,6 +478,8 @@ function Land {
 		Invoke-Git branch -d $branch | Out-Null
 	}
 
+	Prune-Merged
+
 	Say "landed v$version" Green
 
 	# The branch is over, so its testing world goes with it. Without this the
@@ -492,6 +494,33 @@ function Land {
 	# and main is the shipped world: the next branch seeds its own. Re-entering
 	# here is what left main carrying a branch's test values.
 	Show-Status
+}
+
+# Deletes every local branch already merged into main. This is part of landing
+# rather than a separate chore: a merged branch carries no work, and leaving it
+# behind turns repository tidiness into something a person has to notice and
+# decide about. The rider had to ask for this three times before it was
+# automated, which is the argument for automating it.
+#
+# `git branch --merged main` is the safe list by construction: a branch appears
+# only when main already contains every one of its commits, so nothing can be
+# lost. `-d` rather than `-D` keeps that guarantee even if the list is wrong.
+function Prune-Merged {
+	$ErrorActionPreference = "Continue"
+	$merged = & git.exe -C $repo branch --merged main --format="%(refname:short)" 2>&1
+	$ErrorActionPreference = "Stop"
+
+	$gone = @($merged | Where-Object { $_ -and $_.Trim() -ne "" -and $_.Trim() -ne "main" })
+
+	if ($gone.Count -eq 0) {
+		return
+	}
+
+	foreach ($name in $gone) {
+		Invoke-Git branch -d $name.Trim() | Out-Null
+	}
+
+	Say "pruned $($gone.Count) merged branch(es)"
 }
 
 # -------------------------------------------------------------- shipping
