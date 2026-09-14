@@ -99,11 +99,9 @@ impact, so this outranks everything else on the list.
 
 ### 1b. Parked idea: a protected character unhorses you instead
 
-Raised by the rider once issue 1 was fixed, and explicitly not for now:
-
-> "I think it would be funny to make these types of NPCs unhorse you when you
-> try to make contact with them, but that's not something I want to do right
-> now."
+Raised by the rider once issue 1 was fixed, and explicitly parked rather than
+scheduled: a protected character could throw the rider from the saddle when the
+horse tries to make contact with them.
 
 The pieces exist. `IsProtectedFromHarm` already identifies them at the moment of
 impact, and the mod already has a path that pulls Henry off the horse, used by
