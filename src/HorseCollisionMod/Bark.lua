@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.9.2
+-- @release 5.10.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -225,7 +225,7 @@ HorseCollisionMod.RiderBarkSets = {
 -- label is only visible where vanilla's AI files happen to reference one. It is
 -- a shipped column: `label` in `Libs/Tables/text/topic.xml`, 1656 of them
 -- against the 861 those files mention. `tools/bark_alias.py` reads it and
--- `tools/henry_quips.py` cross-references it with who recorded each line, since
+-- `tools/legacy/henry_quips.py` cross-references it with who recorded each line,
 -- having the audio is the gate.
 --
 -- That produced 1076 lines Henry can be asked for, of which the rider chose
@@ -286,7 +286,7 @@ HorseCollisionMod.RiderBarkSets = {
 --
 -- Passing all four is still not proof a line is audible, so every alias below
 -- was fired individually in game and kept only on the rider's word that they
--- heard it. `tools/make_audition.py` fires one by number for that purpose.
+-- heard it. `tools/legacy/make_audition.py` fires one by number for that purpose.
 --
 -- One caution for anyone auditioning more: a silence observed during that
 -- audition turned out not to be reliable, and several lines recorded silent

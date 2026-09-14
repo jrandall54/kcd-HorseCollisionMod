@@ -30,6 +30,40 @@ number.
 
 ## [Unreleased]
 
+## [5.10.0] - 2026-09-13
+
+### Added
+
+- Every setting the mod has is now in the settings file. Forty that existed only
+  as internal defaults are exposed, grouped by how safely they can be changed:
+  detection and scoring, ragdoll motion, the rear and the charge, how a spoken
+  line is submitted, and internals that have no useful second value.
+- `tools/audit_code.py`, which reports settings nothing reads, settings missing
+  from the player's file, and functions and tables nothing uses.
+
+### Removed
+
+- Five settings nothing read: `FinishClampedVictims`, `ShieldClampFloor`,
+  `GetupRestPollMs`, `GetupRestBand` and `GetupRestCeilingMs`. The behavior each
+  controlled had already gone, so no install changes.
+
+### Changed
+
+- Thirteen tools from closed investigations moved to `tools/legacy/`, which is
+  kept but not maintained or checked. A written probe costs nothing to keep and
+  rebuilding one costs a working session.
+- The mod page check now compares only the player-facing half of the settings
+  file, so exposing internals does not demand they be advertised.
+
+### Documentation
+
+- `ROADMAP.md` corrected against the code. The barding and knockback issue is
+  closed by configuration, because `RagdollMassArmorScaled` ships as `false` and
+  every victim now gets the same flat ragdoll mass. The research section no
+  longer recommends a metarole that cannot be driven.
+- Removed a comment listing ten settings deleted in an earlier audit, which is
+  changelog material rather than source.
+
 ## [5.9.2] - 2026-09-13
 
 ### Fixed

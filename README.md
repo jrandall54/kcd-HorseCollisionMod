@@ -228,31 +228,11 @@ tools/
                           full text of every member of each set, filtered to
                           those whose sequence is always-true, repeatable, and
                           recorded by his actor alone
-  henry_quips.py          the same inventory grouped by alias against metarole,
-                          flagging each set's worst member
   npc_pain_sets.py        every NPC bark set whose sequences are all
                           unconditional, with its wordless count and longest
                           line, for choosing the register of a reaction
-  make_audition.py        writes a console script that speaks one numbered line,
-                          for auditioning them one at a time; a result only
-                          counts against a recently launched game
-  make_voice_probe.py     writes a console script that fires one named audio
-                          trigger, validating the name before firing so a
-                          missing trigger reads differently from a silent one
-  audition_batch.lua      speaks ten lines five seconds apart, superseded by
-                          make_audition.py and kept for a bulk pass
-  dev_riderbark.lua       walks the rider's own bark pool one line per run
-  probe_dialog_state.lua  asks the dialog bind what it knows about a refused
-                          request; every reader on it returns nil
-  probe_voice.lua         auditions one vocal trigger on an NPC, the player or a
-                          corpse
-  probe_voice_dead.lua    kills the nearest NPC and fires a cry on the body, the
-                          test that showed an audio trigger outlives a subbrain
   dev_console.py          talks to the running game over its remote console
   dev_subject.lua         spawns a test subject in front of the horse
-  typed_message_probe.lua a Lua probe run in the game through dev_console.py
-  probe_stuck_actor.lua   reports nearby actors' animation state, to tell a
-                          mod-driven animation apart from a vanilla one
   restore_alive.lua       returns nearby actors to the alive physicalization
                           profile, repairing one left in another
   probe_inventory.lua     names what a named entity is carrying, resolving
@@ -283,21 +263,26 @@ tools/
                           running game, which the written references do not
   probe_bark.lua          asks whether a vanilla spoken line can be triggered
                           from Lua, using metaroles the speaker provably holds
-  probe_forcedialog.lua   asks whether a conversation can be opened on a chosen
-                          target from Lua
-  probe_metaroles.lua     reports which metaroles and roles a soul holds, which
-                          is what decides the lines it can be asked for
   probe_camera.lua        polls the first-person camera through a view shake,
                           which is the only way to see what that call does
                           rather than what its arguments suggest
   probe_horse_mass.lua    reports the mass and physics identity of the horse,
                           the player and the nearest NPC, which are the two
                           sides of every collision the mod scores
-  probe_mass_persistence.lua
-                          lists nearby humans by mass, to prove a written
-                          ragdoll mass does not survive the victim standing up
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
+  audit_code.py           reports settings nothing reads, settings missing from
+                          the player's file, and functions and tables nothing
+                          uses, so clutter is a fact rather than an impression
+  legacy/                 tools from investigations that are closed, kept rather
+                          than deleted because a probe already written costs
+                          nothing to keep and rebuilding one costs a whole
+                          working session. Nothing in here is maintained and
+                          none of it is checked: a moved Python tool may need
+                          the tools directory on sys.path before it can import
+                          bark_lines, and a probe may name an engine call since
+                          ruled out. Read the header first, which says what the
+                          probe was for and what it found
   set_version.py          writes the version into all fourteen places that
                           carry it, and dates the changelog section
   version_check.py        derives the next version from CHANGELOG.md

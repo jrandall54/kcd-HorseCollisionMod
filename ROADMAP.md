@@ -1053,50 +1053,48 @@ per lunge, accumulated, following the pattern the throw traces used.
 Until it is seen a second time there is nothing to reproduce.
 
 
-## Open issue: barding and knockback are inert against anyone in armor
+## Closed by configuration: barding and knockback against armored victims
 
-The mod writes a ragdoll mass derived from the victim's armor, and at the
-shipped exponent of 3.7 a mailed guard becomes about 1225 kg against a
-villager's 59. That mass is what every impulse the mod applies is divided by,
-so the tuned force settings land differently by two orders of magnitude:
+**Recorded as open until the 5.9.x audit, and no longer true of the shipped
+build.** The issue was that the mod wrote a ragdoll mass derived from the
+victim's armor, so at the shipped exponent of 3.7 a mailed guard weighed about
+1225 kg against a villager's 59, and every impulse the mod applied was divided
+by that:
 
     villager      mass=58.7    magnitude=58.3  dv=0.99 m/s
     mailed guard  mass=1225.5  magnitude=58.3  dv=0.05 m/s
 
-Five centimetres per second is nothing. `Knockback`, `Uplift` and the whole
-barding force bonus therefore do nothing at all to an armored victim, which
-makes barding a stamina-and-damage feature in practice rather than the force
-feature it is documented as. A player who armors their horse and rides down a
-guard gets no more push than one who does not.
+`RagdollMassArmorScaled` now ships as `false`. `MassVictim` reads it at
+`Reaction.lua:316` and sets the scale to 1.0, so the written mass is the flat
+`RagdollMass` of 80 kg for every victim, armored or not. The two-orders-of-
+magnitude split that made `Knockback`, `Uplift` and the barding force bonus
+inert cannot happen: the same impulse now produces the same velocity change on
+a guard as on a villager.
 
-### Why the obvious fix is not available
+`RagdollMassArmorExponent` is still declared and still read, so turning the
+scaling back on restores the old behavior along with the old defect. It is kept
+because the measurements below were taken with it on and are only meaningful
+with it available.
 
-Removing the mass rewrite is the change that suggests itself and it has already
-been ridden, on `experiment/armor-scaled-damping`, which is unmerged. Measured
-there:
+### What the earlier investigation established, and is still worth knowing
 
-    mass-based (shipping, 43 to 4900 kg)     1.84x separation
-    damping, exponent 0.35                   1.22x
-    damping, exponent 1.0                    1.29x
+Removing the mass rewrite entirely was ridden on `experiment/armor-scaled-damping`,
+which is unmerged. Measured there:
 
-and throw distance responds to mass as `mass ^ -0.185`, so an honest 60 kg
-against 140 kg would separate about 1.17x. The separation the mod has is what
-the lie buys; nothing honest reproduces it. Tripling the damping spread bought
-0.07x.
+    mass-based (43 to 4900 kg)                1.84x separation
+    damping, exponent 0.35                    1.22x
+    damping, exponent 1.0                     1.29x
 
-### What is actually open
+Throw distance responds to mass as `mass ^ -0.185`, so an honest 60 kg against
+140 kg would separate about 1.17x. The separation the mass rewrite bought was
+what the exaggeration bought; nothing honest reproduced it. Tripling the damping
+spread added 0.07x.
 
-Not "should the mass rewrite go". The question is whether the force settings
-can be made to mean something against armored victims while the mass rewrite
-stays, and the shape of the answer is probably to scale the applied magnitude
-by the same figure the mass was scaled by, so that a commanded knockback
-delivers a commanded velocity change rather than a commanded impulse. That is
-a small change and it has not been tried.
-
-Note also that the sculpting measurements in the diary were taken with
-`RagdollMassArmorScaled = false`, which is not the shipped configuration, so
-the separation figures quoted for the brake do not describe the shipped build.
-
+So the trade is explicit rather than hidden: the shipped build has honest force
+against armored victims and a narrower spread in how far they fly. If a wider
+spread is ever wanted back, the route that was never tried is to scale the
+applied magnitude by the same figure the mass is scaled by, so a commanded
+knockback delivers a commanded velocity change rather than a commanded impulse.
 
 ## Research: making NPCs speak vanilla lines on command
 
@@ -1152,6 +1150,24 @@ fit this mod better than the guesses above did:
 Warhorse shipped a bark set for being ridden into by the player and another for
 being ridden into lightly, which is the mod's own subject matter. `NA_KONI` and
 `LEHKA` are held by exactly the same 3399 souls.
+
+**Held is not the same as drivable, and `COMBAT_VICTIM_SCREAM_RECEIVED_HIT` in
+the table above is the proof.** It is held by 3516 souls, its lines are exactly
+the short hit grunts this mod wants, and it cannot be fired at all. Two reasons,
+both established in the diary under the additive table patching entry:
+
+  * `Libs/Tables/rpg/combat_shout_type.xml` registers fifteen shout types
+    against metarole ids 289 to 299, and this is 297. Those are dispatched by the
+    combat shout system rather than by `dialog:monologRequest`, so a bark request
+    naming one reaches the wrong subsystem.
+  * Its topics sit behind `var('hitStrength')`, which the engine hangs on its own
+    `CombatShout_*` request rather than on the character, so no state a mod can
+    set will satisfy the condition.
+
+Relaxing the entry condition and raising `speech_coef`, through table patches the
+engine confirmed it had applied, still produced fourteen silent requests in one
+ride. **Check `combat_shout_type.xml` before spending a ride on any `COMBAT_*`
+set**; it is fifteen rows and it settles the question offline.
 
 **A metarole name in `metarole.xml` is not evidence anyone can say it.** Check
 the holding tables before building on one.
