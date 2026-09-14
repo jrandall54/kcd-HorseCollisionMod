@@ -269,6 +269,9 @@ tools/
   probe_horse_mass.lua    reports the mass and physics identity of the horse,
                           the player and the nearest NPC, which are the two
                           sides of every collision the mod scores
+  nexus_settings_block.py builds the mod page's settings block out of the
+                          settings file, so the page cannot fall behind what
+                          ships; --check reports what it is missing
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
   verify_additive.py      proves the release overrides no vanilla file
   audit_code.py           reports settings nothing reads, settings missing from

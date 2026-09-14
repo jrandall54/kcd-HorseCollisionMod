@@ -30,6 +30,14 @@ number.
 
 ## [Unreleased]
 
+## [5.11.0] - 2026-09-13
+
+### Added
+
+- `tools/nexus_settings_block.py`, which builds the mod page's settings block
+  out of the settings file itself. The page had fallen 150 settings behind what
+  ships; generating the block means it cannot fall behind again.
+
 ## [5.10.0] - 2026-09-13
 
 ### Added
