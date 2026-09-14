@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.13.1] - 2026-09-14
+
 ### Changed
 
 - The wait that decides when a knocked-down victim is back on their feet is
