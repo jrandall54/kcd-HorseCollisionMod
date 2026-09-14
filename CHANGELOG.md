@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.12.0] - 2026-09-14
+
 ### Fixed
 
 - Characters the game will not let you attack no longer take damage from a
