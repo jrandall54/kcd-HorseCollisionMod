@@ -1465,3 +1465,33 @@ The general lesson is in `RearRequested`: every gate that refuses a press says
 which one it was. A press that arrives and is dropped silently looks, from
 outside the game, exactly like a press that never arrived, and those two have
 opposite answers.
+
+## Patching a game table without replacing it
+
+A table under `Libs/Tables/` can be changed by shipping a second file beside it
+named `<table>__<suffix>.xml`, carrying the same `<header>` and only the rows
+that differ. The loader globs `data/libs/tables/<table>__<suffix>.*`, merges what
+it finds and logs the outcome:
+
+    Table 'topic2sequence' is patched by 'topic2sequence__horsecollisionmod',
+        lines added: 0, modified: 1, equal: 0
+
+The suffix needs no registration. Four properties matter in practice:
+
+- `added` against `modified` says whether a row extended vanilla or replaced one.
+  A patch meant to add can report `modified` instead, because rows are keyed on
+  their natural columns rather than on a visible id, and a match rewrites the
+  row. Replacing a vanilla row removes whatever depended on it.
+- Tables are read once at startup, so a patch needs a full relaunch. A script
+  reload leaves the game running on the old values with correct files on disk.
+- A harmless warning follows each patch, that `Localization\text__<suffix>.xml`
+  cannot be opened; the loader looks for a matching localization patch.
+- One row costs a few hundred bytes where replacing the file would cost
+  megabytes, and two mods patching the same table do not conflict unless they
+  touch the same row.
+
+This is the same mechanism third-party perk mods use. It does not make dialogue
+gated on `var(...)` reachable: those conditions read variables that live on the
+engine's own request rather than on the character, and the `COMBAT_*` metaroles
+listed in `Libs/Tables/rpg/combat_shout_type.xml` are dispatched by the combat
+shout system rather than by `dialog:monologRequest`, so no column changes that.
