@@ -2,9 +2,9 @@
 --
 -- A tier is the unit this whole mod varies by. Walk, Trot, Gallop, Rear and
 -- Charge each have their own sound, their own dust, their own camera shake,
--- their own reaction and so on, and every one of those used to be written as a
--- run of loose settings keys read back through a hand-written `if` chain at the
--- point of use.
+-- their own reaction and so on. Each of those is one table keyed by tier, read
+-- through one accessor, rather than a run of loose settings keys behind a
+-- hand-written `if` chain at each point of use.
 --
 -- That shape is what let the rear and the charge quietly fall out of the
 -- Horsemanship progression: nine separate chains, each typed by hand, and no
@@ -23,7 +23,7 @@
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
--- @release 5.12.2
+-- @release 5.13.0
 
 --- One tier's value for one concern.
 --

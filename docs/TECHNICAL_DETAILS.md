@@ -495,8 +495,8 @@ compounds with the combat multiplier below.
 The armor multiplier is the one that does not reach the rear and the charge,
 and that is deliberate rather than an omission. Those two are charged once for
 the whole move and the move can land on several people at once, so there is no
-single victim whose armor to read. What the horse and rider bring — barding,
-Horsemanship and the combat penalty — applies to them in full.
+single victim whose armor to read. What the horse and rider bring, meaning
+barding, Horsemanship and the combat penalty, applies to them in full.
 
 ### Combat multiplier
 
@@ -541,7 +541,7 @@ sits on the ground, so it is the head's height above the floor.
 | 5472 | `BlendRagdoll` | 1.59 | standing |
 | 6064+ | `MotionIdle` | 1.59 | standing, finished |
 
-Three things follow, and the mod had all three wrong for a long time.
+Three things follow, and the mod had all three wrong.
 
 **`BlendRagdoll` is the get-up, not the lie-down.** The head climbs from 0.27 to
 1.59 across it. Every piece of code that treated that state as "the victim is
@@ -550,7 +550,7 @@ it to end was waiting until after the victim was already on their feet.
 
 **The flat stretch is `AnimationControlled` followed by `MotionIdle`.** The fall
 clip ends before Mannequin's Ragdoll ProcLayer takes hold, leaving roughly
-600 ms in which a victim lying face down reads `MotionIdle` — the same state as
+600 ms in which a victim lying face down reads `MotionIdle`, the same state as
 somebody standing about doing nothing. That hole is why every test built on
 animation-state strings eventually let an impact through mid-fall and snapped
 the body upright into a second fall clip.

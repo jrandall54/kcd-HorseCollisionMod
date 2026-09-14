@@ -1,0 +1,381 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+<li><a href="#Tables">Tables</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><strong>HorseCollisionMod.Tiers</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Marks.html">HorseCollisionMod.Marks</a></li>
+  <li><a href="../modules/HorseCollisionMod.Sound.html">HorseCollisionMod.Sound</a></li>
+  <li><a href="../modules/HorseCollisionMod.Bark.html">HorseCollisionMod.Bark</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Retaliation.html">HorseCollisionMod.Retaliation</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Tiers</code></h1>
+<p>The tier concept: five kinds of impact, and what each one is worth.</p>
+<p> A tier is the unit this whole mod varies by. Walk, Trot, Gallop, Rear and
+ Charge each have their own sound, their own dust, their own camera shake,
+ their own reaction and so on. Each of those is one table keyed by tier, read
+ through one accessor, rather than a run of loose settings keys behind a
+ hand-written <code>if</code> chain at each point of use.</p>
+
+<p> That shape is what let the rear and the charge quietly fall out of the
+ Horsemanship progression: nine separate chains, each typed by hand, and no
+ single place where all five tiers could be seen beside each other. A table
+ keyed by tier is one row per concern, so a tier that is missing a value is
+ missing it visibly.</p>
+
+<p> <a href="../modules/HorseCollisionMod.Tiers.html#HorseCollisionMod:TierValue">TierValue</a> is the only way those tables are read. It takes the settings
+ file's table when there is one and the compiled-in default when there is
+ not, per key rather than per table, so a player who overrides three tiers
+ still gets shipped values for the other two.</p>
+
+<p> This file defines data and one accessor: it is pulled in by
+ <code>Script.ReloadScript</code> from <code>Scripts/Startup/HorseCollisionMod.lua</code> and
+ re-running it is harmless.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 5.13.0</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:TierValue">HorseCollisionMod:TierValue (name, tierName)</a></td>
+	<td class="summary">One tier's value for one concern.</td>
+	</tr>
+</table>
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.ImpactDamageByTier">HorseCollisionMod.ImpactDamageByTier</a></td>
+	<td class="summary">What each tier is worth in health, before armor.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.StaminaDrainByTier">HorseCollisionMod.StaminaDrainByTier</a></td>
+	<td class="summary">What each tier costs the horse, before the rider's Horsemanship, the
+ horse's barding and the combat penalty.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.ReactionByTier">HorseCollisionMod.ReactionByTier</a></td>
+	<td class="summary">What a victim's body does when the tier lands on them.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.ThrowByTier">HorseCollisionMod.ThrowByTier</a></td>
+	<td class="summary">The tier's share of the configured impulse, for the tiers that ragdoll.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:TierValue"></a>
+    <strong>HorseCollisionMod:TierValue (name, tierName)</strong>
+    </dt>
+    <dd>
+    One tier's value for one concern. </p>
+
+<p> The single lookup behind every per-tier table. The settings file is asked
+ first and the compiled-in default answers when it has nothing, which is what
+ lets a player's partial table work: an override of <code>Gallop</code> alone leaves the
+ other four at their shipped figures rather than blanking them.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">name</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the table's name, such as "ImpactDamageByTier"
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot", "Gallop", "Rear" or "Charge"
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        the tier's value, or nil when neither table carries one
+    </ol>
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod.ImpactDamageByTier"></a>
+    <strong>HorseCollisionMod.ImpactDamageByTier</strong>
+    </dt>
+    <dd>
+    What each tier is worth in health, before armor. </p>
+
+<p> The gallop figure is set from measurement rather than picked. At 90 the soft
+ end killed six of eight, and both survivors finished on 3.5 and 0.5 health,
+ having been dealt 81.0 and 80.6 against a villager's 100. The engine's own
+ trample adds a further 15 to 20 on top in most impacts but varies from
+ nothing to 28, and that variation is what leaves any survivors at all. 95
+ carries those two over and lands the rate near the nine in ten asked for.</p>
+
+<p> Walk is 0 deliberately: a shove staggers, it does not wound. A trot is worth
+ far less than the gallop rather than proportionally less, because the mod
+ puts a man on the ground at a trot and being knocked down is most of the
+ weight the rider wanted a trotting horse to carry.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.StaminaDrainByTier"></a>
+    <strong>HorseCollisionMod.StaminaDrainByTier</strong>
+    </dt>
+    <dd>
+    What each tier costs the horse, before the rider's Horsemanship, the
+ horse's barding and the combat penalty. </p>
+
+<p> The rear and the charge carry figures of their own rather than borrowing a
+ loop tier's. They are separate moves with separate costs: a rear is hooves
+ coming down from a standstill and is charged near a trot, while a charge is
+ the heaviest thing the mod does and is charged a gallop's.</p>
+
+<p> A charge is charged once for the whole lunge rather than once per victim,
+ which is decided at the call site, because riding down a group is the move
+ and a crowd should not empty the horse for standing close together.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.ReactionByTier"></a>
+    <strong>HorseCollisionMod.ReactionByTier</strong>
+    </dt>
+    <dd>
+    What a victim's body does when the tier lands on them. </p>
+
+<p> Three kinds, and the split is not the two it looks like from the outside:</p>
+
+<ul>
+    <li><code>stagger</code> plays <code>hcm_stagger_</code> and never makes the victim a physics
+     object at all.</li>
+    <li><code>fall</code> plays <code>hcm_fall_</code>, whose fragments carry a Ragdoll ProcLayer at
+     their own ExitTime, so Mannequin hands the body to physics partway
+     through the clip and owns the timing.</li>
+    <li><code>ragdoll</code> drops the victim at the moment of contact and drives the
+     throw from this mod.</li>
+</ul>
+
+<p> The rear sits with the trot rather than with the gallop, which is what the
+ old <code>RearReaction or TrotReaction</code> fallback was saying in a way that could
+ silently change the rear by changing the trot.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.ThrowByTier"></a>
+    <strong>HorseCollisionMod.ThrowByTier</strong>
+    </dt>
+    <dd>
+    The tier's share of the configured impulse, for the tiers that ragdoll. </p>
+
+<p> Only the <code>ragdoll</code> tiers appear. The others hand the body to physics through
+ Mannequin and this mod never pushes it, so a figure for them would be a
+ number that looks live and is not; two such figures sat in the code for
+ months behind branches that shipped settings never reached.</p>
+
+<p> The charge is below a gallop rather than above it. The horse is still moving
+ under its own impulse when the victim goes down in front of it, so its
+ collider shoves the ragdoll on top of whatever this applies.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-14 16:27:45 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

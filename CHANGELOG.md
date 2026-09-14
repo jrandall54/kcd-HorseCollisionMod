@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.13.0] - 2026-09-14
+
 ### Fixed
 
 - A victim lying on the ground no longer snaps upright into a second fall when
@@ -37,8 +39,8 @@ number.
   for two animation states to be absent, and there is a stretch of about 600 ms
   in a normal fall where both are absent and the victim is face down, so a hit
   landing there started a fresh fall clip on a collapsing body. Whether a body
-  can take an animation is now read from its own posture — the head's height
-  above the ground against that victim's own standing height — which is
+  can take an animation is now read from its own posture: the head's height
+  above the ground against that victim's own standing height, which is
   continuous and has no such hole. A victim who has begun to get up still takes
   the reaction, because one shrugging off a hoof reads as vanilla's non-reaction.
   The impact itself always lands either way: the damage, sound, dust and marks

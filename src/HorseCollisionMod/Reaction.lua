@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.12.2
+-- @release 5.13.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -229,7 +229,7 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 	--
 	-- The ragdoll styles are never refused. `Ragdoll` re-physicalizes a body
 	-- that is already down on purpose, so a gallop and a charge can throw
-	-- someone where they lie, and that is the behaviour they should share.
+	-- someone where they lie, and that is the behavior they should share.
 	local animated = style == "stagger" or style == "knockdown"
 			or style == "fall"
 
