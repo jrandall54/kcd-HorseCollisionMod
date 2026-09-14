@@ -174,7 +174,7 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 
 		local generation = self.TimerTick
 
-		self:WhenRagdollResolves(npc, function(state, waitedForBody)
+		self:WhenVictimIsUp(npc, function(state, waitedForBody)
 			if generation ~= self.TimerTick then
 				return
 			end

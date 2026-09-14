@@ -30,6 +30,12 @@ number.
 
 ## [Unreleased]
 
+### Changed
+
+- The wait that decides when a knocked-down victim is back on their feet is
+  named for what it measures. Nothing a player sees changes; the telemetry line
+  for it now reads `on=stood` rather than `on=resolved`.
+
 ## [5.13.0] - 2026-09-14
 
 ### Fixed

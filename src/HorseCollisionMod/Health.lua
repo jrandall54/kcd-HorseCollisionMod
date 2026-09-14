@@ -301,8 +301,8 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	--
 	-- Rest is read from the body's own position rather than from its animation
 	-- state. `BlendRagdoll` never appears on a victim the impact killed, so a
-	-- state test reports `neverRagdolled` on exactly the impacts that threw
-	-- someone hardest and waits out its ceiling instead of measuring them.
+	-- state test reports `neverDown` on exactly the impacts that threw someone
+	-- hardest and waits out its ceiling instead of measuring them.
 	local restPoll = self.RestPollMs
 	local restStill = self.RestStillMeters
 	local restCeiling = 8000

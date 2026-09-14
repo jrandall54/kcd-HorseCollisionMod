@@ -184,23 +184,32 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	return (head - origin) < (standing / 2)
 end
 
---- Runs something once a victim is no longer a settling ragdoll.
+--- Runs something once a victim has finished getting up.
 --
--- `GetPhysicalizationProfile` is not usable for this: measured through a whole
--- ragdoll sequence it read `alive` from start to finish. The animation state
--- does report `BlendRagdoll` while the body is being blended back, so that is
--- what is watched instead.
+-- Named for what it measures. It watches for `BlendRagdoll` and fires when
+-- that state ends, which is not a ragdoll settling: sampling a knockdown
+-- every 100ms shows
+-- the head climbing 0.27, 0.62, 1.21, 1.59 across `BlendRagdoll`, so that
+-- state is the get-up itself and its end is the victim back on their feet.
 --
--- The state has to be seen before its absence counts, for the same reason the
--- reaction wait requires it: a poll landing before the ragdoll takes hold
--- would otherwise report a recovery that has not started as already over.
+-- The distinction is not cosmetic. Two separate mechanisms were built on the
+-- old reading, each treating `BlendRagdoll` as "still down", and both were
+-- wrong in the same direction: they held a victim immune through the whole of
+-- their own recovery. `docs/TECHNICAL_DETAILS.md` carries the measurements.
+--
+-- `GetPhysicalizationProfile` is no use here. Measured through the same
+-- sequence it reads `alive` from the impact to standing, without exception.
+--
+-- The state has to be seen before its absence counts. A poll landing before
+-- the get-up begins would otherwise report a recovery that has not started as
+-- already finished.
 --
 -- @tparam table npc victim entity
 -- @tparam function fn called with the reason and the wait in milliseconds
-function HorseCollisionMod:WhenRagdollResolves(npc, fn)
+function HorseCollisionMod:WhenVictimIsUp(npc, fn)
 	local generation = self.TimerTick
 	local startedAt = self:TimeMs()
-	local deadline = startedAt + self.RagdollResolveCeilingMs
+	local deadline = startedAt + self.GetUpCeilingMs
 	local seen = false
 
 	local function poll()
@@ -219,13 +228,13 @@ function HorseCollisionMod:WhenRagdollResolves(npc, fn)
 		if state == self.RagdollAnimationState then
 			seen = true
 		elseif seen then
-			fn("resolved", elapsed)
+			fn("stood", elapsed)
 
 			return
 		end
 
 		if self:TimeMs() >= deadline then
-			fn(seen and "ceiling" or "neverRagdolled", elapsed)
+			fn(seen and "ceiling" or "neverDown", elapsed)
 
 			return
 		end
@@ -388,7 +397,7 @@ function HorseCollisionMod:TraceRecovery(npc, action)
 			current, since = state, now
 		end
 
-		if now - startedAt < self.RagdollResolveCeilingMs then
+		if now - startedAt < self.GetUpCeilingMs then
 			Script.SetTimer(self.ReactionPollMs, poll)
 
 			return
