@@ -136,17 +136,3 @@ HorseCollisionMod.ThrowByTier = {
 	Gallop = 1.0,
 	Charge = 0.7,
 }
-
---- Which tiers wait for a victim to be ready before scoring another impact.
---
--- Only the tiers that play an animation wait. A gallop ragdolls, which is pure
--- physics with no pose to start from, so it can land at any stage of a
--- victim's recovery; gating it meant the mod declined the impact while the
--- engine's own collision happened anyway.
-HorseCollisionMod.HitReadyByTier = {
-	Walk = true,
-	Trot = true,
-	Gallop = false,
-	Rear = true,
-	Charge = false,
-}

@@ -44,6 +44,18 @@ number.
   The impact itself always lands either way: the damage, sound, dust and marks
   are unchanged.
 
+### Removed
+
+- `HitCooldownMs`, `KnockdownRecoveryMs`, `HitCooldownStateDriven`,
+  `HitReadySettleMs`, `HitReadyPollMs`, `HitReadyCeilingMs` and `HitReadyByTier`.
+  Seven settings and a polling watcher existed to answer whether a victim had
+  recovered enough to take another reaction, and they answered it with timers
+  that were wrong in both directions: an impact landing in the 600 ms hole
+  mid-fall was allowed through, and impacts through the whole of a get-up were
+  refused outright, which read as the mod having stopped working. The victim's
+  own posture answers it directly. `HitMinIntervalMs` is untouched; it debounces
+  one pass of the horse into one impact and says nothing about recovery.
+
 - A rear and a charge now cost the horse what the rider has earned. Both drained
   a flat figure with none of the modifiers every other impact gets, so levelling
   Horsemanship made a walk, a trot and a gallop cheaper while leaving the two

@@ -103,18 +103,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field TickSeconds detection interval, used to sweep the footprint forward
 -- @field SweepMultiplier how far ahead to sweep, per meter per second
 -- @field MaxSweepExtra cap on the forward sweep, in meters
--- @field HitCooldownStateDriven whether the knockdown wait reads the victim's
---   animation state instead of counting
 -- @field HitMinIntervalMs the least time between two scored impacts on one
 --   victim, so a single pass through someone is one impact and not five
--- @field HitReadyByTier which tiers wait for a victim to be ready
--- @field HitReadySettleMs how long a victim must be neither animation-driven
---   nor ragdolling before another impact counts
--- @field HitReadyPollMs how often that state is sampled
--- @field HitReadyCeilingMs the wait's failsafe, for a victim never seen busy
--- @field HitCooldownMs minimum gap between reactions on the same victim
--- @field KnockdownRecoveryMs how long a knocked-down victim is left alone,
---   which is longer than the walk cooldown because they are still on the ground
 -- @field ImpactSpeedSamples ticks of speed history a collision is scored from
 -- @field HorseAirborneVz the upward speed, in meters per second, at which
 --   the mod reports that the horse has left the ground. Nothing is written
@@ -494,8 +484,6 @@ HorseCollisionMod.Config = {
 	SweepMultiplier          = 0.50,
 	MaxSweepExtra            = 0.35,
 	HitMinIntervalMs         = 700,
-	HitCooldownMs            = 3000,
-	KnockdownRecoveryMs      = 6000,
 
 	-- A collision is scored on the peak of the last ImpactSpeedSamples ticks,
 	-- not on the speed read when the victim is noticed. MaxImpactSpeed is the
@@ -1074,14 +1062,7 @@ HorseCollisionMod.Config = {
 	-- animation need to: a knockdown clip starts from standing and has nothing
 	-- to blend from on a victim already flat, while a ragdoll has no pose to
 	-- start from and can land at any point in a recovery.
-	HitReadyByTier           = {
-		Walk = true, Trot = true, Rear = true, Gallop = false, Charge = false
-	},
 
-	HitCooldownStateDriven   = true,
-	HitReadySettleMs         = 250,
-	HitReadyPollMs           = 250,
-	HitReadyCeilingMs        = 6000,
 
 	-- The dust a body throws up where it lands. Nothing at a walk, where
 	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
@@ -1198,21 +1179,13 @@ HorseCollisionMod.Config = {
 }
 
 
---- When each victim may react again, in milliseconds, keyed by entity id.
---
--- Holds the time a victim becomes eligible rather than the time it was last
--- hit, because how long that takes depends on what the last impact did. A
--- stagger is over quickly; a knockdown leaves them on the ground for several
--- seconds.
--- @table RecentHits
-HorseCollisionMod.RecentHits = {}
 
---- When each victim was last scored, keyed the same way as `RecentHits`.
+--- When each victim was last scored, by entity id.
 --
--- Separate from it deliberately. `RecentHits` answers whether a victim is ready
--- for an animated reaction; this answers whether the horse has already been
--- charged for the contact it is still passing through. A gallop is exempt from
--- the first and subject to the second.
+-- Whether the horse has already been charged for the contact it is still
+-- passing through, read by `ImpactIsNewContact`. It debounces one pass into
+-- one impact and says nothing about the victim's recovery, which is
+-- `IsVictimFlat` and is read from the body rather than from a clock.
 --
 -- @table LastScoredHit
 HorseCollisionMod.LastScoredHit = {}
@@ -1730,12 +1703,12 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 
 		self.TimerTick = currentTick
 
-		-- Cooldown deadlines are stamped against a clock the save restores,
-		-- and the entity ids keying them are reused across a load. Neither
-		-- survives the transition, so the table is dropped rather than
-		-- carried into a world it no longer describes.
-		self.RecentHits = {}
+		-- Contact stamps are written against a clock the save restores, and
+		-- the entity ids keying them are reused across a load. Neither
+		-- survives the transition, so the tables are dropped rather than
+		-- carried into a world they no longer describe.
 		self.LastScoredHit = {}
+		self.StandingHead = {}
 		self.LockedUntil = {}
 		self.RecentRejections = {}
 		self.RecentBarks = {}

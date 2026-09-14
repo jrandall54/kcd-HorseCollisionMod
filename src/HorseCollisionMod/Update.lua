@@ -51,52 +51,23 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		horsePos = horseEnt:GetPos()
 	end)
 
-	-- The detection sphere is tested ten times a second, so without a
-	-- per-victim cooldown a single pass through a crowd would restart the
-	-- same NPC's reaction every tick and they would never finish staggering.
+	-- There is no readiness wait any more, and nothing here counts time.
 	--
-	-- The wait runs until the victim can act again rather than for a fixed
-	-- time after the last impact. Someone knocked down is still on the
-	-- ground long after a stagger would have finished, and an impact landing
-	-- while they are down plays no reaction, because every reaction is a
-	-- standing animation, and usually costs them no health either.
+	-- What stood here stamped a deadline per victim and refused every impact
+	-- until it passed, with five settings behind it and a watcher polling the
+	-- animation state to clear it early. It was wrong in both directions.
+	-- It let an impact through mid-fall, because it declared a victim
+	-- recovered after 250ms of being in neither reaction state and there is a
+	-- 608ms stretch of exactly that while the body is face down between the
+	-- fall clip ending and the ragdoll taking hold. And it refused impacts
+	-- through the whole of a get-up, which reads as the mod having stopped
+	-- working.
 	--
-	-- The wait is observed rather than timed. `WatchHitReady` polls the
-	-- victim's own animation state and clears the deadline when they are back
-	-- on their feet, so what is stamped here is a failsafe rather than the
-	-- duration. The comment this replaced said nothing in the engine reports
-	-- whether an actor is on the ground, which was true of the reads tried at
-	-- the time and is not true of `GetCurrentAnimationState`.
-	local readyAt = self.RecentHits[npcId]
-
-	-- A deadline further away than the longest cooldown that can be written
-	-- was not written against this clock. `System.GetCurrTime` is persisted
-	-- in the save, so loading an earlier one moves it backwards by however
-	-- far the save was rewound, and every victim hit before that point is
-	-- then locked out for the length of the rewind. Deadlines up to 239
-	-- seconds ahead were read out of a running game against a configured
-	-- maximum of 6.
-	--
-	-- Discarding the stamp rather than trusting it also covers entity ids
-	-- being reused across a load, which otherwise locks out a victim that
-	-- was never hit at all.
-	if readyAt then
-		local longest = math.max(self.Config.HitCooldownMs,
-				self.Config.KnockdownRecoveryMs)
-
-		-- The state-driven wait stamps its ceiling rather than a duration, so
-		-- the sanity bound has to admit it. Without this every deadline looks
-		-- like one written against a different clock and is thrown away, which
-		-- removes the cooldown entirely.
-		if self.Config.HitCooldownStateDriven then
-			longest = math.max(longest, self.Config.HitReadyCeilingMs or 0)
-		end
-
-		if readyAt - now > longest then
-			self.RecentHits[npcId] = nil
-			readyAt = nil
-		end
-	end
+	-- Whether a body can take an animation is now `IsVictimFlat`, read from
+	-- the victim's own posture at the moment of the impact, and it lives with
+	-- the reaction rather than in front of the whole collision. The impact
+	-- always lands: a second hit on a downed victim registers and costs them
+	-- health, so refusing it only ever lost damage the engine charged anyway.
 
 	-- A lunge belongs to the charge, and this loop stays out of it.
 	--
@@ -120,56 +91,11 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	local tierName = self:GetSpeedTier(speed)
 
-	-- The wait is animation business, so only the tiers that play an animation
-	-- observe it.
-	--
-	-- A trot knocks a victim down with a clip that starts from standing, so
-	-- firing it at someone already flat has nothing to blend from. A gallop
-	-- ragdolls, which is pure physics and has no pose to start from, so there
-	-- is no stage of a victim's recovery where it cannot land.
-	--
-	-- Leaving a gallop gated is what produced the worst of the feedback
-	-- problem: the mod declined the impact, the engine's own collision
-	-- happened anyway, and the rider got the vanilla result, which is the
-	-- horse wedged in the victim, no reaction, and a bark. That reads as the
-	-- mod having stopped working.
-	-- One contact, one impact. Checked for every tier, including the ones that
-	-- do not wait for readiness, because a horse mid-pass is still inside the
-	-- same collision it has already been charged for.
+	-- One contact, one impact. A horse mid-pass is still inside the same
+	-- collision it has already been charged for, and this is the only thing
+	-- that debounces it. It measures the gap between two contacts rather than
+	-- a victim's recovery, which is why it outlived the readiness wait.
 	if not self:ImpactIsNewContact(npcId, now) then
-		return
-	end
-
-	if readyAt and now < readyAt and self:HitReadyApplies(tierName) then
-		-- Once per victim per wait, not once per pass.
-		--
-		-- This fires on every pass of the detection loop for as long as the
-		-- victim is down and in range, not only when one is hit again while
-		-- still down. That is a line every thirty milliseconds or so for up
-		-- to twelve seconds: 404 of them in one session, and a burst of
-		-- several hundred immediately after any landed hit.
-		--
-		-- That is not merely noise. Logging is a synchronous write, and a few
-		-- hundred of them spread across the seconds after an impact costs
-		-- frames in exactly the window the rider is watching an animation
-		-- play. It was reported as the rear animation being "off" with "a
-		-- slight jerk" after hitting someone, and the same mechanism was
-		-- demonstrated earlier in the same session by a diagnostic probe that
-		-- sampled per frame and made a smooth animation look rough.
-		--
-		-- The line is still worth having; it is the only evidence the wait is
-		-- doing anything. It just needs to say so once.
-		if self.Config.LogTelemetry then
-			self.RecoveryLogged = self.RecoveryLogged or {}
-
-			if self.RecoveryLogged[npcId] ~= readyAt then
-				self.RecoveryLogged[npcId] = readyAt
-
-				self:Log("Recovering " .. self:NameOf(npc)
-						.. " for=" .. tostring(readyAt - now) .. "ms")
-			end
-		end
-
 		return
 	end
 
@@ -177,31 +103,12 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	local cfg = self.Config
 	local isCombat, combatDetail, playerInDanger = self:IsCombatCollision(npc)
 
-	-- Only the knockdown tiers put anyone on the ground, so the walk tier
-	-- keeps the shorter wait.
-	local recovery = cfg.HitCooldownMs
-
-	if tierName ~= "Walk" then
-		recovery = cfg.KnockdownRecoveryMs
-	end
-
-	-- Stamped for every tier, including the ones exempt from the readiness
-	-- wait. This is what makes one pass one impact, and a gallop needs it
-	-- precisely because it is exempt from everything else.
+	-- What makes one pass one impact, read by `ImpactIsNewContact` above.
 	self.LastScoredHit[npcId] = now
 
 	-- When the last impact of any kind landed, so the airborne probe above can
 	-- say whether the horse left the ground off a collision or on its own.
 	self.LastImpactAt = now
-
-	-- What is stamped depends on which wait is running. Counting stamps the
-	-- duration; observing stamps the ceiling and lets the watcher clear it
-	-- early, which is almost always what happens.
-	if cfg.HitCooldownStateDriven then
-		self.RecentHits[npcId] = now + (cfg.HitReadyCeilingMs or recovery)
-	else
-		self.RecentHits[npcId] = now + recovery
-	end
 
 	-- Past every early return, so only a victim this impact is resolved for is
 	-- ever made immortal. `ApplyImpactDamage` lifts it once the body is at
@@ -278,11 +185,6 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- rather than where they land, because a gallop throws them several
 	-- meters and dust that follows the body reads as smoke.
 	self:ImpactDust(npc, tierName)
-
-	-- Started after the deadline is stamped, because it clears that deadline.
-	if cfg.HitCooldownStateDriven then
-		self:WatchHitReady(npc, npcId, tierName)
-	end
 
 	if tierName == "Walk" then
 		-- Only a real fight suppresses the stagger. The combat test is also

@@ -96,7 +96,7 @@ breaking the mod. Deleting a line restores its default.
 | `HorseFrontReach` | 1.05 | Meters ahead of the horse that count as contact. Lower to require a closer hit. |
 | `HorseHalfWidth` | 0.70 | Meters to either side that count as contact. Lower if NPCs react when you ride past. |
 | `HorseRearReach` | 0.20 | Meters behind the horse that count as contact. |
-| `HitCooldownMs` | 3000 | Milliseconds before the same NPC can react again. Stops one person reacting repeatedly. |
+| `HitMinIntervalMs` | 700 | Milliseconds between two impacts on the same person, so one pass of the horse counts once rather than four or five times. |
 | `Knockback` | 50.0 | Horizontal knockdown force, trot and gallop only. Higher throws them further. |
 | `Uplift` | 30.0 | Vertical knockdown force, trot and gallop only. Higher throws them upward rather than along the ground. |
 | `RagdollDampSettleSpeed` | 0.5 | The speed a thrown body must drop under, in meters per second, before the mod settles it so it stops sliding. Settling it while it is still traveling cuts the throw short. |
@@ -114,9 +114,6 @@ breaking the mod. Deleting a line restores its default.
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
-| `HitCooldownStateDriven` | true | Whether the wait after a knockdown reads the victim's own animation state instead of counting. A victim standing up cannot be knocked down again by anything, so hitting them costs health with no visible reaction. |
-| `HitReadySettleMs` | 250 | How long a victim must be neither animation-driven nor ragdolling before another impact counts. |
-| `HitReadyCeilingMs` | 6000 | Failsafe, for a victim never seen busy at all. |
 | `Horsemanship` | true | Whether the rider's `horse_riding` skill changes what a collision costs. A novice is thrown by a single gallop impact; a master rides through four or five guards. |
 | `HorsemanshipStaminaWorst` | 10.0 | The horse's stamina cost multiplier at skill 0. |
 | `HorsemanshipStaminaBest` | 1.2 | And at skill 20. |

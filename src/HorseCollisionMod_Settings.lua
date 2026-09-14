@@ -19,9 +19,6 @@ HorseCollisionModSettings = {
 	HorseFrontReach          = 1.05,  -- meters ahead of the horse
 	HorseHalfWidth           = 0.70,  -- meters to either side
 	HorseRearReach           = 0.20,  -- meters behind
-	HitCooldownMs            = 3000,  -- before a staggered NPC can react again
-	KnockdownRecoveryMs      = 6000,  -- before a floored one can, they lie
-	                                  -- there long after a stagger ends
 
 	-- Knockdown force, trot and gallop only.
 	Knockback                = 50.0,  -- horizontal, higher throws further
@@ -695,14 +692,7 @@ HorseCollisionModSettings = {
 	-- second deliberate run.
 	HitMinIntervalMs         = 700,
 
-	HitReadyByTier           = {
-		Walk = true, Trot = true, Rear = true, Gallop = false, Charge = false
-	},
 
-	HitCooldownStateDriven   = true,
-	HitReadySettleMs         = 250,
-	HitReadyPollMs           = 250,
-	HitReadyCeilingMs        = 6000,
 
 	-- The dust a body throws up where it lands. Nothing at a walk, where
 	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
