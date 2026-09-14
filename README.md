@@ -1,49 +1,71 @@
 # Horse Collision Mod
 
-Vanilla horse collisions produce a shout and nothing else. This mod adds existing animations 
-and physical reactions when Henry collides with NPCs while on horseback. The goal of this mod 
-is to increase immersion by adding a feature that would feel right at home being included 
-in vanilla. 
+Vanilla horse collisions produce a shout and nothing else. This mod gives them a
+reaction scaled to your speed, a sound, damage that follows what the victim is
+wearing, marks they carry afterwards, a cost to your horse, and two combat moves
+of your own.
 
 ## What happens
 
-| Speed | NPC | Horse stamina |
+| Speed | The victim | Your horse |
 | --- | --- | --- |
-| Walk, 1.8+ m/s | Staggers, stays on their feet, takes no damage | No cost |
-| Trot, 4.5+ m/s | Knocked down, and hurt | -30 |
-| Gallop, 8.5+ m/s | Knocked down harder, and hurt badly | -45 |
+| Walk, 1.8+ m/s | Staggers and stays up. No damage. | No cost |
+| Trot, 4.5+ m/s | Knocked down by an animation, hurt. | Stamina cost |
+| Gallop, 8.5+ m/s | Thrown by physics. Often fatal without armor. | Higher cost |
+| Rear | Struck by the horse coming down. | Higher cost |
+| Charge | Everyone in a corridor ahead is knocked down. | Highest cost |
 
-- The stagger is the game's own standing hit reaction, picked from the side you hit them on.
-- Riding someone down hurts them, and enough of it kills. The damage is the game's
-  own, from the speed the horse is carrying when it strikes, so a bump costs nothing
-  and a full gallop costs a great deal.
-- Because the game treats a rider's collision as the rider's doing, hurting or
-  killing someone this way is a crime like any other, and guards respond to it.
-- Armor decides how much the impact tires your horse. It does not reduce the damage,
-  and it does not currently change how far someone is carried.
-- If a collision empties your horse's stamina, it rears and throws you off.
-- Horses have different stamina pools and it regenerates between impacts, so how many
-  people you can put down depends on your horse and how fast you string hits together.
-- In combat, stamina costs 2.5x and the walk-speed stagger is disabled. Knockdowns are
-  unchanged.
-- From a standstill you can rear the horse. One key rears on the spot and brings
-  the hooves down on anyone right in front; the other rears and drives forward,
-  riding down whoever is in the way. Both use the horse's own animations and you
-  stay in the saddle.
+- **Two moves on two keys.** `F` rears the horse on the spot and brings its hooves
+  down on anyone in front. The charge is a rearing lunge that knocks down everyone
+  ahead of the horse. The horse must be standing still to rear.
+- **`Q` and `E` lean you out of the saddle** in first person, so the horse's head
+  stops hiding what you are about to ride into.
+- **Damage follows what the victim wears.** An unarmored villager rarely survives a
+  full gallop. A man in plate mostly walks away.
+- **Collision kills are yours or not, as you choose.** Trampling someone to death is
+  a crime and guards respond, unless you turn that off, in which case it genuinely
+  is not charged to you.
+- **Your Horsemanship decides what an impact costs your horse.** Early on a single
+  gallop can empty its stamina; the cost falls as the skill rises. Barding adds
+  damage and eases the stamina cost.
+- **If a collision empties your horse's stamina it rears and throws you off**, and
+  may wander off rather than wait to be remounted.
+- **Victims speak.** A shove gets a complaint. A knockdown gets a cry of pain and
+  then words while they get back up. Henry grunts when the collision goes through
+  him, and has something to say when one kills somebody.
+- **Shove the same person too often and they fight back.** They drag you out of the
+  saddle first, and you can yield instead of killing them. The brawl itself is not a
+  crime. Women raise the alarm rather than fighting.
+- **They carry the marks.** Dirt and blood on the side the horse struck, which build
+  up and wear off once their own routine takes them home.
+- **The impact lands on you too.** Camera kick at a gallop, a brief blur in first
+  person, and dust off the ground where a body lands.
+- **In combat every stamina cost is multiplied**, and the walk stagger is skipped.
+  Knockdowns are not.
+- Your dog is never affected.
 
 ## Requirements
 
-Kingdom Come: Deliverance 1.9.7. The mod declares that version
-and the game refuses to load it against any other.
+Kingdom Come: Deliverance 1.9, any patch.
 
 ## Install
 
 Vortex, or extract the zip into `Kingdom Come - Deliverance\Mods\`.
 
+Upgrading: delete the old version rather than installing over it. Settings you
+changed carry over, and anything this version no longer recognizes is ignored
+rather than breaking.
+
+Upgrading from 4.x: the charge is its own kind of impact now, with its own damage,
+stamina cost and reach, so numbers you tuned through the gallop settings no longer
+describe it. The rear on the spot moved to `F`, because leaning took `Q` and `E`.
+
 ## Settings
 
 Settings live in their own file, `HorseCollisionMod_Settings.lua`, inside the
-mod's pak. It contains nothing but the values below.
+mod's pak. The ones worth changing are listed below. The file holds more than
+this, grouped at the bottom under a warning on each group: internals, and timings
+measured against an animation, where the shipped value is the only sensible one.
 
 Install the mod, then edit the pak that is inside the mods folder. Opening the downloaded
 zip and going into the pak inside it does not work.
@@ -176,21 +198,16 @@ A few detection internals are omitted here and commented in place in the file.
 
 ## Compatibility
 
-Works alongside other animation mods. It replaces neither animation database,
-referencing them instead, so there is nothing for another mod to overwrite or be
-overwritten by. It does not touch AI behavior trees, quests or RPG tables.
+Works alongside other animation mods. No vanilla file is replaced or renamed. AI
+behavior trees, quests and RPG tables are untouched.
 
-`docs/HOW_IT_WORKS.md` explains how, and what the remaining limits are.
-
-Upgrading from 2.x: delete the old version rather than installing over
-it, since it replaced files this one does not.
+The one conflict left is another mod pointing the same NPC classes at a different
+animation database, which is uncommon.
 
 ## Planned
 
-Mass and momentum, so armor decides how far someone flies. Blunt damage and
-injuries. Horsemanship reducing the chance of being thrown. Morale shock, so a
-charge through a line breaks it. And crime, so that riding someone down in a
-village is finally something the game notices.
+Injuries that outlast the impact. Making how bad a collision was easier to read.
+Morale, so a charge through a line breaks it. A braced polearm stopping a charge.
 
 `ROADMAP.md` has the detail.
 

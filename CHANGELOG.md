@@ -30,6 +30,15 @@ number.
 
 ## [Unreleased]
 
+## [5.11.1] - 2026-09-13
+
+### Documentation
+
+- Rewrote the README's opening and the mod page for people who want to use the
+  mod. Both stated what a mechanism was and why, where the answer wanted is what
+  it does. The README's opening was also wrong: it said the damage was the
+  game's own, that armor did not reduce it, and that only 1.9.7 was supported.
+
 ## [5.11.0] - 2026-09-13
 
 ### Added
