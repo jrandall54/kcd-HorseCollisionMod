@@ -58,6 +58,15 @@ that two identical collisions are not identical, but a roll that turns a fatal
 blow non-fatal hands the kill back to the game. When the intended damage would
 have killed, the roll is overruled.
 
+Characters the game will not let you attack are charged nothing at all. The mod
+damages a victim by writing to their health, which is not the path vanilla
+refuses when it declines to let the player swing at Captain Bernard, and which
+ignores the game's own immortality flag, so such a character could be worn down
+and killed. They are recognised by the protection flags the game marks them
+with rather than by name, so a character protected only for the span of one
+quest is covered too. They are still knocked down, since that is the collision
+itself, and whatever the game charges them for it is given straight back.
+
 A badly hurt NPC left in the street would otherwise be taken over by the game's
 own behavior for the wounded, which stands them still until they slowly heal.
 The mod exempts anyone it knocks down from that, using the same mechanism the

@@ -719,6 +719,13 @@ HorseCollisionModSettings = {
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
 	ProtectMutt              = true,  -- whether your dog is immune
 	                                  -- around on his back
+
+	-- Characters the game will not let you attack -- Captain Bernard, the Lord
+	-- of Leipa and anyone else a quest is protecting -- take no damage from a
+	-- collision. They are still knocked down, because that is the game's own
+	-- physics and not something this mod applies, but the impact costs them no
+	-- health. Turning this off lets a horse kill a quest-critical character.
+	ProtectStoryCharacters   = true,
 	LogTelemetry             = true,  -- diagnostics in kcd.log
 
 	-- Names the reason a nearby NPC produced no reaction. Writes a line for

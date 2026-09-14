@@ -249,6 +249,18 @@ local header directly.
 - `soul:DealDamage(stamina, health, attacker, flag)` takes stamina first.
   Vanilla's debug helper `Quick.lua` names the parameters health-first, which is
   wrong. Use `soul:SetState` when adjusting a specific stat.
+- **`soul:DealDamage` ignores the game's immortality flag.** Captain Bernard
+  reads `imm=1` and was taken from 100 health to 66 over three collisions. The
+  protection vanilla applies to a story character lives in the attack path, not
+  in the damage call, so a mod reaching health directly bypasses it and nothing
+  downstream objects. Anything that writes to a victim's health has to check for
+  itself.
+- The protection is readable as derived stats. `soul:GetDerivedStat("apr")` is
+  the attack-protection flag granted by the `vip_attackprot` buff, and `"imm"`
+  is immortality; `"ppr"` and `"upr"` cover theft and unconsciousness. Measured
+  side by side, `rat_bernard` reads `apr=1 imm=1 upr=1 ppr=1` where an ordinary
+  guard reads zero for all four. `references/libKCD1/include/rpgmodule/E_DerivedStat.h`
+  catalogs the full set of 110 codes.
 - Brain messages sent with `XGenAIModule.SendMessageToEntity` are not guaranteed
   to arrive. Handlers declared `Atomic="true"` drop messages while busy, and
   most messages sent under load are lost. There is no return value to check.
