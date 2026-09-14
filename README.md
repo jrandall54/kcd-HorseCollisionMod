@@ -250,6 +250,9 @@ tools/
   probe_recovery_states.lua  samples everything an actor exposes, from an
                           impact until they stand again, so a trigger can be
                           tied to a measured posture rather than a timer
+  probe_fall_landing.lua  reports the moment each fall clip puts a victim on
+                          the ground, by watching the head stop descending,
+                          and re-arms so a run of angles can be measured
   dev_peace.lua           stops the world reacting to the player, so a test
                           that kills someone is not also a test of a fight
   dev_target.lua          puts a pinned test victim four meters in front of
