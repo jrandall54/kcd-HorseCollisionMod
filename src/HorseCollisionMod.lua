@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.12.1
+-- @release 5.12.2
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.12.1"
+HorseCollisionMod.Version = "5.12.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1783,6 +1783,19 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- having reared and there is no deadline to wait for and the keys work
 		-- at once.
 		self.RearNextAt = nil
+
+		-- The lean's re-base guard is stamped the same way, and was the other
+		-- deadline missed when the rear's was fixed: `LeanHomeUntil` is set in
+		-- `StopLean` against this same clock, and a load that winds the clock
+		-- back leaves it in the future, so `StartLean` refuses every press
+		-- until the clock catches up. `LeanHeld` is dropped too, since a save
+		-- written mid-lean would otherwise come back holding a sign that
+		-- nothing can ever release, permanently refusing `StartLean`.
+		self.LeanHomeUntil = nil
+		self.LeanHeld = nil
+		self.LeanLastFlip = nil
+		self.LeanGeneration = (self.LeanGeneration or 0) + 1
+
 		self.VictimActivity = {}
 		self.SurrenderHintFor = {}
 		self.Annoyance = {}

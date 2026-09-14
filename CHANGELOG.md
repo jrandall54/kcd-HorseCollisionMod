@@ -30,6 +30,17 @@ number.
 
 ## [Unreleased]
 
+## [5.12.2] - 2026-09-14
+
+### Fixed
+
+- The lean keys went dead for an unpredictable stretch after a save reload, the
+  same bug the rear's cooldown had: `LeanHomeUntil` is stamped against the level
+  clock a save load winds back, so a deadline set before the save was still in
+  the future once the save came back and every press was refused until the
+  clock caught up. The load handler now clears the lean's deadline and held
+  state the same way it already clears the rear's.
+
 ## [5.12.1] - 2026-09-14
 
 ### Fixed
