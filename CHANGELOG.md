@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.12.1] - 2026-09-14
+
 ### Fixed
 
 - The protection added in 5.12.0 matched every victim, not only the characters
