@@ -21591,3 +21591,106 @@ to miss. This is the map, not a summary: each line names where the work is.
   opens a real conversation with chosen options. It is not a bark and was found
   by accident; it is written up because the capability is worth more than the
   accident.
+
+# Additive table patches work, and the combat hit grunts are still unreachable
+
+Two separate findings, from one investigation into the trot impact vocal. The
+rider's complaint was register: `RANENY_NA_ZEMI` is the set the mod fires at
+trot and gallop, and at trot it reads as far too much.
+
+> "I don't want them to sound like they're dying on trot impacts like they
+> currently do ... I want them to sound like they got hit, not drawn out dying
+> sounds."
+
+## The register survey
+
+`tools/npc_pain_sets.py` reports every metarole whose topics are all backed by
+unconditional sequences, with its line count, how many members are the wordless
+marker, and its longest line. Only three collision sets exist in the whole game,
+and the middle register the rider wanted is not among them:
+
+    KOLIZE_S_HRACEM_LEHKA     36 lines, 21 wordless, longest 2w   too light
+    KOLIZE_S_HRACEM           35 lines,  0 wordless, longest 7w   words, used for recovery
+    KOLIZE_S_HRACEM_NA_KONI   18 lines,  0 wordless, longest 17w  words, used for recovery
+
+Both remaining candidates were auditioned and both were rejected, `LEHKA` as too
+light and `RANENY_NA_ZEMI` as too strong. **No third register exists that a bark
+request can reach.** The register the rider asked for is recorded, and it sits in
+topics 11436 and 15245: "Uff!", "Ech!", "Ow!", "Damn!", "Yow!" for men and
+"Uhh!", "Ech!", "Ow!" for women, split by the gendered roles
+`ZASAH_ZBRANI_SLABY_(MUZ)` and `ZASAH_ZBRANI_SLABY_(ZENA)`.
+
+## Why those topics cannot be driven, definitively
+
+Three gates, each found after clearing the previous one, and each cleared in the
+live game rather than argued from the tables.
+
+**1. The entry condition names a variable no message carries.** Both topics sit
+behind `var('hitStrength') <= 3 & get_health()[0] > 0`. In the decompilation the
+engine builds a request named `CombatShout_%s_%d` and hangs four variables on
+that request:
+
+    blockedAttack   perfectlyBlockedAttack   opponentDistance   hitStrength
+
+So `hitStrength` is a property of the shout request, not state on the NPC. No
+amount of setting context options or sending `hitReaction` can satisfy it,
+because the variable does not live on the character at all. `dialog:monologRequest`
+carries thirteen named fields and none of them is a variable bag.
+
+**2. The metarole belongs to a different subsystem.** `combat_shout_type.xml`
+registers fifteen shout types against metarole ids 289 to 299, and
+`COMBAT_VICTIM_SCREAM_RECEIVED_HIT` is id 297 among them. Those metaroles are
+dispatched by `C_CombatShoutTypeDatabase` through the shout path. A monolog
+request naming one of them reaches the wrong subsystem entirely, which is why
+relaxing the condition to `1` and raising `speech_coef` from 0 to 1 changed
+nothing: fourteen requests in one ride, all silent.
+
+**This is the general rule worth keeping: a metarole listed in
+`combat_shout_type.xml` is not addressable as a bark.** That table is the
+authority on which of the `COMBAT_*` sets are dead ends, and it is nine rows
+long enough to check in a second.
+
+**3. Neither way round the subsystem works.** An invented metarole (a new row in
+`metarole.xml` plus bindings in `TopicToRole` onto roles the victims provably
+hold, confirmed by reading `soul:GetRoles()` on four men) resolved for nobody,
+almost certainly because souls reach metaroles through the precomputed
+`v_soul2role_metarole` view that a new id is absent from. Giving a known-working
+topic a second sequence pointed at the hit recordings did not make that sequence
+pickable either. Trot was left exactly as it shipped.
+
+## The finding that outlasts the failure: tables patch additively
+
+The rider asked the question that turned this around:
+
+> "Do we really need to override the whole thing? Can't we find a more additive
+> route like with our animation databases?"
+
+Yes, and the diary already recorded the mechanism without connecting it to
+dialogue: Perkaholic ships `perk__perkaholic.xml` beside `perk.xml` rather than
+replacing it. The loader builds the glob `data/libs/tables/<table>__<suffix>.*`
+and merges what it finds, and it says so in the log:
+
+    Table 'topic2sequence' is patched by 'topic2sequence__horsecollisionmod',
+        lines added: 0, modified: 1, equal: 0, time: 0.001
+
+Four things about it, all observed rather than assumed:
+
+  * **The suffix is free.** `__horsecollisionmod` was accepted with no
+    registration anywhere. A harmless warning follows, that
+    `Localization\text__horsecollisionmod.xml` cannot be opened, because the
+    loader looks for a matching localization patch.
+  * **It reports what it did.** `added` versus `modified` distinguishes a new row
+    from a rewritten one, which is the difference between extending vanilla and
+    silently taking something over.
+  * **Rows are keyed, and the key is not the visible id.** A `TopicToRole` patch
+    written to add two bindings reported `modified: 2` instead: the loader matched
+    on the (role, topic) pair and rewrote the metarole rather than adding a row.
+    Patching that table therefore removes a vanilla binding as a side effect.
+    Check the `added`/`modified` split before believing a patch is additive.
+  * **Tables load once, at startup.** A table patch needs a full relaunch; a
+    script reload will not pick it up, and the game will run happily on the old
+    values while the files sit correct on disk.
+
+Cost is 490 bytes for one row against a 5.7 MB whole-table override, and it
+conflicts with nothing. Any future gate that lives in a table column is now
+reachable this way, and dialogue is full of them.

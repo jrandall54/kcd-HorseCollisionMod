@@ -230,6 +230,9 @@ tools/
                           recorded by his actor alone
   henry_quips.py          the same inventory grouped by alias against metarole,
                           flagging each set's worst member
+  npc_pain_sets.py        every NPC bark set whose sequences are all
+                          unconditional, with its wordless count and longest
+                          line, for choosing the register of a reaction
   make_audition.py        writes a console script that speaks one numbered line,
                           for auditioning them one at a time; a result only
                           counts against a recently launched game

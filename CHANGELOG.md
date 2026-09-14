@@ -30,6 +30,24 @@ number.
 
 ## [Unreleased]
 
+## [5.9.0] - 2026-09-13
+
+### Added
+
+- `tools/npc_pain_sets.py`, which reports every NPC bark set whose
+  sequences are all unconditional, with its wordless count and longest line,
+  for choosing the register of a reaction.
+
+### Documentation
+
+- How to patch a game table additively, with a second file named
+  `<table>__<suffix>.xml` holding only the changed rows, instead of replacing
+  the whole table. Records what the loader reports and the traps in it.
+- Why the game's short hit grunts cannot be driven as barks: the metaroles
+  listed in `combat_shout_type.xml` belong to the combat shout system, and
+  their entry conditions read variables that live on the engine's own request
+  rather than on the character.
+
 ## [5.8.3] - 2026-09-13
 
 ### Changed
