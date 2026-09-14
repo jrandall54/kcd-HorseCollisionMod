@@ -103,6 +103,77 @@ function HorseCollisionMod:ThrowRider(horseEnt, playerEnt)
 	end
 end
 
+--- What one impact costs the horse, and charging it.
+--
+-- The single place the stamina figure is worked out. Every tier goes through
+-- it, so the rider's Horsemanship, the horse's barding and the combat penalty
+-- reach a rear and a charge exactly as they reach a gallop. They did not
+-- before: the rear and the charge each drained a flat setting at their own
+-- call site and none of the three modifiers touched them, which meant levelling
+-- Horsemanship made every impact cheaper except the two heaviest.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @tparam table playerEnt the player entity
+-- @tparam string tierName "Walk", "Trot", "Gallop", "Rear" or "Charge"
+-- @tparam[opt] table armor the victim's armor from `ArmorOf`, where this
+--   impact has a single victim to read it from
+function HorseCollisionMod:DrainImpactStamina(horseEnt, playerEnt, tierName, armor)
+	local byTier = self.Config.StaminaDrainByTier
+
+	if type(byTier) ~= "table" then
+		byTier = self.StaminaDrainByTier
+	end
+
+	local base = byTier[tierName]
+
+	if type(base) ~= "number" then
+		base = self.StaminaDrainByTier[tierName]
+	end
+
+	if not base or base <= 0 then
+		return
+	end
+
+	-- The victim's armor is the one modifier that does not always apply.
+	--
+	-- A rear and a charge are charged once for the whole move and that move
+	-- can land on several people at once, so there is no single victim whose
+	-- armor to read and the cost is scored on the horse and rider alone. The
+	-- loop tiers resolve one victim per impact and pass theirs.
+	local armorScale = 1.0
+
+	if armor then
+		armorScale = self:ArmorStaminaScale(armor)
+	end
+
+	local combatScale = 1.0
+
+	-- Decided by the player's own combat state and nothing about the victim,
+	-- which is why this answers correctly for a rear and a charge with no
+	-- victim to hand.
+	if self:IsCombatCollision(nil) then
+		combatScale = self.Config.CombatStaminaMultiplier
+	end
+
+	local bardingScale = self:BardingStaminaScale(horseEnt)
+	local horsemanship = self:HorsemanshipScale(playerEnt)
+	local cost = base * combatScale * armorScale * bardingScale * horsemanship
+
+	-- Logged beside the figure it produces rather than on the impact line,
+	-- because a cost that looks wrong is diagnosed by which factor moved it.
+	if self.Config.LogTelemetry then
+		self:Log("Stamina tier=" .. tostring(tierName)
+				.. " base=" .. string.format("%.1f", base)
+				.. " combat=" .. string.format("%.2f", combatScale)
+				.. " armor=" .. string.format("%.2f", armorScale)
+				.. " barding=" .. string.format("%.2f", bardingScale)
+				.. " horsemanship=" .. string.format("%.2f", horsemanship)
+				.. " cost=" .. string.format("%.1f", cost))
+	end
+
+	self:DrainHorseStamina(horseEnt, playerEnt, cost)
+end
+
 --- Charges the horse for an impact and dismounts Henry when it is spent.
 --
 -- Stamina is written with `soul:SetState`, never `soul:DealDamage`. That

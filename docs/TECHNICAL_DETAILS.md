@@ -478,13 +478,25 @@ thrown. Stamina regenerates quickly between impacts, so the number of people
 that can be put down in one run depends on the horse and on how fast the hits
 are strung together.
 
-A walking bump is not hard enough to tire a horse, hence `StaminaDrainWalk = 0`.
+A walking bump is not hard enough to tire a horse, hence the `Walk` figure of
+0 in `StaminaDrainByTier`.
+
+Every tier is charged through one function, `DrainImpactStamina`, which reads
+that table and applies the three modifiers below. The rear and the charge went
+through it late: each used to drain a flat setting at its own call site, so
+Horsemanship, barding and the combat penalty reached every tier except the two
+heaviest.
 
 The cost is then multiplied by what the target wears, between
 `MinArmorStamina` and `MaxArmorStamina`. A villager in cloth costs less than
-the listed figure and a target in mail costs twice it, so a charge into
-armored men is the expensive one. That multiplier compounds with the combat
-multiplier below.
+the listed figure and a target in mail costs twice it. That multiplier
+compounds with the combat multiplier below.
+
+The armor multiplier is the one that does not reach the rear and the charge,
+and that is deliberate rather than an omission. Those two are charged once for
+the whole move and the move can land on several people at once, so there is no
+single victim whose armor to read. What the horse and rider bring — barding,
+Horsemanship and the combat penalty — applies to them in full.
 
 ### Combat multiplier
 
@@ -1387,7 +1399,7 @@ per charge.
 
 `Charge` is a tier in its own right rather than a gallop wearing another name.
 It has its own damage in `ImpactDamageByTier`, its own sound in
-`ImpactSoundCharge`, its own stamina in `RearChargeStaminaCost`, its own victim
+`ImpactSoundCharge`, its own stamina figure in `StaminaDrainByTier`, its own victim
 lockout in `RearChargeVictimLockMs`, and its own dust, camera shake, view blur
 and throw scalar. Nothing about it can be tuned by changing what an ordinary
 collision does, or the reverse.

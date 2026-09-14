@@ -103,9 +103,7 @@ breaking the mod. Deleting a line restores its default.
 | `RagdollDampFloorMs` | 200 | The earliest a body may be settled, in milliseconds, so it cannot happen mid-launch. |
 | `RagdollDampCeilingMs` | 6000 | The latest, applied whatever the body is doing. |
 | `RagdollDampPollMs` | 100 | How often a thrown body is looked at. |
-| `StaminaDrainTrot` | 14.0 | Stamina removed per NPC at a trot. Raise to be thrown sooner. |
-| `StaminaDrainGallop` | 22.0 | Stamina removed per NPC at a gallop. Raise to be thrown sooner. |
-| `StaminaDrainWalk` | 0.0 | Stamina removed per NPC at walking pace. |
+| `StaminaDrainByTier` | Walk 0, Trot 14, Gallop 22, Rear 12, Charge 22 | What each kind of impact costs the horse. Raise a figure to be thrown sooner. A rear and a charge are charged once for the move rather than once per person. |
 | `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
 | `TrotReaction` | "fall" | What a trot impact does. `"fall"` plays an animated fall the game recovers from, `"knockdown"` adds an animated get-up, `"ragdoll"` is the physics knockdown. |
@@ -176,7 +174,6 @@ breaking the mod. Deleting a line restores its default.
 | `LeanForwardShare` | 0.35 | How much the lean also carries the camera forward, as a fraction of the sideways travel. 0 leans straight out. |
 | `RearReach` | 2.5 | How far in front the hooves reach, for the rear on the spot. |
 | `RearArc` | 70 | The arc in front that counts, in degrees. |
-| `RearStaminaCost` | 12.0 | What a landed rear costs the horse. |
 | `Retaliation` | true | Whether a man shoved repeatedly at walking pace can lose patience and fight back. |
 | `RetaliationFreeBumps` | 1 | How many walk impacts a victim tolerates before any chance of a fight begins. The first is always free. |
 | `RetaliationChanceStep` | 0.25 | How much each further shove adds to the chance. |

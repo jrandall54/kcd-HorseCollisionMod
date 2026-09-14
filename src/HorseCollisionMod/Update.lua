@@ -175,7 +175,6 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	local strength = self.HitReactionStrength
 	local cfg = self.Config
-	local combatScale = 1.0
 	local isCombat, combatDetail, playerInDanger = self:IsCombatCollision(npc)
 
 	-- Only the knockdown tiers put anyone on the ground, so the walk tier
@@ -226,7 +225,6 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- enumerating an inventory per use would repeat the work three times.
 	local armor = self:ArmorOf(npc)
 	local armorImpulse = self:ArmorImpulseScale(armor)
-	local armorStamina = self:ArmorStaminaScale(armor)
 
 	-- The horse's own contribution, read once per impact for the same reason
 	-- the victim's is. Barding is three separate flat effects rather than one
@@ -236,14 +234,6 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	-- are derived from, and nothing about the rider enters it.
 	local bardingCover = self:BardingCoverage(horseEnt)
 	local bardingForce = self:BardingForceBonus(horseEnt)
-	local bardingStamina = self:BardingStaminaScale(horseEnt)
-	local horsemanship = self:HorsemanshipScale(playerEnt)
-
-	armorStamina = armorStamina * bardingStamina
-
-	if isCombat then
-		combatScale = cfg.CombatStaminaMultiplier
-	end
 
 	self:Log("Impact tier=" .. tierName
 			.. " speed=" .. string.format("%.2f", speed)
@@ -251,13 +241,9 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 			.. (cfg.DiagnoseMisses
 					and (" trail=[" .. self:SpeedTrail(self.SpeedHistorySize) .. "]")
 					or "")
-			.. " combatScale=" .. string.format("%.1f", combatScale)
 			.. " armorImpulse=" .. string.format("%.2f", armorImpulse)
-			.. " armorStamina=" .. string.format("%.2f", armorStamina)
 			.. " bardingCover=" .. string.format("%.2f", bardingCover)
 			.. " bardingForce=" .. string.format("%.2f", bardingForce.knockback)
-			.. " bardingStamina=" .. string.format("%.2f", bardingStamina)
-			.. " horsemanship=" .. string.format("%.2f", horsemanship)
 			.. " " .. combatDetail)
 
 	-- Before the tier branches, so the request goes out ahead of the
@@ -317,8 +303,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- fight starts from the shove rather than instead of it.
 		self:ProvokeIfAnnoyed(npc, playerEnt)
 
-		self:DrainHorseStamina(horseEnt, playerEnt,
-				cfg.StaminaDrainWalk * combatScale * armorStamina * horsemanship)
+		self:DrainImpactStamina(horseEnt, playerEnt, "Walk", armor)
 		return
 	end
 
@@ -352,8 +337,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- this mod's damage land last, and so own the killing blow and the
 		-- crime attribution with it, is inside `ApplyImpactDamage`.
 		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt, horseEnt)
-		self:DrainHorseStamina(horseEnt, playerEnt,
-				cfg.StaminaDrainTrot * combatScale * armorStamina * horsemanship)
+		self:DrainImpactStamina(horseEnt, playerEnt, "Trot", armor)
 		return
 	end
 
@@ -373,8 +357,7 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		-- this mod's damage land last, and so own the killing blow and the
 		-- crime attribution with it, is inside `ApplyImpactDamage`.
 		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt, horseEnt)
-		self:DrainHorseStamina(horseEnt, playerEnt,
-				cfg.StaminaDrainGallop * combatScale * armorStamina * horsemanship)
+		self:DrainImpactStamina(horseEnt, playerEnt, "Gallop", armor)
 		return
 	end
 end

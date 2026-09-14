@@ -142,9 +142,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
 -- @field ProtectStoryCharacters when true, characters the game marks as
 --   protected take no damage from an impact
--- @field StaminaDrainWalk horse stamina cost per victim at walk
--- @field StaminaDrainTrot horse stamina cost per victim at trot
--- @field StaminaDrainGallop horse stamina cost per victim at gallop
+-- @field StaminaDrainByTier what each kind of impact costs the horse, before
+--   the rider's Horsemanship, the horse's barding and the combat penalty
 -- @field ThrowRiderOnStaminaEmpty dismount Henry when the horse is spent
 -- @field CombatStaminaMultiplier stamina cost multiplier while in a fight
 -- @field SuppressStaggerInCombat skip the stagger animation during a fight
@@ -232,9 +231,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeWaitCeilingMs push anyway by this point
 -- @field RearChargeVictimLockMs how long a victim struck by a charge is closed
 --   to further impacts, so one lunge is one hit
--- @field RearChargeStaminaCost what a landed charge costs the horse. Its own
---   figure, because the detection loop no longer scores a lunge and so no
---   longer charges it the gallop's drain
 -- @field RearChargeLungePeakMin the top speed a lunge must reach before it can
 --   be judged spent, so noise in the derived speed cannot close the window
 --   before the horse has gone anywhere
@@ -310,7 +306,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearArc the arc in front that counts, in degrees
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
--- @field RearStaminaCost what a landed rear costs the horse
 -- @field ReleaseMovementAttempts how many times that release is repeated, in
 --   case the fragment re-applies its movement layer as it blends
 -- @field ReleaseMovementGapMs how far apart those attempts are
@@ -569,9 +564,10 @@ HorseCollisionMod.Config = {
 	MaxArmorStamina          = 3.0,
 
 	-- Horse stamina, against a full pool of roughly 210.
-	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 14.0,
-	StaminaDrainGallop       = 22.0,
+	StaminaDrainByTier       = {
+		Walk = 0.0, Trot = 14.0, Gallop = 22.0, Rear = 12.0, Charge = 22.0
+	},
+
 	ThrowRiderOnStaminaEmpty = true,
 
 	-- How long a victim is exempted from vanilla's auto-cure daycycle,
@@ -749,7 +745,6 @@ HorseCollisionMod.Config = {
 	RearChargeWaitPollMs     = 30,
 	RearChargeWaitCeilingMs  = 3000,
 	RearChargeVictimLockMs   = 2600,
-	RearChargeStaminaCost    = 22.0,
 	RearChargeLungePeakMin   = 3.0,
 	RearChargeLungeSpentAt   = 0.5,
 	RearChargeWindowMs       = 2600,
@@ -778,7 +773,6 @@ HorseCollisionMod.Config = {
 	RearReach                = 2.5,
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,
-	RearStaminaCost          = 12.0,
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,
@@ -1456,6 +1450,24 @@ HorseCollisionMod.ImpactDamageByTier = {
 	Gallop = 95,
 	Rear = 60,
 	Charge = 110,
+}
+
+--- What each tier costs the horse, as the fallback behind the settings file.
+--
+-- The rear and the charge carry figures of their own rather than borrowing a
+-- loop tier's. They are separate moves with separate costs: a rear is hooves
+-- coming down from a standstill and is charged near a trot, while a charge is
+-- the heaviest thing the mod does and is charged a gallop's.
+--
+-- A charge is charged once for the whole lunge rather than once per victim,
+-- which is decided at the call site, because riding down a group is the move
+-- and a crowd should not empty the horse for standing close together.
+HorseCollisionMod.StaminaDrainByTier = {
+	Walk = 0.0,
+	Trot = 14.0,
+	Gallop = 22.0,
+	Rear = 12.0,
+	Charge = 22.0,
 }
 
 HorseCollisionMod.RetaliationPollMs = 1000

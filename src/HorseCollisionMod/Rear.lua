@@ -819,8 +819,8 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 						if not drained then
 							drained = true
 
-							self:DrainHorseStamina(horseEnt, playerEnt,
-									cfg.RearChargeStaminaCost or 0)
+							self:DrainImpactStamina(horseEnt, playerEnt,
+									"Charge")
 						end
 					end
 				end
@@ -963,7 +963,7 @@ function HorseCollisionMod:RearStrike(horseEnt)
 	end
 
 	if hit > 0 then
-		self:DrainHorseStamina(horseEnt, playerEnt, cfg.RearStaminaCost or 0)
+		self:DrainImpactStamina(horseEnt, playerEnt, "Rear")
 	end
 end
 

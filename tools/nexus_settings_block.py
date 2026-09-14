@@ -88,6 +88,27 @@ def player_facing():
 
 		name, value, own = m.group(1), m.group(2).rstrip(","), m.group(3) or ""
 
+		# A setting whose value is a table is listed as its members rather
+		# than as a bare "{", which is what the page showed before and told a
+		# player nothing. Rendered inline so the row stays one row: the page
+		# is checked by setting name, and a member per row would need a name
+		# with a dot in it that check_nexus_page cannot match.
+		if value == "{":
+			members = []
+			j = i + 1
+
+			while j < len(lines) and not lines[j].strip().startswith("}"):
+				body = lines[j].split("--")[0]
+
+				for key, val in re.findall(r"(\w+)\s*=\s*([^,]+)", body):
+					members.append("%s %s" % (key, val.strip()))
+
+				eaten.add(j)
+				j += 1
+
+			eaten.add(j)
+			value = ", ".join(members)
+
 		# Continuation of the trailing comment: a following line whose only
 		# content is a comment aligned past the value column.
 		j = i + 1

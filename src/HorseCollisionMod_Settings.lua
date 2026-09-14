@@ -73,9 +73,18 @@ HorseCollisionModSettings = {
 	RagdollDampCeilingMs     = 6000,  -- damp regardless by this point
 
 	-- Stamina, against a full pool of roughly 210.
-	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 14.0,
-	StaminaDrainGallop       = 22.0,
+	--
+	-- One figure per tier, and every tier is charged through the same path, so
+	-- the rider's Horsemanship, the horse's barding and the combat penalty all
+	-- apply to a rear and a charge exactly as they do to a gallop.
+	StaminaDrainByTier       = {
+		Walk   = 0.0,   -- a shove costs the horse nothing
+		Trot   = 14.0,
+		Gallop = 22.0,
+		Rear   = 12.0,  -- hooves coming down, standing still
+		Charge = 22.0,  -- charged once for the whole lunge, not per victim
+	},
+
 	CombatStaminaMultiplier  = 2.2,   -- 1.0 removes the combat penalty
 	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
 
@@ -233,8 +242,6 @@ HorseCollisionModSettings = {
 
 	RearReach                = 2.5,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
-	RearStaminaCost          = 12.0,  -- what a landed rear costs the horse
-	RearChargeStaminaCost    = 22.0,  -- what a landed charge costs the horse
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance

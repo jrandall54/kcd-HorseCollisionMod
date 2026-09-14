@@ -30,6 +30,25 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+
+- A rear and a charge now cost the horse what the rider has earned. Both drained
+  a flat figure with none of the modifiers every other impact gets, so levelling
+  Horsemanship made a walk, a trot and a gallop cheaper while leaving the two
+  heaviest moves exactly as expensive as they were on day one, and barding bought
+  the horse no relief on either. Both now go through the same path as the rest,
+  so Horsemanship, barding and the combat penalty reach them.
+
+### Changed
+
+- `StaminaDrainWalk`, `StaminaDrainTrot`, `StaminaDrainGallop`, `RearStaminaCost`
+  and `RearChargeStaminaCost` are replaced by one table, `StaminaDrainByTier`,
+  carrying the same five figures unchanged. Anyone who tuned one of the old keys
+  needs to move their figure into the table; an untouched install plays the same.
+- The settings block on the mod page lists a table setting's members instead of
+  an empty `{`, which also repairs the rows for `ImpactDamageByTier` and
+  `HitReadyByTier`.
+
 ## [5.12.2] - 2026-09-14
 
 ### Fixed
