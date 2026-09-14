@@ -1245,6 +1245,14 @@ HorseCollisionMod.ImmortalSubjects = {}
 -- Cleared with the rest of the per-victim state on a load screen.
 HorseCollisionMod.VictimActivity = {}
 
+--- How high each victim carries their head standing, by entity id.
+--
+-- Recorded at the first impact that reaches them, when they are by definition
+-- upright, and read by `IsVictimFlat` to tell a body lying on the ground from
+-- one that has begun to get up. Measured rather than configured: no threshold
+-- in this mod decides it.
+HorseCollisionMod.StandingHead = {}
+
 
 
 

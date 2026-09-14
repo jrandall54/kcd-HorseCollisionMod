@@ -215,6 +215,36 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 										   armorScale, horsePos, horseEnt)
 	local style = self:TierValue("ReactionByTier", tierName)
 
+	-- An animation is refused on a body that is lying flat, and only then.
+	--
+	-- A victim who has begun to get up takes the reaction: watching one shrug
+	-- off a hoof because a clock had not run out reads exactly like vanilla's
+	-- non-reactions, which is the thing this mod exists to replace.
+	--
+	-- Only the animation is refused. The impact itself lands in full: a second
+	-- hit on a victim already down registers and costs them health, so
+	-- declining the whole thing loses damage the engine charges anyway. The
+	-- sound, the dust, the marks and the damage all happen; the body simply
+	-- stays where it is instead of snapping upright into a second fall.
+	--
+	-- The ragdoll styles are never refused. `Ragdoll` re-physicalizes a body
+	-- that is already down on purpose, so a gallop and a charge can throw
+	-- someone where they lie, and that is the behaviour they should share.
+	local animated = style == "stagger" or style == "knockdown"
+			or style == "fall"
+
+	if animated then
+		self:RecordStandingHeight(npc)
+
+		if self:IsVictimFlat(npc) then
+			self:Log("PlayTierReaction " .. self:NameOf(npc)
+					.. " tier=" .. tostring(tierName)
+					.. " flat on the ground, animation skipped")
+
+			return false
+		end
+	end
+
 	if style == "stagger" then
 		return self:PlayReaction(npc, velocity, speed, "hcm_stagger_")
 	end

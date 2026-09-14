@@ -522,6 +522,76 @@ either way.
 Turning it off compares against vanilla collision handling without uninstalling
 the mod. The knockdown tiers are unaffected.
 
+## What a fall-tier impact actually does to a body
+
+Measured, not inferred. A single trot knockdown was sampled every 100 ms from
+the impact until the victim was standing again, untouched throughout. `headUp`
+is `actor:GetHeadPos().z` minus `entity:GetWorldPos().z`, and the entity origin
+sits on the ground, so it is the head's height above the floor.
+
+| t+ms | animation state | headUp | the body |
+| --- | --- | --- | --- |
+| 0 | `AnimationControlled` | 1.55 | upright, the impact lands |
+| 624 | `AnimationControlled` | 0.94 | falling |
+| 1840 | `AnimationControlled` | 0.15 | flat |
+| 2448 | `MotionIdle` | 0.15 | flat |
+| 3072 | `MotionIdle` | 0.15 | flat |
+| 3664 | `BlendRagdoll` | 0.27 | rising |
+| 4880 | `BlendRagdoll` | 1.21 | rising |
+| 5472 | `BlendRagdoll` | 1.59 | standing |
+| 6064+ | `MotionIdle` | 1.59 | standing, finished |
+
+Three things follow, and the mod had all three wrong for a long time.
+
+**`BlendRagdoll` is the get-up, not the lie-down.** The head climbs from 0.27 to
+1.59 across it. Every piece of code that treated that state as "the victim is
+still a settling ragdoll" had the sequence backwards, and anything waiting for
+it to end was waiting until after the victim was already on their feet.
+
+**The flat stretch is `AnimationControlled` followed by `MotionIdle`.** The fall
+clip ends before Mannequin's Ragdoll ProcLayer takes hold, leaving roughly
+600 ms in which a victim lying face down reads `MotionIdle` — the same state as
+somebody standing about doing nothing. That hole is why every test built on
+animation-state strings eventually let an impact through mid-fall and snapped
+the body upright into a second fall clip.
+
+**A victim is flat for about 1.8 seconds and standing again by 5.5.** Not the
+eight seconds the old `VictimRebuild` timings suggested; that figure was the
+mod noticing late, not the body taking that long.
+
+### What does not work as a signal
+
+All of these were sampled through the same sequence and none of them separates
+any phase from any other:
+
+  * `actor:GetPhysicalizationProfile()` reads `alive` from the impact to
+    standing, without exception.
+  * `entity:GetAngles()` returns pitch and roll of 0.00 throughout. The entity
+    does not rotate with the body.
+  * `entity:GetWorldPos().z` does not descend when the victim does. The entity
+    is not what moved.
+  * `entity:GetVelocity()` never exceeds 0.39 across the whole knockdown.
+  * `actor:IsUnconscious()` stays false.
+
+`actor:GetHeadPos()` is the one reading that tracks the rendered body, and
+`GetHeadPos().z` minus the entity origin is a continuous measure of posture
+with no ambiguity anywhere in the sequence.
+
+### How the mod uses it
+
+`RecordStandingHeight` stores a victim's upright `headUp` at the first impact
+that reaches them, since a victim the speed tiers scored is by definition
+someone the horse rode into while they were standing. `IsVictimFlat` then reads
+the current value against half of that. The halfway point is a bisection rather
+than a tuned figure: flat reads 0.15 against a standing 1.55, so the two are an
+order of magnitude apart and any split between them answers identically.
+
+An animated reaction is refused only while the victim is flat. One that has
+begun to get up takes the reaction, because a victim shrugging off a hoof reads
+as vanilla's non-reaction. The impact itself always lands: a second hit on a
+downed victim registers and costs them health, so declining it would lose
+damage the engine charges anyway.
+
 ## Marks left on a victim
 
 Two actor binds, both taking a delta between -1 and 1 and both accumulating:

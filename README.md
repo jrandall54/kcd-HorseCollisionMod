@@ -250,6 +250,9 @@ tools/
   probe_health.lua        logs one entity's health whenever it changes, for
                           the case where health moves with no impact to
                           account for it
+  probe_recovery_states.lua  samples everything an actor exposes, from an
+                          impact until they stand again, so a trigger can be
+                          tied to a measured posture rather than a timer
   dev_peace.lua           stops the world reacting to the player, so a test
                           that kills someone is not also a test of a fight
   dev_target.lua          puts a pinned test victim four meters in front of

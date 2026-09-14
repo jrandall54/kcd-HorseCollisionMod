@@ -1022,36 +1022,13 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	self:PlayRiderVocal(playerEnt, tier)
 	self:ImpactDust(npc, tier)
 
-	-- A victim already inside a reaction is not given another one.
-	--
-	-- Rearing on someone still down from the last rear started a second
-	-- interactive action on top of the first. The new one interrupts the
-	-- running one mid-blend and the body ends up in a broken pose, face down
-	-- and slowly rotating.
-	--
-	-- The hit itself still lands. A previous session built a cooldown that
-	-- refused the whole impact on the premise that a second blow on a downed
-	-- victim does nothing, and testing disproved it: a second impact on a
-	-- victim in `BlendRagdoll` registers and costs full health. So the damage,
-	-- the sound, the dust and the rest all happen. Only the animation is
-	-- skipped, and the victim stays down under the reaction already playing,
-	-- which is what should happen to someone being trampled where they lie.
-	local busy = false
-
-	pcall(function()
-		local state = tostring(npc.actor:GetCurrentAnimationState())
-
-		busy = state == self.ReactionAnimationState
-				or state == self.RagdollAnimationState
-	end)
-
-	if busy then
-		self:Log("RearHit " .. self:NameOf(npc)
-				.. " already reacting, damage only")
-	else
-		self:PlayTierReaction(npc, tier, velocity, speed,
-				armorImpulse, horsePos, horseEnt)
-	end
+	-- The refusal that used to sit here is now inside `PlayTierReaction`, so
+	-- every tier gets it rather than the rear alone, and it reads the recovery
+	-- window instead of testing two animation-state strings. The strings have a
+	-- hole in them: a victim spends about 600ms mid-fall reading `MotionIdle`,
+	-- which this test called free.
+	self:PlayTierReaction(npc, tier, velocity, speed,
+			armorImpulse, horsePos, horseEnt)
 
 	self:MarkVictim(npc, tier, velocity, speed)
 	local force = (tier == "Charge") and strength.MajorInjury

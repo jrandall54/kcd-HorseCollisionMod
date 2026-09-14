@@ -32,6 +32,18 @@ number.
 
 ### Fixed
 
+- A victim lying on the ground no longer snaps upright into a second fall when
+  the horse rides over them. The mod decided a victim had recovered by watching
+  for two animation states to be absent, and there is a stretch of about 600 ms
+  in a normal fall where both are absent and the victim is face down, so a hit
+  landing there started a fresh fall clip on a collapsing body. Whether a body
+  can take an animation is now read from its own posture — the head's height
+  above the ground against that victim's own standing height — which is
+  continuous and has no such hole. A victim who has begun to get up still takes
+  the reaction, because one shrugging off a hoof reads as vanilla's non-reaction.
+  The impact itself always lands either way: the damage, sound, dust and marks
+  are unchanged.
+
 - A rear and a charge now cost the horse what the rider has earned. Both drained
   a flat figure with none of the modifiers every other impact gets, so levelling
   Horsemanship made a walk, a trot and a gallop cheaper while leaving the two

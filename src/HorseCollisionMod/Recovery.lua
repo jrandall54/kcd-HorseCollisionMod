@@ -59,6 +59,104 @@ function HorseCollisionMod:ReleaseActorMovement(ent, what)
 	return ok
 end
 
+--- How high a victim carries their head when they are on their feet.
+--
+-- Recorded once, at the first impact that reaches them, because a victim the
+-- speed tiers have scored is by definition someone the horse rode into while
+-- they were standing. It is the reference every later check is read against,
+-- so nothing here is a number anybody chose.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:RecordStandingHeight(npc)
+	if not npc or not npc.id then
+		return
+	end
+
+	local id = tostring(npc.id)
+
+	if self.StandingHead[id] then
+		return
+	end
+
+	local head, origin = nil, nil
+
+	pcall(function()
+		head = npc.actor:GetHeadPos().z
+	end)
+
+	pcall(function()
+		origin = npc:GetWorldPos().z
+	end)
+
+	if head and origin and head > origin then
+		self.StandingHead[id] = head - origin
+	end
+end
+
+--- Whether a victim is lying flat rather than upright or getting up.
+--
+-- The single answer to "can this body take an animation right now", and it
+-- reads the body instead of a clock or a state string.
+--
+-- **Measured, through an untouched trot knockdown.** `headUp` is the head's
+-- height above the entity origin, and the entity origin sits on the ground:
+--
+--     t+0000ms  AnimationControlled  headUp 1.55   upright, the impact lands
+--     t+0624ms  AnimationControlled  headUp 0.94   falling
+--     t+1840ms  AnimationControlled  headUp 0.15   flat
+--     t+2448ms  MotionIdle           headUp 0.15   flat
+--     t+3072ms  MotionIdle           headUp 0.15   flat
+--     t+3664ms  BlendRagdoll         headUp 0.27   rising
+--     t+4880ms  BlendRagdoll         headUp 1.21   rising
+--     t+5472ms  BlendRagdoll         headUp 1.59   standing
+--
+-- Two things that trace settles, both of which the rest of this mod had
+-- wrong. **`BlendRagdoll` is the get-up, not the lie-down** -- the head climbs
+-- right through it -- so anything treating that state as "still down" has the
+-- sequence backwards. And the flat stretch is `AnimationControlled` followed
+-- by `MotionIdle`, the second of which is indistinguishable from a person
+-- standing about doing nothing, which is the hole every state-string test fell
+-- through.
+--
+-- Nothing else measured separates the phases. The physicalization profile
+-- reads `alive` from the impact to standing, the entity's pitch and roll stay
+-- at 0.00 throughout because the entity does not rotate with the body, and the
+-- velocity never exceeds 0.39.
+--
+-- The halfway point is a bisection rather than a tuned figure: flat reads 0.15
+-- against a standing 1.55, so the two are an order of magnitude apart and any
+-- split between them gives the same answer.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true while they are flat on the ground
+function HorseCollisionMod:IsVictimFlat(npc)
+	if not npc or not npc.id then
+		return false
+	end
+
+	local standing = self.StandingHead[tostring(npc.id)]
+
+	if not standing then
+		return false
+	end
+
+	local head, origin = nil, nil
+
+	pcall(function()
+		head = npc.actor:GetHeadPos().z
+	end)
+
+	pcall(function()
+		origin = npc:GetWorldPos().z
+	end)
+
+	if not head or not origin then
+		return false
+	end
+
+	return (head - origin) < (standing / 2)
+end
+
 --- Runs something once a victim is no longer a settling ragdoll.
 --
 -- `GetPhysicalizationProfile` is not usable for this: measured through a whole
