@@ -26,5 +26,12 @@
 *.mp4   binary
 *.pdf   binary
 
-# Generated API documentation, which is diffed only to see that it regenerated.
-docs/api/** linguist-generated=true
+# Generated API documentation. LDoc stamps "Last updated <timestamp>" into every
+# page on every run, so all eighteen files change whether or not their content
+# did, and the diff is noise in every commit that touches a doc comment. Nothing
+# here is ever read as a diff: the source of truth is the Lua, and the pages are
+# regenerated from it by `pre_release_check.py`.
+#
+# `-diff` collapses each file to a one-line "Binary files differ", and `eol=lf`
+# stops a Windows checkout reporting a line-ending rewrite on all of them.
+docs/api/** linguist-generated=true -diff text eol=lf
