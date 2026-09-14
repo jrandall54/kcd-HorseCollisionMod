@@ -222,6 +222,14 @@ So a branch lands like this:
     git checkout main && git merge --no-ff <branch>
     git tag -a v<version> -m "..."
     git push origin main --follow-tags
+    git branch -d <branch> && git branch --merged main | prune the rest
+
+`tools/flow.ps1 land` does all of that, including the last line: after a
+successful push it deletes the branch it landed and every other local branch
+already merged into `main`. `git branch --merged main` is safe by construction,
+because a branch appears there only once `main` contains all of its commits, and
+`-d` refuses anything that is not truly merged. Pruning is part of landing rather
+than a separate tidy-up, so merged branches never accumulate.
 
 `ldoc .` belongs in that order because the staleness check compares **commit**
 times rather than file times, so the regenerated pages have to be committed

@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.9.0
+-- @release 5.9.1
 
 -- The bark sets, by the moment that causes them.
 --
@@ -593,13 +593,20 @@ end
 --
 -- Walk is absent on purpose. A shove at walking pace does not hurt, and the
 -- victim goes straight to words.
--- Both tiers use the one pain set that is **proven to speak**. The graded
--- ladder below it is written and ready, and is not wired in, because
--- `ZASAH_ZBRANI_SILNY` has never been auditioned: it has real recorded topics,
--- unlike the empty `HIT_REAKCE_*` sets, but "strong weapon hit" describes a
--- combat state, and the rule the diary's silences follow is that a metarole
--- describing a state speaks only from that state. Shipping it unheard swapped
--- a working sound for silence once already.
+-- Both tiers use the one pain set that is **proven to speak**, and the graded
+-- ladder above it can never be wired in. `HurtLight` and `HurtHard` name
+-- `ZASAH_ZBRANI_SLABY` and `ZASAH_ZBRANI_SILNY`, whose metaroles are two of the
+-- fifteen registered in `Libs/Tables/rpg/combat_shout_type.xml`: those are
+-- dispatched by the combat shout system rather than by `dialog:monologRequest`,
+-- so a bark request for one reaches the wrong subsystem entirely. Their entry
+-- conditions also read `var('hitStrength')`, which the engine hangs on its own
+-- `CombatShout_*` request rather than on the character, so no state a mod can
+-- set will satisfy them.
+--
+-- Both were tested rather than assumed: relaxing the entry condition to `1` and
+-- raising `speech_coef` from 0 to 1, through additive table patches the engine
+-- confirmed it had applied, left fourteen requests in one ride silent. The two
+-- names are kept above because they document where the right recordings live.
 HorseCollisionMod.PainByTier = {
 	Trot   = "HurtDown",
 	Gallop = "HurtDown"

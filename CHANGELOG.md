@@ -30,6 +30,20 @@ number.
 
 ## [Unreleased]
 
+## [5.9.1] - 2026-09-13
+
+### Changed
+
+- `tools/flow.ps1 land` now deletes every local branch already merged
+  into `main`, not just the one it landed, so merged branches stop
+  accumulating.
+
+### Documentation
+
+- Corrected the note above `PainByTier`, which said the graded pain ladder
+  was merely unauditioned. Its two upper grades cannot be driven at all:
+  their metaroles belong to the combat shout system.
+
 ## [5.9.0] - 2026-09-13
 
 ### Added
