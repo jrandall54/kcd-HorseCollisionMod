@@ -37,6 +37,7 @@ param (
 	[switch]$AnimOnly,
 	[switch]$Crime,
 	[switch]$FreeGallop,
+	[switch]$Stamina,
 	[switch]$ReleaseSettings,
 	[switch]$SetDevEnvironment,
 	[switch]$SetPlayEnvironment,
@@ -776,7 +777,7 @@ function Sync-LooseFiles {
 		Write-Host "[DEPLOY] release settings: the installed world is the shipped one"
 	}
 	else {
-		Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop
+		Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop -Stamina:$Stamina
 	}
 
 	return $changed
@@ -821,6 +822,9 @@ $script:DevFreeGallopValues = [ordered]@{
 	RearChargeStaminaCost = "0.0"
 }
 
+# The two the -Stamina switch hands back to the repository's own values.
+$script:DevStaminaKeys = @("ThrowRiderOnStaminaEmpty", "HorseBoltsWhenSpent")
+
 $script:DevTestValues = [ordered]@{
 	CollisionIsCrime          = "false"
 	ThrowRiderOnStaminaEmpty  = "false"
@@ -853,7 +857,8 @@ function Set-DeployedTestValues {
 	param (
 		[string]$Root,
 		[switch]$Crime,
-		[switch]$FreeGallop
+		[switch]$FreeGallop,
+		[switch]$Stamina
 	)
 
 	$path = Join-Path $Root "Data\Scripts\Startup\HorseCollisionMod_Settings.lua"
@@ -868,6 +873,15 @@ function Set-DeployedTestValues {
 		# -Crime asks for the shipping behavior, so that one value is left
 		# exactly as the repository has it.
 		if ($Crime -and $key -eq "CollisionIsCrime") {
+			continue
+		}
+
+		# -Stamina does the same for the two consequences of an emptied horse.
+		# They are off by default because being dismounted mid-run ends a test
+		# that was measuring something else, but that makes the stamina figures
+		# themselves untestable: what a drain costs is only felt when the horse
+		# running out does something.
+		if ($Stamina -and $script:DevStaminaKeys -contains $key) {
 			continue
 		}
 

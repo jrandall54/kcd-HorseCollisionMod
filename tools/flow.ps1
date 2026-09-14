@@ -36,7 +36,8 @@ param (
 	# Keep the shipping values for crime and the rest, for the rarer test that
 	# is about the world's reaction rather than the collision.
 	[switch]$Crime,
-	[switch]$FreeGallop
+	[switch]$FreeGallop,
+	[switch]$Stamina
 )
 
 $ErrorActionPreference = "Stop"
@@ -299,6 +300,10 @@ function Enter-Test {
 
 	if ($FreeGallop) {
 		$world.FreeGallop = $true
+	}
+
+	if ($Stamina) {
+		$world.Stamina = $true
 	}
 
 	Write-TestWorld -World $world
