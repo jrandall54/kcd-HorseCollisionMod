@@ -741,6 +741,7 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 		return false
 	end
 
+
 	local table_ = rider and self.RiderBarkSets or self.BarkSets
 	local metarole = self:PickFromPool(table_[set])
 
