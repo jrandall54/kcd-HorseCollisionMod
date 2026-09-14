@@ -30,6 +30,17 @@ number.
 
 ## [Unreleased]
 
+## [5.11.2] - 2026-09-13
+
+### Documentation
+
+- `ROADMAP.md` records eight issues found playing the packaged 5.11.1 build:
+  story characters possibly losing their invincibility to the mod's damage, barks
+  running through ragdolls and state changes, the wrong crime being reported, the
+  rear and charge having no audio of their own, the lean keys dying after a save
+  reload, the lunge throwing too far, a provoked victim's last line being cut
+  off, and controller players having no access to the mod's own moves.
+
 ## [5.11.1] - 2026-09-13
 
 ### Documentation
