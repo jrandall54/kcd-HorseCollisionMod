@@ -70,7 +70,7 @@ Known gaps carried into later phases:
 
 ## Reported from play: the 5.11.1 shipping test
 
-Nine issues, all found in one session playing the packaged build through Vortex
+Eight issues, all found in one session playing the packaged build through Vortex
 rather than the development install. Recorded in the rider's terms first, with any
 explanation marked as untested, because none of these has been investigated yet.
 
@@ -175,23 +175,7 @@ collision tiers do.
 - [ ] Decide what a victim says to each, and what Henry says. Neither has been
       chosen, so both currently fall through to the collision sets.
 
-### 5. The lean keys stop working after a save reload
-
-> "...the lean buttons not working after save reload or taking some time to
-> reregister or something."
-
-The action map is loaded once per session and `Rear.lua` guards that behind a
-flag, which the diary already records as the reason a newly added key is dead
-until the game restarts while the log still reports `loaded=true` from the cached
-flag. Whether a save load hits the same cache is **untested**, and the reported
-symptom includes the keys coming back after a delay, which a dead action map would
-not explain.
-
-- [ ] Reload a save, try the lean immediately, and time how long until it answers.
-- [ ] Read whether the action map is re-registered on a save load and whether the
-      flag is cleared.
-
-### 6. The lunge throws victims too far
+### 5. The lunge throws victims too far
 
 > "the launch distance on rear lunges seems really far."
 
@@ -202,7 +186,7 @@ other tiers.
 - [ ] Compare the charge's throw against a gallop's, and bring it down to
       something that reads as a horse hitting a man rather than a cannon.
 
-### 7. The victim's "now you've made me angry" line is truncated
+### 6. The victim's "now you've made me angry" line is truncated
 
 A specific line, not a general priority problem:
 
@@ -227,7 +211,7 @@ Candidates, none tested:
 - [ ] Find what stops it, then give it room: delay the state change, hold the
       line until the transition is done, or send it earlier in the sequence.
 
-### 8. Controller players cannot reach the mod's features
+### 7. Controller players cannot reach the mod's features
 
 Leaning, the rear on the spot and the charge are all bound to keyboard keys.
 Nothing is bound for a controller, so a controller player has no access to any of

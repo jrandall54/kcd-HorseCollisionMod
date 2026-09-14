@@ -30,6 +30,65 @@ number.
 
 ## [Unreleased]
 
+## [5.13.0] - 2026-09-14
+
+### Fixed
+
+- A victim lying on the ground no longer snaps upright into a second fall when
+  the horse rides over them. The mod decided a victim had recovered by watching
+  for two animation states to be absent, and there is a stretch of about 600 ms
+  in a normal fall where both are absent and the victim is face down, so a hit
+  landing there started a fresh fall clip on a collapsing body. Whether a body
+  can take an animation is now read from its own posture: the head's height
+  above the ground against that victim's own standing height, which is
+  continuous and has no such hole. A victim who has begun to get up still takes
+  the reaction, because one shrugging off a hoof reads as vanilla's non-reaction.
+  The impact itself always lands either way: the damage, sound, dust and marks
+  are unchanged.
+
+### Removed
+
+- `HitCooldownMs`, `KnockdownRecoveryMs`, `HitCooldownStateDriven`,
+  `HitReadySettleMs`, `HitReadyPollMs`, `HitReadyCeilingMs` and `HitReadyByTier`.
+  Seven settings and a polling watcher existed to answer whether a victim had
+  recovered enough to take another reaction, and they answered it with timers
+  that were wrong in both directions: an impact landing in the 600 ms hole
+  mid-fall was allowed through, and impacts through the whole of a get-up were
+  refused outright, which read as the mod having stopped working. The victim's
+  own posture answers it directly. `HitMinIntervalMs` is untouched; it debounces
+  one pass of the horse into one impact and says nothing about recovery.
+
+- A rear and a charge now cost the horse what the rider has earned. Both drained
+  a flat figure with none of the modifiers every other impact gets, so levelling
+  Horsemanship made a walk, a trot and a gallop cheaper while leaving the two
+  heaviest moves exactly as expensive as they were on day one, and barding bought
+  the horse no relief on either. Both now go through the same path as the rest,
+  so Horsemanship, barding and the combat penalty reach them.
+
+### Changed
+
+- `StaminaDrainWalk`, `StaminaDrainTrot`, `StaminaDrainGallop`, `RearStaminaCost`
+  and `RearChargeStaminaCost` are replaced by one table, `StaminaDrainByTier`,
+  carrying the same five figures unchanged. Anyone who tuned one of the old keys
+  needs to move their figure into the table; an untouched install plays the same.
+- The settings block on the mod page lists a table setting's members instead of
+  an empty `{`, which also repairs the rows for `ImpactDamageByTier` and
+  `HitReadyByTier`.
+- `TrotReaction` and `RearReaction` are replaced by `ReactionByTier`, which says
+  what all five tiers do in one place instead of two settings and two hardcoded
+  branches. The rear no longer falls back to the trot's value, so changing what
+  a trot does cannot silently change the rear.
+- `RearChargeThrow` is replaced by `ThrowByTier`. Only the tiers that actually
+  ragdoll carry a throw figure now; the trot and the rear each had one sitting
+  on a branch the shipped settings never reached, doing nothing.
+- The remaining per-tier settings families follow the same shape: `ImpactSoundByTier`,
+  `RiderVocalByTier`, `RiderVocalRankByTier`, `CameraShakeByTier`, `RiderBlurByTier`,
+  `RiderBlurLengthByTier`, `ImpactDustScaleByTier`, `VictimDirtByTier` and
+  `VictimBloodByTier` replace twenty-seven loose keys. Every figure is unchanged,
+  and the rear and the charge now state their own values rather than falling back
+  to the trot's and the gallop's, so tuning one tier can no longer move another.
+  Anyone who tuned one of the old keys needs to move their figure into the table.
+
 ## [5.12.2] - 2026-09-14
 
 ### Fixed

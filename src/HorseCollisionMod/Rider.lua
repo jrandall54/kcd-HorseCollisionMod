@@ -103,6 +103,67 @@ function HorseCollisionMod:ThrowRider(horseEnt, playerEnt)
 	end
 end
 
+--- What one impact costs the horse, and charging it.
+--
+-- The single place the stamina figure is worked out. Every tier goes through
+-- it, so the rider's Horsemanship, the horse's barding and the combat penalty
+-- reach a rear and a charge exactly as they reach a gallop. They did not
+-- before: the rear and the charge each drained a flat setting at their own
+-- call site and none of the three modifiers touched them, which meant levelling
+-- Horsemanship made every impact cheaper except the two heaviest.
+--
+-- @tparam table horseEnt the player's horse entity
+-- @tparam table playerEnt the player entity
+-- @tparam string tierName "Walk", "Trot", "Gallop", "Rear" or "Charge"
+-- @tparam[opt] table armor the victim's armor from `ArmorOf`, where this
+--   impact has a single victim to read it from
+function HorseCollisionMod:DrainImpactStamina(horseEnt, playerEnt, tierName, armor)
+	local base = self:TierValue("StaminaDrainByTier", tierName)
+
+	if type(base) ~= "number" or base <= 0 then
+		return
+	end
+
+	-- The victim's armor is the one modifier that does not always apply.
+	--
+	-- A rear and a charge are charged once for the whole move and that move
+	-- can land on several people at once, so there is no single victim whose
+	-- armor to read and the cost is scored on the horse and rider alone. The
+	-- loop tiers resolve one victim per impact and pass theirs.
+	local armorScale = 1.0
+
+	if armor then
+		armorScale = self:ArmorStaminaScale(armor)
+	end
+
+	local combatScale = 1.0
+
+	-- Decided by the player's own combat state and nothing about the victim,
+	-- which is why this answers correctly for a rear and a charge with no
+	-- victim to hand.
+	if self:IsCombatCollision(nil) then
+		combatScale = self.Config.CombatStaminaMultiplier
+	end
+
+	local bardingScale = self:BardingStaminaScale(horseEnt)
+	local horsemanship = self:HorsemanshipScale(playerEnt)
+	local cost = base * combatScale * armorScale * bardingScale * horsemanship
+
+	-- Logged beside the figure it produces rather than on the impact line,
+	-- because a cost that looks wrong is diagnosed by which factor moved it.
+	if self.Config.LogTelemetry then
+		self:Log("Stamina tier=" .. tostring(tierName)
+				.. " base=" .. string.format("%.1f", base)
+				.. " combat=" .. string.format("%.2f", combatScale)
+				.. " armor=" .. string.format("%.2f", armorScale)
+				.. " barding=" .. string.format("%.2f", bardingScale)
+				.. " horsemanship=" .. string.format("%.2f", horsemanship)
+				.. " cost=" .. string.format("%.1f", cost))
+	end
+
+	self:DrainHorseStamina(horseEnt, playerEnt, cost)
+end
+
 --- Charges the horse for an impact and dismounts Henry when it is spent.
 --
 -- Stamina is written with `soul:SetState`, never `soul:DealDamage`. That
@@ -244,17 +305,7 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 	-- A trot is the same kick at a fraction of it, on one number rather than a
 	-- second set of values, for the same reason `BlurRiderView` scales: the
 	-- shape is right and only the weight should differ between the tiers.
-	local tier = 0
-
-	if tierName == "Rear" then
-		tier = cfg.CameraShakeRearScale or cfg.CameraShakeTrotScale or 0
-	elseif tierName == "Charge" then
-		tier = cfg.CameraShakeChargeScale or cfg.CameraShakeGallopScale or 0
-	elseif tierName == "Gallop" then
-		tier = 1
-	elseif tierName == "Trot" then
-		tier = cfg.CameraShakeTrotScale or 0
-	end
+	local tier = self:TierValue("CameraShakeByTier", tierName) or 0
 
 	if tier <= 0 then
 		return false
@@ -356,20 +407,8 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 	-- a second set of five: one for how heavy it is and one for how long it
 	-- lasts. They came apart in tuning, because a trot wanted the strength
 	-- kept and the length cut, and a single scale could not do both.
-	local tier, length = 0, 1
-
-	if tierName == "Rear" then
-		tier = cfg.RiderBlurRearScale or cfg.RiderBlurTrotScale or 0
-		length = cfg.RiderBlurRearLength or tier
-	elseif tierName == "Charge" then
-		tier = cfg.RiderBlurChargeScale or cfg.RiderBlurGallopScale or 0
-		length = cfg.RiderBlurChargeLength or tier
-	elseif tierName == "Gallop" then
-		tier = 1
-	elseif tierName == "Trot" then
-		tier = cfg.RiderBlurTrotScale or 0
-		length = cfg.RiderBlurTrotLength or tier
-	end
+	local tier = self:TierValue("RiderBlurByTier", tierName) or 0
+	local length = self:TierValue("RiderBlurLengthByTier", tierName) or tier
 
 	if tier <= 0 then
 		return false

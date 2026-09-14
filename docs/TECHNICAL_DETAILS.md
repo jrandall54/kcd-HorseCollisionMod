@@ -478,13 +478,25 @@ thrown. Stamina regenerates quickly between impacts, so the number of people
 that can be put down in one run depends on the horse and on how fast the hits
 are strung together.
 
-A walking bump is not hard enough to tire a horse, hence `StaminaDrainWalk = 0`.
+A walking bump is not hard enough to tire a horse, hence the `Walk` figure of
+0 in `StaminaDrainByTier`.
+
+Every tier is charged through one function, `DrainImpactStamina`, which reads
+that table and applies the three modifiers below. The rear and the charge went
+through it late: each used to drain a flat setting at its own call site, so
+Horsemanship, barding and the combat penalty reached every tier except the two
+heaviest.
 
 The cost is then multiplied by what the target wears, between
 `MinArmorStamina` and `MaxArmorStamina`. A villager in cloth costs less than
-the listed figure and a target in mail costs twice it, so a charge into
-armored men is the expensive one. That multiplier compounds with the combat
-multiplier below.
+the listed figure and a target in mail costs twice it. That multiplier
+compounds with the combat multiplier below.
+
+The armor multiplier is the one that does not reach the rear and the charge,
+and that is deliberate rather than an omission. Those two are charged once for
+the whole move and the move can land on several people at once, so there is no
+single victim whose armor to read. What the horse and rider bring, meaning
+barding, Horsemanship and the combat penalty, applies to them in full.
 
 ### Combat multiplier
 
@@ -509,6 +521,76 @@ either way.
 
 Turning it off compares against vanilla collision handling without uninstalling
 the mod. The knockdown tiers are unaffected.
+
+## What a fall-tier impact actually does to a body
+
+Measured, not inferred. A single trot knockdown was sampled every 100 ms from
+the impact until the victim was standing again, untouched throughout. `headUp`
+is `actor:GetHeadPos().z` minus `entity:GetWorldPos().z`, and the entity origin
+sits on the ground, so it is the head's height above the floor.
+
+| t+ms | animation state | headUp | the body |
+| --- | --- | --- | --- |
+| 0 | `AnimationControlled` | 1.55 | upright, the impact lands |
+| 624 | `AnimationControlled` | 0.94 | falling |
+| 1840 | `AnimationControlled` | 0.15 | flat |
+| 2448 | `MotionIdle` | 0.15 | flat |
+| 3072 | `MotionIdle` | 0.15 | flat |
+| 3664 | `BlendRagdoll` | 0.27 | rising |
+| 4880 | `BlendRagdoll` | 1.21 | rising |
+| 5472 | `BlendRagdoll` | 1.59 | standing |
+| 6064+ | `MotionIdle` | 1.59 | standing, finished |
+
+Three things follow, and the mod had all three wrong.
+
+**`BlendRagdoll` is the get-up, not the lie-down.** The head climbs from 0.27 to
+1.59 across it. Every piece of code that treated that state as "the victim is
+still a settling ragdoll" had the sequence backwards, and anything waiting for
+it to end was waiting until after the victim was already on their feet.
+
+**The flat stretch is `AnimationControlled` followed by `MotionIdle`.** The fall
+clip ends before Mannequin's Ragdoll ProcLayer takes hold, leaving roughly
+600 ms in which a victim lying face down reads `MotionIdle`, the same state as
+somebody standing about doing nothing. That hole is why every test built on
+animation-state strings eventually let an impact through mid-fall and snapped
+the body upright into a second fall clip.
+
+**A victim is flat for about 1.8 seconds and standing again by 5.5.** Not the
+eight seconds the old `VictimRebuild` timings suggested; that figure was the
+mod noticing late, not the body taking that long.
+
+### What does not work as a signal
+
+All of these were sampled through the same sequence and none of them separates
+any phase from any other:
+
+  * `actor:GetPhysicalizationProfile()` reads `alive` from the impact to
+    standing, without exception.
+  * `entity:GetAngles()` returns pitch and roll of 0.00 throughout. The entity
+    does not rotate with the body.
+  * `entity:GetWorldPos().z` does not descend when the victim does. The entity
+    is not what moved.
+  * `entity:GetVelocity()` never exceeds 0.39 across the whole knockdown.
+  * `actor:IsUnconscious()` stays false.
+
+`actor:GetHeadPos()` is the one reading that tracks the rendered body, and
+`GetHeadPos().z` minus the entity origin is a continuous measure of posture
+with no ambiguity anywhere in the sequence.
+
+### How the mod uses it
+
+`RecordStandingHeight` stores a victim's upright `headUp` at the first impact
+that reaches them, since a victim the speed tiers scored is by definition
+someone the horse rode into while they were standing. `IsVictimFlat` then reads
+the current value against half of that. The halfway point is a bisection rather
+than a tuned figure: flat reads 0.15 against a standing 1.55, so the two are an
+order of magnitude apart and any split between them answers identically.
+
+An animated reaction is refused only while the victim is flat. One that has
+begun to get up takes the reaction, because a victim shrugging off a hoof reads
+as vanilla's non-reaction. The impact itself always lands: a second hit on a
+downed victim registers and costs them health, so declining it would lose
+damage the engine charges anyway.
 
 ## Marks left on a victim
 
@@ -1387,7 +1469,7 @@ per charge.
 
 `Charge` is a tier in its own right rather than a gallop wearing another name.
 It has its own damage in `ImpactDamageByTier`, its own sound in
-`ImpactSoundCharge`, its own stamina in `RearChargeStaminaCost`, its own victim
+`ImpactSoundByTier`, its own stamina figure in `StaminaDrainByTier`, its own victim
 lockout in `RearChargeVictimLockMs`, and its own dust, camera shake, view blur
 and throw scalar. Nothing about it can be tuned by changing what an ordinary
 collision does, or the reverse.

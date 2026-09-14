@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.12.2
+-- @release 5.13.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.12.2"
+HorseCollisionMod.Version = "5.13.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -103,18 +103,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field TickSeconds detection interval, used to sweep the footprint forward
 -- @field SweepMultiplier how far ahead to sweep, per meter per second
 -- @field MaxSweepExtra cap on the forward sweep, in meters
--- @field HitCooldownStateDriven whether the knockdown wait reads the victim's
---   animation state instead of counting
 -- @field HitMinIntervalMs the least time between two scored impacts on one
 --   victim, so a single pass through someone is one impact and not five
--- @field HitReadyByTier which tiers wait for a victim to be ready
--- @field HitReadySettleMs how long a victim must be neither animation-driven
---   nor ragdolling before another impact counts
--- @field HitReadyPollMs how often that state is sampled
--- @field HitReadyCeilingMs the wait's failsafe, for a victim never seen busy
--- @field HitCooldownMs minimum gap between reactions on the same victim
--- @field KnockdownRecoveryMs how long a knocked-down victim is left alone,
---   which is longer than the walk cooldown because they are still on the ground
 -- @field ImpactSpeedSamples ticks of speed history a collision is scored from
 -- @field HorseAirborneVz the upward speed, in meters per second, at which
 --   the mod reports that the horse has left the ground. Nothing is written
@@ -142,9 +132,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
 -- @field ProtectStoryCharacters when true, characters the game marks as
 --   protected take no damage from an impact
--- @field StaminaDrainWalk horse stamina cost per victim at walk
--- @field StaminaDrainTrot horse stamina cost per victim at trot
--- @field StaminaDrainGallop horse stamina cost per victim at gallop
+-- @field StaminaDrainByTier what each kind of impact costs the horse, before
+--   the rider's Horsemanship, the horse's barding and the combat penalty
 -- @field ThrowRiderOnStaminaEmpty dismount Henry when the horse is spent
 -- @field CombatStaminaMultiplier stamina cost multiplier while in a fight
 -- @field SuppressStaggerInCombat skip the stagger animation during a fight
@@ -177,9 +166,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
 --   in seconds, or 0 to leave victims in the daycycle
--- @field TrotReaction what a trot impact does: "knockdown" for an animated
---   fall and get-up, "fall" for an animated fall the game recovers from, or
---   "ragdoll" for the physics knockdown
 -- @field AutoCureHealthLimit health at or above which the auto-cure exemption
 --   is dropped, matching vanilla's own limit
 -- @field CollisionIsCrime whether riding someone down is reported to the
@@ -205,25 +191,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeStrikeMs how long the strike sweeps for
 -- @field RearChargeStrikePollMs how often it sweeps
 -- @field RearChargeImpactSpeed the speed a charge is scored at
--- @field ImpactSoundRear the layers the rear on the spot plays. Hooves coming
---   down on someone, not a horse riding into them
 -- @field ImpactDustEffectRear the particle to spawn for a rear impact
--- @field ImpactDustScaleRear how much dust a rear raises
--- @field CameraShakeRearScale how hard a rear shakes the rider's camera
--- @field RiderBlurRearScale how much a rear blurs the rider's view
--- @field RiderBlurRearLength how long that blur lasts
--- @field RearReaction what a rear does to its victim: "fall", "knockdown"
---   or a ragdoll, the same choices the trot tier offers. Only "fall" carries
---   the recovery that restores a victim's facing and re-plans their activity,
---   which is why both tiers default to it
--- @field ImpactSoundCharge the layers a charge plays. Its own set, so the
---   charge can be tuned without touching an ordinary gallop collision
--- @field ImpactDustScaleCharge how much dust a charge raises
--- @field CameraShakeChargeScale how hard a charge shakes the rider's camera
--- @field RiderBlurChargeScale how much a charge blurs the rider's view
--- @field RiderBlurChargeLength how long that blur lasts
--- @field RearChargeThrow how hard a charge throws, as a scalar. The horse is
---   moving under physics as well, so its collider adds to this
 -- @field RearChargeImpulse the physical push that carries the charge, applied
 --   once the rear animation has ended so the horse collides normally
 -- @field RearChargeLift how much of that push is upward
@@ -232,9 +200,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeWaitCeilingMs push anyway by this point
 -- @field RearChargeVictimLockMs how long a victim struck by a charge is closed
 --   to further impacts, so one lunge is one hit
--- @field RearChargeStaminaCost what a landed charge costs the horse. Its own
---   figure, because the detection loop no longer scores a lunge and so no
---   longer charges it the gallop's drain
 -- @field RearChargeLungePeakMin the top speed a lunge must reach before it can
 --   be judged spent, so noise in the derived speed cannot close the window
 --   before the horse has gone anywhere
@@ -310,7 +275,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearArc the arc in front that counts, in degrees
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
--- @field RearStaminaCost what a landed rear costs the horse
 -- @field ReleaseMovementAttempts how many times that release is repeated, in
 --   case the fragment re-applies its movement layer as it blends
 -- @field ReleaseMovementGapMs how far apart those attempts are
@@ -416,6 +380,18 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   which a victim takes half the tier's damage; higher means armor matters less
 -- @field ImpactDamageIgnoredArmor `smash_def` that does not count as armor,
 --   covering the shoes and shirt every villager wears
+-- @field ImpactSoundByTier the layer list each tier plays on impact
+-- @field RiderVocalByTier Henry's own grunt for each tier
+-- @field RiderVocalRankByTier each tier's rank in the shared voice gate
+-- @field CameraShakeByTier how hard each tier kicks the camera
+-- @field RiderBlurByTier how much each tier blurs the rider's view
+-- @field RiderBlurLengthByTier how long each tier's blur lasts
+-- @field ImpactDustScaleByTier how much dust each tier raises
+-- @field VictimDirtByTier the dirt each tier leaves on the victim
+-- @field VictimBloodByTier the blood each tier leaves on the victim
+-- @field ReactionByTier what each tier does to the victim's body: "stagger",
+--   "knockdown", "fall" or "ragdoll"
+-- @field ThrowByTier how hard each ragdoll tier throws, as a scalar
 -- @field ImpactDamageByTier what each kind of collision is worth before armor
 -- @field ImpactDamageOwnsTheHit give back what the engine charged for a
 --   collision, so the mod's figure is the whole cost rather than an addition
@@ -434,8 +410,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   whether a collision death is attributed to the rider
 -- @field ImpactDust whether an impact throws dust off the ground
 -- @field ImpactDustEffect the particle library node to spawn
--- @field ImpactDustScaleTrot size of the effect at a trot, 0 is off
--- @field ImpactDustScaleGallop size of the effect at a gallop, 0 is off
 -- @field ImpactDustHeight meters above the victim's origin to spawn it
 -- @field ImpactDustSampleMs how often the victim's velocity is sampled
 -- @field ImpactDustFallVz vertical velocity below which they are falling
@@ -446,8 +420,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RiderBlurAmount how heavy the blur starts
 -- @field RiderBlurHoldMs how long it is held at full before decaying
 -- @field RiderBlurChroma chromatic shift layered on the same envelope
--- @field RiderBlurTrotScale the fraction of the strength a trot gets, 0 is off
--- @field RiderBlurTrotLength the fraction of the hold and decay a trot gets
 -- @field RiderBlurMs how long it takes to decay to nothing
 -- @field RiderBlurSteps how many writes the decay is made of
 -- @field RiderBlurFirstPersonOnly skip it when the camera is not on the player
@@ -458,7 +430,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field CameraShakeShift meters of positional shake, on all three axes
 -- @field CameraShakeDurationSec how long the shake lasts
 -- @field CameraShakeFrequency oscillations per second
--- @field CameraShakeTrotScale the fraction of the kick a trot gets, 0 is off
 -- @field CameraShakeRandomness how much each shake varies from the last
 -- @field Horsemanship whether the rider's horse_riding skill counts
 -- @field HorsemanshipSkill the skill name read for it
@@ -477,17 +448,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field HorseBoltRestoreMs how long until its health is given back
 -- @field ImpactSound whether a collision makes a noise
 -- @field ImpactSoundDistance meters added to every layer, the master level
--- @field ImpactSoundWalk layers played by a walk impact
--- @field ImpactSoundTrot layers played by a trot impact
--- @field ImpactSoundGallop layers played by a gallop impact
 -- @field ImpactSoundCrack the occasional bone crack layer
 -- @field ImpactSoundCrackChance how often a gallop adds it
 -- @field RiderVocal whether Henry grunts as the collision goes through him
--- @field RiderVocalWalk the vocal layer a walk impact plays on the rider
--- @field RiderVocalTrot the vocal layer a trot impact plays on the rider
--- @field RiderVocalGallop the vocal layer a gallop impact plays on the rider
--- @field RiderVocalCharge the vocal layer a charge plays on the rider
--- @field RiderVocalRear the vocal layer a rear plays on the rider
 -- @field RiderVocalCooldownMs how long the rider stays quiet after grunting
 -- @field RiderBark whether Henry says something about the impact
 -- @field RiderBarkChance how often an impact produces a line instead of a grunt
@@ -495,10 +458,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RiderBarkKill whether a kill gets its own line from the kill pool
 -- @field RiderBarkPriority the priority Henry's own line is sent at
 -- @field VictimMarks whether a collision leaves dirt and blood on the victim
--- @field VictimDirtTrot dirt added by a trot impact, 0 to 1
--- @field VictimDirtGallop dirt added by a gallop impact, 0 to 1
--- @field VictimBloodTrot blood added by a trot impact, 0 to 1
--- @field VictimBloodGallop blood added by a gallop impact, 0 to 1
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
@@ -525,8 +484,6 @@ HorseCollisionMod.Config = {
 	SweepMultiplier          = 0.50,
 	MaxSweepExtra            = 0.35,
 	HitMinIntervalMs         = 700,
-	HitCooldownMs            = 3000,
-	KnockdownRecoveryMs      = 6000,
 
 	-- A collision is scored on the peak of the last ImpactSpeedSamples ticks,
 	-- not on the speed read when the victim is noticed. MaxImpactSpeed is the
@@ -569,9 +526,10 @@ HorseCollisionMod.Config = {
 	MaxArmorStamina          = 3.0,
 
 	-- Horse stamina, against a full pool of roughly 210.
-	StaminaDrainWalk         = 0.0,
-	StaminaDrainTrot         = 14.0,
-	StaminaDrainGallop       = 22.0,
+	StaminaDrainByTier       = {
+		Walk = 0.0, Trot = 14.0, Gallop = 22.0, Rear = 12.0, Charge = 22.0
+	},
+
 	ThrowRiderOnStaminaEmpty = true,
 
 	-- How long a victim is exempted from vanilla's auto-cure daycycle,
@@ -592,7 +550,6 @@ HorseCollisionMod.Config = {
 	--
 	-- "ragdoll" is the physics knockdown the mod shipped before, created at
 	-- the moment of impact.
-	TrotReaction             = "fall",
 
 	-- Whether riding someone down is a crime.
 	--
@@ -714,27 +671,6 @@ HorseCollisionMod.Config = {
 	RearOnlyFragTag          = "hcm_rear",
 	-- Hooves coming down, not a horse riding into someone. Lighter than a
 	-- charge and led by the hoof rather than by the body.
-	ImpactSoundRear          = { { "a_o_jump_landing", 0, 0, 0.6 },
-	                             { "hs_hp_soil", 2, 0.6 },
-	                             { "body", 0, 1.6 },
-	                             { "blunt", 0, 2.0 },
-	                             { "f_bodyfall1", 0, 1.3 } },
-	ImpactDustScaleRear      = 0.6,
-	CameraShakeRearScale     = 0.8,
-	RiderBlurRearScale       = 0.6,
-	RiderBlurRearLength      = 0.4,
-	RearReaction             = "fall",
-	ImpactSoundCharge        = { { "body", 0, 0.6 },
-	                             { "hs_hp_soil", 3, 0.8 },
-	                             { "body_armed", 0, 0.9 },
-	                             { "blunt", 0, 1.0 },
-	                             { "hs_hp_soil", 6, 0.7 },
-	                             { "face_armed", 0, 0.9 },
-	                             { "f_bodyfall1", 0, 0.7 } },
-	ImpactDustScaleCharge    = 0.10,
-	CameraShakeChargeScale   = 1.2,
-	RiderBlurChargeScale     = 1.1,
-	RiderBlurChargeLength    = 1.1,
 	RearChargeStrikes        = true,
 	RearChargeStrikeReach    = 1.8,
 	RearChargeStrikeWidth    = 0.9,
@@ -742,14 +678,12 @@ HorseCollisionMod.Config = {
 	RearChargeStrikeMs       = 1600,
 	RearChargeStrikePollMs   = 50,
 	RearChargeImpactSpeed    = 7.5,
-	RearChargeThrow          = 0.7,
 	RearChargeImpulse        = 6000,
 	RearChargeLift           = 0.2,
 	RearChargeWaitMs         = 400,
 	RearChargeWaitPollMs     = 30,
 	RearChargeWaitCeilingMs  = 3000,
 	RearChargeVictimLockMs   = 2600,
-	RearChargeStaminaCost    = 22.0,
 	RearChargeLungePeakMin   = 3.0,
 	RearChargeLungeSpentAt   = 0.5,
 	RearChargeWindowMs       = 2600,
@@ -778,7 +712,6 @@ HorseCollisionMod.Config = {
 	RearReach                = 2.5,
 	RearArc                  = 70,
 	RearImpactSpeed          = 6.0,
-	RearStaminaCost          = 12.0,
 
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,
@@ -805,6 +738,80 @@ HorseCollisionMod.Config = {
 	-- are the whole damage model and are meant to be read together: this table
 	-- says what the blow is, the armor pair says how much of it survives what
 	-- the victim is wearing, and the floor says how little armor can refuse.
+	ImpactSoundByTier        = {
+		Walk   = { { "f_n_mat_foleyal_cl", 0 },
+		           { "hs_hp_soil", 4 },
+		           { "f_n_mat_foleyal_cl", 5 },
+		           { "f_n_mat_foleyam_cl", 8 },
+		           { "f_bodyfall1", 12 },
+		           { "f_n_mat_foleyam_cl", 13 },
+		           { "f_bodyfall1", 18 } },
+		Trot   = { { "body", 0, 1.3 },
+		           { "body", 0, 1.65 },
+		           { "f_bodyfall1", 0, 1.5 } },
+		Gallop = { { "body", 0, 0.5 },
+		           { "n_lu_log_ground", 0, 1.0 },
+		           { "body_armed", 0, 0.85 },
+		           { "blunt", 0, 1.0 },
+		           { "face_armed", 0, 0.9 },
+		           { "f_bodyfall1", 0, 0.7 } },
+		Rear   = { { "a_o_jump_landing", 0, 0, 0.6 },
+		           { "hs_hp_soil", 2, 0.6 },
+		           { "body", 0, 1.6 },
+		           { "blunt", 0, 2.0 },
+		           { "f_bodyfall1", 0, 1.3 } },
+		Charge = { { "body", 0, 0.6 },
+		           { "hs_hp_soil", 3, 0.8 },
+		           { "body_armed", 0, 0.9 },
+		           { "blunt", 0, 1.0 },
+		           { "hs_hp_soil", 6, 0.7 },
+		           { "face_armed", 0, 0.9 },
+		           { "f_bodyfall1", 0, 0.7 } },
+	},
+
+	RiderVocalByTier         = {
+		Walk   = { "v_henry_hit_soft", 140, 0, 1 },
+		Trot   = { "v_henry_hit_medium", 110, 0, 1 },
+		Gallop = { "v_henry_hit_heavy", 90, 0, 1 },
+		Rear   = { "v_henry_hit_medium", 110, 0, 1 },
+		Charge = { "v_henry_hit_heavy", 90, 0, 1 },
+	},
+
+	RiderVocalRankByTier     = {
+		Walk = 1, Trot = 2, Gallop = 3, Rear = 2, Charge = 3
+	},
+
+	CameraShakeByTier        = {
+		Trot = 0.6, Gallop = 1.0, Rear = 0.8, Charge = 1.2
+	},
+
+	RiderBlurByTier          = {
+		Trot = 0.7, Gallop = 1.0, Rear = 0.6, Charge = 1.1
+	},
+
+	RiderBlurLengthByTier    = {
+		Trot = 0.3, Gallop = 1.0, Rear = 0.4, Charge = 1.1
+	},
+
+	ImpactDustScaleByTier    = {
+		Trot = 0, Gallop = 0.09, Rear = 0.6, Charge = 0.10
+	},
+
+	VictimDirtByTier         = {
+		Trot = 0.35, Gallop = 0.60, Rear = 0.35, Charge = 0.60
+	},
+
+	VictimBloodByTier        = {
+		Trot = 0.15, Gallop = 0.45, Rear = 0.15, Charge = 0.45
+	},
+
+	ReactionByTier           = {
+		Walk = "stagger", Trot = "fall", Gallop = "ragdoll",
+		Rear = "fall", Charge = "ragdoll"
+	},
+
+	ThrowByTier              = { Gallop = 1.0, Charge = 0.7 },
+
 	ImpactDamageByTier       = {
 		Walk = 0, Trot = 18, Gallop = 95, Rear = 60, Charge = 110
 	},
@@ -834,7 +841,6 @@ HorseCollisionMod.Config = {
 	CameraShakeShift         = 0.08,
 	CameraShakeDurationSec   = 0.5,
 	CameraShakeFrequency     = 0.05,
-	CameraShakeTrotScale     = 0.6,
 	CameraShakeRandomness    = 0.5,
 
 	-- What a gallop impact does to the rider's own view in first person. The
@@ -853,8 +859,6 @@ HorseCollisionMod.Config = {
 	RiderBlurHoldMs          = 260,
 	RiderBlurChroma          = 0.2,
 	RiderBlurMs              = 480,
-	RiderBlurTrotScale       = 0.7,
-	RiderBlurTrotLength      = 0.3,
 	RiderBlurSteps           = 7,
 	RiderBlurFirstPersonOnly = true,
 	RiderBlurFirstPersonRange = 1.5,
@@ -984,19 +988,9 @@ HorseCollisionMod.Config = {
 	-- walk tier carries no impact at all: two cloth foleys and a body
 	-- settling, each doubled because those samples are very quiet, over a
 	-- single hoofstep.
-	ImpactSoundWalk          = { { "f_n_mat_foleyal_cl", 0 },
-	                             { "hs_hp_soil", 4 },
-	                             { "f_n_mat_foleyal_cl", 5 },
-	                             { "f_n_mat_foleyam_cl", 8 },
-	                             { "f_bodyfall1", 12 },
-	                             { "f_n_mat_foleyam_cl", 13 },
-	                             { "f_bodyfall1", 18 } },
 
 	-- A trot puts someone on the ground, so the blunt impact leads, doubled
 	-- with the second copy taken back a fraction to shade it down.
-	ImpactSoundTrot          = { { "body", 0, 1.3 },
-	                             { "body", 0, 1.65 },
-	                             { "f_bodyfall1", 0, 1.5 } },
 
 	-- A gallop stacks four different blunt impacts rather than repeats of one,
 	-- so it reads as a collision instead of a flam, with the body settling
@@ -1006,12 +1000,6 @@ HorseCollisionMod.Config = {
 	-- No hoofstep. `hs_hp_soil` is `hoofsteps_player`, the same family as
 	-- `a_o_jump_landing`, and those events ignore position: it played at a
 	-- fixed full level under every other layer with no way down.
-	ImpactSoundGallop        = { { "body", 0, 0.5 },
-	                             { "n_lu_log_ground", 0, 1.0 },
-	                             { "body_armed", 0, 0.85 },
-	                             { "blunt", 0, 1.0 },
-	                             { "face_armed", 0, 0.9 },
-	                             { "f_bodyfall1", 0, 0.7 } },
 
 	-- The occasional injury, gallop only. A foley event, so unlike
 	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out
@@ -1028,11 +1016,6 @@ HorseCollisionMod.Config = {
 	-- Read as an impact layer: `{ trigger, delayMs, distance, chance }`. A
 	-- trigger of `""` silences that tier alone.
 	RiderVocal               = true,
-	RiderVocalWalk           = { "v_henry_hit_soft", 140, 0, 1 },
-	RiderVocalTrot           = { "v_henry_hit_medium", 110, 0, 1 },
-	RiderVocalGallop         = { "v_henry_hit_heavy", 90, 0, 1 },
-	RiderVocalCharge         = { "v_henry_hit_heavy", 90, 0, 1 },
-	RiderVocalRear           = { "v_henry_hit_medium", 110, 0, 1 },
 
 	-- How long the rider stays quiet after grunting. Riding into a group lands
 	-- several collisions inside a second and one grunt each reads as broken
@@ -1079,14 +1062,7 @@ HorseCollisionMod.Config = {
 	-- animation need to: a knockdown clip starts from standing and has nothing
 	-- to blend from on a victim already flat, while a ragdoll has no pose to
 	-- start from and can land at any point in a recovery.
-	HitReadyByTier           = {
-		Walk = true, Trot = true, Rear = true, Gallop = false, Charge = false
-	},
 
-	HitCooldownStateDriven   = true,
-	HitReadySettleMs         = 250,
-	HitReadyPollMs           = 250,
-	HitReadyCeilingMs        = 6000,
 
 	-- The dust a body throws up where it lands. Nothing at a walk, where
 	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
@@ -1100,8 +1076,6 @@ HorseCollisionMod.Config = {
 	ImpactDust               = true,
 	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
 	ImpactDustEffectRear     = "collisions.destructibles.arrow_soil",
-	ImpactDustScaleTrot      = 0,
-	ImpactDustScaleGallop    = 0.09,
 	ImpactDustHeight         = 0.05,
 	ImpactDustSampleMs       = 50,
 	ImpactDustFallVz         = -0.5,
@@ -1115,10 +1089,6 @@ HorseCollisionMod.Config = {
 	-- applied to the body zones on the side the blow landed on. Zero
 	-- switches either half off without touching the other.
 	VictimMarks              = true,
-	VictimDirtTrot           = 0.35,
-	VictimDirtGallop         = 0.60,
-	VictimBloodTrot          = 0.15,
-	VictimBloodGallop        = 0.45,
 
 	-- Switches.
 	ProtectMutt              = true,
@@ -1209,21 +1179,13 @@ HorseCollisionMod.Config = {
 }
 
 
---- When each victim may react again, in milliseconds, keyed by entity id.
---
--- Holds the time a victim becomes eligible rather than the time it was last
--- hit, because how long that takes depends on what the last impact did. A
--- stagger is over quickly; a knockdown leaves them on the ground for several
--- seconds.
--- @table RecentHits
-HorseCollisionMod.RecentHits = {}
 
---- When each victim was last scored, keyed the same way as `RecentHits`.
+--- When each victim was last scored, by entity id.
 --
--- Separate from it deliberately. `RecentHits` answers whether a victim is ready
--- for an animated reaction; this answers whether the horse has already been
--- charged for the contact it is still passing through. A gallop is exempt from
--- the first and subject to the second.
+-- Whether the horse has already been charged for the contact it is still
+-- passing through, read by `ImpactIsNewContact`. It debounces one pass into
+-- one impact and says nothing about the victim's recovery, which is
+-- `IsVictimFlat` and is read from the body rather than from a clock.
 --
 -- @table LastScoredHit
 HorseCollisionMod.LastScoredHit = {}
@@ -1255,6 +1217,14 @@ HorseCollisionMod.ImmortalSubjects = {}
 --
 -- Cleared with the rest of the per-victim state on a load screen.
 HorseCollisionMod.VictimActivity = {}
+
+--- How high each victim carries their head standing, by entity id.
+--
+-- Recorded at the first impact that reaches them, when they are by definition
+-- upright, and read by `IsVictimFlat` to tell a body lying on the ground from
+-- one that has begun to get up. Measured rather than configured: no threshold
+-- in this mod decides it.
+HorseCollisionMod.StandingHead = {}
 
 
 
@@ -1431,33 +1401,8 @@ HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
 -- fight has ended, never how long the fight is allowed to last. One second is
 -- fine for a state that changes on the scale of a scuffle, and it keeps the
 -- telemetry readable rather than a wall of lines.
--- What a tier costs an unarmored victim before armor scales it down, in
--- health. A gallop into someone in a shirt usually kills and sometimes does
--- not, which is the outcome asked for rather than a certainty either way.
---
--- The trot figure is set the same way. At 25 an unarmored villager lost about
--- a third of their health to a knockdown, 31 and 32 across two impacts, which
--- kills in three. 18 makes it about a quarter and four impacts, which is the
--- weight the rider wanted a trotting horse to carry.
---
--- The gallop figure is set from measurement rather than picked. At 90 the
--- soft end killed six of eight, and both survivors finished on 3.5 and 0.5
--- health, having been dealt 81.0 and 80.6 against a villager's 100. The
--- engine's own trample adds a further 15 to 20 on top in most impacts but
--- varies from nothing to 28, and that variation is what leaves any survivors
--- at all. 95 carries those two over and lands the rate near the nine in ten
--- asked for.
---
--- Documented as an ordinary comment rather than an LDoc block: LDoc reads an
--- annotated table as a set of named fields and refuses one holding an array.
-HorseCollisionMod.ImpactDamageByTier = {
-	Walk = 0,
-	Trot = 18,
-	Gallop = 95,
-	Rear = 60,
-	Charge = 110,
-}
-
+-- The per-tier tables live in HorseCollisionMod/Tiers.lua, which owns the tier
+-- concept and the single accessor every one of them is read through.
 HorseCollisionMod.RetaliationPollMs = 1000
 
 --- Consecutive samples out of the fight before the incident is closed.
@@ -1758,12 +1703,12 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 
 		self.TimerTick = currentTick
 
-		-- Cooldown deadlines are stamped against a clock the save restores,
-		-- and the entity ids keying them are reused across a load. Neither
-		-- survives the transition, so the table is dropped rather than
-		-- carried into a world it no longer describes.
-		self.RecentHits = {}
+		-- Contact stamps are written against a clock the save restores, and
+		-- the entity ids keying them are reused across a load. Neither
+		-- survives the transition, so the tables are dropped rather than
+		-- carried into a world they no longer describe.
 		self.LastScoredHit = {}
+		self.StandingHead = {}
 		self.LockedUntil = {}
 		self.RecentRejections = {}
 		self.RecentBarks = {}
@@ -1852,6 +1797,7 @@ end
 -- to the table above and carries no top-level statements, so the reload the
 -- dev console fires cascades through them harmlessly.
 Script.ReloadScript("Scripts/HorseCollisionMod/Enums.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Tiers.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Log.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Armor.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")

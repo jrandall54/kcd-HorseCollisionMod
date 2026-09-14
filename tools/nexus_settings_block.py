@@ -88,6 +88,36 @@ def player_facing():
 
 		name, value, own = m.group(1), m.group(2).rstrip(","), m.group(3) or ""
 
+		# A setting whose value is a table is listed as its members rather
+		# than as a bare "{", which is what the page showed before and told a
+		# player nothing. Rendered inline so the row stays one row: the page
+		# is checked by setting name, and a member per row would need a name
+		# with a dot in it that check_nexus_page cannot match.
+		if value == "{":
+			members = []
+			depth = 1
+			j = i + 1
+
+			while j < len(lines) and depth > 0:
+				body = lines[j].split("--")[0]
+
+				# Only the table's own members count. A member whose value is
+				# itself a list, such as a tier's sound layers, is named
+				# without its contents: printing them turns one row into an
+				# unreadable line of braces and tells a player less than the
+				# tier name does.
+				if depth == 1:
+					for key, val in re.findall(r"(\w+)\s*=\s*([^,{]*\{?)", body):
+						val = val.strip()
+						members.append(key if val.endswith("{")
+								else "%s %s" % (key, val))
+
+				depth += body.count("{") - body.count("}")
+				eaten.add(j)
+				j += 1
+
+			value = ", ".join(members)
+
 		# Continuation of the trailing comment: a following line whose only
 		# content is a comment aligned past the value column.
 		j = i + 1

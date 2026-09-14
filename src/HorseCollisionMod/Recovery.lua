@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.12.2
+-- @release 5.13.0
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -57,6 +57,131 @@ function HorseCollisionMod:ReleaseActorMovement(ent, what)
 			.. " ok=" .. tostring(ok) .. " err=" .. tostring(err))
 
 	return ok
+end
+
+--- How high a victim carries their head when they are on their feet.
+--
+-- Recorded once, at the first impact that reaches them, because a victim the
+-- speed tiers have scored is by definition someone the horse rode into while
+-- they were standing. It is the reference every later check is read against,
+-- so nothing here is a number anybody chose.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:RecordStandingHeight(npc)
+	if not npc or not npc.id then
+		return
+	end
+
+	local id = tostring(npc.id)
+
+	if self.StandingHead[id] then
+		return
+	end
+
+	local head, origin = nil, nil
+
+	pcall(function()
+		head = npc.actor:GetHeadPos().z
+	end)
+
+	pcall(function()
+		origin = npc:GetWorldPos().z
+	end)
+
+	if head and origin and head > origin then
+		self.StandingHead[id] = head - origin
+	end
+end
+
+--- Whether a victim is lying flat rather than upright or getting up.
+--
+-- The single answer to "can this body take an animation right now", and it
+-- reads the body instead of a clock or a state string.
+--
+-- **Measured, through an untouched trot knockdown.** `headUp` is the head's
+-- height above the entity origin, and the entity origin sits on the ground:
+--
+--     t+0000ms  AnimationControlled  headUp 1.55   upright, the impact lands
+--     t+0624ms  AnimationControlled  headUp 0.94   falling
+--     t+1840ms  AnimationControlled  headUp 0.15   flat
+--     t+2448ms  MotionIdle           headUp 0.15   flat
+--     t+3072ms  MotionIdle           headUp 0.15   flat
+--     t+3664ms  BlendRagdoll         headUp 0.27   rising
+--     t+4880ms  BlendRagdoll         headUp 1.21   rising
+--     t+5472ms  BlendRagdoll         headUp 1.59   standing
+--
+-- Two things that trace settles, both of which the rest of this mod had
+-- wrong. **`BlendRagdoll` is the get-up, not the lie-down** -- the head climbs
+-- right through it -- so anything treating that state as "still down" has the
+-- sequence backwards. And the flat stretch is `AnimationControlled` followed
+-- by `MotionIdle`, the second of which is indistinguishable from a person
+-- standing about doing nothing, which is the hole every state-string test fell
+-- through.
+--
+-- Nothing else measured separates the phases. The physicalization profile
+-- reads `alive` from the impact to standing, the entity's pitch and roll stay
+-- at 0.00 throughout because the entity does not rotate with the body, and the
+-- velocity never exceeds 0.39.
+--
+-- The halfway point is a bisection rather than a tuned figure: flat reads 0.15
+-- against a standing 1.55, so the two are an order of magnitude apart and any
+-- split between them gives the same answer.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true while they are flat on the ground
+function HorseCollisionMod:IsVictimFlat(npc)
+	if not npc or not npc.id then
+		return false
+	end
+
+	local standing = self.StandingHead[tostring(npc.id)]
+
+	if not standing then
+		return false
+	end
+
+	local head, origin = nil, nil
+
+	pcall(function()
+		head = npc.actor:GetHeadPos().z
+	end)
+
+	pcall(function()
+		origin = npc:GetWorldPos().z
+	end)
+
+	if not head or not origin then
+		return false
+	end
+
+	local state = nil
+
+	pcall(function()
+		state = tostring(npc.actor:GetCurrentAnimationState())
+	end)
+
+	-- A reaction still playing blocks regardless of height, because the body
+	-- is high through most of a fall: it reads 0.94 of a standing 1.55 six
+	-- hundred milliseconds in, and interrupting there is what broke the pose.
+	if state == self.ReactionAnimationState then
+		return true
+	end
+
+	-- `BlendRagdoll` is the get-up. The head climbs 0.27, 0.62, 1.21, 1.59
+	-- across it, so reaching that state is the victim beginning to rise and is
+	-- the moment they become a fair target again. Height alone cannot say so:
+	-- the rise starts at 0.27 and does not pass halfway until a second later,
+	-- which refuses a reaction through most of a get-up.
+	if state == self.RagdollAnimationState then
+		return false
+	end
+
+	-- What is left is the flat stretch, where the fall clip has ended and the
+	-- ragdoll has not taken hold, and the victim reads `MotionIdle` face down.
+	-- Height is the only thing that separates it from standing about, and the
+	-- two are an order of magnitude apart -- 0.15 against 1.55 -- so the
+	-- halfway split is a bisection rather than a tuned figure.
+	return (head - origin) < (standing / 2)
 end
 
 --- Runs something once a victim is no longer a settling ragdoll.
@@ -624,160 +749,4 @@ function HorseCollisionMod:ImpactIsNewContact(npcId, now)
 	end
 
 	return true
-end
-
-
---- Whether a tier waits for a victim to be ready before it will land.
---
--- The wait exists for one reason: a knockdown clip starts from standing, so
--- playing it at a victim already flat on the ground has nothing to blend from
--- and looks wrong. That reason applies to the tiers that play an animation and
--- to no others.
---
--- A gallop ragdolls. There is no clip and no pose to start from, so no stage of
--- a victim's recovery makes it impossible, and the rider's position is that it
--- should always be available:
---
--- A gallop is pure physics, so it belongs on the table of possibilities at
--- any stage of a victim's recovery.
---
--- Leaving a gallop gated is also what produced the worst of the feedback
--- problem. The mod declined the impact, the engine's own collision happened
--- regardless, and what the rider got was the vanilla result: the horse wedged
--- in the victim, no reaction, and a bark. Nothing this mod does should ever
--- hand an impact back to that.
---
--- A charge is here for the same reason a gallop is. It is a physical ride-down
--- that ends in a ragdoll, and it is already scored as a gallop.
---
--- @tparam string tierName the tier the impact scored as
--- @treturn boolean true when this tier waits
-function HorseCollisionMod:HitReadyApplies(tierName)
-	local byTier = self.Config.HitReadyByTier
-
-	if type(byTier) ~= "table" then
-		return true
-	end
-
-	local applies = byTier[tierName]
-
-	-- A tier nobody has decided about waits, because that is the older and
-	-- more cautious behavior, but it says so rather than deciding silently.
-	if applies == nil then
-		if self.Config.LogTelemetry then
-			self:Log("HitReadyApplies has no entry for tier "
-					.. tostring(tierName) .. ", waiting by default")
-		end
-
-		return true
-	end
-
-	return applies and true or false
-end
-
-
---- Clears a victim's hit cooldown when they are back on their feet.
---
--- `HitCooldownMs` and `KnockdownRecoveryMs` are fixed durations standing in
--- for a question the mod can now ask directly: is this victim in a state where
--- another impact would do anything. A knockdown at 6000 ms was short. Measured
--- on a `villageGuard` sampled every 250 ms, the whole arc runs about seven
--- seconds at both tiers:
---
---     gallop   MotionIdle 0-1.8   BlendRagdoll 2.0-4.3   MotionIdle 4.6-5.3
---              IdleToMove 5.6-6.8   MotionMovement 7.1+
---     trot     AnimationControlled 0.2-3.0   MotionIdle 3.3-3.8
---              BlendRagdoll 4.0-6.4          MotionMovement 6.6+
---
--- An impact landing inside that arc plays no reaction, because every reaction
--- is a standing animation, and usually costs no health either.
---
--- ### Two traps the trace exposes
---
--- **`MotionIdle` appears in the middle of both arcs**, so leaving the busy
--- state is not the same as being recovered. A trot victim is idle for three
--- quarters of a second between the fall clip ending and the ragdoll taking the
--- body, and a gate that fired there would be worse than the timer. The wait
--- therefore requires the settle window to pass with no busy state in it, and
--- any busy state seen restarts it.
---
--- **A gallop victim is not busy for the first two seconds.** The impulse takes
--- that long to physicalize, and until it does they read `MotionIdle`, which is
--- indistinguishable from having recovered. So the settle window does not begin
--- counting until a busy state has actually been seen. Without that the
--- cooldown would clear before the victim had even fallen over.
---
--- The ceiling is what makes it safe. A victim who is never seen busy, because
--- the reaction was suppressed or they were already dead, is released on the
--- ceiling rather than left permanently immune.
---
--- @tparam table npc victim entity
--- @tparam string npcId the key this victim's deadline is stored under
--- @tparam string tierName the tier that hit them, for the telemetry line
-function HorseCollisionMod:WatchHitReady(npc, npcId, tierName)
-	local cfg = self.Config
-	local generation = self.TimerTick
-	local startedAt = self:TimeMs()
-	local settle = cfg.HitReadySettleMs or 2000
-	local ceiling = cfg.HitReadyCeilingMs or 12000
-	local seenBusy = false
-	local freeSince = nil
-
-	local function poll()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		-- Someone hit again while still down restarts the whole wait, and this
-		-- watcher is replaced by the one that impact starts.
-		if self.RecentHits[npcId] == nil then
-			return
-		end
-
-		local state = nil
-
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		local busy = state == self.RagdollAnimationState
-				or state == self.ReactionAnimationState
-		local now = self:TimeMs()
-		local elapsed = now - startedAt
-
-		if busy then
-			seenBusy = true
-			freeSince = nil
-		elseif seenBusy and freeSince == nil then
-			freeSince = now
-		end
-
-		local settled = freeSince ~= nil and (now - freeSince) >= settle
-		local expired = elapsed >= ceiling
-
-		if settled or expired then
-			self.RecentHits[npcId] = nil
-
-			if cfg.LogTelemetry then
-				self:Log("HitReady " .. self:NameOf(npc)
-						.. " tier=" .. tostring(tierName)
-						.. " after=" .. tostring(elapsed) .. "ms"
-						.. " state=" .. tostring(state)
-						.. " on=" .. (settled and "settled" or "ceiling"))
-			end
-
-			-- The recovery bark is deliberately **not** raised from here. This
-			-- watcher requires `HitReadySettleMs` of stillness before it
-			-- reports, so it cannot fire until two seconds after the victim is
-			-- already standing, which the rider heard as a long silence
-			-- between getting up and speaking. The bark pillar times its own
-			-- line from the moment of impact instead.
-
-			return
-		end
-
-		Script.SetTimer(cfg.HitReadyPollMs or 250, poll)
-	end
-
-	Script.SetTimer(cfg.HitReadyPollMs or 250, poll)
 end

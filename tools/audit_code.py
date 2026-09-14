@@ -92,13 +92,20 @@ def main():
 
 	# A setting is used when something reads it off a table, which in this code
 	# is always `cfg.Name`, `self.Config.Name` or `Config.Name`.
+	#
+	# The per-tier tables are the exception. They are reached through
+	# `TierValue("Name", tier)`, which names the table as a string, so an
+	# attribute search alone cannot see the read and calls a live table dead.
+	tiered = re.compile(r"""TierValue\s*\(\s*["'](\w+)["']""")
+	by_tier = set(tiered.findall(everything))
+
 	dead_cfg = []
 
 	for key, line in sorted(cfg.items()):
 		uses = len(re.findall(r"(?:cfg|Config|settings)\s*[.\[]\s*[\"']?%s\b" % key,
 				everything))
 
-		if uses == 0:
+		if uses == 0 and key not in by_tier:
 			dead_cfg.append((key, line))
 
 	print("Config keys: %d    declared in the settings file: %d"
@@ -171,7 +178,7 @@ def main():
 		uses = len(re.findall(r"(?:self|HorseCollisionMod)\.%s\b" % name,
 				everything))
 
-		if uses <= 1 and name not in tools:
+		if uses <= 1 and name not in tools and name not in by_tier:
 			dead_tbl.append((name, where))
 
 	print("\n== Module tables nothing indexes (%d of %d) ==" % (len(dead_tbl),

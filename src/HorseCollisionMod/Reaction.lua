@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.12.2
+-- @release 5.13.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -189,6 +189,95 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 			.. " err=" .. tostring(err))
 
 	return ok
+end
+
+--- What a tier does to the victim's body, dispatched from `ReactionByTier`.
+--
+-- The one place a tier is turned into a reaction. Every tier used to decide
+-- this at its own call site, and two of those sites carried a throw scalar on
+-- a branch the shipped settings never reached, so a live-looking number sat in
+-- the code doing nothing. Reading the style from a table means a tier that does
+-- not ragdoll cannot carry a throw figure at all.
+--
+-- The caller still owns whether a reaction happens. A walk is suppressed during
+-- a fight and a victim already reacting is left alone; those are the caller's
+-- policy about this impact, not a property of the tier.
+--
+-- @tparam table npc victim entity
+-- @tparam string tierName "Walk", "Trot", "Gallop", "Rear" or "Charge"
+-- @tparam table velocity horse velocity vector
+-- @tparam number speed horse speed in meters per second
+-- @tparam number armorScale the victim's armor impulse scale
+-- @tparam table horsePos the horse's world position
+-- @tparam table horseEnt the player's horse
+-- @treturn boolean true when a reaction was started
+function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
+										   armorScale, horsePos, horseEnt)
+	local style = self:TierValue("ReactionByTier", tierName)
+
+	-- An animation is refused on a body that is lying flat, and only then.
+	--
+	-- A victim who has begun to get up takes the reaction: watching one shrug
+	-- off a hoof because a clock had not run out reads exactly like vanilla's
+	-- non-reactions, which is the thing this mod exists to replace.
+	--
+	-- Only the animation is refused. The impact itself lands in full: a second
+	-- hit on a victim already down registers and costs them health, so
+	-- declining the whole thing loses damage the engine charges anyway. The
+	-- sound, the dust, the marks and the damage all happen; the body simply
+	-- stays where it is instead of snapping upright into a second fall.
+	--
+	-- The ragdoll styles are never refused. `Ragdoll` re-physicalizes a body
+	-- that is already down on purpose, so a gallop and a charge can throw
+	-- someone where they lie, and that is the behavior they should share.
+	local animated = style == "stagger" or style == "knockdown"
+			or style == "fall"
+
+	if animated then
+		self:RecordStandingHeight(npc)
+
+		if self:IsVictimFlat(npc) then
+			self:Log("PlayTierReaction " .. self:NameOf(npc)
+					.. " tier=" .. tostring(tierName)
+					.. " flat on the ground, animation skipped")
+
+			return false
+		end
+	end
+
+	if style == "stagger" then
+		return self:PlayReaction(npc, velocity, speed, "hcm_stagger_")
+	end
+
+	if style == "knockdown" then
+		return self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
+	end
+
+	if style == "fall" then
+		return self:PlayReaction(npc, velocity, speed, "hcm_fall_")
+	end
+
+	if style ~= "ragdoll" then
+		self:Log("PlayTierReaction tier=" .. tostring(tierName)
+				.. " has no reaction style, nothing played")
+
+		return false
+	end
+
+	local throw = self:TierValue("ThrowByTier", tierName)
+
+	-- A ragdoll tier with no throw figure still goes down; it is simply not
+	-- pushed. Said out loud rather than defaulted silently, because the only
+	-- way to reach it is a player editing one table and not the other.
+	if type(throw) ~= "number" then
+		self:Log("PlayTierReaction tier=" .. tostring(tierName)
+				.. " ragdolls with no ThrowByTier figure, dropping unpushed")
+
+		throw = 0
+	end
+
+	return self:Ragdoll(npc, velocity, speed, throw, armorScale,
+			horsePos, horseEnt)
 end
 
 --- Sets a ragdolled victim's physical mass, so the horse's own collision
