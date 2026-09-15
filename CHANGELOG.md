@@ -30,6 +30,15 @@ number.
 
 ## [Unreleased]
 
+## [5.15.1] - 2026-09-14
+
+### Changed
+
+- `ImpactDamageDelayMs` now says what it actually governs. The damage path stopped
+  counting and started watching the body some time ago, and the setting had been
+  left describing the old behavior while only the test-subject restore still read
+  it. Nothing about play changes.
+
 ## [5.15.0] - 2026-09-14
 
 ### Fixed
