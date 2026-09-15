@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.14.2
+-- @release 5.15.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -897,21 +897,19 @@ end
 -- stood up and walked off without ever saying a word about what had happened,
 -- which reads as the game forgetting rather than as a person recovering.
 --
--- **Timed from the impact rather than triggered by standing up.** Two earlier
--- attempts were driven by state and both landed late. `WatchHitReady` requires
--- `HitReadySettleMs` of stillness before it reports, so it could not fire until
--- two seconds after the victim was already upright; and waiting for the
--- animation state to leave `BlendRagdoll` fires only once the get-up has
--- finished. Both left an audible hole, which the rider described as "a large
--- gap between when they actually stand up and then the 2nd line plays".
+-- **Fired when the body begins to rise.** Three earlier attempts missed the
+-- moment. Waiting for the readiness watcher could not report until two seconds
+-- after the victim was upright; waiting for the animation state to leave
+-- `BlendRagdoll` fires once the get-up has already finished; and a delay tuned
+-- from the impact is one figure for a get-up that is not one length, so it
+-- landed mid-ragdoll for some victims and after others had walked off. The
+-- rider heard the last as "a large gap between when they actually stand up and
+-- then the 2nd line plays".
 --
--- A timer is the right instrument here and not a shortcut, because the target
--- is a moment *inside* an animation rather than its end, and no readable state
--- marks it. `BarkRecoveryDelayMs` is tuned by ear against the get-up so the
--- line lands while the victim is rising.
---
--- Walk is excluded: a shove has no knockdown to recover from and already spoke
--- at the moment of contact.
+-- The target is a moment inside the get-up rather than at either end of it,
+-- and the body marks it even though no animation state does: the head climbs
+-- from about 0.15 of its standing height to 1.59 across the rise, so leaving
+-- flat is the instant wanted. `WhenVictimRises` reads it.
 --
 -- @tparam table npc the victim
 -- @tparam string tier the speed tier the impact was scored at
@@ -924,7 +922,15 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 		return
 	end
 
-	if tier ~= "Trot" and tier ~= "Gallop" then
+	-- Only the tiers that answer with the collision voice and put somebody on
+	-- the ground. A shove has no knockdown to recover from and already spoke
+	-- at the moment of contact, and the rear and the charge have a voice of
+	-- their own rather than this one.
+	if self:TierValue("VictimBarkByTier", tier) ~= "collision" then
+		return
+	end
+
+	if self:TierValue("ReactionByTier", tier) == "stagger" then
 		return
 	end
 
@@ -933,11 +939,23 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 	end
 
 	local generation = self.TimerTick
-	local delay = self.Config.BarkRecoveryDelayMs or 3200
 
-	Script.SetTimer(delay, function()
+	-- Fired when the body begins to rise rather than after a tuned wait.
+	--
+	-- The delay that stood here was 3200ms for every victim, and a get-up is
+	-- not one length: measured, a body is flat from about 1.8s and starts
+	-- rising anywhere from there to past 7s depending on the fall and the
+	-- character set. One figure lands mid-ragdoll for some and after they are
+	-- already walking for others, which is the gap the rider reported.
+	self:WhenVictimRises(npc, function(why, waited)
 		if generation ~= self.TimerTick then
 			return
+		end
+
+		if self.Config.LogTelemetry then
+			self:Log("BarkRecovered " .. self:NameOf(npc)
+					.. " on=" .. tostring(why)
+					.. " waited=" .. tostring(waited) .. "ms")
 		end
 
 		-- A victim the impact killed is not getting up, and asking a corpse to

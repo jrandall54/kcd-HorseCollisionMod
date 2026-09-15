@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.14.2
+-- @release 5.15.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -234,8 +234,6 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 			or style == "fall"
 
 	if animated then
-		self:RecordStandingHeight(npc)
-
 		if self:IsVictimFlat(npc) then
 			self:Log("PlayTierReaction " .. self:NameOf(npc)
 					.. " tier=" .. tostring(tierName)

@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Impact
 -- @author jrandall54
--- @release 5.14.2
+-- @release 5.15.0
 
 --- Everything one impact does to one victim.
 --
@@ -72,6 +72,14 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	if wounds then
 		self:ShieldFromEngineDamage(npc)
 	end
+
+	-- How tall they stand, taken now because now is when they are upright.
+	--
+	-- It is the reference everything about posture is read against: whether a
+	-- body is flat enough to refuse an animation, and when it begins to rise.
+	-- Recorded here rather than with the reaction because a gallop ragdolls
+	-- without an animated reaction at all and still needs the figure.
+	self:RecordStandingHeight(npc)
 
 	-- What actually prevents the lockup. A victim under 40 health carrying a
 	-- bleeding buff is otherwise taken over by vanilla's auto-cure daycycle,
