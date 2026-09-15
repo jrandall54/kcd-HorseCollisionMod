@@ -1,0 +1,160 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>HorseCollisionMod API reference</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>HorseCollisionMod</h1>
+
+
+<ul>
+  <li><a href="../index.html">Index</a></li>
+</ul>
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
+  <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><strong>HorseCollisionMod.Impact</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
+  <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
+  <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
+  <li><a href="../modules/HorseCollisionMod.Health.html">HorseCollisionMod.Health</a></li>
+  <li><a href="../modules/HorseCollisionMod.Reaction.html">HorseCollisionMod.Reaction</a></li>
+  <li><a href="../modules/HorseCollisionMod.Marks.html">HorseCollisionMod.Marks</a></li>
+  <li><a href="../modules/HorseCollisionMod.Sound.html">HorseCollisionMod.Sound</a></li>
+  <li><a href="../modules/HorseCollisionMod.Bark.html">HorseCollisionMod.Bark</a></li>
+  <li><a href="../modules/HorseCollisionMod.Recovery.html">HorseCollisionMod.Recovery</a></li>
+  <li><a href="../modules/HorseCollisionMod.Crime.html">HorseCollisionMod.Crime</a></li>
+  <li><a href="../modules/HorseCollisionMod.Retaliation.html">HorseCollisionMod.Retaliation</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
+  <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
+  <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>HorseCollisionMod.Impact</code></h1>
+<p>Impact: what happens to a victim, once something has decided one happened.</p>
+<p> The mod has two ways of striking somebody and they have nothing in common.
+ The detection loop samples the horse's surroundings ten times a second and
+ scores whatever it finds; the rear and the charge are key presses that sweep
+ a corridor in front of a standing horse. Their entry conditions are
+ genuinely different, and that difference is why the two lived as two whole
+ functions for as long as they did.</p>
+
+<p> What follows an impact is not different. Probe, sound, bark, camera, blur,
+ vocal, dust, reaction, marks, hit reaction, combat hit, damage, stamina --
+ the same thirteen steps in the same order, with a different set of numbers.
+ Written twice, they drifted: the rear and the charge never shielded their
+ victims from the engine's own collision damage, never wrote an <a href="../modules/HorseCollisionMod.Impact.html">Impact</a> line
+ to the log, and for months took none of the Horsemanship, barding or combat
+ scaling that every other tier's stamina cost did.</p>
+
+<p> So the two entries keep only what is theirs. The loop keeps its contact
+ debounce and its stand-down during a lunge; the rear and charge keep their
+ corridor sweep, their fixed scoring speed and their victim lockout. Both
+ then call <a href="../modules/HorseCollisionMod.Impact.html#HorseCollisionMod:ResolveImpact">ResolveImpact</a>, and every difference that remains between tiers
+ is a row in a table in <code>Tiers.lua</code> rather than a branch in either.</p>
+
+<p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
+ pulls this file in with <code>Script.ReloadScript</code>.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Release</strong>: 5.14.0</li>
+        <li><strong>Author</strong>: jrandall54</li>
+    </ul>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ResolveImpact">HorseCollisionMod:ResolveImpact (npc, tierName, ctx)</a></td>
+	<td class="summary">Everything one impact does to one victim.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "HorseCollisionMod:ResolveImpact"></a>
+    <strong>HorseCollisionMod:ResolveImpact (npc, tierName, ctx)</strong>
+    </dt>
+    <dd>
+    Everything one impact does to one victim. </p>
+
+<p> Called once an entry point has decided this impact happens. It decides
+ nothing about whether it should: no cooldown, no readiness, no gate of any
+ kind lives here.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot", "Gallop", "Rear" or "Charge"
+        </li>
+        <li><span class="parameter">ctx</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         what the entry point knows: <code>velocity</code>, <code>speed</code>,
+   <code>horsePos</code>, <code>horseEnt</code>, <code>playerEnt</code>, <code>horseWuid</code>, and optionally
+   <code>sampledSpeed</code> for the telemetry line
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2026-09-14 17:09:14 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

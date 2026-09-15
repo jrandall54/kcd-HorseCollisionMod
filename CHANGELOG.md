@@ -30,6 +30,29 @@ number.
 
 ## [Unreleased]
 
+## [5.14.0] - 2026-09-14
+
+### Fixed
+
+- A rear and a charge now shield their victim from the engine's own collision
+  damage, the way every other impact already did. Without it the engine could
+  land the killing blow on a victim the mod was about to charge for, which takes
+  the kill and the crime with it.
+- A charge is reported at its real strength. It was probed as a minor injury
+  while the hit it sent was a major one, so its telemetry named the wrong
+  figure.
+
+### Changed
+
+- The rear and the charge no longer duplicate the collision path. Both they and
+  the detection loop now resolve an impact through one shared routine, so a
+  change to what an impact does reaches every tier at once. Nothing a player sees
+  changes; a rear and a charge simply gain the pieces they had been missing.
+- `RearChargeVictimLockMs` is replaced by `VictimLockMsByTier`, and four new
+  tables state per tier what a branch on the tier's name decided before:
+  `HitStrengthByTier`, `VictimBarkByTier`, `RetaliationByTier` and
+  `StaminaPerVictimByTier`.
+
 ## [5.13.2] - 2026-09-14
 
 ### Fixed

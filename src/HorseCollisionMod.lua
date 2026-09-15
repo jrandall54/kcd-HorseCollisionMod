@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.13.2
+-- @release 5.14.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.13.2"
+HorseCollisionMod.Version = "5.14.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -198,8 +198,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeWaitMs when the mod starts watching for the rear to end
 -- @field RearChargeWaitPollMs how often it looks
 -- @field RearChargeWaitCeilingMs push anyway by this point
--- @field RearChargeVictimLockMs how long a victim struck by a charge is closed
---   to further impacts, so one lunge is one hit
 -- @field RearChargeLungePeakMin the top speed a lunge must reach before it can
 --   be judged spent, so noise in the derived speed cannot close the window
 --   before the horse has gone anywhere
@@ -389,6 +387,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpactDustScaleByTier how much dust each tier raises
 -- @field VictimDirtByTier the dirt each tier leaves on the victim
 -- @field VictimBloodByTier the blood each tier leaves on the victim
+-- @field HitStrengthByTier how hard the engine is told each tier hit, by
+--   HitReactionStrength name
+-- @field VictimBarkByTier which spoken set a victim answers each tier with
+-- @field RetaliationByTier which tiers can make a victim fight back
+-- @field StaminaPerVictimByTier which tiers charge the horse once per victim
+-- @field VictimLockMsByTier how long a victim is closed to further impacts,
+--   for tiers that are one deliberate move rather than a series of collisions
 -- @field ReactionByTier what each tier does to the victim's body: "stagger",
 --   "knockdown", "fall" or "ragdoll"
 -- @field ThrowByTier how hard each ragdoll tier throws, as a scalar
@@ -683,7 +688,6 @@ HorseCollisionMod.Config = {
 	RearChargeWaitMs         = 400,
 	RearChargeWaitPollMs     = 30,
 	RearChargeWaitCeilingMs  = 3000,
-	RearChargeVictimLockMs   = 2600,
 	RearChargeLungePeakMin   = 3.0,
 	RearChargeLungeSpentAt   = 0.5,
 	RearChargeWindowMs       = 2600,
@@ -804,6 +808,26 @@ HorseCollisionMod.Config = {
 	VictimBloodByTier        = {
 		Trot = 0.15, Gallop = 0.45, Rear = 0.15, Charge = 0.45
 	},
+
+	HitStrengthByTier        = {
+		Walk = "Tickle", Trot = "MinorInjury", Gallop = "MajorInjury",
+		Rear = "MinorInjury", Charge = "MajorInjury"
+	},
+
+	VictimBarkByTier         = {
+		Walk = "collision", Trot = "collision", Gallop = "collision",
+		Rear = "rear", Charge = "rear"
+	},
+
+	RetaliationByTier        = {
+		Walk = true, Trot = false, Gallop = false, Rear = false, Charge = false
+	},
+
+	StaminaPerVictimByTier   = {
+		Walk = true, Trot = true, Gallop = true, Rear = false, Charge = false
+	},
+
+	VictimLockMsByTier       = { Charge = 2600 },
 
 	ReactionByTier           = {
 		Walk = "stagger", Trot = "fall", Gallop = "ragdoll",
@@ -1815,6 +1839,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Lean.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rear.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Impact.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 
 -- Runs at file scope rather than from the load screen, because
