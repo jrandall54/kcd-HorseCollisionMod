@@ -30,6 +30,17 @@ number.
 
 ## [Unreleased]
 
+## [5.14.2] - 2026-09-14
+
+### Changed
+
+- A development deploy no longer runs the release gate. Installing into the
+  local game is not shipping, and checking the version against the changelog,
+  the `@release` lines and the documentation's currency made the development
+  loop stop the moment work was written into `[Unreleased]` without the manifest
+  being bumped to match. The style and Lua syntax checks still run on every
+  deploy, and a real build is unchanged.
+
 ## [5.14.1] - 2026-09-14
 
 ### Changed
