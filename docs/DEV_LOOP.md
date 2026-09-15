@@ -131,12 +131,12 @@ re-applies it, anything asked for on a later `test` is added to it, and `land`
 clears it. A value given once does not evaporate on the next deploy.
 
 ```
-toolslow.ps1 world                              what is live
-toolslow.ps1 test -Preset stamina               add a named world
-toolslow.ps1 test -Set CollisionIsCrime=true    change one setting
-toolslow.ps1 test -Set StaminaDrainByTier.Gallop=0
-toolslow.ps1 test -Unset CollisionIsCrime       drop one
-toolslow.ps1 test -Shipped                      carry nothing
+tools/flow.ps1 world                              what is live
+tools/flow.ps1 test -Preset stamina               add a named world
+tools/flow.ps1 test -Set CollisionIsCrime=true    change one setting
+tools/flow.ps1 test -Set StaminaDrainByTier.Gallop=0
+tools/flow.ps1 test -Unset CollisionIsCrime       drop one
+tools/flow.ps1 test -Shipped                      carry nothing
 ```
 
 Anything in the settings file can be set, including a member of a table, so a
