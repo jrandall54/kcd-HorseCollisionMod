@@ -30,6 +30,14 @@ number.
 
 ## [Unreleased]
 
+## [5.16.2] - 2026-09-14
+
+### Changed
+
+- Landing a branch forgets its test settings instead of leaving an empty record
+  of them, so the next branch starts from the defaults again rather than with
+  every interruption switched on. Developer-facing only.
+
 ## [5.16.1] - 2026-09-14
 
 ### Fixed
