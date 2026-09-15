@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Impact
 -- @author jrandall54
--- @release 5.16.0
+-- @release 5.16.1
 
 --- Everything one impact does to one victim.
 --
@@ -185,6 +185,10 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- gallop throws them several meters and dust that follows a body reads as
 	-- smoke.
 	self:ImpactDust(npc, tierName)
+
+	-- How long the ragdoll this impact asked for actually took to take.
+	-- Instrumentation only; it changes nothing.
+	self:TraceFallLanding(npc, tierName)
 
 	-- Marks, the native hit reaction, and the combat hit. `MarkVictim` gates
 	-- itself on having dirt and blood figures for the tier, and a tier that

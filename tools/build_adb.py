@@ -467,7 +467,7 @@ FALL_SETTLE_SLEEP = 1
 # reads none of this data. Handover timing was tested against it and moved it
 # by tens of milliseconds.
 FALL_SETTLE_AT = {
-    "male": {"forward": 1.65, "back": 1.16, "left": 1.65, "right": 1.47},
+    "male": {"forward": 1.65, "back": 1.16, "left": 2.80, "right": 2.08},
     "female": {"forward": 1.67, "back": 0.95, "left": 1.01, "right": 1.17}
 }
 

@@ -30,15 +30,40 @@ number.
 
 ## [Unreleased]
 
+## [5.16.1] - 2026-09-14
+
 ### Fixed
 
+- A victim hit twice in quick succession no longer collapses seconds after the
+  blow, or lifts into the air and drops. Those were one defect wearing two
+  faces. A fall carries its ragdoll partway through the animation, and a second
+  impact starting a new animation canceled it; the canceled ragdoll then
+  arrived late, against whatever the victim was doing by then. Landing while
+  they lay still read as a delayed collapse, landing mid-animation read as a
+  levitation. A fall is now refused while the previous one is still waiting to
+  hand over, and only for as long as that lasts.
+- Posture is judged against the tallest a victim has been seen, rather than the
+  first reading taken of them. A victim first touched while already on the
+  ground kept a standing height of a few centimetres for good, which meant
+  nothing could ever judge them to be down and every decision about their
+  posture was wrong from then on.
+- An impact on somebody already down reacts whether or not they were fighting.
+  The mod knew one of the game's two ragdoll states, and the other is the one a
+  victim in combat uses; counted over a session it was more than half of them.
+  A charge or gallop onto those victims did nothing visible and landed seconds
+  later instead, which is why the behavior looked random rather than wrong.
+- An impact reads the victim and acts on them in the same breath. The reaction
+  had drifted to the far side of the sound, the barks, the camera shake, the
+  view blur and the dust, and a victim can leave the state that decides how they
+  are handled in that time.
+
 - An impact on somebody who is already down reacts, whether or not they were
-  fighting. The mod recognised one of the game's two ragdoll states, and the
+  fighting. The mod recognized one of the game's two ragdoll states, and the
   other is the one a victim in combat uses: counted over a session, it accounted
   for more than half of all ragdolled victims. Every test of whether a body was
   down, flat, or back on its feet missed those victims, so a charge or a gallop
   onto them did nothing visible and the blow landed seconds later instead. It is
-  why the behaviour looked random rather than wrong.
+  why the behavior looked random rather than wrong.
 - An impact reads the victim and acts on them in the same breath. The reaction
   had drifted to the far side of the sound, the barks, the camera shake, the
   view blur and the dust, and a victim can leave the state that decides how they
