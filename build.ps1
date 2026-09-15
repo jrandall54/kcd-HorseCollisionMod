@@ -1,5 +1,20 @@
 ﻿param (
-    [string]$Version = "dev"
+    [string]$Version = "dev",
+
+    # A development deploy, which installs but never ships.
+    #
+    # The release checks below are about what a release claims: that the
+    # version follows from the changelog, that every @release line agrees with
+    # it, and that no documentation describes an older build. None of that is
+    # true of a build that only goes into the local install, and gating one on
+    # it means the dev loop stops dead the moment work is written into
+    # [Unreleased] and the manifest has not been bumped to match. That cost a
+    # working session, and the fix belongs here rather than in a habit of
+    # bumping the version by hand mid-branch.
+    #
+    # The version is still carried, because the installed files and the zip
+    # name have to agree with the manifest.
+    [switch]$Development
 )
 
 Write-Host "Building HorseCollisionMod version $Version..."
@@ -267,7 +282,7 @@ Write-Host "Code Style Check Passed ($luaLineCount lines, $($luaScripts.Count) f
 # Release gate. A release version is anything without a prerelease suffix, so
 # -dev and -diag builds skip every check below and stay free to carry
 # diagnostics and a mismatched version.
-$isRelease = $Version -match '^\d+\.\d+\.\d+$'
+$isRelease = (-not $Development) -and ($Version -match '^\d+\.\d+\.\d+$')
 
 if ($isRelease) {
     # The version lives in three places and a release needs all three to agree.

@@ -828,8 +828,13 @@ if ($Version -eq "") {
 }
 
 if (-not $NoBuild) {
+	# -Development, because this installs and never ships. Without it the
+	# build applies the release gate -- version against changelog, @release
+	# lines, documentation staleness -- and refuses to deploy over work that
+	# has been written into [Unreleased] but not yet versioned, which is the
+	# normal state of a branch being tested.
 	& powershell.exe -ExecutionPolicy Bypass `
-		-File (Join-Path $repoRoot "build.ps1") -Version $Version
+		-File (Join-Path $repoRoot "build.ps1") -Version $Version -Development
 	if ($LASTEXITCODE -ne 0) {
 		Write-Host "[DEPLOY] build failed, nothing deployed" -ForegroundColor Red
 		exit 1
