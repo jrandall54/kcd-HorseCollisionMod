@@ -234,11 +234,21 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 			or style == "fall"
 
 	if animated then
-		if self:IsVictimFlat(npc) then
-			self:Log("PlayTierReaction " .. self:NameOf(npc)
-					.. " tier=" .. tostring(tierName)
-					.. " flat on the ground, animation skipped")
+		local flat, headUp, standing, state = self:IsVictimFlat(npc)
 
+		-- Logged whichever way it goes, because the interesting case is the
+		-- one where a reaction was allowed and should not have been, and a
+		-- decision that only speaks when it refuses cannot show you that.
+		if self.Config.LogTelemetry then
+			self:Log("FlatCheck " .. self:NameOf(npc)
+					.. " tier=" .. tostring(tierName)
+					.. " flat=" .. tostring(flat)
+					.. " headUp=" .. string.format("%.2f", headUp or -1)
+					.. " standing=" .. string.format("%.2f", standing or -1)
+					.. " state=" .. tostring(state))
+		end
+
+		if flat then
 			return false
 		end
 	end

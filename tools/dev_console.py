@@ -129,6 +129,7 @@ def is_noise(text):
 # part file and nothing here has to know what they are.
 MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
 SETTINGS_SCRIPT = "Scripts/Startup/HorseCollisionMod_Settings.lua"
+TESTWORLD_SCRIPT = "Scripts/Startup/HorseCollisionMod_TestWorld.lua"
 
 # Reloading the mod's Lua without restarting. `lua_reload_script` is a native
 # console command this build registers, which is a better bet than driving
@@ -173,6 +174,17 @@ RELOAD_COMMANDS = [
     # previous one still live, which reads in game as a setting that does
     # nothing.
     "lua_reload_script " + SETTINGS_SCRIPT,
+    # The testing world assigns over the settings global and is a startup
+    # script too, so it is only read when the game starts unless it is
+    # re-executed here. Without this a world change needed a restart, which is
+    # the opposite of what it exists for: the whole point is changing what a
+    # test runs against without leaving the saddle.
+    #
+    # Ordered between the two because it overrides the settings and is then
+    # read by ApplySettings, which the mod script's entry point runs. Missing
+    # when the world carries no overrides, and reloading a file that is not
+    # there is refused harmlessly.
+    "lua_reload_script " + TESTWORLD_SCRIPT,
     "lua_reload_script " + MOD_SCRIPT,
     # Re-executing the script is not enough on its own. The mod's detection
     # loop is only started by its UI listener when a loading screen ends,

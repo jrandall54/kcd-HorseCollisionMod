@@ -53,6 +53,18 @@ param (
 )
 
 $ErrorActionPreference = "Stop"
+
+# Comma-separated values are split here rather than left to the parameter
+# binder. Called as `.	oolslow.ps1 test -Preset a,b` from a PowerShell
+# prompt the binder splits them; called through `powershell -File`, which is
+# how every tool and script invokes this, every argument arrives as one literal
+# string and `-Preset a,b` binds as a single preset named "a,b". Splitting here
+# makes both spellings mean the same thing.
+$Preset = @($Preset | ForEach-Object { $_ -split ',' } |
+		Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.Trim() })
+$Unset = @($Unset | ForEach-Object { $_ -split ',' } |
+		Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.Trim() })
+
 $repo = Split-Path $PSScriptRoot -Parent
 $deploy = Join-Path $PSScriptRoot "dev_deploy.ps1"
 $gameRoot = "C:\Games\Kingdom Come - Deliverance"

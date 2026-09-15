@@ -392,6 +392,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field StaminaPerVictimByTier which tiers charge the horse once per victim
 -- @field VictimLockMsByTier how long a victim is closed to further impacts,
 --   for tiers that are one deliberate move rather than a series of collisions
+-- @field VictimFlatFraction how low a victim's head must be, against their own
+--   standing height, to count as flat on the ground
 -- @field ReactionByTier what each tier does to the victim's body: "stagger",
 --   "knockdown", "fall" or "ragdoll"
 -- @field ThrowByTier how hard each ragdoll tier throws, as a scalar
@@ -825,6 +827,8 @@ HorseCollisionMod.Config = {
 	},
 
 	VictimLockMsByTier       = { Charge = 2600 },
+
+	VictimFlatFraction       = 0.15,
 
 	ReactionByTier           = {
 		Walk = "stagger", Trot = "fall", Gallop = "ragdoll",

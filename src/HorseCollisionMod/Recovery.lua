@@ -137,7 +137,7 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	local standing = self.StandingHead[tostring(npc.id)]
 
 	if not standing then
-		return false
+		return false, -1, -1, "unrecorded"
 	end
 
 	local head, origin = nil, nil
@@ -151,7 +151,7 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	end)
 
 	if not head or not origin then
-		return false
+		return false, -1, standing, "?"
 	end
 
 	local state = nil
@@ -164,24 +164,41 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	-- is high through most of a fall: it reads 0.94 of a standing 1.55 six
 	-- hundred milliseconds in, and interrupting there is what broke the pose.
 	if state == self.ReactionAnimationState then
-		return true
+		return true, head - origin, standing, state
 	end
 
-	-- `BlendRagdoll` is the get-up. The head climbs 0.27, 0.62, 1.21, 1.59
-	-- across it, so reaching that state is the victim beginning to rise and is
-	-- the moment they become a fair target again. Height alone cannot say so:
-	-- the rise starts at 0.27 and does not pass halfway until a second later,
-	-- which refuses a reaction through most of a get-up.
-	if state == self.RagdollAnimationState then
-		return false
-	end
+	-- Everything else is decided by how high the body is carrying its head,
+	-- and by nothing else.
+	--
+	-- A shortcut stood here that treated `BlendRagdoll` as the get-up, because
+	-- a trot knockdown was traced and the head climbs 0.27, 0.62, 1.21, 1.59
+	-- across that state. That is true of the fall tiers, where Mannequin hands
+	-- the body to physics partway through a clip and the ragdoll resolves into
+	-- a rise. It is false of the ragdoll tiers: a gallop victim is dropped by
+	-- `actor:Fall` and sits in `BlendRagdoll` for the whole time they are
+	-- down, so the shortcut answered "not flat" from the impact until they
+	-- stood, and the log showed it -- a rise watcher running its full fifteen
+	-- second ceiling and reporting `neverFlat`.
+	--
+	-- One state string meaning two different things on two paths is what this
+	-- mod has been caught by twice. Height means the same thing on both.
+	--
+	-- The fraction is measured rather than bisected, and the difference
+	-- mattered. A halfway split stood here on the reasoning that flat and
+	-- standing are an order of magnitude apart, so anything between them would
+	-- answer alike. They are, and it does not: a victim on the way up passes
+	-- through every value in between, and half of standing is most of the way
+	-- to their feet. Logged from play, one guard of standing 1.58 was refused
+	-- at 0.62, 0.39 and 0.34 while visibly getting up, and correctly refused
+	-- at 0.06.
+	--
+	-- Against their own standing height, every flat reading taken so far is
+	-- 0.04 or 0.10 of it, and every reading of a body that has begun to rise is
+	-- 0.17 or more. `VictimFlatFraction` sits between the two with margin on
+	-- both sides.
+	local fraction = self.Config.VictimFlatFraction or 0.15
 
-	-- What is left is the flat stretch, where the fall clip has ended and the
-	-- ragdoll has not taken hold, and the victim reads `MotionIdle` face down.
-	-- Height is the only thing that separates it from standing about, and the
-	-- two are an order of magnitude apart -- 0.15 against 1.55 -- so the
-	-- halfway split is a bisection rather than a tuned figure.
-	return (head - origin) < (standing / 2)
+	return (head - origin) < (standing * fraction), head - origin, standing, state
 end
 
 --- Runs something the moment a victim stops lying flat and starts to rise.
@@ -227,6 +244,17 @@ function HorseCollisionMod:WhenVictimRises(npc, fn)
 		end
 
 		if self:TimeMs() >= deadline then
+			-- The last reading goes with the verdict. `neverFlat` has two
+			-- causes that look identical from outside: a body whose head this
+			-- cannot read at all, and one it reads fine and never finds low.
+			if self.Config.LogTelemetry then
+				local _flat, headUp, standing = self:IsVictimFlat(npc)
+
+				self:Log("WhenVictimRises " .. self:NameOf(npc)
+						.. " gave up, headUp=" .. string.format("%.2f", headUp or -1)
+						.. " standing=" .. string.format("%.2f", standing or -1))
+			end
+
 			fn(seen and "ceiling" or "neverFlat", elapsed)
 
 			return

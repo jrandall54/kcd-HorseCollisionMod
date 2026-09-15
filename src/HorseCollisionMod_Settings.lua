@@ -302,6 +302,19 @@ HorseCollisionModSettings = {
 	-- the charge has one; every other tier is debounced by HitMinIntervalMs.
 	VictimLockMsByTier       = { Charge = 2600 },
 
+	-- How low a victim's head must be, as a fraction of how high they carry it
+	-- standing, before the mod treats them as flat on the ground and refuses
+	-- to start an animation on them.
+	--
+	-- Measured, not chosen. Every reading taken of a body lying flat is 0.04
+	-- or 0.10 of its standing height; every reading of one that has begun to
+	-- get up is 0.17 or more. This sits between them.
+	--
+	-- Raise it and a victim is refused further into their get-up; lower it and
+	-- a reaction can start on a body still on the ground, which snaps them
+	-- upright into it.
+	VictimFlatFraction       = 0.15,
+
 	-- What a tier does to the victim's body.
 	--
 	-- "stagger" and "knockdown" play an animation and nothing else. "fall"
