@@ -30,6 +30,11 @@ number.
 
 ## [Unreleased]
 
+## [5.19.1] - 2026-09-15
+
+### Fixed
+- Prevented severe skeleton tearing (IK glitches) on knocked-down NPCs by forcefully un-equipping their weapons while they are ragdolled and re-arming them when they stand up
+
 ## [5.19.0] - 2026-09-15
 
 ### Added

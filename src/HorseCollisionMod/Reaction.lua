@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.19.0
+-- @release 5.19.1
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -109,11 +109,17 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		self.VictimActivity[tostring(npc.id)] = tostring(npc.actor:GetCurrentAnimationState())
 	end)
 
-	local ok, err = pcall(function()
+		local ok, err = pcall(function()
+		-- Disarm before ragdolling to prevent IK glitches on the ground
+		if string.find(action, "fall") then
+			self:DisarmVictim(npc)
+		end
+
 		-- The second argument is the object being interacted with. There is
 		-- no object in a collision, so the victim is passed as its own
 		-- target; the animation needs no alignment to anything external.
-		npc.actor:StartInteractiveActionByName(action, npc.id, true, 1)
+		npc.actor:StartInteractiveActionByName(
+					action, npc.id, true, 1)
 	end)
 
 	-- Deferred by a tick for the same reason the ragdoll impulse is: the
@@ -182,6 +188,8 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 			if generation ~= self.TimerTick then
 				return
 			end
+
+			self:RearmVictim(npc)
 
 			self:FinishRecovery(npc, action, state, waitedForBody)
 		end)
@@ -258,7 +266,8 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 		-- fall clip on a victim who is not standing". Removing those timers
 		-- took the protection with them. This refuses only the thing that
 		-- causes it, and only while it is actually pending.
-		local pending = style == "fall" and self:HasFallPending(npc)
+		local unsettled = self.RagdollUnsettled and self.RagdollUnsettled[tostring(npc.id)]
+		local pending = self:HasFallPending(npc) or unsettled
 		local refused = flat or pending
 
 		-- Logged whichever way it goes, because the interesting case is the
@@ -560,9 +569,9 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	local damping = self.Config.RagdollDamping or 0
 	local minEnergy = self.Config.RagdollMinEnergy or 0
 
-	if damping <= 0 and minEnergy <= 0 then
-		return
-	end
+	local npcId = tostring(npc.id)
+	self.RagdollUnsettled = self.RagdollUnsettled or {}
+	self.RagdollUnsettled[npcId] = true
 
 	local pollMs = self.Config.RagdollDampPollMs or 100
 	local settleAt = self.Config.RagdollDampSettleSpeed or 0.5
@@ -774,6 +783,8 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 		pcall(function()
 			npc:SetPhysicParams(PHYSICPARAM_SIMULATION, { damping = 0, min_energy = 0 })
 		end)
+
+		self.RagdollUnsettled[npcId] = nil
 	end
 
 	local function watch()
@@ -1024,80 +1035,32 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	--
 	-- Only for a victim already down. The standing path does not need it and
 	-- is where the T-pose came from when this was applied to every impact.
-	local alreadyDown = false
-	local entryState = "?"
-
-	pcall(function()
-		entryState = tostring(npc.actor:GetCurrentAnimationState())
-
-		alreadyDown = self:IsRagdollState(entryState)
-	end)
-
-	if alreadyDown then
-		-- A victim already down is knocked down again by a fragment, not by
-		-- driving physics from here.
-		--
-		-- Setting the physicalization profile by hand works and cannot be made
-		-- to look right. It is the only thing that re-physicalizes a body
-		-- already in `BlendRagdoll`, so the mass write succeeds and the throw
-		-- reaches parity with a standing victim, 2.30 m against 2.05 to 2.18.
-		-- But something has to set the profile back, and an alive actor is an
-		-- upright capsule: returning to it from a body lying on the ground
-		-- stands the victim in a single frame with nothing in between.
-		--
-		-- Ruled out along the way, each on its own: `RagDollize` with no
-		-- argument and with the fall-and-play flag, cycling the profile out to
-		-- `alive` and back, `PostPhysicalize` once and repeated across the whole
-		-- get-up, `StandUp` before the fall, and playing an `hcm_getup_*`
-		-- fragment afterwards, which carries a measured rotation of +53, +90,
-		-- -176 and 0 degrees and is why those were removed from the reaction
-		-- path once already.
-		--
-		-- `hcm_settle` is the fall tier's own shape with the clip taken out: an
-		-- empty terminal animation so nothing imposes a pose, and a `Ragdoll`
-		-- ProcLayer at ExitTime 0 so Mannequin owns the ragdoll from the first
-		-- frame. The game then recovers the actor when the fragment ends, the
-		-- same way it recovers one knocked down by `hcm_fall_`, which is the
-		-- only recovery in this mod that has ever looked right.
-		local played = false
-
+		-- Force the engine into an immediate ragdoll via an interactive action fragment,
+	-- rather than using actor:Fall.
+	--
+	-- actor:Fall merely queues a physics transition. If the victim is playing an
+	-- uninterruptible animation (like walking in combat, getting up, etc.), the engine
+	-- ignores the fall request until the animation finishes. This causes the
+	-- "delayed reaction" bug where a victim takes the hit, walks three steps,
+	-- and then suddenly collapses.
+	--
+	-- hcm_settle is an empty fragment with a Ragdoll ProcLayer at ExitTime 0.
+	-- Because it is an interactive action, the engine immediately aborts whatever
+	-- the victim is doing to play it, instantly snapping them into the physics
+	-- ragdoll state and bypassing the engine's internal queue.
+			local function requestFall()
 		pcall(function()
-			played = npc.actor:StartInteractiveActionByName(
+			self:DisarmVictim(npc)
+
+			if npc.actor then
+				npc.actor:StartInteractiveActionByName(
 					self.Config.SettleFragTag or "hcm_settle",
 					npc.id, false, 1.0)
-		end)
-
-		if self.Config.LogTelemetry then
-			self:Log("Settle " .. self:NameOf(npc)
-					.. " played=" .. tostring(played)
-					.. " entry=" .. entryState)
-		end
-
-		return
-	end
-
-	-- The fall is requested after the body is physicalized, not alongside it.
-	--
-	-- Called in the same frame as `RagDollize` the two race, the fall does not
-	-- take, and the victim stands back up in the T-pose `RagDollize` left. The
-	-- signal for when the body is ready is the one this file already relies on
-	-- further down: the mass write succeeds exactly when the body is
-	-- physicalized, and its ladder reports that at 0 to 120 ms.
-	--
-	-- A victim who was not already down keeps the original order, because
-	-- there the fall is what physicalizes the body in the first place and
-	-- nothing has to wait for anything.
-	local function requestFall()
-		pcall(function()
-			if npc.actor then
-				npc.actor:Fall({ x = 0, y = 0, z = 0 }, true)
 			end
 		end)
 	end
 
-	if not alreadyDown then
-		requestFall()
-	end
+	requestFall()
 
 	-- `actor:RagDollize` does not belong here and must not be added back. It
 	-- asks for the physics profile directly rather than telling the actor to
@@ -1118,10 +1081,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	-- half a second after the victim had already fallen. The mass write is the
 	-- right signal, because it succeeds exactly when the body is physicalized,
 	-- and its own ladder reports that at 0 to 120 ms.
-	self:MassVictim(npc, armorScale, function()
-		if alreadyDown then
-			requestFall()
-		end
+		self:MassVictim(npc, armorScale, function()
 
 		self:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt)
 		self:DampVictim(npc, armorScale)
@@ -1137,6 +1097,13 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	-- how long the engine then holds it is the engine's own figure.
 	self:TraceRecovery(npc, "engine-ragdoll")
 
+	local generation = self.TimerTick
+	self:WhenVictimIsUp(npc, function(state, waitedForBody)
+		if generation ~= self.TimerTick then
+			return
+		end
+		self:RearmVictim(npc)
+	end)
 end
 
 
@@ -1323,3 +1290,9 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos, hor
 		end
 	end)
 end
+
+
+
+
+
+
