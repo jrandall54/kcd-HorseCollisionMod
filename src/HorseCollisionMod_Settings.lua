@@ -254,6 +254,54 @@ HorseCollisionModSettings = {
 	-- Worked example at the defaults: a town guard reads smash_def about 6, so
 	-- worn is 5.5, the falloff is 1/(1+5.5/0.6) = 0.10, and a charge's 110
 	-- becomes 11. Raise ArmorFloor to 0.25 and the same charge lands 27.
+	-- How hard the engine is told each impact hit, by name. The names come
+	-- from the game's own hit reaction scale, ascending: Tickle, Unpleasant,
+	-- Exhausting, MinorInjury, MajorInjury, Fatal.
+	HitStrengthByTier        = {
+		Walk   = "Tickle",
+		Trot   = "MinorInjury",
+		Gallop = "MajorInjury",
+		Rear   = "MinorInjury",
+		Charge = "MajorInjury",
+	},
+
+	-- Which set of spoken lines a victim answers each impact with. The rear
+	-- and the charge have their own voice, separate from the collision sets
+	-- and with their own switch.
+	VictimBarkByTier         = {
+		Walk   = "collision",
+		Trot   = "collision",
+		Gallop = "collision",
+		Rear   = "rear",
+		Charge = "rear",
+	},
+
+	-- Which impacts can make a victim lose patience and fight back. Only the
+	-- shove: being reared on is not a patience problem.
+	RetaliationByTier        = {
+		Walk   = true,
+		Trot   = false,
+		Gallop = false,
+		Rear   = false,
+		Charge = false,
+	},
+
+	-- Which impacts charge the horse once for every person hit. A rear and a
+	-- charge are one move that can land on several people at once, and are
+	-- charged once for the move instead.
+	StaminaPerVictimByTier   = {
+		Walk   = true,
+		Trot   = true,
+		Gallop = true,
+		Rear   = false,
+		Charge = false,
+	},
+
+	-- How long a victim is closed to further impacts, in milliseconds, for an
+	-- impact that is one deliberate move rather than a pass of the horse. Only
+	-- the charge has one; every other tier is debounced by HitMinIntervalMs.
+	VictimLockMsByTier       = { Charge = 2600 },
+
 	-- What a tier does to the victim's body.
 	--
 	-- "stagger" and "knockdown" play an animation and nothing else. "fall"
@@ -859,7 +907,6 @@ HorseCollisionModSettings = {
 	RearChargeStrikeBehind   = 0.2,   -- how far behind the horse still counts
 	RearChargeStrikeMs       = 1600,  -- how long the strike sweeps for
 	RearChargeStrikePollMs   = 50,    -- how often it sweeps
-	RearChargeVictimLockMs   = 2600,  -- how long a charge victim is closed to
 	                                  -- further hits
 	RearChargeWaitMs         = 400,   -- when the mod starts watching for the
 	                                  -- rear to end

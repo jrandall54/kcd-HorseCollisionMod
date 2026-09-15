@@ -24,6 +24,7 @@ file = {
 	"src/HorseCollisionMod.lua",
 	"src/HorseCollisionMod/Enums.lua",
 	"src/HorseCollisionMod/Tiers.lua",
+	"src/HorseCollisionMod/Impact.lua",
 	"src/HorseCollisionMod/Log.lua",
 	"src/HorseCollisionMod/Armor.lua",
 	"src/HorseCollisionMod/Detection.lua",

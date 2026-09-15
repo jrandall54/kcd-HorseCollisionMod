@@ -23,7 +23,7 @@
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
--- @release 5.13.2
+-- @release 5.14.0
 
 --- One tier's value for one concern.
 --
@@ -135,4 +135,61 @@ HorseCollisionMod.ReactionByTier = {
 HorseCollisionMod.ThrowByTier = {
 	Gallop = 1.0,
 	Charge = 0.7,
+}
+
+--- How hard the engine is told each tier hit, by `HitReactionStrength` name.
+--
+-- Named rather than numbered so the settings file reads as English and so a
+-- value that is not a strength fails visibly instead of becoming a plausible
+-- integer.
+--
+-- The charge used to probe itself as a minor injury while sending a major one.
+-- The probe was written once for both rear tiers and the send was branched, so
+-- the two disagreed and the telemetry named the wrong figure.
+HorseCollisionMod.HitStrengthByTier = {
+	Walk = "Tickle",
+	Trot = "MinorInjury",
+	Gallop = "MajorInjury",
+	Rear = "MinorInjury",
+	Charge = "MajorInjury",
+}
+
+--- Which set of spoken lines a victim answers each tier with.
+--
+-- The collision reactions and the rear are separate pillars with separate
+-- switches, and this is where that separation is stated rather than implied by
+-- which file the call happened to sit in.
+HorseCollisionMod.VictimBarkByTier = {
+	Walk = "collision",
+	Trot = "collision",
+	Gallop = "collision",
+	Rear = "rear",
+	Charge = "rear",
+}
+
+--- Which tiers can make a victim lose patience and fight back.
+--
+-- Retaliation answers being shoved, and the escalating roll behind it is built
+-- around a nuisance that does no real harm. A rear brings hooves down on
+-- somebody and a charge rides them down; neither is a shove.
+HorseCollisionMod.RetaliationByTier = {
+	Walk = true,
+	Trot = false,
+	Gallop = false,
+	Rear = false,
+	Charge = false,
+}
+
+--- Which tiers charge the horse once per victim.
+--
+-- The detection loop resolves one victim per impact, so it charges there. A
+-- rear and a charge are one deliberate move that can land on several people at
+-- once, and charging per victim would empty the horse for riding at a crowd,
+-- so their entry points charge once for the whole move instead.
+HorseCollisionMod.StaminaPerVictimByTier = {
+	Walk = true,
+	Trot = true,
+	Gallop = true,
+	Rear = false,
+	Charge = false,
 }

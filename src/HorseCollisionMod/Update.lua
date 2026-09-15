@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.13.2
+-- @release 5.14.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -99,166 +99,26 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		return
 	end
 
-	local strength = self.HitReactionStrength
-	local cfg = self.Config
-	local isCombat, combatDetail, playerInDanger = self:IsCombatCollision(npc)
-
 	-- What makes one pass one impact, read by `ImpactIsNewContact` above.
 	self.LastScoredHit[npcId] = now
 
-	-- When the last impact of any kind landed, so the airborne probe above can
-	-- say whether the horse left the ground off a collision or on its own.
+	-- When the last impact of any kind landed, so the airborne probe can say
+	-- whether the horse left the ground off a collision or on its own.
 	self.LastImpactAt = now
 
-	-- Past every early return, so only a victim this impact is resolved for is
-	-- ever made immortal. `ApplyImpactDamage` lifts it once the body is at
-	-- rest, before it charges them.
-	--
-	-- Never at a walk. A stagger is an animation and never makes the victim a
-	-- physical object, so there is no engine collision damage to shield from,
-	-- and `ApplyImpactDamage` returns early on a tier worth no damage: the
-	-- shield would go on with nothing left to take it off, and the victim
-	-- would stand there immortal until the backstop fired.
-	if tierName ~= "Walk" then
-		self:ShieldFromEngineDamage(npc)
-	end
-
-	-- What actually prevents the lockup. A victim under 40 health carrying a
-	-- bleeding buff is otherwise taken over by vanilla's auto-cure daycycle,
-	-- which stands them in the street playing `PretendingIllness`.
-	self:SuppressAutoCure(npc)
-
-	-- Walked once per impact. Every use below wants the same totals, and
-	-- enumerating an inventory per use would repeat the work three times.
-	local armor = self:ArmorOf(npc)
-	local armorImpulse = self:ArmorImpulseScale(armor)
-
-	-- The horse's own contribution, read once per impact for the same reason
-	-- the victim's is. Barding is three separate flat effects rather than one
-	-- multiplier, and each lands on a different figure: a little more throw, a
-	-- little more damage, and a real saving in the horse's stamina, which is
-	-- the half a player feels. Coverage is logged because it is what the three
-	-- are derived from, and nothing about the rider enters it.
-	local bardingCover = self:BardingCoverage(horseEnt)
-	local bardingForce = self:BardingForceBonus(horseEnt)
-
-	self:Log("Impact tier=" .. tierName
-			.. " speed=" .. string.format("%.2f", speed)
-			.. " sampled=" .. string.format("%.2f", sampledSpeed or speed)
-			.. (cfg.DiagnoseMisses
-					and (" trail=[" .. self:SpeedTrail(self.SpeedHistorySize) .. "]")
-					or "")
-			.. " armorImpulse=" .. string.format("%.2f", armorImpulse)
-			.. " bardingCover=" .. string.format("%.2f", bardingCover)
-			.. " bardingForce=" .. string.format("%.2f", bardingForce.knockback)
-			.. " " .. combatDetail)
-
-	-- Before the tier branches, so the request goes out ahead of the
-	-- reaction animation rather than behind it.
-	self:PlayImpactSound(npc, tierName, armor)
-
-	-- Spoken alongside the impact sound and for the same reason: it belongs
-	-- to the moment of contact. The combat state is passed because vanilla
-	-- refuses a collision bark during a fight and so should this.
-	self:BarkCollision(npc, tierName, isCombat)
-
-	-- The rider's own half of the impact. Sent here for the same reason as the
-	-- sound: it belongs to the moment of contact, not to whatever the victim
-	-- does afterwards. Each of these scales or chooses by tier itself, and
-	-- returns false for a tier it has nothing for, so the tier is passed rather
-	-- than branched on here.
-	self:ShakeRiderCamera(playerEnt, tierName)
-	self:BlurRiderView(playerEnt, tierName)
-
-	-- Words before breath, both at the moment of contact, and only one of them
-	-- heard because they share a ranked voice gate.
-	--
-	-- Which words depends on whether this impact is about to kill, and that is
-	-- predicted rather than observed. The real answer is not settled until the
-	-- body has come to rest and the deferred damage lands, and a line chosen
-	-- from that arrives a second and a half after the collision it is about.
-	self:BarkRiderOnImpact(playerEnt, tierName,
-			self:PredictImpactFatal(npc, tierName, armor, horseEnt), npc)
-	self:PlayRiderVocal(playerEnt, tierName)
-
-	-- The ground's half. Spawned at the victim's feet, where they are struck
-	-- rather than where they land, because a gallop throws them several
-	-- meters and dust that follows the body reads as smoke.
-	self:ImpactDust(npc, tierName)
-
-	if tierName == "Walk" then
-		-- Only a real fight suppresses the stagger. The combat test is also
-		-- true for a victim merely holding a weapon, and a guard on patrol
-		-- with a polearm holds his all day, so keying this off the combined
-		-- signal meant he could never be staggered at all.
-		local suppressed = cfg.SuppressStaggerInCombat and playerInDanger
-
-		if cfg.WalkStagger and not suppressed then
-			self:PlayTierReaction(npc, "Walk", velocity, speed,
-					armorImpulse, horsePos, horseEnt)
-		end
-
-		self:ProbeImpactCost(npc, "Walk", strength.Tickle, armor)
-		self:SendHitReaction(npc, horseWuid, strength.Tickle)
-
-		-- After the stagger and the native hit reaction, so a provoked
-		-- victim has already played their reaction to this shove and the
-		-- fight starts from the shove rather than instead of it.
-		self:ProvokeIfAnnoyed(npc, playerEnt)
-
-		self:DrainImpactStamina(horseEnt, playerEnt, "Walk", armor)
-		return
-	end
-
-	if tierName == "Trot" then
-		-- Sampled before the impulse, not after. Ragdoll can cost the
-		-- victim health of its own, and a probe that reads afterwards
-		-- folds that into the starting figure instead of the delta.
-		self:ProbeImpactCost(npc, "Trot", strength.MinorInjury, armor)
-
-		-- An animated knockdown never makes the victim a physics object, so
-		-- the horse cannot strike them the way it does at a gallop. It does
-		-- not follow that the tier is free: measured, the engine still takes
-		-- 6 to 8 from an unarmored victim here and up to 12 from a guard, so
-		-- something other than the trample is charging for it. The
-		-- ragdoll is kept because it is what shipped, and because an
-		-- animation does not carry the impact's momentum.
-		self:PlayTierReaction(npc, "Trot", velocity, speed,
-				armorImpulse, horsePos, horseEnt)
-		self:MarkVictim(npc, "Trot", velocity, speed)
-		self:SendHitReaction(npc, horseWuid, strength.MinorInjury)
-		self:SendCombatHit(npc, playerEnt, strength.MinorInjury)
-
-		-- Called after the native hit, but calling order is not resolution
-		-- order: `SendCombatHit` returns at once and the engine settles its
-		-- own trample damage around half a second later. The wait that makes
-		-- this mod's damage land last, and so own the killing blow and the
-		-- crime attribution with it, is inside `ApplyImpactDamage`.
-		self:ApplyImpactDamage(npc, "Trot", armor, playerEnt, horseEnt)
-		self:DrainImpactStamina(horseEnt, playerEnt, "Trot", armor)
-		return
-	end
-
-	if tierName == "Gallop" then
-		-- Sampled before the impulse, not after. Ragdoll can cost the
-		-- victim health of its own, and a probe that reads afterwards
-		-- folds that into the starting figure instead of the delta.
-		self:ProbeImpactCost(npc, "Gallop", strength.MajorInjury, armor)
-		self:PlayTierReaction(npc, "Gallop", velocity, speed,
-				armorImpulse, horsePos, horseEnt)
-		self:MarkVictim(npc, "Gallop", velocity, speed)
-		self:SendHitReaction(npc, horseWuid, strength.MajorInjury)
-		self:SendCombatHit(npc, playerEnt, strength.MajorInjury)
-
-		-- Called after the native hit, but calling order is not resolution
-		-- order: `SendCombatHit` returns at once and the engine settles its
-		-- own trample damage around half a second later. The wait that makes
-		-- this mod's damage land last, and so own the killing blow and the
-		-- crime attribution with it, is inside `ApplyImpactDamage`.
-		self:ApplyImpactDamage(npc, "Gallop", armor, playerEnt, horseEnt)
-		self:DrainImpactStamina(horseEnt, playerEnt, "Gallop", armor)
-		return
-	end
+	-- Everything past this point is shared with the rear and the charge, and
+	-- lives in `Impact.lua`. This function's job is the loop's alone: stand
+	-- out of a lunge, score the tier from the measured speed, and refuse a
+	-- contact the horse has already been charged for.
+	self:ResolveImpact(npc, tierName, {
+		velocity = velocity,
+		speed = speed,
+		sampledSpeed = sampledSpeed,
+		horsePos = horsePos,
+		horseEnt = horseEnt,
+		playerEnt = playerEnt,
+		horseWuid = horseWuid
+	})
 end
 
 --- One tick of collision detection.

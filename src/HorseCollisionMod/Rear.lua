@@ -983,58 +983,25 @@ end
 function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 		hitSpeed)
 	local cfg = self.Config
-	local armor = self:ArmorOf(npc)
-	local armorImpulse = self:ArmorImpulseScale(armor)
+
 	tier = tier or "Rear"
+
+	-- Scored at a fixed speed rather than the horse's own, which is zero here.
+	-- What matters is the hooves, not ground the horse covered.
 	local speed = hitSpeed or cfg.RearImpactSpeed or 6.0
 	local velocity = { x = heading.x * speed, y = heading.y * speed, z = 0 }
-	local horsePos = nil
+	local horsePos, horseWuid = nil, nil
 
 	pcall(function()
 		horsePos = horseEnt:GetWorldPos()
 	end)
 
-	-- The rear's own voice. Its own pillar and its own switch: the collision
-	-- reactions and the rear are independent mechanics and neither may carry
-	-- the other's setting.
-	self:BarkRear(npc, true)
-
-	local horseWuid = nil
-
 	pcall(function()
 		horseWuid = player.player:GetPlayerHorse()
 	end)
 
-	local strength = self.HitReactionStrength
-
-	self:SuppressAutoCure(npc)
-	self:ProbeImpactCost(npc, tier, strength.MinorInjury, armor)
-
-	-- Everything the ordinary path does at the moment of contact, in the same
-	-- order. Reaching the reaction without these gave a hit with no sound, no
-	-- dust and no kick to the camera, which reads as the animation glitching
-	-- rather than as a blow landing.
-	self:PlayImpactSound(npc, tier, armor)
-	self:ShakeRiderCamera(playerEnt, tier)
-	self:BlurRiderView(playerEnt, tier)
-	self:BarkRiderOnImpact(playerEnt, tier,
-			self:PredictImpactFatal(npc, tier, armor, horseEnt), npc)
-	self:PlayRiderVocal(playerEnt, tier)
-	self:ImpactDust(npc, tier)
-
-	-- The refusal that used to sit here is now inside `PlayTierReaction`, so
-	-- every tier gets it rather than the rear alone, and it reads the recovery
-	-- window instead of testing two animation-state strings. The strings have a
-	-- hole in them: a victim spends about 600ms mid-fall reading `MotionIdle`,
-	-- which this test called free.
-	self:PlayTierReaction(npc, tier, velocity, speed,
-			armorImpulse, horsePos, horseEnt)
-
-	self:MarkVictim(npc, tier, velocity, speed)
-	local force = (tier == "Charge") and strength.MajorInjury
-			or strength.MinorInjury
-
-	self:SendHitReaction(npc, horseWuid, force)
+	local victimId = tostring(npc.id)
+	local now = self:TimeMs()
 
 	-- Both strikes record their contact, because neither goes through the
 	-- detection loop and the loop cannot honor a gap it was never told about.
@@ -1042,43 +1009,32 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	-- and hits the same person again, and `HitMinIntervalMs` is powerless
 	-- because no contact was ever written for it to measure from. That is the
 	-- double hit on one lunge.
-	local victimId = tostring(npc.id)
-	local now = self:TimeMs()
-
 	self.LastScoredHit[victimId] = now
 
-	-- The lockout is the charge's alone.
-	--
-	-- It is the length of the whole move rather than the gap between two
-	-- passes, because a charge is one deliberate act and a victim struck by it
-	-- should be finished with it. That reasoning is about the charge and
-	-- nothing else, and applying it here unconditionally closed a victim out of
-	-- every impact for 2.6 seconds after an ordinary rear as well -- one
-	-- feature's rule silently governing another because the two share this
-	-- function.
-	if tier == "Charge" then
-		self.LockedUntil[victimId] = now
-				+ (self.Config.RearChargeVictimLockMs or 0)
+	-- A lockout longer than the gap between two passes, for a move that is one
+	-- deliberate act rather than a series of collisions. Only the charge
+	-- carries one, and it says so in the table: applying it to both tiers
+	-- closed a victim out of every impact for 2.6 seconds after an ordinary
+	-- rear as well, which is one feature's rule governing another because the
+	-- two share this function.
+	local lock = self:TierValue("VictimLockMsByTier", tier)
+
+	if lock and lock > 0 then
+		self.LockedUntil[victimId] = now + lock
 	end
 
-	self:SendCombatHit(npc, playerEnt, force)
-	self:ApplyImpactDamage(npc, tier, armor, playerEnt, horseEnt)
-
-	-- No retaliation from a rear or a charge, deliberately.
-	--
-	-- Retaliation is the answer to being shoved: a man barged repeatedly at
-	-- walking pace loses patience and fights back, and the escalating roll in
-	-- `ProvokeIfAnnoyed` is built around a nuisance that does no real harm.
-	-- A rear brings hooves down on someone and a charge rides them down, and
-	-- neither is a shove. Being reared on four times is not a patience
-	-- problem.
-	--
-	-- It was wired here when the rear was first built, before the rear was a
-	-- tier of its own, and it meant a guard reared on repeatedly would start a
-	-- fight through `SendProvocationHit`, which deliberately bypasses the
-	-- crime system and so could not be turned off with `CollisionIsCrime`
-	-- either. `Update.lua` keeps the only remaining call, inside the walk
-	-- stagger branch.
+	-- Everything an impact does is shared with the detection loop and lives in
+	-- `Impact.lua`. What stays here is the rear's alone: a fixed scoring
+	-- speed, a heading to be thrown along, the contact stamp the sweep owes
+	-- the loop, and the charge's lockout.
+	self:ResolveImpact(npc, tier, {
+		velocity = velocity,
+		speed = speed,
+		horsePos = horsePos,
+		horseEnt = horseEnt,
+		playerEnt = playerEnt,
+		horseWuid = horseWuid
+	})
 end
 
 --- Loads the mod's action map and points it at the player.
