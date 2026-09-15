@@ -35,9 +35,6 @@ param (
 	[switch]$Reload,
 	[switch]$ScriptOnly,
 	[switch]$AnimOnly,
-	[switch]$Crime,
-	[switch]$FreeGallop,
-	[switch]$Stamina,
 	[switch]$ReleaseSettings,
 	[switch]$SetDevEnvironment,
 	[switch]$SetPlayEnvironment,
@@ -633,41 +630,10 @@ function Test-InstalledFiles {
 			continue
 		}
 
-		# The settings file is deliberately different: Set-DeployedTestValues
-		# rewrites the testing values in the installed copy on every deploy. A
-		# raw hash would report it stale every single run, and a check that is
-		# always wrong is one everybody learns to ignore. So those values are
-		# normalized out of both sides and everything else still has to match.
-		if ((Split-Path -Leaf $file.To) -eq "HorseCollisionMod_Settings.lua") {
-			$a = [System.IO.File]::ReadAllText($file.From)
-			$b = [System.IO.File]::ReadAllText($file.To)
-
-			# -FreeGallop rewrites three more keys in the installed copy, and
-			# they were not normalized here, so every deploy carrying that
-			# switch reported the settings file stale. That is not cosmetic:
-			# the caller treats a stale file as fatal and exits before the
-			# launch block, which is why -Launch looked broken whenever it was
-			# combined with -FreeGallop.
-			$normalize = @()
-			$normalize += $script:DevTestValues.Keys
-			$normalize += $script:DevFreeGallopValues.Keys
-
-			foreach ($key in $normalize) {
-				$pattern = "($key\s*=\s*)([^,
-]+)"
-				$a = [regex]::Replace($a, $pattern, '${1}X')
-				$b = [regex]::Replace($b, $pattern, '${1}X')
-			}
-
-			if ($a -ne $b) {
-				Write-Host "[VERIFY] STALE    $(Split-Path -Leaf $file.To)" -ForegroundColor Red
-				Write-Host "         installed does not match $($file.From)" -ForegroundColor Red
-				$stale++
-			}
-
-			continue
-		}
-
+		# Every installed file now matches the repository byte for byte,
+		# including the settings. The testing world is a separate file written
+		# beside them rather than a rewrite of them, so there is nothing left
+		# to normalize away and nothing this check has to forgive.
 		$from = (Get-FileHash $file.From -Algorithm SHA256).Hash
 		$to = (Get-FileHash $file.To -Algorithm SHA256).Hash
 
@@ -753,187 +719,37 @@ function Sync-LooseFiles {
 		}
 	}
 
-	# A development deploy leaves the world unable to interrupt a test: riding
-	# someone down is legal, a spent horse keeps its rider, nobody is pulled
-	# down or calls for guards. Almost every collision test is about the
-	# collision. -Crime keeps every one of those at its shipping value, for the
-	# rarer test that is about the reaction rather than the impact.
+	# The testing world, written beside the settings rather than into them.
 	#
-	# This has to happen here, between the copy and the reload the caller runs
-	# next. src\HorseCollisionMod_Settings.lua cannot carry the change, because
+	# `HorseCollisionMod_TestWorld.lua` loads after the settings file because
+	# startup scripts run in name order, and assigns into the same global, so
+	# the mod applies it through ApplySettings with the same type checking and
+	# without knowing it exists. That is what keeps it out of a release: the
+	# build packs from src\, which never holds it.
+	#
+	# This has to happen between the copy and the reload the caller runs next.
+	# The repository's settings file cannot carry a testing value, because
 	# build.ps1 rejects a release that ships CollisionIsCrime = false, and
-	# patching the installed file after the reload is too late: the value the
-	# engine already read is the one a later save load keeps.
-	# Run unconditionally rather than only when a script file moved. The values
-	# depend on the switches as well as on the files, so a deploy that changes
-	# no script but does change -Crime or -FreeGallop still has to rewrite them.
-	# Gated on $changed.Script, asking for a different world silently did
-	# nothing whenever the scripts happened to be identical, which is exactly
-	# the case when only a switch is being changed. It is idempotent and cheap.
-	# -ReleaseSettings installs the repository's own values untouched, which is
-	# what a branch wants once it stops being tested. Without it the only way
-	# back to a shipping world was to remember every switch that had been used.
+	# writing after the reload is too late: the value the engine already read
+	# is the one a later save load keeps.
+	#
+	# Run unconditionally rather than only when a script moved. The world
+	# depends on `.hcm_testworld` as well as on the files, so a deploy that
+	# changes no script but does change the world still has to write it.
+	#
+	# -ReleaseSettings asks for the shipped world, which is the world with no
+	# overrides in it, and is what a branch wants once it stops being tested.
+	$worldTool = Join-Path $PSScriptRoot "testworld.py"
+
 	if ($ReleaseSettings) {
 		Write-Host "[DEPLOY] release settings: the installed world is the shipped one"
+		& python $worldTool --clear --write $Root | Out-String | Write-Host -NoNewline
 	}
 	else {
-		Set-DeployedTestValues -Root $Root -Crime:$Crime -FreeGallop:$FreeGallop -Stamina:$Stamina
+		& python $worldTool --write $Root | Out-String | Write-Host -NoNewline
 	}
 
 	return $changed
-}
-
-# Values forced into the **installed** settings file on every development
-# deploy, so a testing session is not fighting the mod's shipping behavior.
-#
-# The installed copy is the right place for these and the repository copy is
-# not. `build.ps1` refuses a release carrying `CollisionIsCrime = false`, and
-# more importantly these are not opinions about how the mod should behave, they
-# are the conditions a test needs. Writing them here means they survive a save
-# load and a script reload, which is the whole point: the engine reads this file
-# again on both, so anything pushed over the console is gone and anything
-# written here is not.
-#
-# Add to this table rather than poking the console after every reload. That was
-# the previous practice and it cost a rider several tests to settings quietly
-# reverting under them mid-session.
-# The principle, so this table does not have to be argued about a key at a
-# time: a development deploy produces a world that reacts to a collision and
-# does nothing else. Anything whose job is to interrupt the rider belongs here.
-# Anything that changes what a collision itself does must not, because that is
-# the thing under test.
-#
-# On that line: crime, being pulled off the horse, guards arriving, a spent
-# horse throwing its rider or wandering off, and the surrender prompt are all
-# interruptions. Damage, impulse, sound, reactions and the tier thresholds are
-# the subject and are left exactly as they ship.
-#
-# Stamina still drains by default. It is the horse's own resource and part of
-# what a collision costs; only its consequences are suppressed, so a test can
-# still read the drain in the log without the rider ending up on the ground.
-#
-# -FreeGallop overrides that, for the case where the test is long and the
-# stopping to rest is the slow part of it. It is a switch rather than a default
-# for the reason above: zeroing the drain hides something a test may be
-# measuring, so it has to be asked for.
-$script:DevFreeGallopValues = [ordered]@{
-	StaminaDrainTrot      = "0.0"
-	StaminaDrainGallop    = "0.0"
-	RearChargeStaminaCost = "0.0"
-}
-
-# The two the -Stamina switch hands back to the repository's own values.
-$script:DevStaminaKeys = @("ThrowRiderOnStaminaEmpty", "HorseBoltsWhenSpent")
-
-$script:DevTestValues = [ordered]@{
-	CollisionIsCrime          = "false"
-	ThrowRiderOnStaminaEmpty  = "false"
-	HorseBoltsWhenSpent       = "false"
-	# The fight itself, not only its two consequences below.
-	#
-	# `RetaliationPullsRiderDown` and `RetaliationSurrenderHint` were here
-	# without it, which suppressed what a provoked man does to the rider while
-	# leaving the provocation on. Any test that shoves one person repeatedly at
-	# walking pace is the exact input `ProvokeIfAnnoyed` exists to answer, so
-	# the victim draws a weapon partway through and the run ends as a brawl
-	# rather than as the thing being measured.
-	#
-	# Off by the table's own principle: retaliation's job is to interrupt the
-	# rider. Turn it back on in the settings file to test retaliation itself,
-	# the same way crime is turned back on to test crime.
-	Retaliation               = "false"
-	RetaliationPullsRiderDown = "false"
-	RetaliationSurrenderHint  = "false"
-	WomenRaiseAlarm           = "false"
-}
-
-# Rewrites the test values in the installed settings file, and reports what it
-# left behind rather than assuming the edits took. Written as bytes with no byte
-# order mark: Set-Content -Encoding utf8 on Windows PowerShell writes one, and a
-# BOM on the first line makes Lua reject the entire settings file, at which point
-# the mod silently keeps every compiled-in default and the settings appear not to
-# work at all.
-function Set-DeployedTestValues {
-	param (
-		[string]$Root,
-		[switch]$Crime,
-		[switch]$FreeGallop,
-		[switch]$Stamina
-	)
-
-	$path = Join-Path $Root "Data\Scripts\Startup\HorseCollisionMod_Settings.lua"
-
-	if (-not (Test-Path $path)) {
-		return
-	}
-
-	$wanted = [ordered]@{}
-
-	foreach ($key in $script:DevTestValues.Keys) {
-		# -Crime asks for the shipping behavior, so that one value is left
-		# exactly as the repository has it.
-		if ($Crime -and $key -eq "CollisionIsCrime") {
-			continue
-		}
-
-		# -Stamina does the same for the two consequences of an emptied horse.
-		# They are off by default because being dismounted mid-run ends a test
-		# that was measuring something else, but that makes the stamina figures
-		# themselves untestable: what a drain costs is only felt when the horse
-		# running out does something.
-		if ($Stamina -and $script:DevStaminaKeys -contains $key) {
-			continue
-		}
-
-		$wanted[$key] = $script:DevTestValues[$key]
-	}
-
-	if ($FreeGallop) {
-		foreach ($key in $script:DevFreeGallopValues.Keys) {
-			$wanted[$key] = $script:DevFreeGallopValues[$key]
-		}
-	}
-
-	$text = [System.IO.File]::ReadAllText($path)
-	$patched = $text
-
-	foreach ($key in $wanted.Keys) {
-		# Everything up to the comma, so a trailing comment survives.
-		$patched = [regex]::Replace($patched,
-			"($key\s*=\s*)([^,
-]+)", "`${1}$($wanted[$key])")
-	}
-
-	if ($patched -ne $text) {
-		$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-		[System.IO.File]::WriteAllText($path, $patched, $utf8NoBom)
-	}
-
-	# Read back off disk. A regex that matched nothing looks exactly like a
-	# successful patch from here, and the cost of the difference is a rider
-	# fending off guards, or being thrown off a spent horse, through a test that
-	# then has to be run again.
-	$disk = [System.IO.File]::ReadAllText($path)
-	$report = @()
-
-	foreach ($key in $wanted.Keys) {
-		$now = [regex]::Match($disk, "$key\s*=\s*([^,
-]+)")
-
-		if (-not $now.Success) {
-			Write-Host "[DEPLOY] $key not found in the installed settings." -ForegroundColor Yellow
-		}
-		elseif ($now.Groups[1].Value.Trim() -ne $wanted[$key]) {
-			Write-Host "[DEPLOY] $key is $($now.Groups[1].Value.Trim()), wanted $($wanted[$key])." -ForegroundColor Red
-		}
-		else {
-			$report += "$key=$($wanted[$key])"
-		}
-	}
-
-	if ($report.Count -gt 0) {
-		Write-Host "[DEPLOY] test values (installed settings): $($report -join ' ')"
-	}
 }
 
 # Reloads the halves that were written. The console commands are known here, so

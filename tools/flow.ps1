@@ -21,7 +21,7 @@
 
 param (
 	[Parameter(Position = 0)]
-	[ValidateSet("test", "branch", "land", "shipping", "status")]
+	[ValidateSet("test", "branch", "land", "shipping", "status", "world")]
 	[string]$Verb = "status",
 
 	[Parameter(Position = 1)]
@@ -33,11 +33,23 @@ param (
 	# test only: start the game if it is not already running.
 	[switch]$Launch,
 
-	# Keep the shipping values for crime and the rest, for the rarer test that
-	# is about the world's reaction rather than the collision.
-	[switch]$Crime,
-	[switch]$FreeGallop,
-	[switch]$Stamina
+	# The testing world, which sticks to the branch until `land` clears it.
+	# Anything in the settings file can be changed, including a table member,
+	# so no new kind of test needs a new switch here:
+	#
+	#   flow.ps1 test -Preset stamina
+	#   flow.ps1 test -Set CollisionIsCrime=true
+	#   flow.ps1 test -Set StaminaDrainByTier.Gallop=0
+	#   flow.ps1 test -Unset CollisionIsCrime
+	#   flow.ps1 test -Shipped
+	#
+	# Presets live in tools/testworlds.ini, as data.
+	[string[]]$Preset = @(),
+	[string[]]$Set = @(),
+	[string[]]$Unset = @(),
+
+	# Carry no overrides at all, so the install runs the shipped values.
+	[switch]$Shipped
 )
 
 $ErrorActionPreference = "Stop"
@@ -119,48 +131,15 @@ function Working-Tree-Dirty {
 
 # ------------------------------------------------------- test world state
 
-# What the testing world is, remembered for the life of the branch.
-#
-# The drift this removes: the test values were derived from whatever switches
-# happened to be typed on each deploy, so -FreeGallop evaporated the moment a
-# later deploy left it out. That is not a small annoyance. A rider mid test
-# suddenly has a horse that tires, is dismounted by it, and has no reason to
-# connect that to a deploy they did not run.
-#
-# So the switches are branch state rather than command state. `branch` writes
-# the world a branch starts in, every `test` re-applies it, a switch given on a
-# later `test` is added to it, and `land` clears it and puts the install back
-# to the shipped values.
-#
-# Untracked deliberately: it describes this machine's install, not the project.
-$script:worldFile = Join-Path $repo ".hcm_testworld"
+# The testing world lives in tools/testworld.py, which owns `.hcm_testworld`,
+# the presets in tools/testworlds.ini, and writing the override file into the
+# install. This script only passes requests to it.
+$script:worldTool = Join-Path $PSScriptRoot "testworld.py"
 
-function Read-TestWorld {
-	$world = @{}
+function Invoke-World {
+	param ([string[]]$WorldArgs)
 
-	if (Test-Path $script:worldFile) {
-		foreach ($line in (Get-Content $script:worldFile)) {
-			$name = $line.Trim()
-
-			if ($name) {
-				$world[$name] = $true
-			}
-		}
-	}
-
-	return $world
-}
-
-function Write-TestWorld {
-	param ([hashtable]$World)
-
-	Set-Content -Path $script:worldFile -Value ($World.Keys | Sort-Object) -Encoding utf8
-}
-
-function Clear-TestWorld {
-	if (Test-Path $script:worldFile) {
-		Remove-Item $script:worldFile -Force
-	}
+	& python $script:worldTool @WorldArgs 2>&1 | Out-String
 }
 
 
@@ -196,64 +175,21 @@ function Show-Status {
 
 	Say "game        $(if ($running) { 'running' } else { 'not running' })"
 
-	# What a test would actually be run against. Read off disk, because the
-	# whole reason these live in the installed file is that they survive
-	# reloads, and the whole reason they are printed is that a silent revert
-	# costs a test.
-	$settings = Join-Path $gameRoot "Data\Scripts\Startup\HorseCollisionMod_Settings.lua"
+	# What a test would actually be run against. Asked of the tool that writes
+	# it, rather than read back out of the installed file: the world is its own
+	# file now, and one source for it is the whole point.
+	#
+	# Printed every time because a value left on silently is what corrupts the
+	# next comparison, and the rider has paid for that more than once.
+	$world = (Invoke-World @("--list")).TrimEnd()
 
-	if (Test-Path $settings) {
-		$text = [System.IO.File]::ReadAllText($settings)
-		$shown = @()
+	if ($world) {
+		Say "test world"
 
-		# The keys come from dev_deploy.ps1's own table rather than from a
-		# second copy of the list kept here.
-		#
-		# There were two lists, and adding Retaliation to the one that writes
-		# the settings left the one that reports them unchanged, so the status
-		# line said the testing world was one key smaller than it was. A status
-		# line that under-reports is worse than no status line, because the
-		# whole reason these are printed is that a silent revert costs a test.
-		$deploySource = Join-Path $PSScriptRoot "dev_deploy.ps1"
-		$keys = @()
-
-		if (Test-Path $deploySource) {
-			$deployText = [System.IO.File]::ReadAllText($deploySource)
-			$block = [regex]::Match($deployText,
-					'(?s)\$script:DevTestValues\s*=\s*\[ordered\]@\{(.*?)\n\}')
-
-			if ($block.Success) {
-				foreach ($entry in [regex]::Matches($block.Groups[1].Value,
-						'(?m)^\s*([A-Za-z][A-Za-z0-9_]*)\s*=')) {
-					$keys += $entry.Groups[1].Value
-				}
+		foreach ($line in ($world -split "`r?`n")) {
+			if ($line.Trim()) {
+				Say "  $($line.Trim())"
 			}
-		}
-
-		foreach ($key in $keys) {
-			# Anchored to the start of a line so a key that is a prefix of a
-			# longer one, or a mention inside a comment, cannot answer for it.
-			$m = [regex]::Match($text, "(?m)^\s*$([regex]::Escape($key))\s*=\s*([^,\r\n]+)")
-
-			if ($m.Success) {
-				$shown += "$key=$($m.Groups[1].Value.Trim())"
-			}
-		}
-
-		if ($shown.Count -gt 0) {
-			Say "test world  $($shown -join ' ')"
-		}
-
-		# The remembered switches, which are what make the line above sticky.
-		# Printed because a value that reappears on every deploy without being
-		# asked for is worse than one that never appears at all.
-		$world = Read-TestWorld
-
-		if ($world.Keys.Count -gt 0) {
-			Say "world state $(($world.Keys | Sort-Object) -join ' ')"
-		}
-		else {
-			Say "world state none, shipped values"
 		}
 	}
 }
@@ -278,41 +214,36 @@ function Enter-Test {
 		& $deploy -SetDevEnvironment | Out-Null
 	}
 
-	# A hashtable, not an array, and not $args.
-	#
-	# Two separate defects lived here. $args is a PowerShell automatic variable
-	# holding a function's own unbound arguments, so reassigning it inside a
-	# function and splatting it dropped the switches. And splatting an **array**
-	# passes its elements positionally rather than by name, so "-Crime" arrived
-	# as the value of -GameRoot and the deploy exited with "-GameRoot points at
-	# -Crime" -- having installed nothing, while the caller reported success.
-	#
-	# A hashtable splats by parameter name, which is the only form that works
-	# for switches.
-	# Remembered from the branch, plus anything added on this invocation. The
-	# union is written back, so a switch given once stays on until the branch
-	# lands.
-	$world = Read-TestWorld
+	# Anything asked for on this invocation is added to the branch's world and
+	# stays there until `land` clears it. A switch given once should not
+	# evaporate on the next deploy: a rider mid-test suddenly has a horse that
+	# tires, and no reason to connect that to a deploy they did not run.
+	$worldArgs = @()
 
-	if ($Crime) {
-		$world.Crime = $true
+	if ($Shipped) {
+		$worldArgs += "--clear"
 	}
 
-	if ($FreeGallop) {
-		$world.FreeGallop = $true
+	foreach ($name in $Preset) {
+		$worldArgs += @("--preset", $name)
 	}
 
-	if ($Stamina) {
-		$world.Stamina = $true
+	foreach ($pair in $Set) {
+		$worldArgs += @("--set", $pair)
 	}
 
-	Write-TestWorld -World $world
+	foreach ($key in $Unset) {
+		$worldArgs += @("--unset", $key)
+	}
 
+	if ($worldArgs.Count -gt 0) {
+		Write-Host (Invoke-World $worldArgs) -NoNewline
+	}
+
+	# The deploy carries no world switches any more. It writes whatever
+	# `.hcm_testworld` holds, so there is nothing to splat and nothing that can
+	# be dropped between here and there.
 	$deployArgs = @{}
-
-	foreach ($name in $world.Keys) {
-		$deployArgs[$name] = $true
-	}
 
 	if (Game-Running) {
 		# A running game holds the pak, so only the loose halves can be
@@ -363,12 +294,10 @@ function Start-Branch {
 	Invoke-Git checkout -b $Argument | Out-Null
 	Say "on $Argument" Green
 
-	# The world a branch starts in. Free gallop is part of it because nearly
-	# every branch here is tested by riding at people repeatedly, and stopping
-	# to rest is not the thing under test. A branch that is measuring what a
-	# collision costs the horse turns it off in the installed settings.
-	Write-TestWorld -World @{ FreeGallop = $true }
-	Say "testing world seeded: FreeGallop"
+	# The world a branch starts in: the default, which is everything that can
+	# interrupt a test switched off. Anything else is asked for per branch,
+	# and `land` clears it again.
+	Write-Host (Invoke-World @("--reset")) -NoNewline
 
 	Enter-Test
 }
@@ -506,7 +435,7 @@ function Land {
 	# install keeps whatever the branch was riding with and the next branch
 	# inherits a world nobody chose, which is the drift that had a rider
 	# wondering why their horse never tired.
-	Clear-TestWorld
+	Write-Host (Invoke-World @("--reset")) -NoNewline
 	Say "testing world cleared, install back to shipped values"
 	& $deploy -ScriptOnly -ReleaseSettings | Out-Null
 
@@ -550,6 +479,12 @@ function Enter-Shipping {
 		Fail "the game is running and the pak cannot be moved. Quit it, then run this again."
 	}
 
+	# The testing world goes first. A shipping test carrying a branch's
+	# overrides is not a shipping test, and the stray-file check below would
+	# otherwise refuse the park because of a file this script wrote.
+	Write-Host (Invoke-World @("--clear")) -NoNewline
+	& python $script:worldTool --write $gameRoot | Out-String | Write-Host -NoNewline
+
 	& $deploy -PrepareShippingTest | Out-Null
 
 	# The park leaves the mod's line in the load order and an empty directory
@@ -585,10 +520,58 @@ function Enter-Shipping {
 	Say "launch the game normally. .\tools\flow.ps1 test puts it all back."
 }
 
+# ----------------------------------------------------------------- world
+
+# Change the testing world without deploying, or ask what it is.
+#
+# Separate from `test` because reading it should cost nothing, and because a
+# world can be built up across several calls before anything is installed.
+# Nothing is live until the next `test`, and this says so.
+function Show-World {
+	$worldArgs = @()
+
+	if ($Shipped) {
+		$worldArgs += "--clear"
+	}
+
+	foreach ($name in $Preset) {
+		$worldArgs += @("--preset", $name)
+	}
+
+	foreach ($pair in $Set) {
+		$worldArgs += @("--set", $pair)
+	}
+
+	foreach ($key in $Unset) {
+		$worldArgs += @("--unset", $key)
+	}
+
+	if ($worldArgs.Count -eq 0) {
+		$worldArgs += "--list"
+	}
+
+	Write-Host (Invoke-World $worldArgs) -NoNewline
+
+	if ($worldArgs[0] -ne "--list") {
+		Say "not installed yet. flow.ps1 test applies it."
+	}
+
+	$presetFile = Join-Path $PSScriptRoot "testworlds.ini"
+
+	if (Test-Path $presetFile) {
+		$names = @(Get-Content $presetFile |
+			Select-String '^\[(\w+)\]' |
+			ForEach-Object { $_.Matches[0].Groups[1].Value })
+
+		Say "presets: $($names -join ', ')"
+	}
+}
+
 switch ($Verb) {
 	"status"   { Show-Status }
 	"test"     { Enter-Test }
 	"branch"   { Start-Branch }
 	"land"     { Land }
 	"shipping" { Enter-Shipping }
+	"world"    { Show-World }
 }
