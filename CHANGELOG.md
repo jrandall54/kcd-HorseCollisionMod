@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.15.0] - 2026-09-14
+
 ### Fixed
 
 - The line a knocked-down victim speaks as they get up now lands while they are
