@@ -671,8 +671,12 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 		return 0
 	end
 
-	local delay = self.Config.ImpactDamageDelayMs or 0
-
+	-- Nothing is timed here any more, and the local that used to hold a delay
+	-- was read into and never used: the wait below is `WhenBodyStops`, which
+	-- watches the body rather than counting. `ImpactDamageDelayMs` survives for
+	-- the immortal-subject restore above, which has no body to watch because
+	-- the whole point of that path is that nothing about the victim changed.
+	--
 	-- Waiting is right only while the engine cannot land the killing blow.
 	--
 	-- The delay exists so the engine's collision resolves first and the mod
