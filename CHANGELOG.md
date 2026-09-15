@@ -30,6 +30,28 @@ number.
 
 ## [Unreleased]
 
+## [5.16.0] - 2026-09-14
+
+### Fixed
+
+- Riding into somebody who is getting up knocks them down again, instead of
+  passing through them. The test for whether a body is too flat to animate was
+  set at half a victim's standing height, which is most of the way to their
+  feet: a guard was refused a reaction three times while visibly rising. It is
+  measured now, and only a body genuinely face down is refused.
+- A victim knocked down by a gallop speaks their recovery line again. The check
+  above took a shortcut through an animation state that means "getting up" after
+  a fall and "lying there" after a gallop, so a gallop victim never registered as
+  down at all and their line arrived fifteen seconds late, if ever.
+- A bark refused because the speaker just spoke now says so in the log. It
+  refused silently, leaving a line that never played with nothing to account
+  for it.
+
+### Added
+
+- `VictimFlatFraction`, how low a victim's head must be against their own
+  standing height to count as flat on the ground.
+
 ## [5.15.1] - 2026-09-14
 
 ### Changed

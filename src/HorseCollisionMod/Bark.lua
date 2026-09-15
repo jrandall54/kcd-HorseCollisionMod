@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.15.1
+-- @release 5.16.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -698,6 +698,17 @@ function HorseCollisionMod:BarkOnCooldown(entity)
 	local last = self.RecentBarks[id]
 
 	if last and (now - last) < (self.Config.BarkCooldownMs or 6000) then
+		-- Said out loud. This refused silently, so a victim shoved twice in
+		-- three seconds simply did not speak the second time and nothing in
+		-- the log accounted for it. A line nobody hears and nobody can explain
+		-- reads as the mod having missed the impact entirely.
+		if self.Config.LogTelemetry then
+			self:Log("BarkCooldown " .. self:NameOf(entity)
+					.. " silent for another "
+					.. tostring((self.Config.BarkCooldownMs or 6000)
+							- (now - last)) .. "ms")
+		end
+
 		return true
 	end
 
