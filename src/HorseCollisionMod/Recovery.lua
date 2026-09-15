@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.19.0
+-- @release 5.19.1
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -76,7 +76,7 @@ function HorseCollisionMod:RecordStandingHeight(npc)
 	local head, origin = nil, nil
 
 	pcall(function()
-		head = npc.actor:GetHeadPos().z
+		head = npc:GetCenterOfMassPos().z
 	end)
 
 	pcall(function()
@@ -144,6 +144,80 @@ end
 --
 -- @tparam table npc victim entity
 -- @treturn boolean true while they are flat on the ground
+function HorseCollisionMod:DisarmVictim(npc)
+	if npc and npc.human
+			and npc.human:IsWeaponDrawn() then
+		self.NeedsWeaponRedraw = self.NeedsWeaponRedraw or {}
+		self.NeedsWeaponRedraw[tostring(npc.id)] = true
+		pcall(function()
+			npc.human:HolsterWeapon()
+		end)
+		if self.Config.LogTelemetry then
+			self:Log("Disarmed " .. self:NameOf(npc) .. " to prevent IK glitch")
+		end
+	end
+end
+
+function HorseCollisionMod:RearmVictim(npc)
+	if not self.NeedsWeaponRedraw then
+		return
+	end
+	local id = tostring(npc.id)
+	if self.NeedsWeaponRedraw[id] then
+		self.NeedsWeaponRedraw[id] = nil
+		pcall(function()
+			npc.human:DrawWeapon()
+		end)
+		if self.Config.LogTelemetry then
+			self:Log("Rearmed " .. self:NameOf(npc) .. " after recovery")
+		end
+	end
+end
+
+function HorseCollisionMod:WatchRecoveryForRearm(npc)
+	if not self.NeedsWeaponRedraw or not self.NeedsWeaponRedraw[tostring(npc.id)] then
+		return
+	end
+
+	self:WhenVictimStands(npc, function(why, waited)
+		self:RearmVictim(npc)
+	end)
+end
+
+function HorseCollisionMod:WhenVictimStands(npc, fn)
+	local generation = self.TimerTick
+	local gap = self.Config.RisePollMs or 160
+	local ceiling = self.Config.RiseCeilingMs or 15000
+	local spent = 0
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		if spent >= ceiling then
+			fn("gave up", spent)
+			return
+		end
+
+		local state = nil
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		-- If they are no longer in a ragdoll state, they are standing
+		if state and not self:IsRagdollState(state) and state ~= "?" then
+			fn("stood", spent)
+			return
+		end
+
+		spent = spent + gap
+		Script.SetTimer(gap, poll)
+	end
+
+	Script.SetTimer(gap, poll)
+end
+
 function HorseCollisionMod:IsVictimFlat(npc)
 	if not npc or not npc.id then
 		return false
@@ -158,7 +232,7 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	local head, origin = nil, nil
 
 	pcall(function()
-		head = npc.actor:GetHeadPos().z
+		head = npc:GetCenterOfMassPos().z
 	end)
 
 	pcall(function()
@@ -211,7 +285,7 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	-- 0.04 or 0.10 of it, and every reading of a body that has begun to rise is
 	-- 0.17 or more. `VictimFlatFraction` sits between the two with margin on
 	-- both sides.
-	local fraction = self.Config.VictimFlatFraction or 0.15
+	local fraction = self.Config.VictimFlatFraction or 0.45
 
 	return (head - origin) < (standing * fraction), head - origin, standing, state
 end
