@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Impact
 -- @author jrandall54
--- @release 5.18.1
+-- @release 5.19.0
 
 --- Everything one impact does to one victim.
 --
@@ -180,6 +180,7 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	self:BarkRiderOnImpact(playerEnt, tierName,
 			self:PredictImpactFatal(npc, tierName, armor, horseEnt), npc)
 	self:PlayRiderVocal(playerEnt, tierName)
+	self:PlayHorseVocal(horseEnt, tierName)
 
 	-- Spawned where they are struck rather than where they land, because a
 	-- gallop throws them several meters and dust that follows a body reads as

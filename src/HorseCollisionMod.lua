@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.18.1
+-- @release 5.19.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.18.1"
+HorseCollisionMod.Version = "5.19.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -457,6 +457,10 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ImpactSoundCrackChance how often a gallop adds it
 -- @field RiderVocal whether Henry grunts as the collision goes through him
 -- @field RiderVocalCooldownMs how long the rider stays quiet after grunting
+-- @field HorseVocal whether the horse vocalizes on impact
+-- @field HorseVocalCooldownMs how long the horse stays quiet after vocalizing
+-- @field HorseVocalByTier per-tier horse vocal, same format as RiderVocalByTier
+-- @field HorseVocalRankByTier severity ordering for the horse voice gate
 -- @field RiderBark whether Henry says something about the impact
 -- @field RiderBarkChance how often an impact produces a line instead of a grunt
 -- @field RiderBarkCooldownMs how long Henry stays quiet after speaking
@@ -772,6 +776,18 @@ HorseCollisionMod.Config = {
 		           { "f_bodyfall1", 0, 0.7 } },
 	},
 
+	HorseVocalByTier         = {
+		Walk   = { "a_o_horse_excited1", 0, 0, 1 },
+		Trot   = { "a_o_horse_excited1", 0, 0, 1 },
+		Gallop = { "a_o_horse_whinny1",  0, 0, 1 },
+		Rear   = { "", 0, 0, 1 },
+		Charge = { "", 0, 0, 1 },
+	},
+
+	HorseVocalRankByTier     = {
+		Walk = 1, Trot = 2, Gallop = 3, Rear = 2, Charge = 3,
+	},
+
 	RiderVocalByTier         = {
 		Walk   = { "v_henry_hit_soft", 140, 0, 1 },
 		Trot   = { "v_henry_hit_medium", 110, 0, 1 },
@@ -1047,6 +1063,15 @@ HorseCollisionMod.Config = {
 	-- audio rather than as a man being jolted. A harder impact is still let
 	-- through, so a gallop is never silenced by the walk shove before it.
 	RiderVocalCooldownMs     = 1500,
+
+	-- Whether the horse vocalizes on impact. The trigger is played on the
+	-- horse entity, not the victim; horse audio triggers carry engine-level
+	-- `path="horse"` metadata and must not be fired on a human proxy.
+	HorseVocal               = true,
+
+	-- How long the horse stays quiet after vocalizing. Mirrors the rider
+	-- cooldown so a crowd of collisions does not produce a chorus.
+	HorseVocalCooldownMs     = 1500,
 
 	-- Henry saying something about the impact, rather than only grunting. The
 	-- lines are vanilla's, addressed by `alias` so the mod names one topic

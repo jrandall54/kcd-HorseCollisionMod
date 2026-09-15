@@ -30,6 +30,11 @@ number.
 
 ## [Unreleased]
 
+## [5.19.0] - 2026-09-15
+
+### Added
+- Horse vocalizes on impact: excited snort on Walk and Trot, whinny on Gallop
+
 ## [5.18.1] - 2026-09-15
 
 ### Changed

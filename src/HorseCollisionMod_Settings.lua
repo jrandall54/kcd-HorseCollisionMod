@@ -377,6 +377,23 @@ HorseCollisionModSettings = {
 		           { "f_bodyfall1", 0, 0.7 } },
 	},
 
+	HorseVocal               = true,
+	HorseVocalCooldownMs     = 1500,
+
+	-- Horse vocalization on impact. Triggered on the horse entity, not the
+	-- victim. Rear and Charge are already covered by animation-driven sounds.
+	HorseVocalByTier         = {
+		Walk   = { "a_o_horse_excited1", 0, 0, 1 },
+		Trot   = { "a_o_horse_excited1", 0, 0, 1 },
+		Gallop = { "a_o_horse_whinny1",  0, 0, 1 },
+		Rear   = { "", 0, 0, 1 },
+		Charge = { "", 0, 0, 1 },
+	},
+
+	HorseVocalRankByTier     = {
+		Walk = 1, Trot = 2, Gallop = 3, Rear = 2, Charge = 3,
+	},
+
 	-- Henry's own grunt as the collision goes through him, as
 	-- { event, delay in milliseconds, pitch, volume }.
 	RiderVocalByTier         = {

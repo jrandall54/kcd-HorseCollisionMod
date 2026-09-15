@@ -35,7 +35,7 @@
 --
 -- @module HorseCollisionMod.Sound
 -- @author jrandall54
--- @release 5.18.1
+-- @release 5.19.0
 
 --- The material a victim's armor sounds like, by engine armor type.
 --
@@ -473,6 +473,112 @@ function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
 
 	if cfg.LogTelemetry then
 		self:Log("RiderVocal tier=" .. tostring(tierName)
+				.. " trigger=" .. trigger
+				.. " delay=" .. tostring(delay) .. "ms"
+				.. " distance=" .. tostring(distance))
+	end
+
+	return true
+end
+
+--- Plays a horse vocalization on the horse entity at each impact tier.
+--
+-- Mirrors `PlayRiderVocal` but targets the horse rather than the rider.
+-- Playing a horse trigger on a human entity corrupts CryEngine's audio
+-- proxy because the triggers carry `path="horse"` metadata that the engine
+-- applies structurally, not just as routing. Every call here goes to
+-- `horseEnt` only.
+--
+-- The horse gets its own independent voice gate (`HorseVoiceUntil` /
+-- `HorseVoiceRank`) so a rapid series of collisions does not produce a
+-- chorus. The gate mirrors the rider-vocal logic: a harder impact is still
+-- let through, but equal or lighter ones are held off.
+--
+-- Config: `HorseVocal` boolean master switch, `HorseVocalByTier` for per-tier
+-- `{ trigger, delayMs, distance, chance }`, `HorseVocalRankByTier` for
+-- severity ordering.
+--
+-- @tparam table horseEnt the horse entity
+-- @tparam string tierName "Walk", "Trot", "Gallop", "Charge" or "Rear"
+-- @treturn boolean true when a trigger resolved and was played
+function HorseCollisionMod:PlayHorseVocal(horseEnt, tierName)
+	local cfg = self.Config
+
+	if not cfg.HorseVocal or not horseEnt then
+		return false
+	end
+
+	local layer = self:TierValue("HorseVocalByTier", tierName)
+	local rank  = self:TierValue("HorseVocalRankByTier", tierName) or 1
+
+	if type(layer) ~= "table" then
+		return false
+	end
+
+	local trigger  = layer[1]
+	local delay    = layer[2] or 0
+	local distance = layer[3] or 0
+	local chance   = layer[4] or 1
+
+	if type(trigger) ~= "string" or trigger == "" then
+		return false
+	end
+
+	-- Same guard as PlayRiderVocal: the global may not exist yet.
+	if type(PlayAudioTrigger) ~= "function" then
+		return false
+	end
+
+	local now      = self:TimeMs()
+	local cooldown = cfg.HorseVocalCooldownMs or 0
+
+	local until_ = self.HorseVoiceUntil or 0
+	local longest = cooldown
+
+	if (until_ - now) > longest then
+		until_ = 0
+	end
+
+	if now < until_ and rank <= (self.HorseVoiceRank or 0) then
+		if cfg.LogTelemetry then
+			self:Log("HorseVocal tier=" .. tostring(tierName)
+					.. " trigger=" .. trigger .. " skipped=cooldown"
+					.. " for=" .. string.format("%.0f", until_ - now) .. "ms more"
+					.. " rank=" .. tostring(rank)
+					.. " held=" .. tostring(self.HorseVoiceRank))
+		end
+		return false
+	end
+
+	if chance < 1 and math.random() >= chance then
+		if cfg.LogTelemetry then
+			self:Log("HorseVocal tier=" .. tostring(tierName)
+					.. " trigger=" .. trigger .. " skipped=chance")
+		end
+		return false
+	end
+
+	self.HorseVoiceUntil = now + cooldown
+	self.HorseVoiceRank  = rank
+
+	local function fire()
+		pcall(function()
+			if distance > 0 then
+				self:PlayAtDistance(horseEnt, trigger, distance)
+			else
+				PlayAudioTrigger(horseEnt, trigger)
+			end
+		end)
+	end
+
+	if delay <= 0 then
+		fire()
+	else
+		Script.SetTimer(delay, fire)
+	end
+
+	if cfg.LogTelemetry then
+		self:Log("HorseVocal tier=" .. tostring(tierName)
 				.. " trigger=" .. trigger
 				.. " delay=" .. tostring(delay) .. "ms"
 				.. " distance=" .. tostring(distance))
