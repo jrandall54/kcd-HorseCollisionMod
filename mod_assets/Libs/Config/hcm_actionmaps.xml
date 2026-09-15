@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	The mod's own action map, so its features have keys of their own.
+
+	A vanilla key cannot be borrowed. `Player:OnAction` is a notification and
+	not the handler, so consuming a press there does not stop the game acting on
+	it: bound to `jump`, the rear reared the horse and then jumped anyway. And
+	`jump` has no usable hold, since a two second hold and a tap both deliver a
+	single `press` and no `release`.
+
+	`ActionMapManager.LoadFromXML` accepts a file the mod ships, so this defines
+	its own actions rather than overriding `Libs/Config/defaultProfile.xml`,
+	which is a vanilla file this mod does not touch.
+
+	WHY EVERY KEY IS DECLARED SEPARATELY
+
+	Lua cannot write files and `LoadFromXML` can only read one, so the mod
+	cannot rebind a key at runtime. Instead each feature is declared once per
+	candidate key, and the settings file chooses which of them the mod listens
+	to by naming the key. Nothing is spent on the ones that are not chosen: an
+	action nobody listens for does nothing.
+
+	The candidates are keys vanilla either leaves unbound or uses only in
+	minigame maps that are never active while riding. `r` and `q` are its
+	minigame_action_4 and minigame_action_3, bound in the dice, reading,
+	alchemy and building maps. `y`, `u`, `o` and `h` vanilla does not bind at
+	all. `t` is deliberately absent because it is skip time.
+-->
+<profile version="25">
+	<actionmap name="hcm_rear" version="25">
+		<action name="hcm_rear_charge_r" onPress="1" keyboard="r" xboxpad="xi_triggerl_btn" />
+		<action name="hcm_rear_charge_q" onPress="1" keyboard="q" xboxpad="xi_triggerl_btn" />
+		<action name="hcm_rear_charge_e" onPress="1" keyboard="e" xboxpad="xi_triggerl_btn" />
+		<action name="hcm_rear_charge_f" onPress="1" keyboard="f" xboxpad="xi_triggerl_btn" />
+		<action name="hcm_rear_charge_y" onPress="1" keyboard="y" xboxpad="xi_triggerl_btn" />
+		<action name="hcm_rear_charge_u" onPress="1" keyboard="u" xboxpad="xi_triggerl_btn" />
+		<action name="hcm_rear_charge_o" onPress="1" keyboard="o" xboxpad="xi_triggerl_btn" />
+		<action name="hcm_rear_charge_h" onPress="1" keyboard="h" xboxpad="xi_triggerl_btn" />
+
+		<action name="hcm_rear_only_r" onPress="1" keyboard="r" xboxpad="xi_thumbl" />
+		<action name="hcm_rear_only_q" onPress="1" keyboard="q" xboxpad="xi_thumbl" />
+		<action name="hcm_rear_only_e" onPress="1" keyboard="e" xboxpad="xi_thumbl" />
+		<action name="hcm_rear_only_f" onPress="1" keyboard="f" xboxpad="xi_thumbl" />
+		<action name="hcm_rear_only_y" onPress="1" keyboard="y" xboxpad="xi_thumbl" />
+		<action name="hcm_rear_only_u" onPress="1" keyboard="u" xboxpad="xi_thumbl" />
+		<action name="hcm_rear_only_o" onPress="1" keyboard="o" xboxpad="xi_thumbl" />
+		<action name="hcm_rear_only_h" onPress="1" keyboard="h" xboxpad="xi_thumbl" />
+
+		<action name="hcm_lean_left_r" onPress="1" onRelease="1" keyboard="r" xboxpad="xi_shoulderl" />
+		<action name="hcm_lean_left_q" onPress="1" onRelease="1" keyboard="q" xboxpad="xi_shoulderl" />
+		<action name="hcm_lean_left_e" onPress="1" onRelease="1" keyboard="e" xboxpad="xi_shoulderl" />
+		<action name="hcm_lean_left_f" onPress="1" onRelease="1" keyboard="f" xboxpad="xi_shoulderl" />
+		<action name="hcm_lean_left_y" onPress="1" onRelease="1" keyboard="y" xboxpad="xi_shoulderl" />
+		<action name="hcm_lean_left_u" onPress="1" onRelease="1" keyboard="u" xboxpad="xi_shoulderl" />
+		<action name="hcm_lean_left_o" onPress="1" onRelease="1" keyboard="o" xboxpad="xi_shoulderl" />
+		<action name="hcm_lean_left_h" onPress="1" onRelease="1" keyboard="h" xboxpad="xi_shoulderl" />
+
+		<action name="hcm_lean_right_r" onPress="1" onRelease="1" keyboard="r" xboxpad="xi_shoulderr" />
+		<action name="hcm_lean_right_q" onPress="1" onRelease="1" keyboard="q" xboxpad="xi_shoulderr" />
+		<action name="hcm_lean_right_e" onPress="1" onRelease="1" keyboard="e" xboxpad="xi_shoulderr" />
+		<action name="hcm_lean_right_f" onPress="1" onRelease="1" keyboard="f" xboxpad="xi_shoulderr" />
+		<action name="hcm_lean_right_y" onPress="1" onRelease="1" keyboard="y" xboxpad="xi_shoulderr" />
+		<action name="hcm_lean_right_u" onPress="1" onRelease="1" keyboard="u" xboxpad="xi_shoulderr" />
+		<action name="hcm_lean_right_o" onPress="1" onRelease="1" keyboard="o" xboxpad="xi_shoulderr" />
+		<action name="hcm_lean_right_h" onPress="1" onRelease="1" keyboard="h" xboxpad="xi_shoulderr" />
+	</actionmap>
+</profile>
