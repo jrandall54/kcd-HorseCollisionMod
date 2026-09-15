@@ -170,9 +170,9 @@ whole job.
 Never finished. Both moves were added as impacts and inherited whatever the
 collision tiers do.
 
-- [ ] Give the rear on the spot and the charge their own impact audio. The rear
+- [x] Give the rear on the spot and the charge their own impact audio. The rear
       already leads with the horse's landing; the charge has nothing specific.
-- [ ] Decide what a victim says to each, and what Henry says. Neither has been
+- [x] Decide what a victim says to each, and what Henry says. Neither has been
       chosen, so both currently fall through to the collision sets.
 
 ### 5. The lunge throws victims too far

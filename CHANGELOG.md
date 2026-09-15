@@ -30,6 +30,13 @@ number.
 
 ## [Unreleased]
 
+## [5.17.0] - 2026-09-15
+
+### Added
+
+- The rear and charge moves now have their own specific audio behaviors. Charge victims play a distinct pain sound on impact.
+- Henry now issues a horse command ("yah") exactly when the rear or charge key is pressed, separate from the collision impact grunts.
+
 ## [5.16.2] - 2026-09-14
 
 ### Changed

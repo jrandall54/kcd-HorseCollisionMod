@@ -21863,3 +21863,12 @@ mod's. Vanilla may have them call for help once they are on their feet and
 moving again. The recovery bark is a complaint and does not belong when the
 collision was a crime, because somebody fleeing in terror does not stop to say
 "learn how to ride a horse".
+
+
+### Build: 5.16.2-dev (Audio for Rear/Charge)
+**Hypothesis**: Giving rear and charge their own impact audio and barks. Charge should use HurtHard pain set, and Henry should shout 'hyje' (yah) independently on keypress.
+**Changes**:
+- Mapped Charge to HurtHard in PainByTier.
+- Pointed VictimBarkByTier.Charge to collision.
+- Directly invoked PlayAudioTrigger(player, 'v_henry_hyje') in RearHorse inside Rear.lua.
+**Results**: PENDING (user is testing).

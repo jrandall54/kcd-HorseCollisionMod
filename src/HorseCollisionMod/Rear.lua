@@ -647,6 +647,11 @@ end
 -- @tparam table horseEnt the player's horse
 function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 	local tag = fragTag or self.Config.RearFragTag or "hcm_rear_charge"
+	local tierName = (tag == (self.Config.RearOnlyFragTag or "")) and "Rear" or "Charge"
+
+	if player and self.Config.RiderVocal and type(PlayAudioTrigger) == "function" then
+		pcall(function() PlayAudioTrigger(player, "v_henry_hyje") end)
+	end
 
 	-- Marked for as long as the charge could be touching anyone, so the
 	-- detection loop scores whatever it finds as a gallop rather than by the

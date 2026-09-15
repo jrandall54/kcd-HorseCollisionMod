@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.16.2
+-- @release 5.17.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -609,7 +609,8 @@ end
 -- names are kept above because they document where the right recordings live.
 HorseCollisionMod.PainByTier = {
 	Trot   = "HurtDown",
-	Gallop = "HurtDown"
+	Gallop = "HurtDown",
+	Charge = "HurtHard"
 }
 
 --- Whether a bark may be raised at all right now.

@@ -273,7 +273,7 @@ HorseCollisionModSettings = {
 		Trot   = "collision",
 		Gallop = "collision",
 		Rear   = "rear",
-		Charge = "rear",
+		Charge = "collision",
 	},
 
 	-- Which impacts can make a victim lose patience and fight back. Only the
