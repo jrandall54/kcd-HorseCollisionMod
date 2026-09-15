@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.14.2] - 2026-09-14
+
 ### Changed
 
 - A development deploy no longer runs the release gate. Installing into the
