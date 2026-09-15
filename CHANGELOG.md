@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.16.2] - 2026-09-14
+
 ### Changed
 
 - Landing a branch forgets its test settings instead of leaving an empty record
