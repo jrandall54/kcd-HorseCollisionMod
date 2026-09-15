@@ -447,9 +447,18 @@ function Land {
 	# install keeps whatever the branch was riding with and the next branch
 	# inherits a world nobody chose, which is the drift that had a rider
 	# wondering why their horse never tired.
+	# The deploy first, then forget the world.
+	#
+	# -ReleaseSettings asks the tool for a world with nothing in it, and asking
+	# for that writes an empty file. Done before this, the file it writes
+	# survives, and an empty file is not the same as no file: no file means
+	# nobody has chosen and the default preset applies, while an empty one is a
+	# choice to run shipped values. So the next branch started with crime and
+	# every other interruption switched on, and a preset asked for afterwards
+	# landed on nothing instead of on the defaults.
+	& $deploy -ScriptOnly -ReleaseSettings | Out-Null
 	Write-Host (Invoke-World @("--reset")) -NoNewline
 	Say "testing world cleared, install back to shipped values"
-	& $deploy -ScriptOnly -ReleaseSettings | Out-Null
 
 	# Deliberately not re-entering the testing world. Landing returns to main,
 	# and main is the shipped world: the next branch seeds its own. Re-entering
