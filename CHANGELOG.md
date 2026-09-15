@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.17.0] - 2026-09-15
+
 ### Added
 
 - The rear and charge moves now have their own specific audio behaviors. Charge victims play a distinct pain sound on impact.
