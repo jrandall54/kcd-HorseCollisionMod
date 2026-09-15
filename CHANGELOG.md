@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.16.0] - 2026-09-14
+
 ### Fixed
 
 - Riding into somebody who is getting up knocks them down again, instead of

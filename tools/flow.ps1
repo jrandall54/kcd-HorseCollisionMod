@@ -55,7 +55,7 @@ param (
 $ErrorActionPreference = "Stop"
 
 # Comma-separated values are split here rather than left to the parameter
-# binder. Called as `.	oolslow.ps1 test -Preset a,b` from a PowerShell
+# binder. Called as `flow.ps1 test -Preset a,b` from a PowerShell
 # prompt the binder splits them; called through `powershell -File`, which is
 # how every tool and script invokes this, every argument arrives as one literal
 # string and `-Preset a,b` binds as a single preset named "a,b". Splitting here
