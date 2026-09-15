@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.15.1] - 2026-09-14
+
 ### Changed
 
 - `ImpactDamageDelayMs` now says what it actually governs. The damage path stopped
