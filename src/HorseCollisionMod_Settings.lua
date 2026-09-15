@@ -380,10 +380,10 @@ HorseCollisionModSettings = {
 	-- Henry's own grunt as the collision goes through him, as
 	-- { event, delay in milliseconds, pitch, volume }.
 	RiderVocalByTier         = {
-		Walk   = { "v_henry_hit_soft", 140, 0, 1 },
-		Trot   = { "v_henry_hit_medium", 110, 0, 1 },
+		Walk   = { "", 140, 0, 1 },
+		Trot   = { "v_henry_hit_soft", 140, 0, 1 },
 		Gallop = { "v_henry_hit_heavy", 90, 0, 1 },
-		Rear   = { "v_henry_hit_medium", 110, 0, 1 },
+		Rear   = { "v_henry_hit_soft", 140, 0, 1 },
 		Charge = { "v_henry_hit_heavy", 90, 0, 1 },
 	},
 
