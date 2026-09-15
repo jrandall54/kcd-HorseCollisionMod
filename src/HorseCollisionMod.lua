@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.16.0
+-- @release 5.16.1
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.16.0"
+HorseCollisionMod.Version = "5.16.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1524,6 +1524,43 @@ HorseCollisionMod.RetaliationReleaseTries = 20
 HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
+
+--- Every animation state that means the body is in a ragdoll.
+--
+-- The engine has one per context and the mod only ever knew the first. Counted
+-- over a session's log, `CombatBlendRagdoll` appears 185 times against
+-- `BlendRagdoll`'s 175, so more than half of all ragdolled victims were
+-- invisible to every test that compared against the single name: whether a
+-- victim was already down, whether they were flat, whether they had finished
+-- getting up, whether their recovery line was due.
+--
+-- That is what made the mod's behavior depend on whether a victim happened to
+-- be fighting, which reads from the saddle as random.
+--- Victims whose fall clip has not yet handed the body to physics.
+--
+-- A `hcm_fall_` clip carries its ragdoll as a ProcLayer that fires partway
+-- through it, so between the clip starting and that layer firing there is a
+-- handover in flight. Starting a second clip on the same victim in that window
+-- cancels it, and the canceled handover then lands against whatever the
+-- victim is doing later: they collapse seconds after the impact if they are
+-- idle, or are yanked limp in the middle of another clip, which lifts the body
+-- and drops it.
+--
+-- The readiness cooldown used to prevent this as a side effect, and the diary
+-- said so in as many words -- that it existed "to prevent ghost damage and the
+-- awkward restart of a fall clip on a victim who is not standing". Removing
+-- those timers removed that protection with them, which is what made both
+-- symptoms reproducible.
+--
+-- Keyed by entity id, set when a fall clip starts and cleared when the body is
+-- seen to ragdoll or the wait gives up.
+HorseCollisionMod.FallPending = {}
+
+HorseCollisionMod.RagdollAnimationStates = {
+	BlendRagdoll = true,
+	CombatBlendRagdoll = true,
+}
+
 
 -- The action hint slot the surrender prompt uses. An arbitrary id, chosen high
 -- enough to stay clear of the ones vanilla raises for its own hints.

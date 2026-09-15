@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.16.0
+-- @release 5.16.1
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -169,6 +169,10 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- a different signal rather than the same call. Until then both tiers that
 	-- can knock someone down default to "fall".
 	if prefix == "hcm_fall_" then
+		-- The handover this clip carries is now in flight. Nothing may start
+		-- another clip on this victim until it has landed.
+		self:WatchFallHandover(npc)
+
 		self:TraceRecovery(npc, action)
 		self:WatchTurn(npc, action)
 
@@ -236,6 +240,27 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 	if animated then
 		local flat, headUp, standing, state = self:IsVictimFlat(npc)
 
+		-- A fall clip is refused while the last one's handover is still in
+		-- flight, whatever the victim's posture.
+		--
+		-- `hcm_fall_` carries its ragdoll as a ProcLayer that fires partway
+		-- through the clip. Starting a second clip in that window cancels the
+		-- handover the first was carrying, and the canceled handover lands
+		-- later against whatever the victim is doing by then: they collapse
+		-- seconds after the impact if they are idle, or are pulled limp in the
+		-- middle of another clip, which lifts the body and drops it. One
+		-- defect, two appearances, and it needs two impacts close together,
+		-- which is why it is so hard to reproduce on purpose.
+		--
+		-- The readiness cooldown used to prevent this as a side effect of
+		-- refusing every impact for several seconds, and the diary said so:
+		-- it existed "to prevent ghost damage and the awkward restart of a
+		-- fall clip on a victim who is not standing". Removing those timers
+		-- took the protection with them. This refuses only the thing that
+		-- causes it, and only while it is actually pending.
+		local pending = style == "fall" and self:HasFallPending(npc)
+		local refused = flat or pending
+
 		-- Logged whichever way it goes, because the interesting case is the
 		-- one where a reaction was allowed and should not have been, and a
 		-- decision that only speaks when it refuses cannot show you that.
@@ -243,12 +268,14 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 			self:Log("FlatCheck " .. self:NameOf(npc)
 					.. " tier=" .. tostring(tierName)
 					.. " flat=" .. tostring(flat)
+					.. " pending=" .. tostring(pending)
 					.. " headUp=" .. string.format("%.2f", headUp or -1)
 					.. " standing=" .. string.format("%.2f", standing or -1)
-					.. " state=" .. tostring(state))
+					.. " state=" .. tostring(state)
+					.. " refused=" .. tostring(refused))
 		end
 
-		if flat then
+		if refused then
 			return false
 		end
 	end
@@ -1003,7 +1030,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	pcall(function()
 		entryState = tostring(npc.actor:GetCurrentAnimationState())
 
-		alreadyDown = entryState == self.RagdollAnimationState
+		alreadyDown = self:IsRagdollState(entryState)
 	end)
 
 	if alreadyDown then

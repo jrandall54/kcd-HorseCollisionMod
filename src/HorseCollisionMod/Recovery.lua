@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.16.0
+-- @release 5.16.1
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -73,11 +73,6 @@ function HorseCollisionMod:RecordStandingHeight(npc)
 	end
 
 	local id = tostring(npc.id)
-
-	if self.StandingHead[id] then
-		return
-	end
-
 	local head, origin = nil, nil
 
 	pcall(function()
@@ -88,8 +83,28 @@ function HorseCollisionMod:RecordStandingHeight(npc)
 		origin = npc:GetWorldPos().z
 	end)
 
-	if head and origin and head > origin then
-		self.StandingHead[id] = head - origin
+	if not head or not origin or head <= origin then
+		return
+	end
+
+	-- The tallest this victim has ever been seen, not the first reading.
+	--
+	-- Recording once was wrong and quietly poisoned everything downstream. A
+	-- victim's first contact with the mod is usually made while they are
+	-- standing, but not always, and a first reading taken off a body already
+	-- on the ground sticks for good: one guard was carrying a standing height
+	-- of 0.27, against a real one near 1.5, so "flat" meant below four
+	-- centimetres and he was never once judged to be down. Every posture
+	-- decision about him was wrong from then on.
+	--
+	-- A maximum is self-correcting and needs no threshold to decide whether a
+	-- reading is plausible. Whatever state a victim is first seen in, they
+	-- stand at some point, and the reference converges on the truth.
+	local seen = head - origin
+	local best = self.StandingHead[id]
+
+	if not best or seen > best then
+		self.StandingHead[id] = seen
 	end
 end
 
@@ -266,6 +281,138 @@ function HorseCollisionMod:WhenVictimRises(npc, fn)
 	Script.SetTimer(self.ReactionPollMs, poll)
 end
 
+--- Whether an animation state means the body is in a ragdoll.
+--
+-- @tparam ?string state an animation state name
+-- @treturn boolean true when the body is ragdolling
+function HorseCollisionMod:IsRagdollState(state)
+	return state ~= nil and self.RagdollAnimationStates[state] == true
+end
+
+--- Whether a victim's last fall clip has yet handed them to physics.
+--
+-- True from the moment a `hcm_fall_` clip starts until the body is seen in a
+-- ragdoll state, or until the wait gives up on it. A second clip started in
+-- that window cancels the handover the first one was carrying, and the
+-- canceled handover lands later against whatever the victim is doing then.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true while a handover is in flight
+function HorseCollisionMod:HasFallPending(npc)
+	if not npc or not npc.id then
+		return false
+	end
+
+	return self.FallPending[tostring(npc.id)] == true
+end
+
+--- Marks a handover as in flight, and clears it when the body ragdolls.
+--
+-- @tparam table npc victim entity
+function HorseCollisionMod:WatchFallHandover(npc)
+	if not npc or not npc.id then
+		return
+	end
+
+	local id = tostring(npc.id)
+
+	self.FallPending[id] = true
+
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local deadline = startedAt + self.GetUpCeilingMs
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			self.FallPending[id] = nil
+
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		-- Cleared the moment the body is physics, which is the handover
+		-- having happened and the window being over.
+		if self:IsRagdollState(state) or self:TimeMs() >= deadline then
+			self.FallPending[id] = nil
+
+			return
+		end
+
+		Script.SetTimer(self.ReactionPollMs, poll)
+	end
+
+	Script.SetTimer(self.ReactionPollMs, poll)
+end
+
+--- Records how long a requested ragdoll took to actually take.
+--
+-- Instrumentation, and it answers a question the mod could not previously be
+-- asked. `actor:Fall` requests a ragdoll; it does not perform one, and nothing
+-- reports back. So a fall that takes on the next frame and one the engine
+-- holds for two and a half seconds look identical in the log, and the rider
+-- has been describing the second for hours with no way to show it: a victim
+-- takes the impact, walks a few steps, and falls over long afterwards.
+--
+-- The diary measured the mechanism once, firing `actor:Fall` every 33ms from
+-- the first frame of a get-up: seventy-six calls did nothing and the
+-- seventy-seventh landed at the instant the animation released, and two
+-- unrelated sequences both landed at 2532ms to the millisecond. What is not
+-- known is how often it happens in ordinary play, which this counts.
+--
+-- Costs one line per impact and nothing per frame.
+--
+-- @tparam table npc victim entity
+-- @tparam string tierName the tier that struck them
+function HorseCollisionMod:TraceFallLanding(npc, tierName)
+	if not self.Config.LogTelemetry then
+		return
+	end
+
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local deadline = startedAt + self.GetUpCeilingMs
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		local elapsed = self:TimeMs() - startedAt
+
+		if self:IsRagdollState(state) then
+			self:Log("FallLanded " .. self:NameOf(npc)
+					.. " tier=" .. tostring(tierName)
+					.. " after=" .. tostring(elapsed) .. "ms"
+					.. " state=" .. tostring(state))
+
+			return
+		end
+
+		if self:TimeMs() >= deadline then
+			self:Log("FallLanded " .. self:NameOf(npc)
+					.. " tier=" .. tostring(tierName)
+					.. " never, last=" .. tostring(state))
+
+			return
+		end
+
+		Script.SetTimer(self.ReactionPollMs, poll)
+	end
+
+	poll()
+end
+
 --- Runs something once a victim has finished getting up.
 --
 -- Named for what it measures. It watches for `BlendRagdoll` and fires when
@@ -307,7 +454,7 @@ function HorseCollisionMod:WhenVictimIsUp(npc, fn)
 
 		local elapsed = self:TimeMs() - startedAt
 
-		if state == self.RagdollAnimationState then
+		if self:IsRagdollState(state) then
 			seen = true
 		elseif seen then
 			fn("stood", elapsed)
