@@ -23,7 +23,7 @@
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
--- @release 5.17.0
+-- @release 5.18.0
 
 --- One tier's value for one concern.
 --

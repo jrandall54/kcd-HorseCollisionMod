@@ -21872,3 +21872,8 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - Pointed VictimBarkByTier.Charge to collision.
 - Directly invoked PlayAudioTrigger(player, 'v_henry_hyje') in RearHorse inside Rear.lua.
 **Results**: PENDING (user is testing).
+### Build: 5.17.0-dev (Controller Support)
+**Hypothesis**: Add Xbox controller button candidate bindings to hcm_actionmaps.xml so players can trigger features via gamepad without modifying Lua configs.
+**Changes**:
+- Added xboxpad mappings for xi_triggerl_btn (Charge), xi_thumbl (Rear), xi_shoulderl (Lean Left), and xi_shoulderr (Lean Right) into the existing action candidates in hcm_actionmaps.xml.
+**Results**: SUCCESS. Controller bindings work alongside keyboard keys. Left Bumper + Left Stick Click is eaten by the engine due to blocking/crouching conflict, but all other combos work perfectly.

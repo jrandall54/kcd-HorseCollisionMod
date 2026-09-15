@@ -30,6 +30,11 @@ number.
 
 ## [Unreleased]
 
+## [5.18.0] - 2026-09-15
+
+### Added
+- Added gamepad support for Rear and Lean actions. Users can now natively trigger these features using controller buttons alongside their chosen keyboard keys. (Rear: Left Stick Click, Rear Charge: Left Trigger, Lean Left: Left Bumper, Lean Right: Right Bumper).
+
 ## [5.17.0] - 2026-09-15
 
 ### Added
