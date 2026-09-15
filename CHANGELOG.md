@@ -30,6 +30,11 @@ number.
 
 ## [Unreleased]
 
+## [5.18.1] - 2026-09-15
+
+### Changed
+- Shifted Henry's impact grunts upward so a walk impact is silent
+
 ## [5.18.0] - 2026-09-15
 
 ### Added
