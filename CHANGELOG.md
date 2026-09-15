@@ -30,6 +30,15 @@ number.
 
 ## [Unreleased]
 
+### Changed
+
+- The testing world is now anything in the settings file rather than three
+  fixed switches, and reaches table members as well as top-level keys. It is
+  written into a development install as its own file beside the settings rather
+  than rewritten into them, so the installed settings stay identical to the
+  repository and a release cannot carry a test value. Developer-facing only;
+  `docs/DEV_LOOP.md` describes it.
+
 ## [5.14.0] - 2026-09-14
 
 ### Fixed

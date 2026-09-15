@@ -217,8 +217,14 @@ src/
   mod.manifest
 tools/
   build_adb.py            generates the animation data from a game install
-  flow.ps1                the session's states: test, branch, land, shipping
+  flow.ps1                the session's states: test, branch, land, shipping,
+                          world
   dev_deploy.ps1          installs into the game without Vortex
+  testworld.py            what a branch changes about the installed settings
+                          for testing, written into the development install as
+                          a separate file so the settings themselves are never
+                          rewritten
+  testworlds.ini          named testing worlds, as data
   bark_chain.py           walks a bark set from metarole to role to topic to
                           sequences, showing each line with its cooldown, so
                           what a speaker will say and when they run dry is

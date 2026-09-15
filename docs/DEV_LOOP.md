@@ -118,6 +118,55 @@ through to another install. `build_adb.py` resolves the same way, with
 
 Releases go through `build.ps1`. The dev folder never ships.
 
+## The testing world
+
+What a branch changes about the installed settings so a test is not fighting
+the mod's shipping behavior. Riding someone down is legal, a spent horse keeps
+its rider, nobody is pulled down or calls for guards; almost every collision
+test is about the collision, and a guard summoned mid-run ends a test that was
+measuring something else.
+
+It is branch state. `flow.ps1 branch` seeds the default, every `test`
+re-applies it, anything asked for on a later `test` is added to it, and `land`
+clears it. A value given once does not evaporate on the next deploy.
+
+```
+toolslow.ps1 world                              what is live
+toolslow.ps1 test -Preset stamina               add a named world
+toolslow.ps1 test -Set CollisionIsCrime=true    change one setting
+toolslow.ps1 test -Set StaminaDrainByTier.Gallop=0
+toolslow.ps1 test -Unset CollisionIsCrime       drop one
+toolslow.ps1 test -Shipped                      carry nothing
+```
+
+Anything in the settings file can be set, including a member of a table, so a
+new kind of test never needs a new switch. Named worlds live in
+`tools/testworlds.ini` as data: adding one is an edit to that file and nothing
+else.
+
+### How it reaches the game
+
+`tools/testworld.py` writes `HorseCollisionMod_TestWorld.lua` into the
+development install beside the settings file. Startup scripts load in name
+order, so it runs after `HorseCollisionMod_Settings.lua` and assigns into the
+same global; the mod then applies it through `ApplySettings` with the same type
+checking and without knowing it exists.
+
+Three things follow from that shape. Nothing can ship it, because `build.ps1`
+packs from `src/`, which never holds it. Table members work, which a regex over
+the settings file could not do once everything per-tier moved into tables. And
+the installed settings stay byte-identical to the repository, so the deploy's
+own verification is exact rather than having to forgive the values it patched.
+
+The world announces itself in `kcd.log` at load:
+
+```
+[HorseCollisionMod] test world: CollisionIsCrime=false, Retaliation=false
+```
+
+That line is the record of what a run was measured against. A world nobody
+could see is how a setting stays on through the next three tests.
+
 ## The remote console
 
 CryEngine listens on port 4600 and streams console output back.
