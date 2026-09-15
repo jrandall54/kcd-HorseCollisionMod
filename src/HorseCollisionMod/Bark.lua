@@ -609,7 +609,8 @@ end
 -- names are kept above because they document where the right recordings live.
 HorseCollisionMod.PainByTier = {
 	Trot   = "HurtDown",
-	Gallop = "HurtDown"
+	Gallop = "HurtDown",
+	Charge = "HurtHard"
 }
 
 --- Whether a bark may be raised at all right now.
