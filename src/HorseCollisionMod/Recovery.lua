@@ -307,7 +307,7 @@ function HorseCollisionMod:WhenVictimIsUp(npc, fn)
 
 		local elapsed = self:TimeMs() - startedAt
 
-		if state == self.RagdollAnimationState then
+		if self:IsRagdollState(state) then
 			seen = true
 		elseif seen then
 			fn("stood", elapsed)

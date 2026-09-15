@@ -91,6 +91,50 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- starting figure instead of the delta.
 	self:ProbeImpactCost(npc, tierName, strength, armor)
 
+	-- Sound first, and then the reaction.
+	--
+	-- The request has to go out ahead of the body being seized. Sent after the
+	-- ragdoll it is requested against an entity that is already being handed
+	-- to physics, and the rider reported impacts landing silently when this
+	-- was moved below. The mod logs a full set of accepted layers either way,
+	-- which is worth remembering: a sent request is evidence the mod asked,
+	-- never that the game answered.
+	self:PlayImpactSound(npc, tierName, armor)
+
+	-- The reaction goes out here, next to the probe that just read the
+	-- victim, and ahead of everything cosmetic.
+	--
+	-- Not a preference about ordering. `Ragdoll` reads the victim's animation
+	-- state to decide whether they are already down, and a victim who is takes
+	-- a different path entirely. With the sound, the barks, the camera, the
+	-- blur and the dust in between, the state it reads is no longer the state
+	-- the probe saw: measured across two builds of the same `Ragdoll` code,
+	-- seven gallops onto victims logged as `BlendRagdoll` produced not one
+	-- `Settle`, where three such gallops in the older build produced three.
+	-- They had left that state by the time anything acted on it, so they took
+	-- the standing path and the impact did nothing visible.
+	--
+	-- Everything below is about the moment of contact too, but none of it
+	-- reads the victim. Only this does, so only this has to be adjacent.
+	-- A stagger is the one reaction a player can switch off, and the one a
+	-- fight suppresses. Both are properties of that style rather than of the
+	-- walk, so they are asked of the style: a tier set to stagger obeys them
+	-- whichever tier it is.
+	--
+	-- The combat test is `playerInDanger` and not the combined signal. The
+	-- combined one is true for a victim merely holding a weapon, and a guard
+	-- on patrol with a polearm holds his all day, so keying off it meant he
+	-- could never be staggered at all.
+	local style = self:TierValue("ReactionByTier", tierName)
+	local staggerRefused = style == "stagger"
+			and (not cfg.WalkStagger
+					or (cfg.SuppressStaggerInCombat and playerInDanger))
+
+	if not staggerRefused then
+		self:PlayTierReaction(npc, tierName, velocity, speed,
+				armorImpulse, ctx.horsePos, horseEnt)
+	end
+
 	if cfg.LogTelemetry then
 		-- Read here only because the line reports them. Barding's three
 		-- effects are applied inside the calls that use them.
@@ -109,9 +153,6 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 				.. " " .. tostring(combatDetail))
 	end
 
-	-- The moment of contact, in order. All of it belongs to the instant the
-	-- horse touches them rather than to whatever the body does afterwards.
-	self:PlayImpactSound(npc, tierName, armor)
 
 	-- Which voice answers a hit is the tier's, because the collision
 	-- reactions and the rear are separate pillars and neither may carry the
@@ -144,25 +185,6 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- gallop throws them several meters and dust that follows a body reads as
 	-- smoke.
 	self:ImpactDust(npc, tierName)
-
-	-- A stagger is the one reaction a player can switch off, and the one a
-	-- fight suppresses. Both are properties of that style rather than of the
-	-- walk, so they are asked of the style: a tier set to stagger obeys them
-	-- whichever tier it is.
-	--
-	-- The combat test is `playerInDanger` and not the combined signal. The
-	-- combined one is true for a victim merely holding a weapon, and a guard
-	-- on patrol with a polearm holds his all day, so keying off it meant he
-	-- could never be staggered at all.
-	local style = self:TierValue("ReactionByTier", tierName)
-	local staggerRefused = style == "stagger"
-			and (not cfg.WalkStagger
-					or (cfg.SuppressStaggerInCombat and playerInDanger))
-
-	if not staggerRefused then
-		self:PlayTierReaction(npc, tierName, velocity, speed,
-				armorImpulse, ctx.horsePos, horseEnt)
-	end
 
 	-- Marks, the native hit reaction, and the combat hit. `MarkVictim` gates
 	-- itself on having dirt and blood figures for the tier, and a tier that

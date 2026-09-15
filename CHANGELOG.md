@@ -30,6 +30,20 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+
+- An impact on somebody who is already down reacts, whether or not they were
+  fighting. The mod recognised one of the game's two ragdoll states, and the
+  other is the one a victim in combat uses: counted over a session, it accounted
+  for more than half of all ragdolled victims. Every test of whether a body was
+  down, flat, or back on its feet missed those victims, so a charge or a gallop
+  onto them did nothing visible and the blow landed seconds later instead. It is
+  why the behaviour looked random rather than wrong.
+- An impact reads the victim and acts on them in the same breath. The reaction
+  had drifted to the far side of the sound, the barks, the camera shake, the
+  view blur and the dust, and a victim can leave the state that decides how they
+  are handled in that time.
+
 ## [5.16.0] - 2026-09-14
 
 ### Fixed

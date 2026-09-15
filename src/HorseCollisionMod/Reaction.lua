@@ -1003,7 +1003,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	pcall(function()
 		entryState = tostring(npc.actor:GetCurrentAnimationState())
 
-		alreadyDown = entryState == self.RagdollAnimationState
+		alreadyDown = self:IsRagdollState(entryState)
 	end)
 
 	if alreadyDown then

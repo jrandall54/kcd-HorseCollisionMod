@@ -1525,6 +1525,30 @@ HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
 HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
 
+--- Every animation state that means the body is in a ragdoll.
+--
+-- The engine has one per context and the mod only ever knew the first. Counted
+-- over a session's log, `CombatBlendRagdoll` appears 185 times against
+-- `BlendRagdoll`'s 175, so more than half of all ragdolled victims were
+-- invisible to every test that compared against the single name: whether a
+-- victim was already down, whether they were flat, whether they had finished
+-- getting up, whether their recovery line was due.
+--
+-- That is what made the mod's behaviour depend on whether a victim happened to
+-- be fighting, which reads from the saddle as random.
+HorseCollisionMod.RagdollAnimationStates = {
+	BlendRagdoll = true,
+	CombatBlendRagdoll = true,
+}
+
+--- Whether an animation state means the body is in a ragdoll.
+--
+-- @tparam ?string state an animation state name
+-- @treturn boolean true when the body is ragdolling
+function HorseCollisionMod:IsRagdollState(state)
+	return state ~= nil and self.RagdollAnimationStates[state] == true
+end
+
 -- The action hint slot the surrender prompt uses. An arbitrary id, chosen high
 -- enough to stay clear of the ones vanilla raises for its own hints.
 HorseCollisionMod.SurrenderHintId = 4771
