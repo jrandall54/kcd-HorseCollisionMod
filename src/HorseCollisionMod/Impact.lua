@@ -73,6 +73,14 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 		self:ShieldFromEngineDamage(npc)
 	end
 
+	-- How tall they stand, taken now because now is when they are upright.
+	--
+	-- It is the reference everything about posture is read against: whether a
+	-- body is flat enough to refuse an animation, and when it begins to rise.
+	-- Recorded here rather than with the reaction because a gallop ragdolls
+	-- without an animated reaction at all and still needs the figure.
+	self:RecordStandingHeight(npc)
+
 	-- What actually prevents the lockup. A victim under 40 health carrying a
 	-- bleeding buff is otherwise taken over by vanilla's auto-cure daycycle,
 	-- which stands them in the street playing `PretendingIllness`.

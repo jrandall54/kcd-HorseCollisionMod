@@ -145,8 +145,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   or below HitCooldownMs or whole impacts fall silent
 -- @field BarkSuppressMs how long vanilla's own collision bark is held off
 -- @field BarkOnRecovery whether a knocked-down victim speaks again once up
--- @field BarkRecoveryDelayMs how long after the impact that second line comes,
---   timed to land during the get-up
 -- @field BarkGapMs least silence between a victim's cry and their recovery line
 -- @field BarkInCombat whether a victim already fighting still speaks, which
 --   vanilla refuses
@@ -622,7 +620,6 @@ HorseCollisionMod.Config = {
 	-- it lands *during* the get-up rather than after it. Tuned by ear: a
 	-- state-driven trigger fires only once the get-up has finished, which
 	-- leaves an audible hole between standing and speaking.
-	BarkRecoveryDelayMs      = 3200,
 	-- The least silence between two lines from the same speaker. A victim who
 	-- recovers quickly is upright while their own cry of pain is still
 	-- playing, and speaking again then cuts the first line off mid-word.

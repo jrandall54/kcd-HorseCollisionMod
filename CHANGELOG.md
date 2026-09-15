@@ -30,6 +30,20 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+
+- The line a knocked-down victim speaks as they get up now lands while they are
+  getting up. It was timed from the impact, one figure for every victim, and a
+  get-up is not one length: a body lies flat from about 1.8 seconds and starts
+  rising anywhere from there to past seven depending on the fall and on who was
+  hit, so the line arrived mid-ragdoll for some and after others had already
+  walked off. It is triggered by the body starting to rise instead.
+
+### Removed
+
+- `BarkRecoveryDelayMs`. The moment it was tuned to guess is now read from the
+  victim.
+
 ## [5.14.2] - 2026-09-14
 
 ### Changed

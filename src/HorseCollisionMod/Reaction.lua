@@ -234,8 +234,6 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 			or style == "fall"
 
 	if animated then
-		self:RecordStandingHeight(npc)
-
 		if self:IsVictimFlat(npc) then
 			self:Log("PlayTierReaction " .. self:NameOf(npc)
 					.. " tier=" .. tostring(tierName)

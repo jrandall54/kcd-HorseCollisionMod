@@ -184,6 +184,60 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	return (head - origin) < (standing / 2)
 end
 
+--- Runs something the moment a victim stops lying flat and starts to rise.
+--
+-- The middle of a get-up. A recovery line wants
+-- to land while the victim is getting to their feet, and the two states either
+-- side of that moment are both wrong: waiting for the reaction to end fires
+-- while they are still on the ground, and waiting for `BlendRagdoll` to end
+-- fires once they are already walking. The rider heard the second as "a large
+-- gap between when they actually stand up and then the 2nd line plays".
+--
+-- A tuned delay stood here instead, and its comment said no readable state
+-- marked the moment. That was true of the states anyone had looked at. It is
+-- not true of the body: the head climbs from about 0.15 of its standing height
+-- to 1.59 across the get-up, so leaving flat is exactly the instant wanted,
+-- and `IsVictimFlat` reads it.
+--
+-- The state has to be seen before its absence counts, as everywhere else here.
+-- A poll landing in the moment between the impact and the body reaching the
+-- ground would otherwise report a rise that has not begun as already over.
+--
+-- @tparam table npc victim entity
+-- @tparam function fn called with the reason and the wait in milliseconds
+function HorseCollisionMod:WhenVictimRises(npc, fn)
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local deadline = startedAt + self.GetUpCeilingMs
+	local seen = false
+
+	local function poll()
+		if generation ~= self.TimerTick then
+			return
+		end
+
+		local elapsed = self:TimeMs() - startedAt
+
+		if self:IsVictimFlat(npc) then
+			seen = true
+		elseif seen then
+			fn("rising", elapsed)
+
+			return
+		end
+
+		if self:TimeMs() >= deadline then
+			fn(seen and "ceiling" or "neverFlat", elapsed)
+
+			return
+		end
+
+		Script.SetTimer(self.ReactionPollMs, poll)
+	end
+
+	Script.SetTimer(self.ReactionPollMs, poll)
+end
+
 --- Runs something once a victim has finished getting up.
 --
 -- Named for what it measures. It watches for `BlendRagdoll` and fires when

@@ -718,13 +718,21 @@ tier with `CollisionIsCrime` off.
 ### Sequencing the two lines of a knockdown
 
 A knockdown speaks twice: a wordless cry at impact, then words during the
-get-up. The second is timed from the impact by `BarkRecoveryDelayMs` rather than
-triggered by the victim standing, because both state-driven attempts landed
-late. `WatchHitReady` requires `HitReadySettleMs` of stillness before reporting,
-so it cannot fire until two seconds after the victim is already up; and waiting
-for the animation state to leave `BlendRagdoll` fires only once the get-up has
-finished. The target is a moment *inside* an animation, and nothing readable
-marks it, so a tuned timer is the correct instrument here.
+get-up. The second fires when the body begins to rise, which `WhenVictimRises`
+reads from head height.
+
+Three earlier attempts missed the moment. The readiness watcher could not
+report until two seconds after the victim was upright. Waiting for the
+animation state to leave `BlendRagdoll` fires once the get-up has already
+finished, because that state *is* the get-up. And a delay tuned from the impact
+is one figure for a rise that is not one length: measured, a body lies flat
+from about 1.8 seconds and starts rising anywhere from there to past seven,
+depending on the fall and the character set, so 3200 ms landed mid-ragdoll for
+some victims and after others had walked away.
+
+The target is a moment inside the get-up rather than at either end, and no
+animation state marks it. The body does: the head climbs from about 0.15 of its
+standing height to 1.59 across the rise, so leaving flat is the instant wanted.
 
 `BarkGapMs` keeps the two apart: a victim who recovers quickly would otherwise
 speak over their own cry, and the second request cuts the first off mid-word.

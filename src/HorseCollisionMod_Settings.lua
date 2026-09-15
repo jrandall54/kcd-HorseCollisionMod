@@ -816,9 +816,6 @@ HorseCollisionModSettings = {
 	BarkGapMs                = 2500,  -- least silence between two lines from
 	                                  -- the same speaker, so a recovery line
 	                                  -- cannot cut off the cry of pain
-	BarkRecoveryDelayMs      = 3200,  -- how long after the impact the victim's
-	                                  -- second line is spoken; tuned so it
-	                                  -- lands while they are getting up
 	BarkOnRecovery           = true,  -- victims say something once they are
 	                                  -- back on their feet, rather than
 	                                  -- walking off without a word
