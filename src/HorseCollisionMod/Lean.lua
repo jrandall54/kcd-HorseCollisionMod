@@ -80,6 +80,23 @@ function HorseCollisionMod:LeanActionFor(key, side)
 end
 
 
+local function GetPlayerAndHorse()
+	local playerEnt = rawget(_G, "player")
+
+	if not playerEnt or not playerEnt.player then
+		return nil, nil
+	end
+
+	local horse = nil
+
+	pcall(function()
+		horse = XGenAIModule.GetEntityByWUID(playerEnt.player:GetPlayerHorse())
+	end)
+
+	return horse, playerEnt
+end
+
+
 --- Where the camera sits across the horse, in meters from its centerline.
 --
 -- Measured against the **horse**, not against where the camera happened to be
@@ -102,20 +119,13 @@ end
 --
 -- @treturn ?number offset across the horse, positive to the horse's right
 function HorseCollisionMod:LeanOffset()
-	local playerEnt = rawget(_G, "player")
-	local horse, hp, fwd, cam = nil, nil, nil, nil
-
-	if not playerEnt then
-		return nil
-	end
-
-	pcall(function()
-		horse = XGenAIModule.GetEntityByWUID(playerEnt.player:GetPlayerHorse())
-	end)
+	local horse, playerEnt = GetPlayerAndHorse()
 
 	if not horse then
 		return nil
 	end
+
+	local hp, fwd, cam = nil, nil, nil
 
 	pcall(function()
 		hp = horse:GetWorldPos()
@@ -147,26 +157,15 @@ end
 -- already inside the pair of them once it stops pointing down the horse's line.
 --
 -- @treturn ?number degrees, 0 looking straight ahead, always positive
+-- @treturn boolean true if pitch limit was exceeded
 function HorseCollisionMod:LeanViewAngle()
-	local playerEnt = rawget(_G, "player")
-	local horse, dir, heading = nil, nil, nil
-
-	if not playerEnt then
-		return nil
-	end
-
-	-- `GetPlayerHorse` answers with a WUID and not an entity, which is why
-	-- every other call site in this mod pairs it with `GetEntityByWUID`.
-	-- Calling an entity method straight on the WUID throws, and inside a pcall
-	-- that shows up as a silent nil rather than as an error: the angle read
-	-- `-1` on every release and the limit never refused anything.
-	pcall(function()
-		horse = XGenAIModule.GetEntityByWUID(playerEnt.player:GetPlayerHorse())
-	end)
+	local horse, playerEnt = GetPlayerAndHorse()
 
 	if not horse then
-		return nil
+		return nil, false
 	end
+
+	local dir, heading = nil, nil
 
 	pcall(function()
 		dir = System.GetViewCameraDir()
@@ -174,18 +173,11 @@ function HorseCollisionMod:LeanViewAngle()
 	end)
 
 	if not dir or not heading then
-		return nil
+		return nil, false
 	end
 
-	local dl = math.sqrt((dir.x * dir.x) + (dir.y * dir.y))
-	local hl = math.sqrt((heading.x * heading.x) + (heading.y * heading.y))
-
-	if dl <= 0 or hl <= 0 then
-		return nil
-	end
-
-	-- Steep pitch counts as out of range, reported as a right angle so the
-	-- limit refuses on it.
+	-- Steep pitch counts as out of range, checked before the 2D length check
+	-- so looking straight down does not collapse dl to zero and bypass the limit.
 	--
 	-- The yaw below is flattened, deliberately, so that looking up or down is
 	-- not treated as looking away. That is right in the middle of the range and
@@ -195,9 +187,17 @@ function HorseCollisionMod:LeanViewAngle()
 	-- also when the camera is nearest the rider's own model, which is why the
 	-- clipping shows up there and nowhere else.
 	local pitch = math.deg(math.asin(math.max(-1, math.min(1, dir.z))))
+	local maxPitch = self.Config.LeanMaxPitchDeg or 55
 
-	if math.abs(pitch) > (self.Config.LeanMaxPitchDeg or 55) then
-		return 90
+	if maxPitch > 0 and math.abs(pitch) > maxPitch then
+		return nil, true
+	end
+
+	local dl = math.sqrt((dir.x * dir.x) + (dir.y * dir.y))
+	local hl = math.sqrt((heading.x * heading.x) + (heading.y * heading.y))
+
+	if dl <= 0 or hl <= 0 then
+		return nil, false
 	end
 
 	-- Flattened, because looking up or down is not looking away.
@@ -209,7 +209,7 @@ function HorseCollisionMod:LeanViewAngle()
 		dot = -1
 	end
 
-	return math.deg(math.acos(dot))
+	return math.deg(math.acos(dot)), false
 end
 
 
@@ -271,7 +271,7 @@ function HorseCollisionMod:FlipLean(amplitude, sign, seconds, force)
 		playerEnt.actor:SetViewShake(
 				{ x = 0, y = 0, z = 0 },
 				{ x = amplitude * sign, y = forward, z = 0 },
-				seconds, cfg.LeanShakePeriod or 8.0, 0)
+				seconds, cfg.LeanShakePeriod or 40.0, 0)
 	end)
 end
 
@@ -325,7 +325,11 @@ function HorseCollisionMod:StartLean(sign)
 	-- travels in its own space and past a point that takes it through the
 	-- rider and the horse rather than out beside them.
 	local maxAngle = cfg.LeanMaxAngleDeg or 45
-	local angle = self:LeanViewAngle()
+	local angle, pitchExceeded = self:LeanViewAngle()
+
+	if pitchExceeded then
+		return
+	end
 
 	if maxAngle > 0 and angle and angle > maxAngle then
 		return
@@ -370,6 +374,18 @@ function HorseCollisionMod:StartLean(sign)
 			return
 		end
 
+		local isMounted = false
+
+		pcall(function()
+			isMounted = playerEnt.human:IsMounted()
+		end)
+
+		if not isMounted then
+			self:StopLean()
+
+			return
+		end
+
 		-- Turning past the limit mid lean ends it, and the limit is **led by how
 		-- fast the rider is turning**.
 		--
@@ -383,7 +399,14 @@ function HorseCollisionMod:StartLean(sign)
 		-- makes the limit tighten in proportion to the turn, which is the only
 		-- part of it that varies. A rider turning slowly still gets the full 45
 		-- degrees.
-		local turned = self:LeanViewAngle()
+		local turned, pitchViolation = self:LeanViewAngle()
+
+		if pitchViolation then
+			self:StopLean()
+
+			return
+		end
+
 		local limit = cfg.LeanMaxAngleDeg or 45
 
 		if limit > 0 and turned then
@@ -412,6 +435,12 @@ function HorseCollisionMod:StartLean(sign)
 
 		local offset = self:LeanOffset()
 
+		if not offset then
+			self:StopLean()
+
+			return
+		end
+
 		-- Nothing may travel far past the target, whatever went wrong. The
 		-- camera moves at nearly three meters a second on the way out, so a
 		-- correction that does not land is ten meters away in a few seconds,
@@ -419,80 +448,84 @@ function HorseCollisionMod:StartLean(sign)
 		-- bounds every failure in here, including ones not yet found.
 		local ceiling = (cfg.LeanDistance or 0.65) * (cfg.LeanRunawayFactor or 2.0)
 
-		if offset and math.abs(offset) > ceiling then
+		if math.abs(offset) > ceiling then
 			self:StopLean()
 
 			return
 		end
 
-		if offset then
-			local hold = cfg.LeanHoldAmplitude or 3.0
-			local live = cfg.LeanShakeSec or 20.0
-			local past = (sign > 0 and offset >= target) or (sign < 0 and offset <= target)
+		local hold = cfg.LeanHoldAmplitude or 3.0
+		local live = cfg.LeanShakeSec or 1.5
+		local past = (sign > 0 and offset >= target) or (sign < 0 and offset <= target)
 
-			if not reached and last and not past then
-				-- **The press cannot choose a direction, so it is checked.**
-				--
-				-- `SetViewShake` only picks a side when nothing is already
-				-- running; against a live shake it simply reverses. Re-pressing
-				-- inside the shake lifetime therefore sends the camera whichever
-				-- way the last one was not going, and a lean asked for left
-				-- travels right until the runaway ceiling ends it.
-				--
-				-- Measured across eight deliberate double taps, the wrong ones
-				-- alternate perfectly with the right ones and all stop at 1.3,
-				-- which is the ceiling rather than anywhere the lean meant:
-				--
-				--     side=left  from=+1.39    side=right from=-1.37
-				--     side=right from=+0.63    side=left  from=-0.67
-				--
-				-- Two corrections are allowed, because one flip may not have
-				-- reached the camera by the next poll and a third would mean
-				-- something else is wrong.
-				local moving = offset - last
-				local gap = target - offset
+		if not reached and last and not past then
+			-- **The press cannot choose a direction, so it is checked.**
+			--
+			-- `SetViewShake` only picks a side when nothing is already
+			-- running; against a live shake it simply reverses. Re-pressing
+			-- inside the shake lifetime therefore sends the camera whichever
+			-- way the last one was not going, and a lean asked for left
+			-- travels right until the runaway ceiling ends it.
+			--
+			-- Measured across eight deliberate double taps, the wrong ones
+			-- alternate perfectly with the right ones and all stop at 1.3,
+			-- which is the ceiling rather than anywhere the lean meant:
+			--
+			--     side=left  from=+1.39    side=right from=-1.37
+			--     side=right from=+0.63    side=left  from=-0.67
+			--
+			-- Two corrections are allowed, because one flip may not have
+			-- reached the camera by the next poll and a third would mean
+			-- something else is wrong.
+			local moving = offset - last
+			local gap = target - offset
 
-				if turns < 2 and (gap * moving) < 0 and math.abs(moving) > 0.001 then
-					turns = turns + 1
-					self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, live, true)
-				end
+			if turns < 2 and (gap * moving) < 0 and math.abs(moving) > 0.001 then
+				turns = turns + 1
+				self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, live, true)
 			end
-
-			if not reached and past then
-				-- Arrived. Forced, because this is the one-time change down to
-				-- the hold speed and delaying it means sailing past the target
-				-- at the full travel speed.
-				reached = true
-				self:FlipLean(hold, sign, live, true)
-			elseif reached and last then
-				-- **Direction is measured, never remembered.**
-				--
-				-- A boolean flipped on each correction cannot work here,
-				-- because it assumes the camera only ever changes direction
-				-- when this loop turns it. A shake's own curve peaks at its
-				-- period and reverses with no flip involved, and a remembered
-				-- direction is wrong from that moment on: the loop then
-				-- "corrects" the way the camera is already going and the lean
-				-- drifts home five or six seconds into a hold. Releases aimed
-				-- at 0.65 landed at 0.11, -0.05 and -0.08, the last two having
-				-- crossed through center to the wrong side.
-				--
-				-- Comparing two samples cannot go stale, whatever moved the
-				-- camera or why.
-				local moving = offset - last
-				local gap = target - offset
-				local band = cfg.LeanDeadband or 0.03
-
-				-- Away from the target, and far enough out to be worth a
-				-- correction. The deadband is what stops a flip every poll
-				-- once the camera is sitting on the target.
-				if math.abs(gap) > band and (gap * moving) < 0 then
-					self:FlipLean(hold, sign, live)
-				end
-			end
-
-			last = offset
 		end
+
+		if not reached and past then
+			-- Arrived. Forced, because this is the one-time change down to
+			-- the hold speed and delaying it means sailing past the target
+			-- at the full travel speed.
+			reached = true
+			self:FlipLean(hold, sign, live, true)
+		elseif reached and last then
+			-- **Direction is measured, never remembered.**
+			--
+			-- A boolean flipped on each correction cannot work here,
+			-- because it assumes the camera only ever changes direction
+			-- when this loop turns it. A shake's own curve peaks at its
+			-- period and reverses with no flip involved, and a remembered
+			-- direction is wrong from that moment on: the loop then
+			-- "corrects" the way the camera is already going and the lean
+			-- drifts home five or six seconds into a hold. Releases aimed
+			-- at 0.65 landed at 0.11, -0.05 and -0.08, the last two having
+			-- crossed through center to the wrong side.
+			--
+			-- Comparing two samples cannot go stale, whatever moved the
+			-- camera or why.
+			local moving = offset - last
+			local gap = target - offset
+			local band = cfg.LeanDeadband or 0.06
+			local now = self:TimeMs()
+			local timeSinceFlip = self.LeanLastFlip and (now - self.LeanLastFlip) or 0
+
+			-- Away from the target, and far enough out to be worth a
+			-- correction. The deadband is what stops a flip every poll
+			-- once the camera is sitting on the target.
+			-- Also flip if the shake is about to expire, to keep the animation queue
+			local expired = timeSinceFlip > (live * 1000 - 150)
+			local turning = math.abs(gap) > band and (gap * moving) < 0
+
+			if turning or expired then
+				self:FlipLean(hold, sign, live, true)
+			end
+		end
+
+		last = offset
 
 		Script.SetTimer(pollMs, watch)
 	end
@@ -522,14 +555,13 @@ function HorseCollisionMod:StopLean()
 	local sign = self.LeanHeld
 
 	self.LeanHeld = nil
-	self.LeanGoingBack = false
 	self.LeanGeneration = (self.LeanGeneration or 0) + 1
 
 	-- A shake whose duration expires returns the camera home in about 160 ms,
 	-- and nothing may re-base until it has.
 	self.LeanHomeUntil = self:TimeMs() + (cfg.LeanHomeMs or 220)
 
-	self:FlipLean(cfg.LeanHoldAmplitude or 3.0, 1, cfg.LeanReleaseSec or 0.05, true)
+	self:FlipLean(cfg.LeanHoldAmplitude or 3.0, sign or 1, cfg.LeanReleaseSec or 0.05, true)
 
 	if cfg.LogTelemetry then
 		local offset = self:LeanOffset()
@@ -556,11 +588,14 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 	end
 
 	if cfg.RequirePerks then
+		local playerEnt = rawget(_G, "player")
 		local hasAbility = false
 
-		pcall(function()
-			hasAbility = player.soul:HasAbility("hcm_lean")
-		end)
+		if playerEnt and playerEnt.soul then
+			pcall(function()
+				hasAbility = playerEnt.soul:HasAbility("hcm_lean")
+			end)
+		end
 
 		if not hasAbility then
 			return false

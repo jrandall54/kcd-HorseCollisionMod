@@ -30,6 +30,13 @@ number.
 
 ## [Unreleased]
 
+## [5.21.1] - 2026-09-16
+
+### Fixed
+- Fixed lean camera snapping back towards center when holding the lean button still by renewing the view shake before duration expires.
+- Fixed pitch limit bypass in `LeanViewAngle` when looking straight down.
+- Added dismount guard to `StartLean` loop to cleanly exit if dismounting while leaning.
+
 ## [5.21.0] - 2026-09-16
 
 ### Added
