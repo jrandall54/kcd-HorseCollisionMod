@@ -333,6 +333,14 @@ function Land {
 		Fail "documentation style failed. Fix the errors above, then run land again."
 	}
 
+	Say "verifying the testing diary was updated"
+	$base = & git.exe -C $repo merge-base main HEAD
+	$src_changed = & git.exe -C $repo diff --name-only $base HEAD -- src/ tools/
+	$diary_changed = & git.exe -C $repo diff --name-only $base HEAD -- docs/TESTING_DIARY.md
+	if (-not [string]::IsNullOrWhiteSpace($src_changed) -and [string]::IsNullOrWhiteSpace($diary_changed)) {
+		Fail "Source files were modified on this branch, but docs/TESTING_DIARY.md was not updated. You must document your testing results before landing."
+	}
+
 	# The repository's claims about itself. This regenerates the API reference
 	# as a side effect when it is out of date, which is why it runs before the
 	# version is chosen and why anything it changes is staged below.
