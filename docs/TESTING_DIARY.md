@@ -21879,10 +21879,10 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 **Results**: SUCCESS. Controller bindings work alongside keyboard keys. Left Bumper + Left Stick Click is eaten by the engine due to blocking/crouching conflict, but all other combos work perfectly.
 
 ### Build: 5.19.1-dev (fix/ragdoll-twitch)
-**Hypothesis**: Prevent violent IK skeleton tearing on downed NPCs by forcefully unequipping their weapon on impact and restoring it when they stand. Replace unreliable cooldown timers with physical Z-height posture checking. Replace ctor:Fall() with StartInteractiveActionByName('hcm_settle') to bypass engine queues.
+**Hypothesis**: Prevent violent IK skeleton tearing on downed NPCs by forcefully unequipping their weapon on impact and restoring it when they stand. Replace unreliable cooldown timers with physical Z-height posture checking. Replace ctor:Fall() with StartInteractiveActionByName('hcm_settle') to bypass engine queues.
 **Changes**:
 - Replaced VictimLockMsByTier timer with IsVictimFlat physical Z-height gate in Reaction.lua.
-- Replaced ctor:Fall() in Ragdoll with StartInteractiveActionByName('hcm_settle').
+- Replaced ctor:Fall() in Ragdoll with StartInteractiveActionByName('hcm_settle').
 - Added DisarmVictim right before impact to forcibly HolsterWeapon if drawn.
 - Added WhenVictimIsUp to watch the get-up sequence (BlendRagdoll) and RearmVictim to forcibly DrawWeapon the exact millisecond they stand up.
 - Added protection against hitting NPCs currently performing Retaliation (HorseCombatAttackSync).
@@ -21891,5 +21891,5 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 ### Build: 5.20.0-dev (feat/diary-gate)
 **Hypothesis**: Prevent landing branches if src/ or 	ools/ was modified without a corresponding update to docs/TESTING_DIARY.md.
 **Changes**:
-- Injected a strict git diff check inside low.ps1 land right after documentation style checks.
+- Injected a strict git diff check inside low.ps1 land right after documentation style checks.
 **Results**: SUCCESS. The land script now correctly halts and complains if the diary is untouched, enforcing project guidelines at a systemic level.

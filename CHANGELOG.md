@@ -30,8 +30,10 @@ number.
 
 ## [Unreleased]
 
+## [5.20.0] - 2026-09-15
+
 ### Added
-- Added a strict check inside low.ps1 that prevents developers from landing a branch if they modified code but forgot to append an entry to the Testing Diary
+- Added a strict check inside low.ps1 that prevents developers from landing a branch if they modified code but forgot to append an entry to the Testing Diary
 
 ## [5.19.1] - 2026-09-15
 
