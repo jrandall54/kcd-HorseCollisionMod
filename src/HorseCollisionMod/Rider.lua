@@ -640,3 +640,28 @@ function HorseCollisionMod:HorsemanshipScale(playerEnt)
 
 	return stamina, seat
 end
+
+--- Grants the mod's Horsemanship perks directly to the player soul.
+--
+-- Called on startup or settings apply when `AutoGrantPerks` is enabled in
+-- the configuration.
+function HorseCollisionMod:GrantPerks()
+	local player = player or (type(g_localActor) == "userdata" and g_localActor)
+
+	if not player or not player.soul then
+		return
+	end
+
+	local perks = {
+		"13ed04b3-297d-43ca-9fb8-d3a3a1192f9c",
+		"da38020a-eecf-45b5-8203-34b0b678600a",
+		"6a0ca946-cce5-4c2b-831a-585db059027d",
+	}
+
+	for _, perkId in ipairs(perks) do
+		pcall(function()
+			player.soul:AddPerk(perkId)
+		end)
+	end
+end
+

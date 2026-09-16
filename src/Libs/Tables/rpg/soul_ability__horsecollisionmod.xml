@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<database name="hammerheart">
+  <table name="soul_ability" version="1">
+    <header>
+      <column name="soul_ability_id" type="integer" />
+      <column name="soul_ability_name" type="character varying" />
+    </header>
+    <rows>
+      <row soul_ability_id="8" soul_ability_name="hcm_lean" />
+      <row soul_ability_id="9" soul_ability_name="hcm_rear" />
+      <row soul_ability_id="11" soul_ability_name="hcm_charge" />
+    </rows>
+  </table>
+</database>

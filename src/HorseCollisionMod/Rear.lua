@@ -232,6 +232,19 @@ function HorseCollisionMod:RearRequested(fragTag)
 		return refuse("off")
 	end
 
+	if cfg.RequirePerks then
+		local abilityName = (fragTag == cfg.RearFragTag) and "hcm_charge" or "hcm_rear"
+		local hasAbility = false
+
+		pcall(function()
+			hasAbility = player.soul:HasAbility(abilityName)
+		end)
+
+		if not hasAbility then
+			return refuse("missing perk: " .. abilityName)
+		end
+	end
+
 	local mounted = false
 
 	pcall(function()

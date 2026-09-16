@@ -1,4 +1,4 @@
-﻿param (
+param (
     [string]$Version = "dev",
 
     # A development deploy, which installs but never ships.
@@ -442,6 +442,12 @@ if (Test-Path $staleItemData) {
 Write-Host "Including data overrides from mod_assets ..."
 Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 
+$srcLibs = Join-Path $srcDir "Libs"
+if (Test-Path $srcLibs) {
+    New-Item -ItemType Directory -Force -Path "$buildDir\pak\Libs" | Out-Null
+    Copy-Item "$srcLibs\*" -Destination "$buildDir\pak\Libs\" -Recurse -Force
+}
+
 # The animation chain needs every one of these present or the stagger silently
 # no-ops in game, which is expensive to diagnose. Fail the build instead.
 #
@@ -520,6 +526,21 @@ finally {
 Copy-Item (Join-Path $srcDir "mod.manifest") -Destination "$modDir\"
 $readme = Join-Path $repoRoot "README.md"
 if (Test-Path $readme) { Copy-Item $readme -Destination "$modDir\" }
+
+$locSource = Join-Path $srcDir "Localization\text__horsecollisionmod.xml"
+if (Test-Path $locSource) {
+    $locModDir = Join-Path $modDir "Localization"
+    New-Item -ItemType Directory -Force -Path $locModDir | Out-Null
+    $locPak = Join-Path $locModDir "English_xml.pak"
+    $locZip = [System.IO.Compression.ZipFile]::Open($locPak, "Create")
+    try {
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($locZip, $locSource, "text__horsecollisionmod.xml") | Out-Null
+    }
+    finally {
+        $locZip.Dispose()
+    }
+    Write-Host "  + Localization\English_xml.pak"
+}
 
 # 4. Create the final Release ZIP
 if (-not (Test-Path $releasesDir)) { New-Item -ItemType Directory -Force -Path $releasesDir | Out-Null }

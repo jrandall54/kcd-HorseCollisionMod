@@ -1,0 +1,32 @@
+<Table>
+  <Row>
+    <Cell>perk_hcm_lean_name</Cell>
+    <Cell>Hello There</Cell>
+    <Cell>Hello There</Cell>
+  </Row>
+  <Row>
+    <Cell>perk_hcm_lean_desc</Cell>
+    <Cell>Lean out in the saddle to look past your horse's head and neck without turning the mount, giving you a clear view of the road or potential hazards directly ahead.</Cell>
+    <Cell>Lean out in the saddle to look past your horse's head and neck without turning the mount, giving you a clear view of the road or potential hazards directly ahead.</Cell>
+  </Row>
+  <Row>
+    <Cell>perk_hcm_rear_name</Cell>
+    <Cell>Rear in Headlights</Cell>
+    <Cell>Rear in Headlights</Cell>
+  </Row>
+  <Row>
+    <Cell>perk_hcm_rear_desc</Cell>
+    <Cell>Command your horse to rear up on its hind legs, striking and scattering anyone standing directly in front of you. Striking innocent bystanders is considered a crime.</Cell>
+    <Cell>Command your horse to rear up on its hind legs, striking and scattering anyone standing directly in front of you. Striking innocent bystanders is considered a crime.</Cell>
+  </Row>
+  <Row>
+    <Cell>perk_hcm_charge_name</Cell>
+    <Cell>Move Roach, Get Out the Way</Cell>
+    <Cell>Move Roach, Get Out the Way</Cell>
+  </Row>
+  <Row>
+    <Cell>perk_hcm_charge_desc</Cell>
+    <Cell>Lunge forward out of a rear with explosive momentum, bowling over and trampling anyone unfortunate enough to stand in your path. Trampling innocent bystanders is considered a crime.</Cell>
+    <Cell>Lunge forward out of a rear with explosive momentum, bowling over and trampling anyone unfortunate enough to stand in your path. Trampling innocent bystanders is considered a crime.</Cell>
+  </Row>
+</Table>

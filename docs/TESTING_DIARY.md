@@ -21889,7 +21889,23 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 **Results**: SUCCESS. The "delayed knockdown" bug caused by the engine queue was completely bypassed. The weapon IK glitch was fully resolved on all weapon types (maces, axes, polearms) by successfully hiding the weapon during the ragdoll phase and cleanly handing it back after they stood, seamlessly returning them to their combat AI.
 
 ### Build: 5.20.0-dev (feat/diary-gate)
-**Hypothesis**: Prevent landing branches if src/ or 	ools/ was modified without a corresponding update to docs/TESTING_DIARY.md.
+**Hypothesis**: Prevent landing branches if src/ or tools/ was modified without a corresponding update to docs/TESTING_DIARY.md.
 **Changes**:
-- Injected a strict git diff check inside low.ps1 land right after documentation style checks.
+- Injected a strict git diff check inside flow.ps1 land right after documentation style checks.
 **Results**: SUCCESS. The land script now correctly halts and complains if the diary is untouched, enforcing project guidelines at a systemic level.
+
+### Build: 5.21.0-dev (feature/horsemanship-perks)
+**Hypothesis**: Gate the mod's three main physical maneuvers (Lean, Rear, Rear Charge) behind standard unlockable perks in the player's Horsemanship skill tree costing 1 perk point each, aligned with natural point milestone levels (4, 7, 10), with prerequisite enforcement.
+**Changes**:
+- Created `src/Libs/Tables/rpg/perk__horsecollisionmod.xml` declaring Level 4 ("Hello There"), Level 7 ("Rear in Headlights"), and Level 10 ("Move Roach, Get Out the Way", requiring Rear as parent).
+- Created `src/Libs/Tables/rpg/soul_ability__horsecollisionmod.xml` and `perk_soul_ability__horsecollisionmod.xml` with soul ability IDs 8, 9, and 11.
+- Created `src/Localization/text__horsecollisionmod.xml` for localized UI names and descriptions including crime warnings.
+- Updated `src/HorseCollisionMod/Lean.lua` and `Rear.lua` to check `player.soul:HasAbility()` before executing maneuvers.
+- Added `RequirePerks = true` and `AutoGrantPerks = false` settings in `src/HorseCollisionMod_Settings.lua` and `src/HorseCollisionMod.lua`.
+- Implemented `HorseCollisionMod:GrantPerks()` in `src/HorseCollisionMod/Rider.lua` to call `player.soul:AddPerk()` directly for players opting out of manual progression.
+- Updated `build.ps1` and `tools/dev_deploy.ps1` to package `src/Libs/` and `Localization/English_xml.pak`.
+**Results**: SUCCESS.
+- Verified that table extension XML files in KCD must match the mod name declared in `mod.manifest` (`__horsecollisionmod.xml`).
+- Verified that `soul:HasAbility(name)` queries a 64-bit bitset (IDs 0 to 62); IDs > 62 are clamped by CryEngine C++ as out-of-range. Using IDs 8, 9, and 11 allows full native bitset integration.
+- Perks display cleanly in the UI, correctly consume perk points, unlock in-game, and gate the maneuvers on horseback.
+- Verified `AutoGrantPerks = true` successfully adds perks directly to the player soul and grants all abilities automatically on game load.
