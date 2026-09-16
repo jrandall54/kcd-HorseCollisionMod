@@ -21877,3 +21877,13 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 **Changes**:
 - Added xboxpad mappings for xi_triggerl_btn (Charge), xi_thumbl (Rear), xi_shoulderl (Lean Left), and xi_shoulderr (Lean Right) into the existing action candidates in hcm_actionmaps.xml.
 **Results**: SUCCESS. Controller bindings work alongside keyboard keys. Left Bumper + Left Stick Click is eaten by the engine due to blocking/crouching conflict, but all other combos work perfectly.
+
+### Build: 5.19.1-dev (fix/ragdoll-twitch)
+**Hypothesis**: Prevent violent IK skeleton tearing on downed NPCs by forcefully unequipping their weapon on impact and restoring it when they stand. Replace unreliable cooldown timers with physical Z-height posture checking. Replace ctor:Fall() with StartInteractiveActionByName('hcm_settle') to bypass engine queues.
+**Changes**:
+- Replaced VictimLockMsByTier timer with IsVictimFlat physical Z-height gate in Reaction.lua.
+- Replaced ctor:Fall() in Ragdoll with StartInteractiveActionByName('hcm_settle').
+- Added DisarmVictim right before impact to forcibly HolsterWeapon if drawn.
+- Added WhenVictimIsUp to watch the get-up sequence (BlendRagdoll) and RearmVictim to forcibly DrawWeapon the exact millisecond they stand up.
+- Added protection against hitting NPCs currently performing Retaliation (HorseCombatAttackSync).
+**Results**: SUCCESS. The "delayed knockdown" bug caused by the engine queue was completely bypassed. The weapon IK glitch was fully resolved on all weapon types (maces, axes, polearms) by successfully hiding the weapon during the ragdoll phase and cleanly handing it back after they stood, seamlessly returning them to their combat AI.
