@@ -21909,3 +21909,13 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - Verified that `soul:HasAbility(name)` queries a 64-bit bitset (IDs 0 to 62); IDs > 62 are clamped by CryEngine C++ as out-of-range. Using IDs 8, 9, and 11 allows full native bitset integration.
 - Perks display cleanly in the UI, correctly consume perk points, unlock in-game, and gate the maneuvers on horseback.
 - Verified `AutoGrantPerks = true` successfully adds perks directly to the player soul and grants all abilities automatically on game load.
+
+### Build: 5.21.1-dev (fix/lean-logic-and-cleanup)
+**Hypothesis**: Prevent lean camera snap-back when holding key still by renewing view shake before `LeanShakeSec` duration expires. Fix pitch checking calculation in `LeanViewAngle` when looking straight down, and add a dismount safety check to the lean watcher loop.
+**Changes**:
+- Updated `Lean.lua` watch loop to renew the view shake if elapsed time approaches expiration (`timeSinceFlip > (live * 1000 - 150)`), keeping the queue alive and preventing CryEngine camera snap-back.
+- Fixed pitch limit check in `LeanViewAngle` to compute pitch before validating 2D directional length, preventing steep pitch bypass when looking straight down.
+- Added dismount check in `watch()` loop to immediately trigger `StopLean()` if Henry dismounts while leaning.
+- Cleaned up unused variables and synchronized internal defaults with `HorseCollisionMod_Settings.lua`.
+- Tested with `AutoGrantPerks = true` during dev verification.
+**Results**: SUCCESS. The camera holds stably without snapping back to center when holding the lean key, and dismounting/looking straight down behaves safely without unexpected clipping or stuck loops.
