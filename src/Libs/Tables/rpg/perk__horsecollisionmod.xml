@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<database name="hammerheart">
+  <table name="perk" version="1">
+    <header>
+      <column name="autolearnable" type="boolean" />
+      <column name="exclude_in_game_mode" type="integer" />
+      <column name="icon_id" type="character varying" />
+      <column name="level" type="integer" />
+      <column name="metaperk_id" type="uuid" />
+      <column name="parent_id" type="uuid" />
+      <column name="perk_id" type="uuid" />
+      <column name="perk_name" type="character varying" />
+      <column name="perk_ui_desc" type="character varying" />
+      <column name="perk_ui_name" type="character varying" />
+      <column name="skill_selector" type="integer" />
+      <column name="stat_selector" type="integer" />
+      <column name="ui_priority" type="integer" />
+      <column name="visibility" type="integer" />
+    </header>
+    <rows>
+      <row autolearnable="False" exclude_in_game_mode="" icon_id="racing_horse" level="4" metaperk_id="" parent_id="" perk_id="13ed04b3-297d-43ca-9fb8-d3a3a1192f9c" perk_name="HCM Lean" perk_ui_desc="perk_hcm_lean_desc" perk_ui_name="perk_hcm_lean_name" skill_selector="1" stat_selector="" ui_priority="0" visibility="2" />
+      <row autolearnable="False" exclude_in_game_mode="" icon_id="strong_thighs" level="7" metaperk_id="" parent_id="" perk_id="da38020a-eecf-45b5-8203-34b0b678600a" perk_name="HCM Rear" perk_ui_desc="perk_hcm_rear_desc" perk_ui_name="perk_hcm_rear_name" skill_selector="1" stat_selector="" ui_priority="0" visibility="2" />
+      <row autolearnable="False" exclude_in_game_mode="" icon_id="warhorse" level="10" metaperk_id="" parent_id="da38020a-eecf-45b5-8203-34b0b678600a" perk_id="6a0ca946-cce5-4c2b-831a-585db059027d" perk_name="HCM Charge" perk_ui_desc="perk_hcm_charge_desc" perk_ui_name="perk_hcm_charge_name" skill_selector="1" stat_selector="" ui_priority="0" visibility="2" />
+    </rows>
+  </table>
+</database>

@@ -914,6 +914,9 @@ Expand-Archive -Path $zip -DestinationPath $staging -Force
 
 Copy-Item (Join-Path $staging "Data\HorseCollisionMod.pak") -Destination (Join-Path $devDir "Data\")
 Copy-Item (Join-Path $staging "mod.manifest") -Destination $devDir
+if (Test-Path (Join-Path $staging "Localization")) {
+	Copy-Item (Join-Path $staging "Localization") -Destination $devDir -Recurse -Force
+}
 Remove-Item -Recurse -Force $staging
 
 # mod_order.txt is one folder name per line. Later lines win a conflict, so the

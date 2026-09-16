@@ -30,6 +30,18 @@ number.
 
 ## [Unreleased]
 
+## [5.21.0] - 2026-09-16
+
+### Added
+- Horsemanship skill tree perks to gate horseback maneuvers:
+  - "Hello There" (Level 4, 1 Perk Point): Enables horseback Lean maneuvers.
+  - "Rear in Headlights" (Level 7, 1 Perk Point): Enables Rear maneuvers (with crime warning).
+  - "Move Roach, Get Out the Way" (Level 10, 1 Perk Point, requires "Rear in Headlights"): Enables Rear Charge maneuvers (with crime warning).
+- Table extensions for RPG perk and soul ability definitions (`src/Libs/Tables/rpg/`).
+- Localization package containing perk names and descriptions (`Localization/English_xml.pak`).
+- `RequirePerks` configuration setting (default `true`) in `HorseCollisionMod_Settings.lua` to toggle perk gating.
+- `AutoGrantPerks` configuration setting (default `false`) in `HorseCollisionMod_Settings.lua` to automatically add the three perks to Henry without spending perk points.
+
 ## [5.20.0] - 2026-09-15
 
 ### Added

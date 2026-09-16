@@ -555,6 +555,18 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 		return false
 	end
 
+	if cfg.RequirePerks then
+		local hasAbility = false
+
+		pcall(function()
+			hasAbility = player.soul:HasAbility("hcm_lean")
+		end)
+
+		if not hasAbility then
+			return false
+		end
+	end
+
 	local left = self:LeanActionFor(cfg.LeanLeftKey, "left")
 	local right = self:LeanActionFor(cfg.LeanRightKey, "right")
 	local sign = nil

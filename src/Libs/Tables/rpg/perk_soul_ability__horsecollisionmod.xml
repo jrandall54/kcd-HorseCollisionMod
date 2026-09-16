@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<database name="hammerheart">
+  <table name="perk_soul_ability" version="1">
+    <header>
+      <column name="perk_id" type="uuid" />
+      <column name="soul_ability_id" type="integer" />
+    </header>
+    <rows>
+      <row perk_id="13ed04b3-297d-43ca-9fb8-d3a3a1192f9c" soul_ability_id="8" />
+      <row perk_id="da38020a-eecf-45b5-8203-34b0b678600a" soul_ability_id="9" />
+      <row perk_id="6a0ca946-cce5-4c2b-831a-585db059027d" soul_ability_id="11" />
+    </rows>
+  </table>
+</database>

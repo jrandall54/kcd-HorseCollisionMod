@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.20.0
+-- @release 5.21.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.20.0"
+HorseCollisionMod.Version = "5.21.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -467,12 +467,18 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RiderBarkKill whether a kill gets its own line from the kill pool
 -- @field RiderBarkPriority the priority Henry's own line is sent at
 -- @field VictimMarks whether a collision leaves dirt and blood on the victim
+-- @field RequirePerks whether maneuvers are gated by Horsemanship perks
+-- @field AutoGrantPerks whether to automatically grant the maneuvers' perks
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
 	SpeedWalk                = 1.8,
 	SpeedTrot                = 4.5,
 	SpeedGallop              = 8.5,
+
+	-- Maneuver gating.
+	RequirePerks             = true,
+	AutoGrantPerks           = false,
 
 	-- Detection. HitRadius is a broad-phase sphere; everything inside it is
 	-- then tested against the horse footprint, in meters from the horse
@@ -1668,6 +1674,10 @@ function HorseCollisionMod:ApplySettings()
 		end
 	end
 
+	if self.Config.AutoGrantPerks then
+		self:GrantPerks()
+	end
+
 	return applied, rejected
 end
 
@@ -1846,6 +1856,10 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		if applied > 0 or rejected > 0 then
 			self:Log("Settings: " .. tostring(applied) .. " applied, "
 					.. tostring(rejected) .. " ignored")
+		end
+
+		if self.Config.AutoGrantPerks then
+			self:GrantPerks()
 		end
 
 		self:HookRearKey()

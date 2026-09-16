@@ -15,6 +15,12 @@ HorseCollisionModSettings = {
 	SpeedTrot                = 4.5,   -- knocked down
 	SpeedGallop              = 8.5,   -- knocked down harder
 
+	-- Whether maneuvers (Lean, Rear, Charge) require Horsemanship perks.
+	RequirePerks             = true,
+
+	-- Automatically grant the maneuvers' Horsemanship perks to Henry on load.
+	AutoGrantPerks           = false,
+
 	-- What counts as contact. Lower these if NPCs react when you ride past.
 	HorseFrontReach          = 1.05,  -- meters ahead of the horse
 	HorseHalfWidth           = 0.70,  -- meters to either side

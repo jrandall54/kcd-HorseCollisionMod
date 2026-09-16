@@ -152,6 +152,8 @@ breaking the mod. Deleting a line restores its default.
 | `VictimDirtByTier` | Trot 0.35, Gallop 0.60, Rear 0.35, Charge 0.60 | Dirt added to everything the victim is wearing, 0 to 1. 0 switches it off. |
 | `VictimBloodByTier` | Trot 0.15, Gallop 0.45, Rear 0.15, Charge 0.45 | Blood added to the side of the body the impact struck, 0 to 1. 0 switches it off. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
+| `RequirePerks` | true | Whether Lean, Rear, and Rear Charge require purchasing their respective Horsemanship skill tree perks first. |
+| `AutoGrantPerks` | false | Automatically adds all three Horsemanship maneuver perks to the player upon game load without spending perk points. |
 | `Rear` | true | Whether your horse can be reared on command. Only from a standstill. |
 | `RearChargeKey` | "r" | Which key rears the horse and drives it forward, riding down whoever is in the way. One of r, q, e, f, y, u, o, h. |
 | `RearOnlyKey` | "f" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
@@ -214,6 +216,8 @@ src/
   HorseCollisionMod_Settings.lua   the values a player edits
   HorseCollisionMod/               the rest of the mod, one file per concern,
                                    pulled in by the entry point
+  Libs/                            RPG table extensions for Horsemanship perks
+  Localization/                    UI text and descriptions for perks
   mod.manifest
 tools/
   build_adb.py            generates the animation data from a game install
