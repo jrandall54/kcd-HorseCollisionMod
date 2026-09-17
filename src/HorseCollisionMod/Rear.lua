@@ -352,7 +352,13 @@ function HorseCollisionMod:RearRequested(fragTag)
 	local now = self:TimeMs()
 
 	if self.RearNextAt and now < self.RearNextAt then
-		return refuse("cooldown")
+		-- If the clock wound back (e.g. save load), now will be much smaller than RearNextAt.
+		-- Any difference larger than the cooldown itself means a reload happened.
+		if (self.RearNextAt - now) > (cfg.RearCooldownMs or 2500) + 1000 then
+			self:Log("Rear clock wound back, ignoring cooldown")
+		else
+			return refuse("cooldown")
+		end
 	end
 
 	self.RearNextAt = now + (cfg.RearCooldownMs or 2500)
@@ -694,10 +700,39 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 		self:ChargeForward(horseEnt)
 	end
 
-	local ok = pcall(function()
-		horseEnt.actor:StartInteractiveActionByName(tag, horseEnt.id, false,
-				self.Config.RearAnimSpeed or 1.0)
-	end)
+	local animSpeed = self.Config.RearAnimSpeed or 1.0
+
+	-- Fix for broken save games caused by previous tests getting stuck at 0.
+	-- This only needs to run once to rescue the physics proxy.
+	if not self.HasRescuedPhysicsProxy then
+		self.HasRescuedPhysicsProxy = true
+		pcall(function()
+			if horseEnt.SetAnimationDrivenMotion then
+				horseEnt:SetAnimationDrivenMotion(0, 1)
+			end
+		end)
+	end
+
+	local ok = true
+
+	if tag == (self.Config.RearOnlyFragTag or "hcm_rear") then
+		ok = pcall(function()
+			-- Clear any stuck manual animations from a previous rear so this can
+			-- be re-triggered without requiring the horse to move.
+			horseEnt:StopAnimation(0, 0)
+			
+			-- Bypass Mannequin entirely for the standing rear.
+			-- SetAnimationDrivenMotion is left alone. Leaving it completely
+			-- up to the engine means it will never rubberband, and if the player 
+			-- moves, Mannequin gracefully interrupts with MotionWalk.
+			horseEnt:StartAnimation(0, "relaxed_rearing")
+		end)
+	else
+		-- hcm_rear_charge
+		ok = pcall(function()
+			horseEnt.actor:StartInteractiveActionByName(tag, horseEnt.id, false, animSpeed)
+		end)
+	end
 
 	-- Only the rear on the spot needs this. A charge physically drives the
 	-- horse into people and the ordinary detection loop scores it; a rear that

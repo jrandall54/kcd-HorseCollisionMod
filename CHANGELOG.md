@@ -30,6 +30,10 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+- Fixed standing rear animation snapping at its conclusion by migrating the implementation from `StartInteractiveActionByName` to `StartAnimation`.
+- Fixed the cooldown system permanently locking out inputs when loading an older save game by detecting clock rollbacks.
+
 ## [5.21.1] - 2026-09-16
 
 ### Fixed
