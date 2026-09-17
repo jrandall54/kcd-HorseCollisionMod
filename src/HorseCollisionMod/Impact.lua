@@ -198,29 +198,37 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	self:MarkVictim(npc, tierName, velocity, speed)
 	self:SendHitReaction(npc, ctx.horseWuid, strength)
 
-	if wounds then
-		self:SendCombatHit(npc, playerEnt, strength)
-	end
+	-- Defer the crime trigger and retaliation until the victim stands up. The engine's
+	-- `sb_switch_hitreactions.xml` spawns the assault crime volume the moment
+	-- `SendCombatHit` arrives. By withholding it while they fall and only delivering
+	-- it when they finish their get-up, the crime broadcast happens while they are
+	-- standing. Their barks and reaction make physical sense, and it perfectly overrides
+	-- the casual recovery dialogue.
+	self:WhenVictimIsUp(npc, function(reason, elapsed)
+		local isDead = false
+
+		pcall(function()
+			isDead = npc:IsDead()
+		end)
+
+		if not isDead then
+			if wounds then
+				self:SendCombatHit(npc, playerEnt, strength)
+			end
+
+			-- Retaliation is the answer to being shoved. It is deferred so a
+			-- provoked victim enters combat from a standing posture rather
+			-- than attempting to process fight initialization while ragdolled.
+			if self:TierValue("RetaliationByTier", tierName) then
+				self:ProvokeIfAnnoyed(npc, playerEnt)
+			end
+		end
+	end)
 
 	-- Called after the native hit, but calling order is not resolution order.
-	-- `SendCombatHit` returns at once and the engine settles its own trample
-	-- damage around half a second later. The wait that makes this mod's damage
-	-- land last, and so own the killing blow and the crime attribution with
-	-- it, is inside `ApplyImpactDamage`, which also returns early on a tier
-	-- worth no damage.
+	-- `ApplyImpactDamage` contains a wait that makes this mod's damage land
+	-- last, and so own the killing blow and the crime attribution with it.
 	self:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt)
-
-	-- Retaliation is the answer to being shoved. The escalating roll in
-	-- `ProvokeIfAnnoyed` is built around a nuisance that does no real harm,
-	-- and being reared on four times is not a patience problem, so only the
-	-- tiers the table names can provoke one.
-	--
-	-- After the reaction and the native hit, so a provoked victim has already
-	-- played their answer to this shove and the fight starts from the shove
-	-- rather than instead of it.
-	if self:TierValue("RetaliationByTier", tierName) then
-		self:ProvokeIfAnnoyed(npc, playerEnt)
-	end
 
 	-- The loop resolves one victim per impact and charges the horse here. A
 	-- rear and a charge are one deliberate move that can land on several
