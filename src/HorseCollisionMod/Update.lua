@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.21.3
+-- @release 5.22.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -144,7 +144,13 @@ function HorseCollisionMod:SafeUpdate()
 	end)
 
 	if not isMounted then
+		self.WasMounted = false
 		return
+	end
+
+	if not self.WasMounted then
+		self.WasMounted = true
+		self:CheckMountTutorials(player)
 	end
 
 	local horseWuid = nil

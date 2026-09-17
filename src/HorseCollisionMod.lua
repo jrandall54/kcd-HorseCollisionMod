@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.21.3
+-- @release 5.22.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.21.3"
+HorseCollisionMod.Version = "5.22.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -469,6 +469,7 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field VictimMarks whether a collision leaves dirt and blood on the victim
 -- @field RequirePerks whether maneuvers are gated by Horsemanship perks
 -- @field AutoGrantPerks whether to automatically grant the maneuvers' perks
+-- @field ShowTutorials whether to display on-screen maneuver tutorials
 -- @table Config
 HorseCollisionMod.Config = {
 	-- Speed tiers, in meters per second. Below SpeedWalk nothing happens.
@@ -479,6 +480,7 @@ HorseCollisionMod.Config = {
 	-- Maneuver gating.
 	RequirePerks             = true,
 	AutoGrantPerks           = false,
+	ShowTutorials            = true,
 
 	-- Detection. HitRadius is a broad-phase sphere; everything inside it is
 	-- then tested against the horse footprint, in meters from the horse
@@ -1809,6 +1811,10 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		end
 	end
 
+	if actionName == "igm_inventory" and eventName == "OnEnd" then
+		self:CheckMenuTutorials()
+	end
+
 	if actionName == "sys_loadingimagescreen" and eventName == "OnEnd" then
 		HorseCollisionModGeneration = HorseCollisionModGeneration + 1
 
@@ -1857,6 +1863,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		self.VictimActivity = {}
 		self.SurrenderHintFor = {}
 		self.Annoyance = {}
+		self.WasMounted = false
 
 		-- A hint showing when the game was saved would come back with the
 		-- save and never be taken down, since the fight that raised it is
@@ -1930,6 +1937,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Lean.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rear.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Impact.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Tutorial.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
 
 -- Runs at file scope rather than from the load screen, because

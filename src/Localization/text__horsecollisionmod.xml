@@ -6,8 +6,8 @@
   </Row>
   <Row>
     <Cell>perk_hcm_lean_desc</Cell>
-    <Cell>Lean out in the saddle to look past your horse's head and neck without turning the mount, giving you a clear view of the road or potential hazards directly ahead.</Cell>
-    <Cell>Lean out in the saddle to look past your horse's head and neck without turning the mount, giving you a clear view of the road or potential hazards directly ahead.</Cell>
+    <Cell>Lean out in the saddle to look past your horse's head without steering. While mounted, hold [Q] / [LB] to lean left or [E] / [RB] to lean right. Release to return upright.</Cell>
+    <Cell>Lean out in the saddle to look past your horse's head without steering. While mounted, hold [Q] / [LB] to lean left or [E] / [RB] to lean right. Release to return upright.</Cell>
   </Row>
   <Row>
     <Cell>perk_hcm_rear_name</Cell>
@@ -16,8 +16,8 @@
   </Row>
   <Row>
     <Cell>perk_hcm_rear_desc</Cell>
-    <Cell>Command your horse to rear up on its hind legs, striking and scattering anyone standing directly in front of you. Striking innocent bystanders is considered a crime.</Cell>
-    <Cell>Command your horse to rear up on its hind legs, striking and scattering anyone standing directly in front of you. Striking innocent bystanders is considered a crime.</Cell>
+    <Cell>Command your horse to rear up on its hind legs, striking and scattering anyone standing directly in front of you. Come to a complete stop and press [F] (or [L-Stick] on controller) to perform. Striking innocent bystanders is considered a crime.</Cell>
+    <Cell>Command your horse to rear up on its hind legs, striking and scattering anyone standing directly in front of you. Come to a complete stop and press [F] (or [L-Stick] on controller) to perform. Striking innocent bystanders is considered a crime.</Cell>
   </Row>
   <Row>
     <Cell>perk_hcm_charge_name</Cell>
@@ -26,7 +26,67 @@
   </Row>
   <Row>
     <Cell>perk_hcm_charge_desc</Cell>
-    <Cell>Lunge forward out of a rear with explosive momentum, bowling over and trampling anyone unfortunate enough to stand in your path. Trampling innocent bystanders is considered a crime.</Cell>
-    <Cell>Lunge forward out of a rear with explosive momentum, bowling over and trampling anyone unfortunate enough to stand in your path. Trampling innocent bystanders is considered a crime.</Cell>
+    <Cell>Lunge forward out of a rear with explosive momentum, bowling over and trampling anyone in your path. Come to a complete stop and press [R] (or [LT] on controller) to perform. Trampling innocent bystanders is considered a crime.</Cell>
+    <Cell>Lunge forward out of a rear with explosive momentum, bowling over and trampling anyone in your path. Come to a complete stop and press [R] (or [LT] on controller) to perform. Trampling innocent bystanders is considered a crime.</Cell>
+  </Row>
+  <Row>
+    <Cell>ui_tutorial_hcm_rear</Cell>
+    <Cell>Horsemanship: Rear Maneuver
+
+Command your horse to rear up on its hind legs and strike with its front hooves.
+
+Controls:
+Bring your horse to a complete stop and press the Rear key.
+
+Combat &amp; Collision:
+The horse's hooves strike and push anyone standing directly in front of you.
+
+Notes:
+- Consumes horse stamina.
+- Subject to a brief recovery cooldown.
+- Warning: Striking innocent bystanders is considered a crime.</Cell>
+    <Cell>Horsemanship: Rear Maneuver
+
+Command your horse to rear up on its hind legs and strike with its front hooves.
+
+Controls:
+Bring your horse to a complete stop and press the Rear key.
+
+Combat &amp; Collision:
+The horse's hooves strike and push anyone standing directly in front of you.
+
+Notes:
+- Consumes horse stamina.
+- Subject to a brief recovery cooldown.
+- Warning: Striking innocent bystanders is considered a crime.</Cell>
+  </Row>
+  <Row>
+    <Cell>ui_tutorial_hcm_charge</Cell>
+    <Cell>Horsemanship: Rear Charge
+
+Launch an explosive forward charge out of a rear, bowling over and trampling opponents.
+
+Controls:
+Bring your horse to a complete stop and press the Rear Charge key.
+
+Combat &amp; Collision:
+The horse lunges forward with violent momentum, trampling anyone in its path.
+
+Notes:
+- Consumes significantly more stamina than a stationary rear.
+- Warning: Trampling innocent civilians will alert guards and incur a bounty.</Cell>
+    <Cell>Horsemanship: Rear Charge
+
+Launch an explosive forward charge out of a rear, bowling over and trampling opponents.
+
+Controls:
+Bring your horse to a complete stop and press the Rear Charge key.
+
+Combat &amp; Collision:
+The horse lunges forward with violent momentum, trampling anyone in its path.
+
+Notes:
+- Consumes significantly more stamina than a stationary rear.
+- Warning: Trampling innocent civilians will alert guards and incur a bounty.</Cell>
   </Row>
 </Table>

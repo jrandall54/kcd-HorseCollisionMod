@@ -21,6 +21,9 @@ HorseCollisionModSettings = {
 	-- Automatically grant the maneuvers' Horsemanship perks to Henry on load.
 	AutoGrantPerks           = false,
 
+	-- Whether to display on-screen tutorials for maneuvers (Rear, Charge, Lean).
+	ShowTutorials            = true,
+
 	-- What counts as contact. Lower these if NPCs react when you ride past.
 	HorseFrontReach          = 1.05,  -- meters ahead of the horse
 	HorseHalfWidth           = 0.70,  -- meters to either side
