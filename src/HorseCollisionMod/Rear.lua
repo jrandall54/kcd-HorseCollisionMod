@@ -233,7 +233,8 @@ function HorseCollisionMod:RearRequested(fragTag)
 	end
 
 	if cfg.RequirePerks then
-		local abilityName = (fragTag == cfg.RearFragTag) and "hcm_charge" or "hcm_rear"
+		local isCharge = (fragTag == cfg.RearFragTag)
+		local abilityName = isCharge and "hcm_charge" or "hcm_rear"
 		local hasAbility = false
 
 		pcall(function()
@@ -241,6 +242,12 @@ function HorseCollisionMod:RearRequested(fragTag)
 		end)
 
 		if not hasAbility then
+			if isCharge then
+				self:ShowTutorial("charge_locked")
+			else
+				self:ShowTutorial("rear_locked")
+			end
+
 			return refuse("missing perk: " .. abilityName)
 		end
 	end
@@ -253,6 +260,12 @@ function HorseCollisionMod:RearRequested(fragTag)
 
 	if not mounted then
 		return refuse("not mounted")
+	end
+
+	if fragTag == cfg.RearFragTag then
+		self:ShowTutorial("charge")
+	else
+		self:ShowTutorial("rear")
 	end
 
 	local horseEnt = nil

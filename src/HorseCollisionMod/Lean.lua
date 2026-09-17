@@ -310,6 +310,8 @@ function HorseCollisionMod:StartLean(sign)
 		return
 	end
 
+	self:ShowTutorial("lean")
+
 	-- Refused while the last lean is still on its way home. Re-basing against a
 	-- camera that is still displaced is the pumping bug: each tap took its
 	-- baseline from wherever the camera had got to, so release and re-press
@@ -587,6 +589,18 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 		return false
 	end
 
+	local left = self:LeanActionFor(cfg.LeanLeftKey, "left")
+	local right = self:LeanActionFor(cfg.LeanRightKey, "right")
+	local sign = nil
+
+	if left and action == left then
+		sign = -1
+	elseif right and action == right then
+		sign = 1
+	else
+		return false
+	end
+
 	if cfg.RequirePerks then
 		local playerEnt = rawget(_G, "player")
 		local hasAbility = false
@@ -598,20 +612,12 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 		end
 
 		if not hasAbility then
+			if activation == "press" then
+				self:ShowTutorial("lean_locked")
+			end
+
 			return false
 		end
-	end
-
-	local left = self:LeanActionFor(cfg.LeanLeftKey, "left")
-	local right = self:LeanActionFor(cfg.LeanRightKey, "right")
-	local sign = nil
-
-	if left and action == left then
-		sign = -1
-	elseif right and action == right then
-		sign = 1
-	else
-		return false
 	end
 
 	if activation == "press" then

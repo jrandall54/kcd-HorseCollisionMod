@@ -21929,3 +21929,14 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - Added safety check `isDead = npc:IsDead()` to avoid sending assault charges on a victim whose death already broadcasted a murder.
 - Added `hcm_combat_injected` flag to bypass `RebuildVictim` in `FinishRecovery` so the engine doesn't destroy the newly injected crime/combat behavior tree when they finish standing up.
 **Results**: PENDING. (The expected result is that the crime volume and retaliation subbrain are injected the exact moment the victim starts getting off the ground. This interrupts the casual recovery bark perfectly. The victim then correctly holds onto their fear/combat state instead of having their AI wiped and casually walking away when they finish standing.)
+
+### Build: 5.22.0-dev (tutorials)
+**Hypothesis**: Add in-game tutorial notifications and perk descriptions for horseback maneuvers (Rear, Rear Charge, Lean) per Item 1 of HANDOFF.md, keeping banner text within the parchment graphic and dynamically adjusting button prompts based on whether the player is using a keyboard or controller.
+**Changes**:
+- Created `src/HorseCollisionMod/Tutorial.lua` with dynamic input device detection (`Game.GetActionControl`) mapping `[F]`/`[R]`/`[Q]/[E]` for keyboard and `[L-Stick]`/`[LT]`/`[LB]/[RB]` for gamepad.
+- Integrated tutorial triggers into `Rider.lua` on mount (`CheckMountTutorials`) and `Update.lua` on exiting the inventory/character screen (`igm_inventory` `OnEnd` via `CheckMenuTutorials`).
+- Added locked perk warnings in `Rear.lua` and `Lean.lua` shown once per session when attempting maneuvers without the required perk.
+- Updated `src/Localization/text__horsecollisionmod.xml` with dual keyboard and controller button descriptions for "Hello There", "Rear in Headlights", and "Move Roach, Get Out the Way".
+- Formatted banner text to remain concise and fit within parchment frame without overflow.
+**Results**: SUCCESS. Verified in devmode live testing that banners render cleanly, respond to controller vs keyboard inputs, notify on menu exit upon unlocking perks, and locked warnings fire only once.
+

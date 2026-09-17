@@ -33,6 +33,14 @@ number.
 
 ## [Unreleased]
 
+## [5.22.0] - 2026-09-17
+
+### Added
+- Custom tutorial banner system (`HorseCollisionMod.Tutorial`) displaying parchment tutorial notices for horseback maneuvers (Rear, Rear Charge, Lean) upon mounting or after unlocking perks when closing the inventory menu.
+- Dynamic input detection adapting tutorial button prompts between gamepad (`[L-Stick]`, `[LT]`, `[LB]/[RB]`) and keyboard (`[F]`, `[R]`, `[Q]/[E]`).
+- Dual keyboard and controller input bindings in Horsemanship perk tree descriptions.
+- One-time warning notification per session when attempting locked maneuvers before unlocking their respective perks.
+
 ## [5.21.3] - 2026-09-16
 
 ### Fixed
