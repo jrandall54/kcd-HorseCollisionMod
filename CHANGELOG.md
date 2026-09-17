@@ -33,6 +33,11 @@ number.
 
 ## [Unreleased]
 
+## [5.22.1] - 2026-09-17
+
+### Fixed
+- Updated workspace configuration and ignore rules.
+
 ## [5.22.0] - 2026-09-17
 
 ### Added

@@ -36,3 +36,12 @@ __pycache__/
 # Ignore decompilation notes and references
 decomp*.txt
 references/decomp/
+
+# Workspace metadata and configuration
+GEMINI.md
+AGENTS.md
+CLAUDE.md
+.agent*
+.aider*
+.claude/
+
