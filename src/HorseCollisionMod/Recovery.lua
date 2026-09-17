@@ -323,6 +323,19 @@ function HorseCollisionMod:WhenVictimRises(npc, fn)
 		end
 
 		local elapsed = self:TimeMs() - startedAt
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		-- The engine transitions the victim to BlendRagdoll the moment it hands
+		-- them back from physics to the animation system so they can stand up.
+		-- This is the most reliable indicator that they have started rising.
+		if self:IsRagdollState(state) then
+			fn("ragdoll", elapsed)
+			return
+		end
 
 		if self:IsVictimFlat(npc) then
 			seen = true
