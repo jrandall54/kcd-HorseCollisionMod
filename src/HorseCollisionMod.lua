@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.21.1
+-- @release 5.21.2
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.21.1"
+HorseCollisionMod.Version = "5.21.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1799,7 +1799,7 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 	if self.Config and self.Config.LogTelemetry then
 		local a = string.lower(actionName or "")
 		local e = string.lower(eventName or "")
-		if string.match(a, "dialog") or string.match(e, "dialog") 
+		if string.match(a, "dialog") or string.match(e, "dialog")
 			or string.match(a, "item") or string.match(e, "item")
 			or string.match(a, "money") or string.match(e, "money")
 			or string.match(a, "msg") or string.match(e, "msg")
