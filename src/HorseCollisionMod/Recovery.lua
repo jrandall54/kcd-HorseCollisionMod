@@ -628,12 +628,20 @@ end
 -- @tparam string why how the wait before this ended
 -- @tparam number waited how long that wait took, in milliseconds
 function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
-	self:RebuildVictim(npc)
+	if npc.hcm_combat_injected then
+		npc.hcm_combat_injected = nil
 
-	if self.Config.LogTelemetry then
-		self:Log("VictimRebuild action=" .. action
-				.. " on=" .. why
-				.. " waited=" .. string.format("%.0f", waited) .. "ms")
+		if self.Config.LogTelemetry then
+			self:Log("VictimRebuild skipped, active combat injected")
+		end
+	else
+		self:RebuildVictim(npc)
+
+		if self.Config.LogTelemetry then
+			self:Log("VictimRebuild action=" .. action
+					.. " on=" .. why
+					.. " waited=" .. string.format("%.0f", waited) .. "ms")
+		end
 	end
 
 	-- Watching starts here rather than after a delay. The delay that used to

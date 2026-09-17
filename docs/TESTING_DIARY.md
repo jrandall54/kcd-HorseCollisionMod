@@ -21923,9 +21923,9 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 ### Build: 5.22.0-dev (fix/deferred-crime-barks)
 **Hypothesis**: Prevent victims from absurdly shouting for guards (VOLANI_STRAZE_BITKA) while flying mid-air in ragdoll, and override casual recovery dialogue without using the proven-impossible human:InterruptDialog or entity links.
 **Changes**:
-- Analyzed decompiled C++ behavior trees (sb_switch_hitreactions.xml, sb_combat.xml) which revealed the engine instantly spawns the ssault perceptible crime volume the exact millisecond it receives combat:hit.
+- Analyzed decompiled C++ behavior trees (sb_switch_hitreactions.xml, sb_combat.xml) which revealed the engine instantly spawns the  ssault perceptible crime volume the exact millisecond it receives combat:hit.
 - Discovered that the physics engine's native Collision damage is explicitly filtered out of the assault behavior tree (to prevent bumping into crowds causing arrest) but triggers unavoidable native C++ murder information (CreateInformation label="murder") upon death. This validates the mod's existing architecture of manually sending combat:hit (to enable assault crimes for trampling) and the immortality shield (to intercept the engine's physics kill).
-- Refactored SendCombatHit and ProvokeIfAnnoyed in Impact.lua to be executed inside the WhenVictimIsUp watcher callback rather than at the moment of impact.
-- Added safety check isDead = npc:IsDead() to avoid sending assault charges on a victim whose death already broadcasted a murder.
-**Results**: PENDING. (The expected result is that the crime volume and retaliation subbrain are not injected until the victim gets back on their feet, allowing them to finish their ragdoll flight in silence, completely sidestepping the engine's inability to queue high-priority monologues.)
-
+- Refactored `SendCombatHit` and `ProvokeIfAnnoyed` in `Impact.lua` to be executed inside the `WhenVictimRises` watcher callback rather than at the moment of impact.
+- Added safety check `isDead = npc:IsDead()` to avoid sending assault charges on a victim whose death already broadcasted a murder.
+- Added `hcm_combat_injected` flag to bypass `RebuildVictim` in `FinishRecovery` so the engine doesn't destroy the newly injected crime/combat behavior tree when they finish standing up.
+**Results**: PENDING. (The expected result is that the crime volume and retaliation subbrain are injected the exact moment the victim starts getting off the ground. This interrupts the casual recovery bark perfectly. The victim then correctly holds onto their fear/combat state instead of having their AI wiped and casually walking away when they finish standing.)

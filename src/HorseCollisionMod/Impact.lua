@@ -204,7 +204,7 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- it when they finish their get-up, the crime broadcast happens while they are
 	-- standing. Their barks and reaction make physical sense, and it perfectly overrides
 	-- the casual recovery dialogue.
-	self:WhenVictimIsUp(npc, function(reason, elapsed)
+	self:WhenVictimRises(npc, function(reason, elapsed)
 		local isDead = false
 
 		pcall(function()
@@ -214,13 +214,16 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 		if not isDead then
 			if wounds then
 				self:SendCombatHit(npc, playerEnt, strength)
+				npc.hcm_combat_injected = true
 			end
 
 			-- Retaliation is the answer to being shoved. It is deferred so a
 			-- provoked victim enters combat from a standing posture rather
 			-- than attempting to process fight initialization while ragdolled.
 			if self:TierValue("RetaliationByTier", tierName) then
-				self:ProvokeIfAnnoyed(npc, playerEnt)
+				if self:ProvokeIfAnnoyed(npc, playerEnt) then
+					npc.hcm_combat_injected = true
+				end
 			end
 		end
 	end)
@@ -238,3 +241,5 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 		self:DrainImpactStamina(horseEnt, playerEnt, tierName, armor)
 	end
 end
+
+-- test reload
