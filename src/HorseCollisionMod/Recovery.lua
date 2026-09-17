@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.21.1
+-- @release 5.21.2
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -323,6 +323,19 @@ function HorseCollisionMod:WhenVictimRises(npc, fn)
 		end
 
 		local elapsed = self:TimeMs() - startedAt
+		local state = nil
+
+		pcall(function()
+			state = tostring(npc.actor:GetCurrentAnimationState())
+		end)
+
+		-- The engine transitions the victim to BlendRagdoll the moment it hands
+		-- them back from physics to the animation system so they can stand up.
+		-- This is the most reliable indicator that they have started rising.
+		if self:IsRagdollState(state) then
+			fn("ragdoll", elapsed)
+			return
+		end
 
 		if self:IsVictimFlat(npc) then
 			seen = true
@@ -628,12 +641,20 @@ end
 -- @tparam string why how the wait before this ended
 -- @tparam number waited how long that wait took, in milliseconds
 function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
-	self:RebuildVictim(npc)
+	if npc.hcm_combat_injected then
+		npc.hcm_combat_injected = nil
 
-	if self.Config.LogTelemetry then
-		self:Log("VictimRebuild action=" .. action
-				.. " on=" .. why
-				.. " waited=" .. string.format("%.0f", waited) .. "ms")
+		if self.Config.LogTelemetry then
+			self:Log("VictimRebuild skipped, active combat injected")
+		end
+	else
+		self:RebuildVictim(npc)
+
+		if self.Config.LogTelemetry then
+			self:Log("VictimRebuild action=" .. action
+					.. " on=" .. why
+					.. " waited=" .. string.format("%.0f", waited) .. "ms")
+		end
 	end
 
 	-- Watching starts here rather than after a delay. The delay that used to

@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.21.1
+-- @release 5.21.2
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.21.1"
+HorseCollisionMod.Version = "5.21.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1796,6 +1796,19 @@ end
 -- @tparam string eventName phase of that action
 -- @tparam table argTable event arguments, unused
 function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
+	if self.Config and self.Config.LogTelemetry then
+		local a = string.lower(actionName or "")
+		local e = string.lower(eventName or "")
+		if string.match(a, "dialog") or string.match(e, "dialog")
+			or string.match(a, "item") or string.match(e, "item")
+			or string.match(a, "money") or string.match(e, "money")
+			or string.match(a, "msg") or string.match(e, "msg")
+			or string.match(a, "surrender") or string.match(e, "surrender")
+			or string.match(a, "inventory") or string.match(e, "inventory") then
+			self:Log("UIEvent action=" .. tostring(actionName) .. " event=" .. tostring(eventName))
+		end
+	end
+
 	if actionName == "sys_loadingimagescreen" and eventName == "OnEnd" then
 		HorseCollisionModGeneration = HorseCollisionModGeneration + 1
 

@@ -720,10 +720,10 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 			-- Clear any stuck manual animations from a previous rear so this can
 			-- be re-triggered without requiring the horse to move.
 			horseEnt:StopAnimation(0, 0)
-			
+
 			-- Bypass Mannequin entirely for the standing rear.
 			-- SetAnimationDrivenMotion is left alone. Leaving it completely
-			-- up to the engine means it will never rubberband, and if the player 
+			-- up to the engine means it will never rubberband, and if the player
 			-- moves, Mannequin gracefully interrupts with MotionWalk.
 			horseEnt:StartAnimation(0, "relaxed_rearing")
 		end)
