@@ -9,7 +9,10 @@ the reactions a player sees in game. A change that forces a player to redo their
 configuration, or that changes how the mod sits alongside other mods, is a major
 change even when nothing about it looks like an API.
 
-Entries land under `## [Unreleased]` as the work does, and move under a version
+Entries land under `## [Unreleased]
+
+### Fixed
+- Removed unused workspace scratch files.` as the work does, and move under a version
 heading when the branch merges. An entry that breaks an existing install is
 marked **BREAKING**. `tools/version_check.py` derives the next version from
 these sections and refuses a build made at any other number.
@@ -29,6 +32,11 @@ against whatever version is current at the time, and it does not change the
 number.
 
 ## [Unreleased]
+
+## [5.21.3] - 2026-09-16
+
+### Fixed
+- Removed unused workspace scratch files.
 
 ## [5.21.2] - 2026-09-16
 

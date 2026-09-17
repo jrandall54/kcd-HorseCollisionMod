@@ -32,3 +32,7 @@ __pycache__/
 # immediately stale, so the generator is the tracked artifact, not its output.
 /tools/audition_now.lua
 /tools/voice_probe_now.lua
+
+# Ignore decompilation notes and references
+decomp*.txt
+references/decomp/
