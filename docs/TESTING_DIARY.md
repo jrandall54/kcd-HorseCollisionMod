@@ -21949,4 +21949,14 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - Added `HorseCollisionMod:SyncTutorialsOnLoad()` to `src/HorseCollisionMod/Tutorial.lua` and invoked it from `sys_loadingimagescreen` `OnEnd` in `src/HorseCollisionMod.lua`.
 **Results**: SUCCESS. Hot-reloaded in the live game with shipped values active. Attempting locked maneuvers silently refuses, and loading an earlier save dynamically resynchronizes tutorial flags with the player's actual abilities.
 
+### Build: 5.22.2-dev (fix/tutorial-banner-queue)
+**Hypothesis**: Prevent multiple consecutive tutorial banners caused by accumulated UIAction listener instances across script hot-reloads. Queue multiple unlocked perk tutorials sequentially so each plays in full without overlap or requiring repeated menu visits.
+**Changes**:
+- Tracked registered listener in global `HorseCollisionModListenerInstance` and called `UIAction.UnregisterActionListener` before registering new instances in `src/HorseCollisionMod.lua`.
+- Added listener instance verification in `HorseCollisionMod:uiActionListener` to drop events dispatched to stale tables.
+- Added `self.InventoryOpen` tracking on `igm_inventory` `OnStart`/`OnEnd`.
+- Implemented `HorseCollisionMod:QueueNextTutorial()` in `src/HorseCollisionMod/Tutorial.lua` with natural perk milestone ordering (`lean` -> `rear` -> `charge`), scheduling subsequent tutorials after 10.5 seconds while outside inventory menus.
+**Results**: SUCCESS. Verified via dev console that stale listener tables are unregistered on reload, and multiple newly acquired perks display their tutorial banners sequentially.
+
+
 

@@ -7,7 +7,7 @@
 --
 -- @module HorseCollisionMod.Tutorial
 -- @author jrandall54
--- @release 5.22.2
+-- @release 5.22.3
 
 HorseCollisionMod.TutorialsShown = HorseCollisionMod.TutorialsShown or {}
 
@@ -112,54 +112,13 @@ function HorseCollisionMod:ShowTutorial(name, force)
 	return ok
 end
 
---- Checks whether newly unlocked maneuver tutorials should be shown on mount.
+--- Displays newly acquired maneuver tutorials in order, scheduling subsequent banners.
 --
--- @tparam table playerEnt the player entity table
-function HorseCollisionMod:CheckMountTutorials(playerEnt)
-	if not self.Config.ShowTutorials then
-		return
-	end
-
-	if not playerEnt or not playerEnt.soul then
-		return
-	end
-
-	self.TutorialsShown = self.TutorialsShown or {}
-
-	if self.Config.RequirePerks then
-		local hasRear = false
-		local hasCharge = false
-		local hasLean = false
-
-		pcall(function()
-			hasRear = playerEnt.soul:HasAbility("hcm_rear")
-			hasCharge = playerEnt.soul:HasAbility("hcm_charge")
-			hasLean = playerEnt.soul:HasAbility("hcm_lean")
-		end)
-
-		if hasRear and not self.TutorialsShown["rear"] then
-			self:ShowTutorial("rear")
-			return
-		end
-
-		if hasCharge and not self.TutorialsShown["charge"] then
-			self:ShowTutorial("charge")
-			return
-		end
-
-		if hasLean and not self.TutorialsShown["lean"] then
-			self:ShowTutorial("lean")
-			return
-		end
-	else
-		if not self.TutorialsShown["rear"] then
-			self:ShowTutorial("rear")
-		end
-	end
-end
-
---- Checks whether newly unlocked maneuver tutorials should be shown when leaving menus.
-function HorseCollisionMod:CheckMenuTutorials()
+-- When multiple perks are acquired at once (e.g. in the perk menu), this shows
+-- the first banner immediately and schedules subsequent banners to appear after
+-- the preceding banner's 10-second display duration expires, ensuring every
+-- tutorial plays in full in sequence.
+function HorseCollisionMod:QueueNextTutorial()
 	if not self.Config.ShowTutorials then
 		return
 	end
@@ -172,24 +131,55 @@ function HorseCollisionMod:CheckMenuTutorials()
 	self.TutorialsShown = self.TutorialsShown or {}
 
 	if self.Config.RequirePerks then
-		local hasRear = false
-		local hasCharge = false
-		local hasLean = false
+		local perks = {
+			{ id = "lean", ability = "hcm_lean" },
+			{ id = "rear", ability = "hcm_rear" },
+			{ id = "charge", ability = "hcm_charge" },
+		}
 
-		pcall(function()
-			hasRear = playerEnt.soul:HasAbility("hcm_rear")
-			hasCharge = playerEnt.soul:HasAbility("hcm_charge")
-			hasLean = playerEnt.soul:HasAbility("hcm_lean")
-		end)
+		local pending = {}
+		for _, p in ipairs(perks) do
+			local has = false
+			pcall(function()
+				has = playerEnt.soul:HasAbility(p.ability)
+			end)
+			if has and not self.TutorialsShown[p.id] then
+				table.insert(pending, p.id)
+			end
+		end
 
-		if hasRear and not self.TutorialsShown["rear"] then
+		if #pending > 0 then
+			local nextId = pending[1]
+			self:ShowTutorial(nextId)
+
+			if #pending > 1 and not self.TutorialTimerPending then
+				self.TutorialTimerPending = true
+				local tick = self.TimerTick
+				Script.SetTimer(10500, function()
+					self.TutorialTimerPending = false
+					if self.TimerTick == tick and not self.InventoryOpen then
+						self:QueueNextTutorial()
+					end
+				end)
+			end
+		end
+	else
+		if not self.TutorialsShown["rear"] then
 			self:ShowTutorial("rear")
-		elseif hasCharge and not self.TutorialsShown["charge"] then
-			self:ShowTutorial("charge")
-		elseif hasLean and not self.TutorialsShown["lean"] then
-			self:ShowTutorial("lean")
 		end
 	end
+end
+
+--- Checks whether newly acquired maneuver tutorials should be shown on mount.
+--
+-- @tparam table playerEnt the player entity table
+function HorseCollisionMod:CheckMountTutorials(playerEnt)
+	self:QueueNextTutorial()
+end
+
+--- Checks whether newly acquired maneuver tutorials should be shown when leaving menus.
+function HorseCollisionMod:CheckMenuTutorials()
+	self:QueueNextTutorial()
 end
 
 --- Synchronizes tutorial state against the player's actual abilities in the loaded save.
@@ -200,6 +190,7 @@ end
 -- clear the flag so unlocking it later in this save cleanly displays the banner.
 function HorseCollisionMod:SyncTutorialsOnLoad()
 	self.TutorialsShown = self.TutorialsShown or {}
+	self.TutorialTimerPending = false
 
 	local playerEnt = rawget(_G, "player")
 	if not playerEnt or not playerEnt.soul then
@@ -237,5 +228,6 @@ end
 --- Clears the history of displayed tutorials.
 function HorseCollisionMod:ResetTutorials()
 	self.TutorialsShown = {}
+	self.TutorialTimerPending = false
 	self:Log("Tutorials reset")
 end

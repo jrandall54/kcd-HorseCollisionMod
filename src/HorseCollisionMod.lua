@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.22.2
+-- @release 5.22.3
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.22.2"
+HorseCollisionMod.Version = "5.22.3"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1798,6 +1798,10 @@ end
 -- @tparam string eventName phase of that action
 -- @tparam table argTable event arguments, unused
 function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
+	if HorseCollisionModListenerInstance and self ~= HorseCollisionModListenerInstance then
+		return
+	end
+
 	if self.Config and self.Config.LogTelemetry then
 		local a = string.lower(actionName or "")
 		local e = string.lower(eventName or "")
@@ -1811,8 +1815,13 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		end
 	end
 
-	if actionName == "igm_inventory" and eventName == "OnEnd" then
-		self:CheckMenuTutorials()
+	if actionName == "igm_inventory" then
+		if eventName == "OnStart" then
+			self.InventoryOpen = true
+		elseif eventName == "OnEnd" then
+			self.InventoryOpen = false
+			self:CheckMenuTutorials()
+		end
 	end
 
 	if actionName == "sys_loadingimagescreen" and eventName == "OnEnd" then
@@ -1952,6 +1961,17 @@ local hcmRedirected, hcmPending = HorseCollisionMod:RedirectAnimationDatabases()
 HorseCollisionMod:Log("Redirected " .. tostring(hcmRedirected)
 		.. " animation databases, " .. tostring(hcmPending) .. " pending")
 
-if type(UIAction) == "table" and type(UIAction.RegisterActionListener) == "function" then
-	UIAction.RegisterActionListener(HorseCollisionMod, "", "", "uiActionListener")
+if type(UIAction) == "table" then
+	if type(UIAction.UnregisterActionListener) == "function"
+			and HorseCollisionModListenerInstance then
+		pcall(function()
+			UIAction.UnregisterActionListener(HorseCollisionModListenerInstance,
+					"", "", "uiActionListener")
+		end)
+	end
+
+	if type(UIAction.RegisterActionListener) == "function" then
+		UIAction.RegisterActionListener(HorseCollisionMod, "", "", "uiActionListener")
+		HorseCollisionModListenerInstance = HorseCollisionMod
+	end
 end
