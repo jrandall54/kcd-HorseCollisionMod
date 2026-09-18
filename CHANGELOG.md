@@ -33,6 +33,9 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+- Attributed fatal collisions to the player immediately upon victim death so guards properly register murders instead of ignoring unattributed corpses, while keeping living victim crime calls deferred until they finish standing up.
+
 ## [5.22.3] - 2026-09-18
 
 ### Fixed

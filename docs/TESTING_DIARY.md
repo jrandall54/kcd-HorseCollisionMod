@@ -21958,5 +21958,12 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - Implemented `HorseCollisionMod:QueueNextTutorial()` in `src/HorseCollisionMod/Tutorial.lua` with natural perk milestone ordering (`lean` -> `rear` -> `charge`), scheduling subsequent tutorials after 10.5 seconds while outside inventory menus.
 **Results**: SUCCESS. Verified via dev console that stale listener tables are unregistered on reload, and multiple newly acquired perks display their tutorial banners sequentially.
 
-
-
+### Build: 5.22.4-dev (fix-murder-crime-visibility)
+**Hypothesis**: Attributing fatal collision impacts directly to the player when damage resolves will create the engine's `lastHitByPlayer` graph link, enabling guards to perceive and charge the player with murder upon discovering corpses, while preserving the deferred crime trigger for surviving victims to prevent mid-air tumbling shouts.
+**Changes**:
+- Decompilation research revealed that guard corpse murder investigation (`produceMurderStimulus` in `sb_combat.xml`) requires the corpse to have an active `lastHitByPlayer` engine link dated within 8 seconds ($t - 8000$).
+- When `SendCombatHit` was previously gated inside `WhenVictimRises` behind `if not isDead then`, killed NPCs never received `SendCombatHit`, leaving their bodies as unattributed `corpse` records (`isCrime = false`) rather than murders.
+- Updated `ApplyImpactDamage` in `src/HorseCollisionMod/Health.lua` to accept `hitStrength` and immediately call `SendCombatHit(npc, playerEnt, strength)` when `fatal == true`.
+- In `sb_switch_hitreactions.xml`, dead victims skip `stimulus_hit` (so corpses never bark mid-air or scream while tumbling), while successfully linking `lastHitByPlayer` and alerting guards.
+- Updated `ResolveImpact` in `src/HorseCollisionMod/Impact.lua` to pass `strength` to `ApplyImpactDamage`.
+**Results**: SUCCESS. Tested in running game. Running down an NPC and killing them successfully registers as murder when discovered by guards, and guards properly charge Henry with murder upon confrontation.
