@@ -21940,3 +21940,13 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - Formatted banner text to remain concise and fit within parchment frame without overflow.
 **Results**: SUCCESS. Verified in devmode live testing that banners render cleanly, respond to controller vs keyboard inputs, notify on menu exit upon unlocking perks, and locked warnings fire only once.
 
+### Build: 5.22.1-dev (drop-locked-perk-banners)
+**Hypothesis**: Remove locked maneuver tutorial banners. Attempting an unlearned perk maneuver should silently refuse without intrusive tutorial banners, matching vanilla behavior and avoiding desync across savegame reloads or playthroughs. Synchronize tutorial display history (`TutorialsShown`) against player soul abilities on save load (`sys_loadingimagescreen` `OnEnd`) so that reloading earlier saves resets unearned perk banner flags and allows unlock banners to show when perks are purchased in that save.
+**Changes**:
+- Removed `lean_locked` tutorial banner trigger from `src/HorseCollisionMod/Lean.lua`.
+- Removed `charge_locked` and `rear_locked` tutorial banner triggers from `src/HorseCollisionMod/Rear.lua`.
+- Cleaned up unused `*_locked` text formatter cases from `src/HorseCollisionMod/Tutorial.lua`.
+- Added `HorseCollisionMod:SyncTutorialsOnLoad()` to `src/HorseCollisionMod/Tutorial.lua` and invoked it from `sys_loadingimagescreen` `OnEnd` in `src/HorseCollisionMod.lua`.
+**Results**: SUCCESS. Hot-reloaded in the live game with shipped values active. Attempting locked maneuvers silently refuses, and loading an earlier save dynamically resynchronizes tutorial flags with the player's actual abilities.
+
+

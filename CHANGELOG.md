@@ -33,6 +33,14 @@ number.
 
 ## [Unreleased]
 
+## [5.22.2] - 2026-09-18
+
+### Fixed
+- Synchronized maneuver perk tutorial display state with character abilities on save load, ensuring tutorial banners show when perks are acquired even after reloading earlier saves.
+
+### Removed
+- Removed intrusive locked maneuver tutorial banners when attempting unlearned perk maneuvers, preventing desync across savegame reloads.
+
 ## [5.22.1] - 2026-09-17
 
 ### Fixed

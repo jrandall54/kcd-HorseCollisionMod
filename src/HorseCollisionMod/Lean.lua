@@ -612,10 +612,6 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 		end
 
 		if not hasAbility then
-			if activation == "press" then
-				self:ShowTutorial("lean_locked")
-			end
-
 			return false
 		end
 	end
