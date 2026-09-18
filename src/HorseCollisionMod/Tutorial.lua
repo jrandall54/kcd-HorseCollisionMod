@@ -7,7 +7,7 @@
 --
 -- @module HorseCollisionMod.Tutorial
 -- @author jrandall54
--- @release 5.22.1
+-- @release 5.22.2
 
 HorseCollisionMod.TutorialsShown = HorseCollisionMod.TutorialsShown or {}
 
@@ -46,18 +46,6 @@ function HorseCollisionMod:FormatTutorialText(name)
 				.. " to lunge forward, trampling anyone in your path.\n\n"
 				.. "- Consumes high horse stamina.\n"
 				.. "- Warning: Trampling innocent bystanders is a crime!"
-	elseif name == "rear_locked" then
-		local btn = pad and "[L-Stick]"
-				or ("[" .. string.upper(cfg.RearOnlyKey or "f") .. "]")
-		return "Rear Maneuver Locked\n\n"
-				.. "Requires the Horsemanship perk 'Rear in Headlights' (Level 7).\n"
-				.. "Bring your horse to a stop and press " .. btn .. " to perform."
-	elseif name == "charge_locked" then
-		local btn = pad and "[LT]"
-				or ("[" .. string.upper(cfg.RearChargeKey or "r") .. "]")
-		return "Rear Charge Locked\n\n"
-				.. "Requires the perk 'Move Roach, Get Out the Way' (Level 10).\n"
-				.. "Bring your horse to a stop and press " .. btn .. " to perform."
 	elseif name == "lean" then
 		local left = pad and "[LB]"
 				or ("[" .. string.upper(cfg.LeanLeftKey or "q") .. "]")
@@ -66,14 +54,6 @@ function HorseCollisionMod:FormatTutorialText(name)
 		return "Horsemanship: Saddle Lean\n\n"
 				.. "While mounted, hold " .. left .. " or " .. right
 				.. " to lean out and look past your horse's head."
-	elseif name == "lean_locked" then
-		local left = pad and "[LB]"
-				or ("[" .. string.upper(cfg.LeanLeftKey or "q") .. "]")
-		local right = pad and "[RB]"
-				or ("[" .. string.upper(cfg.LeanRightKey or "e") .. "]")
-		return "Saddle Lean Locked\n\n"
-				.. "Requires the Horsemanship perk 'Hello There' (Level 4).\n"
-				.. "Hold " .. left .. " or " .. right .. " while mounted to lean."
 	end
 
 	return ""
@@ -209,6 +189,48 @@ function HorseCollisionMod:CheckMenuTutorials()
 		elseif hasLean and not self.TutorialsShown["lean"] then
 			self:ShowTutorial("lean")
 		end
+	end
+end
+
+--- Synchronizes tutorial state against the player's actual abilities in the loaded save.
+--
+-- Called on save load (sys_loadingimagescreen OnEnd). If a loaded character
+-- already has an ability, mark its tutorial as already shown so the player is
+-- not spammed. If the loaded character does NOT have the ability in this save,
+-- clear the flag so unlocking it later in this save cleanly displays the banner.
+function HorseCollisionMod:SyncTutorialsOnLoad()
+	self.TutorialsShown = self.TutorialsShown or {}
+
+	local playerEnt = rawget(_G, "player")
+	if not playerEnt or not playerEnt.soul then
+		return
+	end
+
+	if self.Config.RequirePerks then
+		local abilities = {
+			rear = "hcm_rear",
+			charge = "hcm_charge",
+			lean = "hcm_lean",
+		}
+
+		for bannerName, abilityName in pairs(abilities) do
+			local hasAbility = false
+			pcall(function()
+				hasAbility = playerEnt.soul:HasAbility(abilityName)
+			end)
+
+			if hasAbility then
+				self.TutorialsShown[bannerName] = true
+			else
+				self.TutorialsShown[bannerName] = nil
+			end
+		end
+	end
+
+	if self.Config.LogTelemetry then
+		self:Log("SyncTutorialsOnLoad rear=" .. tostring(self.TutorialsShown["rear"])
+				.. " charge=" .. tostring(self.TutorialsShown["charge"])
+				.. " lean=" .. tostring(self.TutorialsShown["lean"]))
 	end
 end
 

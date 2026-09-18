@@ -242,12 +242,6 @@ function HorseCollisionMod:RearRequested(fragTag)
 		end)
 
 		if not hasAbility then
-			if isCharge then
-				self:ShowTutorial("charge_locked")
-			else
-				self:ShowTutorial("rear_locked")
-			end
-
 			return refuse("missing perk: " .. abilityName)
 		end
 	end

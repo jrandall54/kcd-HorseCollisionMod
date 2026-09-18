@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.22.1
+-- @release 5.22.2
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.22.1"
+HorseCollisionMod.Version = "5.22.2"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -1880,6 +1880,10 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 
 		if self.Config.AutoGrantPerks then
 			self:GrantPerks()
+		end
+
+		if self.SyncTutorialsOnLoad then
+			self:SyncTutorialsOnLoad()
 		end
 
 		self:HookRearKey()
