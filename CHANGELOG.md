@@ -33,6 +33,12 @@ number.
 
 ## [Unreleased]
 
+## [5.22.3] - 2026-09-18
+
+### Fixed
+- Prevented duplicate UI action listener accumulation across script reloads by unregistering stale listener instances.
+- Added sequential queuing for maneuver tutorial banners when multiple perks are acquired at once.
+
 ## [5.22.2] - 2026-09-18
 
 ### Fixed
