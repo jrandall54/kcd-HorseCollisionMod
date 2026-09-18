@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.22.3
+-- @release 5.22.4
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -524,7 +524,8 @@ function HorseCollisionMod:IsProtectedFromHarm(npc)
 	return protected
 end
 
-function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt, hitStrength)
+function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
+		playerEnt, horseEnt, hitStrength)
 	if not self.Config.ImpactDamage or not npc or not npc.soul then
 		return 0
 	end
@@ -823,7 +824,8 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 			if self.Config.CollisionIsCrime and playerEnt then
 				local strength = hitStrength
 						or (self.HitReactionStrength
-							and self.HitReactionStrength[self:TierValue("HitStrengthByTier", tierName) or "Tickle"])
+							and self.HitReactionStrength[
+								self:TierValue("HitStrengthByTier", tierName) or "Tickle"])
 						or 0
 				self:SendCombatHit(npc, playerEnt, strength)
 				npc.hcm_combat_injected = true
