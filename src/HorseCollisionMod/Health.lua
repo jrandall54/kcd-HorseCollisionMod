@@ -524,7 +524,7 @@ function HorseCollisionMod:IsProtectedFromHarm(npc)
 	return protected
 end
 
-function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt)
+function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt, hitStrength)
 	if not self.Config.ImpactDamage or not npc or not npc.soul then
 		return 0
 	end
@@ -812,6 +812,23 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor, playerEnt, ho
 				and type(after) == "number" and after <= 0
 
 		if fatal then
+			-- If the hit was fatal and CollisionIsCrime is enabled, attribute the
+			-- hit to the player immediately. When the victim survives, SendCombatHit
+			-- is deferred until WhenVictimRises so living NPCs don't yell crime barks
+			-- while ragdolling. But a corpse never rises, and without SendCombatHit,
+			-- the engine graph link 'lastHitByPlayer' is never created, causing guards
+			-- to classify the death as an unattributed corpse (isCrime = false) rather
+			-- than a murder. Dead victims in sb_switch_hitreactions skip stimulus_hit
+			-- (no mid-air barks) while properly linking lastHitByPlayer and alerting guards.
+			if self.Config.CollisionIsCrime and playerEnt then
+				local strength = hitStrength
+						or (self.HitReactionStrength
+							and self.HitReactionStrength[self:TierValue("HitStrengthByTier", tierName) or "Tickle"])
+						or 0
+				self:SendCombatHit(npc, playerEnt, strength)
+				npc.hcm_combat_injected = true
+			end
+
 			-- The moment the mod's own damage killed somebody, which is the
 			-- only place the death is attributable to the mod rather than to
 			-- anything else that might have finished them.
