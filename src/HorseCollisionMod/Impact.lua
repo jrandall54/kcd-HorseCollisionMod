@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Impact
 -- @author jrandall54
--- @release 5.22.3
+-- @release 5.22.4
 
 --- Everything one impact does to one victim.
 --
@@ -231,7 +231,7 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- Called after the native hit, but calling order is not resolution order.
 	-- `ApplyImpactDamage` contains a wait that makes this mod's damage land
 	-- last, and so own the killing blow and the crime attribution with it.
-	self:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt)
+	self:ApplyImpactDamage(npc, tierName, armor, playerEnt, horseEnt, strength)
 
 	-- The loop resolves one victim per impact and charges the horse here. A
 	-- rear and a charge are one deliberate move that can land on several
