@@ -21975,3 +21975,7 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - Added dynamic recovery calculations and ground pain barks (`RANENY_NA_ZEMI`) emitted periodically while downed victims are on the ground before standing up.
 **Results**: Verified in running game. Ragdoll stillness settles and initiates native recovery cleanly without runtime CVar tampering.
 
+
+
+## Ragdoll CVar Exposure
+Exposed wh_rd_StillDuration and wh_rd_StillSpeedThreshold to mod settings to easily tweak engine stillness delays.

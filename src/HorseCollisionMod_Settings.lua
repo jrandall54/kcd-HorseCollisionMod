@@ -113,6 +113,11 @@ HorseCollisionModSettings = {
 	RecoveryGroundBarks       = true,
 	RecoveryBarkIntervalMs    = 1400,  -- ms between pain moans while down
 
+	-- Native Engine Ragdoll Stillness CVars
+	-- Set the time and speed threshold required for ragdoll recovery.
+	RagdollStillDuration        = 0.8,
+	RagdollStillSpeedThreshold  = 0.4,
+
 	-- Stamina, against a full pool of roughly 210.
 	--
 	-- One figure per tier, and every tier is charged through the same path, so
