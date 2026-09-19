@@ -35,7 +35,7 @@
 --
 -- @module HorseCollisionMod.Sound
 -- @author jrandall54
--- @release 5.23.0
+-- @release 5.24.0
 
 --- The material a victim's armor sounds like, by engine armor type.
 --

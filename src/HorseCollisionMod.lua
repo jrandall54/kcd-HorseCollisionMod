@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.23.0
+-- @release 5.24.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.23.0"
+HorseCollisionMod.Version = "5.24.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -137,6 +137,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RecoveryMaxSec maximum bound on recovery stillness duration
 -- @field RecoveryGroundBarks emit periodic pain barks while downed on the ground
 -- @field RecoveryBarkIntervalMs interval between ground hurt barks in milliseconds
+-- @field RagdollStillDuration seconds of stillness before a ragdoll stands up
+-- @field RagdollStillSpeedThreshold speed threshold under which a ragdoll is still
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
 -- @field ProtectStoryCharacters when true, characters the game marks as
 --   protected take no damage from an impact
@@ -1257,6 +1259,10 @@ HorseCollisionMod.Config = {
 	RecoveryMaxSec            = 5.0,
 	RecoveryGroundBarks       = true,
 	RecoveryBarkIntervalMs    = 1400,
+
+	-- Native Engine Ragdoll Stillness
+	RagdollStillDuration        = 0.8,
+	RagdollStillSpeedThreshold  = 0.4,
 }
 
 
@@ -1704,8 +1710,9 @@ function HorseCollisionMod:ApplySettings()
 	end
 
 	-- Global engine ragdoll stillness thresholds for recovery
-	System.SetCVar("wh_rd_StillSpeedThreshold", 0.8)
-	System.SetCVar("wh_rd_StillDuration", 0.5)
+	local threshold = self.Config.RagdollStillSpeedThreshold or 0.4
+	System.SetCVar("wh_rd_StillSpeedThreshold", threshold)
+	System.SetCVar("wh_rd_StillDuration", self.Config.RagdollStillDuration or 0.8)
 
 	return applied, rejected
 end

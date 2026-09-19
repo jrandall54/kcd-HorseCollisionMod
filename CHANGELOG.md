@@ -33,6 +33,11 @@ number.
 
 ## [Unreleased]
 
+## [5.24.0] - 2026-09-18
+
+### Added
+- Exposed `RagdollStillDuration` and `RagdollStillSpeedThreshold` to configuration to allow tuning engine get-up delays.
+
 ## [5.23.0] - 2026-09-18
 
 ### Added
