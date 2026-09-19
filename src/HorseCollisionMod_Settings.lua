@@ -78,6 +78,41 @@ HorseCollisionModSettings = {
 	RagdollDampFloorMs       = 200,   -- never damp before this, mid-launch
 	RagdollDampCeilingMs     = 6000,  -- damp regardless by this point
 
+	-- =========================================================================
+	-- Dynamic Ragdoll Recovery & Ground Stun
+	-- =========================================================================
+	-- Whether to scale the ragdoll get-up delay based on impact tier and armor.
+	-- When enabled, heavy armored targets recover quickly to defend themselves,
+	-- while unarmored villagers or severe high-speed collisions leave the victim
+	-- stunned on the ground longer.
+	DynamicRecovery           = true,
+
+	-- Base get-up stillness delay (in seconds) by impact tier.
+	-- Trot knocks down lightly; Gallop and Charge deliver heavy concussive force.
+	RecoveryDelayByTier       = {
+		Trot   = 0.5,   -- light knock, quick shake-off
+		Gallop = 2.0,   -- solid hit, concussive knockdown
+		Rear   = 1.0,   -- reared and bowled over
+		Charge = 3.5,   -- devastating direct charge
+	},
+
+	-- How armor modifies the recovery delay.
+	-- Unarmored victims (high armor scale, ~1.15-1.26) take more of the shock
+	-- and stay down longer. Fully armored guards (~0.35-0.42) absorb the impact
+	-- across their plate and recover faster.
+	-- Multipliers applied to RecoveryDelayByTier:
+	RecoveryArmorScaleArmored   = 0.6,   -- armored knight recovers 40% faster
+	RecoveryArmorScaleUnarmored = 1.5,   -- unarmored peasant stays down 50% longer
+
+	-- Bounds on total get-up stillness duration (in seconds):
+	RecoveryMinSec            = 0.3,   -- fastest recovery (near immediate)
+	RecoveryMaxSec            = 5.0,   -- maximum groggy stun duration
+
+	-- Ground hurt barks: while recovering on the ground, weaker/dazed victims
+	-- periodically emit groans of pain (RANENY_NA_ZEMI) before standing up.
+	RecoveryGroundBarks       = true,
+	RecoveryBarkIntervalMs    = 1400,  -- ms between pain moans while down
+
 	-- Stamina, against a full pool of roughly 210.
 	--
 	-- One figure per tier, and every tier is charged through the same path, so

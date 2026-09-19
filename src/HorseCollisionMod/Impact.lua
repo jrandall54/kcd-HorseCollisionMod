@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Impact
 -- @author jrandall54
--- @release 5.22.4
+-- @release 5.23.0
 
 --- Everything one impact does to one victim.
 --
@@ -133,6 +133,7 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	if not staggerRefused then
 		self:PlayTierReaction(npc, tierName, velocity, speed,
 				armorImpulse, ctx.horsePos, horseEnt)
+		self:ApplyDynamicRecovery(npc, tierName, armorImpulse)
 	end
 
 	if cfg.LogTelemetry then
