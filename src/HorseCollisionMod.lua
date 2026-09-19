@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.22.4
+-- @release 5.23.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.22.4"
+HorseCollisionMod.Version = "5.23.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -129,6 +129,14 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ArmorStaminaExponent how sharply armor weight raises the stamina cost
 -- @field MinArmorStamina floor on the armor stamina multiplier
 -- @field MaxArmorStamina ceiling on the armor stamina multiplier
+-- @field DynamicRecovery scale ragdoll recovery get-up delay based on tier and armor
+-- @field RecoveryDelayByTier base get-up stillness delay by impact tier
+-- @field RecoveryArmorScaleArmored recovery delay multiplier for armored targets
+-- @field RecoveryArmorScaleUnarmored recovery delay multiplier for unarmored targets
+-- @field RecoveryMinSec minimum bound on recovery stillness duration
+-- @field RecoveryMaxSec maximum bound on recovery stillness duration
+-- @field RecoveryGroundBarks emit periodic pain barks while downed on the ground
+-- @field RecoveryBarkIntervalMs interval between ground hurt barks in milliseconds
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
 -- @field ProtectStoryCharacters when true, characters the game marks as
 --   protected take no damage from an impact
@@ -1234,6 +1242,21 @@ HorseCollisionMod.Config = {
 	RagdollDampRampSamples   = 8,
 	RagdollDampFloorMs       = 200,
 	RagdollDampCeilingMs     = 6000,
+
+	-- Dynamic Ragdoll Recovery
+	DynamicRecovery           = true,
+	RecoveryDelayByTier       = {
+		Trot   = 0.5,
+		Gallop = 2.0,
+		Rear   = 1.0,
+		Charge = 3.5,
+	},
+	RecoveryArmorScaleArmored   = 0.6,
+	RecoveryArmorScaleUnarmored = 1.5,
+	RecoveryMinSec            = 0.3,
+	RecoveryMaxSec            = 5.0,
+	RecoveryGroundBarks       = true,
+	RecoveryBarkIntervalMs    = 1400,
 }
 
 
@@ -1679,6 +1702,10 @@ function HorseCollisionMod:ApplySettings()
 	if self.Config.AutoGrantPerks then
 		self:GrantPerks()
 	end
+
+	-- Global engine ragdoll stillness thresholds for recovery
+	System.SetCVar("wh_rd_StillSpeedThreshold", 0.8)
+	System.SetCVar("wh_rd_StillDuration", 0.5)
 
 	return applied, rejected
 end

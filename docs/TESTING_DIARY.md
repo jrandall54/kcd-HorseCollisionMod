@@ -21967,3 +21967,11 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 - In `sb_switch_hitreactions.xml`, dead victims skip `stimulus_hit` (so corpses never bark mid-air or scream while tumbling), while successfully linking `lastHitByPlayer` and alerting guards.
 - Updated `ResolveImpact` in `src/HorseCollisionMod/Impact.lua` to pass `strength` to `ApplyImpactDamage`.
 **Results**: SUCCESS. Tested in running game. Running down an NPC and killing them successfully registers as murder when discovered by guards, and guards properly charge Henry with murder upon confrontation.
+
+### Build: 5.23.0-dev (feature/native-ragdoll-cvars)
+**Hypothesis**: Tune ragdoll stillness and ground recovery parameters using CryEngine's native physics cvars and ground hurt barks.
+**Changes**:
+- Configured engine ragdoll stillness thresholds at initialization: `wh_rd_StillSpeedThreshold = 0.8` and `wh_rd_StillDuration = 0.5`.
+- Added dynamic recovery calculations and ground pain barks (`RANENY_NA_ZEMI`) emitted periodically while downed victims are on the ground before standing up.
+**Results**: Verified in running game. Ragdoll stillness settles and initiates native recovery cleanly without runtime CVar tampering.
+

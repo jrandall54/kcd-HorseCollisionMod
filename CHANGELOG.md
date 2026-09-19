@@ -33,6 +33,12 @@ number.
 
 ## [Unreleased]
 
+## [5.23.0] - 2026-09-18
+
+### Added
+- Ground pain groans and moans (`RANENY_NA_ZEMI`) emitted periodically by downed victims while recovering on the ground before standing up.
+- Ragdoll stillness threshold configuration tuning (`wh_rd_StillDuration = 0.5` and `wh_rd_StillSpeedThreshold = 0.8`).
+
 ## [5.22.4] - 2026-09-18
 
 ### Fixed

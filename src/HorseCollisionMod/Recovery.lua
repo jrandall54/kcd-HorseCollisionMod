@@ -22,7 +22,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.22.4
+-- @release 5.23.0
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -1082,4 +1082,104 @@ function HorseCollisionMod:ImpactIsNewContact(npcId, now)
 	end
 
 	return true
+end
+
+
+--- Calculates the dynamic recovery get-up delay for a fallen victim.
+--
+-- Armored victims (low armorScale) shake off the impact and recover quickly.
+-- Unarmored peasants (high armorScale) absorb the concussive force and stay
+-- stunned on the ground longer.
+--
+-- @tparam string tierName "Trot", "Gallop", "Charge", "Rear"
+-- @tparam[opt] number armorScale victim's armor scale (~0.35 armored, ~1.26 unarmored)
+-- @treturn number duration in seconds
+function HorseCollisionMod:CalculateRecoveryDuration(tierName, armorScale)
+	if not self.Config.DynamicRecovery then
+		return self.Config.RecoveryMinSec or 0.3
+	end
+
+	local delays = self.Config.RecoveryDelayByTier
+	local baseSec = (delays and delays[tierName]) or 1.5
+
+	local mult = 1.0
+	local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+	local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
+	local heavyMult = self.Config.RecoveryArmorScaleArmored or 0.6
+	local lightMult = self.Config.RecoveryArmorScaleUnarmored or 1.5
+
+	if armorScale and hi > lo then
+		local t = (armorScale - lo) / (hi - lo)
+		if t < 0 then
+			t = 0
+		elseif t > 1 then
+			t = 1
+		end
+		mult = heavyMult + ((lightMult - heavyMult) * t)
+	end
+
+	local dur = baseSec * mult
+	local minSec = self.Config.RecoveryMinSec or 0.3
+	local maxSec = self.Config.RecoveryMaxSec or 5.0
+
+	if dur < minSec then
+		dur = minSec
+	end
+	if dur > maxSec then
+		dur = maxSec
+	end
+
+	return dur
+end
+
+--- Applies dynamic recovery groans and telemetry to an impacted victim.
+--
+-- Armored victims shake off the impact quickly, while unarmored peasants
+-- stay stunned and emit periodic groans of pain while on the ground.
+--
+-- @tparam table npc victim entity
+-- @tparam string tierName impact tier
+-- @tparam[opt] number armorScale victim's armor scale
+function HorseCollisionMod:ApplyDynamicRecovery(npc, tierName, armorScale)
+	if not self.Config.DynamicRecovery or not npc then
+		return
+	end
+
+	-- Walk tier only staggers and never knocks to the ground
+	if tierName == "Walk" then
+		return
+	end
+
+	local durationSec = self:CalculateRecoveryDuration(tierName, armorScale)
+
+	if self.Config.LogTelemetry then
+		self:Log("DynamicRecovery " .. self:NameOf(npc)
+				.. " tier=" .. tostring(tierName)
+				.. " armorScale=" .. string.format("%.2f", armorScale or 1.0)
+				.. " duration=" .. string.format("%.2f", durationSec) .. "s")
+	end
+
+	local generation = self.TimerTick
+	local startedAt = self:TimeMs()
+	local durationMs = durationSec * 1000
+
+	-- Schedule ground barks while recovering
+	if self.Config.RecoveryGroundBarks and durationSec >= 1.0 then
+		local barkInterval = self.Config.RecoveryBarkIntervalMs or 1400
+		local function barkLoop()
+			if generation ~= self.TimerTick then
+				return
+			end
+			local elapsed = self:TimeMs() - startedAt
+			if elapsed < durationMs - 400 then
+				local isDead = false
+				pcall(function() isDead = npc:IsDead() end)
+				if not isDead then
+					self:Bark(npc, "HurtDown", false, true)
+				end
+				Script.SetTimer(barkInterval, barkLoop)
+			end
+		end
+		Script.SetTimer(barkInterval, barkLoop)
+	end
 end
