@@ -223,6 +223,25 @@ HorseCollisionModSettings = {
 	RearChargeStrikeReach    = 1.8,   -- how far ahead it reaches
 	RearChargeStrikeWidth    = 0.9,   -- how wide, either side
 	RearChargeImpactSpeed    = 7.5,   -- the speed it is scored at
+	-- The near miss, the charge's own. Same idea as the rear's band but a
+	-- wider one, because the margin the rear uses does not describe a charge.
+	-- A rear is a horse making a noise in one place and the fright is the
+	-- hooves coming down a stride away, so a stride past the strike is the
+	-- whole of it. A charge is a horse bearing down at speed, and a man does
+	-- not have to be within a stride of it to have something to run from: the
+	-- horse will be where he is standing in a moment.
+	--
+	-- So the margin is the ground the horse covers rather than the room a man
+	-- stands in. `RearChargeLungePeakMin` is the slowest a lunge may be and
+	-- still count as one, 3.0 m/s, and a second of that past the 1.8 m
+	-- corridor is 4.8 m. That is comfortably outside the rear's 3.5 and it is
+	-- derived from the lunge rather than chosen to be bigger.
+	RearChargeFear           = true,
+	RearChargeFearReach      = 4.8,   -- the corridor plus a second of lunge
+	-- The same rank as the rear's scream, and for the same reason: it is
+	-- spoken by a man already running, over whatever his own brain says while
+	-- he runs.
+	RearChargeFearScreamPriority = 50,
 	RearChargeImpulse        = 6000,  -- how hard the charge is pushed
 	RearChargeLift           = 0.2,   -- how much of that is upward
 	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop

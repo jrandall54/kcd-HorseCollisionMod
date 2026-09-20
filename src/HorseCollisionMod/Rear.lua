@@ -802,6 +802,17 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 	local drained = false
 	local playerEnt = player
 
+	-- Who the near miss has already reached. It belongs to the charge and not
+	-- to a tick, because the band is sampled every tick from a horse that has
+	-- moved, and the same man would otherwise be frightened once a tick for as
+	-- long as the lunge kept him inside the radius.
+	local feared = {}
+	local playerWuid = nil
+
+	pcall(function()
+		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
+	end)
+
 	local function sweep()
 		-- The sweep lives exactly as long as the charge does.
 		--
@@ -814,6 +825,16 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 		-- clock that has to agree with the first.
 		if generation ~= self.TimerTick or not self.RearCharging
 				or self:TimeMs() > deadline then
+			-- The lunge is over. Whoever is still standing in front of the
+			-- horse untouched was charged at and not reached, which the lane
+			-- test inside the band suppresses while the charge is still
+			-- coming, so the closing pass is the only thing that speaks for
+			-- him. Not run on a script reload, where `generation` has moved
+			-- on and there is no charge to close.
+			if generation == self.TimerTick then
+				self:CloseChargeFear(horseEnt, playerWuid, hit, feared)
+			end
+
 			return
 		end
 
@@ -885,6 +906,9 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 					end
 				end
 			end
+
+			self:ChargeFearBand(horseEnt, pos, fx, fy, playerWuid, hit,
+					feared, false)
 		end)
 
 		Script.SetTimer(cfg.RearChargeStrikePollMs or 50, sweep)

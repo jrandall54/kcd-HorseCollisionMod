@@ -30,6 +30,20 @@ number.
 
 ## [Unreleased]
 
+## [5.26.0] - 2026-09-20
+
+### Added
+- A charge now frightens the people it goes past without running down. The band
+  is measured from the horse as it lunges, so it follows the charge rather than
+  sitting where it started, and anyone within `RearChargeFearReach` who is not
+  ridden down reacts to the rider as a threat and decides for themselves
+  whether to run or turn on him. Governed by `RearChargeFear`.
+- Someone frightened by a charge cries out as it passes, at
+  `RearChargeFearScreamPriority`.
+- The man a charge comes at and falls short of is frightened as the lunge dies.
+  While the charge is still coming he is left alone, because he is about to be
+  ridden down rather than missed.
+
 ## [5.25.0] - 2026-09-20
 
 ### Added
