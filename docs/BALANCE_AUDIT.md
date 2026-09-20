@@ -22,7 +22,7 @@ The tunables that decide how a collision *feels* fall into six systems.
 | --- | --- | --- |
 | Tier identity | `SpeedWalk`, `SpeedTrot`, `SpeedGallop`, `MaxImpactSpeed`, `ImpactSpeedSamples`, `RearImpactSpeed`, `RearChargeImpactSpeed` | `Tiers.lua:GetSpeedTier`, `Update.lua` |
 | Damage to the victim | `ImpactDamageByTier`, `ImpactDamageArmorScale/Curve/Floor/IgnoredArmor`, `ImpactDamageVariance`, `BardingDamageBonus` | `Health.lua`, `Armor.lua` |
-| Throw of the body | `Knockback`, `Uplift`, `ThrowByTier`, `LateralImpulse`, `RagdollMass*`, `RagdollBrake*`, `RagdollSpeedCap*`, `RagdollAirDamping*`, `ArmorImpulseExponent` | `Reaction.lua` |
+| Throw of the body | `Knockback`, `Uplift`, `ThrowByTier`, `LateralImpulse`, `RagdollBrake*`, `RagdollSpeedCap*`, `RagdollAirDamping*`, `ArmorImpulseExponent` | `Reaction.lua` |
 | Recovery | `RecoveryDelayByTier`, `RecoveryArmorScale*`, `RecoveryMin/MaxSec` | `Recovery.lua` |
 | Cost to the horse | `StaminaDrainByTier`, `CombatStaminaMultiplier`, `ArmorStaminaExponent`, `BardingStaminaRelief`, `HorsemanshipStamina*` | `Rider.lua` |
 | Fear and reaction | `RearFearReach`, `RearChargeFearReach`, the scream priorities | `Fear.lua` |
@@ -116,10 +116,21 @@ be tuned at all. **Fixed in Stage 0:** both are declared and exposed.
 mod polls the body repeatedly to write a value it never changes.
 `RagdollMassArmorExponent = 3.7` is dead alongside it.
 
-**Fix:** decide in the sweep whether mass returns as a lever, where the roadmap's
-position is that unarmored victims sit at their normal mass and the curve scales
-*up* from there, or whether the path is removed. It must not stay as a no-op
-that looks live.
+**Fixed: the path is removed, not revived.** The roadmap's position was that
+mass could come back as a lever, with unarmored victims at their normal mass
+and the curve scaling up from there. It does not come back, because the coupling
+is too weak to spend a setting on: the throw goes as roughly `mass ^ -0.185`, so
+a visible difference between mail and cloth costs a spread around a hundredfold.
+The exponent that bought it, 3.7, gave a villager 43 kg and a mailed guard
+1,208, rising to 501,187 at the armor scale real guards score, which is a cliff
+rather than a scale and made every force setting above it a no-op against anyone
+in armor. Armor is separated by the ragdoll brake instead, which is bounded and
+does not lie about what a person weighs.
+
+`MassVictim` also doubled as the signal that the body had physicalized, since a
+mass write is refused on a living actor and accepted on a ragdoll. That signal
+is now `PhysicsReadyMs`, a single frame, which is what its six rung ladder
+measured on every impact ever logged.
 
 ### 2.5 `Config` and the settings file disagree on two values
 
@@ -303,22 +314,144 @@ this class of drift from coming back between sessions and between agents.
 **Nothing is tuned until Stage 0 is merged**, because until then every damage
 figure exists in three files.
 
-### Stage 1: four rulings, made at the desk
+### Stage 1: four rulings, answered
 
-Answered before anything is measured, because each one determines what the later
-stages mean:
+All four are settled. They were answered at the desk before anything was
+measured, because each one decides what the later stages mean.
 
-1. **Is damage flat per tier, or continuous in speed within the tier?**
-   Continuous lets the five figures be derived from one named constant and the
-   scored speed, which is what the no-invented-constants rule wants, at the cost
-   of the tiers no longer being crisply distinguishable. Flat keeps the current
-   design and keeps five picked numbers.
-2. **Is the rear a trot-class blow or a gallop-class one?** Section 3.1. The
-   answer sets reaction, hit strength, dirt, blood, vocal rank and damage
-   together.
-3. **Do the stamina modifiers compound or bound?** Section 3.5.
-4. **Do `Knockback` and `Uplift` get authority, or get labeled as trim?**
-   Section 3.6.
+#### Ruling 1: damage stays flat per tier
+
+Damage is not made continuous in speed. Three reasons decided it.
+
+The tier is not a damage band. It also picks the reaction animation, the bark
+set, hit strength, throw, horse stamina, retaliation, dust, dirt, blood and the
+recovery delay. A continuous law would change one of nine tier-keyed tables and
+`GetSpeedTier` would still run for the other eight.
+
+The gallop band is too narrow to feel. It runs from `SpeedGallop` 8.5 to the
+`MaxImpactSpeed` cap of 11.0, a spread of 1.29x, so a linear law would separate a
+fast gallop's 95 from a slow one's 73. `ImpactDamageVariance` already rolls plus
+or minus 15 percent on every hit, so the speed term would sit inside noise the
+player cannot read. The distinction a player can hear is trot against gallop, and
+that is a tier boundary either way.
+
+It would also decide the rear and the charge by accident. Neither is scored at a
+real speed: a rear is pinned at `RearImpactSpeed` 6.0 and a charge at
+`RearChargeImpactSpeed` 7.5. A speed law would force the rear between trot and
+gallop and drop the charge below a gallop, overriding deliberate choices.
+
+The no-invented-constants argument does not apply here. The gallop's 95 is
+derived from measurement, walk's 0 and trot's 18 both carry a stated rationale,
+and a single named constant would need the same derivation work.
+
+#### Ruling 2: every tier is its own case, and the rear kills sometimes
+
+The question as originally posed, whether the rear is a trot-class or a
+gallop-class blow, was the wrong question. The rider rejected the framing:
+
+> "even the conception of 'class' doesn't really make sense because it's a rear,
+> it's own thing, not a 'trot'. This is the entire point of making it on it's
+> own and it should [not] borrow anything directly from trot. ... Every impact
+> tier is unique in some way, or they wouldn't be separate tiers."
+
+So section 3.1's table is not a defect list. A tier's figure disagreeing with
+the damage order is only a defect if that figure is wrong for that tier on its
+own terms. The real defect it exposed is narrower: in `Tiers.lua` the gallop's
+95 is derived from measurement and walk and trot carry a stated rationale, while
+**the rear's 60 and the charge's 110 have no derivation recorded at all.**
+
+The rear's figure was then derived the way the gallop's was, from an outcome the
+rider named. NPC health is a flat 100: across the whole testing diary every
+health reading tops out at exactly 100.00, while stamina readings run to 121 and
+132, so health is not a vitality-scaled pool. A kill needs
+`damage x spread + trample >= 100`, with spread uniform on 0.85 to 1.15 and the
+engine's own trample in its typical 15 to 20 band.
+
+| Rear damage | Kills an unarmored man |
+| --- | --- |
+| 60, as shipped | never, since 69 plus 28 is still 97 |
+| 72 | about 1 in 16 |
+| 75 | about 1 in 6 |
+| 80 | about 2 in 5 |
+
+The ruling is that a rear should kill sometimes, and "sometimes" is read as about
+one in six, so **the rear's damage becomes 75**. Occasional enough to be a real
+risk, rare enough that the gallop remains the blow that kills.
+
+#### Ruling 3: the stamina stack is redesigned, not capped
+
+A clamp on the product was offered and rejected:
+
+> "Having something do 600% of a max points towards a poor design and throwing
+> cap on it seems like a bandaid."
+
+The multiplicative chain goes. Costs become a share of that horse's own maximum
+stamina, and the three situational factors become additive surcharges on that
+share:
+
+    cost = maxStamina x (tierShare + combatAdd + armorAdd - bardingRelief)
+           x horsemanship
+
+Every term is then readable on its own and the worst case is the sum of the
+named maxima rather than an emergent product. Horsemanship stays a multiplier,
+because it is the one factor meant to dominate, and the progressive drain at low
+Horsemanship is settled design.
+
+A share is used rather than a flat point value because the pool is not fixed. It
+measured 210 on the test horse and 230 on another, so it is that horse's own
+stamina stat and a flat cost would mean different things on different mounts.
+
+The anchor figures come from the rider's statement of intent, that a horse should
+not become a tank but Henry should be able to take down a few people with ease,
+together with the settled floor that one gallop impact empties the horse at level
+0 Horsemanship. That gives a gallop at 0.20 of the pool and a Horsemanship span
+of 5.0 down to 1.0.
+
+| Tier | Share of pool | Back to back at max Horsemanship |
+| --- | --- | --- |
+| Walk | 0 | unlimited |
+| Trot | 0.13 | about 8 |
+| Rear | 0.10 | limited by its cooldown, not by stamina |
+| Gallop | 0.20 | 5 |
+| Charge | 0.20 | limited by its cooldown, not by stamina |
+
+| Surcharge | Share | Effect on a gallop at max Horsemanship |
+| --- | --- | --- |
+| In a fight | +0.13 | 3 impacts |
+| Armored victim | +0.05 at most | 4 impacts |
+| Full barding | -0.03 | 6 impacts |
+
+Worst case is 0.38 of the pool at max Horsemanship and 1.9 pools at level 0, so a
+novice is still emptied by one impact as intended, and the figure is written down
+rather than emergent.
+
+These counts are back to back counts. The diary records stamina refilling between
+passes, so the number a player experiences is higher whenever they circle and
+line up again.
+
+A second ruling came with it: **the rear and the charge are limited by a cooldown
+rather than by stamina.** They are commanded attacks, not consequences of riding,
+so the check against spamming them belongs on the move itself. `RearCooldownMs`
+2500 already does this and both moves pass through it, because a charge is a rear
+followed by the forward lunge. Two things follow. The rear and the charge should
+not share one cooldown figure, since one number cannot be right for a standing
+strike and for a lunge that covers ground. And their stamina share stops being a
+budget the player counts and becomes only a cost the player feels.
+
+#### Ruling 4: `Knockback` and `Uplift` stay, as a player's knob
+
+They date from version 1 and nothing in the mod depends on them. They are kept
+because a player can raise them for fun, and that works: the ragdoll brake is
+proportional rather than an absolute cancel, reading the body's velocity at
+plus 60 ms and keeping a fraction of it, about 0.94 for an unarmored villager and
+0.35 for an armored guard. So raising `Knockback` tenfold does deliver roughly
+tenfold the push.
+
+What has to change is the documentation, not the figures. The settings file
+presents them as the throw controls and at their shipped values they are a
+0.73 m/s nudge against an engine collision. They should be described as a knob a
+player may turn up, with the ragdoll brake named as the setting that actually
+governs how far a body travels.
 
 ### Stage 2: one axis at a time, in this order
 

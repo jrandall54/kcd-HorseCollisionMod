@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.27.0
+-- @release 5.28.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.27.0"
+HorseCollisionMod.Version = "5.28.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -113,14 +113,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field MaxImpactSpeed ceiling on the speed a collision is scored at
 -- @field Knockback horizontal ragdoll impulse at full strength
 -- @field Uplift vertical ragdoll impulse at full strength
--- @field RagdollMass what the horse collides with, in kilograms, divided by
---   the armor scale so armor is felt as weight rather than as a force
--- @field RagdollMassArmorScaled whether RagdollMass is divided by the armor
---   scale; false gives every victim the same mass, which is how the direction
---   of the effect is read
--- @field RagdollMassArmorExponent how sharply armor is felt as weight. The
---   base cancels out of the ratio between an armored victim's mass and an
---   unarmored one, so only this widens the gap between them
 -- @field ArmorReferenceWeight armor weight that scales a target by exactly one
 -- @field ArmorImpulseExponent how sharply armor weight reduces the impulse
 -- @field MinArmorImpulse floor on the armor impulse multiplier
@@ -536,22 +528,6 @@ HorseCollisionMod.Config = {
 	-- Knockdown impulse. Trot and gallop only; the walk tier never ragdolls.
 	Knockback                = 50.0,
 	Uplift                   = 30.0,
-
-	-- What the horse is hitting, in kilograms, divided by the armor scale so
-	-- a man in mail is the heavier thing to move. Every human is 80 to the
-	-- physics engine, which is why armor has never been felt in a throw.
-	-- 0 leaves the engine's own figure alone.
-	RagdollMass              = 80.0,
-	RagdollMassArmorScaled   = false,
-
-	-- How hard armor is felt as weight. The mass written is the base over the
-	-- armor scale raised to this, so the ratio between an armored victim and
-	-- an unarmored one is the scale ratio raised to it as well. The base
-	-- cancels out of that ratio entirely, which is why 40 and 80 both left
-	-- armored and unarmored victims traveling the same distance: both
-	-- present the horse with the same 3.4x spread. Above 1 widens the spread;
-	-- 1 is the plain division and 0 removes the scaling.
-	RagdollMassArmorExponent = 3.7,
 
 	-- What the target is wearing, as a multiplier on the impulse and on the
 	-- horse's stamina cost. Both are 1.0 at ArmorReferenceWeight; an
@@ -1473,21 +1449,16 @@ HorseCollisionMod.ReactionEndCeilingMs = 12000
 -- activity it tears down takes any prop the NPC was holding with it.
 HorseCollisionMod.ReplanHaltSpeed = 1
 
--- When to try setting a ragdolled victim's mass, in milliseconds from the
--- moment the reaction starts. Not an LDoc item: the generator rejects a
--- documented table that carries array entries.
+--- How long after `actor:Fall` the victim is a physics body, in milliseconds.
 --
--- A ladder rather than a single delay. Mass only takes once the body is
--- physicalized, and how long that takes is not fixed; the impulse path waits
--- `ImpulseDelayMs` for the same reason and was still measured applying to a
--- body that had not finished. Each rung is tried in turn and the first that
--- reads back is kept, so the telemetry reports which one won rather than the
--- code assuming one.
+-- One frame. Measured rather than chosen: the readiness probe this replaced
+-- reported the handover at 16 ms on every impact ever logged, never at 0 and
+-- never at any of the four longer rungs it also offered.
 --
--- The rungs are tight because the horse is the thing being raced. At ten
--- meters per second it covers a centimeter every millisecond, so a mass that
--- arrives late arrives after the collision it was meant to change.
-HorseCollisionMod.RagdollMassAttemptsMs = { 0, 16, 33, 50, 80, 120 }
+-- Before this, the brake and the damping waited on a probe that wrote a mass
+-- and read it back to find out. The answer never varied, so the probe was
+-- machinery around a constant.
+HorseCollisionMod.PhysicsReadyMs = 16
 
 --- How often a provoked victim is sampled while the incident is open.
 --

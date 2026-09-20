@@ -30,6 +30,18 @@ number.
 
 ## [Unreleased]
 
+## [5.28.0] - 2026-09-20
+
+### Removed
+- `RagdollMass`, `RagdollMassArmorScaled` and `RagdollMassArmorExponent`. They
+  presented a weight lever the mod did not have: the scaling shipped switched
+  off, so the mod wrote the engine's own 80 kg over itself on every victim.
+  Switched on, the exponent needed to make armor visible in a throw put a
+  mailed guard past a tonne, which canceled the knockback, the uplift and the
+  barding force bonus for anyone in armor. What a victim is wearing is
+  separated by the ragdoll brake instead. Deleting the three lines from an
+  existing settings file is optional; they are ignored.
+
 ## [5.27.0] - 2026-09-20
 
 ### Added

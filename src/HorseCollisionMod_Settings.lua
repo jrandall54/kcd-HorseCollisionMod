@@ -33,31 +33,6 @@ HorseCollisionModSettings = {
 	Knockback                = 50.0,  -- horizontal, higher throws further
 	Uplift                   = 30.0,  -- vertical, higher throws upward
 
-	-- What the horse collides with, in kilograms. The engine gives every
-	-- human 80, and this is written over it.
-	--
-	-- **It is deliberately the engine's own figure, and the armor scaling is
-	-- off.** Armor is separated by the brake instead, which removes a
-	-- commanded fraction of a thrown body's speed rather than lying about
-	-- what a person weighs.
-	--
-	-- The scaling divided the base by the armor scale raised to the exponent,
-	-- with nothing bounding the result. At base 100 and exponent 3.7 that ran
-	-- from 43 kg for an unarmored villager to 1,208 kg for a mailed guard and
-	-- 501,187 kg at an armor scale of 0.10, which real guards score. Between
-	-- scale 0.35 and 0.10 the mass moved by a factor of a hundred. It was a
-	-- cliff rather than a scale, and it made everything stacked on top of it
-	-- meaningless: an impulse of 58 against 1,208 kg moves a guard five
-	-- centimeters per second, so the knockback, the uplift and the whole
-	-- barding force bonus did nothing to anyone in armor.
-	--
-	-- The write itself stays, and the value is not zero. It doubles as the
-	-- signal that the body has physicalized as a ragdoll, which is what the
-	-- impulse waits for, so writing the engine's own 80 keeps the handshake
-	-- while changing nothing about what the horse hits.
-	RagdollMass              = 80.0,
-	RagdollMassArmorScaled   = false,
-	RagdollMassArmorExponent = 3.7,
 	-- How hard a traveling body is dragged, which is the figure that actually
 	-- holds it, and the lever that decides how far an armored victim goes.
 	-- The ceiling below only decides when the drag starts: past the ceiling
