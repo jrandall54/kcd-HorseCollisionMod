@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
 -- A sum over a person has to exclude them and a sum over a horse has to be
@@ -299,6 +299,65 @@ function HorseCollisionMod:ArmorImpulseScale(armor)
 end
 
 
+--- Where a target sits between "fully armored" and "unarmored", 0 to 1.
+--
+-- `ArmorImpulseScale` answers a multiplier, and four separate things then want
+-- a *position* rather than a multiplier: the brake, the ragdoll speed cap, the
+-- air damping and the recovery delay each interpolate their own pair of
+-- figures across the same span. All four derived that position themselves,
+-- from the same two settings, in four copies of the same seven lines.
+--
+-- The span is `RagdollBrakeArmorScaleArmored` to
+-- `RagdollBrakeArmorScaleUnarmored`, which are named for the brake because
+-- that is what first needed them. They are not the same pair as
+-- `MinArmorImpulse` and `MaxArmorImpulse`, which bound the curve itself: the
+-- unarmored endpoint here is 1.26 against a curve ceiling of 1.5, and it is
+-- deliberately inside the curve's range. Measured, ordinary villagers score
+-- about 1.15, so they land near but not at 1, which is why the log's `keep` is
+-- rarely the figure `RagdollBrakeKeepUnarmored` names. Reading the endpoints as
+-- describing a bracket rather than a delivered value is the way round it.
+--
+-- @tparam[opt] number armorScale a value from `ArmorImpulseScale`
+-- @treturn number 0 at the armored endpoint, 1 at the unarmored one
+function HorseCollisionMod:ArmorLerp(armorScale)
+	local lo = self.Config.RagdollBrakeArmorScaleArmored
+	local hi = self.Config.RagdollBrakeArmorScaleUnarmored
+
+	if not armorScale or not lo or not hi or hi <= lo then
+		return 1.0
+	end
+
+	local t = (armorScale - lo) / (hi - lo)
+
+	if t < 0 then
+		return 0
+	end
+
+	if t > 1 then
+		return 1
+	end
+
+	return t
+end
+
+
+--- One pair of figures interpolated across a target's armor.
+--
+-- The shape every consumer of `ArmorLerp` wanted. `armored` is what a victim
+-- in full mail gets and `unarmored` is what a victim in none gets; everyone
+-- else lands between them.
+--
+-- @tparam[opt] number armorScale a value from `ArmorImpulseScale`
+-- @tparam number armored the figure at the armored endpoint
+-- @tparam number unarmored the figure at the unarmored endpoint
+-- @treturn number the interpolated figure
+function HorseCollisionMod:ArmorBlend(armorScale, armored, unarmored)
+	local t = self:ArmorLerp(armorScale)
+
+	return armored + ((unarmored - armored) * t)
+end
+
+
 --- The stamina multiplier for a target's armor.
 --
 -- Composes with the combat multiplier already applied, and is the same shape
@@ -374,7 +433,7 @@ function HorseCollisionMod:ImpactDamageScale(armor)
 		smashDef = armor.smashDef
 	end
 
-	local ignored = self.Config.ImpactDamageIgnoredArmor or 0
+	local ignored = self.Config.ImpactDamageIgnoredArmor
 	local worn = smashDef - ignored
 
 	if worn <= 0 then
@@ -397,9 +456,9 @@ function HorseCollisionMod:ImpactDamageScale(armor)
 	-- makes a man weigh less than the animal standing on him, so there is a
 	-- share of an impact that plate should not be able to refuse. It is the
 	-- lowest multiplier armor can reach, applied after the curve.
-	local curve = self.Config.ImpactDamageArmorCurve or 1.0
+	local curve = self.Config.ImpactDamageArmorCurve
 	local falloff = 1.0 / (1.0 + ((worn / scale) ^ curve))
-	local floor = self.Config.ImpactDamageArmorFloor or 0
+	local floor = self.Config.ImpactDamageArmorFloor
 
 	if falloff < floor then
 		falloff = floor
@@ -445,7 +504,7 @@ function HorseCollisionMod:BardingCoverage(horseEnt)
 		return 0
 	end
 
-	local full = cfg.BardingFullSmashDef or 1.5
+	local full = cfg.BardingFullSmashDef
 
 	if full <= 0 then
 		return 0
@@ -506,7 +565,7 @@ end
 -- @treturn number a multiplier on impact damage, 1 on a bare horse
 function HorseCollisionMod:BardingDamageScale(horseEnt)
 	return 1.0 + (self:BardingCoverage(horseEnt)
-			* (self.Config.BardingDamageBonus or 0))
+			* (self.Config.BardingDamageBonus))
 end
 
 --- What barding saves the horse in stamina.
@@ -519,5 +578,5 @@ end
 -- @treturn number a multiplier on the stamina cost, 1 on a bare horse
 function HorseCollisionMod:BardingStaminaScale(horseEnt)
 	return 1.0 - (self:BardingCoverage(horseEnt)
-			* (self.Config.BardingStaminaRelief or 0))
+			* (self.Config.BardingStaminaRelief))
 end

@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Log
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 --- The engine clock in milliseconds.
 --
 -- `System.GetCurrTime` returns seconds as a float and `os.clock` returns nil
@@ -231,27 +231,6 @@ function HorseCollisionMod:Log(message)
 	System.LogAlways("[HorseCollisionMod] " .. tostring(message))
 end
 
---- Resolves a speed to its gait name.
--- @tparam number speed speed in meters per second
--- @treturn string one of "Gallop", "Trot", "Walk" or "Idle"
-function HorseCollisionMod:GetSpeedTier(speed)
-	local cfg = self.Config
-
-	if speed >= cfg.SpeedGallop then
-		return "Gallop"
-	end
-
-	if speed >= cfg.SpeedTrot then
-		return "Trot"
-	end
-
-	if speed >= cfg.SpeedWalk then
-		return "Walk"
-	end
-
-	return "Idle"
-end
-
 --- The detection interval in milliseconds.
 --
 -- `TickSeconds` is the one figure the loop rate and the forward sweep are both
@@ -260,7 +239,7 @@ end
 --
 -- @treturn number milliseconds between detection ticks
 function HorseCollisionMod:TickMs()
-	local seconds = self.Config.TickSeconds or 0.1
+	local seconds = self.Config.TickSeconds
 
 	if seconds < 0.016 then
 		seconds = 0.016

@@ -22061,3 +22061,78 @@ of street because they are different events.
 `SendHostilePerception` and the scream that goes with it are now one call,
 `FrightenBystander`, shared by both bands; only the rank the scream is
 submitted at comes from the caller, since each move carries its own settings.
+
+---
+
+### Build: 5.27.0 — the balance pass, stage 0
+
+Desk work, no rides. The sweep's first stage is the one that has to happen
+before any figure is set, because a number that exists in three files cannot be
+tuned. The full audit behind it is `docs/BALANCE_AUDIT.md`.
+
+**What was wrong.** Eight per-tier tables were declared three times: in
+`Tiers.lua` beside their derivation, again as bare literals in the `Config`
+block, and again in the settings file. `TierValue` reads `Config` first and the
+module table only as a fallback, and `ApplySettings` replaces `Config[key]`
+outright rather than merging, so the module copy is consulted **only** when a
+player overrides one tier and leaves the others out. In every other case it is
+never read, which is why two of them had drifted without anyone noticing:
+`VictimBarkByTier.Charge` read `"rear"` in both compiled-in copies while the
+settings file shipped `"collision"`, and `RiderVocalByTier` was a whole tier
+apart between `Config` and the settings file, leaving `v_henry_hit_medium`
+declared, documented and unplayable.
+
+Alongside that, 168 settings were read as `cfg.Key or <literal>`. `Config` is a
+literal and `ApplySettings` never writes a nil into it, so every one of those
+right-hand sides was unreachable — and seventeen of them disagreed with the
+shipped value, `CameraShakeFrequency or 12` against a shipped 0.05 among them.
+They are also wrong in principle for a boolean: `cfg.Flag or true` reads `true`
+when the player set `false`.
+
+**What changed.**
+
+- The eight tables are declared once, in `Tiers.lua`, and bound into `Config` by
+  a loop at its foot. Deleting them from `Config` without that binding would
+  have been worse than leaving them: `ApplySettings` refuses a key `Config` does
+  not carry, so a player's overrides would have been rejected at load.
+- All 168 inline fallbacks removed.
+- `RisePollMs` and `RiseCeilingMs` were read by `Recovery.lua` and declared
+  nowhere, so they were refused by `ApplySettings` and could never be tuned.
+  Both are now settings.
+- `ShieldVictimFromEngineDamage` and `VictimFlatFraction` had different defaults
+  in `Config` than the values the settings file ships. The defaults now match
+  what runs, so deleting either line from a settings file is a no-op rather than
+  a silent behaviour change.
+- `GetSpeedTier` moved from `Log.lua` to `Tiers.lua`.
+- The armor span was re-derived in four places from the same two endpoints, in
+  four copies of the same seven lines, and the unarmored endpoint (1.26) is not
+  the armor curve's own ceiling (1.5). `Armor.lua` now carries `ArmorLerp` and
+  `ArmorBlend`; the four consumers are one line each and the endpoints are read
+  in exactly one place.
+- `CalculateRecoveryDuration` fell back to an invented 1.5 seconds for a tier
+  with no entry. It returns `RecoveryMinSec` instead.
+- `tools/audit_code.py` gained three checks for the class of defect above: tier
+  tables declared but never bound, settings shadowed by an inline fallback, and
+  `Config` defaults disagreeing with the settings file. `pre_release_check.py`
+  learned about the binding so its `@field` check still sees the eight tables.
+
+**Verified live**, by console probe against the running game rather than by
+reading the source:
+
+    STAGE0 damage gallop=95 bark charge=collision reaction rear=fall
+           shield=true risePoll=160 lerp(1.26)=1 lerp(0.35)=0 blend=0.45
+           tier(9)=Gallop
+    STAGE0 partial gallop=200 trot=18
+    STAGE0 restored trot=18 gallop=95
+
+The second line is the one that matters: with `Config.ImpactDamageByTier` set to
+`{ Gallop = 200 }`, a gallop reads 200 and a trot still reads 18. The partial
+override contract `Tiers.lua` documents is real, and it is now backed by the
+same figures the shipped build runs. `Settings: 30 applied, 0 ignored` on load
+confirms no key is being refused.
+
+**Thoughts & Conclusions**: No behaviour changed and none was meant to. Every
+tunable now has exactly one declaration, and three mechanical checks stand
+between the project and this happening again. The four rulings in section 5 of
+the audit are what stage 1 needs, and they are decisions rather than
+measurements.

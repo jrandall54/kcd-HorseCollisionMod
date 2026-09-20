@@ -7,7 +7,7 @@
 --
 -- @module HorseCollisionMod.Tutorial
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 
 HorseCollisionMod.TutorialsShown = HorseCollisionMod.TutorialsShown or {}
 
@@ -32,7 +32,7 @@ function HorseCollisionMod:FormatTutorialText(name)
 
 	if name == "rear" then
 		local btn = pad and "[L-Stick]"
-				or ("[" .. string.upper(cfg.RearOnlyKey or "f") .. "]")
+				or ("[" .. string.upper(cfg.RearOnlyKey) .. "]")
 		return "Horsemanship: Rear Maneuver\n\n"
 				.. "Bring your horse to a stop and press " .. btn
 				.. " to rear up and strike anyone ahead.\n\n"
@@ -40,7 +40,7 @@ function HorseCollisionMod:FormatTutorialText(name)
 				.. "- Warning: Striking innocent bystanders is a crime!"
 	elseif name == "charge" then
 		local btn = pad and "[LT]"
-				or ("[" .. string.upper(cfg.RearChargeKey or "r") .. "]")
+				or ("[" .. string.upper(cfg.RearChargeKey) .. "]")
 		return "Horsemanship: Rear Charge\n\n"
 				.. "Bring your horse to a stop and press " .. btn
 				.. " to lunge forward, trampling anyone in your path.\n\n"
@@ -48,9 +48,9 @@ function HorseCollisionMod:FormatTutorialText(name)
 				.. "- Warning: Trampling innocent bystanders is a crime!"
 	elseif name == "lean" then
 		local left = pad and "[LB]"
-				or ("[" .. string.upper(cfg.LeanLeftKey or "q") .. "]")
+				or ("[" .. string.upper(cfg.LeanLeftKey) .. "]")
 		local right = pad and "[RB]"
-				or ("[" .. string.upper(cfg.LeanRightKey or "e") .. "]")
+				or ("[" .. string.upper(cfg.LeanRightKey) .. "]")
 		return "Horsemanship: Saddle Lean\n\n"
 				.. "While mounted, hold " .. left .. " or " .. right
 				.. " to lean out and look past your horse's head."

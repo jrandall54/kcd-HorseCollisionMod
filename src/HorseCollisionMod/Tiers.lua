@@ -17,13 +17,16 @@
 -- not, per key rather than per table, so a player who overrides three tiers
 -- still gets shipped values for the other two.
 --
--- This file defines data and one accessor: it is pulled in by
+-- This file defines the data, one accessor, and the binding at its foot that
+-- puts every table into `Config` so the settings file can reach it. It is the
+-- only declaration of any of those figures: the entry point carried a second
+-- copy of all eight, and they drifted. It is pulled in by
 -- `Script.ReloadScript` from `Scripts/Startup/HorseCollisionMod.lua` and
 -- re-running it is harmless.
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 
 --- One tier's value for one concern.
 --
@@ -57,6 +60,37 @@ function HorseCollisionMod:TierValue(name, tierName)
 	end
 
 	return nil
+end
+
+--- Resolves a speed to the tier it falls in.
+--
+-- The three loop tiers are speed bands and this is where a speed becomes one
+-- of them. It sat in `Log.lua` for as long as the telemetry was the only thing
+-- that named a gait out loud; tier identity is this file's subject, so it
+-- belongs beside the tables that say what each tier is worth.
+--
+-- The rear and the charge are not reachable from here. They are commanded
+-- moves rather than speed bands, and their entry points name their own tier
+-- and score it at `RearImpactSpeed` and `RearChargeImpactSpeed`.
+--
+-- @tparam number speed speed in meters per second
+-- @treturn string one of "Gallop", "Trot", "Walk" or "Idle"
+function HorseCollisionMod:GetSpeedTier(speed)
+	local cfg = self.Config
+
+	if speed >= cfg.SpeedGallop then
+		return "Gallop"
+	end
+
+	if speed >= cfg.SpeedTrot then
+		return "Trot"
+	end
+
+	if speed >= cfg.SpeedWalk then
+		return "Walk"
+	end
+
+	return "Idle"
 end
 
 --- What each tier is worth in health, before armor.
@@ -193,3 +227,45 @@ HorseCollisionMod.StaminaPerVictimByTier = {
 	Rear = false,
 	Charge = false,
 }
+
+--- Binds every table above into `Config`, which is the only place a player can
+--- reach them from.
+--
+-- `ApplySettings` refuses a settings key that `Config` does not already
+-- declare, so a tier table that lived only on this module could never be
+-- overridden at all. Both were therefore declared, with the value written out
+-- twice: once here beside its derivation and once as a bare literal in the
+-- entry point. The two drifted. `VictimBarkByTier.Charge` read "rear" in one
+-- and "collision" in the other, and `RiderVocalByTier` was a whole tier apart,
+-- and neither difference was visible, because a whole-table override hides the
+-- module copy until a player overrides a single tier.
+--
+-- Bound rather than copied, so there is one literal per concern and the two
+-- lookups `TierValue` makes have distinct jobs rather than duplicate contents:
+--
+--   * `Config[name]` is the whole table, replaced outright when the settings
+--     file carries one, because `ApplySettings` assigns rather than merges.
+--   * `self[name]` is this module's own table, which that assignment cannot
+--     reach, and is therefore the per-tier floor under a partial override.
+--
+-- A player who writes `ImpactDamageByTier = { Gallop = 200 }` gets 200 for a
+-- gallop and the shipped figures for the other four, and those figures are now
+-- the same ones the shipped build runs.
+--
+-- Re-running this file rebinds `Config` to the shipped tables and so discards
+-- an applied override, which is harmless: every path that reloads the mod
+-- reloads the settings file and calls `ApplySettings` after it.
+HorseCollisionMod.TierTables = {
+	"ImpactDamageByTier",
+	"StaminaDrainByTier",
+	"ReactionByTier",
+	"ThrowByTier",
+	"HitStrengthByTier",
+	"VictimBarkByTier",
+	"RetaliationByTier",
+	"StaminaPerVictimByTier",
+}
+
+for _, hcmTierTable in ipairs(HorseCollisionMod.TierTables) do
+	HorseCollisionMod.Config[hcmTierTable] = HorseCollisionMod[hcmTierTable]
+end

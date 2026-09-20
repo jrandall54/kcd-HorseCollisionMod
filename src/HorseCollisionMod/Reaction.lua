@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -138,8 +138,8 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- the victim in the first place.
 	if self.Config.ReleaseAnimationMovement then
 		local generation = self.TimerTick
-		local attempts = self.Config.ReleaseMovementAttempts or 4
-		local gap = self.Config.ReleaseMovementGapMs or 80
+		local attempts = self.Config.ReleaseMovementAttempts
+		local gap = self.Config.ReleaseMovementGapMs
 
 		for index = 1, attempts do
 			Script.SetTimer(50 + ((index - 1) * gap), function()
@@ -374,7 +374,7 @@ end
 -- @tparam number armorScale the tier's armor multiplier, high for an
 --   unarmored target and low for one in mail
 function HorseCollisionMod:MassVictim(npc, armorScale, onTook)
-	local base = self.Config.RagdollMass or 0
+	local base = self.Config.RagdollMass
 
 	-- Zero means "do not touch the mass", and it must still hand control on.
 	--
@@ -456,7 +456,7 @@ function HorseCollisionMod:MassVictim(npc, armorScale, onTook)
 	-- raised to k and the base cancels out of it. Bases of 80 and 40 both
 	-- present the horse with the same 3.4x spread and both measured at parity;
 	-- k is what moves that number.
-	local exponent = self.Config.RagdollMassArmorExponent or 1.0
+	local exponent = self.Config.RagdollMassArmorExponent
 
 	if exponent ~= 1.0 then
 		scale = scale ^ exponent
@@ -566,17 +566,17 @@ end
 --   unarmored victim and low for one in mail, the same figure the ragdoll mass
 --   is derived from. Chooses the commanded throw distance
 function HorseCollisionMod:DampVictim(npc, armorScale)
-	local damping = self.Config.RagdollDamping or 0
-	local minEnergy = self.Config.RagdollMinEnergy or 0
+	local damping = self.Config.RagdollDamping
+	local minEnergy = self.Config.RagdollMinEnergy
 
 	local npcId = tostring(npc.id)
 	self.RagdollUnsettled = self.RagdollUnsettled or {}
 	self.RagdollUnsettled[npcId] = true
 
-	local pollMs = self.Config.RagdollDampPollMs or 100
-	local settleAt = self.Config.RagdollDampSettleSpeed or 0.5
-	local floorMs = self.Config.RagdollDampFloorMs or 200
-	local ceilingMs = self.Config.RagdollDampCeilingMs or 6000
+	local pollMs = self.Config.RagdollDampPollMs
+	local settleAt = self.Config.RagdollDampSettleSpeed
+	local floorMs = self.Config.RagdollDampFloorMs
+	local ceilingMs = self.Config.RagdollDampCeilingMs
 	local generation = self.TimerTick
 	local startedAt = self:TimeMs()
 
@@ -591,41 +591,22 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 	local keep = 1.0
 
 	if self.Config.RagdollBrake then
-		local heavy = self.Config.RagdollBrakeKeepArmored or 0.45
-		local light = self.Config.RagdollBrakeKeepUnarmored or 1.0
-		local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
+		-- Interpolated across the armor span rather than delivered outright,
+		-- which is why `keep` in the log is rarely the figure the settings
+		-- name: an ordinary villager scores about 1.15 against an unarmored
+		-- endpoint of 1.26, so they are braked by six percent where the
+		-- setting reads "untouched". `ArmorLerp` carries the reasoning.
+		keep = self:ArmorBlend(armorScale,
+				self.Config.RagdollBrakeKeepArmored,
+				self.Config.RagdollBrakeKeepUnarmored)
 
-		-- The unarmored endpoint, and the reason `keep` in the log is rarely
-		-- the figure the settings name.
-		--
-		-- `keep` is interpolated across this bracket, so a victim only
-		-- receives `RagdollBrakeKeepUnarmored` if their armor scale reaches
-		-- this endpoint exactly. Measured, ordinary villagers score about
-		-- 1.15 against an endpoint of 1.26, so they are braked by six percent
-		-- where the setting reads "untouched". That is wanted here, since the
-		-- engine's throws run long at every armor level, but the setting is
-		-- then describing an endpoint rather than a delivered figure and
-		-- should be read that way.
-		local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
-		local t = 1.0
-
-		if armorScale and hi > lo then
-			t = (armorScale - lo) / (hi - lo)
-			if t < 0 then
-				t = 0
-			elseif t > 1 then
-				t = 1
-			end
-		end
-
-		keep = heavy + ((light - heavy) * t)
 		if keep < 0.02 then
 			keep = 0.02
 		end
 	end
 
 	if self.Config.RagdollBrake and keep < 1.0 then
-		local delayMs = (self.Config.ImpulseDelayMs or 50) + 10
+		local delayMs = (self.Config.ImpulseDelayMs) + 10
 
 		Script.SetTimer(delayMs, function()
 			-- The same generation guard every other timer in this file
@@ -873,35 +854,21 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 		-- subtraction, so it does not care when the engine stops pushing: a
 		-- body held under 2.5 m/s cannot travel like one allowed 6.0 however
 		-- it got its speed.
-		local cap = self.Config.RagdollSpeedSoftCap or 0
+		local cap = self.Config.RagdollSpeedSoftCap
 
 		if self.Config.RagdollSpeedCapArmorScaled and armorScale then
-			local heavy = self.Config.RagdollSpeedCapArmored or 2.5
-			local light = self.Config.RagdollSpeedCapUnarmored or 6.0
-			local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
-			local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
-			local t = 1.0
-
-			if hi > lo then
-				t = (armorScale - lo) / (hi - lo)
-
-				if t < 0 then
-					t = 0
-				elseif t > 1 then
-					t = 1
-				end
-			end
-
-			cap = heavy + ((light - heavy) * t)
+			cap = self:ArmorBlend(armorScale,
+					self.Config.RagdollSpeedCapArmored,
+					self.Config.RagdollSpeedCapUnarmored)
 		end
 
 		lastCap = cap
 
 		if cap > 0 and speed and
-				touching < (self.Config.RagdollDampContactRun or 3) then
+				touching < (self.Config.RagdollDampContactRun) then
 			local strength = 0
 			if speed > cap then
-				strength = (speed - cap) / (self.Config.RagdollSpeedSoftCapSpan or 6.0)
+				strength = (speed - cap) / (self.Config.RagdollSpeedSoftCapSpan)
 				if strength > 1 then
 					strength = 1
 				end
@@ -927,26 +894,12 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 			-- before it was tested, on the grounds it would read as syrup. The
 			-- rider rode armored victims at a flat 15.0 and reported no syrup
 			-- at all, so the objection is already withdrawn on evidence.
-			local drag = self.Config.RagdollAirDamping or 3.0
+			local drag = self.Config.RagdollAirDamping
 
 			if self.Config.RagdollAirDampingArmorScaled and armorScale then
-				local heavy = self.Config.RagdollAirDampingArmored or 20.0
-				local light = self.Config.RagdollAirDampingUnarmored or 4.0
-				local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
-				local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
-				local t = 1.0
-
-				if hi > lo then
-					t = (armorScale - lo) / (hi - lo)
-
-					if t < 0 then
-						t = 0
-					elseif t > 1 then
-						t = 1
-					end
-				end
-
-				drag = heavy + ((light - heavy) * t)
+				drag = self:ArmorBlend(armorScale,
+						self.Config.RagdollAirDampingArmored,
+						self.Config.RagdollAirDampingUnarmored)
 			end
 
 			lastDrag = drag
@@ -959,9 +912,9 @@ function HorseCollisionMod:DampVictim(npc, armorScale)
 		end
 
 		if moving and elapsed >= floorMs
-				and touching >= (self.Config.RagdollDampContactRun or 3) then
-			local ramp = self.Config.RagdollDampRampSamples or 8
-			local share = (touching - (self.Config.RagdollDampContactRun or 3)) / ramp
+				and touching >= (self.Config.RagdollDampContactRun) then
+			local ramp = self.Config.RagdollDampRampSamples
+			local share = (touching - (self.Config.RagdollDampContactRun)) / ramp
 
 			if share > 1 then
 				share = 1
@@ -1054,7 +1007,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 
 			if npc.actor then
 				npc.actor:StartInteractiveActionByName(
-					self.Config.SettleFragTag or "hcm_settle",
+					self.Config.SettleFragTag,
 					npc.id, false, 1.0)
 			end
 		end)
@@ -1179,7 +1132,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos, hor
 		-- reads better than picking a side, and never pushes anyone back
 		-- through the horse.
 		local across = { x = 0, y = 0 }
-		local lateral = self.Config.LateralImpulse or 0
+		local lateral = self.Config.LateralImpulse
 
 		if lateral > 0 and horsePos then
 			local side = ((hitPos.x - horsePos.x) * dir.y)
@@ -1250,7 +1203,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos, hor
 			-- impulse, and one applied too early is ignored without saying so.
 			-- The wait is settable because a fixed 50 ms produced throws of
 			-- four meters and of nothing at all from the same magnitude.
-			Script.SetTimer(self.Config.ImpulseDelayMs or 50, function()
+			Script.SetTimer(self.Config.ImpulseDelayMs, function()
 				local before, after = nil, nil
 
 				pcall(function()

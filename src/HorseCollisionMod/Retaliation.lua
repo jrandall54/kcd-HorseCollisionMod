@@ -74,7 +74,7 @@
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
@@ -189,7 +189,7 @@ function HorseCollisionMod:NoteAnnoyance(npc)
 	local id = tostring(npc.id)
 	local now = self:TimeMs()
 	local record = self.Annoyance[id]
-	local memory = (self.Config.RetaliationMemorySec or 0) * 1000
+	local memory = (self.Config.RetaliationMemorySec) * 1000
 
 	if record and memory > 0 and (now - record.at) > memory then
 		record = nil
@@ -216,15 +216,15 @@ end
 -- @tparam number count how many shoves this victim has taken
 -- @treturn number a chance between 0 and 1
 function HorseCollisionMod:RetaliationChance(count)
-	local free = self.Config.RetaliationFreeBumps or 0
+	local free = self.Config.RetaliationFreeBumps
 	local beyond = count - free
 
 	if beyond <= 0 then
 		return 0.0
 	end
 
-	local chance = beyond * (self.Config.RetaliationChanceStep or 0)
-	local ceiling = self.Config.RetaliationMaxChance or 1.0
+	local chance = beyond * (self.Config.RetaliationChanceStep)
+	local ceiling = self.Config.RetaliationMaxChance
 
 	if chance > ceiling then
 		chance = ceiling
@@ -380,7 +380,7 @@ end
 function HorseCollisionMod:WatchRetaliation(npc)
 	local generation = self.TimerTick
 	local interval = self.RetaliationPollMs
-	local ceiling = (self.Config.RetaliationCeilingSec or 120) * 1000
+	local ceiling = (self.Config.RetaliationCeilingSec) * 1000
 
 	local elapsed = 0
 	local finishedFor = 0
@@ -748,7 +748,7 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 			self.SurrenderHintCalm = (self.SurrenderHintCalm or 0) + 1
 
 			if self.SurrenderHintCalm
-					>= (self.Config.SurrenderHintCalmPasses or 6) then
+					>= (self.Config.SurrenderHintCalmPasses) then
 				self:HideSurrenderHint(true)
 
 				return
@@ -771,10 +771,10 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 			end
 		end)
 
-		Script.SetTimer(self.Config.SurrenderHintHoldMs or 1000, hold)
+		Script.SetTimer(self.Config.SurrenderHintHoldMs, hold)
 	end
 
-	Script.SetTimer(self.Config.SurrenderHintHoldMs or 1000, hold)
+	Script.SetTimer(self.Config.SurrenderHintHoldMs, hold)
 end
 
 --- Whether the game will raise its own surrender prompt for this victim.
@@ -1113,8 +1113,8 @@ function HorseCollisionMod:PullRiderDown(npc)
 		return false
 	end
 
-	local pollMs = self.Config.PullDownPollMs or 250
-	local ceilingMs = self.Config.PullDownCeilingMs or 8000
+	local pollMs = self.Config.PullDownPollMs
+	local ceilingMs = self.Config.PullDownCeilingMs
 	local generation = self.TimerTick
 	local startedAt = self:TimeMs()
 	local polls = 0
@@ -1287,7 +1287,7 @@ function HorseCollisionMod:PullRiderDown(npc)
 			-- it when it is ready, and without the offense released there is
 			-- little for it to be busy with, so this is a safety net rather
 			-- than the mechanism.
-			Script.SetTimer(self.Config.PullDownRepeatMs or 1500, attempt)
+			Script.SetTimer(self.Config.PullDownRepeatMs, attempt)
 
 			return
 		end

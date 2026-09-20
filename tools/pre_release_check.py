@@ -168,6 +168,14 @@ def check_config_docs():
                  "could not locate the Config table")]
 
     declared = set(re.findall(r"^\t(\w+)\s*=", block.group(1), re.M))
+
+    # The per-tier tables are settings too, and are documented by an @field
+    # line here, but they are not in the literal above: `Tiers.lua` declares
+    # each one beside its derivation and binds it into `Config` at its foot.
+    tiers = read(os.path.join("src", "HorseCollisionMod", "Tiers.lua"))
+    declared |= set(re.findall(r"^HorseCollisionMod\.(\w+ByTier)\s*=", tiers,
+                               re.M))
+
     found = []
 
     for key in sorted(declared - documented):

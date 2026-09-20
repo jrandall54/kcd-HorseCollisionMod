@@ -11,6 +11,17 @@ Three questions, each of which has produced real clutter before:
   * **Module tables.** A `HorseCollisionMod.Name = {...}` nothing indexes is the
     same problem one level up, and bark pools have been left behind this way.
 
+Three more ask the opposite question: not what has no declaration, but what has
+two. Each found real drift at 5.26.0, and each is the kind a reader cannot see.
+
+  * **Tier tables.** One declared in `Tiers.lua` but missing from the binding
+    loop at its foot never reaches `Config`, so `ApplySettings` refuses a
+    player's override of it.
+  * **Inline fallbacks.** `cfg.Key or 3.0` writes the number a second time, and
+    the copy cannot be reached, so it drifts unnoticed.
+  * **Default against shipped.** `Config` and the settings file carrying
+    different values means the documented default is not the one that runs.
+
 Read as a starting list, not a verdict: a name may be reached from a tool, from
 a console script or from a string. Every hit is reported with its line so it can
 be checked.
@@ -28,6 +39,7 @@ import sys
 SRC = "src"
 ENTRY = os.path.join(SRC, "HorseCollisionMod.lua")
 SETTINGS = os.path.join(SRC, "HorseCollisionMod_Settings.lua")
+TIERS = os.path.join(SRC, "HorseCollisionMod", "Tiers.lua")
 
 
 def lua_files():
@@ -77,6 +89,24 @@ def config_keys(text):
 	return out
 
 
+def tier_tables(text):
+	"""The per-tier tables `Tiers.lua` declares and binds into `Config`.
+
+	They are settings like any other and the settings file may override them,
+	but they are not written in the `Config` literal: `Tiers.lua` declares each
+	one beside its derivation and the loop at its foot puts it into `Config`.
+	Reading only the literal reports all eight as keys the settings file
+	declares and `Config` does not, which is the opposite of the truth.
+	"""
+	out = {}
+
+	for m in re.finditer(r"^HorseCollisionMod\.(\w+ByTier)\s*=\s*\{", text,
+			re.MULTILINE):
+		out[m.group(1)] = text[:m.start()].count("\n") + 1
+
+	return out
+
+
 def main():
 	ap = argparse.ArgumentParser()
 	ap.add_argument("--settings", action="store_true", help="settings only")
@@ -88,7 +118,105 @@ def main():
 	everything = "\n".join(code.values())
 
 	cfg = config_keys(bodies[ENTRY])
+	cfg.update(tier_tables(bodies[TIERS]))
 	in_settings = set(config_keys(bodies[SETTINGS]))
+
+	# Every table `Tiers.lua` declares must be in the binding loop at its foot,
+	# or `ApplySettings` rejects a player's override of it: the loop is what
+	# puts the key into `Config`, and a key `Config` does not carry is refused.
+	bound = set(re.findall(r'^\t"(\w+ByTier)",',
+			bodies[TIERS], re.MULTILINE))
+	unbound = sorted(set(tier_tables(bodies[TIERS])) - bound)
+
+	print("== Tier tables Tiers.lua declares but never binds (%d) =="
+			% len(unbound))
+
+	for key in unbound:
+		print("   %s" % key)
+
+	print()
+
+	# A second declaration of a setting, written as `cfg.Key or 3.0`.
+	#
+	# `Config` is a literal and `ApplySettings` never writes a nil into it, so
+	# the right-hand side is unreachable. It is not harmless: it is the same
+	# number written twice, and the two drift. Seventeen of them disagreed with
+	# the shipped default at 5.26.0, among them `CameraShakeFrequency or 12`
+	# against a shipped 0.05. It also breaks a boolean setting outright, since
+	# `cfg.Flag or true` reads `true` when the player set `false`.
+	fallback = re.compile(
+			r"(?:self\.Config|cfg)\.(\w+)\s+or\s+"
+			r"(-?\d+\.?\d*|true|false|\"[^\"]*\")")
+	shadowed = []
+
+	for path, text in sorted(code.items()):
+		if path == SETTINGS:
+			continue
+
+		for line_no, line in enumerate(text.split("\n"), 1):
+			for m in fallback.finditer(line):
+				if m.group(1) in cfg:
+					shadowed.append((os.path.basename(path), line_no,
+							m.group(0)))
+
+	print("== Settings shadowed by an inline fallback (%d) ==" % len(shadowed))
+
+	for name, line_no, snippet in shadowed:
+		print("   %-22s %5d  %s" % (name, line_no, snippet))
+
+	print()
+
+	# The shipped default and the value the settings file actually carries.
+	#
+	# A player who deletes a line from their settings file falls back to
+	# `Config`, so the two disagreeing means the documented default is not the
+	# one the mod runs. `ShieldVictimFromEngineDamage` read `false` in `Config`
+	# while the settings file shipped `true`, which is the difference between a
+	# research switch and the mechanism the damage model rests on.
+	def scalars(text):
+		out = {}
+		start = text.index("HorseCollisionMod.Config"
+				if "HorseCollisionMod.Config" in text
+				else "HorseCollisionModSettings")
+		depth = 0
+
+		for line in text[start:].split("\n"):
+			m = re.match(r"^\t([A-Za-z_]\w*)\s*=\s*([^\n]+)$", line)
+
+			if m and depth == 1:
+				value = m.group(2).split("--")[0].strip().rstrip(",").strip()
+
+				if value and not value.endswith("{"):
+					out[m.group(1)] = value
+
+			depth += line.count("{") - line.count("}")
+
+			if depth <= 0 and out:
+				break
+
+		return out
+
+	shipped = scalars(bodies[ENTRY])
+	written = scalars(bodies[SETTINGS])
+	drifted = []
+
+	for key in sorted(set(shipped) & set(written)):
+		a, b = shipped[key], written[key]
+
+		try:
+			same = abs(float(a) - float(b)) < 1e-9
+		except ValueError:
+			same = a == b
+
+		if not same:
+			drifted.append((key, a, b))
+
+	print("== Defaults the settings file disagrees with (%d) ==" % len(drifted))
+
+	for key, a, b in drifted:
+		print("   %-34s Config %-10s settings %s" % (key, a, b))
+
+	print()
 
 	# A setting is used when something reads it off a table, which in this code
 	# is always `cfg.Name`, `self.Config.Name` or `Config.Name`.

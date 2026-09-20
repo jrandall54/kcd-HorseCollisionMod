@@ -14,7 +14,7 @@
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
@@ -545,7 +545,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 	-- Symmetric about the base, so the tier figure stays the average rather
 	-- than the floor and a setting can be reasoned about as "what this
 	-- usually costs".
-	local variance = self.Config.ImpactDamageVariance or 0
+	local variance = self.Config.ImpactDamageVariance
 	local spread = 1.0 + ((math.random() * 2.0) - 1.0) * variance
 
 	-- An armored horse hits harder. Small, because this is the one barding
@@ -654,7 +654,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 			was = npc.soul:GetState("health")
 		end)
 
-		Script.SetTimer(self.Config.ImpactDamageDelayMs or 600, function()
+		Script.SetTimer(self.Config.ImpactDamageDelayMs, function()
 			pcall(function()
 				if was then
 					npc.soul:SetState("health", was)
@@ -756,7 +756,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 				and type(atImpact) == "number" and type(before) == "number"
 				and before > 0 and before < atImpact then
 			local taken = atImpact - before
-			local ceiling = self.Config.ImpactDamageReclaimCeiling or 0
+			local ceiling = self.Config.ImpactDamageReclaimCeiling
 
 			if taken <= ceiling then
 				if pcall(function()

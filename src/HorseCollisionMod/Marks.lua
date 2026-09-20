@@ -29,7 +29,7 @@
 --
 -- @module HorseCollisionMod.Marks
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 
 --- Body zones bloodied for each impact direction.
 --
@@ -316,17 +316,17 @@ function HorseCollisionMod:DustWhenLanded(npc, tierName, scale, samples, falling
 
 	local vz = vel and vel.z or 0
 
-	if vz <= (cfg.ImpactDustFallVz or -0.5) then
+	if vz <= (cfg.ImpactDustFallVz) then
 		falling = true
 	end
 
-	local landed = falling and vz > (cfg.ImpactDustLandVz or -0.15)
-	local givenUp = samples >= (cfg.ImpactDustMaxSamples or 30)
+	local landed = falling and vz > (cfg.ImpactDustLandVz)
+	local givenUp = samples >= (cfg.ImpactDustMaxSamples)
 	local expired = not falling
-			and samples >= (cfg.ImpactDustFallWaitSamples or 8)
+			and samples >= (cfg.ImpactDustFallWaitSamples)
 
 	if not landed and not givenUp and not expired then
-		Script.SetTimer(cfg.ImpactDustSampleMs or 50, function()
+		Script.SetTimer(cfg.ImpactDustSampleMs, function()
 			self:DustWhenLanded(npc, tierName, scale, samples + 1, falling)
 		end)
 
@@ -338,7 +338,7 @@ function HorseCollisionMod:DustWhenLanded(npc, tierName, scale, samples, falling
 
 	local ok = pcall(function()
 		Particle.SpawnEffect(cfg.ImpactDustEffect,
-				{ x = at.x, y = at.y, z = at.z + (cfg.ImpactDustHeight or 0) },
+				{ x = at.x, y = at.y, z = at.z + (cfg.ImpactDustHeight) },
 				{ x = 0, y = 0, z = 1 },
 				scale)
 	end)

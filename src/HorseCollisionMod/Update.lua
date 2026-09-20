@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.26.0
+-- @release 5.27.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -203,7 +203,7 @@ function HorseCollisionMod:SafeUpdate()
 	-- gallop up a hill reads well under the threshold.
 	if velocity and self.Config.LogTelemetry then
 		local vz = velocity.z or 0
-		local trigger = self.Config.HorseAirborneVz or 2.5
+		local trigger = self.Config.HorseAirborneVz
 		local last = self.HorseAirborneAt or 0
 		local now = self:TimeMs()
 

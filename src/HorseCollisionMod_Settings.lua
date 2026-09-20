@@ -113,6 +113,10 @@ HorseCollisionModSettings = {
 	RecoveryGroundBarks       = true,
 	RecoveryBarkIntervalMs    = 1400,  -- ms between pain moans while down
 
+	-- Waiting for a victim to be back on their feet.
+	RisePollMs                = 160,   -- how often to look
+	RiseCeilingMs             = 15000, -- how long before the wait is given up
+
 	-- Native Engine Ragdoll Stillness CVars
 	-- Set the time and speed threshold required for ragdoll recovery.
 	RagdollStillDuration        = 0.8,
