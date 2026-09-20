@@ -196,8 +196,8 @@ animation database, which is uncommon.
 
 ## Planned
 
-Injuries that outlast the impact. Making how bad a collision was easier to read.
-Morale, so a charge through a line breaks it. A braced polearm stopping a charge.
+Morale, so a rear frightens people the hooves never reach and a charge through a
+line breaks it. A braced polearm stopping a charge.
 
 `ROADMAP.md` has the detail.
 
@@ -206,7 +206,7 @@ Morale, so a charge through a line breaks it. A braced polearm stopping a charge
 ```
 build.ps1                 the one build entry point
 CHANGELOG.md              what changed in each release
-ROADMAP.md                what is planned, and what each phase established
+ROADMAP.md                what is still open and what is planned
 config.ld                 LDoc configuration for the API reference
 .luarc.json               Lua language server settings, including engine globals
 .gitattributes            how files are stored, so line endings do not drift
