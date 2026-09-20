@@ -262,7 +262,7 @@ HorseCollisionModSettings = {
 	-- The near miss. A horse rearing is not in itself frightening and not a
 	-- crime; what frightens a man is the hooves coming down a stride away
 	-- from him. So the band is not a sweep of the area but a margin around
-	-- the strike, one metre of ground past where the hooves reach. It has no
+	-- the strike, one meter of ground past where the hooves reach. It has no
 	-- arc, unlike the strike: a man the horse reared beside saw the same
 	-- thing as a man it reared in front of.
 	RearFear                 = true,

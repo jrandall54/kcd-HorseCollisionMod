@@ -21997,7 +21997,7 @@ choice it always makes.
   path, so the fight-or-run decision is the game's own and the mod forces
   neither side of it.
 - The band was first a sweep, 8 m and a 140 degree arc, and frightened the
-  whole street. It is now 3.5 m, one metre past where the hooves reach, and
+  whole street. It is now 3.5 m, one meter past where the hooves reach, and
   has **no arc at all**: a man the horse reared beside saw the same thing as a
   man it reared in front of. Rearing is not in itself a crime or a fright; the
   hooves coming down a stride away is.
