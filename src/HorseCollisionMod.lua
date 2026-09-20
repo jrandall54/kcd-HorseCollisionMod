@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.25.0
+-- @release 5.26.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.25.0"
+HorseCollisionMod.Version = "5.26.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -199,6 +199,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeStrikeMs how long the strike sweeps for
 -- @field RearChargeStrikePollMs how often it sweeps
 -- @field RearChargeImpactSpeed the speed a charge is scored at
+-- @field RearChargeFear whether a charge frightens the people it goes past
+--   without running down
+-- @field RearChargeFearReach how far that near miss reaches, in meters, all
+--   round the horse as it goes. Wider than the rear's band, because the
+--   margin is the ground a charging horse covers rather than the room a man
+--   stands in
+-- @field RearChargeFearScreamPriority the rank that scream is submitted at
 -- @field ImpactDustEffectRear the particle to spawn for a rear impact
 -- @field RearChargeImpulse the physical push that carries the charge, applied
 --   once the rear animation has ended so the horse collides normally
@@ -707,6 +714,9 @@ HorseCollisionMod.Config = {
 	RearChargeStrikeMs       = 1600,
 	RearChargeStrikePollMs   = 50,
 	RearChargeImpactSpeed    = 7.5,
+	RearChargeFear           = true,
+	RearChargeFearReach      = 4.8,
+	RearChargeFearScreamPriority = 50,
 	RearChargeImpulse        = 6000,
 	RearChargeLift           = 0.2,
 	RearChargeWaitMs         = 400,

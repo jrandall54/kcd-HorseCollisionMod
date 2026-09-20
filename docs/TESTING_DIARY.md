@@ -22024,3 +22024,40 @@ watcher was removed with the second line it existed for.
 `Bark` now takes an optional priority and an optional suppression override per
 call, which is what let both of those be ruled out one at a time rather than
 guessed at.
+
+---
+
+### Build: 5.26.0 — fear around a charge
+
+**Hypothesis**: The near miss the rear got should exist for the charge too.
+The mechanism is settled — `combat:stimulus:hostilePerception` plus the
+`NASILI_UTEK` scream at the moment of the fright — so the only open questions
+were who the charge misses and how far the fright carries.
+
+**Results**:
+- The band has to be sampled along the lunge rather than once. A charge covers
+  ground, and a man passed at the start of it is well behind the horse by the
+  end, so the band is measured from wherever the horse is each sweep tick and a
+  set of who has already been frightened carries across the ticks.
+- The lane in front is excluded while the charge is still coming. A man
+  standing in it is not being missed, he is about to be ridden down, and a
+  scream and a flee a stride before the chest arrives would land on a man the
+  next tick knocks flat. A single closing pass as the lunge dies drops the lane
+  test, which is what speaks for the man the charge came at and fell short of.
+- **The rear's margin does not describe a charge.** 2.8 m, the charge corridor
+  plus the same one meter the rear's band uses, was judged too small by the
+  rider on a ride through a group. A rear is a noise in one place and the
+  fright is the hooves landing a stride away; a charge is a horse that will be
+  where the man is standing in a moment, so the margin is the ground the horse
+  covers rather than the room a man stands in. `RearChargeFearReach` is the
+  1.8 m corridor plus a second of lunge at `RearChargeLungePeakMin`, the
+  slowest a lunge may be and still count as one, which is 4.8 m.
+
+**Thoughts & Conclusions**: The spread of who reacts to a charge was judged
+right at 4.8 m. The charge's band being wider than the rear's is the intended
+end state and not a tuning accident — the two moves frighten different amounts
+of street because they are different events.
+
+`SendHostilePerception` and the scream that goes with it are now one call,
+`FrightenBystander`, shared by both bands; only the rank the scream is
+submitted at comes from the caller, since each move carries its own settings.
