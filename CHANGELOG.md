@@ -11,6 +11,13 @@ change even when nothing about it looks like an API.
 
 Entries land under `## [Unreleased]
 
+### Added
+- A rear now frightens the people it misses. Anyone within `RearFearReach` of a
+  rear who is not struck by it reacts to the rider as a threat, and decides for
+  themselves whether to run or to turn on him. Most villagers run; a guard is
+  more likely to come for you. Governed by `RearFear`.
+- Someone frightened by a near miss cries out as it happens.
+
 ### Fixed
 - Removed unused workspace scratch files.` as the work does, and move under a version
 heading when the branch merges. An entry that breaks an existing install is
