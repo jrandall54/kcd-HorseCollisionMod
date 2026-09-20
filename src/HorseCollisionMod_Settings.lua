@@ -127,15 +127,17 @@ HorseCollisionModSettings = {
 	-- sum of their armor, from the game's own item tables: a villager is
 	-- around 5, a mail-wearing guard around 47.
 	--
-	-- ArmorReferenceWeight is the weight counted as a full set: the impulse
-	-- multiplier is 1.0 there and the stamina surcharge reaches its maximum
-	-- there. An impulse exponent of 0 switches that half off.
+	-- The impulse multiplier is exactly 1.0 at ArmorReferenceWeight, and an
+	-- exponent of 0 switches that half off. The stamina surcharge has its own
+	-- anchor: it reaches MaxArmorStaminaAdd at ArmorStaminaFullWeight, the
+	-- weight of a full set of armor, so a villager in clothes pays almost
+	-- nothing.
 	ArmorReferenceWeight     = 8.0,   -- the weight counted as a full set
 	ArmorImpulseExponent     = 0.5,   -- higher means armor plants them harder
 	MinArmorImpulse          = 0.35,  -- a knight is never immovable
 	MaxArmorImpulse          = 1.5,   -- nor is a naked peasant weightless
-	ArmorStaminaExponent     = 0.4,   -- higher means armor tires the horse
-	                                  -- sooner on the way to the figure below
+	ArmorStaminaFullWeight   = 50.0,  -- armor weight counted as a full set
+	ArmorStaminaExponent     = 1.0,   -- higher means light armor costs less
 	MaxArmorStaminaAdd       = 0.05,  -- the most an armored victim can add
 
 	-- The floor a collision will not take a victim below. A collision puts

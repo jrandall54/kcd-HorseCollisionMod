@@ -369,16 +369,22 @@ end
 -- The weight of what the victim is wearing is the input, not their armor
 -- rating, for the same reason the impulse curve uses weight: what tires a
 -- horse is shifting a heavy body, not the plate's rating against a hoof.
--- `ArmorReferenceWeight` is where the surcharge reaches its maximum, the same
--- weight the impulse curve treats as a full set, and `ArmorStaminaExponent`
--- shapes the approach to it.
+--
+-- It has its own full-set weight rather than sharing `ArmorReferenceWeight`,
+-- and the two figures are far apart on purpose. The impulse curve's reference
+-- is the weight that multiplies an impulse by exactly one, a point inside the
+-- range; a surcharge needs the weight where a victim is *fully* armored, or
+-- everybody pays the maximum. Measured on a run of 76 impacts by inverting
+-- `ArmorImpulseScale` off the impact log, villagers came out at 5 to 7 and
+-- mailed guards at 45 to 65, so 50 is where a full set sits and a villager
+-- pays a tenth of the surcharge.
 --
 -- @tparam table armor a table from `ArmorOf`
--- @treturn number a share of the horse's maximum stamina, 0 on a victim in
---   ordinary clothes
+-- @treturn number a share of the horse's maximum stamina, near 0 on a victim
+--   in ordinary clothes
 function HorseCollisionMod:ArmorStaminaAdd(armor)
 	local cfg = self.Config
-	local reference = cfg.ArmorReferenceWeight
+	local reference = cfg.ArmorStaminaFullWeight
 
 	if reference <= 0 then
 		return 0.0

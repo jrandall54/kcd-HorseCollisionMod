@@ -118,6 +118,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field MinArmorImpulse floor on the armor impulse multiplier
 -- @field MaxArmorImpulse ceiling on the armor impulse multiplier, reached by
 --   an unarmored target
+-- @field ArmorStaminaFullWeight the armor weight counted as a full set for the
+--   stamina surcharge, where it reaches its maximum
 -- @field ArmorStaminaExponent how sharply armor weight raises the stamina
 --   surcharge on the way to its maximum
 -- @field MaxArmorStaminaAdd the largest share of the horse's pool a victim's
@@ -533,14 +535,16 @@ HorseCollisionMod.Config = {
 	Uplift                   = 30.0,
 
 	-- What the target is wearing, as a multiplier on the impulse and as a
-	-- surcharge on the horse's stamina cost. ArmorReferenceWeight is the
-	-- weight counted as a full set: the impulse multiplier is 1.0 there and
-	-- the stamina surcharge reaches its maximum there.
+	-- surcharge on the horse's stamina cost. The two have separate anchors:
+	-- ArmorReferenceWeight is the weight whose impulse multiplier is exactly
+	-- one, and ArmorStaminaFullWeight is the weight counted as a full set of
+	-- armor, where the stamina surcharge reaches its maximum.
 	ArmorReferenceWeight     = 8.0,
 	ArmorImpulseExponent     = 0.5,
 	MinArmorImpulse          = 0.35,
 	MaxArmorImpulse          = 1.5,
-	ArmorStaminaExponent     = 0.4,
+	ArmorStaminaFullWeight   = 50.0,
+	ArmorStaminaExponent     = 1.0,
 	MaxArmorStaminaAdd       = 0.05,
 
 	-- `StaminaShareByTier` is declared in `Tiers.lua` and bound into this table

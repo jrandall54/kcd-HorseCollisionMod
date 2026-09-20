@@ -55,8 +55,11 @@ number.
 - `CombatStaminaMultiplier`, replaced by `CombatStaminaAdd` 0.13.
 - `MinArmorStamina` and `MaxArmorStamina`, replaced by `MaxArmorStaminaAdd`
   0.05, the most a victim's armor can add to an impact's share. It is reached
-  at `ArmorReferenceWeight`, which `ArmorStaminaExponent` still shapes the
-  approach to.
+  at the new `ArmorStaminaFullWeight` 50.0, the weight of a full set of armor,
+  measured by inverting the impulse curve across a 76-impact run: villagers
+  weigh 5 to 7 and mailed guards 45 to 65. Sharing `ArmorReferenceWeight` 8.0
+  charged a villager 0.041 of the 0.05 maximum, which made the surcharge a
+  flat tax on every victim.
 - `BardingStaminaRelief` keeps its name and changes units, from a fraction of
   the cost removed to a share of the pool taken off: 0.03.
 
