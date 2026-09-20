@@ -22,7 +22,7 @@ The tunables that decide how a collision *feels* fall into six systems.
 | --- | --- | --- |
 | Tier identity | `SpeedWalk`, `SpeedTrot`, `SpeedGallop`, `MaxImpactSpeed`, `ImpactSpeedSamples`, `RearImpactSpeed`, `RearChargeImpactSpeed` | `Tiers.lua:GetSpeedTier`, `Update.lua` |
 | Damage to the victim | `ImpactDamageByTier`, `ImpactDamageArmorScale/Curve/Floor/IgnoredArmor`, `ImpactDamageVariance`, `BardingDamageBonus` | `Health.lua`, `Armor.lua` |
-| Throw of the body | `Knockback`, `Uplift`, `ThrowByTier`, `LateralImpulse`, `RagdollMass*`, `RagdollBrake*`, `RagdollSpeedCap*`, `RagdollAirDamping*`, `ArmorImpulseExponent` | `Reaction.lua` |
+| Throw of the body | `Knockback`, `Uplift`, `ThrowByTier`, `LateralImpulse`, `RagdollBrake*`, `RagdollSpeedCap*`, `RagdollAirDamping*`, `ArmorImpulseExponent` | `Reaction.lua` |
 | Recovery | `RecoveryDelayByTier`, `RecoveryArmorScale*`, `RecoveryMin/MaxSec` | `Recovery.lua` |
 | Cost to the horse | `StaminaDrainByTier`, `CombatStaminaMultiplier`, `ArmorStaminaExponent`, `BardingStaminaRelief`, `HorsemanshipStamina*` | `Rider.lua` |
 | Fear and reaction | `RearFearReach`, `RearChargeFearReach`, the scream priorities | `Fear.lua` |
@@ -116,10 +116,21 @@ be tuned at all. **Fixed in Stage 0:** both are declared and exposed.
 mod polls the body repeatedly to write a value it never changes.
 `RagdollMassArmorExponent = 3.7` is dead alongside it.
 
-**Fix:** decide in the sweep whether mass returns as a lever, where the roadmap's
-position is that unarmored victims sit at their normal mass and the curve scales
-*up* from there, or whether the path is removed. It must not stay as a no-op
-that looks live.
+**Fixed: the path is removed, not revived.** The roadmap's position was that
+mass could come back as a lever, with unarmored victims at their normal mass
+and the curve scaling up from there. It does not come back, because the coupling
+is too weak to spend a setting on: the throw goes as roughly `mass ^ -0.185`, so
+a visible difference between mail and cloth costs a spread around a hundredfold.
+The exponent that bought it, 3.7, gave a villager 43 kg and a mailed guard
+1,208, rising to 501,187 at the armor scale real guards score, which is a cliff
+rather than a scale and made every force setting above it a no-op against anyone
+in armor. Armor is separated by the ragdoll brake instead, which is bounded and
+does not lie about what a person weighs.
+
+`MassVictim` also doubled as the signal that the body had physicalized, since a
+mass write is refused on a living actor and accepted on a ragdoll. That signal
+is now `PhysicsReadyMs`, a single frame, which is what its six rung ladder
+measured on every impact ever logged.
 
 ### 2.5 `Config` and the settings file disagree on two values
 

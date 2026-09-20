@@ -401,35 +401,46 @@ reaction restarts every tick and they never finish staggering.
 Why the defaults in `HorseCollisionMod.Config` are set where they are. The
 config table itself is kept scannable, since it is read to change a setting.
 
-### Ragdoll mass and the armor exponent
+### Every victim weighs what the engine says, and why
 
-Every human is 80 kg to the physics engine, so without intervention a peasant
-and a knight are the same thing for a horse to hit. `RagdollMass` replaces that
-figure on the victim, written once the body is a ragdoll and before the horse
-reaches it, and `RagdollMassArmorExponent` divides it by the armor scale raised
-to a power.
+`GetMass` answers 80 for every human including the player, so a peasant and a
+knight are the same thing for a horse to hit. The mod once wrote over that
+figure, dividing a base by the armor scale raised to an exponent, so that a
+mailed guard was the heavier body to move. That path is gone.
 
-The two numbers do different jobs, and this is the part worth understanding
-before changing either:
+It was removed for two reasons. The coupling is weak: the throw goes as roughly
+`mass ^ -0.185`, measured across a fiftyfold flat comparison, so doubling a
+victim's mass shortens the throw by 12% and a visible difference costs a spread
+around a hundredfold. Buying that spread meant an exponent of 3.7, which ran
+from 43 kg for a villager to 1,208 kg for a mailed guard and 501,187 kg at the
+armor scale real guards score. Between scale 0.35 and 0.10 the mass moved by a
+factor of a hundred, which is a cliff rather than a scale, and everything
+stacked above it stopped meaning anything: an impulse of 58 against 1,208 kg
+moves a guard five centimeters per second, so the knockback, the uplift and the
+barding force bonus did nothing at all to anyone in armor.
 
-- **The exponent sets how far apart armored and unarmored victims land.** The
-  base cancels out of the ratio between two victims, so it cannot widen the
-  gap no matter what it is set to.
-- **The base sets how far everyone travels**, armored and unarmored alike.
+Armor is separated by the ragdoll brake instead, which removes a commanded
+fraction of a thrown body's speed. That is a lever with a bounded range and it
+does not lie about what a person weighs.
 
-The throw responds to mass as roughly `mass ^ -0.185`, measured across a
-fiftyfold flat comparison. That coupling is weak enough to matter: doubling a
-victim's mass shortens the throw by 12%, so a spread around a hundredfold is
-what a visible difference costs, and an exponent of 1 is worth nothing at all.
+### Waiting for the body to become physics
 
-At the shipped figures a villager is about 43 kg and a mailed guard about 4900,
-and the measured six-second throws are 4.19 m against 1.92 m.
+`actor:Fall` requests the fall, it does not perform it. For one frame after the
+request the victim is still an animated character, and physics calls aimed at
+one are discarded silently, so the brake and the damping wait
+`PhysicsReadyMs` before running.
 
-Lowering the base widens the separation on the ground while shortening nothing
-else, which is tempting and has a limit. At a base of 40 light victims reach 17
-kg, where the mod's own knockdown impulse stops being negligible and adds up to
-4.34 m/s to a body the horse has already launched. Those victims travel twelve
-meters and more, which does not read as a person being hit by a horse.
+The wait cannot be skipped. Without it the brake fires onto
+a body still carrying the peak velocity of the engine's collision and, being
+proportional, takes more speed away: gallop throws fell from a mean of 1.81 m to
+1.57 m over 18 impacts, and the rider described the victims as bricks.
+
+The figure is one frame because that is what it measured at. The mass rewrite
+doubled as the readiness probe, writing a value and reading it back on a six
+rung ladder of 0, 16, 33, 50, 80 and 120 ms, because a write is refused on a
+living actor and accepted on a ragdoll. Every impact ever logged answered on the
+second rung. The probe worked and never varied, so it was machinery around a
+constant.
 
 ### Ending a throw
 
