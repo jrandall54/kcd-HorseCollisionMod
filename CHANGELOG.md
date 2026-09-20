@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.25.0] - 2026-09-20
+
 ### Added
 - A rear now frightens the people it misses. Anyone within `RearFearReach` of a
   rear who is not struck by it reacts to the rider as a threat, and decides for

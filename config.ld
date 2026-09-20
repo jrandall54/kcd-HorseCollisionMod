@@ -39,6 +39,7 @@ file = {
 	"src/HorseCollisionMod/Rider.lua",
 	"src/HorseCollisionMod/Lean.lua",
 	"src/HorseCollisionMod/Rear.lua",
+	"src/HorseCollisionMod/Fear.lua",
 	"src/HorseCollisionMod/Tutorial.lua",
 	"src/HorseCollisionMod/Update.lua"
 }
