@@ -21979,3 +21979,48 @@ collision was a crime, because somebody fleeing in terror does not stop to say
 
 ## Ragdoll CVar Exposure
 Exposed wh_rd_StillDuration and wh_rd_StillSpeedThreshold to mod settings to easily tweak engine stillness delays.
+
+---
+
+### Build: 5.24.0 — fear around a rear
+
+**Hypothesis**: A rear should do something to the people it misses. Rather than
+the mod deciding who runs, send each of them vanilla's own
+`combat:stimulus:hostilePerception` (a typed table carrying the single member
+`perceptible`, set to the player's WUID) and let their own brain make the
+choice it always makes.
+
+**Results**:
+- The stimulus works and the fork is vanilla's. Guards came for the rider and
+  could be surrendered to with no punishment, no crime being involved; ordinary
+  villagers paused and then fled. `sb_combat.xml` runs 46 morale nodes on that
+  path, so the fight-or-run decision is the game's own and the mod forces
+  neither side of it.
+- The band was first a sweep, 8 m and a 140 degree arc, and frightened the
+  whole street. It is now 3.5 m, one metre past where the hooves reach, and
+  has **no arc at all**: a man the horse reared beside saw the same thing as a
+  man it reared in front of. Rearing is not in itself a crime or a fright; the
+  hooves coming down a stride away is.
+- **A bark cannot be delivered to a man who is already fleeing.** The moment
+  wanted two lines, a startle at the hooves and a scream as he broke and ran,
+  and a watcher on his distance from the horse fired the second one at the
+  moment he cleared the band, measured at 1.4 s to 4.2 s. The request was
+  accepted every time and never spoken. It was still silent after the two
+  things that normally explain a swallowed line: the bark cooldown the startle
+  had started, bypassed, and the auction, raised from priority 0 to 50, the
+  rank Henry's own lines were confirmed audible at. It was still silent with
+  `overrideContextSuppress` set, which clears the `suppressMonologs` gate a
+  brain raises on itself.
+- The same set, sent to the same speaker at the moment of the fright rather
+  than during the flight, is audible. So the flee state is what eats it, and
+  nothing reachable from Lua reopens it.
+
+**Thoughts & Conclusions**: The near miss speaks once, at the fright, and the
+line is `NASILI_UTEK` ("Help!", "Christ almighty!", "Oh god, oh god.") rather
+than the startled `KDO_TAM_CITOSLOVCE` ("Hey!"). Two lines were wanted and one
+is reachable, so it is the frightened one and not the startled one. The flee
+watcher was removed with the second line it existed for.
+
+`Bark` now takes an optional priority and an optional suppression override per
+call, which is what let both of those be ruled out one at a time rather than
+guessed at.
