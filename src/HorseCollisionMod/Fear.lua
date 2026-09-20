@@ -155,7 +155,7 @@ function HorseCollisionMod:FearBand(horseEnt, struck)
 	local found = nil
 
 	pcall(function()
-		found = System.GetEntitiesInSphere(horsePos, cfg.RearFearReach or 3.5)
+		found = System.GetEntitiesInSphere(horsePos, cfg.RearFearReach)
 	end)
 
 	if type(found) ~= "table" then
@@ -231,14 +231,14 @@ function HorseCollisionMod:ChargeFearBand(horseEnt, pos, fx, fy, playerWuid,
 
 	pcall(function()
 		found = System.GetEntitiesInSphere(pos,
-				cfg.RearChargeFearReach or 4.8)
+				cfg.RearChargeFearReach)
 	end)
 
 	if type(found) ~= "table" then
 		return 0
 	end
 
-	local halfWidth = cfg.RearChargeStrikeWidth or 1.6
+	local halfWidth = cfg.RearChargeStrikeWidth
 	local sent = 0
 
 	for _, npc in pairs(found) do

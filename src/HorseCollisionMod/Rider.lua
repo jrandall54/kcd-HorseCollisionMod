@@ -311,17 +311,17 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 		return false
 	end
 
-	local angle = (cfg.CameraShakeAngle or 0) * tier
+	local angle = (cfg.CameraShakeAngle) * tier
 			* (g_Deg2Rad or 0.0174532925)
-	local shift = (cfg.CameraShakeShift or 0) * tier
+	local shift = (cfg.CameraShakeShift) * tier
 
 	local ok = pcall(function()
 		playerEnt.actor:SetViewShake(
 				{ x = angle, y = angle, z = angle },
 				{ x = shift, y = shift, z = shift },
-				(cfg.CameraShakeDurationSec or 0.2) * tier,
-				cfg.CameraShakeFrequency or 12,
-				cfg.CameraShakeRandomness or 0.5)
+				(cfg.CameraShakeDurationSec) * tier,
+				cfg.CameraShakeFrequency,
+				cfg.CameraShakeRandomness)
 	end)
 
 	if cfg.LogTelemetry then
@@ -414,7 +414,7 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 		return false
 	end
 
-	local amount = (cfg.RiderBlurAmount or 0) * tier
+	local amount = (cfg.RiderBlurAmount) * tier
 
 	if amount <= 0 then
 		return false
@@ -424,11 +424,11 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 		return false
 	end
 
-	local steps = cfg.RiderBlurSteps or 5
-	local hold = math.floor((cfg.RiderBlurHoldMs or 0) * length)
-	local every = math.floor(((cfg.RiderBlurMs or 220) * length) / steps)
+	local steps = cfg.RiderBlurSteps
+	local hold = math.floor((cfg.RiderBlurHoldMs) * length)
+	local every = math.floor(((cfg.RiderBlurMs) * length) / steps)
 
-	local chroma = (cfg.RiderBlurChroma or 0) * tier
+	local chroma = (cfg.RiderBlurChroma) * tier
 
 	pcall(function()
 		System.SetScreenFx("FilterBlurring_Type", 0)
@@ -493,7 +493,7 @@ function HorseCollisionMod:CameraIsFirstPerson(playerEnt)
 	local dz = cam.z - pos.z
 	local away = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
 
-	return away <= (self.Config.RiderBlurFirstPersonRange or 1.5)
+	return away <= (self.Config.RiderBlurFirstPersonRange)
 end
 
 --- Sends the horse off after it has thrown its rider.
@@ -541,7 +541,7 @@ function HorseCollisionMod:BoltHorse(horseEnt, playerEnt)
 		return false
 	end
 
-	local chance = cfg.HorseBoltChance or 0
+	local chance = cfg.HorseBoltChance
 
 	if chance <= 0 or math.random() >= chance then
 		return false
@@ -564,7 +564,7 @@ function HorseCollisionMod:BoltHorse(horseEnt, playerEnt)
 	-- Given back once it has gone. The bolt is the whole point and a horse
 	-- left on nothing would be a lasting penalty for an ordinary spree.
 	if ok then
-		Script.SetTimer(cfg.HorseBoltRestoreMs or 3000, function()
+		Script.SetTimer(cfg.HorseBoltRestoreMs, function()
 			pcall(function()
 				horseEnt.soul:SetState("health", before)
 			end)
@@ -618,7 +618,7 @@ function HorseCollisionMod:HorsemanshipScale(playerEnt)
 		return 1.0, 0.0
 	end
 
-	local top = cfg.HorsemanshipMaxLevel or 20
+	local top = cfg.HorsemanshipMaxLevel
 	local fraction = level / top
 
 	if fraction > 1 then
@@ -632,11 +632,11 @@ function HorseCollisionMod:HorsemanshipScale(playerEnt)
 	-- the difference evenly, so each level is worth the same and the ends are
 	-- still far apart.
 	local remaining = 1.0 - fraction
-	local worst = cfg.HorsemanshipStaminaWorst or 1.0
-	local best = cfg.HorsemanshipStaminaBest or 1.0
+	local worst = cfg.HorsemanshipStaminaWorst
+	local best = cfg.HorsemanshipStaminaBest
 
 	local stamina = best + ((worst - best) * remaining)
-	local seat = (cfg.HorsemanshipSeatChance or 0) * (1.0 - remaining)
+	local seat = (cfg.HorsemanshipSeatChance) * (1.0 - remaining)
 
 	return stamina, seat
 end

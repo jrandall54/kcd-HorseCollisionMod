@@ -186,8 +186,8 @@ end
 
 function HorseCollisionMod:WhenVictimStands(npc, fn)
 	local generation = self.TimerTick
-	local gap = self.Config.RisePollMs or 160
-	local ceiling = self.Config.RiseCeilingMs or 15000
+	local gap = self.Config.RisePollMs
+	local ceiling = self.Config.RiseCeilingMs
 	local spent = 0
 
 	local function poll()
@@ -285,7 +285,7 @@ function HorseCollisionMod:IsVictimFlat(npc)
 	-- 0.04 or 0.10 of it, and every reading of a body that has begun to rise is
 	-- 0.17 or more. `VictimFlatFraction` sits between the two with margin on
 	-- both sides.
-	local fraction = self.Config.VictimFlatFraction or 0.45
+	local fraction = self.Config.VictimFlatFraction
 
 	return (head - origin) < (standing * fraction), head - origin, standing, state
 end
@@ -1058,7 +1058,7 @@ end
 -- @tparam number now the current time in milliseconds
 -- @treturn boolean true when this impact should be scored
 function HorseCollisionMod:ImpactIsNewContact(npcId, now)
-	local interval = self.Config.HitMinIntervalMs or 0
+	local interval = self.Config.HitMinIntervalMs
 
 	if interval <= 0 then
 		return true
@@ -1096,31 +1096,31 @@ end
 -- @treturn number duration in seconds
 function HorseCollisionMod:CalculateRecoveryDuration(tierName, armorScale)
 	if not self.Config.DynamicRecovery then
-		return self.Config.RecoveryMinSec or 0.3
+		return self.Config.RecoveryMinSec
 	end
 
+	-- A tier with no entry gets the floor rather than an invented figure. Only
+	-- the tiers that put someone on the ground carry one, so reaching this
+	-- means a tier that does not, and holding such a victim down for a made-up
+	-- second and a half is worse than not holding them at all.
 	local delays = self.Config.RecoveryDelayByTier
-	local baseSec = (delays and delays[tierName]) or 1.5
+	local baseSec = delays and delays[tierName]
+
+	if type(baseSec) ~= "number" then
+		return self.Config.RecoveryMinSec
+	end
 
 	local mult = 1.0
-	local lo = self.Config.RagdollBrakeArmorScaleArmored or 0.35
-	local hi = self.Config.RagdollBrakeArmorScaleUnarmored or 1.26
-	local heavyMult = self.Config.RecoveryArmorScaleArmored or 0.6
-	local lightMult = self.Config.RecoveryArmorScaleUnarmored or 1.5
 
-	if armorScale and hi > lo then
-		local t = (armorScale - lo) / (hi - lo)
-		if t < 0 then
-			t = 0
-		elseif t > 1 then
-			t = 1
-		end
-		mult = heavyMult + ((lightMult - heavyMult) * t)
+	if armorScale then
+		mult = self:ArmorBlend(armorScale,
+				self.Config.RecoveryArmorScaleArmored,
+				self.Config.RecoveryArmorScaleUnarmored)
 	end
 
 	local dur = baseSec * mult
-	local minSec = self.Config.RecoveryMinSec or 0.3
-	local maxSec = self.Config.RecoveryMaxSec or 5.0
+	local minSec = self.Config.RecoveryMinSec
+	local maxSec = self.Config.RecoveryMaxSec
 
 	if dur < minSec then
 		dur = minSec
@@ -1165,7 +1165,7 @@ function HorseCollisionMod:ApplyDynamicRecovery(npc, tierName, armorScale)
 
 	-- Schedule ground barks while recovering
 	if self.Config.RecoveryGroundBarks and durationSec >= 1.0 then
-		local barkInterval = self.Config.RecoveryBarkIntervalMs or 1400
+		local barkInterval = self.Config.RecoveryBarkIntervalMs
 		local function barkLoop()
 			if generation ~= self.TimerTick then
 				return

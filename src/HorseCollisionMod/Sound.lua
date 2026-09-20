@@ -215,7 +215,7 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	local master = 0
 
 	if tierName == "Trot" or tierName == "Gallop" then
-		master = cfg.ImpactSoundDistance or 0
+		master = cfg.ImpactSoundDistance
 	end
 
 	if type(layers) ~= "table" then
@@ -243,7 +243,7 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 
 	if (tierName == "Gallop" or tierName == "Charge")
 			and type(cfg.ImpactSoundCrack) == "table"
-			and math.random() < (cfg.ImpactSoundCrackChance or 0) then
+			and math.random() < (cfg.ImpactSoundCrackChance) then
 		plan[#plan + 1] = cfg.ImpactSoundCrack
 		cracked = true
 	end
@@ -406,13 +406,13 @@ function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
 	end
 
 	local now = self:TimeMs()
-	local cooldown = cfg.RiderVocalCooldownMs or 0
+	local cooldown = cfg.RiderVocalCooldownMs
 
 	-- One gate for everything that comes out of Henry's mouth, shared with
 	-- `BarkRiderImpact`. A spoken line and a grunt on the same impact is two
 	-- voices at once, so whichever goes out first holds the other off.
 	local until_ = self.RiderVoiceUntil or 0
-	local longest = math.max(cooldown, cfg.RiderBarkCooldownMs or 0)
+	local longest = math.max(cooldown, cfg.RiderBarkCooldownMs)
 
 	-- A hold further out than any cooldown that can be written was not written
 	-- against this clock. `System.GetCurrTime` is persisted in the save, so
@@ -530,7 +530,7 @@ function HorseCollisionMod:PlayHorseVocal(horseEnt, tierName)
 	end
 
 	local now      = self:TimeMs()
-	local cooldown = cfg.HorseVocalCooldownMs or 0
+	local cooldown = cfg.HorseVocalCooldownMs
 
 	local until_ = self.HorseVoiceUntil or 0
 	local longest = cooldown

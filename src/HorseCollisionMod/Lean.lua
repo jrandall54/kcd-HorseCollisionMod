@@ -187,7 +187,7 @@ function HorseCollisionMod:LeanViewAngle()
 	-- also when the camera is nearest the rider's own model, which is why the
 	-- clipping shows up there and nowhere else.
 	local pitch = math.deg(math.asin(math.max(-1, math.min(1, dir.z))))
-	local maxPitch = self.Config.LeanMaxPitchDeg or 55
+	local maxPitch = self.Config.LeanMaxPitchDeg
 
 	if maxPitch > 0 and math.abs(pitch) > maxPitch then
 		return nil, true
@@ -258,20 +258,20 @@ function HorseCollisionMod:FlipLean(amplitude, sign, seconds, force)
 	local now = self:TimeMs()
 
 	if not force and self.LeanLastFlip
-			and (now - self.LeanLastFlip) < (cfg.LeanMinFlipMs or 200) then
+			and (now - self.LeanLastFlip) < (cfg.LeanMinFlipMs) then
 		return
 	end
 
 	self.LeanLastFlip = now
 	self.LeanFlips = (self.LeanFlips or 0) + 1
 
-	local forward = amplitude * (cfg.LeanForwardShare or 0.35)
+	local forward = amplitude * (cfg.LeanForwardShare)
 
 	pcall(function()
 		playerEnt.actor:SetViewShake(
 				{ x = 0, y = 0, z = 0 },
 				{ x = amplitude * sign, y = forward, z = 0 },
-				seconds, cfg.LeanShakePeriod or 40.0, 0)
+				seconds, cfg.LeanShakePeriod, 0)
 	end)
 end
 
@@ -326,7 +326,7 @@ function HorseCollisionMod:StartLean(sign)
 	-- Refused when looking too far off the horse's line, because the camera
 	-- travels in its own space and past a point that takes it through the
 	-- rider and the horse rather than out beside them.
-	local maxAngle = cfg.LeanMaxAngleDeg or 45
+	local maxAngle = cfg.LeanMaxAngleDeg
 	local angle, pitchExceeded = self:LeanViewAngle()
 
 	if pitchExceeded then
@@ -357,15 +357,15 @@ function HorseCollisionMod:StartLean(sign)
 	local timerTick = self.TimerTick
 	-- A position across the horse rather than a distance traveled, so both
 	-- sides finish the same distance from the head.
-	local target = (cfg.LeanDistance or 0.65) * sign
-	local pollMs = cfg.LeanPollMs or 30
+	local target = (cfg.LeanDistance) * sign
+	local pollMs = cfg.LeanPollMs
 	local reached = false
 	local last = nil
 	local turns = 0
 	local lastAngle = nil
 	local lastAngleAt = nil
 
-	self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, cfg.LeanShakeSec or 1.5, true)
+	self:FlipLean(cfg.LeanTravelAmplitude, sign, cfg.LeanShakeSec, true)
 
 	local function watch()
 		if generation ~= self.LeanGeneration or timerTick ~= self.TimerTick then
@@ -409,7 +409,7 @@ function HorseCollisionMod:StartLean(sign)
 			return
 		end
 
-		local limit = cfg.LeanMaxAngleDeg or 45
+		local limit = cfg.LeanMaxAngleDeg
 
 		if limit > 0 and turned then
 			local now = self:TimeMs()
@@ -421,7 +421,7 @@ function HorseCollisionMod:StartLean(sign)
 				-- Only a turn heading toward the limit leads it. Coming back
 				-- toward the horse's line should not cancel anything.
 				if rate > 0 then
-					projected = turned + (rate * ((cfg.LeanTurnLeadMs or 200) / 1000))
+					projected = turned + (rate * ((cfg.LeanTurnLeadMs) / 1000))
 				end
 			end
 
@@ -448,7 +448,7 @@ function HorseCollisionMod:StartLean(sign)
 		-- correction that does not land is ten meters away in a few seconds,
 		-- which the rider has seen. A ceiling costs one comparison a poll and
 		-- bounds every failure in here, including ones not yet found.
-		local ceiling = (cfg.LeanDistance or 0.65) * (cfg.LeanRunawayFactor or 2.0)
+		local ceiling = (cfg.LeanDistance) * (cfg.LeanRunawayFactor)
 
 		if math.abs(offset) > ceiling then
 			self:StopLean()
@@ -456,8 +456,8 @@ function HorseCollisionMod:StartLean(sign)
 			return
 		end
 
-		local hold = cfg.LeanHoldAmplitude or 3.0
-		local live = cfg.LeanShakeSec or 1.5
+		local hold = cfg.LeanHoldAmplitude
+		local live = cfg.LeanShakeSec
 		local past = (sign > 0 and offset >= target) or (sign < 0 and offset <= target)
 
 		if not reached and last and not past then
@@ -484,7 +484,7 @@ function HorseCollisionMod:StartLean(sign)
 
 			if turns < 2 and (gap * moving) < 0 and math.abs(moving) > 0.001 then
 				turns = turns + 1
-				self:FlipLean(cfg.LeanTravelAmplitude or 110.0, sign, live, true)
+				self:FlipLean(cfg.LeanTravelAmplitude, sign, live, true)
 			end
 		end
 
@@ -511,7 +511,7 @@ function HorseCollisionMod:StartLean(sign)
 			-- camera or why.
 			local moving = offset - last
 			local gap = target - offset
-			local band = cfg.LeanDeadband or 0.06
+			local band = cfg.LeanDeadband
 			local now = self:TimeMs()
 			local timeSinceFlip = self.LeanLastFlip and (now - self.LeanLastFlip) or 0
 
@@ -561,16 +561,16 @@ function HorseCollisionMod:StopLean()
 
 	-- A shake whose duration expires returns the camera home in about 160 ms,
 	-- and nothing may re-base until it has.
-	self.LeanHomeUntil = self:TimeMs() + (cfg.LeanHomeMs or 220)
+	self.LeanHomeUntil = self:TimeMs() + (cfg.LeanHomeMs)
 
-	self:FlipLean(cfg.LeanHoldAmplitude or 3.0, sign or 1, cfg.LeanReleaseSec or 0.05, true)
+	self:FlipLean(cfg.LeanHoldAmplitude, sign or 1, cfg.LeanReleaseSec, true)
 
 	if cfg.LogTelemetry then
 		local offset = self:LeanOffset()
 
 		self:Log("LeanBack side=" .. ((sign or 1) < 0 and "left" or "right")
 				.. " from=" .. string.format("%.2f", offset or -9)
-				.. " target=" .. string.format("%.2f", cfg.LeanDistance or 0.65)
+				.. " target=" .. string.format("%.2f", cfg.LeanDistance)
 				.. " angle=" .. string.format("%.0f", self:LeanViewAngle() or -1)
 				.. " flips=" .. tostring(self.LeanFlips or 0))
 	end

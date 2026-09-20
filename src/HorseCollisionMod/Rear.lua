@@ -324,7 +324,7 @@ function HorseCollisionMod:RearRequested(fragTag)
 		speed = tracked
 	end
 
-	if speed > (cfg.RearMaxSpeed or 1.0) then
+	if speed > (cfg.RearMaxSpeed) then
 		return refuse("speed " .. string.format("%.2f", speed))
 	end
 
@@ -361,14 +361,14 @@ function HorseCollisionMod:RearRequested(fragTag)
 	if self.RearNextAt and now < self.RearNextAt then
 		-- If the clock wound back (e.g. save load), now will be much smaller than RearNextAt.
 		-- Any difference larger than the cooldown itself means a reload happened.
-		if (self.RearNextAt - now) > (cfg.RearCooldownMs or 2500) + 1000 then
+		if (self.RearNextAt - now) > (cfg.RearCooldownMs) + 1000 then
 			self:Log("Rear clock wound back, ignoring cooldown")
 		else
 			return refuse("cooldown")
 		end
 	end
 
-	self.RearNextAt = now + (cfg.RearCooldownMs or 2500)
+	self.RearNextAt = now + (cfg.RearCooldownMs)
 
 	self:RearHorse(horseEnt, fragTag)
 
@@ -420,7 +420,7 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 
 	local generation = self.TimerTick
 	local started = self:TimeMs()
-	local deadline = started + (cfg.RearChargeWaitCeilingMs or 3000)
+	local deadline = started + (cfg.RearChargeWaitCeilingMs)
 
 	-- The direction is taken at the moment of the push, not at the key press.
 	--
@@ -446,7 +446,7 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 			horseEnt:AddImpulse(-1, horseEnt:GetWorldPos(), {
 				x = d.x / flat,
 				y = d.y / flat,
-				z = cfg.RearChargeLift or 0.2
+				z = cfg.RearChargeLift
 			}, cfg.RearChargeImpulse, 1)
 		end)
 
@@ -483,10 +483,10 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 			return
 		end
 
-		Script.SetTimer(cfg.RearChargeWaitPollMs or 30, waitForEnd)
+		Script.SetTimer(cfg.RearChargeWaitPollMs, waitForEnd)
 	end
 
-	Script.SetTimer(cfg.RearChargeWaitMs or 400, waitForEnd)
+	Script.SetTimer(cfg.RearChargeWaitMs, waitForEnd)
 end
 
 --- Closes the charge window when the lunge has spent itself.
@@ -567,8 +567,8 @@ function HorseCollisionMod:WatchLunge(horseEnt)
 
 		previous = speed
 
-		if peak >= (cfg.RearChargeLungePeakMin or 3.0)
-				and speed <= peak * (cfg.RearChargeLungeSpentAt or 0.5) then
+		if peak >= (cfg.RearChargeLungePeakMin)
+				and speed <= peak * (cfg.RearChargeLungeSpentAt) then
 			self.RearCharging = false
 
 			if cfg.LogTelemetry then
@@ -592,10 +592,10 @@ function HorseCollisionMod:WatchLunge(horseEnt)
 			return
 		end
 
-		Script.SetTimer(cfg.RearChargeWaitPollMs or 30, watch)
+		Script.SetTimer(cfg.RearChargeWaitPollMs, watch)
 	end
 
-	Script.SetTimer(cfg.RearChargeWaitPollMs or 30, watch)
+	Script.SetTimer(cfg.RearChargeWaitPollMs, watch)
 end
 
 --- Reports how long an interactive action held the horse.
@@ -617,7 +617,7 @@ function HorseCollisionMod:LogActionEnd(horseEnt, tag)
 
 	local generation = self.TimerTick
 	local started = self:TimeMs()
-	local deadline = started + (self.Config.RearChargeWaitCeilingMs or 3000)
+	local deadline = started + (self.Config.RearChargeWaitCeilingMs)
 
 	local function poll()
 		if generation ~= self.TimerTick then
@@ -637,13 +637,13 @@ function HorseCollisionMod:LogActionEnd(horseEnt, tag)
 			return
 		end
 
-		Script.SetTimer(self.Config.RearChargeWaitPollMs or 30, poll)
+		Script.SetTimer(self.Config.RearChargeWaitPollMs, poll)
 	end
 
 	-- Started after the same delay the charge uses, because the state does not
 	-- read back as `AnimationControlled` the instant the call returns and a poll
 	-- that begins too early ends immediately with a length of nothing.
-	Script.SetTimer(self.Config.RearChargeWaitMs or 400, poll)
+	Script.SetTimer(self.Config.RearChargeWaitMs, poll)
 end
 
 
@@ -672,8 +672,8 @@ end
 --
 -- @tparam table horseEnt the player's horse
 function HorseCollisionMod:RearHorse(horseEnt, fragTag)
-	local tag = fragTag or self.Config.RearFragTag or "hcm_rear_charge"
-	local tierName = (tag == (self.Config.RearOnlyFragTag or "")) and "Rear" or "Charge"
+	local tag = fragTag or self.Config.RearFragTag
+	local tierName = (tag == (self.Config.RearOnlyFragTag)) and "Rear" or "Charge"
 
 	if player and self.Config.RiderVocal and type(PlayAudioTrigger) == "function" then
 		pcall(function() PlayAudioTrigger(player, "v_henry_hyje") end)
@@ -684,7 +684,7 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 	-- horse's own speed. The lunge covers about five and a half meters in a
 	-- second, which reads as a trot, and a deliberate charge producing the
 	-- animated knockdown instead of a ragdoll is not what the rider asked for.
-	if tag == (self.Config.RearFragTag or "") then
+	if tag == (self.Config.RearFragTag) then
 		self.RearCharging = true
 
 		local generation = self.TimerTick
@@ -698,7 +698,7 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 		-- outlives the move by a long way: the action ends around 1050 ms and
 		-- the lunge covers one to two meters, so more than a second remains in
 		-- which walking into someone plays a full charge reaction.
-		Script.SetTimer(self.Config.RearChargeWindowMs or 2600, function()
+		Script.SetTimer(self.Config.RearChargeWindowMs, function()
 			if generation == self.TimerTick then
 				self.RearCharging = false
 			end
@@ -707,7 +707,7 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 		self:ChargeForward(horseEnt)
 	end
 
-	local animSpeed = self.Config.RearAnimSpeed or 1.0
+	local animSpeed = self.Config.RearAnimSpeed
 
 	-- Fix for broken save games caused by previous tests getting stuck at 0.
 	-- This only needs to run once to rescue the physics proxy.
@@ -722,7 +722,7 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 
 	local ok = true
 
-	if tag == (self.Config.RearOnlyFragTag or "hcm_rear") then
+	if tag == (self.Config.RearOnlyFragTag) then
 		ok = pcall(function()
 			-- Clear any stuck manual animations from a previous rear so this can
 			-- be re-triggered without requiring the horse to move.
@@ -745,8 +745,8 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 	-- horse into people and the ordinary detection loop scores it; a rear that
 	-- does not travel is invisible to that loop, because detection is driven by
 	-- the horse's speed and the horse never moves.
-	if tag == (self.Config.RearOnlyFragTag or "") then
-		Script.SetTimer(self.Config.RearStrikeMs or 700, function()
+	if tag == (self.Config.RearOnlyFragTag) then
+		Script.SetTimer(self.Config.RearStrikeMs, function()
 			self:RearStrike(horseEnt)
 		end)
 
@@ -797,7 +797,7 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 	end
 
 	local generation = self.TimerTick
-	local deadline = self:TimeMs() + (cfg.RearChargeStrikeMs or 1600)
+	local deadline = self:TimeMs() + (cfg.RearChargeStrikeMs)
 	local hit = {}
 	local drained = false
 	local playerEnt = player
@@ -849,8 +849,8 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 			end
 
 			local fx, fy = heading.x / flat, heading.y / flat
-			local reach = cfg.RearChargeStrikeReach or 3.0
-			local halfWidth = cfg.RearChargeStrikeWidth or 1.6
+			local reach = cfg.RearChargeStrikeReach
+			local halfWidth = cfg.RearChargeStrikeWidth
 			local found = System.GetEntitiesInSphere(pos, reach + 1.0)
 			local now = self:TimeMs()
 
@@ -880,14 +880,14 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 
 					-- A corridor in front of the horse: far enough back to catch
 					-- anyone the chest reaches, and never behind it.
-					if ahead >= -(cfg.RearChargeStrikeBehind or 0.5)
+					if ahead >= -(cfg.RearChargeStrikeBehind)
 							and ahead <= reach and across <= halfWidth
-							and dz <= (cfg.HorseMaxVerticalDiff or 2.0) then
+							and dz <= (cfg.HorseMaxVerticalDiff) then
 						hit[tostring(id)] = true
 
 						self:RearHit(npc, horseEnt, playerEnt,
 								{ x = fx, y = fy, z = 0 }, "Charge",
-								cfg.RearChargeImpactSpeed or 9.0)
+								cfg.RearChargeImpactSpeed)
 
 						-- The charge pays for itself now that the detection
 						-- loop stays out of a lunge. It received the gallop's
@@ -911,7 +911,7 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 					feared, false)
 		end)
 
-		Script.SetTimer(cfg.RearChargeStrikePollMs or 50, sweep)
+		Script.SetTimer(cfg.RearChargeStrikePollMs, sweep)
 	end
 
 	sweep()
@@ -1006,14 +1006,14 @@ function HorseCollisionMod:RearStrike(horseEnt)
 	local found = nil
 
 	pcall(function()
-		found = System.GetEntitiesInSphere(horsePos, cfg.RearReach or 3.0)
+		found = System.GetEntitiesInSphere(horsePos, cfg.RearReach)
 	end)
 
 	if type(found) ~= "table" then
 		return
 	end
 
-	local arc = math.cos(math.rad((cfg.RearArc or 70) / 2))
+	local arc = math.cos(math.rad((cfg.RearArc) / 2))
 	local hit = 0
 
 	-- Who the hooves reached, so the fear band can leave them out: a man with
@@ -1081,7 +1081,7 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 
 	-- Scored at a fixed speed rather than the horse's own, which is zero here.
 	-- What matters is the hooves, not ground the horse covered.
-	local speed = hitSpeed or cfg.RearImpactSpeed or 6.0
+	local speed = hitSpeed or cfg.RearImpactSpeed
 	local velocity = { x = heading.x * speed, y = heading.y * speed, z = 0 }
 	local horsePos, horseWuid = nil, nil
 

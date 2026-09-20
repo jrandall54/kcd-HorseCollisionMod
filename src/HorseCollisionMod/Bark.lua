@@ -416,8 +416,8 @@ function HorseCollisionMod:RiderVoiceReady(rank)
 	local cfg = self.Config
 	local now = self:TimeMs()
 	local until_ = self.RiderVoiceUntil or 0
-	local longest = math.max(cfg.RiderBarkCooldownMs or 0,
-			cfg.RiderVocalCooldownMs or 0)
+	local longest = math.max(cfg.RiderBarkCooldownMs,
+			cfg.RiderVocalCooldownMs)
 
 	if (until_ - now) > longest then
 		return true
@@ -471,7 +471,7 @@ function HorseCollisionMod:BarkRiderImpact(playerEnt, tierName)
 
 	-- Rolled after the cooldown so a losing roll does not start one, which
 	-- would silence the following impact as well.
-	if math.random() >= (cfg.RiderBarkChance or 0) then
+	if math.random() >= (cfg.RiderBarkChance) then
 		return false
 	end
 
@@ -511,7 +511,7 @@ function HorseCollisionMod:SendRiderAlias(playerEnt, pool, tag, rank)
 	local fields = {
 		alias = alias,
 		forceOnMuted = true,
-		priority = cfg.RiderBarkPriority or cfg.BarkPriority or 0,
+		priority = cfg.RiderBarkPriority or cfg.BarkPriority,
 		canBeDelayed = cfg.BarkCanBeDelayed == true,
 		overrideContextSuppress = cfg.BarkOverrideSuppress == true
 	}
@@ -524,7 +524,7 @@ function HorseCollisionMod:SendRiderAlias(playerEnt, pool, tag, rank)
 	if ok then
 		-- Both spoken ranks sit above every grunt, so no breath follows a line
 		-- inside the hold, and a death line can still cut across an impact one.
-		self.RiderVoiceUntil = self:TimeMs() + (cfg.RiderBarkCooldownMs or 0)
+		self.RiderVoiceUntil = self:TimeMs() + (cfg.RiderBarkCooldownMs)
 		self.RiderVoiceRank = rank or self.RiderVoiceRanks.Impact
 	end
 
@@ -698,7 +698,7 @@ function HorseCollisionMod:BarkOnCooldown(entity)
 	local now = self:TimeMs()
 	local last = self.RecentBarks[id]
 
-	if last and (now - last) < (self.Config.BarkCooldownMs or 6000) then
+	if last and (now - last) < (self.Config.BarkCooldownMs) then
 		-- Said out loud. This refused silently, so a victim shoved twice in
 		-- three seconds simply did not speak the second time and nothing in
 		-- the log accounted for it. A line nobody hears and nobody can explain
@@ -706,7 +706,7 @@ function HorseCollisionMod:BarkOnCooldown(entity)
 		if self.Config.LogTelemetry then
 			self:Log("BarkCooldown " .. self:NameOf(entity)
 					.. " silent for another "
-					.. tostring((self.Config.BarkCooldownMs or 6000)
+					.. tostring((self.Config.BarkCooldownMs)
 							- (now - last)) .. "ms")
 		end
 
@@ -815,7 +815,7 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown,
 		-- heard over whatever the speaker's own brain is saying at the time.
 		-- The fear scream is the case: it is spoken by a man in the middle of
 		-- running away, and running away has lines of its own.
-		priority = priority or cfg.BarkPriority or 0,
+		priority = priority or cfg.BarkPriority,
 		canBeDelayed = cfg.BarkCanBeDelayed == true,
 		-- Likewise overridable per call. A man running for his life is inside
 		-- a brain that raises `suppressMonologs` on itself, and a request
@@ -996,7 +996,7 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 		-- only this caller sequences two lines from one speaker.
 		local last = self.RecentBarks[tostring(npc.id or "?")]
 
-		if last and (self:TimeMs() - last) < (self.Config.BarkGapMs or 2500) then
+		if last and (self:TimeMs() - last) < (self.Config.BarkGapMs) then
 			if self.Config.LogTelemetry then
 				self:Log("BarkRecovered " .. self:NameOf(npc)
 						.. " skipped, only " .. tostring(self:TimeMs() - last)
@@ -1136,7 +1136,7 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 	-- loop stops doing work. This one must not: the work it does is removing
 	-- immortality, and skipping it would leave a victim unkillable for the rest
 	-- of the session. A reload happens on every deploy, so that is not remote.
-	Script.SetTimer(self.Config.ShieldWindowMs or 6000, function()
+	Script.SetTimer(self.Config.ShieldWindowMs, function()
 		if state.removed then
 			return
 		end
@@ -1221,7 +1221,7 @@ function HorseCollisionMod:HushVanillaBark(npc)
 	local id = tostring(npc and npc.id or "?")
 	local now = self:TimeMs()
 	local last = self.RecentHushes[id]
-	local window = self.Config.BarkSuppressMs or 2500
+	local window = self.Config.BarkSuppressMs
 
 	if last and (now - last) < (window * 0.5) then
 		return

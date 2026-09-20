@@ -30,6 +30,28 @@ number.
 
 ## [Unreleased]
 
+### Added
+- `RisePollMs` and `RiseCeilingMs`, which govern how often the mod looks for a
+  victim being back on their feet and how long it waits before giving up. Both
+  were already read by the recovery code and declared nowhere, so the settings
+  loader refused them and they could not be tuned.
+
+### Changed
+- Every per-tier table is now declared once, in `Tiers.lua`, beside the
+  reasoning for its figures. Seven of them were also written out as bare
+  literals in the entry point, and the two copies had drifted.
+- The defaults for `ShieldVictimFromEngineDamage` and `VictimFlatFraction` now
+  match the values the settings file ships. Deleting either line from a settings
+  file is a no-op rather than a silent change to how the mod behaves.
+- Armor's effect on the brake, the ragdoll speed cap, the air damping and the
+  recovery delay is derived in one place instead of four.
+
+### Fixed
+- 168 settings were read with an inline fallback value that could never be
+  reached and, in seventeen cases, disagreed with the setting's shipped figure.
+  A setting set to `false` in a settings file could also be read back as `true`.
+  Nothing a player configures is shadowed by a second copy any more.
+
 ## [5.26.0] - 2026-09-20
 
 ### Added

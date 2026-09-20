@@ -137,6 +137,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RecoveryMaxSec maximum bound on recovery stillness duration
 -- @field RecoveryGroundBarks emit periodic pain barks while downed on the ground
 -- @field RecoveryBarkIntervalMs interval between ground hurt barks in milliseconds
+-- @field RisePollMs how often to look for a victim being back on their feet
+-- @field RiseCeilingMs how long to wait for that before giving up
 -- @field RagdollStillDuration seconds of stillness before a ragdoll stands up
 -- @field RagdollStillSpeedThreshold speed threshold under which a ragdoll is still
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
@@ -562,10 +564,10 @@ HorseCollisionMod.Config = {
 	MinArmorStamina          = 0.75,
 	MaxArmorStamina          = 3.0,
 
-	-- Horse stamina, against a full pool of roughly 210.
-	StaminaDrainByTier       = {
-		Walk = 0.0, Trot = 14.0, Gallop = 22.0, Rear = 12.0, Charge = 22.0
-	},
+	-- `StaminaDrainByTier` is declared in `Tiers.lua` and bound into this table
+	-- at the foot of that file, along with the seven other per-tier tables
+	-- whose figures carry a derivation. Each of those was declared here as
+	-- well, and the two copies drifted.
 
 	ThrowRiderOnStaminaEmpty = true,
 
@@ -664,8 +666,12 @@ HorseCollisionMod.Config = {
 	BarkInCombat             = false,
 	-- Make a victim briefly immortal across the moment of contact, so the
 	-- engine's own collision damage lands on nothing and the mod is the only
-	-- thing that charges them. Research setting.
-	ShieldVictimFromEngineDamage = false,
+	-- thing that charges them. It began as a research setting and became the
+	-- mechanism: it is what lets `ImpactDamageByTier` be the victim's actual
+	-- loss and what puts the killing blow, and so the crime, under the mod's
+	-- attribution. The default read `false` here long after the settings file
+	-- had shipped `true`, so the figure a player saw was not the one that ran.
+	ShieldVictimFromEngineDamage = true,
 	-- A backstop, not a mechanism. The shield goes on only where an impact is
 	-- scored and `ApplyImpactDamage` lifts it synchronously, so this should
 	-- A crash backstop, in milliseconds, and nothing else. The shield is lifted
@@ -858,38 +864,15 @@ HorseCollisionMod.Config = {
 		Trot = 0.15, Gallop = 0.45, Rear = 0.15, Charge = 0.45
 	},
 
-	HitStrengthByTier        = {
-		Walk = "Tickle", Trot = "MinorInjury", Gallop = "MajorInjury",
-		Rear = "MinorInjury", Charge = "MajorInjury"
-	},
-
-	VictimBarkByTier         = {
-		Walk = "collision", Trot = "collision", Gallop = "collision",
-		Rear = "rear", Charge = "rear"
-	},
-
-	RetaliationByTier        = {
-		Walk = true, Trot = false, Gallop = false, Rear = false, Charge = false
-	},
-
-	StaminaPerVictimByTier   = {
-		Walk = true, Trot = true, Gallop = true, Rear = false, Charge = false
-	},
+	-- `HitStrengthByTier`, `VictimBarkByTier`, `RetaliationByTier`,
+	-- `StaminaPerVictimByTier`, `ReactionByTier`, `ThrowByTier` and
+	-- `ImpactDamageByTier` are declared in `Tiers.lua` and bound into this
+	-- table at the foot of that file. See the note beside
+	-- `ThrowRiderOnStaminaEmpty` above.
 
 	VictimLockMsByTier       = { Charge = 2600 },
 
-	VictimFlatFraction       = 0.15,
-
-	ReactionByTier           = {
-		Walk = "stagger", Trot = "fall", Gallop = "ragdoll",
-		Rear = "fall", Charge = "ragdoll"
-	},
-
-	ThrowByTier              = { Gallop = 1.0, Charge = 0.7 },
-
-	ImpactDamageByTier       = {
-		Walk = 0, Trot = 18, Gallop = 95, Rear = 60, Charge = 110
-	},
+	VictimFlatFraction       = 0.45,
 
 	ImpactDamageOwnsTheHit   = true,
 	ImpactDamageReclaimCeiling = 60,
@@ -1275,6 +1258,14 @@ HorseCollisionMod.Config = {
 	RecoveryMaxSec            = 5.0,
 	RecoveryGroundBarks       = true,
 	RecoveryBarkIntervalMs    = 1400,
+
+	-- How `WhenVictimStands` waits for a victim to be back on their feet: how
+	-- often it looks, and how long it looks before giving up and reporting the
+	-- wait as spent. Both were read from `Config` and declared nowhere, so
+	-- `ApplySettings` refused them and the literals in `Recovery.lua` were the
+	-- only figures that could ever run.
+	RisePollMs                = 160,
+	RiseCeilingMs             = 15000,
 
 	-- Native Engine Ragdoll Stillness
 	RagdollStillDuration        = 0.8,
@@ -1726,9 +1717,9 @@ function HorseCollisionMod:ApplySettings()
 	end
 
 	-- Global engine ragdoll stillness thresholds for recovery
-	local threshold = self.Config.RagdollStillSpeedThreshold or 0.4
+	local threshold = self.Config.RagdollStillSpeedThreshold
 	System.SetCVar("wh_rd_StillSpeedThreshold", threshold)
-	System.SetCVar("wh_rd_StillDuration", self.Config.RagdollStillDuration or 0.8)
+	System.SetCVar("wh_rd_StillDuration", self.Config.RagdollStillDuration)
 
 	return applied, rejected
 end
