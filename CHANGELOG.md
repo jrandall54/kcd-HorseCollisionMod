@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.27.0] - 2026-09-20
+
 ### Added
 - `RisePollMs` and `RiseCeilingMs`, which govern how often the mod looks for a
   victim being back on their feet and how long it waits before giving up. Both

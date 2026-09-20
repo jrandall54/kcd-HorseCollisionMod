@@ -47,8 +47,8 @@ block of `HorseCollisionMod.lua`, and again in the settings file.
 merging into it. So `Tiers.lua`'s copies are not dead: they are the per-tier
 floor that makes a *partial* override work, and they are consulted only when a
 player overrides one tier and leaves the rest out. In every other case the value
-that runs comes from `Config` or from the settings file, and `Tiers.lua` — the
-file carrying every derivation and every justification — is never read.
+that runs comes from `Config` or from the settings file, and `Tiers.lua`, the
+file carrying every derivation and every justification, is never read.
 
 That is what made the drift invisible. Two have already drifted:
 
@@ -65,7 +65,7 @@ both defaults. `v_henry_hit_medium` is declared, documented, and never plays.
 that binding would have been wrong in the other direction: `ApplySettings`
 refuses a key `Config` does not declare, so the settings file's eight tables
 would have been rejected at load. Now there is one literal per concern, serving
-both roles — `Config[name]` as the whole-table default the settings file
+both roles: `Config[name]` as the whole-table default the settings file
 replaces, `self[name]` as the floor under a partial override.
 
 ### 2.2 Fifty-four inline `or <number>` fallbacks, seventeen of them stale
@@ -112,13 +112,13 @@ be tuned at all. **Fixed in Stage 0:** both are declared and exposed.
 ### 2.4 Three throw settings are inert as shipped
 
 `RagdollMassArmorScaled = false`, so `MassVictim` computes
-`wanted = RagdollMass / 1.0 = 80` — the engine's own figure for every human. The
+`wanted = RagdollMass / 1.0 = 80`, the engine's own figure for every human. The
 mod polls the body repeatedly to write a value it never changes.
 `RagdollMassArmorExponent = 3.7` is dead alongside it.
 
-**Fix:** decide in the sweep whether mass returns as a lever — the roadmap's
+**Fix:** decide in the sweep whether mass returns as a lever, where the roadmap's
 position is that unarmored victims sit at their normal mass and the curve scales
-*up* from there — or whether the path is removed. It must not stay as a no-op
+*up* from there, or whether the path is removed. It must not stay as a no-op
 that looks live.
 
 ### 2.5 `Config` and the settings file disagree on two values
@@ -127,7 +127,7 @@ that looks live.
 file; `VictimFlatFraction` was 0.15 and 0.45. The settings file wins, so both
 were live at the settings value and the `Config` figures described a build that
 no longer exists. **Fixed in Stage 0** by moving the defaults to the shipped
-values, which changes no behaviour and makes deleting the line from a settings
+values, which changes no behavior and makes deleting the line from a settings
 file a no-op rather than a silent change.
 
 ### 2.6 `GetSpeedTier` lives in `Log.lua`
@@ -151,14 +151,14 @@ Charge 110. Against that order:
 | Table | Walk | Trot | Rear | Gallop | Charge | Ordered? |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ImpactDamageByTier` | 0 | 18 | 60 | 95 | 110 | the reference |
-| `RecoveryDelayByTier` | — | 0.5 | 1.0 | 2.0 | 3.5 | yes |
-| `CameraShakeByTier` | — | 0.6 | 0.8 | 1.0 | 1.2 | yes |
-| `RiderBlurLengthByTier` | — | 0.3 | 0.4 | 1.0 | 1.1 | yes |
+| `RecoveryDelayByTier` | n/a | 0.5 | 1.0 | 2.0 | 3.5 | yes |
+| `CameraShakeByTier` | n/a | 0.6 | 0.8 | 1.0 | 1.2 | yes |
+| `RiderBlurLengthByTier` | n/a | 0.3 | 0.4 | 1.0 | 1.1 | yes |
 | `StaminaDrainByTier` | 0 | 14 | **12** | 22 | 22 | **rear below trot** |
-| `RiderBlurByTier` | — | 0.7 | **0.6** | 1.0 | 1.1 | **rear below trot** |
-| `ImpactDustScaleByTier` | — | 0 | **0.6** | 0.09 | 0.10 | **rear 6x gallop** |
-| `VictimDirtByTier` | — | 0.35 | 0.35 | 0.60 | 0.60 | rear = trot |
-| `VictimBloodByTier` | — | 0.15 | 0.15 | 0.45 | 0.45 | rear = trot |
+| `RiderBlurByTier` | n/a | 0.7 | **0.6** | 1.0 | 1.1 | **rear below trot** |
+| `ImpactDustScaleByTier` | n/a | 0 | **0.6** | 0.09 | 0.10 | **rear 6x gallop** |
+| `VictimDirtByTier` | n/a | 0.35 | 0.35 | 0.60 | 0.60 | rear = trot |
+| `VictimBloodByTier` | n/a | 0.15 | 0.15 | 0.45 | 0.45 | rear = trot |
 | `HitStrengthByTier` | Tickle | Minor | Minor | Major | Major | rear = trot |
 | `ReactionByTier` | stagger | fall | fall | ragdoll | ragdoll | rear = trot |
 | `HorseVocalRankByTier` | 1 | 2 | 2 | 3 | 3 | rear = trot |
@@ -188,7 +188,7 @@ design, but it is the reason the tier figures cannot be derived from physics and
 have to be picked. **This is the largest single decision in the sweep**, and it
 is question 1 in section 5.
 
-For reference, if damage were made proportional to kinetic energy and normalised
+For reference, if damage were made proportional to kinetic energy and normalized
 so that the measured gallop figure of 95 is preserved, the other tiers land at:
 
 | Tier | Scored speed | Energy-derived | Shipped |
@@ -205,8 +205,8 @@ Walk must stay 0 whatever is decided: `wounds` is derived from
 ### 3.4 Fear exists for two tiers out of five
 
 `RearFear` and `RearChargeFear` are loose per-manoeuvre settings with their own
-reaches and scream priorities. A gallop — the heaviest thing that happens in
-ordinary riding — frightens nobody. `Fear.lua` is the one pillar that never
+reaches and scream priorities. A gallop, the heaviest thing that happens in
+ordinary riding, frightens nobody. `Fear.lua` is the one pillar that never
 adopted the tier-table shape `Tiers.lua` exists to enforce. It shipped in 5.25.0
 and 5.26.0, after the roadmap entry that scheduled it *after* the balance pass,
 so `ROADMAP.md` item 2 is stale.
@@ -218,14 +218,14 @@ and unbounded:
 
 | Factor | Range |
 | --- | --- |
-| tier base | 12 – 22 |
-| combat | 1.0 – 2.2 |
-| victim armor | 0.75 – 3.0 |
-| barding | 0.75 – 1.0 |
-| Horsemanship | 1.2 – 10.0 |
+| tier base | 12 to 22 |
+| combat | 1.0 to 2.2 |
+| victim armor | 0.75 to 3.0 |
+| barding | 0.75 to 1.0 |
+| Horsemanship | 1.2 to 10.0 |
 
 A gallop costs 14.85 at the best end and 1452 at the worst, against a pool of
-about 210. The tier separation the rider tunes — 14 against 22, a factor of 1.6 —
+about 210. The tier separation the rider tunes, 14 against 22, a factor of 1.6,
 is invisible beside a modifier stack spanning nearly 100x. The progressive drain
 at low Horsemanship is settled design and is not in question; what is in question
 is whether the other three factors should compound with it or be bounded.
@@ -233,7 +233,7 @@ is whether the other three factors should compound with it or be bounded.
 ### 3.6 The mod's own throw force is a rounding error
 
 `Knockback` 50 and `Uplift` 30 combine to a magnitude of 58.3 against a mass of
-80 — a velocity change of 0.73 m/s. The brake applied a few frames later was
+80, a velocity change of 0.73 m/s. The brake applied a few frames later was
 measured at 2576 units, forty times larger, and `Reaction.lua` says so in a
 comment. The throw is the engine's collision; the only levers that move distance
 are `RagdollBrakeKeep*`, the speed cap and the air damping.
@@ -245,7 +245,7 @@ them authority or say plainly in the settings file that they are trim.
 ### 3.7 The armor axis is redeclared in three shapes
 
 `ArmorImpulseScale` produces a value bounded by `MinArmorImpulse` 0.35 and
-`MaxArmorImpulse` 1.5. Four consumers then re-derive a 0–1 position from a
+`MaxArmorImpulse` 1.5. Four consumers then re-derive a 0 to 1 position from a
 *different* pair of endpoints, `RagdollBrakeArmorScaleArmored` 0.35 and
 `RagdollBrakeArmorScaleUnarmored` 1.26, hardcoded as fallbacks at eight call
 sites across `Reaction.lua` (brake, speed cap, air damping) and `Recovery.lua`.
@@ -253,7 +253,7 @@ The unarmored endpoint does not match the curve's own ceiling, which is why the
 log's `keep` is never the figure the setting names.
 
 **Fix (done, Stage 0):** `Armor.lua` now carries `ArmorLerp`, which is the
-position across that span — 0 at the armored endpoint, 1 at the unarmored one —
+position across that span, 0 at the armored endpoint and 1 at the unarmored one,
 and `ArmorBlend`, which interpolates a consumer's own pair of figures across it.
 The four consumers are one line each and the span's endpoints are read in exactly
 one place. The orientation is the one the code already used rather than the
@@ -282,16 +282,16 @@ Said explicitly so the sweep does not spend rides on it.
 
 ## 5. How the session should run
 
-The roadmap's position is that armor separation, armor defence and base damage
+The roadmap's position is that armor separation, armor defense and base damage
 are one project, because each changes what the others compensate for. That is
 right, and it extends further than three numbers. The way to keep it from chasing
 its tail is to pin every axis but one, and to fix the structure first.
 
-### Stage 0 — structural, no in-game testing
+### Stage 0: structural, no in-game testing
 
 Everything in section 2. Delete the duplicate tier tables, strip the stale
 fallbacks, declare the two missing keys, reconcile the two drifted values, move
-`GetSpeedTier`, normalise the armor factor. No behaviour changes except the two
+`GetSpeedTier`, normalize the armor factor. No behavior changes except the two
 already-drifted values, which come to the rider as a question rather than a
 decision made alone.
 
@@ -303,7 +303,7 @@ this class of drift from coming back between sessions and between agents.
 **Nothing is tuned until Stage 0 is merged**, because until then every damage
 figure exists in three files.
 
-### Stage 1 — four rulings, made at the desk
+### Stage 1: four rulings, made at the desk
 
 Answered before anything is measured, because each one determines what the later
 stages mean:
@@ -317,10 +317,10 @@ stages mean:
    answer sets reaction, hit strength, dirt, blood, vocal rank and damage
    together.
 3. **Do the stamina modifiers compound or bound?** Section 3.5.
-4. **Do `Knockback` and `Uplift` get authority, or get labelled as trim?**
+4. **Do `Knockback` and `Uplift` get authority, or get labeled as trim?**
    Section 3.6.
 
-### Stage 2 — one axis at a time, in this order
+### Stage 2: one axis at a time, in this order
 
 Each stage pins everything downstream of it. The order is chosen so that no stage
 changes an input to a stage already finished.
@@ -330,20 +330,20 @@ changes an input to a stage already finished.
    fires, so this is first, and it is judged by riding rather than by numbers.
 2. **Base damage per tier, unarmored.** Armor pinned out, victim unarmored. The
    question is only what a gallop is worth against 100 health.
-3. **Armor defence.** `ImpactDamageArmorScale`, `Curve`, `Floor`,
+3. **Armor defense.** `ImpactDamageArmorScale`, `Curve`, `Floor`,
    `IgnoredArmor`. Base damage fixed from stage 2; this decides how much a
    knight refuses. The figure to beat: a charge worth 110 currently becomes 12
    against chainmail.
 4. **Throw and armor separation.** The brake, the speed cap and the air damping
-   against the normalised armor factor from Stage 0. Includes the charge's throw
+   against the normalized armor factor from Stage 0. Includes the charge's throw
    distance, reported as too far.
 5. **Recovery.** How long each tier keeps someone down, now that the damage and
    the throw are settled.
 6. **Horse stamina.** Last, because its inputs are all decided elsewhere.
-7. **Cosmetics.** Dust, dirt, blood, camera shake, blur — ordered against the
+7. **Cosmetics.** Dust, dirt, blood, camera shake, blur, ordered against the
    final tier severity, judged by eye.
 
-### Stage 3 — fear, and the roadmap
+### Stage 3: fear, and the roadmap
 
 Give `Fear.lua` the tier-table shape and decide which tiers have a fear band.
 This is also when `ROADMAP.md` is corrected: item 2 partly shipped in 5.25.0 and
