@@ -106,11 +106,32 @@ end
 --- What one impact costs the horse, and charging it.
 --
 -- The single place the stamina figure is worked out. Every tier goes through
--- it, so the rider's Horsemanship, the horse's barding and the combat penalty
--- reach a rear and a charge exactly as they reach a gallop. They did not
--- before: the rear and the charge each drained a flat setting at their own
+-- it, so the rider's Horsemanship, the horse's barding and the combat
+-- surcharge reach a rear and a charge exactly as they reach a gallop. They did
+-- not before: the rear and the charge each drained a flat setting at their own
 -- call site and none of the three modifiers touched them, which meant levelling
 -- Horsemanship made every impact cheaper except the two heaviest.
+--
+-- The cost is a share of the horse's own maximum stamina, and the three
+-- situational factors are surcharges on that share rather than multipliers on
+-- it:
+--
+--     cost = maxStamina
+--          * (tierShare + combatAdd + armorAdd - bardingRelief)
+--          * horsemanship
+--
+-- The chain used to be five multipliers deep and unbounded, which put a gallop
+-- anywhere between 14.85 and 1452 points against a pool of about 210. The tier
+-- separation the rider tunes, a factor of 1.6, was invisible beside a modifier
+-- stack spanning nearly a hundredfold, and the answer to that is not a clamp
+-- on the product but a shape where every term is readable on its own. Adding
+-- the surcharges makes the worst case the sum of the named maxima rather than
+-- an emergent product: 0.38 of the pool before Horsemanship, which the log
+-- prints term by term.
+--
+-- Horsemanship stays a multiplier, because it is the one factor meant to
+-- dominate. The progressive drain at low Horsemanship is settled design: at
+-- level 0 a single gallop impact empties the horse, and that is the point.
 --
 -- @tparam table horseEnt the player's horse entity
 -- @tparam table playerEnt the player entity
@@ -118,50 +139,92 @@ end
 -- @tparam[opt] table armor the victim's armor from `ArmorOf`, where this
 --   impact has a single victim to read it from
 function HorseCollisionMod:DrainImpactStamina(horseEnt, playerEnt, tierName, armor)
-	local base = self:TierValue("StaminaDrainByTier", tierName)
+	local share = self:TierValue("StaminaShareByTier", tierName)
 
-	if type(base) ~= "number" or base <= 0 then
+	if type(share) ~= "number" or share <= 0 then
 		return
 	end
 
-	-- The victim's armor is the one modifier that does not always apply.
+	local pool = self:MaxStaminaOf(horseEnt)
+
+	if not pool or pool <= 0 then
+		return
+	end
+
+	-- The victim's armor is the one surcharge that does not always apply.
 	--
 	-- A rear and a charge are charged once for the whole move and that move
 	-- can land on several people at once, so there is no single victim whose
 	-- armor to read and the cost is scored on the horse and rider alone. The
 	-- loop tiers resolve one victim per impact and pass theirs.
-	local armorScale = 1.0
+	local armorAdd = 0.0
 
 	if armor then
-		armorScale = self:ArmorStaminaScale(armor)
+		armorAdd = self:ArmorStaminaAdd(armor)
 	end
 
-	local combatScale = 1.0
+	local combatAdd = 0.0
 
 	-- Decided by the player's own combat state and nothing about the victim,
 	-- which is why this answers correctly for a rear and a charge with no
 	-- victim to hand.
 	if self:IsCombatCollision(nil) then
-		combatScale = self.Config.CombatStaminaMultiplier
+		combatAdd = self.Config.CombatStaminaAdd
 	end
 
-	local bardingScale = self:BardingStaminaScale(horseEnt)
+	local bardingRelief = self:BardingStaminaRelief(horseEnt)
 	local horsemanship = self:HorsemanshipScale(playerEnt)
-	local cost = base * combatScale * armorScale * bardingScale * horsemanship
+	local total = share + combatAdd + armorAdd - bardingRelief
+
+	-- Floored rather than allowed to go negative, so that a fully barded horse
+	-- on a tier with a small share is never paid stamina for an impact.
+	if total < 0 then
+		total = 0
+	end
+
+	local cost = pool * total * horsemanship
 
 	-- Logged beside the figure it produces rather than on the impact line,
-	-- because a cost that looks wrong is diagnosed by which factor moved it.
+	-- because a cost that looks wrong is diagnosed by which term moved it.
 	if self.Config.LogTelemetry then
 		self:Log("Stamina tier=" .. tostring(tierName)
-				.. " base=" .. string.format("%.1f", base)
-				.. " combat=" .. string.format("%.2f", combatScale)
-				.. " armor=" .. string.format("%.2f", armorScale)
-				.. " barding=" .. string.format("%.2f", bardingScale)
+				.. " pool=" .. string.format("%.1f", pool)
+				.. " share=" .. string.format("%.3f", share)
+				.. " combat=" .. string.format("%.3f", combatAdd)
+				.. " armor=" .. string.format("%.3f", armorAdd)
+				.. " barding=" .. string.format("%.3f", bardingRelief)
 				.. " horsemanship=" .. string.format("%.2f", horsemanship)
 				.. " cost=" .. string.format("%.1f", cost))
 	end
 
 	self:DrainHorseStamina(horseEnt, playerEnt, cost)
+end
+
+--- The horse's maximum stamina, the pool every cost is a share of.
+--
+-- `mst` is the engine's own derived stat for maximum stamina, the figure
+-- vanilla's own feature tests read to check a stamina potion worked. It is
+-- read per impact rather than cached because a buff or a potion can move it
+-- between one impact and the next.
+--
+-- @tparam table ent an entity with a soul
+-- @treturn number|nil the maximum stamina, or nil when it cannot be read
+function HorseCollisionMod:MaxStaminaOf(ent)
+	if not ent or not ent.soul then
+		return nil
+	end
+
+	local pool = nil
+
+	pcall(function()
+		pool = ent.soul:GetDerivedStat("mst")
+	end)
+
+	if type(pool) ~= "number" or pool <= 0 then
+		return nil
+	end
+
+	return pool
 end
 
 --- Charges the horse for an impact and dismounts Henry when it is spent.

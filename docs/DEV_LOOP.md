@@ -134,7 +134,7 @@ clears it. A value given once does not evaporate on the next deploy.
 tools/flow.ps1 world                              what is live
 tools/flow.ps1 test -Preset stamina               add a named world
 tools/flow.ps1 test -Set CollisionIsCrime=true    change one setting
-tools/flow.ps1 test -Set StaminaDrainByTier.Gallop=0
+tools/flow.ps1 test -Set StaminaShareByTier.Gallop=0
 tools/flow.ps1 test -Unset CollisionIsCrime       drop one
 tools/flow.ps1 test -Shipped                      carry nothing
 ```

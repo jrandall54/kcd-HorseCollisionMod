@@ -39,7 +39,7 @@ param (
 	#
 	#   flow.ps1 test -Preset stamina
 	#   flow.ps1 test -Set CollisionIsCrime=true
-	#   flow.ps1 test -Set StaminaDrainByTier.Gallop=0
+	#   flow.ps1 test -Set StaminaShareByTier.Gallop=0
 	#   flow.ps1 test -Unset CollisionIsCrime
 	#   flow.ps1 test -Shipped
 	#

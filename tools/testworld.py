@@ -12,7 +12,7 @@ two-minute detour to flip two booleans:
 
 It also could not reach most of the mod any more. After the per-tier tables
 landed, a setting like the gallop's stamina cost lives at
-`StaminaDrainByTier.Gallop`, and a regex looking for `^\\tKey = value` cannot
+`StaminaShareByTier.Gallop`, and a regex looking for `^\\tKey = value` cannot
 see inside a table.
 
 How it works now. Startup scripts are loaded in name order, so a file named
@@ -39,7 +39,7 @@ land` clears it, so a merged branch leaves nothing behind.
 
     python tools/testworld.py --list
     python tools/testworld.py --set CollisionIsCrime=true
-    python tools/testworld.py --set StaminaDrainByTier.Gallop=0
+    python tools/testworld.py --set StaminaShareByTier.Gallop=0
     python tools/testworld.py --unset CollisionIsCrime
     python tools/testworld.py --preset stamina
     python tools/testworld.py --clear
@@ -123,7 +123,7 @@ def write_world(pairs):
 		"# applied by flow.ps1 test, and cleared by flow.ps1 land.",
 		"#",
 		"# Every line is one setting the development install overrides. A key",
-		"# may name a table member: StaminaDrainByTier.Gallop = 0",
+		"# may name a table member: StaminaShareByTier.Gallop = 0",
 		"",
 	]
 

@@ -118,9 +118,10 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field MinArmorImpulse floor on the armor impulse multiplier
 -- @field MaxArmorImpulse ceiling on the armor impulse multiplier, reached by
 --   an unarmored target
--- @field ArmorStaminaExponent how sharply armor weight raises the stamina cost
--- @field MinArmorStamina floor on the armor stamina multiplier
--- @field MaxArmorStamina ceiling on the armor stamina multiplier
+-- @field ArmorStaminaExponent how sharply armor weight raises the stamina
+--   surcharge on the way to its maximum
+-- @field MaxArmorStaminaAdd the largest share of the horse's pool a victim's
+--   armor can add, reached at ArmorReferenceWeight
 -- @field DynamicRecovery scale ragdoll recovery get-up delay based on tier and armor
 -- @field RecoveryDelayByTier base get-up stillness delay by impact tier
 -- @field RecoveryArmorScaleArmored recovery delay multiplier for armored targets
@@ -136,10 +137,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ProtectMutt when true, Henry's dog is never a valid victim
 -- @field ProtectStoryCharacters when true, characters the game marks as
 --   protected take no damage from an impact
--- @field StaminaDrainByTier what each kind of impact costs the horse, before
---   the rider's Horsemanship, the horse's barding and the combat penalty
+-- @field StaminaShareByTier what each kind of impact costs the horse, as a
+--   share of the horse's own maximum stamina, before the rider's Horsemanship,
+--   the horse's barding and the combat surcharge
 -- @field ThrowRiderOnStaminaEmpty dismount Henry when the horse is spent
--- @field CombatStaminaMultiplier stamina cost multiplier while in a fight
+-- @field CombatStaminaAdd share of the horse's pool added while in a fight
 -- @field SuppressStaggerInCombat skip the stagger animation during a fight
 -- @field Barks whether the mod gives its moments spoken vanilla lines at all
 -- @field CollisionBarks whether victims of an impact speak
@@ -458,7 +460,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field HorsemanshipSeatChance chance of keeping the saddle at the top
 -- @field Barding whether the horse's own barding changes what a collision does
 -- @field BardingFullSmashDef the total `smash_def` counted as a full set
--- @field BardingStaminaRelief how much less stamina an impact costs at a full set
+-- @field BardingStaminaRelief the share of the horse's pool a full set of
+--   barding takes off an impact's cost
 -- @field BardingDamageBonus how much harder a fully barded horse hits
 -- @field BardingForceSteps rows of `{ coverage, knockback added, uplift added }`,
 --   the flat force a barded horse adds, in five steps from bare to a full set
@@ -529,18 +532,18 @@ HorseCollisionMod.Config = {
 	Knockback                = 50.0,
 	Uplift                   = 30.0,
 
-	-- What the target is wearing, as a multiplier on the impulse and on the
-	-- horse's stamina cost. Both are 1.0 at ArmorReferenceWeight; an
-	-- exponent of 0 switches that half off.
+	-- What the target is wearing, as a multiplier on the impulse and as a
+	-- surcharge on the horse's stamina cost. ArmorReferenceWeight is the
+	-- weight counted as a full set: the impulse multiplier is 1.0 there and
+	-- the stamina surcharge reaches its maximum there.
 	ArmorReferenceWeight     = 8.0,
 	ArmorImpulseExponent     = 0.5,
 	MinArmorImpulse          = 0.35,
 	MaxArmorImpulse          = 1.5,
 	ArmorStaminaExponent     = 0.4,
-	MinArmorStamina          = 0.75,
-	MaxArmorStamina          = 3.0,
+	MaxArmorStaminaAdd       = 0.05,
 
-	-- `StaminaDrainByTier` is declared in `Tiers.lua` and bound into this table
+	-- `StaminaShareByTier` is declared in `Tiers.lua` and bound into this table
 	-- at the foot of that file, along with the seven other per-tier tables
 	-- whose figures carry a derivation. Each of those was declared here as
 	-- well, and the two copies drifted.
@@ -594,8 +597,10 @@ HorseCollisionMod.Config = {
 	-- exemption is held until the victim is back over this.
 	AutoCureHealthLimit      = 40.0,
 
-	-- Combat.
-	CombatStaminaMultiplier  = 2.2,
+	-- Combat. The surcharge is a share of the horse's maximum stamina added
+	-- to the tier's own share, so riding people down in a fight costs about
+	-- two thirds again what it costs outside one at the gallop tier.
+	CombatStaminaAdd         = 0.13,
 	SuppressStaggerInCombat  = true,
 
 	-- Spoken reactions. Every line is vanilla, spoken by the character's own
@@ -901,13 +906,12 @@ HorseCollisionMod.Config = {
 	-- skill runs 0 to 20; a rider at 0 is unaffected and the figures below are
 	-- what the skill is worth at the top of that scale.
 	--
-	-- The stamina cost is multiplied, not discounted, and the range is wide on
-	-- purpose. At level 0 a single gallop impact very nearly empties the
-	-- horse; at 20 it takes four or five armored guards, or about nine
-	-- villagers. The ceiling is set against guards rather than villagers
-	-- because guards are what the figure was judged on, and it stays low
-	-- enough that a rider never becomes a cartoon. It runs linearly between
-	-- the two, so every level is worth the same.
+	-- Horsemanship is the one factor that multiplies the cost rather than
+	-- adding to it, because it is the factor meant to dominate, and the range
+	-- is wide on purpose. At 5.0 a gallop's 0.20 share is one full pool, so a
+	-- novice is thrown by a single impact; at 1.0 the share is what it says
+	-- and an expert rides down five in a row, or three in a fight. It runs
+	-- linearly between the two, so every level is worth the same.
 	--
 	-- Seat is the chance of staying mounted when the horse is finally spent.
 	-- The horse still stops either way; a rider who can ride does not always
@@ -915,8 +919,8 @@ HorseCollisionMod.Config = {
 	Horsemanship             = true,
 	HorsemanshipSkill        = "horse_riding",
 	HorsemanshipMaxLevel     = 20,
-	HorsemanshipStaminaWorst = 10.0,  -- the cost multiplier at level 0
-	HorsemanshipStaminaBest  = 1.2,   -- and at HorsemanshipMaxLevel
+	HorsemanshipStaminaWorst = 5.0,   -- the cost multiplier at level 0
+	HorsemanshipStaminaBest  = 1.0,   -- and at HorsemanshipMaxLevel
 	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
 
 	-- What the horse's own barding is worth. Barding is the horse's armor and
@@ -926,7 +930,7 @@ HorseCollisionMod.Config = {
 	-- the rider enters this: barding does not scale with Horsemanship.
 	Barding                  = true,
 	BardingFullSmashDef      = 1.45,
-	BardingStaminaRelief     = 0.25,
+	BardingStaminaRelief     = 0.03,
 	BardingDamageBonus       = 0.15,
 	BardingForceSteps        = {
 		{ 0.0, 0.0, 0.0 },
