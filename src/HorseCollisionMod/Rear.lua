@@ -992,6 +992,10 @@ function HorseCollisionMod:RearStrike(horseEnt)
 	local arc = math.cos(math.rad((cfg.RearArc or 70) / 2))
 	local hit = 0
 
+	-- Who the hooves reached, so the fear band can leave them out: a man with
+	-- a hit reaction to get through does not also need a reason to run.
+	local struck = {}
+
 	for _, npc in pairs(found) do
 		-- No cap. Everyone the hooves come down on takes it; a limit would
 		-- mean a crowd absorbing the blow for each other by standing close.
@@ -1011,6 +1015,7 @@ function HorseCollisionMod:RearStrike(horseEnt)
 
 			if ok and forward and forward >= arc then
 				hit = hit + 1
+				struck[tostring(npc.id)] = true
 				self:RearHit(npc, horseEnt, playerEnt, heading, "Rear")
 			end
 		end
@@ -1025,6 +1030,10 @@ function HorseCollisionMod:RearStrike(horseEnt)
 	if hit > 0 then
 		self:DrainImpactStamina(horseEnt, playerEnt, "Rear")
 	end
+
+	-- After the strike, because the band excludes whoever it landed on and
+	-- cannot know that until the sweep has run.
+	self:FearBand(horseEnt, struck)
 end
 
 --- What a hoof landing on someone does.

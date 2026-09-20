@@ -259,6 +259,20 @@ HorseCollisionModSettings = {
 	RearReach                = 2.5,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 
+	-- The near miss. A horse rearing is not in itself frightening and not a
+	-- crime; what frightens a man is the hooves coming down a stride away
+	-- from him. So the band is not a sweep of the area but a margin around
+	-- the strike, one meter of ground past where the hooves reach. It has no
+	-- arc, unlike the strike: a man the horse reared beside saw the same
+	-- thing as a man it reared in front of.
+	RearFear                 = true,
+	RearFearReach            = 3.5,   -- a stride past the hooves, all round
+	-- The scream is spoken by a man already running, over whatever his own
+	-- brain says while he runs, so it is submitted above the rank victim lines
+	-- ship at. 50 is the rank Henry's own lines were confirmed audible at and
+	-- is used here for the same reason.
+	RearFearScreamPriority   = 50,
+
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance
 	RetaliationChanceStep    = 0.25,  -- added per shove beyond that

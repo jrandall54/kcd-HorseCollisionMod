@@ -51,7 +51,7 @@
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
--- @release 5.24.0
+-- @release 5.25.0
 
 -- The bark sets, by the moment that causes them.
 --
@@ -748,7 +748,8 @@ end
 -- @tparam ?boolean ignoreCooldown true to speak even inside the speaker's
 --   cooldown, used only for the recovery line that follows a cry of pain
 -- @treturn boolean true when a request was sent
-function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
+function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown,
+		priority, overrideSuppress)
 	if not entity then
 		return false
 	end
@@ -810,9 +811,18 @@ function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown)
 	local fields = {
 		metarole = metarole,
 		forceOnMuted = true,
-		priority = cfg.BarkPriority or 0,
+		-- A caller may outbid the shipped rank for a line that has to be
+		-- heard over whatever the speaker's own brain is saying at the time.
+		-- The fear scream is the case: it is spoken by a man in the middle of
+		-- running away, and running away has lines of its own.
+		priority = priority or cfg.BarkPriority or 0,
 		canBeDelayed = cfg.BarkCanBeDelayed == true,
-		overrideContextSuppress = cfg.BarkOverrideSuppress == true
+		-- Likewise overridable per call. A man running for his life is inside
+		-- a brain that raises `suppressMonologs` on itself, and a request
+		-- that does not say it outranks that context is discarded with no
+		-- error, exactly as a losing bid is.
+		overrideContextSuppress = overrideSuppress == true
+				or cfg.BarkOverrideSuppress == true
 	}
 
 	local ok, err = pcall(function()

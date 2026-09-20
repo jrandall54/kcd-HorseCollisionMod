@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.24.0
+-- @release 5.25.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.24.0"
+HorseCollisionMod.Version = "5.25.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -279,6 +279,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   lets the camera return home
 
 -- @field RearArc the arc in front that counts, in degrees
+-- @field RearFear whether a rear frightens the people it does not hit
+-- @field RearFearReach how far a near miss reaches, in meters, all round
+-- @field RearFearScreamPriority the rank the scream is submitted at
 -- @field RearImpactSpeed the speed a rear is scored at, since the horse's
 --   own speed is zero and what matters is the hooves
 -- @field ReleaseMovementAttempts how many times that release is repeated, in
@@ -736,6 +739,9 @@ HorseCollisionMod.Config = {
 	LeanReleaseSec           = 0.05,
 	RearReach                = 2.5,
 	RearArc                  = 70,
+	RearFear                 = true,
+	RearFearReach            = 3.5,
+	RearFearScreamPriority   = 50,
 	RearImpactSpeed          = 6.0,
 
 	Retaliation              = true,
@@ -1983,6 +1989,7 @@ Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Lean.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Rear.lua")
+Script.ReloadScript("Scripts/HorseCollisionMod/Fear.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Impact.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Tutorial.lua")
 Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
