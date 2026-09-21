@@ -30,6 +30,41 @@ number.
 
 ## [Unreleased]
 
+## [5.29.0] - 2026-09-20
+
+### Changed
+- **The horse's stamina cost is a share of that horse's own maximum stamina,
+  and the situational factors are surcharges rather than multipliers.** The
+  chain was `base x combat x victimArmor x barding x horsemanship`, all
+  multiplicative and unbounded, which put a gallop anywhere between 14.85 and
+  1452 points against a pool of about 210: the tier separation a player tunes,
+  a factor of 1.6, was invisible beside a stack spanning nearly a hundredfold.
+  Now `cost = maxStamina x (tier share + combat + victim armor - barding) x
+  Horsemanship`, so the worst case is the sum of the figures the settings file
+  names, 0.38 of the pool before Horsemanship, instead of an emergent product.
+  The pool is read per impact from the engine's `mst` derived stat, because it
+  is that horse's own stamina stat and measured 210 on one horse and 230 on
+  another.
+- `HorsemanshipStaminaWorst` is 5.0 and `HorsemanshipStaminaBest` is 1.0, the
+  span that keeps one gallop impact emptying the horse at level 0 and allows
+  five back to back at the top of the skill. Horsemanship remains the one
+  factor that multiplies, because it is the one meant to dominate.
+
+### Removed
+- `StaminaDrainByTier`, replaced by `StaminaShareByTier`, whose figures are
+  shares of the horse's pool rather than point values: Walk 0, Trot 0.13,
+  Gallop 0.20, Rear 0.10, Charge 0.20.
+- `CombatStaminaMultiplier`, replaced by `CombatStaminaAdd` 0.13.
+- `MinArmorStamina` and `MaxArmorStamina`, replaced by `MaxArmorStaminaAdd`
+  0.05, the most a victim's armor can add to an impact's share. It is reached
+  at the new `ArmorStaminaFullWeight` 50.0, the weight of a full set of armor,
+  measured by inverting the impulse curve across a 76-impact run: villagers
+  weigh 5 to 7 and mailed guards 45 to 65. Sharing `ArmorReferenceWeight` 8.0
+  charged a villager 0.041 of the 0.05 maximum, which made the surcharge a
+  flat tax on every victim.
+- `BardingStaminaRelief` keeps its name and changes units, from a fraction of
+  the cost removed to a share of the pool taken off: 0.03.
+
 ## [5.28.0] - 2026-09-20
 
 ### Removed

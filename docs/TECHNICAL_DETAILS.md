@@ -483,41 +483,71 @@ watch, the settled one and the failsafe ceiling.
 
 ### Stamina
 
-A full horse stamina pool is 210. At the current values a gallop costs roughly
-five bodies and a trot roughly seven before the horse is spent and Henry is
-thrown. Stamina regenerates quickly between impacts, so the number of people
-that can be put down in one run depends on the horse and on how fast the hits
-are strung together.
+An impact's cost is a **share of that horse's own maximum stamina**, read per
+impact from the engine's `mst` derived stat. A flat point figure would mean
+different things on different mounts: the pool measured 210 on the test horse
+and 230 on another.
 
-A walking bump is not hard enough to tire a horse, hence the `Walk` figure of
-0 in `StaminaDrainByTier`.
+    cost = maxStamina
+         * (tier share + combat + victim armor - barding)
+         * Horsemanship
 
-Every tier is charged through one function, `DrainImpactStamina`, which reads
-that table and applies the three modifiers below. The rear and the charge went
-through it late: each used to drain a flat setting at its own call site, so
-Horsemanship, barding and the combat penalty reached every tier except the two
-heaviest.
+The three situational figures are added to the tier's share rather than
+multiplied with it. Multiplied, the chain ran `base x combat x victimArmor x
+barding x horsemanship`, all unbounded, and put a gallop anywhere between 14.85
+and 1452 points against a pool of about 210, so the tier separation the rider
+tunes, a factor of 1.6, was invisible beside a stack spanning nearly a
+hundredfold. Added, the worst case is the sum of the named maxima, 0.38 of the
+pool before Horsemanship, and each term is readable on its own in the telemetry
+line.
 
-The cost is then multiplied by what the target wears, between
-`MinArmorStamina` and `MaxArmorStamina`. A villager in cloth costs less than
-the listed figure and a target in mail costs twice it. That multiplier
-compounds with the combat multiplier below.
+Horsemanship remains a multiplier because it is the one factor meant to
+dominate. It runs from 5.0 at level 0 to 1.0 at the top of the skill, so a
+gallop's 0.20 share empties the horse in one impact for a novice and allows
+five back to back for an expert. Stamina regenerates between impacts, so a
+player who circles and lines up again gets more than those counts say.
 
-The armor multiplier is the one that does not reach the rear and the charge,
-and that is deliberate rather than an omission. Those two are charged once for
-the whole move and the move can land on several people at once, so there is no
+| Tier | Share of pool | Back to back at full Horsemanship |
+| --- | --- | --- |
+| Walk | 0 | unlimited |
+| Trot | 0.13 | about 8 |
+| Rear | 0.10 | limited by its cooldown, not by stamina |
+| Gallop | 0.20 | 5 |
+| Charge | 0.20 | limited by its cooldown, not by stamina |
+
+A walking bump is not hard enough to tire a horse, hence the `Walk` figure of 0
+in `StaminaShareByTier`. The rear and the charge are commanded attacks rather
+than consequences of riding, so what stops a player spamming them is
+`RearCooldownMs` on the move itself; their share is a cost the player feels, not
+a budget they count.
+
+Every tier is charged through one function, `DrainImpactStamina`. The rear and
+the charge went through it late: each used to drain a flat setting at its own
+call site, so Horsemanship, barding and the combat surcharge reached every tier
+except the two heaviest.
+
+| Surcharge | Share | Effect on a gallop at full Horsemanship |
+| --- | --- | --- |
+| In a fight | +0.13 | 3 impacts |
+| Armored victim | +0.05 at most | 4 impacts |
+| Full barding | -0.03 | 6 impacts |
+
+The victim's armor surcharge rises with the weight of what they are wearing and
+reaches `MaxArmorStaminaAdd` at `ArmorReferenceWeight`, the weight counted as a
+full set. It is the one term that does not reach the rear and the charge, and
+that is deliberate rather than an omission. Those two are charged once for the
+whole move and the move can land on several people at once, so there is no
 single victim whose armor to read. What the horse and rider bring, meaning
-barding, Horsemanship and the combat penalty, applies to them in full.
+barding, Horsemanship and the combat surcharge, applies to them in full.
 
-### Combat multiplier
+### Combat surcharge
 
 Riding through a market at speed is meant to be cheap. Using the horse as crowd
-control mid-battle is not: with no penalty, charging a group of four leaves them
-ragdolled and the rider free to shoot or swing at no cost.
+control mid-battle is not: with no surcharge, charging a group of four leaves
+them ragdolled and the rider free to shoot or swing at no cost.
 
-At `CombatStaminaMultiplier = 2.5` a galloping charge into combat spends the
-horse in a single impact, making it a committed move instead of a repeatable
-one.
+At `CombatStaminaAdd = 0.13` a gallop in a fight costs 0.33 of the pool instead
+of 0.20, so three impacts spend the horse where five would outside a fight.
 
 ### SuppressStaggerInCombat
 
@@ -1488,7 +1518,7 @@ per charge.
 
 `Charge` is a tier in its own right rather than a gallop wearing another name.
 It has its own damage in `ImpactDamageByTier`, its own sound in
-`ImpactSoundByTier`, its own stamina figure in `StaminaDrainByTier`, its own victim
+`ImpactSoundByTier`, its own stamina share in `StaminaShareByTier`, its own victim
 lockout in `RearChargeVictimLockMs`, and its own dust, camera shake, view blur
 and throw scalar. Nothing about it can be tuned by changing what an ordinary
 collision does, or the reverse.

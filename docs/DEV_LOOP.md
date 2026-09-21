@@ -122,9 +122,10 @@ Releases go through `build.ps1`. The dev folder never ships.
 
 What a branch changes about the installed settings so a test is not fighting
 the mod's shipping behavior. Riding someone down is legal, a spent horse keeps
-its rider, nobody is pulled down or calls for guards; almost every collision
-test is about the collision, and a guard summoned mid-run ends a test that was
-measuring something else.
+its rider, nobody is pulled down or calls for guards, and a rear or a charge
+frightens nobody; almost every collision test is about the collision, and a
+guard summoned mid-run, or a crowd that scatters before the horse reaches it,
+ends a test that was measuring something else.
 
 It is branch state. `flow.ps1 branch` seeds the default, every `test`
 re-applies it, anything asked for on a later `test` is added to it, and `land`
@@ -134,7 +135,7 @@ clears it. A value given once does not evaporate on the next deploy.
 tools/flow.ps1 world                              what is live
 tools/flow.ps1 test -Preset stamina               add a named world
 tools/flow.ps1 test -Set CollisionIsCrime=true    change one setting
-tools/flow.ps1 test -Set StaminaDrainByTier.Gallop=0
+tools/flow.ps1 test -Set StaminaShareByTier.Gallop=0
 tools/flow.ps1 test -Unset CollisionIsCrime       drop one
 tools/flow.ps1 test -Shipped                      carry nothing
 ```

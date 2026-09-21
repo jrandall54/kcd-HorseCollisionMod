@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
--- @release 5.28.0
+-- @release 5.29.0
 
 --- One tier's value for one concern.
 --
@@ -114,23 +114,43 @@ HorseCollisionMod.ImpactDamageByTier = {
 	Charge = 110,
 }
 
---- What each tier costs the horse, before the rider's Horsemanship, the
---- horse's barding and the combat penalty.
+--- What each tier costs the horse, as a share of that horse's own maximum
+--- stamina, before the rider's Horsemanship, the horse's barding and the
+--- combat surcharge.
+--
+-- A share rather than a point figure because the pool is not fixed: it
+-- measured 210 on the test horse and 230 on another, so it is that horse's own
+-- stamina stat and a flat cost would mean different things on different
+-- mounts.
+--
+-- The gallop's 0.20 is the anchor and everything else is derived from it. It
+-- comes from two statements of intent held together: a horse should not become
+-- a tank but Henry should be able to ride down a few people with ease, and one
+-- gallop impact empties the horse at level 0 Horsemanship. With the
+-- Horsemanship span running 5.0 down to 1.0, 0.20 of the pool is exactly one
+-- full pool at level 0 and five back-to-back impacts at the top of the skill.
+-- A trot is 0.13, about eight impacts back to back, because it puts a man on
+-- the ground without being the blow that kills and should not be rationed the
+-- way the gallop is. Walk is 0 for the same reason it deals no damage: a shove
+-- is not an impact. These are back-to-back counts, and the diary records
+-- stamina refilling between passes, so a player who circles and lines up again
+-- gets more than the figure says.
 --
 -- The rear and the charge carry figures of their own rather than borrowing a
--- loop tier's. They are separate moves with separate costs: a rear is hooves
--- coming down from a standstill and is charged near a trot, while a charge is
--- the heaviest thing the mod does and is charged a gallop's.
+-- loop tier's. They are also the two tiers that are not limited by stamina at
+-- all: they are commanded attacks rather than consequences of riding, so what
+-- stops a player spamming them is `RearCooldownMs` on the move itself, and
+-- their share is only a cost the player feels.
 --
 -- A charge is charged once for the whole lunge rather than once per victim,
 -- which is decided at the call site, because riding down a group is the move
 -- and a crowd should not empty the horse for standing close together.
-HorseCollisionMod.StaminaDrainByTier = {
-	Walk = 0.0,
-	Trot = 14.0,
-	Gallop = 22.0,
-	Rear = 12.0,
-	Charge = 22.0,
+HorseCollisionMod.StaminaShareByTier = {
+	Walk = 0.00,
+	Trot = 0.13,
+	Gallop = 0.20,
+	Rear = 0.10,
+	Charge = 0.20,
 }
 
 --- What a victim's body does when the tier lands on them.
@@ -257,7 +277,7 @@ HorseCollisionMod.StaminaPerVictimByTier = {
 -- reloads the settings file and calls `ApplySettings` after it.
 HorseCollisionMod.TierTables = {
 	"ImpactDamageByTier",
-	"StaminaDrainByTier",
+	"StaminaShareByTier",
 	"ReactionByTier",
 	"ThrowByTier",
 	"HitStrengthByTier",

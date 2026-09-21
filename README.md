@@ -103,8 +103,9 @@ breaking the mod. Deleting a line restores its default.
 | `RagdollDampFloorMs` | 200 | The earliest a body may be settled, in milliseconds, so it cannot happen mid-launch. |
 | `RagdollDampCeilingMs` | 6000 | The latest, applied whatever the body is doing. |
 | `RagdollDampPollMs` | 100 | How often a thrown body is looked at. |
-| `StaminaDrainByTier` | Walk 0, Trot 14, Gallop 22, Rear 12, Charge 22 | What each kind of impact costs the horse. Raise a figure to be thrown sooner. A rear and a charge are charged once for the move rather than once per person. |
-| `CombatStaminaMultiplier` | 2.2 | Multiplies the drain values while you are fighting. 1.0 disables the combat penalty. |
+| `StaminaShareByTier` | Walk 0, Trot 0.13, Gallop 0.20, Rear 0.10, Charge 0.20 | What each kind of impact costs the horse, as a share of that horse's own full stamina. Raise a figure to be thrown sooner. A rear and a charge are charged once for the move rather than once per person. |
+| `CombatStaminaAdd` | 0.13 | Added to the share above while you are fighting. 0 removes the combat surcharge. |
+| `MaxArmorStaminaAdd` | 0.05 | The most an armored victim adds to the share above. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
 | `ReactionByTier` | Walk stagger, Trot fall, Gallop ragdoll, Rear fall, Charge ragdoll | What each impact does to the victim's body. `"stagger"` and `"knockdown"` play an animation, `"fall"` plays one that hands the body to physics partway through and is the only one that gives a victim their activity back, `"ragdoll"` drops them on contact. |
 | `ThrowByTier` | Gallop 1.0, Charge 0.7 | How hard each ragdoll tier throws. Only tiers set to `"ragdoll"` above use it. |
@@ -115,12 +116,12 @@ breaking the mod. Deleting a line restores its default.
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
 | `ProtectMutt` | true | Whether your dog is immune. |
 | `Horsemanship` | true | Whether the rider's `horse_riding` skill changes what a collision costs. A novice is thrown by a single gallop impact; a master rides through four or five guards. |
-| `HorsemanshipStaminaWorst` | 10.0 | The horse's stamina cost multiplier at skill 0. |
-| `HorsemanshipStaminaBest` | 1.2 | And at skill 20. |
+| `HorsemanshipStaminaWorst` | 5.0 | The horse's stamina cost multiplier at skill 0. |
+| `HorsemanshipStaminaBest` | 1.0 | And at skill 20. |
 | `HorsemanshipSeatChance` | 0.6 | Chance of keeping the saddle when the horse is spent, at skill 20. |
 | `Barding` | true | Whether the horse's own barding changes what a collision does. Barding is the horse's armor, not its tack: a saddle, bridle and shoes count for nothing. |
 | `BardingFullSmashDef` | 1.45 | The total `smash_def` treated as a full set of barding. Everything below scales from nothing on a bare horse to its figure here. |
-| `BardingStaminaRelief` | 0.25 | How much less stamina an impact costs a fully barded horse. The half of barding you actually feel: one more guard ridden down before the horse is spent. |
+| `BardingStaminaRelief` | 0.03 | How much less stamina an impact costs a fully barded horse. The half of barding you actually feel: one more guard ridden down before the horse is spent. |
 | `BardingDamageBonus` | 0.15 | How much harder a fully barded horse hits. |
 | `BardingForceSteps` | five steps | What barding adds to the knockdown force, as a list of `{ coverage, added to Knockback, added to Uplift }`. No barding adds nothing, a fifth of a full set adds a fifth of the bonus, and a full set adds all of it. At the top that is 5.0 on a `Knockback` of 50 and 3.0 on an `Uplift` of 30. |
 | `HorseBoltsWhenSpent` | true | Whether a horse that has thrown a spent rider may leave rather than wait. |

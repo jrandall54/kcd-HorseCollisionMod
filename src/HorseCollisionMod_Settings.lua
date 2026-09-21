@@ -97,35 +97,48 @@ HorseCollisionModSettings = {
 	RagdollStillDuration        = 0.8,
 	RagdollStillSpeedThreshold  = 0.4,
 
-	-- Stamina, against a full pool of roughly 210.
+	-- Stamina. Every figure here is a share of the horse's own maximum
+	-- stamina, not a point value, because that pool differs from horse to
+	-- horse: 0.20 means a fifth of whatever this horse has.
 	--
-	-- One figure per tier, and every tier is charged through the same path, so
-	-- the rider's Horsemanship, the horse's barding and the combat penalty all
-	-- apply to a rear and a charge exactly as they do to a gallop.
-	StaminaDrainByTier       = {
-		Walk   = 0.0,   -- a shove costs the horse nothing
-		Trot   = 14.0,
-		Gallop = 22.0,
-		Rear   = 12.0,  -- hooves coming down, standing still
-		Charge = 22.0,  -- charged once for the whole lunge, not per victim
+	-- One share per tier, and every tier is charged through the same path, so
+	-- the rider's Horsemanship, the horse's barding and the combat surcharge
+	-- all apply to a rear and a charge exactly as they do to a gallop:
+	--
+	--     cost = maxStamina
+	--          * (tier share + combat + victim armor - barding)
+	--          * Horsemanship
+	--
+	-- The three situational figures are added to the tier's share rather than
+	-- multiplied with it, so the worst an impact can cost before Horsemanship
+	-- is the sum of the figures below and can be read straight off them.
+	StaminaShareByTier       = {
+		Walk   = 0.00,  -- a shove costs the horse nothing
+		Trot   = 0.13,  -- about eight back to back at full Horsemanship
+		Gallop = 0.20,  -- five back to back, one at level 0 Horsemanship
+		Rear   = 0.10,  -- rationed by RearCooldownMs, not by stamina
+		Charge = 0.20,  -- charged once for the whole lunge, not per victim
 	},
 
-	CombatStaminaMultiplier  = 2.2,   -- 1.0 removes the combat penalty
+	CombatStaminaAdd         = 0.13,  -- 0 removes the combat surcharge
 	ThrowRiderOnStaminaEmpty = true,  -- false still drains stamina
 
 	-- How much what a target is wearing changes the impact. Weight is the
 	-- sum of their armor, from the game's own item tables: a villager is
 	-- around 5, a mail-wearing guard around 47.
 	--
-	-- Both multipliers are 1.0 at ArmorReferenceWeight and move from there.
-	-- An exponent of 0 switches that half off and keeps the old behavior.
-	ArmorReferenceWeight     = 8.0,   -- the weight that changes nothing
+	-- The impulse multiplier is exactly 1.0 at ArmorReferenceWeight, and an
+	-- exponent of 0 switches that half off. The stamina surcharge has its own
+	-- anchor: it reaches MaxArmorStaminaAdd at ArmorStaminaFullWeight, the
+	-- weight of a full set of armor, so a villager in clothes pays almost
+	-- nothing.
+	ArmorReferenceWeight     = 8.0,   -- the weight counted as a full set
 	ArmorImpulseExponent     = 0.5,   -- higher means armor plants them harder
 	MinArmorImpulse          = 0.35,  -- a knight is never immovable
 	MaxArmorImpulse          = 1.5,   -- nor is a naked peasant weightless
-	ArmorStaminaExponent     = 0.4,   -- higher means armor tires the horse more
-	MinArmorStamina          = 0.75,
-	MaxArmorStamina          = 3.0,
+	ArmorStaminaFullWeight   = 50.0,  -- armor weight counted as a full set
+	ArmorStaminaExponent     = 1.0,   -- higher means light armor costs less
+	MaxArmorStaminaAdd       = 0.05,  -- the most an armored victim can add
 
 	-- The floor a collision will not take a victim below. A collision puts
 	-- its victim into a wounded state whose exit is gated on health, and an
@@ -589,13 +602,12 @@ HorseCollisionModSettings = {
 	-- skill runs 0 to 20; a rider at 0 is unaffected and the figures below are
 	-- what the skill is worth at the top of that scale.
 	--
-	-- The stamina cost is multiplied, not discounted, and the range is wide on
-	-- purpose. At level 0 a single gallop impact very nearly empties the
-	-- horse; at 20 it takes four or five armored guards, or about nine
-	-- villagers. The ceiling is set against guards rather than villagers
-	-- because guards are what the figure was judged on, and it stays low
-	-- enough that a rider never becomes a cartoon. It runs linearly between
-	-- the two, so every level is worth the same.
+	-- Horsemanship is the one factor that multiplies the cost rather than
+	-- adding to it, because it is the factor meant to dominate, and the range
+	-- is wide on purpose. At 5.0 a gallop's 0.20 share is one full pool, so a
+	-- novice is thrown by a single impact; at 1.0 the share is what it says
+	-- and an expert rides down five in a row, or three in a fight. It runs
+	-- linearly between the two, so every level is worth the same.
 	--
 	-- Seat is the chance of staying mounted when the horse is finally spent.
 	-- The horse still stops either way; a rider who can ride does not always
@@ -603,8 +615,8 @@ HorseCollisionModSettings = {
 	Horsemanship             = true,
 	HorsemanshipSkill        = "horse_riding",
 	HorsemanshipMaxLevel     = 20,
-	HorsemanshipStaminaWorst = 10.0,  -- the cost multiplier at level 0
-	HorsemanshipStaminaBest  = 1.2,   -- and at HorsemanshipMaxLevel
+	HorsemanshipStaminaWorst = 5.0,   -- the cost multiplier at level 0
+	HorsemanshipStaminaBest  = 1.0,   -- and at HorsemanshipMaxLevel
 	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
 
 	-- What the horse's own barding is worth. Barding is the horse's armor and
@@ -617,7 +629,7 @@ HorseCollisionModSettings = {
 	-- rider enters this: barding does not scale with Horsemanship.
 	Barding                  = true,
 	BardingFullSmashDef      = 1.45,  -- smash_def counted as a full set, measured
-	BardingStaminaRelief     = 0.25,  -- how much less stamina an impact costs
+	BardingStaminaRelief     = 0.03,  -- share of the pool a full set takes off
 	BardingDamageBonus       = 0.15,  -- how much harder a barded horse hits
 	-- What barding adds to the knockdown force, in five steps. No barding adds
 	-- nothing, a fifth of a full set adds a fifth of the bonus, up to a full

@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 5.28.0
+-- @release 5.29.0
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
 -- A sum over a person has to exclude them and a sum over a horse has to be
@@ -358,20 +358,49 @@ function HorseCollisionMod:ArmorBlend(armorScale, armored, unarmored)
 end
 
 
---- The stamina multiplier for a target's armor.
+--- The stamina surcharge for a target's armor.
 --
--- Composes with the combat multiplier already applied, and is the same shape
--- the Phase 3 Horsemanship multiplier will take, so the three multiply rather
--- than each becoming its own rule.
+-- A share of the horse's pool added to the tier's own share, rising from zero
+-- on a victim in clothes to `MaxArmorStaminaAdd` on one in a full set. It used
+-- to be a multiplier running 0.75 to 3.0, which is the factor that put a
+-- gallop at seven times its tier figure on an armored guard; as a surcharge
+-- the worst it can do is the figure it names.
+--
+-- The weight of what the victim is wearing is the input, not their armor
+-- rating, for the same reason the impulse curve uses weight: what tires a
+-- horse is shifting a heavy body, not the plate's rating against a hoof.
+--
+-- It has its own full-set weight rather than sharing `ArmorReferenceWeight`,
+-- and the two figures are far apart on purpose. The impulse curve's reference
+-- is the weight that multiplies an impulse by exactly one, a point inside the
+-- range; a surcharge needs the weight where a victim is *fully* armored, or
+-- everybody pays the maximum. Measured on a run of 76 impacts by inverting
+-- `ArmorImpulseScale` off the impact log, villagers came out at 5 to 7 and
+-- mailed guards at 45 to 65, so 50 is where a full set sits and a villager
+-- pays a tenth of the surcharge.
 --
 -- @tparam table armor a table from `ArmorOf`
--- @treturn number a multiplier on the tier's stamina cost
-function HorseCollisionMod:ArmorStaminaScale(armor)
+-- @treturn number a share of the horse's maximum stamina, near 0 on a victim
+--   in ordinary clothes
+function HorseCollisionMod:ArmorStaminaAdd(armor)
 	local cfg = self.Config
+	local reference = cfg.ArmorStaminaFullWeight
 
-	return self:ArmorCurve(armor.weight, cfg.ArmorReferenceWeight,
-			cfg.ArmorStaminaExponent, false,
-			cfg.MinArmorStamina, cfg.MaxArmorStamina)
+	if reference <= 0 then
+		return 0.0
+	end
+
+	local ratio = (armor.weight or 0) / reference
+
+	if ratio < 0 then
+		ratio = 0
+	end
+
+	if ratio > 1 then
+		ratio = 1
+	end
+
+	return cfg.MaxArmorStaminaAdd * math.pow(ratio, cfg.ArmorStaminaExponent)
 end
 
 --- The damage multiplier for a target's armor.
@@ -574,9 +603,12 @@ end
 -- of barding a player actually feels: one more guard ridden down before the
 -- horse is spent and throws them.
 --
+-- A share of the horse's pool subtracted from the tier's own share, in the
+-- same currency as the tier figure and the two surcharges, so a full set is
+-- worth exactly the figure `BardingStaminaRelief` names.
+--
 -- @tparam table horseEnt the player's horse entity
--- @treturn number a multiplier on the stamina cost, 1 on a bare horse
-function HorseCollisionMod:BardingStaminaScale(horseEnt)
-	return 1.0 - (self:BardingCoverage(horseEnt)
-			* (self.Config.BardingStaminaRelief))
+-- @treturn number a share of the horse's maximum stamina, 0 on a bare horse
+function HorseCollisionMod:BardingStaminaRelief(horseEnt)
+	return self:BardingCoverage(horseEnt) * self.Config.BardingStaminaRelief
 end
