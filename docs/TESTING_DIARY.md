@@ -22136,3 +22136,49 @@ tunable now has exactly one declaration, and three mechanical checks stand
 between the project and this happening again. The four rulings in section 5 of
 the audit are what stage 1 needs, and they are decisions rather than
 measurements.
+
+---
+
+### Build: 5.28.0 — the balance pass, ruling 3: stamina as a share of the pool
+
+**Hypothesis**: Ruling 3 of `docs/BALANCE_AUDIT.md` replaced the multiplicative
+stamina chain with a share of the horse's own pool:
+
+    cost = maxStamina x (tier share + combat + victim armor - barding)
+           x Horsemanship
+
+The old chain spanned 14.85 to 1452 points against a pool of about 210, so the
+factor-of-1.6 tier separation a player tunes was invisible beside it. The
+question a ride can answer is not whether the figures are right — that needs a
+playthrough — but whether the system behaves as the derivation says it does.
+
+**Results**: Ridden with the `stamina` preset, which turns on
+`ThrowRiderOnStaminaEmpty` and `HorseBoltsWhenSpent` so that running out does
+something. `HorseBoltsWhenSpent` had to be switched off after the first run: a
+horse that bolts on empty ends the run after a single throw, which is no use
+for counting impacts.
+
+Six gallop impacts in a row, then `Horse spent - throwing rider.`
+
+    Stamina tier=Gallop pool=210.0 share=0.200 combat=0.000 armor=0.050
+            barding=0.003 horsemanship=1.00 cost=51.8
+    Stamina tier=Gallop pool=210.0 share=0.200 combat=0.000 armor=0.005
+            barding=0.003 horsemanship=1.00 cost=42.4
+
+Every impact cost 42 to 52 against a pool of 210, at `horsemanship=1.00`, the
+top of the skill. The commit's stated intent was five back-to-back impacts
+there; regeneration between hits bought a sixth. An earlier row at
+`horsemanship=2.40` cost 101.7, half the pool in one hit, which is the
+progressive drain working as designed.
+
+The throws that came out of the same run ranged 0.07 m to 5.22 m by victim.
+
+**Thoughts & Conclusions**: The system behaves as derived and the rider accepts
+the figures provisionally — *"it feels okay. There's no right or wrong answer at
+this point without extensive actual playthrough testing."* Ruling 3 is settled
+as far as the desk can settle it. The branch is clean and unmerged.
+
+One preset note worth keeping: `[stamina]` pairs
+`ThrowRiderOnStaminaEmpty` with `HorseBoltsWhenSpent`, and the second one makes
+the preset unusable for its own purpose. Counting impacts needs the throw
+without the bolt.
