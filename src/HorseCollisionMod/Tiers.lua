@@ -95,23 +95,48 @@ end
 
 --- What each tier is worth in health, before armor.
 --
--- The gallop figure is set from measurement rather than picked. At 90 the soft
--- end killed six of eight, and both survivors finished on 3.5 and 0.5 health,
--- having been dealt 81.0 and 80.6 against a villager's 100. The engine's own
--- trample adds a further 15 to 20 on top in most impacts but varies from
--- nothing to 28, and that variation is what leaves any survivors at all. 95
--- carries those two over and lands the rate near the nine in ten asked for.
+-- Every figure here is derived from the outcome it should produce against an
+-- unarmored man, and the arithmetic is the same each time. NPC health is a
+-- flat 100: across the whole testing diary every health reading tops out at
+-- exactly 100.00, while stamina runs to 121 and 132, so health is not a
+-- vitality-scaled pool. `ImpactDamageVariance` rolls the figure uniformly
+-- across 0.85 to 1.15. The mod's damage is the only damage the victim keeps:
+-- `ShieldVictimFromEngineDamage` hands the engine's own trample straight back,
+-- measured live at `dealt=92.2 engineTook=29.1` leaving a victim on 7.8, so a
+-- tier reaches 100 on its own or it does not reach it. A rear charges no
+-- engine collision at all, since the horse is standing still.
 --
 -- Walk is 0 deliberately: a shove staggers, it does not wound. A trot is worth
 -- far less than the gallop rather than proportionally less, because the mod
 -- puts a man on the ground at a trot and being knocked down is most of the
 -- weight the rider wanted a trotting horse to carry.
+--
+-- The gallop is the blow that kills, at about nine in ten. That needs the roll
+-- to clear 100 nine times in ten, which is a threshold of 0.88, so the figure
+-- is 100 / 0.88 = 113 before the horse's barding and 111 with it. The earlier
+-- 95 was set when the trample was believed to add 15 to 20 on top of it, and
+-- measured live it kills about two in five.
+--
+-- The rear and the charge are commanded moves rather than speed bands, so
+-- neither is derived from a speed.
+--
+-- A rear never kills a healthy man outright. At 75 its span is 65 to 88, so a
+-- man on full health always survives one and a man already hurt does not: it
+-- takes two rears to put someone down. This keeps clear air between the rear
+-- and the gallop, which the rear is below in reaction, hit strength, dirt,
+-- blood and vocal rank. Making it kill one in six would have cost 89 and
+-- collapsed that gap.
+--
+-- A charge is the heaviest thing the mod does and the only impact a player
+-- spends a perk, a key and most of the horse's stamina on. It is the one blow
+-- that kills on every roll: 118 x the worst roll of 0.85 is 100.3. Measured
+-- live at 117.2 and 116.0 dealt, both fatal from full health.
 HorseCollisionMod.ImpactDamageByTier = {
 	Walk = 0,
 	Trot = 18,
-	Gallop = 95,
-	Rear = 60,
-	Charge = 110,
+	Gallop = 111,
+	Rear = 75,
+	Charge = 118,
 }
 
 --- What each tier costs the horse, as a share of that horse's own maximum

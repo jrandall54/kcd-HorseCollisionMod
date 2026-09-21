@@ -31,6 +31,18 @@ number.
 ## [Unreleased]
 
 ### Changed
+- **A gallop deals 111, a rear 75 and a charge 118**, from 95, 60 and 110.
+  None of the three was ever derived from anything, and the derivation that
+  was written for them assumed the engine's own trample landed on top of the
+  mod's damage. It does not: `ShieldVictimFromEngineDamage` hands the engine's
+  charge straight back, so the mod's figure is the entire cost of an impact.
+  Each is now set from the outcome it should produce against an unarmored man,
+  whose health is a flat 100 and who takes the figure spread across 0.85 to
+  1.15. A gallop is the blow that kills, about nine men in ten, which needs
+  111; at 95 it killed about two in five. A rear never kills a healthy man
+  outright -- its span is 65 to 88 -- but kills one already hurt, so it takes
+  two, and a rear charges no engine collision at all because the horse is
+  standing still. A charge is the only impact that kills on every roll.
 - **`MaxImpactSpeed` is 13.0, up from 11.0.** The ceiling was set just above
   the gallop plateau of Pebbles, the one horse every measurement this project
   ever took was ridden on. A horse at the agility cap sustains 12.55 m/s, so

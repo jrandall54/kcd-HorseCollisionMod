@@ -363,20 +363,36 @@ own terms. The real defect it exposed is narrower: in `Tiers.lua` the gallop's
 The rear's figure was then derived the way the gallop's was, from an outcome the
 rider named. NPC health is a flat 100: across the whole testing diary every
 health reading tops out at exactly 100.00, while stamina readings run to 121 and
-132, so health is not a vitality-scaled pool. A kill needs
-`damage x spread + trample >= 100`, with spread uniform on 0.85 to 1.15 and the
-engine's own trample in its typical 15 to 20 band.
+132, so health is not a vitality-scaled pool.
 
-| Rear damage | Kills an unarmored man |
-| --- | --- |
-| 60, as shipped | never, since 69 plus 28 is still 97 |
-| 72 | about 1 in 16 |
-| 75 | about 1 in 6 |
-| 80 | about 2 in 5 |
+The first version of this derivation read the kill condition as
+`damage x spread + trample >= 100`, with the engine's own trample in its typical
+15 to 20 band. **That is wrong, and stage 2 step 2 proved it in the log.**
+`ShieldVictimFromEngineDamage` hands the engine's charge straight back, so the
+trample never reaches the victim: a gallop logged `dealt=92.2 engineTook=29.1`
+and left the victim on 7.8, which is 100 minus the mod's figure alone. A rear
+charges no engine collision in the first place, since the horse is standing
+still. The condition is `damage x spread >= 100`, spread uniform on 0.85 to
+1.15, and a tier reaches 100 on its own or not at all.
 
-The ruling is that a rear should kill sometimes, and "sometimes" is read as about
-one in six, so **the rear's damage becomes 75**. Occasional enough to be a real
-risk, rare enough that the gallop remains the blow that kills.
+Under the corrected condition, with the horse's barding multiplier of about
+1.02 included:
+
+| Tier | Figure | Kills an unarmored man |
+| --- | --- | --- |
+| Rear | 75 | never from full health: the span is 65 to 88 |
+| Rear | 89 | about 1 in 6 |
+| Gallop | 95, as shipped | about 2 in 5 |
+| Gallop | 111 | about 9 in 10 |
+| Charge | 118 | every roll: the worst is 100.3 |
+
+The rulings taken against that table: **a rear never kills a healthy man
+outright and stays at 75**, because reaching one in six would have cost 89 and
+collapsed the gap to a gallop the rear sits below in every other table; two
+rears put a man down. **A gallop becomes 111**, which is the nine in ten it was
+always meant to be and only read as 95 because the trample was believed to make
+up the difference. **A charge is 118**, the one blow that kills on every roll,
+measured live at 117.2 and 116.0 dealt and fatal both times.
 
 #### Ruling 3: the stamina stack is redesigned, not capped
 
@@ -465,7 +481,7 @@ changes an input to a stage already finished.
    question is only what a gallop is worth against 100 health.
 3. **Armor defense.** `ImpactDamageArmorScale`, `Curve`, `Floor`,
    `IgnoredArmor`. Base damage fixed from stage 2; this decides how much a
-   knight refuses. The figure to beat: a charge worth 110 currently becomes 12
+   knight refuses. The figure to beat: a charge worth 118 currently becomes 12
    against chainmail.
 4. **Throw and armor separation.** The brake, the speed cap and the air damping
    against the normalized armor factor from Stage 0. Includes the charge's throw

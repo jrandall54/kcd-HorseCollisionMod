@@ -326,8 +326,8 @@ HorseCollisionModSettings = {
 	-- is wearing. ArmorFloor says how little armor is allowed to refuse.
 	--
 	-- Worked example at the defaults: a town guard reads smash_def about 6, so
-	-- worn is 5.5, the falloff is 1/(1+5.5/0.6) = 0.10, and a charge's 110
-	-- becomes 11. Raise ArmorFloor to 0.25 and the same charge lands 27.
+	-- worn is 5.5, the falloff is 1/(1+5.5/0.6) = 0.10, and a charge's 118
+	-- becomes 12. Raise ArmorFloor to 0.25 and the same charge lands 30.
 	-- How hard the engine is told each impact hit, by name. The names come
 	-- from the game's own hit reaction scale, ascending: Tickle, Unpleasant,
 	-- Exhausting, MinorInjury, MajorInjury, Fatal.
@@ -539,9 +539,11 @@ HorseCollisionModSettings = {
 	ImpactDamageByTier       = {
 		Walk   = 0,     -- a walk staggers, it does not wound
 		Trot   = 18,
-		Gallop = 95,
-		Rear   = 60,    -- hooves coming down, standing still
-		Charge = 110,   -- the heaviest thing the mod does
+		Gallop = 111,   -- kills about nine unarmored men in ten
+		Rear   = 75,    -- hooves coming down, standing still: badly wounds
+		                -- a healthy man, kills one already hurt
+		Charge = 118,   -- the heaviest thing the mod does, and the only
+		                -- impact that kills on every roll
 	},
 
 	-- Hand back whatever the engine charged for the collision, so the figures

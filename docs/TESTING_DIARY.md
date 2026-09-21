@@ -22231,3 +22231,50 @@ single horse, and the reason it never showed up as a symptom is that the value
 it caps has less authority than its own documentation claimed. Step 2 is base
 damage per tier against an unarmored victim.
 
+---
+
+### Build: 5.29.1 — the balance pass, stage 2 step 2: base damage, unarmored
+
+**Hypothesis**: Step 2 of stage 2 is what each tier is worth against an
+unarmored man's 100 health. The gallop's 95 came from measurement; the rear's
+60 and the charge's 110 were never derived from anything. The audit's ruling
+set the rear at 75 for a kill about one man in six, and the charge at 118 as
+the blow that reaches 100 on its worst roll. Both were derived from
+`damage x spread + trample >= 100`, taking the engine's own trample as landing
+on top of the mod's damage.
+
+**Results**: Two charges at 118 on unarmored peasants, `dealt=117.2` and
+`116.0`, both `fatal=true` from full health, `engineTook=4.2` and `0.0`.
+
+Eight rears at 75 on healthy peasants: rolls 65.0 to 86.8, `engineTook=0.0`
+every one, **none fatal**. A rear's ceiling is 75 x 1.02 x 1.15 = 88, so it
+cannot kill a healthy man at all.
+
+The reason is in the gallop rows, and it invalidates the arithmetic rather than
+the figure: `dealt=92.2 engineTook=29.1 health=100.0 after=7.8`. The victim
+keeps exactly 100 minus the mod's damage. **`ShieldVictimFromEngineDamage`
+hands the engine's trample straight back**, which is its whole purpose and is
+documented beside it, so no tier has ever borrowed anything from the engine.
+The kill condition is `damage x spread >= 100` alone. Separately, a rear logs
+`engineTook=0.0` every time: a stationary horse charges no collision in the
+first place.
+
+Under the corrected condition the rear could reach one in six only at 89, which
+sits under the gallop's 95 and collapses a gap the rear is below in reaction,
+hit strength, dirt, blood and vocal rank. The gallop at 95 was killing about
+two in five rather than the nine in ten it was set for.
+
+The rulings: a rear never kills a healthy man outright and **stays at 75**, so
+it takes two; the gallop **becomes 111**, which is 100 divided by the 0.88
+threshold that nine in ten needs; the charge **stays at 118**.
+
+Ridden again at 111. Eight unarmored gallop impacts, rolls 108.4 to 129.4, all
+eight fatal from full health. A merchant at `armorScale=0.86` survived on 3.7,
+which is the armor axis and belongs to step 3.
+
+**Thoughts & Conclusions**: The axis turned up one real defect and it was in
+the derivation, not the figures: every kill rate this project has quoted since
+the shield was added assumed damage the victim never takes. `docs/BALANCE_AUDIT.md`
+carries the corrected condition and the table it produces. Base damage is
+settled. Step 3 is armor defence, where a charge worth 118 currently becomes 12
+against chainmail.
