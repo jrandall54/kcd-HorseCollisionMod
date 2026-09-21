@@ -22182,3 +22182,52 @@ One preset note worth keeping: `[stamina]` pairs
 `ThrowRiderOnStaminaEmpty` with `HorseBoltsWhenSpent`, and the second one makes
 the preset unusable for its own purpose. Counting impacts needs the throw
 without the bolt.
+
+---
+
+### Build: 5.29.1 — the balance pass, stage 2 step 1: tier identity
+
+**Hypothesis**: Step 1 of stage 2 in `docs/BALANCE_AUDIT.md` is tier identity.
+`SpeedWalk` 1.8, `SpeedTrot` 4.5 and `SpeedGallop` 8.5 were set from gait
+plateaus measured years ago, and every one of those measurements was ridden on
+Pebbles. If a faster horse's plateaus sit elsewhere, the thresholds are keyed to
+one horse rather than to the gaits, and a good horse could trot its way into a
+gallop impact.
+
+**Results**: `tools/probe_gait_speed.lua` samples the mounted horse's velocity
+at 10 Hz and reports the peak and mean of each second;
+`tools/dev_fasthorse.lua` hands the player the highest-`agi` stabled horse in
+the level, since `agi` is the stat a horse's pace rides on and one of the four
+the Horsetraders price a horse by.
+
+Two horses, each ridden through its gaits:
+
+| horse    | walk | trot | gallop sustained | gallop transient |
+|----------|------|------|------------------|------------------|
+| Pebbles  | 3.08 | 7.00 | 10.75            | —                |
+| agi 20   | 3.25 | 7.56 | 12.55            | 14.0             |
+
+The whole spread from stat 0 to stat 20 is about 30 percent, which matches
+`RPG.MaxAgilityToMovementSpeedAddition` at 0.15: the gaits are animation
+plateaus and a horse's stats trim its pace rather than setting it.
+
+So the thresholds are safe and stay where they are — the fastest trot in the
+game, 7.56, is well under `SpeedGallop`'s 8.5. What was not safe was
+`MaxImpactSpeed` at 11.0, set just above *Pebbles'* gallop. It clipped the
+scored speed of every gallop impact a good horse ever landed. It is 13.0 now,
+above the fastest sustained gallop and below the physics system's spikes.
+
+Raising it changed the logged speed of a measured impact from 11.00 to 11.79
+and changed nothing the rider could feel, which is what reading the code
+predicts: the scored speed selects the tier and gives `GetImpactDir` its
+direction, and nothing downstream scales force by it. Every force figure is
+flat per tier, the brake reads the body's own velocity, and `Impulse` is
+`Knockback` and `Uplift` alone. The comment in `Log.lua` that claimed the cap
+protected the knockback force was wrong and has been corrected.
+
+**Thoughts & Conclusions**: Tier identity is settled without moving a
+threshold. The one real defect the axis turned up was a ceiling calibrated to a
+single horse, and the reason it never showed up as a symptom is that the value
+it caps has less authority than its own documentation claimed. Step 2 is base
+damage per tier against an unarmored victim.
+

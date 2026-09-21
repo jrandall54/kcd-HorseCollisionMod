@@ -153,8 +153,14 @@ end
 -- someone.
 --
 -- Capped because the physics system reports occasional speeds above anything a
--- horse holds, and this value scales knockback force as well as selecting the
--- tier.
+-- horse holds. What the cap protects is narrower than it used to claim: this
+-- value selects the tier and gives `GetImpactDir` its direction, and nothing
+-- downstream scales force by it. Every force figure is flat per tier, the
+-- brake reads the body's own velocity, and `Impulse` is `Knockback` and
+-- `Uplift` alone. Raising the ceiling from 11.0 to 13.0, which is what a
+-- stat-capped horse actually sustains, changed the logged speed from 11.00 to
+-- 11.79 on a measured impact and changed nothing a rider could feel, exactly
+-- as that reading predicts.
 --
 -- @treturn number the speed to score the impact at, in meters per second
 function HorseCollisionMod:ImpactSpeed()

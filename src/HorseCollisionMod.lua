@@ -526,9 +526,26 @@ HorseCollisionMod.Config = {
 	-- ceiling on that value, a little above the top of the gallop plateau.
 	-- Nine ticks rather than three, because the tick is a third as long. The
 	-- window a collision is scored over is what matters, and it is unchanged.
+	--
+	-- 13.0 comes from measuring two horses rather than one. Every plateau this
+	-- project ever recorded was ridden on Pebbles, which walks at 3.08, trots
+	-- at 7.00 and gallops at 10.75, and the old ceiling of 11.0 was set just
+	-- above that gallop. A horse at the stat cap, agi 20, holds 3.25, 7.56 and
+	-- a *sustained* 12.55, with transients to 14.0. So 11.0 was not a ceiling
+	-- above anything a horse holds: it clipped every gallop impact a good
+	-- horse ever landed, and the scored speed drives the impulse magnitude as
+	-- well as the tier. 13.0 clears the fastest sustained gallop in the game
+	-- and still discards the physics system's spikes.
+	--
+	-- The gait thresholds themselves are untouched by that measurement: the
+	-- fastest trot in the game, 7.56, is still well under SpeedGallop's 8.5,
+	-- so no horse can trot its way into a gallop impact. A horse's stats trim
+	-- its pace rather than setting it - the gaits are animation plateaus, and
+	-- RPG.MaxAgilityToMovementSpeedAddition is 0.15, so the whole spread from
+	-- stat 0 to stat 20 is about 30 percent.
 	HorseAirborneVz          = 2.5,
 	ImpactSpeedSamples       = 9,
-	MaxImpactSpeed           = 11.0,
+	MaxImpactSpeed           = 13.0,
 
 	-- Knockdown impulse. Trot and gallop only; the walk tier never ragdolls.
 	Knockback                = 50.0,

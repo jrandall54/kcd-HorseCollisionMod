@@ -968,7 +968,11 @@ HorseCollisionModSettings = {
 	                                  -- ignored, so you do not strike someone
 	                                  -- on a floor above or below you
 	HorseAirborneVz          = 2.5,   -- upward speed counted as a jump
-	MaxImpactSpeed           = 11.0,  -- ceiling on the speed a hit is scored at
+	MaxImpactSpeed           = 13.0,  -- ceiling on the speed a hit is scored
+	                                  -- at, set just above the fastest gallop
+	                                  -- in the game: a horse at the stat cap
+	                                  -- holds 12.55 m/s, where Pebbles holds
+	                                  -- 10.75
 	ImpactSpeedSamples       = 9,     -- ticks of speed history a hit is scored
 	                                  -- from, which is what stops a single
 	                                  -- stuttering frame deciding the tier

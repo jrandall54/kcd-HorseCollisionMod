@@ -30,6 +30,17 @@ number.
 
 ## [Unreleased]
 
+### Changed
+- **`MaxImpactSpeed` is 13.0, up from 11.0.** The ceiling was set just above
+  the gallop plateau of Pebbles, the one horse every measurement this project
+  ever took was ridden on. A horse at the agility cap sustains 12.55 m/s, so
+  11.0 was not a ceiling above anything a horse holds: it clipped the scored
+  speed of every gallop impact a good horse landed. 13.0 clears the fastest
+  sustained gallop in the game and still discards the physics system's
+  transient spikes, which reach 14.0. The gait thresholds are untouched: the
+  fastest trot in the game is 7.56 against `SpeedGallop`'s 8.5, so no horse can
+  trot its way into a gallop impact.
+
 ## [5.29.0] - 2026-09-20
 
 ### Changed
