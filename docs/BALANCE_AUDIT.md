@@ -481,8 +481,18 @@ changes an input to a stage already finished.
    question is only what a gallop is worth against 100 health.
 3. **Armor defense.** `ImpactDamageArmorScale`, `Curve`, `Floor`,
    `IgnoredArmor`. Base damage fixed from stage 2; this decides how much a
-   knight refuses. The figure to beat: a charge worth 118 currently becomes 12
-   against chainmail.
+   knight refuses. **Settled: scale 2.9 and floor 0.14**, from 0.6 and 0. The
+   floor is not a chosen figure. Until `ImpactDamageOwnsTheHit`, the engine's
+   own trample reached the victim and was armor blind, charging 7.5 to 28.3
+   whatever they wore over five measured gallop impacts; the mod now hands that
+   back, so it owes the mean of 16 against a gallop's 111, which is 0.14. The
+   scale is set against the horse's own stamina budget rather than by taste: a
+   pool buys five gallop impacts at max Horsemanship, and at the old 0.6 a
+   mailed guard took eight, so the horse was spent before one armored man fell.
+   At 2.9 he takes two on good rolls and three otherwise, a villager still
+   takes one, light armor two and plate four to five. `Curve` stays 1.0 and
+   `IgnoredArmor` 0.5: the clothes every villager wears sum to 0.3 to 0.5 and
+   must not read as armor.
 4. **Throw and armor separation.** The brake, the speed cap and the air damping
    against the normalized armor factor from Stage 0. Includes the charge's throw
    distance, reported as too far.

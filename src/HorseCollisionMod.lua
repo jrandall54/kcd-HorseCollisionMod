@@ -879,9 +879,9 @@ HorseCollisionMod.Config = {
 	ImpactDamageOwnsTheHit   = true,
 	ImpactDamageReclaimCeiling = 60,
 
-	ImpactDamageArmorScale   = 0.6,
+	ImpactDamageArmorScale   = 2.9,
 	ImpactDamageArmorCurve   = 1.0,
-	ImpactDamageArmorFloor   = 0.0,
+	ImpactDamageArmorFloor   = 0.14,
 	ImpactDamageIgnoredArmor = 0.5,
 	ImpactDamageVariance     = 0.15,
 	ImpactDamageDelayMs      = 600,

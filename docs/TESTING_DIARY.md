@@ -22278,3 +22278,47 @@ the shield was added assumed damage the victim never takes. `docs/BALANCE_AUDIT.
 carries the corrected condition and the table it produces. Base damage is
 settled. Step 3 is armor defence, where a charge worth 118 currently becomes 12
 against chainmail.
+
+---
+
+### Build: 5.29.1 — the balance pass, stage 2 step 3: armor defence
+
+**Hypothesis**: Step 3 of stage 2 is how much of a tier's damage armor is
+allowed to refuse. `ImpactDamageArmorScale` 0.6 with no floor turned a gallop's
+111 into 13 on a mailed guard and a charge's 118 into 14, a factor of nine
+across a range the player experiences only as wearing armor or not.
+
+**Results**: The floor came first, because it is the one figure that could be
+derived rather than chosen. Armor defence used to have a backstop nobody
+configured: the engine's own trample reached the victim and was armor blind,
+charging `rat_guardJanik` in the heaviest mail 7.5 while `rat_guard3` was
+charged 28.3 in the same session. `ImpactDamageOwnsTheHit` now hands that
+charge back — stage 2 step 2 proved it in the log — so the backstop is gone and
+the mod owes it. The mean of those five measurements is 16 against a gallop now
+worth 111, which is `ImpactDamageArmorFloor` 0.14. That is the same claim the
+setting always made for itself, that no plate makes a man weigh less than the
+horse standing on him, with the engine's own figure behind it instead of a
+guess.
+
+The scale was set against the horse's stamina budget, which ruling 3 already
+settled: a pool buys five back-to-back gallop impacts at max Horsemanship. At
+0.6 a mailed guard took eight, so the horse was spent before one armored man
+went down, and the two systems contradicted each other. 1.9 was ridden first
+and put him at three; the rider asked for armor to be a little less resistant
+and 2.9 was ridden after it.
+
+    scale   villager   light   guard   mail   heavy mail   plate
+    0.6     1          3       6       8      11           14
+    1.9     1          2       3       3      4            7
+    2.9     1          2       2       2 to 3 3            4 to 5
+
+(gallop impacts to put the victim down, at the tier's 111 before the 0.85 to
+1.15 spread)
+
+**Thoughts & Conclusions**: 2.9 is accepted — *"that feels right"*. `Curve`
+stays 1.0 and `IgnoredArmor` stays 0.5, since a villager's shoes and shirt sum
+to 0.3 to 0.5 and must keep reading as clothes. The floor no longer binds
+anywhere inside the range a person can dress in, which is the right state for
+it: it is a guarantee against armor heavier than plate, not a clamp doing the
+tuning. Step 4 is the throw and armor separation, including the charge's throw
+distance, reported as too far.

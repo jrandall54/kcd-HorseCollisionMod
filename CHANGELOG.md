@@ -43,6 +43,18 @@ number.
   outright -- its span is 65 to 88 -- but kills one already hurt, so it takes
   two, and a rear charges no engine collision at all because the horse is
   standing still. A charge is the only impact that kills on every roll.
+- **Armor refuses much less of an impact: `ImpactDamageArmorScale` is 2.9,
+  from 0.6, and `ImpactDamageArmorFloor` is 0.14, from 0.** A gallop worth 111
+  landed 13 on a mailed guard, eight impacts to put him down, against a horse
+  whose whole stamina pool buys five. Armor was refusing nine tenths of every
+  blow across a range a player experiences only as wearing armor or not. The
+  same guard now takes 44, two impacts on good rolls and three otherwise; a
+  villager is unchanged at one, light armor takes two, and plate takes four or
+  five. The floor is the armor-blind share no plate may refuse, because a man
+  in it still weighs less than the horse standing on him: the engine's own
+  trample used to supply it, charging 7.5 to 28.3 whatever the victim wore, and
+  `ImpactDamageOwnsTheHit` now hands that back, so the mod delivers the mean of
+  16 against a gallop's 111 itself.
 - **`MaxImpactSpeed` is 13.0, up from 11.0.** The ceiling was set just above
   the gallop plateau of Pebbles, the one horse every measurement this project
   ever took was ridden on. A horse at the agility cap sustains 12.55 m/s, so

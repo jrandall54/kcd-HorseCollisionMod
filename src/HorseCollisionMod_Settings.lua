@@ -325,9 +325,10 @@ HorseCollisionModSettings = {
 	-- ArmorScale and ArmorCurve say how much of that survives what the victim
 	-- is wearing. ArmorFloor says how little armor is allowed to refuse.
 	--
-	-- Worked example at the defaults: a town guard reads smash_def about 6, so
-	-- worn is 5.5, the falloff is 1/(1+5.5/0.6) = 0.10, and a charge's 118
-	-- becomes 12. Raise ArmorFloor to 0.25 and the same charge lands 30.
+	-- Worked example at the defaults: a town guard reads smash_def about 5, so
+	-- worn is 4.5, the falloff is 1/(1+4.5/2.9) = 0.39, and a gallop's 111
+	-- becomes 44, which is two impacts to put him down on good rolls and three
+	-- otherwise. Lower ArmorScale and armor refuses more of every blow.
 	-- How hard the engine is told each impact hit, by name. The names come
 	-- from the game's own hit reaction scale, ascending: Tickle, Unpleasant,
 	-- Exhausting, MinorInjury, MajorInjury, Fatal.
@@ -554,9 +555,9 @@ HorseCollisionModSettings = {
 
 	ImpactDamageReclaimCeiling = 60,   -- never give back more than this at once
 
-	ImpactDamageArmorScale   = 0.6,   -- smash_def past the ignored figure that halves damage
+	ImpactDamageArmorScale   = 2.9,   -- smash_def past the ignored figure that halves damage
 	ImpactDamageArmorCurve   = 1.0,   -- >1 armor bites sooner, <1 flattens
-	ImpactDamageArmorFloor   = 0.0,   -- least armor can reduce an impact to
+	ImpactDamageArmorFloor   = 0.14,  -- least armor can reduce an impact to
 	ImpactDamageIgnoredArmor = 0.5,   -- smash_def that is clothing, not armor
 	ImpactDamageVariance     = 0.15,  -- spread either side of the tier figure
 	ImpactDamageDelayMs      = 600,   -- only for a test subject's health being
