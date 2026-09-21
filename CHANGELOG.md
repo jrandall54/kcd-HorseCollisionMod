@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.29.0] - 2026-09-20
+
 ### Changed
 - **The horse's stamina cost is a share of that horse's own maximum stamina,
   and the situational factors are surcharges rather than multipliers.** The

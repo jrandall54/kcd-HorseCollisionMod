@@ -120,8 +120,8 @@ end
 --          * (tierShare + combatAdd + armorAdd - bardingRelief)
 --          * horsemanship
 --
--- The chain used to be five multipliers deep and unbounded, which put a gallop
--- anywhere between 14.85 and 1452 points against a pool of about 210. The tier
+-- A chain five multipliers deep and unbounded puts a gallop anywhere between
+-- 14.85 and 1452 points against a pool of about 210. The tier
 -- separation the rider tunes, a factor of 1.6, was invisible beside a modifier
 -- stack spanning nearly a hundredfold, and the answer to that is not a clamp
 -- on the product but a shape where every term is readable on its own. Adding

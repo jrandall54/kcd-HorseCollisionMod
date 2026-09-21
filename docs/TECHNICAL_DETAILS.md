@@ -495,7 +495,7 @@ and 230 on another.
 The three situational figures are added to the tier's share rather than
 multiplied with it. Multiplied, the chain ran `base x combat x victimArmor x
 barding x horsemanship`, all unbounded, and put a gallop anywhere between 14.85
-and 1452 points against a pool of about 210 — so the tier separation the rider
+and 1452 points against a pool of about 210, so the tier separation the rider
 tunes, a factor of 1.6, was invisible beside a stack spanning nearly a
 hundredfold. Added, the worst case is the sum of the named maxima, 0.38 of the
 pool before Horsemanship, and each term is readable on its own in the telemetry
