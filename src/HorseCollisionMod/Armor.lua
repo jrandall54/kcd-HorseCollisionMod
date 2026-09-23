@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 5.29.0
+-- @release 5.30.0
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
 -- A sum over a person has to exclude them and a sum over a horse has to be
@@ -314,7 +314,7 @@ end
 -- unarmored endpoint here is 1.26 against a curve ceiling of 1.5, and it is
 -- deliberately inside the curve's range. Measured, ordinary villagers score
 -- about 1.15, so they land near but not at 1, which is why the log's `keep` is
--- rarely the figure `RagdollBrakeKeepUnarmored` names. Reading the endpoints as
+-- rarely the figure a tier's `brakeKeepUnarmored` names. Reading the endpoints as
 -- describing a bracket rather than a delivered value is the way round it.
 --
 -- @tparam[opt] number armorScale a value from `ArmorImpulseScale`
@@ -438,14 +438,15 @@ end
 --
 -- The scale is a half-life rather than a ceiling: at
 -- `ImpactDamageArmorScale` past the ignored figure the target takes half, at
--- twice it a third. With the shipped 0.6 that reads across the range actually
--- worn in game as
+-- twice it a third. With the shipped 2.9 that reads across the range actually
+-- worn in game as, in gallop impacts to put the victim down,
 --
---     villager    smashDef 0.30   1.00
---     light       smashDef 1.50   0.37
---     mail        smashDef 4.99   0.12
---     heavy mail  smashDef 7.16   0.08
---     plate       smashDef 12.0   0.05
+--     villager    smashDef 0.30   1.00   1
+--     light       smashDef 1.50   0.74   2
+--     guard       smashDef 3.22   0.52   2
+--     mail        smashDef 4.99   0.39   2 to 3
+--     heavy mail  smashDef 7.16   0.30   3
+--     plate       smashDef 12.0   0.20   4 to 5
 --
 -- @tparam table armor totals from `ArmorOf`
 -- @treturn number multiplier on the tier's damage, in (0, 1]
@@ -485,6 +486,15 @@ function HorseCollisionMod:ImpactDamageScale(armor)
 	-- makes a man weigh less than the animal standing on him, so there is a
 	-- share of an impact that plate should not be able to refuse. It is the
 	-- lowest multiplier armor can reach, applied after the curve.
+	--
+	-- Its figure is not chosen. Before `ImpactDamageOwnsTheHit` handed the
+	-- engine's trample back, that trample was the floor: measured over five
+	-- armored gallop impacts it charged 7.5 to 28.3 regardless of what the
+	-- victim wore, a mean of 16 against a gallop now worth 111. 0.14 is that
+	-- ratio, so the mod delivers the floor it took away. At the shipped scale
+	-- the curve stays above it everywhere anyone in the game is dressed, so the
+	-- floor is a guarantee against armor heavier than plate rather than a clamp
+	-- inside the range.
 	local curve = self.Config.ImpactDamageArmorCurve
 	local falloff = 1.0 / (1.0 + ((worn / scale) ^ curve))
 	local floor = self.Config.ImpactDamageArmorFloor

@@ -687,6 +687,39 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 	if tag == (self.Config.RearFragTag) then
 		self.RearCharging = true
 
+		-- Cleared here so the detection loop's once-per-lunge stamina drain
+		-- is once per lunge rather than once per session. The rider's voice is
+		-- the same question and is cleared with it.
+		self.ChargeDrained = false
+		self.ChargeVoiced = false
+
+		-- A new lunge clears every lockout the last one wrote.
+		--
+		-- `VictimLockMsByTier.Charge` closes a victim out for 2.6 seconds so
+		-- that one lunge cannot strike the same person twice. It is a rule
+		-- about a single charge, and holding it on a clock made it a rule about
+		-- the player as well: charging the same woman again a second later was
+		-- refused, and the rider saw three charges in a row land on nobody with
+		-- her right in front of the horse.
+		--
+		-- Pressing the key is a new deliberate attack, so the previous lunge's
+		-- bookkeeping has no say in it.
+		self.LockedUntil = {}
+
+		-- How long the detection loop scores a contact as a charge, which is
+		-- not the same question as whether the lunge is still moving.
+		--
+		-- `RearCharging` answers the second and is cleared by `ChargeForward`
+		-- the moment the horse's speed falls off its own peak, measured at 144
+		-- to 256 ms after the push. The horse reaches most of its victims
+		-- after that, so scoring off it left a charge landing as a `Walk`
+		-- stagger. This is the window the corridor sweep used for exactly this
+		-- job before the loop took it over, so it is the figure that was
+		-- already tuned against the move rather than a new one.
+		self.ChargeScoringUntil = self:TimeMs()
+				+ (self.Config.RearChargeStrikeMs)
+
+
 		local generation = self.TimerTick
 
 		-- The window ends when the lunge is spent, which `ChargeForward`
@@ -799,7 +832,6 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 	local generation = self.TimerTick
 	local deadline = self:TimeMs() + (cfg.RearChargeStrikeMs)
 	local hit = {}
-	local drained = false
 	local playerEnt = player
 
 	-- Who the near miss has already reached. It belongs to the charge and not
@@ -885,20 +917,33 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 							and dz <= (cfg.HorseMaxVerticalDiff) then
 						hit[tostring(id)] = true
 
+						-- Struck at the charge's own speed, which is declared
+						-- rather than measured.
+						--
+						-- The horse cannot be measured through a lunge. Its
+						-- speed here is derived from its positions, and the rear
+						-- holds it `AnimationControlled`, so the readings come
+						-- back 0.02 and 0.07 with occasional snaps of 25.9.
+						-- Neither works as the scoring figure: the
+						-- instantaneous reading collapses the velocity vector,
+						-- and a two-sample peak never once clears its own
+						-- minimum, so every impact in a whole run scores at that
+						-- 3.0 floor while the horse strikes bodies at 10.5.
+						--
+						-- So the charge is normalized, the way the rear already
+						-- is: one figure that says what this attack hits like.
+						-- `RearChargeImpactSpeed` carries the derivation, and it
+						-- is the speed the whole impact is resolved at, the
+						-- launch in `ImpulseVictim` included.
 						self:RearHit(npc, horseEnt, playerEnt,
 								{ x = fx, y = fy, z = 0 }, "Charge",
 								cfg.RearChargeImpactSpeed)
 
-						-- The charge pays for itself now that the detection
-						-- loop stays out of a lunge. It received the gallop's
-						-- drain as a side effect of being scored as a gallop,
-						-- and taking that relabel away took the cost with it.
-						--
 						-- Once per charge, not once per victim. Riding down a
-						-- group is the move; a crowd should not empty the horse
-						-- for standing close together.
-						if not drained then
-							drained = true
+						-- group is the move; a crowd should not empty the
+						-- horse for standing close together.
+						if not self.ChargeDrained then
+							self.ChargeDrained = true
 
 							self:DrainImpactStamina(horseEnt, playerEnt,
 									"Charge")

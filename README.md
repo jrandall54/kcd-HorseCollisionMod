@@ -278,6 +278,11 @@ tools/
                           horse traders' stable data
   dev_barding.lua         puts a set of barding on the player's horse, so the
                           barding impulse multiplier can be judged
+  dev_fasthorse.lua       hands the player the fastest horse in the level, so
+                          a gait plateau is not only Pebbles' own
+  probe_gait_speed.lua    samples the mounted horse's speed and reports each
+                          gait's plateau, which the tier thresholds are set
+                          against
   dev_watchfight.lua      samples everyone near the player once a second, with
                           the player alongside them, so a fight reads as one
                           timeline rather than an impression

@@ -24,7 +24,7 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.29.0
+-- @release 5.30.0
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.
@@ -71,21 +71,24 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 
 	-- A lunge belongs to the charge, and this loop stays out of it.
 	--
-	-- What stood here relabelled a charge as a gallop: the lunge reads about
-	-- 5.5 m/s, which scores as a trot, and a trot plays an animated knockdown
-	-- rather than the ragdoll a deliberate charge should earn. That was written
-	-- when the charge had no detection of its own and the loop was the only
-	-- thing that could score it.
+	-- `ChargeStrike` sweeps a corridor ahead of the horse and raises the
+	-- impact itself, because a charge has to be able to catch several people
+	-- at once and to catch them without the horse's collider physically
+	-- reaching each one. Scoring the lunge here instead makes the move
+	-- useless: a charge can then only land where a real collision happened,
+	-- which whiffs on a walking man three times running.
 	--
-	-- `ChargeStrike` now sweeps the corridor itself and carries a `Charge`
-	-- tier the whole way down, with its own damage, sound, throw and lockout.
-	-- So the relabel bought nothing and cost the separation: every rule written
-	-- for a gallop silently governed the charge, and the log called it Gallop.
-	--
-	-- Standing out entirely is better than scoring alongside the sweep. Two
-	-- paths on one collision is what the double hit was, and the contact gate
+	-- Scoring alongside the sweep is not an option either. Two paths on one
+	-- collision is what the old double hit was, and the contact gate
 	-- suppresses the second rather than preventing it.
-	if self.RearCharging then
+	--
+	-- The window is `ChargeScoringUntil` rather than `RearCharging`.
+	-- `RearCharging` is cleared by `ChargeForward` the moment the horse stops
+	-- accelerating, measured at 144 to 256 ms after the push, while the sweep
+	-- runs for `RearChargeStrikeMs`. Standing out for the shorter of the two
+	-- let this loop score a contact the sweep was about to score as well, as a
+	-- `Walk` stagger, which is what a charge landing on nobody looked like.
+	if self.ChargeScoringUntil and now < self.ChargeScoringUntil then
 		return
 	end
 

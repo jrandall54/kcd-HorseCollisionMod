@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Impact
 -- @author jrandall54
--- @release 5.29.0
+-- @release 5.30.0
 
 --- Everything one impact does to one victim.
 --
@@ -180,8 +180,24 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- a line chosen from that arrives a second and a half too late.
 	self:BarkRiderOnImpact(playerEnt, tierName,
 			self:PredictImpactFatal(npc, tierName, armor, horseEnt), npc)
-	self:PlayRiderVocal(playerEnt, tierName)
-	self:PlayHorseVocal(horseEnt, tierName)
+	-- Once for the charge, not once for each person it rode down.
+	--
+	-- The ranked voice gate holds a grunt off for 1500 ms and so covers a
+	-- gallop pass, but a charge resolves every victim inside one sweep tick and
+	-- catching several people is the whole move: two guards in one lunge
+	-- produced two grunts and a kill line over the top of each other. The horse
+	-- is charged stamina once per lunge for the same reason, and this is the
+	-- same question asked of the rider's voice.
+	local voiced = tierName == "Charge" and self.ChargeVoiced
+
+	if tierName == "Charge" then
+		self.ChargeVoiced = true
+	end
+
+	if not voiced then
+		self:PlayRiderVocal(playerEnt, tierName)
+		self:PlayHorseVocal(horseEnt, tierName)
+	end
 
 	-- Spawned where they are struck rather than where they land, because a
 	-- gallop throws them several meters and dust that follows a body reads as

@@ -22182,3 +22182,143 @@ One preset note worth keeping: `[stamina]` pairs
 `ThrowRiderOnStaminaEmpty` with `HorseBoltsWhenSpent`, and the second one makes
 the preset unusable for its own purpose. Counting impacts needs the throw
 without the bolt.
+
+---
+
+### Build: 5.29.1 — the balance pass, stage 2 step 1: tier identity
+
+**Hypothesis**: Step 1 of stage 2 in `docs/BALANCE_AUDIT.md` is tier identity.
+`SpeedWalk` 1.8, `SpeedTrot` 4.5 and `SpeedGallop` 8.5 were set from gait
+plateaus measured years ago, and every one of those measurements was ridden on
+Pebbles. If a faster horse's plateaus sit elsewhere, the thresholds are keyed to
+one horse rather than to the gaits, and a good horse could trot its way into a
+gallop impact.
+
+**Results**: `tools/probe_gait_speed.lua` samples the mounted horse's velocity
+at 10 Hz and reports the peak and mean of each second;
+`tools/dev_fasthorse.lua` hands the player the highest-`agi` stabled horse in
+the level, since `agi` is the stat a horse's pace rides on and one of the four
+the Horsetraders price a horse by.
+
+Two horses, each ridden through its gaits:
+
+| horse    | walk | trot | gallop sustained | gallop transient |
+|----------|------|------|------------------|------------------|
+| Pebbles  | 3.08 | 7.00 | 10.75            | —                |
+| agi 20   | 3.25 | 7.56 | 12.55            | 14.0             |
+
+The whole spread from stat 0 to stat 20 is about 30 percent, which matches
+`RPG.MaxAgilityToMovementSpeedAddition` at 0.15: the gaits are animation
+plateaus and a horse's stats trim its pace rather than setting it.
+
+So the thresholds are safe and stay where they are — the fastest trot in the
+game, 7.56, is well under `SpeedGallop`'s 8.5. What was not safe was
+`MaxImpactSpeed` at 11.0, set just above *Pebbles'* gallop. It clipped the
+scored speed of every gallop impact a good horse ever landed. It is 13.0 now,
+above the fastest sustained gallop and below the physics system's spikes.
+
+Raising it changed the logged speed of a measured impact from 11.00 to 11.79
+and changed nothing the rider could feel, which is what reading the code
+predicts: the scored speed selects the tier and gives `GetImpactDir` its
+direction, and nothing downstream scales force by it. Every force figure is
+flat per tier, the brake reads the body's own velocity, and `Impulse` is
+`Knockback` and `Uplift` alone. The comment in `Log.lua` that claimed the cap
+protected the knockback force was wrong and has been corrected.
+
+**Thoughts & Conclusions**: Tier identity is settled without moving a
+threshold. The one real defect the axis turned up was a ceiling calibrated to a
+single horse, and the reason it never showed up as a symptom is that the value
+it caps has less authority than its own documentation claimed. Step 2 is base
+damage per tier against an unarmored victim.
+
+---
+
+### Build: 5.29.1 — the balance pass, stage 2 step 2: base damage, unarmored
+
+**Hypothesis**: Step 2 of stage 2 is what each tier is worth against an
+unarmored man's 100 health. The gallop's 95 came from measurement; the rear's
+60 and the charge's 110 were never derived from anything. The audit's ruling
+set the rear at 75 for a kill about one man in six, and the charge at 118 as
+the blow that reaches 100 on its worst roll. Both were derived from
+`damage x spread + trample >= 100`, taking the engine's own trample as landing
+on top of the mod's damage.
+
+**Results**: Two charges at 118 on unarmored peasants, `dealt=117.2` and
+`116.0`, both `fatal=true` from full health, `engineTook=4.2` and `0.0`.
+
+Eight rears at 75 on healthy peasants: rolls 65.0 to 86.8, `engineTook=0.0`
+every one, **none fatal**. A rear's ceiling is 75 x 1.02 x 1.15 = 88, so it
+cannot kill a healthy man at all.
+
+The reason is in the gallop rows, and it invalidates the arithmetic rather than
+the figure: `dealt=92.2 engineTook=29.1 health=100.0 after=7.8`. The victim
+keeps exactly 100 minus the mod's damage. **`ShieldVictimFromEngineDamage`
+hands the engine's trample straight back**, which is its whole purpose and is
+documented beside it, so no tier has ever borrowed anything from the engine.
+The kill condition is `damage x spread >= 100` alone. Separately, a rear logs
+`engineTook=0.0` every time: a stationary horse charges no collision in the
+first place.
+
+Under the corrected condition the rear could reach one in six only at 89, which
+sits under the gallop's 95 and collapses a gap the rear is below in reaction,
+hit strength, dirt, blood and vocal rank. The gallop at 95 was killing about
+two in five rather than the nine in ten it was set for.
+
+The rulings: a rear never kills a healthy man outright and **stays at 75**, so
+it takes two; the gallop **becomes 111**, which is 100 divided by the 0.88
+threshold that nine in ten needs; the charge **stays at 118**.
+
+Ridden again at 111. Eight unarmored gallop impacts, rolls 108.4 to 129.4, all
+eight fatal from full health. A merchant at `armorScale=0.86` survived on 3.7,
+which is the armor axis and belongs to step 3.
+
+**Thoughts & Conclusions**: The axis turned up one real defect and it was in
+the derivation, not the figures: every kill rate this project has quoted since
+the shield was added assumed damage the victim never takes. `docs/BALANCE_AUDIT.md`
+carries the corrected condition and the table it produces. Base damage is
+settled. Step 3 is armor defence, where a charge worth 118 currently becomes 12
+against chainmail.
+
+---
+
+### Build: 5.29.1 — the balance pass, stage 2 step 3: armor defence
+
+**Hypothesis**: Step 3 of stage 2 is how much of a tier's damage armor is
+allowed to refuse. `ImpactDamageArmorScale` 0.6 with no floor turned a gallop's
+111 into 13 on a mailed guard and a charge's 118 into 14, a factor of nine
+across a range the player experiences only as wearing armor or not.
+
+**Results**: The floor came first, because it is the one figure that could be
+derived rather than chosen. Armor defence used to have a backstop nobody
+configured: the engine's own trample reached the victim and was armor blind,
+charging `rat_guardJanik` in the heaviest mail 7.5 while `rat_guard3` was
+charged 28.3 in the same session. `ImpactDamageOwnsTheHit` now hands that
+charge back — stage 2 step 2 proved it in the log — so the backstop is gone and
+the mod owes it. The mean of those five measurements is 16 against a gallop now
+worth 111, which is `ImpactDamageArmorFloor` 0.14. That is the same claim the
+setting always made for itself, that no plate makes a man weigh less than the
+horse standing on him, with the engine's own figure behind it instead of a
+guess.
+
+The scale was set against the horse's stamina budget, which ruling 3 already
+settled: a pool buys five back-to-back gallop impacts at max Horsemanship. At
+0.6 a mailed guard took eight, so the horse was spent before one armored man
+went down, and the two systems contradicted each other. 1.9 was ridden first
+and put him at three; the rider asked for armor to be a little less resistant
+and 2.9 was ridden after it.
+
+    scale   villager   light   guard   mail   heavy mail   plate
+    0.6     1          3       6       8      11           14
+    1.9     1          2       3       3      4            7
+    2.9     1          2       2       2 to 3 3            4 to 5
+
+(gallop impacts to put the victim down, at the tier's 111 before the 0.85 to
+1.15 spread)
+
+**Thoughts & Conclusions**: 2.9 is accepted — *"that feels right"*. `Curve`
+stays 1.0 and `IgnoredArmor` stays 0.5, since a villager's shoes and shirt sum
+to 0.3 to 0.5 and must keep reading as clothes. The floor no longer binds
+anywhere inside the range a person can dress in, which is the right state for
+it: it is a guarantee against armor heavier than plate, not a clamp doing the
+tuning. Step 4 is the throw and armor separation, including the charge's throw
+distance, reported as too far.

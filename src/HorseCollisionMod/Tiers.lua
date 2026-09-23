@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
--- @release 5.29.0
+-- @release 5.30.0
 
 --- One tier's value for one concern.
 --
@@ -95,23 +95,48 @@ end
 
 --- What each tier is worth in health, before armor.
 --
--- The gallop figure is set from measurement rather than picked. At 90 the soft
--- end killed six of eight, and both survivors finished on 3.5 and 0.5 health,
--- having been dealt 81.0 and 80.6 against a villager's 100. The engine's own
--- trample adds a further 15 to 20 on top in most impacts but varies from
--- nothing to 28, and that variation is what leaves any survivors at all. 95
--- carries those two over and lands the rate near the nine in ten asked for.
+-- Every figure here is derived from the outcome it should produce against an
+-- unarmored man, and the arithmetic is the same each time. NPC health is a
+-- flat 100: across the whole testing diary every health reading tops out at
+-- exactly 100.00, while stamina runs to 121 and 132, so health is not a
+-- vitality-scaled pool. `ImpactDamageVariance` rolls the figure uniformly
+-- across 0.85 to 1.15. The mod's damage is the only damage the victim keeps:
+-- `ShieldVictimFromEngineDamage` hands the engine's own trample straight back,
+-- measured live at `dealt=92.2 engineTook=29.1` leaving a victim on 7.8, so a
+-- tier reaches 100 on its own or it does not reach it. A rear charges no
+-- engine collision at all, since the horse is standing still.
 --
 -- Walk is 0 deliberately: a shove staggers, it does not wound. A trot is worth
 -- far less than the gallop rather than proportionally less, because the mod
 -- puts a man on the ground at a trot and being knocked down is most of the
 -- weight the rider wanted a trotting horse to carry.
+--
+-- The gallop is the blow that kills, at about nine in ten. That needs the roll
+-- to clear 100 nine times in ten, which is a threshold of 0.88, so the figure
+-- is 100 / 0.88 = 113 before the horse's barding and 111 with it. The earlier
+-- 95 was set when the trample was believed to add 15 to 20 on top of it, and
+-- measured live it kills about two in five.
+--
+-- The rear and the charge are commanded moves rather than speed bands, so
+-- neither is derived from a speed.
+--
+-- A rear never kills a healthy man outright. At 75 its span is 65 to 88, so a
+-- man on full health always survives one and a man already hurt does not: it
+-- takes two rears to put someone down. This keeps clear air between the rear
+-- and the gallop, which the rear is below in reaction, hit strength, dirt,
+-- blood and vocal rank. Making it kill one in six would have cost 89 and
+-- collapsed that gap.
+--
+-- A charge is the heaviest thing the mod does and the only impact a player
+-- spends a perk, a key and most of the horse's stamina on. It is the one blow
+-- that kills on every roll: 118 x the worst roll of 0.85 is 100.3. Measured
+-- live at 117.2 and 116.0 dealt, both fatal from full health.
 HorseCollisionMod.ImpactDamageByTier = {
 	Walk = 0,
 	Trot = 18,
-	Gallop = 95,
-	Rear = 60,
-	Charge = 110,
+	Gallop = 111,
+	Rear = 75,
+	Charge = 118,
 }
 
 --- What each tier costs the horse, as a share of that horse's own maximum
@@ -183,13 +208,188 @@ HorseCollisionMod.ReactionByTier = {
 -- number that looks live and is not; two such figures sat in the code for
 -- months behind branches that shipped settings never reached.
 --
--- The charge is below a gallop rather than above it. The horse is still moving
--- under its own impulse when the victim goes down in front of it, so its
--- collider shoves the ragdoll on top of whatever this applies.
+-- Both tiers are 1.0, and the reason is worth keeping. This scales `Knockback`
+-- and `Uplift`, together a velocity change of about 0.73 m/s on an 80 kg body,
+-- so it is trim, and the audit's fourth ruling said so. It was briefly made to
+-- scale the ragdoll brake and the airborne speed cap as well, to give the
+-- charge its distance, and that stacked three multipliers on one throw: an
+-- unarmored victim launched at 10.9 m/s under a ceiling raised by the same
+-- factor traveled 20 meters.
+--
+-- One factor in one place. What separates a charge from a gallop is the speed
+-- it is resolved at, `RearChargeImpactSpeed`, and everything downstream is the
+-- gallop's own machinery working on a faster impact.
 HorseCollisionMod.ThrowByTier = {
 	Gallop = 1.0,
-	Charge = 0.7,
+	Charge = 1.0,
 }
+
+--- How each ragdoll tier throws a victim, and what holds the throw down.
+--
+-- The two ragdoll tiers are opposite in kind under the hood and identical to
+-- the player: both look like physical contact and both throw a body in
+-- ragdoll. What differs is who owns the throw.
+--
+-- **The gallop reacts to physics.** The horse is genuinely moving at 8 to
+-- 12 m/s under its own locomotion and carries through the victim, so the
+-- engine's collision does the throwing and there is a real throw to take away.
+-- The gallop is subtractive: a brake keeps a fraction of what the engine gave,
+-- and a ceiling with a soft drag holds what is left.
+--
+-- **The charge sidesteps physics.** The lunge starts from a stop and ends at a
+-- stop. The horse only moves because this mod hands it `RearChargeImpulse`,
+-- and through the rear Mannequin holds it `AnimationControlled`, so its own
+-- velocity reads 0.02 to 0.07 with occasional snaps of 25.9 and cannot be
+-- measured at all. The engine's collision does not reliably deliver anything:
+-- measured with no mod throw in place, charge victims moved 0.3 to 1.0 m.
+--
+-- So the mod owns the charge outright. It commands the throw, and nothing
+-- downstream is allowed to take it back out. Half-ownership is what produced
+-- years of circles here -- the mod launched the victim and then ran the
+-- gallop's subtractive brake, ceiling and a per-poll cap enforcement over the
+-- top, two systems fighting over one body, and the charge came out traveling
+-- *less* than a gallop.
+--
+-- ## The steps
+--
+--  1. **Throw.** Either a brake, which keeps a fraction of the speed the body
+--     arrived with (the gallop), or a launch, which commands a speed outright
+--     as a floor under whatever the body holds (the charge). A tier carries
+--     one or the other, never both.
+--  2. **Cap.** The speed the body may not exceed while it is in the air, held
+--     there by drag. For the gallop it is what removes variance from the
+--     engine's throw. For the charge it is only a rail: it sits at the
+--     commanded speed, so it never touches the throw itself and catches only
+--     what the horse's collider adds on top afterwards.
+--  3. **Settle.** Damping and a sleep threshold once it is on the ground,
+--     which is the same for every tier and lives in the `RagdollDamp*`
+--     settings.
+--
+-- Both endpoints of every pair are blended across the victim's armour, so
+-- armour is what decides distance within a tier, in both tiers.
+--
+-- ## The charge's throw is 1:1 with the horse
+--
+-- The charge commands a speed, so that speed has to come from somewhere real
+-- or it is an invented constant, which is what every previous attempt here
+-- was. It is derived from the lunge the mod itself commanded:
+--
+--     throw = RearChargeImpactSpeed * transfer * RearChargeThrow
+--
+-- `RearChargeImpactSpeed` is the lunge, already declared rather than measured
+-- for exactly this reason: `RearChargeImpulse` of 6000 on a horse of about 480
+-- kg is 12.5 m/s, and the setting says 12.3.
+--
+-- `transfer` is the fraction of a striker's speed a struck body leaves with,
+-- and the gallop supplies it, because the gallop is tuned and accepted. Its
+-- ceilings are the speeds this mod has settled on as right for each armour
+-- class -- 6.0 unarmored and 2.5 in full mail -- so the transfer that
+-- reproduces them off a 12.3 m/s lunge is 6.0/12.3 = 0.49 and 2.5/12.3 = 0.20.
+-- That is what makes a charge at `RearChargeThrow` of 1.0 land like a gallop.
+--
+-- `RearChargeThrow` is then the only dial, and it has a wide range on purpose:
+-- a charge is an offensive attack the player commands, not a consequence of
+-- riding into somebody, so it is allowed to be tuned well past what a gallop
+-- would ever do.
+--
+-- The drag is the gallop's, 20.0 in mail and 4.0 unarmored, because drag is
+-- not a distance axis in either tier. It is what makes a ceiling true.
+HorseCollisionMod.ThrowProfileByTier = {
+	Gallop = {
+		brakeKeepArmored   = 0.45,
+		brakeKeepUnarmored = 1.0,
+		capArmored         = 2.5,
+		capUnarmored       = 6.0,
+		dragArmored        = 20.0,
+		dragUnarmored      = 4.0,
+	},
+
+	Charge = {
+		lungeTransferArmored   = 0.20,
+		lungeTransferUnarmored = 0.49,
+		dragArmored            = 20.0,
+		dragUnarmored          = 4.0,
+	},
+}
+
+--- Resolves a tier's throw profile against a victim's armour.
+--
+-- Returns a flat table of the figures the throw pipeline needs, with every
+-- armour pair already blended, or nil for a tier that does not ragdoll. The
+-- pipeline reads only what comes back from here, so no part of it knows which
+-- tier it is working for.
+--
+-- @tparam string tierName the tier that struck
+-- @tparam[opt] number armorScale the victim's armor scale, high for an
+--   unarmored victim and low for one in mail
+-- @treturn[1] table a keep or a launch, the cap that rails it and the drag
+-- @treturn[2] nil for a tier with no profile
+function HorseCollisionMod:ThrowProfile(tierName, armorScale)
+	local shape = self:TierValue("ThrowProfileByTier", tierName)
+
+	if type(shape) ~= "table" then
+		return nil
+	end
+
+	local profile = {
+		drag = self:ArmorBlend(armorScale, shape.dragArmored,
+				shape.dragUnarmored),
+	}
+
+	-- A brake keeps a fraction, so no brake is 1.0 and not 0.
+	profile.keep = 1.0
+
+	if shape.brakeKeepArmored or shape.brakeKeepUnarmored then
+		profile.keep = self:ArmorBlend(armorScale, shape.brakeKeepArmored,
+				shape.brakeKeepUnarmored)
+
+		if profile.keep < 0.02 then
+			profile.keep = 0.02
+		end
+	end
+
+	-- A tier the mod throws itself, derived 1:1 from the lunge it commanded.
+	--
+	-- The transfer is the fraction of the striker's speed a struck body leaves
+	-- with, so the lunge speed is the thing it is a fraction *of*, and the dial
+	-- multiplies the result. Nothing here is a constant: the lunge is
+	-- `RearChargeImpulse` over the horse's mass, and the transfer reproduces
+	-- the gallop's accepted ceilings off it.
+	--
+	-- The cap is then the commanded speed itself, so it is a rail rather than
+	-- a ceiling. It cannot shorten a throw the mod set, because it sits exactly
+	-- where that throw lands; it catches only what the horse's collider adds
+	-- afterwards. A tier that commands its own throw must not have anything
+	-- downstream subtracting from it.
+	if shape.lungeTransferArmored or shape.lungeTransferUnarmored then
+		local transfer = self:ArmorBlend(armorScale,
+				shape.lungeTransferArmored, shape.lungeTransferUnarmored)
+
+		profile.launch = (self.Config.RearChargeImpactSpeed) * transfer
+				* (self.Config.RearChargeThrow)
+		profile.cap = profile.launch
+
+		-- And the rail is enforced, which is the half that makes ownership
+		-- real. Drag does not bind a ragdoll: measured, a victim railed at
+		-- 6.03 was driven to 8.64 and 9.17 m/s by the horse's collider with
+		-- the drag applied throughout, and lowering the commanded speed did
+		-- not shorten a single throw, because the commanded speed was only
+		-- ever a floor. A tier that owns its throw has to hold it at both
+		-- ends.
+		profile.railEnforce = true
+	end
+
+	-- A tier whose ceiling is stated outright rather than derived from a throw
+	-- it commanded, which is every tier that lets the engine do the throwing.
+	if shape.capArmored or shape.capUnarmored then
+		profile.cap = self:ArmorBlend(armorScale, shape.capArmored,
+				shape.capUnarmored)
+	end
+
+	profile.cap = profile.cap or 0
+
+	return profile
+end
 
 --- How hard the engine is told each tier hit, by `HitReactionStrength` name.
 --
@@ -280,6 +480,7 @@ HorseCollisionMod.TierTables = {
 	"StaminaShareByTier",
 	"ReactionByTier",
 	"ThrowByTier",
+	"ThrowProfileByTier",
 	"HitStrengthByTier",
 	"VictimBarkByTier",
 	"RetaliationByTier",
