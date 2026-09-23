@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.29.0
+-- @release 5.30.0
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.29.0"
+HorseCollisionMod.Version = "5.30.0"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -196,7 +196,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearChargeStrikeBehind how far behind the horse still counts
 -- @field RearChargeStrikeMs how long the strike sweeps for
 -- @field RearChargeStrikePollMs how often it sweeps
--- @field RearChargeImpactSpeed the speed a charge is scored at
+-- @field RearChargeImpactSpeed the speed a charge is resolved at, scoring and
+--   physics alike, since the horse cannot be measured through a lunge
 -- @field RearChargeFear whether a charge frightens the people it goes past
 --   without running down
 -- @field RearChargeFearReach how far that near miss reaches, in meters, all
@@ -205,6 +206,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   stands in
 -- @field RearChargeFearScreamPriority the rank that scream is submitted at
 -- @field ImpactDustEffectRear the particle to spawn for a rear impact
+-- @field RearChargeThrow how far a charge throws, against a gallop. The mod
+--   commands a charge's throw outright, at the lunge speed times the tier's
+--   transfer, and this multiplies the result. At 1.0 a charge lands where a
+--   gallop does; it is allowed a wide range because a charge is an attack the
+--   player commands rather than a consequence of riding into somebody
 -- @field RearChargeImpulse the physical push that carries the charge, applied
 --   once the rear animation has ended so the horse collides normally
 -- @field RearChargeLift how much of that push is upward
@@ -305,29 +311,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   own collision decides the launch and is never interfered with; the brake
 --   is one counter-impulse along the body's own velocity and can only ever
 --   subtract
--- @field RagdollBrakeKeepArmored the fraction of its speed a victim in full
---   mail keeps, the low end of the bracket
--- @field RagdollBrakeKeepUnarmored the fraction an unarmored victim keeps,
---   the high end. 1.0 is untouched, and is only reached by a victim whose
---   armor scale reaches `RagdollBrakeArmorScaleUnarmored` exactly
 -- @field RagdollBrakeArmorScaleArmored the armor scale treated as fully
 --   armored, the low end of the range
 -- @field RagdollBrakeArmorScaleUnarmored the armor scale treated as
 --   unarmored. An endpoint set above the highest scale that actually occurs
 --   silently converts "leave them alone" into "slow everyone"
--- @field RagdollSpeedCapArmorScaled whether the speed ceiling a traveling
---   body is held to is scaled by the victim's armor. This is the lever that
---   separates an armored victim from an unarmored one, because distance
---   tracks how long a body spends above the ceiling
--- @field RagdollSpeedCapArmored the ceiling for a victim in full mail
--- @field RagdollSpeedCapUnarmored the ceiling for an unarmored victim
--- @field RagdollAirDampingArmorScaled whether the drag applied to a
---   traveling body is scaled by the victim's armor. The ceiling only decides
---   when the drag starts, and past the ceiling plus the span it saturates, so
---   without this every victim receives the same drag on the fast throws,
---   which are the ones where armor should tell them apart
--- @field RagdollAirDampingArmored the drag for a victim in full mail
--- @field RagdollAirDampingUnarmored the drag for an unarmored victim
 -- @field RagdollDamping how fast a thrown body sheds speed, 0 for the
 --   engine's own value
 -- @field RagdollMinEnergy the energy below which a body is put to rest,
@@ -339,15 +327,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RagdollDampRampSamples over how many samples the damping reaches its
 --   full value once the body is down, so a fast landing decelerates rather
 --   than being braked
--- @field RagdollSpeedSoftCap the speed past which a traveling body is
---   dragged down whether it is touching anything or not, in meters per
---   second. Read off the per-throw speed traces: a long throw runs 8 to 9
---   for its first three or four samples and a short one never passes 3.9,
---   so 4 separates them and nothing ordinary is touched
 -- @field RagdollSpeedSoftCapSpan how far above the cap the drag reaches full
 --   strength, so it comes in progressively rather than as a wall
--- @field RagdollAirDamping the damping applied at full strength in the air,
---   against RagdollDamping on the ground
 -- @field RagdollDampContactRun how many samples in a row must report contact
 --   before a thrown body is damped, so a bounce does not count as landing
 -- @field RagdollDampFloorMs the earliest the damping may be applied, so it
@@ -414,7 +395,11 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   standing height, to count as flat on the ground
 -- @field ReactionByTier what each tier does to the victim's body: "stagger",
 --   "knockdown", "fall" or "ragdoll"
--- @field ThrowByTier how hard each ragdoll tier throws, as a scalar
+-- @field ThrowByTier how much of the throw each ragdoll tier keeps, as a
+--   scalar on the impulse, on the ragdoll brake and on the airborne speed cap
+-- @field ThrowProfileByTier how each ragdoll tier throws and what holds the
+--   throw down: the entry mode ("brake" or "launch"), the airborne ceiling and
+--   the drag that holds it, each as an armored and unarmored pair
 -- @field ImpactDamageByTier what each kind of collision is worth before armor
 -- @field ImpactDamageOwnsTheHit give back what the engine charged for a
 --   collision, so the mod's figure is the whole cost rather than an addition
@@ -721,7 +706,8 @@ HorseCollisionMod.Config = {
 	RearChargeStrikeBehind   = 0.2,
 	RearChargeStrikeMs       = 1600,
 	RearChargeStrikePollMs   = 50,
-	RearChargeImpactSpeed    = 7.5,
+	RearChargeImpactSpeed    = 12.3,
+	RearChargeThrow          = 0.6,
 	RearChargeFear           = true,
 	RearChargeFearReach      = 4.8,
 	RearChargeFearScreamPriority = 50,
@@ -1222,8 +1208,6 @@ HorseCollisionMod.Config = {
 	-- engine's own variation between one contact and the next passes through
 	-- intact and what is controlled is how much is taken away.
 	RagdollBrake             = true,
-	RagdollBrakeKeepArmored  = 0.45,
-	RagdollBrakeKeepUnarmored = 1.0,
 	RagdollBrakeArmorScaleArmored = 0.35,
 	RagdollBrakeArmorScaleUnarmored = 1.26,
 	RagdollDamping           = 5.0,
@@ -1231,15 +1215,7 @@ HorseCollisionMod.Config = {
 	RagdollDampPollMs        = 100,
 	RagdollDampSettleSpeed   = 0.5,
 	SettleFragTag            = "hcm_settle",
-	RagdollSpeedCapArmorScaled = true,
-	RagdollSpeedCapArmored   = 2.5,
-	RagdollSpeedCapUnarmored = 6.0,
-	RagdollSpeedSoftCap      = 4.0,
 	RagdollSpeedSoftCapSpan  = 3.0,
-	RagdollAirDampingArmorScaled = true,
-	RagdollAirDampingArmored = 20.0,
-	RagdollAirDampingUnarmored = 4.0,
-	RagdollAirDamping        = 8.0,
 	RagdollDampContactRun    = 3,
 	RagdollDampRampSamples   = 8,
 	RagdollDampFloorMs       = 200,

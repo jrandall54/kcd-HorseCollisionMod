@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.30.0] - 2026-09-22
+
 ### Changed
 - **A gallop deals 111, a rear 75 and a charge 118**, from 95, 60 and 110.
   None of the three was ever derived from anything, and the derivation that

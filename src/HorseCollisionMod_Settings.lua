@@ -33,18 +33,11 @@ HorseCollisionModSettings = {
 	Knockback                = 50.0,  -- horizontal, higher throws further
 	Uplift                   = 30.0,  -- vertical, higher throws upward
 
-	-- How hard a traveling body is dragged, which is the figure that actually
-	-- holds it, and the lever that decides how far an armored victim goes.
-	-- The ceiling below only decides when the drag starts: past the ceiling
-	-- plus the span it saturates, so without this every victim received the
-	-- same drag on exactly the fast throws where armor should tell them apart.
-	RagdollAirDampingArmorScaled = true,
-	RagdollAirDampingArmored = 20.0,  -- drag on a victim in full mail
-	RagdollAirDampingUnarmored = 4.0,   -- drag on an unarmored victim
-
-	RagdollSpeedCapArmorScaled = true,
-	RagdollSpeedCapArmored   = 2.5,   -- the ceiling for a victim in full mail
-	RagdollSpeedCapUnarmored = 6.0,   -- the ceiling for an unarmored victim
+	-- The ceiling a thrown body is held under, the drag that holds it there and
+	-- the brake or launch it enters with all live in `ThrowProfileByTier`
+	-- below, one set per tier. They used to live here, as one set shared by
+	-- every tier that ragdolls, which is why the rear charge's throw distance
+	-- could only be changed by moving the gallop's.
 
 	RagdollDamping           = 5.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 1.0,   -- higher puts it to rest sooner
@@ -214,7 +207,42 @@ HorseCollisionModSettings = {
 	RearChargeStrikes        = true,  -- whether the charge knocks people down
 	RearChargeStrikeReach    = 1.8,   -- how far ahead it reaches
 	RearChargeStrikeWidth    = 0.9,   -- how wide, either side
-	RearChargeImpactSpeed    = 7.5,   -- the speed it is scored at
+	-- The speed a charge is resolved at, scoring and physics alike.
+	--
+	-- Declared rather than measured, because the horse cannot be measured
+	-- through a lunge: its speed is derived from its positions and the rear
+	-- holds it animation-controlled, so the readings are 0.02 and 0.07 with
+	-- occasional snaps of 25.9. Neither works, and each produces a charge
+	-- whose throw had nothing to do with what the player saw.
+	--
+	-- The figure is the charge's own push, which the mod applies itself: an
+	-- impulse is a change in momentum, so 6000 units on a horse the engine
+	-- masses at 480 kg buys 12.5 m/s, less the share the 0.2 lift takes out of
+	-- the horizontal. Change `RearChargeImpulse` and this should follow it.
+	--
+	-- It sits just under a gallop's own ceiling, so a charge hits like a horse
+	-- at full gallop. How far a charge throws is `RearChargeThrow` below, not
+	-- this figure.
+	RearChargeImpactSpeed    = 12.3,  -- the speed a charge is resolved at
+
+	-- How far a charge throws, and the only dial for it.
+	--
+	-- The mod commands a charge's throw outright rather than subtracting from
+	-- the engine's, because there is nothing to subtract from: the lunge starts
+	-- from a stop, the horse moves only because of `RearChargeImpulse`, and
+	-- through the rear Mannequin holds it animation-controlled, so its own
+	-- velocity cannot be read at all. Measured with no mod throw in place,
+	-- charge victims moved 0.3 to 1.0 m.
+	--
+	-- The throw is the lunge speed above times the tier's transfer in
+	-- `ThrowProfileByTier`, and this multiplies the result. The transfers are
+	-- set so that 1.0 lands a charge where a gallop lands, which is the honest
+	-- place to start from.
+	--
+	-- Turn it up freely. A charge is an offensive attack the player commands,
+	-- not a consequence of riding into somebody, so this is allowed a much
+	-- wider range than anything on the gallop.
+	RearChargeThrow          = 0.6,   -- 1.0 throws like a gallop, 2.0 twice as far
 	-- The near miss, the charge's own. Same idea as the rear's band but a
 	-- wider one, because the margin the rear uses does not describe a charge.
 	-- A rear is a horse making a noise in one place and the fright is the
@@ -529,12 +557,80 @@ HorseCollisionModSettings = {
 	-- appear: the others hand the body to physics through the animation and
 	-- this mod never pushes them, so a figure for them would do nothing.
 	--
-	-- The charge is below a gallop rather than above it. The horse is still
-	-- driving forward when the victim goes down in front of it, so its own
-	-- collider shoves the ragdoll on top of whatever this applies.
+	-- This is trim: it scales Knockback and Uplift, together about one meter per
+	-- second on a body of 80 kg. What makes a charge throw further than a gallop
+	-- is the speed it is resolved at, not this.
 	ThrowByTier              = {
 		Gallop = 1.0,
-		Charge = 0.7,
+		Charge = 1.0,
+	},
+
+	-- How each ragdoll tier throws a victim, and what holds the throw down.
+	--
+	-- Every ragdoll tier runs the same three steps, and owns its own numbers
+	-- for them. Nothing here is shared between tiers.
+	--
+	--   1. throw   -- either a brake, which keeps a fraction of the speed the
+	--                 engine gave the body, or a launch, which commands a
+	--                 speed outright. A tier has one or the other
+	--   2. cap     -- the speed the body may not exceed in the air. For a
+	--                 braking tier it is a ceiling held by the drag; for a
+	--                 launching tier it is the commanded speed itself, held by
+	--                 a counter-impulse, so the throw is the same length every
+	--                 time
+	--   3. settle  -- damping on the ground, the `RagdollDamp*` figures above,
+	--                 which are the same for every tier
+	--
+	-- Both ends of every pair are blended across the victim's armour, so armour
+	-- is what decides distance within a tier.
+	--
+	-- The two tiers are opposite in kind under the hood and identical to the
+	-- player: both look like physical contact and both throw a body in ragdoll.
+	-- What differs is who owns the throw.
+	--
+	-- A gallop reacts to physics. The horse is really moving at 8 to 12 m/s
+	-- and carries through the victim, so the engine throws them and the mod
+	-- subtracts: a brake keeps a fraction, a ceiling holds what is left.
+	--
+	-- A charge sidesteps physics. The lunge starts and ends at a stop, the
+	-- horse moves only because of the impulse the mod gives it, and the engine
+	-- delivers nothing reliable -- victims moved 0.3 to 1.0 m with no mod throw
+	-- in place. So the mod commands the whole throw, derived 1:1 from that
+	-- lunge, and nothing downstream is allowed to take it back out.
+	--
+	--   throw = RearChargeImpactSpeed * lungeTransfer * RearChargeThrow
+	--
+	-- The transfers are the fraction of a striker's speed a struck body leaves
+	-- with, and they reproduce the gallop's accepted ceilings off a 12.3 m/s
+	-- lunge: 6.0/12.3 = 0.49 unarmored and 2.5/12.3 = 0.20 in full mail. So a
+	-- charge at `RearChargeThrow` of 1.0 lands where a gallop lands, and that
+	-- setting is the dial.
+	--
+	-- The charge's cap is not a ceiling. It is set to the commanded speed
+	-- itself, so it never shortens the throw the mod set and catches only what
+	-- the horse's collider adds on top afterwards.
+	--
+	-- The drag is the same in both tiers, because drag is not a distance axis.
+	-- It is what makes a ceiling true.
+	ThrowProfileByTier       = {
+		Gallop = {
+			brakeKeepArmored   = 0.45,  -- fraction of its speed a victim in
+			brakeKeepUnarmored = 1.0,   -- full mail keeps, and an unarmored one
+			capArmored         = 2.5,   -- the cap for a victim in full mail
+			capUnarmored       = 6.0,   -- and for an unarmored one
+			dragArmored        = 20.0,  -- drag holding a victim in full mail
+			dragUnarmored      = 4.0,   -- and an unarmored one
+		},
+
+		Charge = {
+			-- The share of the lunge's speed the victim leaves with. These
+			-- reproduce the gallop's ceilings off a 12.3 m/s lunge, so a
+			-- charge at RearChargeThrow 1.0 throws like a gallop.
+			lungeTransferArmored   = 0.20,  -- 2.5 / 12.3, a victim in mail
+			lungeTransferUnarmored = 0.49,  -- 6.0 / 12.3, an unarmored one
+			dragArmored            = 20.0,  -- the gallop's drag unchanged
+			dragUnarmored          = 4.0,
+		},
 	},
 
 	ImpactDamageByTier       = {
@@ -991,18 +1087,14 @@ HorseCollisionModSettings = {
 	LateralImpulse           = 0.0,   -- sideways share of the impulse; the
 	                                  -- throw direction is the engine's, and
 	                                  -- adding to it fought that
-	RagdollBrake             = true,  -- whether a thrown body is braked at all
-	RagdollBrakeKeepArmored  = 0.45,  -- fraction of its speed a victim in full
-	                                  -- armor keeps
-	RagdollBrakeKeepUnarmored = 1.0,  -- and an unarmored one
+	RagdollBrake             = true,  -- whether a braking tier brakes at all
 	RagdollBrakeArmorScaleArmored = 0.35,
 	RagdollBrakeArmorScaleUnarmored = 1.26,
-	RagdollAirDamping        = 8.0,   -- damping at full strength in the air
 	RagdollDampContactRun    = 3,     -- samples of contact in a row before the
 	                                  -- body counts as down
 	RagdollDampRampSamples   = 8,     -- samples over which damping ramps up
-	RagdollSpeedSoftCap      = 4.0,   -- speed past which drag begins
-	RagdollSpeedSoftCapSpan  = 3.0,   -- how far above it drag reaches full
+	RagdollSpeedSoftCapSpan  = 3.0,   -- how far above a tier's ceiling the drag
+	                                  -- reaches full strength
 
 	-- The rear and the charge. Timings measured against the animation, so a
 	-- value out of step with the clip shows as a strike that misses or lands

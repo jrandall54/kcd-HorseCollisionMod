@@ -12,7 +12,7 @@
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- @release 5.29.0
+-- @release 5.30.0
 -- The `armor_type_id` values worn by a horse rather than a person.
 --
 -- A sum over a person has to exclude them and a sum over a horse has to be
@@ -314,7 +314,7 @@ end
 -- unarmored endpoint here is 1.26 against a curve ceiling of 1.5, and it is
 -- deliberately inside the curve's range. Measured, ordinary villagers score
 -- about 1.15, so they land near but not at 1, which is why the log's `keep` is
--- rarely the figure `RagdollBrakeKeepUnarmored` names. Reading the endpoints as
+-- rarely the figure a tier's `brakeKeepUnarmored` names. Reading the endpoints as
 -- describing a bracket rather than a delivered value is the way round it.
 --
 -- @tparam[opt] number armorScale a value from `ArmorImpulseScale`
