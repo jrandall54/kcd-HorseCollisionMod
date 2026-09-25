@@ -30,6 +30,24 @@ number.
 
 ## [Unreleased]
 
+### Added
+- **The rear and the charge each have their own cooldown, shown as an icon.**
+  "Rear Spent" or "Charge Spent" appears among your status icons while it runs
+  and clears when the move is ready again. New settings: `ChargeCooldownMs`
+  (12500) and `MoveCooldownIcons` (true).
+
+### Changed
+- **A cooldown now starts when the move hits someone**, not when you press the
+  key, so a rear or charge that reaches nobody costs no cooldown.
+  `RearCooldownMs` is 7500, from 2500.
+- **A rear and a charge cost the same stamina as a gallop**, 0.20 of the pool,
+  from 0.10 and 0.20.
+
+### Fixed
+- Pressing the charge key repeatedly could push the horse twice, sending it
+  much further and stacking its sounds. A press is now ignored while a rear or
+  charge is still playing.
+
 ## [5.30.0] - 2026-09-22
 
 ### Changed
