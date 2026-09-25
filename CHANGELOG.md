@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.31.1] - 2026-09-24
+
 ### Changed
 - **Blood on a victim now scales with how hard they were hit**: trot 0.07,
   rear 0.30, gallop 0.45, charge 0.48, from 0.15, 0.15, 0.45 and 0.45.
