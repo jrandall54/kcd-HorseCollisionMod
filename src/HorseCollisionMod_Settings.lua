@@ -525,7 +525,7 @@ HorseCollisionModSettings = {
 	-- two tables rather than one pair per tier because they came apart in
 	-- tuning: a trot wanted the strength kept and the length cut.
 	RiderBlurByTier          = {
-		Trot = 0.7, Gallop = 1.0, Rear = 0.6, Charge = 1.1,
+		Trot = 0.7, Gallop = 1.0, Rear = 0.8, Charge = 1.1,
 	},
 
 	RiderBlurLengthByTier    = {
@@ -537,14 +537,16 @@ HorseCollisionModSettings = {
 		Trot = 0, Gallop = 0.09, Rear = 0.6, Charge = 0.10,
 	},
 
-	-- The marks left on the victim. Dirt is where they landed, blood is what
-	-- the impact opened.
+	-- The marks left on the victim. Dirt is where they landed, so a fall
+	-- (trot, rear) leaves less than a throw (gallop, charge). Blood is what
+	-- the impact opened, so it scales with each tier's damage against the
+	-- gallop's.
 	VictimDirtByTier         = {
 		Trot = 0.35, Gallop = 0.60, Rear = 0.35, Charge = 0.60,
 	},
 
 	VictimBloodByTier        = {
-		Trot = 0.15, Gallop = 0.45, Rear = 0.15, Charge = 0.45,
+		Trot = 0.07, Gallop = 0.45, Rear = 0.30, Charge = 0.48,
 	},
 
 	ReactionByTier           = {

@@ -66,10 +66,10 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.31.0
+-- @release 5.31.1
 HorseCollisionMod = {}
 
-HorseCollisionMod.Version = "5.31.0"
+HorseCollisionMod.Version = "5.31.1"
 
 --- Loop generation counter, deliberately kept outside the table above.
 --
@@ -845,8 +845,11 @@ HorseCollisionMod.Config = {
 		Trot = 0.6, Gallop = 1.0, Rear = 0.8, Charge = 1.2
 	},
 
+	-- Shake and blur follow the tiers' severity order, trot below rear below
+	-- gallop below charge. The rear's strength sits level with its shake, where
+	-- it used to fall below the trot's.
 	RiderBlurByTier          = {
-		Trot = 0.7, Gallop = 1.0, Rear = 0.6, Charge = 1.1
+		Trot = 0.7, Gallop = 1.0, Rear = 0.8, Charge = 1.1
 	},
 
 	RiderBlurLengthByTier    = {
@@ -857,12 +860,17 @@ HorseCollisionMod.Config = {
 		Trot = 0, Gallop = 0.09, Rear = 0.6, Charge = 0.10
 	},
 
+	-- Dirt follows how the victim lands: a trot and a rear play a fall, a
+	-- gallop and a charge throw the body.
 	VictimDirtByTier         = {
 		Trot = 0.35, Gallop = 0.60, Rear = 0.35, Charge = 0.60
 	},
 
+	-- Blood follows damage. The gallop's 0.45 is the anchor and every other
+	-- tier is scaled by its `ImpactDamageByTier` against the gallop's 111:
+	-- trot 18, rear 75, charge 118.
 	VictimBloodByTier        = {
-		Trot = 0.15, Gallop = 0.45, Rear = 0.15, Charge = 0.45
+		Trot = 0.07, Gallop = 0.45, Rear = 0.30, Charge = 0.48
 	},
 
 	-- `HitStrengthByTier`, `VictimBarkByTier`, `RetaliationByTier`,
