@@ -358,21 +358,132 @@ function HorseCollisionMod:RearRequested(fragTag)
 
 	local now = self:TimeMs()
 
-	if self.RearNextAt and now < self.RearNextAt then
-		-- If the clock wound back (e.g. save load), now will be much smaller than RearNextAt.
+	-- One move at a time. The idle and speed gates above do not cover this:
+	-- between the charge's rear ending and its push the horse reads
+	-- `MotionIdle` at 0 m/s, and a second press there doubled the push and
+	-- stacked the horse's voice. The standing rear reads `MotionIdle`
+	-- throughout. So the press is refused on the move's own state, the
+	-- charge's `RearCharging` and the rear's animation length.
+	if self.RearCharging then
+		return refuse("charge in progress")
+	end
+
+	if self.RearBusyUntil and now < self.RearBusyUntil
+			and (self.RearBusyUntil - now) <= self:RearAnimMs() then
+		return refuse("rear in progress")
+	end
+
+	-- The rear and the charge each keep their own cooldown clock. They used to
+	-- share `RearNextAt`, so the charge was rationed by the rear's cooldown.
+	-- Both start on the move's first contact, in `RearStrike` and
+	-- `ChargeStrike`, so a move that reaches nobody costs no cooldown.
+	local isCharge = (fragTag == cfg.RearFragTag)
+	local clock = isCharge and "ChargeNextAt" or "RearNextAt"
+	local cooldown = isCharge and cfg.ChargeCooldownMs or cfg.RearCooldownMs
+	local nextAt = self[clock]
+
+	if nextAt and now < nextAt then
+		-- If the clock wound back (e.g. save load), now will be much smaller than nextAt.
 		-- Any difference larger than the cooldown itself means a reload happened.
-		if (self.RearNextAt - now) > (cfg.RearCooldownMs) + 1000 then
-			self:Log("Rear clock wound back, ignoring cooldown")
+		if (nextAt - now) > cooldown + 1000 then
+			self:Log(clock .. " wound back, ignoring cooldown")
 		else
-			return refuse("cooldown")
+			return refuse("cooldown " .. string.format("%.1fs", (nextAt - now) / 1000))
 		end
 	end
 
-	self.RearNextAt = now + (cfg.RearCooldownMs)
+	if not isCharge then
+		self.RearBusyUntil = now + self:RearAnimMs()
+	end
 
 	self:RearHorse(horseEnt, fragTag)
 
 	return true
+end
+
+--- How long the standing rear holds the horse, in milliseconds.
+--
+-- Read from the animation itself rather than declared, divided by the speed
+-- it is played at.
+--
+-- @treturn number the length, or 0 when it cannot be read
+function HorseCollisionMod:RearAnimMs()
+	local length = 0
+
+	pcall(function()
+		local horseEnt = XGenAIModule.GetEntityByWUID(
+				player.player:GetPlayerHorse())
+
+		length = horseEnt:GetAnimationLength(0, "relaxed_rearing") or 0
+	end)
+
+	return (length * 1000) / (self.Config.RearAnimSpeed)
+end
+
+--- The cooldown icons, one per commanded move.
+--
+-- Each is the mod's own buff, a copy of vanilla's `barking_cooldown`: a timed
+-- buff with no effect whose only job is to sit among the game's buff icons.
+-- They are declared with no duration, so the table never carries a second
+-- copy of the cooldown; `UpdateMoveCooldowns` takes each off when its clock
+-- runs out.
+local COOLDOWN_ICONS = {
+	{ clock = "RearNextAt", buff = "RearCooldownBuff" },
+	{ clock = "ChargeNextAt", buff = "ChargeCooldownBuff" },
+}
+
+--- Starts a move's cooldown and puts its icon on the player.
+--
+-- Called at the move's first contact, which is when its cooldown starts.
+--
+-- @tparam string clock "RearNextAt" or "ChargeNextAt"
+-- @tparam number cooldown the cooldown, in milliseconds
+function HorseCollisionMod:StartMoveCooldown(clock, cooldown)
+	local cfg = self.Config
+
+	self[clock] = self:TimeMs() + cooldown
+
+	if not cfg.MoveCooldownIcons then
+		return
+	end
+
+	for _, icon in ipairs(COOLDOWN_ICONS) do
+		if icon.clock == clock then
+			pcall(function()
+				player.soul:RemoveAllBuffsByGuid(cfg[icon.buff])
+				player.soul:AddBuff(cfg[icon.buff])
+			end)
+
+			self.CooldownIconShown = self.CooldownIconShown or {}
+			self.CooldownIconShown[clock] = true
+		end
+	end
+end
+
+--- Takes a cooldown icon off once its move is available again.
+--
+-- Read from the move's clock every tick, so an icon clears at the moment a
+-- press would be taken, and on a save load, which drops the deadline.
+--
+-- @tparam number now the mod's clock, in milliseconds
+function HorseCollisionMod:UpdateMoveCooldowns(now)
+	local shown = self.CooldownIconShown
+
+	if not shown then
+		return
+	end
+
+	for _, icon in ipairs(COOLDOWN_ICONS) do
+		local nextAt = self[icon.clock]
+
+		if shown[icon.clock] and not (nextAt and now < nextAt) then
+			pcall(function()
+				player.soul:RemoveAllBuffsByGuid(self.Config[icon.buff])
+			end)
+
+			shown[icon.clock] = false
+		end
+	end
 end
 
 
@@ -942,11 +1053,17 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 						-- Once per charge, not once per victim. Riding down a
 						-- group is the move; a crowd should not empty the
 						-- horse for standing close together.
+						-- The cooldown starts here for the same reason: it is
+						-- the price of a charge that landed, and a lunge into
+						-- empty air has not spent one.
 						if not self.ChargeDrained then
 							self.ChargeDrained = true
 
 							self:DrainImpactStamina(horseEnt, playerEnt,
 									"Charge")
+
+							self:StartMoveCooldown("ChargeNextAt",
+									cfg.ChargeCooldownMs)
 						end
 					end
 				end
@@ -1098,6 +1215,9 @@ function HorseCollisionMod:RearStrike(horseEnt)
 
 	if hit > 0 then
 		self:DrainImpactStamina(horseEnt, playerEnt, "Rear")
+
+		-- The rear's cooldown starts on contact, as the charge's does.
+		self:StartMoveCooldown("RearNextAt", cfg.RearCooldownMs)
 	end
 
 	-- After the strike, because the band excludes whoever it landed on and

@@ -183,7 +183,13 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field RearIdleOnly rear only from the horse's idle state, not while it moves
 -- @field RearMaxSpeed the speed above which a rear request is ignored, in
 --   meters per second, since a rear is a standstill move
--- @field RearCooldownMs how long before another rear is accepted
+-- @field RearCooldownMs how long after a rear lands before another is accepted
+-- @field ChargeCooldownMs how long after a charge lands before another is
+--   accepted, on its own clock rather than the rear's
+-- @field MoveCooldownIcons show a buff icon while either cooldown runs
+-- @field RearCooldownBuff the id of the rear's icon buff, declared in the
+--   mod's `buff__horsecollisionmod.xml`
+-- @field ChargeCooldownBuff the id of the charge's, from the same file
 -- @field RearChargeKey which key rears and charges. One of r, q, y, u, o, h,
 --   the keys the mod's action map declares
 -- @field RearOnlyKey which key rears on the spot, from the same list
@@ -694,7 +700,14 @@ HorseCollisionMod.Config = {
 	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
 	RearIdleOnly             = true,
 	RearMaxSpeed             = 0.15,
-	RearCooldownMs           = 2500,
+	-- Each commanded move's own ration, counted from its first contact. They
+	-- are offensive moves limited by uses rather than by stamina, so these
+	-- are set by feel on a ride, not derived.
+	RearCooldownMs           = 7500,
+	ChargeCooldownMs         = 12500,
+	MoveCooldownIcons        = true,
+	RearCooldownBuff         = "a8d30cd4-d7ae-4b58-a726-d94a875c50e8",
+	ChargeCooldownBuff       = "488afdee-b2bb-4d94-8357-d923f40d65ef",
 	RearFragTag              = "hcm_rear_charge",
 	RearOnlyKey              = "f",
 	RearOnlyFragTag          = "hcm_rear",
@@ -1869,6 +1882,13 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		-- having reared and there is no deadline to wait for and the keys work
 		-- at once.
 		self.RearNextAt = nil
+		self.ChargeNextAt = nil
+
+		-- The move-in-progress marks, for the same reason and one more: the
+		-- timers that clear `RearCharging` are dropped by the generation
+		-- change, so a save written mid-charge would refuse every press.
+		self.RearBusyUntil = nil
+		self.RearCharging = false
 
 		-- The lean's re-base guard is stamped the same way, and was the other
 		-- deadline missed when the rear's was fixed: `LeanHomeUntil` is set in

@@ -511,15 +511,32 @@ player who circles and lines up again gets more than those counts say.
 | --- | --- | --- |
 | Walk | 0 | unlimited |
 | Trot | 0.13 | about 8 |
-| Rear | 0.10 | limited by its cooldown, not by stamina |
+| Rear | 0.20 | limited by its cooldown, not by stamina |
 | Gallop | 0.20 | 5 |
 | Charge | 0.20 | limited by its cooldown, not by stamina |
 
 A walking bump is not hard enough to tire a horse, hence the `Walk` figure of 0
 in `StaminaShareByTier`. The rear and the charge are commanded attacks rather
-than consequences of riding, so what stops a player spamming them is
-`RearCooldownMs` on the move itself; their share is a cost the player feels, not
-a budget they count.
+than consequences of riding, so what stops a player spamming them is the
+cooldown on the move itself, `RearCooldownMs` for the rear and
+`ChargeCooldownMs` for the charge, each on its own clock. Both start on the
+move's first contact, so a move that reaches nobody costs no cooldown; their share is a cost
+the player feels, not a budget they count. Both match the gallop's 0.20 by the
+rider's ruling. The cooldown figures are set by feel on a ride, not derived.
+
+While a cooldown runs, the player carries the mod's `hcm_rear_cooldown` or
+`hcm_charge_cooldown` buff, so the game's own buff icons show it. The rows copy
+vanilla's `barking_cooldown`, a `Cpp:BasicTimed` buff with no effect. They are
+declared with no duration and the mod removes each when its clock passes, so
+the icon follows the setting rather than a second copy of the figure in a table.
+Buff rows are read at startup only; neither `Database.LoadTable('buff')` nor
+`wh_rpg_reload` makes a new one addable in a running game.
+
+Because no cooldown starts until contact, a press is also refused while a move
+is in progress: during a charge on `RearCharging`, during a standing rear for
+the length of `relaxed_rearing` as the horse reports it. Without it, a second
+charge press in the idle moment between the rear and the push doubled the
+push.
 
 Every tier is charged through one function, `DrainImpactStamina`. The rear and
 the charge went through it late: each used to drain a flat setting at its own

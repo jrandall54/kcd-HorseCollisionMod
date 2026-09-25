@@ -140,6 +140,10 @@ function HorseCollisionMod:SafeUpdate()
 		return
 	end
 
+	-- Before the mount check, so an icon still clears if the rider has
+	-- dismounted while the cooldown ran.
+	self:UpdateMoveCooldowns(self:TimeMs())
+
 	local isMounted = false
 
 	pcall(function()
