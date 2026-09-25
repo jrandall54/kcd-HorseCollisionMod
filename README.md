@@ -137,7 +137,7 @@ breaking the mod. Deleting a line restores its default.
 | `RiderBlurHoldMs` | 260 | How long it holds before decaying. |
 | `RiderBlurChroma` | 0.2 | A chromatic shift on the same envelope. Past about 0.5 it tints the screen red. |
 | `RiderBlurMs` | 480 | How long the decay takes. |
-| `RiderBlurByTier` | Trot 0.7, Gallop 1.0, Rear 0.6, Charge 1.1 | The fraction of the blur strength each impact gets. |
+| `RiderBlurByTier` | Trot 0.7, Gallop 1.0, Rear 0.8, Charge 1.1 | The fraction of the blur strength each impact gets. |
 | `RiderBlurLengthByTier` | Trot 0.3, Gallop 1.0, Rear 0.4, Charge 1.1 | The fraction of the blur timing each impact gets. |
 | `ImpactDamageDelayMs` | 600 | How long the mod waits, in milliseconds, before charging the victim for the impact. The engine applies trample damage of its own for a collision and attributes it to you; waiting lets that land first so the mod delivers the killing blow. That decides whether guards treat a death as murder or as a corpse nobody is blamed for, and so it is what makes `CollisionIsCrime` mean anything. Set to 0 to charge immediately. |
 | `ImpactDust` | true | Whether a collision throws dust off the ground where the victim lands. |
@@ -151,7 +151,7 @@ breaking the mod. Deleting a line restores its default.
 | `ImpactSoundCrackChance` | 0.12 | How often a gallop adds it. |
 | `VictimMarks` | true | Whether a knockdown leaves dirt and blood on the victim. Nothing is applied at walking pace. |
 | `VictimDirtByTier` | Trot 0.35, Gallop 0.60, Rear 0.35, Charge 0.60 | Dirt added to everything the victim is wearing, 0 to 1. 0 switches it off. |
-| `VictimBloodByTier` | Trot 0.15, Gallop 0.45, Rear 0.15, Charge 0.45 | Blood added to the side of the body the impact struck, 0 to 1. 0 switches it off. |
+| `VictimBloodByTier` | Trot 0.07, Gallop 0.45, Rear 0.30, Charge 0.48 | Blood added to the side of the body the impact struck, 0 to 1. 0 switches it off. |
 | `LogTelemetry` | true | Whether the mod writes diagnostics to `kcd.log`. |
 | `RequirePerks` | true | Whether Lean, Rear, and Rear Charge require purchasing their respective Horsemanship skill tree perks first. |
 | `AutoGrantPerks` | false | Automatically adds all three Horsemanship maneuver perks to the player upon game load without spending perk points. |

@@ -22358,3 +22358,22 @@ for a vanilla one. `sys_localization_reload` does reload the strings live.
 **Thoughts & Conclusions**: Confirmed on a ride: *"Everything seems to work as
 it should."* The cooldowns are set by feel, not derived: `RearCooldownMs` 7500,
 `ChargeCooldownMs` 12500. Step 7, cosmetics, is next.
+
+### Build: 5.31.x — the balance pass, stage 2 step 7: cosmetics
+
+**Hypothesis**: With damage settled (trot 18, rear 75, gallop 111, charge 118),
+each cosmetic should follow that severity order. Two figures did not. The rear's
+blood equaled the trot's (0.15), left over from the retired rule that the rear
+is trot-class. The rear's blur strength (0.6) sat below the trot's (0.7).
+
+**Results**: Blood now scales with damage against the gallop's 0.45: trot 0.07,
+rear 0.30, charge 0.48. Rear blur strength is 0.8, level with its shake. Dirt
+follows how the victim lands (a fall for trot and rear, a throw for gallop and
+charge) and is unchanged, as are shake, blur length and dust. The log confirmed
+each tier requested its own blur: trot 0.70 held 78 ms, rear 0.80 held 104 ms,
+gallop 1.00 held 260 ms. The rear's short length (0.4 of the gallop's) made its
+blur read as faint on the ride. That was expected, not a fault.
+
+**Thoughts & Conclusions**: The rider accepted it: *"If everything is applied
+based on it's tier/scale then I think we are good."* Stage 2 is complete except
+step 5, Recovery, which is still disputed. Stage 3, fear, is next.
