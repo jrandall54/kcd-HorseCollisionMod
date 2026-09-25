@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<database name="hammerheart">
+  <table name="buff" version="1">
+    <header>
+      <column name="buff_ai_tag_id" type="integer" />
+      <column name="buff_class_id" type="integer" />
+      <column name="buff_desc" type="character varying" />
+      <column name="buff_exclusivity_id" type="integer" />
+      <column name="buff_id" type="uuid" />
+      <column name="buff_lifetime_id" type="integer" />
+      <column name="buff_name" type="character varying" />
+      <column name="buff_ui_name" type="character varying" />
+      <column name="buff_ui_order" type="integer" />
+      <column name="buff_ui_type_id" type="integer" />
+      <column name="buff_ui_visibility_id" type="integer" />
+      <column name="duration" type="real" />
+      <column name="icon_id" type="integer" />
+      <column name="implementation" type="character varying" />
+      <column name="is_persistent" type="boolean" />
+      <column name="params" type="character varying" />
+      <column name="slot_buff_ui_name" type="character varying" />
+      <column name="slot_icon_id" type="integer" />
+      <column name="visual_effect" type="character varying" />
+    </header>
+    <rows>
+      <row buff_ai_tag_id="" buff_class_id="1" buff_desc="buff_hcm_rear_cooldown_desc" buff_exclusivity_id="1" buff_id="a8d30cd4-d7ae-4b58-a726-d94a875c50e8" buff_lifetime_id="0" buff_name="hcm_rear_cooldown" buff_ui_name="buff_hcm_rear_cooldown" buff_ui_order="14" buff_ui_type_id="1" buff_ui_visibility_id="3" duration="-1" icon_id="40" implementation="Cpp:BasicTimed" is_persistent="False" params="" slot_buff_ui_name="buff_hcm_rear_cooldown" slot_icon_id="1" visual_effect="" />
+      <row buff_ai_tag_id="" buff_class_id="1" buff_desc="buff_hcm_charge_cooldown_desc" buff_exclusivity_id="1" buff_id="488afdee-b2bb-4d94-8357-d923f40d65ef" buff_lifetime_id="0" buff_name="hcm_charge_cooldown" buff_ui_name="buff_hcm_charge_cooldown" buff_ui_order="15" buff_ui_type_id="1" buff_ui_visibility_id="3" duration="-1" icon_id="46" implementation="Cpp:BasicTimed" is_persistent="False" params="" slot_buff_ui_name="buff_hcm_charge_cooldown" slot_icon_id="1" visual_effect="" />
+    </rows>
+  </table>
+</database>

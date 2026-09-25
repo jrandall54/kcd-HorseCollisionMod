@@ -43,7 +43,7 @@ The horse's hooves strike and push anyone standing directly in front of you.
 
 Notes:
 - Consumes horse stamina.
-- Subject to a brief recovery cooldown.
+- Subject to a recovery cooldown once it lands on someone, shown as an icon while it lasts.
 - Warning: Striking innocent bystanders is considered a crime.</Cell>
     <Cell>Horsemanship: Rear Maneuver
 
@@ -57,7 +57,7 @@ The horse's hooves strike and push anyone standing directly in front of you.
 
 Notes:
 - Consumes horse stamina.
-- Subject to a brief recovery cooldown.
+- Subject to a recovery cooldown once it lands on someone, shown as an icon while it lasts.
 - Warning: Striking innocent bystanders is considered a crime.</Cell>
   </Row>
   <Row>
@@ -73,7 +73,8 @@ Combat &amp; Collision:
 The horse lunges forward with violent momentum, trampling anyone in its path.
 
 Notes:
-- Consumes significantly more stamina than a stationary rear.
+- Consumes horse stamina.
+- Subject to a long recovery cooldown once it lands on someone, shown as an icon while it lasts.
 - Warning: Trampling innocent civilians will alert guards and incur a bounty.</Cell>
     <Cell>Horsemanship: Rear Charge
 
@@ -86,7 +87,28 @@ Combat &amp; Collision:
 The horse lunges forward with violent momentum, trampling anyone in its path.
 
 Notes:
-- Consumes significantly more stamina than a stationary rear.
+- Consumes horse stamina.
+- Subject to a long recovery cooldown once it lands on someone, shown as an icon while it lasts.
 - Warning: Trampling innocent civilians will alert guards and incur a bounty.</Cell>
+  </Row>
+  <Row>
+    <Cell>buff_hcm_rear_cooldown</Cell>
+    <Cell>Rear Spent</Cell>
+    <Cell>Rear Spent</Cell>
+  </Row>
+  <Row>
+    <Cell>buff_hcm_rear_cooldown_desc</Cell>
+    <Cell>Your horse is recovering from a rear and cannot rear again until this passes.</Cell>
+    <Cell>Your horse is recovering from a rear and cannot rear again until this passes.</Cell>
+  </Row>
+  <Row>
+    <Cell>buff_hcm_charge_cooldown</Cell>
+    <Cell>Charge Spent</Cell>
+    <Cell>Charge Spent</Cell>
+  </Row>
+  <Row>
+    <Cell>buff_hcm_charge_cooldown_desc</Cell>
+    <Cell>Your horse is recovering from a charge and cannot charge again until this passes.</Cell>
+    <Cell>Your horse is recovering from a charge and cannot charge again until this passes.</Cell>
   </Row>
 </Table>

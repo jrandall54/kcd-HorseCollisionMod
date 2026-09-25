@@ -103,7 +103,7 @@ breaking the mod. Deleting a line restores its default.
 | `RagdollDampFloorMs` | 200 | The earliest a body may be settled, in milliseconds, so it cannot happen mid-launch. |
 | `RagdollDampCeilingMs` | 6000 | The latest, applied whatever the body is doing. |
 | `RagdollDampPollMs` | 100 | How often a thrown body is looked at. |
-| `StaminaShareByTier` | Walk 0, Trot 0.13, Gallop 0.20, Rear 0.10, Charge 0.20 | What each kind of impact costs the horse, as a share of that horse's own full stamina. Raise a figure to be thrown sooner. A rear and a charge are charged once for the move rather than once per person. |
+| `StaminaShareByTier` | Walk 0, Trot 0.13, Gallop 0.20, Rear 0.20, Charge 0.20 | What each kind of impact costs the horse, as a share of that horse's own full stamina. Raise a figure to be thrown sooner. A rear and a charge are charged once for the move rather than once per person. |
 | `CombatStaminaAdd` | 0.13 | Added to the share above while you are fighting. 0 removes the combat surcharge. |
 | `MaxArmorStaminaAdd` | 0.05 | The most an armored victim adds to the share above. |
 | `ThrowRiderOnStaminaEmpty` | true | Whether an emptied horse throws you. False still drains stamina. |
@@ -160,7 +160,9 @@ breaking the mod. Deleting a line restores its default.
 | `RearOnlyKey` | "f" | Which key rears on the spot, bringing the hooves down on anyone right in front. Same list. |
 | `RearMaxSpeed` | 0.15 | Horizontal speed above which a rear is refused. A rear is a standing attack: a horse still moving when it starts slides about 0.12 m before the animation takes hold. |
 | `RearIdleOnly` | true | Also require the horse's own locomotion state to be idle, which catches slow drift a speed reading misses. |
-| `RearCooldownMs` | 2500 | How long before another rear is accepted. |
+| `RearCooldownMs` | 7500 | How long before another rear is accepted, counted from the rear hitting someone. A rear that hits nobody has no cooldown. |
+| `ChargeCooldownMs` | 12500 | The same for the charge. |
+| `MoveCooldownIcons` | true | Whether an icon shows while either cooldown runs. |
 | `Lean` | true | Whether Q and E lean the camera out to either side, so you can see past the horse's head in first person. |
 | `LeanLeftKey` | "q" | Which key leans left. One of r, q, e, g, y, u, o, h. |
 | `LeanRightKey` | "e" | Which key leans right. Same list. |

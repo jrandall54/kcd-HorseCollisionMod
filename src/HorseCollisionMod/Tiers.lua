@@ -26,7 +26,7 @@
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
--- @release 5.30.0
+-- @release 5.31.0
 
 --- One tier's value for one concern.
 --
@@ -161,11 +161,12 @@ HorseCollisionMod.ImpactDamageByTier = {
 -- stamina refilling between passes, so a player who circles and lines up again
 -- gets more than the figure says.
 --
--- The rear and the charge carry figures of their own rather than borrowing a
--- loop tier's. They are also the two tiers that are not limited by stamina at
--- all: they are commanded attacks rather than consequences of riding, so what
--- stops a player spamming them is `RearCooldownMs` on the move itself, and
--- their share is only a cost the player feels.
+-- The rear and the charge cost the same 0.20 as the gallop, by the rider's
+-- ruling. They are commanded attacks rather than consequences of riding, so
+-- stamina is not what rations them: the cooldown on the move itself is, and
+-- their share is only a cost the player feels. They are perk-gated, the rear
+-- at Horsemanship 7 and the charge at 10, so a freshly unlocked move costs
+-- 0.72 and 0.60 of the pool and never empties a full horse on its own.
 --
 -- A charge is charged once for the whole lunge rather than once per victim,
 -- which is decided at the call site, because riding down a group is the move
@@ -174,7 +175,7 @@ HorseCollisionMod.StaminaShareByTier = {
 	Walk = 0.00,
 	Trot = 0.13,
 	Gallop = 0.20,
-	Rear = 0.10,
+	Rear = 0.20,
 	Charge = 0.20,
 }
 

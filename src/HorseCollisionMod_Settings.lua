@@ -109,8 +109,8 @@ HorseCollisionModSettings = {
 		Walk   = 0.00,  -- a shove costs the horse nothing
 		Trot   = 0.13,  -- about eight back to back at full Horsemanship
 		Gallop = 0.20,  -- five back to back, one at level 0 Horsemanship
-		Rear   = 0.10,  -- rationed by RearCooldownMs, not by stamina
-		Charge = 0.20,  -- charged once for the whole lunge, not per victim
+		Rear   = 0.20,  -- matches the gallop; rationed by its cooldown
+		Charge = 0.20,  -- matches the gallop; once per lunge, not per victim
 	},
 
 	CombatStaminaAdd         = 0.13,  -- 0 removes the combat surcharge
@@ -171,7 +171,9 @@ HorseCollisionModSettings = {
 	Rear                     = true,
 	RearIdleOnly             = true,  -- also require the horse's idle state
 	RearMaxSpeed             = 0.15,  -- horizontal m/s; above this it slides
-	RearCooldownMs           = 2500,  -- before another rear is accepted
+	RearCooldownMs           = 7500,  -- after a rear lands, set by feel
+	ChargeCooldownMs         = 12500, -- after a charge lands, set by feel
+	MoveCooldownIcons        = true,  -- show an icon while either runs
 	RearFragTag              = "hcm_rear_charge", -- rear, then drive forward
 	RearOnlyFragTag          = "hcm_rear",       -- the second key rears on the spot
 	-- The charge rears in place and is then pushed forward physically, so the
