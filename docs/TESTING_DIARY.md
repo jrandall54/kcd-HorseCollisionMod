@@ -22322,3 +22322,39 @@ anywhere inside the range a person can dress in, which is the right state for
 it: it is a guarantee against armor heavier than plate, not a clamp doing the
 tuning. Step 4 is the throw and armor separation, including the charge's throw
 distance, reported as too far.
+
+### Build: 5.31.0 — the balance pass, stage 2 step 6: stamina and move cooldowns
+
+**Hypothesis**: The rear (0.10) and the charge (0.20) are commanded attacks, and
+the rider's intent is that a cooldown rations them rather than stamina. But both
+moves stamped one shared `RearNextAt` from `RearCooldownMs` 2500, so the charge
+was rationed by the rear's clock.
+
+**Results**: The rider ruled on stamina directly: *"just match charge and rear
+stamina drain to gallop and be done with it."* Both are 0.20. There is no
+exemption from `ThrowRiderOnStaminaEmpty`: the moves unlock at Horsemanship 7
+and 10 (multipliers 3.6 and 3.0), so one move costs 0.72 and 0.60 of a pool and
+never empties a full horse, and the cooldown stops a chain.
+
+Each move got its own clock, started at its first contact (`RearStrike` for the
+rear, the once-per-lunge block in `ChargeStrike` for the charge), so a whiff
+costs nothing. Moving the stamp off the press exposed a double charge: mashing
+the key produced `ChargeForward pushed=true` at `after=1072ms` and again at
+`after=2144ms`, a long lunge and three or more stacked horse sounds. Between
+the rear ending and the push, the horse reads `MotionIdle` at 0 m/s, so the
+idle and speed gates pass. The shared 2.5 s press stamp had been hiding this.
+A press is now refused while a move is in progress: on `RearCharging` for the
+charge, and for the length of `relaxed_rearing` from `GetAnimationLength`
+(2 s) for the rear.
+
+The cooldown shows as a buff icon. Vanilla's `barking_cooldown` is a
+`Cpp:BasicTimed` buff with no effect and a HUD icon, and the mod's
+`hcm_rear_cooldown` (icon 40) and `hcm_charge_cooldown` (icon 46) copy it with no
+duration; the mod removes each when its clock passes. A new buff row does not
+hot-load. After `Database.LoadTable('buff')` (0 to 496 lines) and then
+`wh_rpg_reload`, `player.soul:AddBuff` returned nil for the new id and userdata
+for a vanilla one. `sys_localization_reload` does reload the strings live.
+
+**Thoughts & Conclusions**: Confirmed on a ride: *"Everything seems to work as
+it should."* The cooldowns are set by feel, not derived: `RearCooldownMs` 7500,
+`ChargeCooldownMs` 12500. Step 7, cosmetics, is next.
