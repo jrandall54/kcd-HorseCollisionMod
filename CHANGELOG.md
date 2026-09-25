@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.31.0] - 2026-09-24
+
 ### Added
 - **The rear and the charge each have their own cooldown, shown as an icon.**
   "Rear Spent" or "Charge Spent" appears among your status icons while it runs
