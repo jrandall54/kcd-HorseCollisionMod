@@ -18,14 +18,14 @@ heading in **Findings** as `:line` — problem — planned edit; anything that
 changes behavior or needs a decision goes in **Rulings needed** instead;
 update this section; commit as `docs(audit): record findings for <file>`.
 
-**Next pass:** `src/HorseCollisionMod/Armor.lua`.
+**Next pass:** `src/HorseCollisionMod/Reaction.lua`.
 
 **Pass order** (dependencies first, then largest):
 
 - [x] `src/HorseCollisionMod.lua` (entry point)
 - [x] `src/HorseCollisionMod_Settings.lua`
 - [x] `src/HorseCollisionMod/Tiers.lua`
-- [ ] `Armor.lua`
+- [x] `Armor.lua`
 - [ ] `Reaction.lua`
 - [ ] `Rear.lua`
 - [ ] `Retaliation.lua`
@@ -55,6 +55,10 @@ audited are listed here, so its pass picks them up.
 - `Marks.lua` — check the dust comments against the vertical-speed test.
 - `Reaction.lua:541-790` — the cap and rail comments carry measurements and
   history (seen while checking `Tiers.lua`).
+- `Health.lua:364` — the note on `ImpactDamageScale`; check it against the
+  `Armor.lua` findings on the floor and the formula.
+- `Recovery.lua:1116` — the `ArmorBlend` use there goes with the
+  DynamicRecovery ruling; if it goes, update the `ArmorLerp` consumer list.
 
 ## Standard
 
@@ -232,6 +236,11 @@ Format: `file:line` — problem — planned edit.
   why…", "Measured: presses reached the hook at +112 ms…", "the other
   deadline missed when the rear's was fixed". — One sentence: level time
   rewinds on load, so every deadline stamped against it is cleared.
+- [ ] `:543` — "Knockdown impulse. Trot and gallop only"; `ThrowByTier` trims
+  `Knockback` and `Uplift` for the charge too (`Reaction.lua:318`). —
+  Correct. (Found in the `Armor.lua` pass.)
+- [ ] `:955-958` barding — "Three flat effects rather than one multiplier";
+  damage is a multiplier. — Correct. (Found in the `Armor.lua` pass.)
 - [ ] `:1842-1853` `uiActionListener` logs every UI event whose name contains
   dialog, item, money, msg, surrender or inventory whenever `LogTelemetry` is
   on. Investigation scaffolding. — Remove, or ruling.
@@ -321,6 +330,12 @@ Contradictions with the code:
 - [ ] `:640-648` `ImpactDamageByTier` — "kills about nine unarmored men in
   ten": with 0.15 variance a 111 hit exceeds 100 health about 83% of the
   time. — Verify NPC health and restate, or cut.
+
+- [ ] `:127` `ArmorReferenceWeight` — "the weight counted as a full set";
+  it is the weight whose impulse multiplier is 1.0 (the block above says
+  so). — Correct. (Found in the `Armor.lua` pass.)
+- [ ] `:730-732` barding — "Three flat effects rather than one multiplier";
+  damage is a multiplier. — Correct. (Found in the `Armor.lua` pass.)
 
 Duplicates:
 
@@ -421,6 +436,75 @@ does):
   literal per concern" is false while the settings file ships whole copies
   of all nine tables (see the ruling). — Cut the history; describe the
   binding.
+
+### src/HorseCollisionMod/Armor.lua
+
+- [ ] `:1-15` module header — says two multipliers through a single curve.
+  The stamina half is `ArmorStaminaAdd`, a surcharge off its own anchor, and
+  damage is a third effect on `smash_def`; only the impulse uses
+  `ArmorCurve`. — Rewrite: impulse (weight, `ArmorCurve`), stamina surcharge
+  (weight), damage (`smash_def`), plus barding.
+- [ ] `:15-16` no blank line or `---` between `@release` and the `TackTypes`
+  doc, so LDoc folds "The `armor_type_id` values worn by a horse" into the
+  module doc. — Separate.
+- [ ] `:16-27` `TackTypes` — two docs spliced ("The values worn by a horse…"
+  then "Only the saddle and the horseshoes…"); "which is why the barding
+  multiplier had to be cranked before it did anything" is history. — One
+  doc: ids 10 and 11 are tack; 12 is excluded because the game files
+  head-and-neck barding under it.
+- [ ] `:61-64` `ItemIndex` — "This replaces a 50 KB table… the download no
+  longer carries them". — Cut.
+- [ ] `:154-156`, `:159` `ArmorOf` — "`tack` true… is what Phase 3 barding
+  needs". Nothing passes `tack` true: `BardingCoverage` (`:540`) calls
+  `ArmorOf(horseEnt)` and sums the non-tack pieces. The doc also calls spurs
+  and bridles tack; neither id is in `TackTypes`. — Drop the unused
+  parameter (always exclude tack; behavior unchanged); rewrite the doc.
+- [ ] `:237-246` `ArmorCurve` — "One curve serves both halves… the stamina
+  cost takes it directly". `ArmorImpulseScale` is the only caller and always
+  passes `invert` true. — Describe it as the impulse curve; drop `invert`,
+  or record why it stays.
+- [ ] `:304-318` `ArmorLerp` — "four copies of the same seven lines", "named
+  for the brake because that is what first needed them", "Reading the
+  endpoints as… is the way round it". The consumer list (brake, cap, drag,
+  recovery) omits the charge's `transfer` (`Tiers.lua:366`); the recovery
+  use goes with the DynamicRecovery ruling. — Keep: the span is
+  `RagdollBrakeArmorScale*`, inside the curve's 0.35 to 1.5, and a villager
+  (about 1.15) lands near but not at 1.
+- [ ] `:364-367` `ArmorStaminaAdd` — "It used to be a multiplier running 0.75
+  to 3.0…". — Cut. Keep the 50 derivation (villagers 5 to 7, mailed guards
+  45 to 65).
+- [ ] `:406-418` `ImpactDamageScale` — two `---` doc headers spliced; the
+  first names `ArmorStaminaScale`, which does not exist, and calls this "the
+  third of the three armor multipliers". — Delete the first block; keep the
+  weight-versus-`smash_def` sentence in the second.
+- [ ] `:423` formula omits `ImpactDamageArmorCurve` and the floor. — Give the
+  full expression.
+- [ ] `:427-431` — "Measured against the raw figure, a villager was already
+  taking 17 per cent off…". — Constraint only: clothing sums to 0.30 to
+  0.50 and is subtracted.
+- [ ] `:441-449` table — multipliers check out at scale 2.9, ignored 0.5,
+  curve 1. The hits column does not at gallop 111 ±15% on 100 health: heavy
+  mail (33.6) is 3 to 4, plate (22.3) 4 to 6. — Recompute with the
+  `Tiers.lua` health check, or drop the column.
+- [ ] `:473-497` inner comment — "measured on ordinary town guards it lands
+  between 0.08 and 0.19" contradicts the table (guard 0.52; it predates the
+  2.9 scale). "a man", "Before `ImpactDamageOwnsTheHit` handed…", "a gallop
+  now worth 111". — Keep: the curve exponent (1 is the plain hyperbola) and
+  the floor, 0.14 = the engine trample's mean 16 over 111; "they".
+- [ ] `:521-526` `BardingCoverage` — "barding's three effects are flat
+  additions and reductions"; `BardingDamageScale` is a multiplier. `if not
+  barding` (`:542`) can never be true. — Correct: force and stamina are
+  flat, damage is a multiplier on the victim's damage; delete the dead
+  check.
+- [ ] `:600-601` `BardingDamageScale` — "Damage is a number rather than a
+  picture, so a subtle change here is actually achievable, unlike
+  knockback". — Cut.
+- [ ] `:612-618` `BardingStaminaRelief` — "the half of barding a player
+  actually feels: one more guard ridden down…"; "the two surcharges" (the
+  combat surcharge and the armor one — name them). — Describe.
+- [ ] `:219-220`, `:233-234`, `:286-287`, `:299-300`, `:341-342`,
+  `:358-359`, `:507-508` — two blank lines between functions; the rest of
+  the file and the other modules use one. — One.
 
 ### Dead code (`tools/audit_code.py`)
 
