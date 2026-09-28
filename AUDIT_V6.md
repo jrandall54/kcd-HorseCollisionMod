@@ -5,6 +5,57 @@ Working document for the `audit/v6` branch. Deleted before the branch lands.
 Phase 1 records findings only. Phase 2 applies them in small batches, each
 checked off here with its commit.
 
+## Resuming
+
+Read this section first in a new session. It is updated and committed at the
+end of every pass, so it always says where the audit stands.
+
+**Phase:** 1, recording findings. No source file has been edited.
+
+**Method for one pass:** read the whole file; check every factual claim in a
+comment against the code it describes; record each problem under the file's
+heading in **Findings** as `:line` — problem — planned edit; anything that
+changes behavior or needs a decision goes in **Rulings needed** instead;
+update this section; commit as `docs(audit): record findings for <file>`.
+
+**Next pass:** `src/HorseCollisionMod/Armor.lua`.
+
+**Pass order** (dependencies first, then largest):
+
+- [x] `src/HorseCollisionMod.lua` (entry point)
+- [x] `src/HorseCollisionMod_Settings.lua`
+- [x] `src/HorseCollisionMod/Tiers.lua`
+- [ ] `Armor.lua`
+- [ ] `Reaction.lua`
+- [ ] `Rear.lua`
+- [ ] `Retaliation.lua`
+- [ ] `Bark.lua`
+- [ ] `Recovery.lua`
+- [ ] `Health.lua`
+- [ ] `Rider.lua`
+- [ ] `Sound.lua`
+- [ ] `Lean.lua`
+- [ ] `Update.lua`
+- [ ] `Marks.lua`
+- [ ] `Fear.lua`
+- [ ] `Crime.lua`
+- [ ] `Impact.lua`
+- [ ] `Log.lua`
+- [ ] `Tutorial.lua`
+- [ ] `Detection.lua`
+- [ ] `Enums.lua`
+- [ ] Documentation: `README`, `docs/*.md` except the diary
+- [ ] Tooling: `build.ps1`, `tools/`, `.claude/` hooks and linter
+
+**Carried forward:** findings in one file that point into a file not yet
+audited are listed here, so its pass picks them up.
+
+- `Sound.lua:240` — the crack comment says "gallop only"; the code plays it
+  on gallop and charge.
+- `Marks.lua` — check the dust comments against the vertical-speed test.
+- `Reaction.lua:541-790` — the cap and rail comments carry measurements and
+  history (seen while checking `Tiers.lua`).
+
 ## Standard
 
 Measured against `.claude/STYLE.md`, plus these rules from the research pass:
