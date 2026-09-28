@@ -18,7 +18,11 @@ heading in **Findings** as `:line` — problem — planned edit; anything that
 changes behavior or needs a decision goes in **Rulings needed** instead;
 update this section; commit as `docs(audit): record findings for <file>`.
 
-**Next pass:** `src/HorseCollisionMod/Retaliation.lua`.
+**Decisions are deferred.** Nothing in phase 1 waits on a ruling. Anything
+needing one is recorded under **Rulings needed** with a proposal, and the
+passes continue. Rulings are made together once phase 1 is complete.
+
+**Next pass:** `src/HorseCollisionMod/Bark.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -28,7 +32,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 - [x] `Armor.lua`
 - [x] `Reaction.lua`
 - [x] `Rear.lua`
-- [ ] `Retaliation.lua`
+- [x] `Retaliation.lua`
 - [ ] `Bark.lua`
 - [ ] `Recovery.lua`
 - [ ] `Health.lua`
@@ -121,6 +125,20 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `UpdateMoveCooldowns` only asks `now < nextAt`, so the icon can stay up
   while the move is available. Proposal: apply the same wind-back test in
   `UpdateMoveCooldowns`, or clear both clocks on load.
+
+- [ ] **`CatchYieldImmediately`.** A module constant fixed at `false`
+  (`HorseCollisionMod.lua:1547`) with no setting, so the yield branch in
+  `WatchRetaliation` (`Retaliation.lua:414-425`), `sawYield`, `caught` and
+  `SendStandDown`, whose only caller is that branch, never run. Proposal:
+  delete them.
+
+- [ ] **The pull-down target probe.** `PullRiderDown` asks
+  `CanHorsePullDown` for both the player and the horse "until one of them is
+  shown to be the right one" (`Retaliation.lua:1190-1192`), and computes
+  horse-to-victim angles every poll for the log line alone, whether or not
+  telemetry is on (`:1203-1242`). Proposal: settle the target from the
+  diary's pull-down rides, keep that one, and delete the second query and
+  the angle tracking.
 
 ## Findings
 
@@ -803,6 +821,113 @@ say the opposite, and `RearCharging` is cleared by `WatchLunge`, not
   `RearRequested` say which gate refused.
 - [ ] Settings `:269` `RearChargeWindowMs` — "how long a charge counts as a
   gallop"; it is the ceiling on `RearCharging`. — Correct.
+
+### src/HorseCollisionMod/Retaliation.lua
+
+File-wide: "the rider" is used throughout for the player (`:46`, `:483`,
+`:509`, `:580`, `:583`, `:688`, `:862`, `:871`, `:888`, `:939-951`,
+`:1043-1048`, `:1079-1101`). — "the player". "he/him" for a fighting
+victim is accurate (only men reach the fight branch) and stays.
+
+- [ ] `:17-22` — the `q_ledecko` and `q_hareHunt` examples justify the
+  method by precedent. — Keep one clause: vanilla quests set context options
+  the same way.
+- [ ] `:44-49`, `:129-136` — the guard behavior is explained twice; the
+  second adds "An earlier revision gated soldiers out; the gate was wrong
+  and has been removed." — Keep it once, in `CanRetaliate`; cut the
+  history.
+- [ ] `:51-73`, `:118-122` — the gender routing is explained twice; `:68-73`
+  carries a survey ("twenty one NPCs in Rattay", the morale ranges) and
+  "the honest implementation, not a shortcut". — Keep once in the header:
+  the combat tree tests gender, not morale, so the mod routes on gender.
+  Move the survey to the diary if absent.
+- [ ] `:77-78` — no blank line or `---` between `@release` and the
+  `RetaliationOption` doc (same LDoc fold as `Armor.lua`). — Separate.
+- [ ] `:94-95` — "Confirmed against telemetry rather than assumed". — "The
+  values `GetGender` returns."
+- [ ] `:138-141` — "if the distinction is ever wanted" is speculative. —
+  "Read for the log only."
+- [ ] `:183-184` — "this morning… today's ride" anecdote. — Cut.
+- [ ] `:213-214` — "The first contact is always free" holds only while
+  `RetaliationFreeBumps` is at least 1. — "Contacts up to
+  `RetaliationFreeBumps` are free."
+- [ ] `:279-281` — "the `Retaliation` line above" refers to a log line in
+  another function. — Name it: the `Retaliation` telemetry line.
+- [ ] `:328-329`, `:341-343` `IsStillFighting` — "observed on a guard
+  closing to two meters"; "An earlier design classified running
+  separately… fired in none of six incidents". — Cut both.
+- [ ] `:366-369` — "it always arrives": `ReleaseWhenFighting` (`:279-281`)
+  logs a victim who never reaches the fight as the case to watch for. —
+  Drop the claim; state that `alwaysFightWhenHit` removes the morale test.
+- [ ] `:372-373` — "in six measured incidents it was never reached". — Cut.
+- [ ] `:481-500` `RepairVictim` — "which is what made this hard to see",
+  "bought five seconds", "That is why an earlier reading of this called
+  reputation irrelevant", "stood at a meter and a half for twelve
+  seconds". — Keep: the flee in progress and the relationship are separate;
+  a stand-down stops the first, raising the relationship changes the next
+  decision.
+- [ ] `:513-523` — "in a measured sweep" and the argument list tried. —
+  Keep: `surrender_step` moves a fixed `RepairStepValue` whatever its
+  argument, caps at 0.8430, and does not read back in the same frame.
+- [ ] `:568-589`, `:834` — the `EndRetaliation` doc comment is separated
+  from its function by `ShowSurrenderHint`; LDoc attaches both blocks to
+  `ShowSurrenderHint`, and `EndRetaliation` is undocumented. — Move the
+  block to `:834`.
+- [ ] `:590-610` `ShowSurrenderHint` — "Nothing told the player so… the
+  option existed and was invisible". Missing `@tparam npc`. — Keep: a
+  provoked fight does not trigger vanilla's hint. Add the param.
+- [ ] `:651-656` — "measured as the prompt appearing correctly, then
+  disappearing". — Keep: leaving the saddle swaps the action map and drops
+  the hint, so it is re-asserted on an interval.
+- [ ] `:686-691` — "Hanging the prompt on that took it down a second after
+  it appeared"; says `EndRetaliation` fires when the player is pulled off
+  the horse, which `:840-843` says no longer happens (the watcher requires a
+  seen fight). — Keep: the prompt follows `IsInCombatDanger`, which is when
+  a surrender is possible. Drop the claim about `EndRetaliation`.
+- [ ] `:709-714` — "needs six quiet passes… five or six seconds":
+  `SurrenderHintCalmPasses` ships 3. "Measured after a beggar was reared to
+  death, and newly reachable because the rear can now kill". — Cut; the
+  constraint is `:704-707`.
+- [ ] `:736`, `:1059` — log lines not gated on `LogTelemetry`, unlike every
+  other line here. — Gate them.
+- [ ] `:762-766` — "after the action map change wiped the hint… stayed gone
+  for the rest of the fight". — Keep: re-showing an id the HUD believes is
+  displayed does nothing, so it is hidden first.
+- [ ] `:786-787` `SurrenderIsTheGames` — "the same source the retaliation
+  answer uses, so the two cannot disagree about who is a soldier":
+  `CanRetaliate` reads social class for the log only and does not decide on
+  it. — Cut the sentence.
+- [ ] `:840-843` — "no longer reads" is a timeless word. — "does not read".
+- [ ] `:865-872` — two contradictory comments spliced: "Sent on every
+  ending" and "The stand-down is deliberately not sent here"; the code sends
+  none. "measured at 0.737". — Keep the second.
+- [ ] `:884-904` `WatchAftermath` — "One measured victim was repaired…",
+  "Measured on one beggar, one build… fourteen seconds… forty seconds". —
+  Keep: the repair is re-run after `AftermathSettleMs` because the player
+  may keep hitting the victim; a flee ends at `fleeFromNPCParams.distance`
+  (150); a stand-down would stop it but holds the victim about 25 s.
+- [ ] `:939-951` — "Measured at 1.93 m/s against a threshold of 1.8… on a
+  rider who had shoved one merchant". — Keep: detection cannot tell who
+  closed the distance, so no one new is provoked while the player is in
+  combat.
+- [ ] `:1038-1057` — two comment blocks spliced with no break (offense
+  order, then the soldier hint). "which is the whole of what a provoked
+  victim did before it existed", "is what made him punch the horse",
+  "Reproducible every time", "The mod's own documentation already
+  records…". The soldier-hint reason repeats `:782-784`. — Split; keep the
+  pull-then-fight order as a constraint; for the hint, refer to
+  `SurrenderIsTheGames`.
+- [ ] `:1086-1089` — "with a Z angle and a zero angle alongside it" is
+  unclear. — Name the cvars or cut.
+- [ ] `:1093-1094` — "as it did before". — "without the pull".
+- [ ] `:1133` — `local mounted` shadows the outer `mounted` at `:1106`. —
+  Rename.
+- [ ] `:1143-1145` — "one merchant gets the pull within a second and another
+  never gets it". — Cut; the log line speaks for itself.
+- [ ] `:1257-1264` — "Measured on one merchant across 32 polls…", "Whether
+  the request is honoured anyway is a separate question"; "honoured". —
+  Keep: `CanHorsePullDown` returns 2 enabled, 1 disabled, 0 not applicable;
+  `PullDownForce` requests regardless.
 
 ### Dead code (`tools/audit_code.py`)
 
