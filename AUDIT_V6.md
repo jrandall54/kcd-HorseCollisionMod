@@ -12,6 +12,9 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
+**Current status:** Bark.lua has been read (1243 lines). Findings drafted but
+not yet committed. Ready to record findings and continue to next file.
+
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
 heading in **Findings** as `:line` — problem — planned edit; anything that
@@ -22,7 +25,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `src/HorseCollisionMod/Bark.lua`.
+**Next pass:** Record Bark.lua findings, then continue with `Recovery.lua`.
 
 **Pass order** (dependencies first, then largest):
 
