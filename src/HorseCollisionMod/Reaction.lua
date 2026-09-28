@@ -90,9 +90,16 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	local action = prefix .. side
 
 
-	-- Gender is logged because the female animation set has no
-	-- AnimationControlled fragment, so female victims accept the call and
-	-- play nothing. Without this the misses look random.
+	-- Gender is logged because the two character sets resolve this call through
+	-- separate databases, so a reaction can work on one and not the other and
+	-- the misses look random without it.
+	--
+	-- This used to say the women had no AnimationControlled fragment at all and
+	-- could never play a reaction. That was true, but it was this mod's own
+	-- doing: it shipped a copy of `wh_female_fragmentids.xml` taken from the
+	-- 2018 game, which is the version where the declaration is absent, and the
+	-- copy overrode the patched file that has it. The women have had the
+	-- fragment, and a scope for it, since patch 1.9.
 	local gender = "?"
 
 	pcall(function()

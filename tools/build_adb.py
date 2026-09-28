@@ -790,7 +790,7 @@ def write_shared_tags(nl):
 #
 # It was never needed. Patch 1.9 declares the fragment itself, with the same
 # subTagDef this mod uses, and `wh_female_controllerdefs.xml` gives it
-# `scopes="FullBody+HoldItem+Looking"` — a scope the mod never shipped for the
+# `scopes="FullBody+HoldItem+Looking"`, a scope the mod never shipped for the
 # women, so its female reactions could not have played even when the file was
 # doing its job. The check that would have caught this was already written into
 # the function, raising "the female fragment ids already declare it; this patch

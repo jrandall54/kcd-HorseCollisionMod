@@ -132,7 +132,7 @@ Anything copied out of the game must be read from `Data/patch/`, never from
 `Data/Animations-part1.pak` alone. That pak is the game as released in February
 2018, and the patches replace whole files on top of it. `read_vanilla` in
 `tools/build_adb.py` collects every pak holding an entry and takes the last in
-the engine's own open order — base paks, then `Data/patch/` ascending — which is
+the engine's own open order: base paks, then `Data/patch/` ascending, which is
 the copy the running game serves.
 
 This is not a hypothetical. The generator read only the launch pak, and two
@@ -152,8 +152,8 @@ Matching an entry name needs care, because the paks do not agree on how they
 spell one. Launch and the patches to 1.7 use `Animations/Mannequin/ADB/...`; 1.8
 onward store the path lowercased; some use backslashes. A case-sensitive match
 finds the entry in the old paks, misses every modern one, and falls back to an
-older pak without saying so — the first version of `read_vanilla` silently
-resolved to 1.7.1b and looked correct. `pak_key` normalises both.
+older pak without saying so. The first version of `read_vanilla` silently
+resolved to 1.7.1b and looked correct. `pak_key` normalizes both.
 
 ## Pak packaging
 

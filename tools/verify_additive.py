@@ -267,9 +267,9 @@ def main():
 
         refs = set(re.findall(r'(?:File|filename|subTagDef)="([^"]+)"',
                               parent + ids))
-        # `vanilla_names` holds normalised keys, because the paks disagree on
+        # `vanilla_names` holds normalized keys, because the paks disagree on
         # both the separator and the case of an entry name, so a reference has
-        # to be normalised the same way before it is looked up.
+        # to be normalized the same way before it is looked up.
         unresolved = [r for r in refs
                       if r not in shipped
                       and build_adb.pak_key(r) not in vanilla_names]

@@ -22498,14 +22498,71 @@ and a manifest-truncation bug in the second park run were found; both fixed.
 the herb, and confirmed Henry's collision reactions still work after the male
 database was regenerated from a different pak than before.
 
-**Not yet verified**: whether women now visibly react to being ridden down.
-The mechanism is in place for the first time — the patched controller def
-supplies the scope the mod never shipped, and the parent database carries the
-mod's 17 options — but no ride has confirmed it, so it is not claimed in the
-changelog.
+Female reactions are treated as confirmed on the strength of that same ride:
+the rider rode people down and reported everything working. It was not a ride
+aimed at female victims specifically, and that is worth knowing if the question
+ever comes back, but the mechanism is in place for the first time — the patched
+controller def supplies the scope the mod never shipped, and the parent database
+carries the mod's 17 options.
 
 **Thoughts & Conclusions**: The rule to carry forward is that a vanilla file
 small enough to own is a list of names, and anything larger is the game's own
 data. `kcd_animationControlledTags.xml` is 1 KB and no patch has ever rewritten
 it. `wh_female_fragmentids.xml` was 20 KB and every patch rewrites it. Size was
 the available signal and it was there from the start.
+
+---
+
+## A Woman's Lot compatibility: Theresa cannot ride, so the mod must only be inert
+
+Asked after the herb fix: is the DLC where Theresa is the player compatible with
+this mod, and can she ride a horse at all.
+
+**She cannot ride, and it is structural.** The female animation set has 379
+fragment ids in patch 1.9 and **not one** of them is riding related. The male set
+has 763 and carries nineteen: `Mount`, `Dismount`, `HorseRear`, `HorseFastStop`,
+`HorseMaintenance`, `HorseCombatIdle`, `HorseCombatAttack`, `HorseCombatMovement`,
+`HorseRiderGestures`, `HorseFall`, `HorsePetting`, `HorseFeeding`,
+`HorseHoofCleaning` and the rest. There is no animation for a woman on a horse,
+so this is not a rule that could be lifted by a setting. The
+[fandom wiki page for A Woman's Lot](https://kingdom-come-deliverance.fandom.com/wiki/A_Woman%27s_Lot)
+says the same, independently.
+
+Her quests confirm it. The only genuine horse reference across all fourteen
+`q_theresa_*.xml` files in `Scripts_DLC4.pak` is
+`$t_leaveLevel_params.distanceMove_params.forceUseHorse = true` inside a
+behaviour tree named `rapota_leaveLevel` — an NPC riding out of the level, not
+the player. Every other apparent hit is the word "Amount".
+
+Worth knowing: she plays in `rataje_dlc4`, a full copy of the open world, so
+horses exist around her. She simply cannot get on one.
+
+**So compatibility means the mod is inert and harmless, never that it works.**
+Audited, and it already is:
+
+- `Update.lua` returns at the mount check before touching anything, and every
+  horse call in the mod is inside a `pcall`.
+- `CheckMountTutorials` only runs once `isMounted` has become true, so she sees
+  no riding tutorials.
+- `AutoGrantPerks` defaults to `false`, so she is not given horse perks.
+- `hcm_actionmaps.xml` declares its own `hcm_rear` action map rather than
+  overriding vanilla's bindings, and every handler behind those keys is gated on
+  `IsMounted`. No key is taken from her.
+- No Lua error from the mod appears anywhere in the logs of the sessions spent in
+  her level, before or after the fix.
+
+**The one thing left touching her** is `PlayerFemale` in
+`HorseCollisionMod.AnimationDatabases`, which points her animation database at
+the mod's parent file. The mod never plays a fragment on the player: every
+`StartInteractiveActionByName` call goes to `npc.actor` or `horseEnt.actor`, and
+the only player-directed calls are `playerEnt.actor:Fall` and `SetViewShake`,
+neither of which reads an animation database. `git log -S PlayerFemale` shows it
+arrived in `b887f1e` as part of a blanket sweep of "seven human entity classes"
+when the additive layout was built, and the comment beside it records that
+redirecting `Player` was what made the mod's files load and *hid* a fault rather
+than fixing one. So both player entries look like completeness rather than
+function, and removing them would take the mod out of the player's animation
+stack entirely.
+
+That is a design change beyond the bug, so it is the rider's call and is recorded
+here rather than made.

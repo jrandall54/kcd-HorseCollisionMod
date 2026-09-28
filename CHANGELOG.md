@@ -42,6 +42,8 @@ number.
 - **Women can open doors and gates again.** The mod's female animation file was
   also built from the 2018 game, which cost every woman the mod affects her 25
   door and gate animations.
+- **Women react to being ridden down.** Their reactions could never play before,
+  for the same reason.
 
 ## [5.31.1] - 2026-09-24
 
