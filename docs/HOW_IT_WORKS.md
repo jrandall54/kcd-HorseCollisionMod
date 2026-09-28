@@ -303,16 +303,24 @@ The 5.5 MB database is never copied and never replaced. The mod's own file is
 
 ## What the mod does still replace
 
-Two small declaration files:
+One small declaration file:
 
 | File | Size | Why |
 | --- | --- | --- |
-| `kcd_animationControlledTags.xml` | 1 KB | Lists the names an option may use, and the four new names have to be declared where the game looks. |
-| `wh_female_fragmentids.xml` | 14 KB | Female characters have the same animations but no `AnimationControlled` list, so one has to be declared. |
+| `kcd_animationControlledTags.xml` | 1 KB | Lists the names an option may use, and the new names have to be declared where the game looks. |
 
-If another mod replaces one of these, whichever loads later wins, as with any
-file conflict in KCD. The loss is 15 KB of declarations rather than a whole
-animation set, and it can be reconciled by hand.
+If another mod replaces it, whichever loads later wins, as with any file
+conflict in KCD. The loss is 1 KB of declarations rather than a whole animation
+set, and it can be reconciled by hand.
+
+`wh_female_fragmentids.xml` was in this list and is not any more. It was a 14 KB
+copy of the game's female animation index, and unlike the tag file above, the
+game rewrites that index with every patch. The copy that shipped came from the
+game as released in February 2018, so installing the mod removed 103 animations
+from every female character. The game has declared what the mod wanted from that
+file since patch 1.9, so the mod no longer ships it at all. The size is the
+signal worth remembering: a file small enough to own is a list of names, and a
+file this large is the game's own data.
 
 ## Verifying it
 

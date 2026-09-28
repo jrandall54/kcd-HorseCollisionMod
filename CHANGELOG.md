@@ -30,6 +30,19 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+- **Playing as a woman no longer breaks.** The mod shipped a copy of the game's
+  female animation index, and the copy was taken from the game as it was in
+  February 2018. Installing it removed 103 animations from every female
+  character. Picking a herb as Theresa in A Woman's Lot locked the game with no
+  way to move or open the menu, and fighting, lockpicking, drawing a weapon,
+  using a bow, dragging a body and several Woman's Lot quest scenes were broken
+  the same way. The mod no longer ships that file; the game already provides
+  everything the mod needed from it.
+- **Women can open doors and gates again.** The mod's female animation file was
+  also built from the 2018 game, which cost every woman the mod affects her 25
+  door and gate animations.
+
 ## [5.31.1] - 2026-09-24
 
 ### Changed

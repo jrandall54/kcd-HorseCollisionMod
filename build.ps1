@@ -459,16 +459,21 @@ if (Test-Path $srcLibs) {
 # whole arrangement without changing anything this build prints.
 $adb = "$buildDir\pak\Animations\Mannequin\ADB"
 
-# The exact file set the mod ships. Two of these carry vanilla names on
+# The exact file set the mod ships. Three of these carry vanilla names on
 # purpose: they are small declaration files, and owning them is far cheaper
 # than the alternative of restating 123 KB of fragment and controller
 # definitions under mod names, which put this mod in the resolution path of
 # every human animation and broke unrelated ones. See TECHNICAL_DETAILS.md.
+#
+# `wh_female_fragmentids.xml` was in this list and must never come back. It is
+# not a small declaration file: it is a 20 KB copy of a file the patches rewrite,
+# and the copy that shipped was the launch one, so it deleted 103 fragment ids
+# from every female character, `PickingHerbs` among them. Patch 1.9 declares
+# what the mod wanted from it anyway. See the note in tools/build_adb.py.
 $required = @(
     "$adb\hcm_male_database.adb",
     "$adb\hcm_female_database.adb",
     "$adb\kcd_animationControlledTags.xml",
-    "$adb\wh_female_fragmentids.xml",
     "$adb\hcm_horse_database.adb",
     "$adb\kcd_horse_fragmentids.xml",
     "$adb\kcd_horse_controllerdefs.xml"
