@@ -7,6 +7,12 @@
 -- and the charge keeps its corridor; this file owns the wider ground outside
 -- both: the people close enough to be frightened and far enough not to be hit.
 --
+-- The trot and the gallop have no band, and that is deliberate. An impact
+-- that wounds is charged as an assault through `combat:hit` when
+-- `CollisionIsCrime` is on, and vanilla's witnesses already react to that.
+-- Fear covers the one case nothing else does: a move aimed at somebody that
+-- hits nobody, which only the rear and the charge can produce.
+--
 -- Nothing here decides who runs. The stimulus the band sends is vanilla's own
 -- `combat:stimulus:hostilePerception`, the message an NPC's brain receives
 -- when it perceives somebody it reads as a threat, and the brain then makes

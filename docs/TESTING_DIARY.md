@@ -22607,3 +22607,24 @@ is a vanilla unit-test entity failing at startup.
 One correction to how the tests were first framed: the gallop and the charge
 ragdoll and read no animation database. The tiers that exercise the redirect are
 walk (stagger), trot and rear (fall).
+
+## Stage 3, fear: settled at the desk, no ride
+
+The balance audit scheduled fear to take the tier-table shape and asked which
+tiers should have a fear band. The rider's ruling: crime ships on by default, so
+every wounding impact already sends a real `combat:hit` attributed to the player
+(`Crime.lua`, `SendCombatHit`), and vanilla's witnesses react to that assault on
+their own. A fear band on the trot or the gallop would stack a second reaction on
+top of it.
+
+Fear therefore covers only the near miss, which only the rear and the charge
+produce. The loose per-move settings stay as they are; a tier table would carry
+three empty rows. Recorded in `Fear.lua`, the audit's section 3.4, and
+`ROADMAP.md` item 2, which now covers only a charge breaking a line and a braced
+polearm stopping one.
+
+Recovery is withdrawn from the balance pass. The get-up is the global cvar
+`wh_rd_StillDuration`, which the mod deliberately never sets per impact.
+
+No code changed, so there was nothing to ride.
+

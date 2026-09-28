@@ -222,6 +222,15 @@ adopted the tier-table shape `Tiers.lua` exists to enforce. It shipped in 5.25.0
 and 5.26.0, after the roadmap entry that scheduled it *after* the balance pass,
 so `ROADMAP.md` item 2 is stale.
 
+**Resolved in Stage 3: fear stays with the rear and the charge.** Fear is for the
+near miss, where nobody is hit. An impact that wounds sends a real `combat:hit`
+attributed to the player whenever `CollisionIsCrime` is on, which is the shipped
+default, and vanilla's own witness reaction frightens the onlookers of that
+assault. A fear band on the trot or the gallop would stack a second reaction on
+the one vanilla already runs. Only the commanded moves can miss someone they were
+aimed at, so only they have a band. The settings stay per move rather than
+becoming tier tables, because three of the five rows would be empty.
+
 ### 3.5 The horse's stamina modifiers span 100x and drown the tier
 
 `cost = base x combat x victimArmor x barding x horsemanship`, all multiplicative
@@ -496,8 +505,9 @@ changes an input to a stage already finished.
 4. **Throw and armor separation.** The brake, the speed cap and the air damping
    against the normalized armor factor from Stage 0. Includes the charge's throw
    distance, reported as too far.
-5. **Recovery.** How long each tier keeps someone down, now that the damage and
-   the throw are settled.
+5. **Recovery. Withdrawn.** The get-up is the global cvar `wh_rd_StillDuration`,
+   which the mod deliberately does not set per impact, so there is no per-tier
+   recovery to tune.
 6. **Horse stamina.** Last, because its inputs are all decided elsewhere.
 7. **Cosmetics.** Dust, dirt, blood, camera shake, blur, ordered against the
    final tier severity, judged by eye.
