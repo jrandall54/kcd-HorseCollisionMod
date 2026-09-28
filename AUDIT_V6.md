@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Health.lua findings recorded and committed.
+**Current status:** Rider.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Rider.lua`.
+**Next pass:** `Sound.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -38,7 +38,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Bark.lua`
 - [x] `Recovery.lua`
 - [x] `Health.lua`
-- [ ] `Rider.lua`
+- [x] `Rider.lua`
 - [ ] `Sound.lua`
 - [ ] `Lean.lua`
 - [ ] `Update.lua`
@@ -66,6 +66,9 @@ audited are listed here, so its pass picks them up.
 - `Impact.lua:218-223` — the comment on deferring `SendCombatHit` ("it
   perfectly overrides the casual recovery dialogue") is in another register;
   its `WhenVictimRises` depends on the early-return ruling.
+- `Impact.lua:51`, `:124-127` — `IsCombatCollision` returns the same value
+  twice; the comment contrasts `playerInDanger` with "the combined signal",
+  which no longer exists. Follows the Rider finding.
 - `Impact.lua:251` — ignores `ApplyImpactDamage`'s return value, which the
   Health findings remove.
 
@@ -1317,6 +1320,86 @@ victim is accurate (only men reach the fight branch) and stays.
 - [ ] `HorseCollisionMod.lua:421-424` `@field ImpactDamageDelayMs` —
   describes the wait before charging; the setting only times the test
   subject's restore (the settings file, `:663-665`, says so). — Correct.
+
+### src/HorseCollisionMod/Rider.lua
+
+- [ ] `:1-18` header — "every impact at trot or gallop draws horse
+  stamina"; the rear and the charge draw it too, the walk does not. The
+  file also holds the camera shake, the blur, the bolt and `GrantPerks`.
+  "offence" (British). No `@release`, unlike the other modules. — List the
+  parts; "offense"; add `@release`.
+- [ ] `:17-19` — the module block runs straight into `IsCombatCollision`
+  with no break, so LDoc attaches the module doc to the function, which has
+  none of its own. — Separate; give it a doc naming its three returns.
+- [ ] `:40-54` — "used to count as well", "Measured… cost 103 stamina", "The
+  signal never earned its place… no longer decides anything". — Keep: the
+  player's combat state decides; the victim's drawn weapon is logged only,
+  because guards patrol armed.
+- [ ] `:55` — returns `danger` twice; `Impact.lua:51` names the first
+  `isCombat` and the third `playerInDanger`, which are the same value. —
+  Return two values; carried to `Impact.lua`.
+- [ ] `:171` — `IsCombatCollision(nil)` runs the armed test on nil and logs
+  nothing with the detail. — Harmless in the pcall; if the two-value change
+  goes in, add a player-only query or say the npc is optional.
+- [ ] `:60-66` `ThrowRider` — "which is what earlier builds did". — Cut.
+- [ ] `:73-82` — the fallbacks exist "in case a different mount type
+  differs", and the preference order is iterated with `pairs`. — `ipairs`;
+  one line on the order.
+- [ ] `:108-113` `DrainImpactStamina` — "They did not before… levelling".
+  `:123-127` "puts a gallop anywhere between 14.85 and 1452", "The tier
+  separation the rider tunes". — Keep the formula, the additive shape and
+  the 0.38 worst case (checked: 0.20 + 0.13 + 0.05); cut the history.
+- [ ] `:138` `@tparam tierName` — lists five tiers by hand. — "an impact
+  tier name".
+- [ ] `:232-235` `DrainHorseStamina` — says `DealDamage` takes
+  `(stamina, health, attacker, ...)`; `Health.lua:377-381` says it takes two
+  arguments and discards the rest (`C_ScriptBindSoul`). Double spaces
+  around the dashes. — Match `Health.lua`; stamina first is the point.
+- [ ] `:280-283` — "which was measured: two saves in a row at 0.0 stamina".
+  — Keep: the seat is rolled only on the impact that empties the horse.
+- [ ] `:305-317` `ShakeRiderCamera` — "on a gallop impact"; "A trot gets a
+  fraction… through `CameraShakeTrotScale`", which does not exist; the
+  scale is `CameraShakeByTier`. "Half a ton of horse". `@tparam tierName`
+  names three tiers. — Correct to the tier table.
+- [ ] `:359` — `cfg.LeanSuppressShake ~= false`; the setting is declared, so
+  the test is a truthiness check. — `cfg.LeanSuppressShake`.
+- [ ] `:377-385` — `(cfg.CameraShakeAngle)`, `(cfg.CameraShakeShift)`,
+  `(cfg.CameraShakeDurationSec)` in stray parentheses, the residue of
+  removed `or` defaults; `g_Deg2Rad or 0.0174532925` is a literal fallback.
+  The same at `:480`, `:491-494`, `:559`, `:702`. — Remove the parentheses;
+  `math.rad`, or name why the global may be absent.
+- [ ] `:409-427` `BlurRiderView` — "What was confirmed working in game, by
+  setting each and looking". — "These work:" and the table.
+- [ ] `:437-442`, `:535-538` — the 7.7 m / 4.6 m camera measurement twice.
+  — Keep it on `CameraIsFirstPerson` only.
+- [ ] `:444-453` — "Raising it from 0.9 to 1.3 to 2.0 produced the same
+  picture three times", "raising the amount alone stopped helping well
+  before it read". — Keep: the amount has no effect past about 1.0, so
+  weight comes from the hold and the chroma layer.
+- [ ] `:469-472` — "They came apart in tuning". — Keep: strength and
+  length are separate because a trot keeps the strength and cuts the length.
+- [ ] `:492` — divides by `RiderBlurSteps`; 0 in the settings file gives an
+  infinite interval and no clearing write, leaving the screen blurred,
+  which `:455-457` says must never happen. — Floor at 1.
+- [ ] `:562-595` `BoltHorse` — "### Why this is a chance and not a health
+  system" is removal history; "how the 2.0.0-dev1 bug behaved when it
+  charged 25 health an impact by mistake". — Cut the first section; keep:
+  `hostilePerception` cannot reach the player's horse, whose combat subbrain
+  is a bare `Wait`; emptying its health throws the rider and sends it off,
+  and the health is restored after `HorseBoltRestoreMs`.
+- [ ] `:624` — `DealDamage(0, before, nil, true)`: per `Health.lua` the last
+  two arguments are discarded. — Two arguments.
+- [ ] `:691-696` `HorsemanshipScale` — "Two curved shapes do not work, both
+  measured in game". — Keep: linear, so each level is worth the same.
+- [ ] `:707-729` `GrantPerks` — three perk GUIDs as bare literals, copies of
+  `perk__horsecollisionmod.xml`; `local player = player or (type(g_localActor)
+  == "userdata" and g_localActor)` shadows the global, and nowhere else in
+  the mod falls back to `g_localActor`. No `@` tags. The doc says "on
+  startup or settings apply"; the callers are `HorseCollisionMod.lua:1709`
+  and `:1933`. — Name the perks (a table with the perk names beside the
+  ids); use `player` as the rest of the mod does; check with
+  `build.ps1` that the ids match the table.
+- [ ] `:730` — trailing blank line at end of file. — Remove.
 
 ### Dead code (`tools/audit_code.py`)
 
