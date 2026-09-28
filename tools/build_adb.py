@@ -45,6 +45,7 @@ TESTING_DIARY.md, builds 2.0.1-dev.15 through 2.1.0.
 Run: python tools/build_adb.py
 """
 
+import glob
 import io
 import os
 import re
@@ -526,6 +527,88 @@ def read_pak_entry(pak, entry):
     return zlib.decompress(blob, -15)
 
 
+# Every pak the game reads vanilla data out of, lowest priority first.
+#
+# This exists because reading `Data/Animations-part1.pak` alone is reading the
+# game as it shipped in February 2018, and that is not the game anyone runs.
+# The patches in `Data/patch/` replace whole files, and `wh_female_fragmentids.xml`
+# grew from 277 fragment ids at launch to 379 by 1.9. A mod that copied the
+# launch file and shipped it under vanilla's name deleted 103 fragments from
+# every female character, among them `PickingHerbs`, which is how a player
+# reported being locked in place picking a herb as Theresa in Woman's Lot.
+#
+# The order is the engine's own, read off its log rather than guessed: the base
+# paks in `Data/` are opened first, then `Data/patch/` in ascending name order,
+# and a later pak wins. So the last pak in this list that holds an entry is the
+# one the game actually serves.
+PATCH_RELATIVE = os.path.join("Data", "patch")
+
+
+def vanilla_paks():
+    """Returns every candidate pak, lowest priority first."""
+    base = sorted(glob.glob(os.path.join(GAME_ROOT, "Data", "*.pak")))
+    patches = sorted(glob.glob(os.path.join(GAME_ROOT, PATCH_RELATIVE, "*.pak")))
+
+    return base + patches
+
+
+_PAK_ENTRIES = {}
+
+
+def pak_key(name):
+    """Normalises a pak entry name so the same file matches across paks.
+
+    Paks are not consistent about how they spell an entry. The launch paks and
+    the patches up to 1.7 use `Animations/Mannequin/ADB/...`; 1.8 onward store
+    the whole path lowercased. Some store backslashes. A literal match therefore
+    finds an entry in the old paks and misses it in every modern one, and a
+    resolver that misses the highest patch falls back to a lower one without
+    saying so — which is this bug over again, one layer up. It happened during
+    this fix: the first version of the resolver silently picked 1.7.1b.
+    """
+    return name.replace("\\", "/").lower()
+
+
+def pak_entries(pak):
+    """Cached {normalised name: name as stored} for one pak.
+
+    A pak that cannot be opened raises rather than resolving to nothing: an
+    empty table would drop that pak out of the priority order in silence, which
+    is the failure this whole mechanism exists to prevent.
+    """
+    if pak not in _PAK_ENTRIES:
+        table = {}
+
+        with zipfile.ZipFile(pak) as archive:
+            for name in archive.namelist():
+                table[pak_key(name)] = name
+
+        _PAK_ENTRIES[pak] = table
+
+    return _PAK_ENTRIES[pak]
+
+
+def read_vanilla(entry):
+    """Reads a vanilla entry from the pak the running game would serve it from.
+
+    Returns (bytes, label), where the label names the winning pak so the build
+    output says which version of the game each generated file was derived from.
+    Silent version skew is the whole failure this guards against, so it is
+    printed rather than merely resolved.
+    """
+    key = pak_key(entry)
+    holders = [p for p in vanilla_paks() if key in pak_entries(p)]
+
+    if not holders:
+        raise SystemExit("no pak under %s holds %s" % (GAME_ROOT, entry))
+
+    winner = holders[-1]
+    stored = pak_entries(winner)[key]
+
+    return (read_pak_entry(winner, stored),
+            os.path.relpath(winner, GAME_ROOT))
+
+
 def newline_of(text):
     if "\r\n" in text:
         return "\r\n"
@@ -660,7 +743,8 @@ def write_shared_tags(nl):
     the whole fragment and controller definitions, and it leaves every
     unrelated animation on vanilla's own path.
     """
-    raw = read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace")
+    blob, source = read_vanilla(TAGS_ENTRY)
+    raw = blob.decode("ascii", "replace")
 
     group = ['    <Group name="HcmReaction">']
     group += ['      <Tag name="%s" />' % tag for tag, _, _ in REACTIONS]
@@ -693,38 +777,38 @@ def write_shared_tags(nl):
     with io.open(out(name), "wb") as handle:
         handle.write(patched.encode("ascii"))
 
-    print("  tags   %s (%d B, %d vanilla + %d added)"
+    print("  tags   %s (%d B, %d vanilla + %d added) from %s"
           % (name, os.path.getsize(out(name)),
-             raw.count("<Tag "), len(REACTIONS) + len(HORSE_TAGS)))
+             raw.count("<Tag "), len(REACTIONS) + len(HORSE_TAGS), source))
 
 
-def write_female_declaration(paths, nl):
-    """Declares AnimationControlled for the women, who have no such fragment.
-
-    Also under vanilla's name. The men already declare it and need no change
-    here at all.
-    """
-    ids = read_pak_entry(PAK, paths["ids"]).decode("ascii", "replace")
-
-    if "AnimationControlled" in ids:
-        raise SystemExit("the female fragment ids already declare it; "
-                         "this patch is no longer needed")
-
-    declaration = ('    <Tag name="AnimationControlled" subTagDef="%s" />'
-                   % TAGS_ENTRY)
-    anchor = nl + "  </Tags>"
-    patched = ids.replace(anchor, nl + declaration + anchor, 1)
-
-    if patched == ids:
-        raise SystemExit("female fragment ids anchor not matched")
-
-    name = paths["ids"].rsplit("/", 1)[-1]
-
-    with io.open(out(name), "wb") as handle:
-        handle.write(patched.encode("ascii"))
-
-    print("  female %s (%d B, declares AnimationControlled)"
-          % (name, os.path.getsize(out(name))))
+# This generator used to write a third file: a copy of
+# `wh_female_fragmentids.xml` with `AnimationControlled` appended, because the
+# women had no such fragment and the mod's female reactions are options on it.
+#
+# It no longer does, for two reasons.
+#
+# It was never needed. Patch 1.9 declares the fragment itself, with the same
+# subTagDef this mod uses, and `wh_female_controllerdefs.xml` gives it
+# `scopes="FullBody+HoldItem+Looking"`, a scope the mod never shipped for the
+# women, so its female reactions could not have played even when the file was
+# doing its job. The check that would have caught this was already written into
+# the function, raising "the female fragment ids already declare it; this patch
+# is no longer needed"; it never fired only because the file was being read out
+# of the launch pak, where the declaration genuinely is absent.
+#
+# And it did real harm. The file it copied was the February 2018 one, 277
+# fragment ids against the 379 the running game has, so shipping it under
+# vanilla's name deleted 103 fragments from every female character: all of
+# combat, all of lockpicking, drawing and holstering a weapon, the whole bow
+# set, `Weeding`, `Sowing`, corpse dragging, stealth kills, NPC monologues, the
+# Woman's Lot quest sets, and `PickingHerbs`. A player reported the last of
+# those as being locked in place picking a herb as Theresa, which is what a
+# minigame waiting forever on a fragment that no longer exists looks like. The
+# engine says nothing: an unresolvable fragment is not an error.
+#
+# `read_vanilla` now resolves out of `Data/patch/`, so the same mistake in a
+# future file raises instead of shipping.
 
 
 def write_parent(gender, paths, nl):
@@ -738,7 +822,8 @@ def write_parent(gender, paths, nl):
     Everything else a human animates with is reached by reference, through a
     SubADB pointing at the untouched vanilla database inside its own pak.
     """
-    db = read_pak_entry(PAK, paths["db"]).decode("ascii", "replace")
+    blob, source = read_vanilla(paths["db"])
+    db = blob.decode("ascii", "replace")
 
     present = set(re.findall(r'<Animation name="([^"]*)"', db))
     wanted = reactions_for(gender)
@@ -785,12 +870,13 @@ def write_parent(gender, paths, nl):
     with io.open(out(name), "wb") as handle:
         handle.write(parent.encode("ascii"))
 
-    print("  %-6s %s (%d B, %d vanilla options + %d added)"
-          % (gender, name, os.path.getsize(out(name)), inherited, len(wanted)))
+    print("  %-6s %s (%d B, %d vanilla options + %d added) from %s"
+          % (gender, name, os.path.getsize(out(name)), inherited, len(wanted),
+             source))
 
 def write_additive():
     """Generates the whole layout."""
-    nl = newline_of(read_pak_entry(PAK, TAGS_ENTRY).decode("ascii", "replace"))
+    nl = newline_of(read_vanilla(TAGS_ENTRY)[0].decode("ascii", "replace"))
 
     print("Additive layout, %d options where the character set has the clip:"
           % len(REACTIONS))
@@ -799,7 +885,6 @@ def write_additive():
         write_parent(gender, paths, nl)
 
     write_shared_tags(nl)
-    write_female_declaration(GENDERS["female"], nl)
 
     for tag, clips, genders in REACTIONS:
         print("  + %-24s -> %-46s %s"
@@ -807,9 +892,13 @@ def write_additive():
 
     # A stale file here is still an override, and would quietly change which
     # chain entities resolve through.
+    #
+    # `wh_female_fragmentids.xml` is deliberately absent: it is no longer
+    # generated, so leaving it in this set would keep an already-installed copy
+    # alive forever. It stays in `generated` below, which is what licenses the
+    # sweep to delete it.
     keep = set(["hcm_male_database.adb", "hcm_female_database.adb",
-                TAGS_ENTRY.rsplit("/", 1)[-1],
-                GENDERS["female"]["ids"].rsplit("/", 1)[-1]])
+                TAGS_ENTRY.rsplit("/", 1)[-1]])
 
     # Only files this generator has produced before may be removed.
     #

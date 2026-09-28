@@ -22377,3 +22377,192 @@ blur read as faint on the ride. That was expected, not a fault.
 **Thoughts & Conclusions**: The rider accepted it: *"If everything is applied
 based on it's tier/scale then I think we are good."* Stage 2 is complete except
 step 5, Recovery, which is still disputed. Stage 3, fear, is next.
+
+---
+
+## Build 5.31.2: a player report — Theresa cannot pick herbs
+
+**The report**, from a comment on the mod's Nexus page, against the published
+4.2.2:
+
+> "For some bizarre reason, this mod blocks Theresa's herb-picking animation in
+> Woman's Lot, essentially locking the game in first person unable to move. I've
+> had this mod installed for 90 hours of playtime and it's worked just fine
+> except for that."
+
+Reproduced on the first attempt: 4.2.2 installed as a normal mod with the dev
+build parked, Theresa's save loaded, herb picked, player frozen. On a second run
+the menu would not open either, which is the tell — the herb gathering minigame
+had started and never ended.
+
+### What it was not
+
+Three hypotheses were wrong and are recorded so they are not tried again.
+
+- **Not a missing scope for the female `AnimationControlled` fragment.** The
+  first theory was that the mod declares that fragment for the women without the
+  controller def giving it a scope, so an interaction could start and never play.
+  Checked: vanilla's `AnimationControlled` options are doors, cabinets,
+  wardrobes, gates and the alarm bell. Nothing to do with picking.
+- **Not the `AnimDatabase3P` redirect.** Tested live from the console:
+  `HorseCollisionMod.AnimationDatabases.PlayerFemale = nil` and
+  `PlayerFemale.AnimDatabase3P` set back to `wh_female_database.adb`, then a save
+  reload. Verified in effect afterwards — `class=PlayerFemale`, `live
+  adb=wh_female_database.adb`, while Henry's was still `hcm_male_database.adb`,
+  so the probe had not blanket-reverted the mod. **Still frozen.**
+- **Not the male side by luck rather than judgement.** The male
+  `AnimationControlled` block is byte-identical from launch to 1.9.2, so reading
+  it out of the launch pak happened to give the right answer.
+
+### What it was
+
+`Data\patch\ipl_patch_010900.pak` ships `wh_female_fragmentids.xml` at 19,956
+bytes, with **379 fragment ids**. The mod shipped a 14,082-byte copy derived
+from the 13,973-byte launch-day file in `Animations-part1.pak`, with **277**.
+Shipping it under vanilla's name reverted the female fragment table by seven
+patches and deleted **103 fragment ids**, every one of them declared in the
+patched controller def, including:
+
+    PickingHerbs  PickingHerbsNPCIn  PickingHerbsNPC  PickingHerbsNPCOut
+
+and also all female combat (`CombatAttack`, `CombatIdle`, `CombatHit`, the block
+set), the nine lockpicking fragments, `DrawWeapon`, `HolsterWeapon`, the whole
+bow set (`Load`, `Charge`, `Fire`, `AimPose`), `Weeding`, `Sowing`, corpse
+dragging, stealth kills, NPC monologues, and the `Quest_HenslinAbuse` and
+`Quest_BlankaPointing` sets — Woman's Lot quest scripts.
+
+**The engine says nothing about this.** With `ca_AnimWarningLevel 3` and
+`log_WriteToFileVerbosity 4` set, not one line was written while the game hung.
+A fragment id that does not exist is not an error: the controller asks for a
+name, gets nothing, and the minigame waits forever. The absence of a log line was
+the strongest clue available and it pointed away from a broken fragment towards a
+missing one.
+
+### The file was never needed
+
+Patch 1.9 already ships both halves the mod was trying to create:
+
+| | mod appended | patch 1.9 already has |
+| --- | --- | --- |
+| fragment id | `AnimationControlled` + `kcd_animationControlledTags.xml` | line 327, identical |
+| scope | never shipped for the female | line 544, `scopes="FullBody+HoldItem+Looking"` |
+
+`build_adb.py`'s `write_female_declaration` already carried the check that would
+have caught this — *"the female fragment ids already declare it; this patch is no
+longer needed"*. It never fired because the function was reading the launch pak,
+where the declaration genuinely is absent.
+
+### A second bug from the same cause
+
+With the generator reading the patch paks, `hcm_female_database.adb` went from
+22 KB carrying **0** inherited vanilla options to 81 KB carrying **27**. The
+launch female database has no `AnimationControlled` block at all; the patched one
+has 27 options, 25 of them doors and gates. The mod's parent database defines
+that fragment and therefore shadows the sub-database's copy, so every redirected
+woman had been losing all 25 door and gate options. This is exactly the failure
+the "30 vanilla options" comment in `write_parent` warns about, happening
+unnoticed on the other character set.
+
+### Two traps in the fix itself
+
+The first `read_vanilla` silently resolved to `ipl_patch_010701b.pak` and looked
+correct. Two reasons, both now handled by `pak_key` and commented:
+
+- the paks disagree on the path **separator**;
+- from patch **1.8 onward the entry names are stored lowercased**
+  (`animations/mannequin/adb/...`), so a case-sensitive match finds the entry in
+  the old paks, misses every modern one, and falls back to an older pak without
+  saying so. Which is this same bug one layer up.
+
+The engine's own open order was read off its log rather than guessed: base paks
+in `Data/`, then `Data/patch/` ascending, last one wins.
+
+### Two tooling holes that would have faked a pass
+
+- **The deploy only ever wrote.** Withdrawing the file from `mod_assets` left the
+  installed loose copy in place, still overriding vanilla at
+  `sys_PakPriority 0`, and `[VERIFY] installed files match the repository`
+  passed, because it only compares files the repository still has.
+  `Remove-WithdrawnAnimOverrides` now deletes them and says so.
+- **`verify_additive.py` had the same bug as the generator.** It read
+  `Animations-part1.pak` directly, so it validated the mod against the 2018 game
+  and reported the female `AnimationControlled` declaration as absent — true at
+  launch, false in every patched install. It had also been failing on the horse
+  declaration files since they landed, unnoticed. It now resolves through
+  `build_adb.read_vanilla` and all 35 checks pass.
+
+`flow.ps1 shipping` also refused the park, which is how the stale table overrides
+and a manifest-truncation bug in the second park run were found; both fixed.
+
+**Results**: On the rebuilt 5.31.1 dev install the rider confirmed Theresa picks
+the herb, and confirmed Henry's collision reactions still work after the male
+database was regenerated from a different pak than before.
+
+Female reactions are treated as confirmed on the strength of that same ride:
+the rider rode people down and reported everything working. It was not a ride
+aimed at female victims specifically, and that is worth knowing if the question
+ever comes back, but the mechanism is in place for the first time — the patched
+controller def supplies the scope the mod never shipped, and the parent database
+carries the mod's 17 options.
+
+**Thoughts & Conclusions**: The rule to carry forward is that a vanilla file
+small enough to own is a list of names, and anything larger is the game's own
+data. `kcd_animationControlledTags.xml` is 1 KB and no patch has ever rewritten
+it. `wh_female_fragmentids.xml` was 20 KB and every patch rewrites it. Size was
+the available signal and it was there from the start.
+
+---
+
+## A Woman's Lot compatibility: Theresa cannot ride, so the mod must only be inert
+
+Asked after the herb fix: is the DLC where Theresa is the player compatible with
+this mod, and can she ride a horse at all.
+
+**She cannot ride, and it is structural.** The female animation set has 379
+fragment ids in patch 1.9 and **not one** of them is riding related. The male set
+has 763 and carries nineteen: `Mount`, `Dismount`, `HorseRear`, `HorseFastStop`,
+`HorseMaintenance`, `HorseCombatIdle`, `HorseCombatAttack`, `HorseCombatMovement`,
+`HorseRiderGestures`, `HorseFall`, `HorsePetting`, `HorseFeeding`,
+`HorseHoofCleaning` and the rest. There is no animation for a woman on a horse,
+so this is not a rule that could be lifted by a setting. The
+[fandom wiki page for A Woman's Lot](https://kingdom-come-deliverance.fandom.com/wiki/A_Woman%27s_Lot)
+says the same, independently.
+
+Her quests confirm it. The only genuine horse reference across all fourteen
+`q_theresa_*.xml` files in `Scripts_DLC4.pak` is
+`$t_leaveLevel_params.distanceMove_params.forceUseHorse = true` inside a
+behaviour tree named `rapota_leaveLevel` — an NPC riding out of the level, not
+the player. Every other apparent hit is the word "Amount".
+
+Worth knowing: she plays in `rataje_dlc4`, a full copy of the open world, so
+horses exist around her. She simply cannot get on one.
+
+**So compatibility means the mod is inert and harmless, never that it works.**
+Audited, and it already is:
+
+- `Update.lua` returns at the mount check before touching anything, and every
+  horse call in the mod is inside a `pcall`.
+- `CheckMountTutorials` only runs once `isMounted` has become true, so she sees
+  no riding tutorials.
+- `AutoGrantPerks` defaults to `false`, so she is not given horse perks.
+- `hcm_actionmaps.xml` declares its own `hcm_rear` action map rather than
+  overriding vanilla's bindings, and every handler behind those keys is gated on
+  `IsMounted`. No key is taken from her.
+- No Lua error from the mod appears anywhere in the logs of the sessions spent in
+  her level, before or after the fix.
+
+**The one thing left touching her** is `PlayerFemale` in
+`HorseCollisionMod.AnimationDatabases`, which points her animation database at
+the mod's parent file. The mod never plays a fragment on the player: every
+`StartInteractiveActionByName` call goes to `npc.actor` or `horseEnt.actor`, and
+the only player-directed calls are `playerEnt.actor:Fall` and `SetViewShake`,
+neither of which reads an animation database. `git log -S PlayerFemale` shows it
+arrived in `b887f1e` as part of a blanket sweep of "seven human entity classes"
+when the additive layout was built, and the comment beside it records that
+redirecting `Player` was what made the mod's files load and *hid* a fault rather
+than fixing one. So both player entries look like completeness rather than
+function, and removing them would take the mod out of the player's animation
+stack entirely.
+
+That is a design change beyond the bug, so it is the rider's call and is recorded
+here rather than made.

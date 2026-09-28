@@ -107,21 +107,53 @@ Three kinds of file, all mandatory. Omitting any one leaves the call succeeding
 while nothing plays.
 
 1. **Fragment IDs** declare which fragments exist and point each at its tag
-   definition file. `kcd_male_fragmentids.xml` already declares
-   `AnimationControlled`. `wh_female_fragmentids.xml` does not, and is patched
-   to add it.
+   definition file. Both `kcd_male_fragmentids.xml` and
+   `wh_female_fragmentids.xml` declare `AnimationControlled` as the game ships
+   today, so the mod touches neither. The female file did not declare it at
+   launch, and the mod used to ship a patched copy; see **Read vanilla from the
+   patch paks** below for what that cost.
 2. **The tag definition** (`kcd_animationControlledTags.xml`) declares the valid
    FragTags. A FragTags value absent from this file does nothing, even when the
-   database entry exists. Both sexes share the file.
-3. **The databases** hold the options. The mod's four point at
-   `hitreaction_idle_medium_torso_stab_{front,back,left,right}`, standing hit
-   reactions already in the game. `kcd_male_database.adb` has an existing
-   `AnimationControlled` block to append to. `wh_female_database.adb` has none,
-   so the whole block is added.
+   database entry exists. Both sexes share the file, and it is the one vanilla
+   file the mod still replaces, because no patch has ever rewritten it.
+3. **The databases** hold the options. The mod's own point at standing hit
+   reactions already in the game. Both `kcd_male_database.adb` and
+   `wh_female_database.adb` have an existing `AnimationControlled` block, whose
+   options the mod's parent database has to carry over, since a sub-database
+   does not merge into a fragment its parent defines.
 
-`tools/build_adb.py` generates all four files from the game's own paks. It
-checks that every clip it references exists, because a missing clip resolves to
-nothing without an error.
+`tools/build_adb.py` generates the files from the game's own paks. It checks
+that every clip it references exists, because a missing clip resolves to nothing
+without an error.
+
+### Read vanilla from the patch paks
+
+Anything copied out of the game must be read from `Data/patch/`, never from
+`Data/Animations-part1.pak` alone. That pak is the game as released in February
+2018, and the patches replace whole files on top of it. `read_vanilla` in
+`tools/build_adb.py` collects every pak holding an entry and takes the last in
+the engine's own open order: base paks, then `Data/patch/` ascending, which is
+the copy the running game serves.
+
+This is not a hypothetical. The generator read only the launch pak, and two
+files came out wrong:
+
+- `wh_female_fragmentids.xml` grew from 277 fragment ids at launch to 379 by
+  1.9. Shipping the launch copy under vanilla's name deleted 103 of them from
+  every female character, `PickingHerbs` among them, which locked the game on
+  picking a herb as Theresa. A player reported it after 90 hours as Henry, since
+  none of it touches the men.
+- `wh_female_database.adb` had no `AnimationControlled` block at launch and has
+  27 options by 1.9. The mod's parent database defines that fragment and so
+  shadows the sub-database's copy of it, and with nothing inherited every
+  redirected woman lost all 25 of her door and gate options.
+
+Matching an entry name needs care, because the paks do not agree on how they
+spell one. Launch and the patches to 1.7 use `Animations/Mannequin/ADB/...`; 1.8
+onward store the path lowercased; some use backslashes. A case-sensitive match
+finds the entry in the old paks, misses every modern one, and falls back to an
+older pak without saying so. The first version of `read_vanilla` silently
+resolved to 1.7.1b and looked correct. `pak_key` normalizes both.
 
 ## Pak packaging
 
@@ -1263,11 +1295,14 @@ after the world is populated.
 
 ### Constraints on any change here
 
-- `kcd_animationControlledTags.xml` and `wh_female_fragmentids.xml` are copies
-  of vanilla with additions, not references. A copy cannot pick up another mod's
-  additions to the same file. This is acceptable while nothing else extends
-  `AnimationControlled`, and would not be for a mod that had to share a tag
-  group.
+- `kcd_animationControlledTags.xml` is a copy of vanilla with additions, not a
+  reference. A copy cannot pick up another mod's additions to the same file.
+  This is acceptable while nothing else extends `AnimationControlled`, and would
+  not be for a mod that had to share a tag group.
+- Nothing else vanilla may be copied without checking `Data/patch/` for a newer
+  version of it first, and preferring a file the patches have never touched. The
+  tag file above qualifies; the female fragment id file did not, and shipping a
+  copy of it broke every female character.
 - Two mods redirecting `AnimDatabase3P` on the same class conflict. The
   contested resource is a Lua string, not a binary, so a cooperative mod can
   chain by referencing whatever is already set.

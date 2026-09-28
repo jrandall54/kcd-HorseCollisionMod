@@ -151,6 +151,25 @@ $devMod = "HorseCollisionMod_dev"
 # a release zip can be tested with nothing loose left to mask a broken pak.
 $parkedDir = "hcm_dev_parked"
 
+# Vanilla animation file names this mod has claimed at some point. Everything
+# else it installs carries an hcm_ prefix.
+#
+# Named because a file the mod no longer ships still has to be cleaned out of an
+# install that has it. At sys_PakPriority = 0 a loose override wins, so a
+# withdrawn file goes on overriding vanilla forever and the verify pass calls the
+# install correct, because it only checks files the repository still has.
+#
+# That happened with wh_female_fragmentids.xml. It was withdrawn for deleting
+# 103 fragment ids from every female character, the build and the pak were
+# clean, and the stale loose copy sat in the install being read in preference to
+# the game's own.
+$claimedVanillaAdb = @(
+    "kcd_animationControlledTags.xml",
+    "wh_female_fragmentids.xml",
+    "kcd_horse_fragmentids.xml",
+    "kcd_horse_controllerdefs.xml"
+)
+
 # ---------------------------------------------------------------------------
 # Which configuration the install is in
 # ---------------------------------------------------------------------------
@@ -319,8 +338,16 @@ if ($PrepareShippingTest) {
 	New-Item -ItemType Directory -Force $park | Out-Null
 
 	# Where each item came from, so the restore does not have to infer it.
+	#
+	# An existing manifest is kept and appended to. The park is idempotent and
+	# gets run twice whenever the first run refused, and truncating the manifest
+	# on the second run orphaned the 31 items the first run had already moved:
+	# they were still in the park with nothing left to say where they belonged.
 	$manifest = Join-Path $park "parked.txt"
-	Set-Content $manifest "" -Encoding utf8
+
+	if (-not (Test-Path $manifest)) {
+		Set-Content $manifest "" -Encoding utf8
+	}
 
 	$moved = 0
 
@@ -345,7 +372,9 @@ if ($PrepareShippingTest) {
 		@{ Dir = "Data\Animations\Mannequin\ADB"
 		   Names = @("kcd_animationControlledTags.xml", "wh_female_fragmentids.xml",
 		             "kcd_horse_fragmentids.xml", "kcd_horse_controllerdefs.xml") },
-		@{ Dir = "Data\Libs\Config"; Filter = "hcm_*" }
+		@{ Dir = "Data\Libs\Config"; Filter = "hcm_*" },
+		@{ Dir = "Data\Libs\Tables\rpg"; Filter = "*horsecollisionmod*" },
+		@{ Dir = "Data\Libs\Tables\text"; Filter = "*horsecollisionmod*" }
 	)
 
 	$found = @()
@@ -658,6 +687,43 @@ function Test-InstalledFiles {
 	return $bad
 }
 
+# Deletes loose animation overrides the mod installed once and no longer ships.
+#
+# A deploy only ever writes, so withdrawing a file from mod_assets leaves the
+# installed copy behind, still overriding vanilla at sys_PakPriority = 0, and
+# every check downstream passes: the pak is right, the build is right, and the
+# verify pass compares only files the repository still has.
+#
+# Scoped to names this mod is known to own, so nothing of the game's or of
+# another mod's is ever a candidate.
+function Remove-WithdrawnAnimOverrides {
+	param ([string]$Root)
+
+	$source = Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB"
+	$installed = Join-Path $Root "Data\Animations\Mannequin\ADB"
+
+	if (-not (Test-Path $source) -or -not (Test-Path $installed)) {
+		return
+	}
+
+	$shipped = @(Get-ChildItem -Path $source -File | ForEach-Object { $_.Name })
+
+	foreach ($file in (Get-ChildItem -Path $installed -File | Sort-Object Name)) {
+		if ($shipped -contains $file.Name) {
+			continue
+		}
+
+		$ours = $file.Name -like "hcm_*" -or $claimedVanillaAdb -contains $file.Name
+
+		if (-not $ours) {
+			continue
+		}
+
+		Remove-Item $file.FullName -Force
+		Write-Host "[DEPLOY] removed withdrawn override $($file.Name)" -ForegroundColor Yellow
+	}
+}
+
 function Sync-LooseFiles {
 	param (
 		[string]$Root,
@@ -668,6 +734,10 @@ function Sync-LooseFiles {
 
 	$changed = @{ Script = $false; Anim = $false }
 	$files = Get-LooseFileMap -Root $Root -Script:$Script -Anim:$Anim
+
+	if ($Anim) {
+		Remove-WithdrawnAnimOverrides -Root $Root
+	}
 
 	foreach ($file in $files) {
 		if (-not (Test-Path $file.From)) {

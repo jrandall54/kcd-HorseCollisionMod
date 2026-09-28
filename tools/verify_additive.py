@@ -62,6 +62,18 @@ def read_pak_text(pak, entry):
     return build_adb.read_pak_entry(pak, entry).decode("ascii", "replace")
 
 
+def vanilla_text(entry):
+    """The vanilla entry as the running game serves it.
+
+    Not from the launch pak. This script used to read `Animations-part1.pak`
+    directly, and so verified the mod against the game as it was in February
+    2018: it reported the female `AnimationControlled` declaration as absent,
+    which is true at launch and false in every patched install, and that wrong
+    answer is what the mod was built to satisfy.
+    """
+    return build_adb.read_vanilla(entry)[0].decode("ascii", "replace")
+
+
 def newest_release():
     releases = os.path.join(REPO_ROOT, "releases")
     zips = [os.path.join(releases, f) for f in os.listdir(releases)
@@ -74,7 +86,7 @@ def newest_release():
 def main():
     release = sys.argv[1] if len(sys.argv) > 1 else newest_release()
     print("Verifying %s" % os.path.basename(release))
-    print("against    %s" % build_adb.PAK)
+    print("against    the patched install under %s" % build_adb.GAME_ROOT)
 
     outer = zipfile.ZipFile(release)
     pak_bytes = outer.read("Data/HorseCollisionMod.pak")
@@ -84,16 +96,27 @@ def main():
     # ---- 1. no vanilla filename is claimed --------------------------------
     heading("1. The release overrides no vanilla file")
 
-    with zipfile.ZipFile(build_adb.PAK) as anim:
-        vanilla_names = set(n.replace("\\", "/") for n in anim.namelist())
+    vanilla_names = set()
 
+    for candidate in build_adb.vanilla_paks():
+        vanilla_names.update(build_adb.pak_entries(candidate))
+
+    # The vanilla names the mod is allowed to claim, and no others.
+    #
+    # Each one has to be a small list of declarations that no patch has ever
+    # rewritten. `wh_female_fragmentids.xml` was on this list and failed both
+    # tests: it is the game's own 20 KB animation index, and the patches rewrite
+    # it, so the launch copy the mod shipped deleted 103 fragment ids from every
+    # female character.
     intended_vanilla = {
         build_adb.TAGS_ENTRY,
-        build_adb.GENDERS["female"]["ids"],
+        "Animations/Mannequin/ADB/kcd_horse_fragmentids.xml",
+        "Animations/Mannequin/ADB/kcd_horse_controllerdefs.xml",
     }
-    claimed = set(n for n in shipped if n in vanilla_names)
+    claimed = set(n for n in shipped
+                  if build_adb.pak_key(n) in vanilla_names)
     check(claimed == intended_vanilla,
-          "the only vanilla names claimed are the two small declaration files",
+          "the only vanilla names claimed are the declaration files",
           "unexpected=%s missing=%s"
           % (sorted(claimed - intended_vanilla) or "none",
              sorted(intended_vanilla - claimed) or "none"))
@@ -113,8 +136,9 @@ def main():
     adb_files = [n for n in shipped if n.startswith(ADB_PREFIX)]
 
     expected = set("hcm_%s_database.adb" % g for g in build_adb.GENDERS)
+    expected.add("hcm_horse_database.adb")
     expected.add(build_adb.TAGS_ENTRY.rsplit("/", 1)[-1])
-    expected.add(build_adb.GENDERS["female"]["ids"].rsplit("/", 1)[-1])
+    expected.update(n.rsplit("/", 1)[-1] for n in intended_vanilla)
 
     got = set(n.rsplit("/", 1)[-1] for n in adb_files)
     check(got == expected, "animation file set matches the generator's contract",
@@ -168,7 +192,7 @@ def main():
         parent_name = "hcm_%s_database.adb" % gender
         parent = pak.read(ADB_PREFIX + parent_name).decode("ascii", "replace")
 
-        vanilla_db = read_pak_text(build_adb.PAK, paths["db"])
+        vanilla_db = vanilla_text(paths["db"])
         van_block = re.search(
             "\n    <AnimationControlled>(.*?)\n    </AnimationControlled>",
             vanilla_db, re.S)
@@ -228,14 +252,14 @@ def main():
         ids_name = paths["ids"].rsplit("/", 1)[-1]
         ids = (pak.read(ADB_PREFIX + ids_name).decode("ascii", "replace")
                if ADB_PREFIX + ids_name in shipped
-               else read_pak_text(build_adb.PAK, paths["ids"]))
+               else vanilla_text(paths["ids"]))
         m = re.search(r'<Tag name="AnimationControlled" subTagDef="([^"]*)"', ids)
         check(m is not None and m.group(1) == build_adb.TAGS_ENTRY,
               "AnimationControlled resolves to the tag file the mod extends",
               m.group(1) if m else "not declared")
 
         if ADB_PREFIX + ids_name in shipped:
-            van_ids = read_pak_text(build_adb.PAK, paths["ids"])
+            van_ids = vanilla_text(paths["ids"])
             vset = set(re.findall(r'<Tag name="([^"]+)"', van_ids))
             oset = set(re.findall(r'<Tag name="([^"]+)"', ids))
             check(not (vset - oset), "no vanilla fragment id dropped",
@@ -243,15 +267,18 @@ def main():
 
         refs = set(re.findall(r'(?:File|filename|subTagDef)="([^"]+)"',
                               parent + ids))
+        # `vanilla_names` holds normalized keys, because the paks disagree on
+        # both the separator and the case of an entry name, so a reference has
+        # to be normalized the same way before it is looked up.
         unresolved = [r for r in refs
-                      if r not in shipped and r not in vanilla_names
-                      and r.replace("/", chr(92)) not in vanilla_names]
+                      if r not in shipped
+                      and build_adb.pak_key(r) not in vanilla_names]
         check(not unresolved, "every referenced path resolves", unresolved)
     # ---- 6. tags -----------------------------------------------------------
     heading("Tag definitions")
 
     our_tags = pak.read(build_adb.TAGS_ENTRY).decode("ascii", "replace")
-    van_tags = read_pak_text(build_adb.PAK, build_adb.TAGS_ENTRY)
+    van_tags = vanilla_text(build_adb.TAGS_ENTRY)
     vt = set(re.findall(r'<Tag name="([^"]+)"', van_tags))
     ot = set(re.findall(r'<Tag name="([^"]+)"', our_tags))
     check(not (vt - ot), "every vanilla FragTag survives", sorted(vt - ot) or "%d tags" % len(vt))
