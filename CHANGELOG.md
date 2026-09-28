@@ -30,6 +30,11 @@ number.
 
 ## [Unreleased]
 
+### Changed
+- **The mod no longer touches the player's animations.** Henry and Theresa now
+  use the game's own animation files untouched. The mod only ever animated the
+  people and horses you ride into, so nothing you see changes.
+
 ## [5.31.2] - 2026-09-27
 
 ### Fixed

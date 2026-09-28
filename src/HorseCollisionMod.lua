@@ -1733,9 +1733,12 @@ end
 -- paths taken when its script loaded, and redirecting only the template
 -- changes nothing about what spawns.
 --
--- The player class is declared
--- directly rather than through CreateAI, so redirecting it did work, which
--- made the mod's own files load and hid the fault.
+-- The player classes, `Player` and `PlayerFemale`, are deliberately not
+-- redirected. The mod never plays a fragment on the player: every interactive
+-- action goes to an NPC or the horse, and the only calls aimed at the player,
+-- Fall and SetViewShake, do not read an animation database. Redirecting the
+-- player only put it into this mod's animation stack, which was the last point
+-- where the mod touched Theresa in A Woman's Lot.
 -- The parent database is a few hundred bytes and holds no
 -- fragments of its own; it references the untouched vanilla database inside its
 -- own pak, plus this mod's fragment file.
@@ -1753,9 +1756,7 @@ HorseCollisionMod.AnimationDatabases = {
 	NPC_NAI       = "male",
 	NullAI        = "male",
 	DummyTarget   = "male",
-	Player        = "male",
 	NPC_Female    = "female",
-	PlayerFemale  = "female",
 
 	-- The templates they were built from. Redirected too, so that anything
 	-- calling CreateAI after this point inherits the right paths rather than
