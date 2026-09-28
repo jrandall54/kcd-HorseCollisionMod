@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.31.2] - 2026-09-27
+
 ### Fixed
 - **Playing as a woman no longer breaks.** The mod shipped a copy of the game's
   female animation index, and the copy was taken from the game as it was in
