@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Bark.lua findings recorded and committed.
+**Current status:** Recovery.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Recovery.lua`.
+**Next pass:** `Health.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -36,7 +36,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Rear.lua`
 - [x] `Retaliation.lua`
 - [x] `Bark.lua`
-- [ ] `Recovery.lua`
+- [x] `Recovery.lua`
 - [ ] `Health.lua`
 - [ ] `Rider.lua`
 - [ ] `Sound.lua`
@@ -61,13 +61,10 @@ audited are listed here, so its pass picks them up.
 - `Marks.lua` — check the dust comments against the vertical-speed test.
 - `Health.lua:364` — the note on `ImpactDamageScale`; check it against the
   `Armor.lua` findings on the floor and the formula.
-- `Recovery.lua:1116` — the `ArmorBlend` use there goes with the
-  DynamicRecovery ruling; if it goes, update the `ArmorLerp` consumer list.
 - `Update.lua:85-90` — says `RearCharging` is cleared by `ChargeForward`
   "the moment the horse stops accelerating"; `WatchLunge` clears it when
   speed decays to a fraction of the peak. "the old double hit" is history.
-- `Recovery.lua:314` `WhenVictimRises` — check the head-height figures that
-  `Bark.lua:931-934` quotes (0.15 of standing height, 1.59).
+- `Update.lua` — receives `ImpactIsNewContact` from `Recovery.lua`.
 - `Health.lua` — receives `ShieldFromEngineDamage` and `LiftCollisionShield`
   from `Bark.lua`; `:837` loses the `BarkDeath` call if that ruling passes.
 
@@ -174,6 +171,37 @@ Items that change behavior or delete a feature. Not applied without a decision.
   of the horse. This is the two-writers failure the comment in `Bark`
   (`:788-790`) warns against. Proposal: the timer clears only when
   `RecentHushes[id]` still holds its own stamp.
+
+- [ ] **`WhenVictimRises` fires at once on a ragdoll tier.** `8809c66` added
+  an early return on any ragdoll state (`Recovery.lua:332-338`, "the most
+  reliable indicator that they have started rising"). `IsVictimFlat`
+  (`:262-270`) records that a gallop or charge victim sits in `BlendRagdoll`
+  for the whole time they are down, so on those tiers the recovery line
+  fires on the first poll, while the victim is still on the ground. The
+  doc above the function describes the height test that the early return
+  bypasses. Proposal: take the shortcut only on a tier whose reaction is
+  `fall`, or remove it and rely on the height test.
+
+- [ ] **`VictimFlatFraction` ships at 0.45 against a derivation for about
+  0.13.** The comment (`Recovery.lua:275-287`) says flat reads 0.04 to 0.10
+  of standing, a rising body 0.17 or more, and that a halfway split refused
+  victims who were visibly getting up. `2910119` raised the value from 0.15
+  to 0.45 without touching the comment. Proposal: find the reason for 0.45
+  in the diary; restore 0.15 or rewrite the derivation for 0.45.
+
+- [ ] **`WhenBodyStops` reads `GetWorldPos`.** `Reaction.lua:421-428` says
+  the entity does not follow a ragdoll and reads `GetCenterOfMassPos`;
+  `WhenBodyStops` (`Recovery.lua:604`) times the damage from the entity. The
+  current log's four `BodyStopped` rows all report `stopped` (1008 to
+  2608 ms), so the entity moves on these victims. Proposal: use the same
+  body reading as `Reaction.lua`, so the two do not disagree.
+
+- [ ] **The investigation diagnostics.** `WatchTurn` (a polearm victim
+  reported facing the wrong way) and `TraceFallLanding` (how often a
+  requested fall is held) were built to answer one question each.
+  `TraceFallLanding` runs on every impact whenever `LogTelemetry` is on.
+  Proposal: delete `WatchTurn`; keep `TraceFallLanding` only if its question
+  is still open, and gate it on `TraceRecovery` with the others.
 
 ## Findings
 
@@ -1067,6 +1095,91 @@ victim is accurate (only men reach the fight branch) and stays.
 - [ ] `:1200-1209` `HushVanillaBark` — "about ten times a second" and
   "twenty times a second"; `TickSeconds` is 0.033, about thirty. "The rider
   heard the result". — Correct the rate; cut the quote.
+
+### src/HorseCollisionMod/Recovery.lua
+
+- [ ] `:8-13` header — "The two waits"; the file has seven. It says
+  `BlendRagdoll` is "while physics owns the body"; `:128-134` says it is the
+  get-up on a fall tier and `:264-268` that it is the whole time down on a
+  ragdoll tier. — Rewrite: the waits poll the animation state or the body,
+  and each carries a ceiling.
+- [ ] `:25-26` — no blank line or `---` break between `@release` and the
+  `ReleaseActorMovement` doc (the same LDoc fold as `Armor.lua`). —
+  Separate.
+- [ ] `:36-38` — "victims clipped into walls exactly as they did without
+  it". — Cut.
+- [ ] `:62-67`, `:90-102` `RecordStandingHeight` — the doc says "Recorded
+  once, at the first impact"; the code keeps the maximum ever seen. The body
+  is history ("Recording once was wrong… one guard… he was never once
+  judged"; "centimetres"). The value is named `head` and read from
+  `GetCenterOfMassPos`. — Doc: the tallest reading seen, so a first reading
+  off a downed body corrects itself; say what the reading is.
+- [ ] `:111-146` — the `IsVictimFlat` doc sits above `DisarmVictim`, so LDoc
+  attaches it there, and `IsVictimFlat` (`:221`) is undocumented.
+  `DisarmVictim`, `RearmVictim` and `WhenVictimStands` have no docs, and the
+  first two lack the file's blank lines around blocks. — Move the doc; add
+  one line each.
+- [ ] `:141-143` — "The halfway point is a bisection rather than a tuned
+  figure" contradicts `:275-282`, "measured rather than bisected". — Cut
+  with the `VictimFlatFraction` ruling.
+- [ ] `:177-219` — `WatchRecoveryForRearm` is already listed as dead; its
+  only callee `WhenVictimStands` is dead with it, and `RisePollMs` and
+  `RiseCeilingMs` then serve only `Reaction.lua:964`. `:208` "no longer". —
+  Delete both functions; keep the settings for their remaining reader.
+- [ ] `:221-230` `IsVictimFlat` — returns one value on a nil victim and four
+  otherwise; the orphan doc names one. — Document all four; return four
+  throughout.
+- [ ] `:252-254` — "interrupting there is what broke the pose". — Keep the
+  constraint: a playing reaction counts as flat whatever the height.
+- [ ] `:262-287` — "A shortcut stood here", "caught by twice", "Logged from
+  play, one guard". — Keep: `BlendRagdoll` means rising on a fall tier and
+  down on a ragdoll tier, so height alone decides; then the fraction's
+  derivation, per the ruling.
+- [ ] `:295-306` `WhenVictimRises` — "The rider heard", "A tuned delay stood
+  here", "about 0.15 of its standing height to 1.59": both figures are
+  meters. The same error is quoted at `Bark.lua:931-934`. — "from about
+  0.15 m to 1.59 m"; cut the rest. See the ruling on the early return.
+- [ ] `:332-334` — the inline comment contradicts the doc and `:262-270`. —
+  Follows the ruling.
+- [ ] `:441-452` `TraceFallLanding` — "the rider has been describing the
+  second for hours", the diary's 76 calls. — Follows the diagnostics ruling.
+- [ ] `:505-514` `WhenVictimIsUp` — "Named for what it measures", "Two
+  separate mechanisms were built on the old reading"; a broken line at
+  `:507`. On a ragdoll tier it fires as the victim stands, not on the
+  get-up. — Keep: fires when the ragdoll state ends, which is the victim
+  standing; the state must be seen first.
+- [ ] `:566` `WhenBodyStops` — "the same thing `ImpactThrow` already means":
+  `ImpactThrow` is a log line (`Health.lua:335`), not a function. `:571-576`
+  "which the rider saw". — Name `RestStillMeters`; cut the story; keep why
+  equality is too strict.
+- [ ] `:644-649` `FinishRecovery` — skips the rebuild when
+  `hcm_combat_injected` is set (`Health.lua:831`, `Impact.lua:234`, `:242`)
+  and does not say why. `:660-664` "The delay that used to sit in front of
+  this". — One line on the skip; cut the history.
+- [ ] `:670-675` `TraceRecovery` — "the complaint is about one of them". —
+  "to show which phase is long".
+- [ ] `:743-752` `WatchTurn` — the polearm report, "his". — Follows the
+  diagnostics ruling.
+- [ ] `:869-870`, `:1086-1087` — two blank lines between functions. — One.
+- [ ] `:877-878`, `:882`, `:884-887` `ReplanIfStranded` — the bucket
+  anecdote, "Measured across nine recoveries", "the wait was only ever the
+  cost of a weaker signal". — Keep: a replan restarts the daycycle and
+  drops a carried prop, so only a victim idle after the get-up is replanned.
+- [ ] `:946-948`, `:957-973` `ReplanVictim` — the entity-link probe, "every
+  send this mod made before this one passed an empty payload", "Measured…
+  moved him 0.00 m… 3.94 m". — Keep: `Utils.makeTable` fills the declared
+  `reason` and `speed`, and an empty payload is discarded.
+- [ ] `:1034-1085` `ImpactIsNewContact` — detection logic in the recovery
+  module; both callers are `Update.lua:101` and `Rear.lua:1016`. `:1041-1051`
+  "Repeats were suppressed by accident before this existed… came straight
+  back", "now"; "a rider" for the player; "700 ms" repeats the setting. —
+  Move to `Update.lua`; keep: one contact spans several 33 ms ticks, and the
+  interval must be shorter than a turn and return.
+- [ ] `:1088-1185` DynamicRecovery — follows that ruling. If it stays:
+  "peasants", the armor range "~0.35… ~1.26" (the curve spans 0.35 to 1.5),
+  the `- 400` literal, `npc:IsDead()` where `BarkRecovered` reads health, and
+  the missing blank lines. If it goes, `ArmorLerp`'s consumer list loses
+  recovery.
 
 ### Dead code (`tools/audit_code.py`)
 
