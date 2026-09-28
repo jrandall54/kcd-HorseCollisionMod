@@ -30,6 +30,13 @@ number.
 
 ## [Unreleased]
 
+## [5.31.4] - 2026-09-27
+
+### Changed
+- **Fear is documented as a near-miss reaction.** Only a rear or a charge that
+  misses frightens the people nearby. An impact that hurts someone is handled by
+  the game's own reaction to an assault. No behavior changes.
+
 ## [5.31.3] - 2026-09-27
 
 ### Changed

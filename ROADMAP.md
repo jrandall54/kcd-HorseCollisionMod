@@ -126,20 +126,12 @@ they are deliberate placeholders.
 **It comes after every pillar ships**, because each new pillar adds a tier that
 has to be balanced against the rest.
 
-### 2. Fear and morale around a rear
+### 2. A charge against a line
 
-A rear either hits someone or does nothing to them. The feature is three bands
-instead of one.
-
-- The hooves land, as now, inside `RearReach` and `RearArc`.
-- A wider and longer band where nobody is touched and the horse is frightening:
-  they break and flee.
-- Some of those stand and turn on the rider instead, decided by a morale check,
-  feeding the retaliation system that already exists.
-
-A charge breaking a line, and a braced polearm stopping a charge, are the same
-feature and belong here. This goes after the balance pass, which changes what
-the lunge does to the people around it.
+The fear band around a rear and a charge shipped in 5.25.0 and 5.26.0: a near
+miss sends vanilla's `hostilePerception`, and each bystander's own brain decides
+whether to flee or turn on the rider. What remains of the original item is a
+charge breaking a line of people, and a braced polearm stopping a charge.
 
 ### 3. Widen who can be pulled from the saddle
 
