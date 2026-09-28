@@ -22566,3 +22566,44 @@ stack entirely.
 
 That is a design change beyond the bug, so it is the rider's call and is recorded
 here rather than made.
+
+## The player is out of the mod's animation stack
+
+Made on the branch `anim/player-out-of-stack`. `Player` and `PlayerFemale` are
+gone from `HorseCollisionMod.AnimationDatabases`, so the mod no longer points
+either player class at its parent database. Henry and Theresa run the vanilla
+databases untouched.
+
+**Proved live before any ride.** The startup line read `Redirected 11 animation
+databases, 0 pending`, down from 13. A console probe of `AnimDatabase3P` on each
+class printed:
+
+```
+Player=Animations/Mannequin/ADB/kcd_male_database.adb
+PlayerFemale=Animations/Mannequin/ADB/wh_female_database.adb
+NPC=Animations/Mannequin/ADB/hcm_male_database.adb
+NPC_Female=Animations/Mannequin/ADB/hcm_female_database.adb
+```
+
+The field is `AnimDatabase3P`, not `AnimDatabase`; a probe of the latter prints
+nil for every class.
+
+**Rides, one per save reload, all passed by the rider and confirmed in the log:**
+
+- Walk into a man and a woman: `hcm_stagger_back` and `hcm_stagger_forward`,
+  gender 1 and 2, `ok=true`.
+- Trot into a guard and into Konya's wife: `hcm_fall_back`, gender 1 and 2,
+  `ok=true`, each followed by `FallLanded`.
+- Rear into a woman: `Rear hcm_rear ok=true`, victim plays `hcm_fall_left`
+  gender 2. Henry's own body on the horse looked normal.
+- Rear charge into a guard: `Rear hcm_rear_charge ok=true`, speed 12.30,
+  ragdoll then blend.
+- Theresa in `rataje_dlc4` picks a herb and it completes. The pick writes no log
+  line; the evidence is the rider's observation and the log continuing normally.
+
+No Lua error from the mod anywhere in the session. The one Lua error in the log
+is a vanilla unit-test entity failing at startup.
+
+One correction to how the tests were first framed: the gallop and the charge
+ragdoll and read no animation database. The tiers that exercise the redirect are
+walk (stagger), trot and rear (fall).
