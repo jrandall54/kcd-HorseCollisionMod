@@ -12,8 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Bark.lua has been read (1243 lines). Findings drafted but
-not yet committed. Ready to record findings and continue to next file.
+**Current status:** Bark.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -25,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** Record Bark.lua findings, then continue with `Recovery.lua`.
+**Next pass:** `Recovery.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -36,7 +35,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Reaction.lua`
 - [x] `Rear.lua`
 - [x] `Retaliation.lua`
-- [ ] `Bark.lua`
+- [x] `Bark.lua`
 - [ ] `Recovery.lua`
 - [ ] `Health.lua`
 - [ ] `Rider.lua`
@@ -67,6 +66,10 @@ audited are listed here, so its pass picks them up.
 - `Update.lua:85-90` — says `RearCharging` is cleared by `ChargeForward`
   "the moment the horse stops accelerating"; `WatchLunge` clears it when
   speed decays to a fraction of the peak. "the old double hit" is history.
+- `Recovery.lua:314` `WhenVictimRises` — check the head-height figures that
+  `Bark.lua:931-934` quotes (0.15 of standing height, 1.59).
+- `Health.lua` — receives `ShieldFromEngineDamage` and `LiftCollisionShield`
+  from `Bark.lua`; `:837` loses the `BarkDeath` call if that ruling passes.
 
 ## Standard
 
@@ -142,6 +145,35 @@ Items that change behavior or delete a feature. Not applied without a decision.
   telemetry is on (`:1203-1242`). Proposal: settle the target from the
   diary's pull-down rides, keep that one, and delete the second query and
   the angle tracking.
+
+- [ ] **The dead Henry set path.** `RiderBarkSets` is empty, so
+  `BarkDeath`'s `Bark(player, "Killed", true)` (`Bark.lua:1049`) always
+  returns false and, with telemetry on, logs "no rider set wired" on every
+  death. The `RiderBarks` setting gates only that call; the kill line is
+  gated by `RiderBarkKill`. Proposal: delete `BarkDeath` and its call
+  (`Health.lua:837`), `RiderBarkSets`, `RiderBarks`, and `Bark`'s `rider`
+  parameter. Resolves the settings file's `RiderBark`/`RiderBarks` finding.
+
+- [ ] **The empty impact pool.** `RiderBarkAliases` is empty and `RiderBark`
+  ships false, so `BarkRiderImpact` never sends. Its doc (`Bark.lua:211-297`)
+  says it is kept so a line can be put back. Proposal: keep the mechanism;
+  reduce the doc to what an entry must satisfy (the four filters) and move the
+  survey and audition history to the diary if absent there.
+
+- [ ] **The charge's impact cry is silent.** `VictimBarkByTier.Charge` ships
+  `"collision"`, so the charge reaches `BarkForTier`, and `PainByTier.Charge`
+  is `HurtHard` (`ZASAH_ZBRANI_SILNY`), which the comment directly above
+  (`Bark.lua:596-609`) says is a combat-shout set that a bark request cannot
+  reach. Proposal: `HurtDown`, as trot and gallop use; decide together with
+  the charge's bark set ruling.
+
+- [ ] **`HushVanillaBark` clears its own refresh.** Each call arms a timer
+  that clears the option after `BarkSuppressMs`, and a refresh comes at half
+  that window, so the first timer clears an option the second call set and
+  expects to hold. The option can be down while the victim is still in front
+  of the horse. This is the two-writers failure the comment in `Bark`
+  (`:788-790`) warns against. Proposal: the timer clears only when
+  `RecentHushes[id]` still holds its own stamp.
 
 ## Findings
 
@@ -931,6 +963,110 @@ victim is accurate (only men reach the fight branch) and stays.
   the request is honoured anyway is a separate question"; "honoured". —
   Keep: `CanHorsePullDown` returns 2 enabled, 1 disabled, 0 not applicable;
   `PullDownForce` requests regardless.
+
+### src/HorseCollisionMod/Bark.lua
+
+- [ ] `:27`, `:45-50`, `:72-77` — "each of which has already cost a wrong
+  choice"; the `KOLIZE_*` paragraph appears twice, both with "reverses an
+  earlier decision", "now", "no longer". — Keep one sentence in the header:
+  the `KOLIZE_*` sets are pooled because `HushVanillaBark` keeps vanilla from
+  playing them itself.
+- [ ] `:58-59`, `:306-307` — "for the same reason as `ImpactProbeSamples` in
+  the entry point" / "above"; it lives in `Health.lua:27`. `:62-63` a doubled
+  empty `--`. — Fix the pointer; one blank comment line.
+- [ ] `:82-104` `Shove` — "the mod's own find", the removed
+  `KOLIZE_S_HRACEM_LEHKA` story, "The rider heard", "The lesson
+  generalises". Header test 3 already states the rule. — Keep the two
+  sets' sample lines; cut the rest.
+- [ ] `:111-113`, `:1211` — "the rider having just trampled them", "an NPC
+  the rider passes". — "the player".
+- [ ] `:136-148` hurt grades — "what the victim makes at the moment of
+  impact, in three grades"; only `HurtDown` is audible (`:596-609`), and the
+  two comments contradict each other. — One comment: `HurtDown` is the
+  impact cry; `HurtLight` and `HurtHard` name where the graded recordings
+  live and cannot be requested.
+- [ ] `:150-164` bystander sets — removal history. Header test 4 states the
+  rule. — Cut, or one line naming the three sets as excluded by test 4.
+- [ ] `:169-208` `RiderBarkSets` — "These two are confirmed on him" above an
+  empty table; the role survey, "The rider rejected it", the audition trap
+  and the untested assumptions. — Follows the dead-set-path ruling; if the
+  table stays, one line.
+- [ ] `:211-297` `RiderBarkAliases` — "was recorded as unrecoverable", "the
+  rider chose these", the quoted instruction, "for now", "turned out". —
+  Follows the empty-pool ruling.
+- [ ] `:299-314` `RiderBarkKillAliases` — the gender column is explained
+  here and again in `PoolForVictim` (`:346-349`); "the two filters described
+  above" (there are four). — Keep the explanation in `PoolForVictim`; "the
+  four filters".
+- [ ] `:397-398`, `:446-447` — "two at once is a defect rather than a richer
+  moment" twice; "the same man". — Once, in `RiderVoiceReady`.
+- [ ] `:400-403` — the rewind sentence is hard to parse. — "A hold further
+  out than the longest cooldown means the save clock was wound back; it is
+  ignored."
+- [ ] `:406-410` — "A grunt is `RiderVoiceGrunt`" (it is
+  `RiderVoiceRanks.Grunt`); "four gallop kills… produced one death line and
+  three silences". — Correct the name; cut the measurement.
+- [ ] `:419`, `:474`, `:527`, `:701`, `:709`, `:999` — redundant parentheses
+  around single `cfg` reads. — Remove.
+- [ ] `:484` "every spoken line the rider has" means Henry's. — "Henry".
+- [ ] `:592-609` `PainByTier` — "Both tiers" over three entries; test
+  history ("Both were tested rather than assumed… fourteen requests"). —
+  Keep: those sets are combat shouts dispatched outside
+  `dialog:monologRequest` and gated on the engine's `hitStrength`. See the
+  charge-cry ruling.
+- [ ] `:646-648` `PickFromPool` — "once the rider reports which lines they
+  actually hear". — Cut.
+- [ ] `:689-692` `BarkOnCooldown` — "which is the point of having a
+  bystander set at all"; there are none. `:702-705` history. — Keep: per
+  speaker, so two victims can both speak; a refusal is logged.
+- [ ] `:723-724` `Bark` — "the whole finding of the investigation behind
+  this file". `:756` double blank line. `priority` and `overrideSuppress`
+  undocumented; `ignoreCooldown` is "used only for the recovery line", but
+  `Fear.lua:106` and the recovery groans (`Recovery.lua:1178`) pass it too. —
+  Cut; add the two params; describe `ignoreCooldown` without a caller list.
+- [ ] `:783-809` — the `HushVanillaBark` note and the message-fields note run
+  together with no break; "Three approaches failed… none should be
+  retried", "this used to send two of them". — Split; keep: the branch is
+  closed ahead of contact by `HushVanillaBark`, and a request below the top
+  priority waits or is discarded.
+- [ ] `:814-823`, `:892-895` — "a man" for the speaker. — "they".
+- [ ] `:850-861` `BarkForTier` — "Mirrors `GetSpeedTier`" (it is a table
+  lookup); "graded by how hard they were hit" (trot and gallop both use
+  `HurtDown`); `@tparam` lists Walk, Trot, Gallop, and the charge also
+  arrives here. — Correct.
+- [ ] `:886-895` `BarkCollision` — "which the mod had no counterpart for",
+  "The rider heard the gap". — Keep the vanilla condition and its source
+  line.
+- [ ] `:918-934`, `:965-971` `BarkRecovered` — the three failed timings are
+  told twice, with the quoted ride. "about 0.15 of its standing height to
+  1.59" mixes a fraction and meters. — Keep: the line fires when the body
+  leaves flat, read by `WhenVictimRises`; check the figures in the
+  `Recovery.lua` pass.
+- [ ] `:947-950` — "the rear and the charge have a voice of their own"; the
+  charge ships `"collision"` and reaches this function. — Follows the
+  charge's bark set ruling.
+- [ ] `:983-984` — "is how the death barks ended up firing over silence". —
+  Keep: a dead victim does not rise.
+- [ ] `:1031-1037` `BarkDeath` — removal history, and "logs the death and
+  says nothing." is a fragment. — Follows the dead-set-path ruling.
+- [ ] `:1054-1196` `ShieldFromEngineDamage`, `LiftCollisionShield` — damage
+  code in the bark module; the caller is `Impact.lua:73` and the lifter is
+  `ApplyImpactDamage` in `Health.lua`. — Move to `Health.lua`.
+- [ ] `:1057-1062` — "Five separate levers leave it unchanged" names two. —
+  Keep: the engine's collision damage cannot be stopped without a global
+  that also governs arrows, so the victim is made immortal through the
+  window.
+- [ ] `:1071-1072` — "for a few hundred milliseconds"; the shield lasts until
+  `ApplyImpactDamage`, after the ragdoll resolves, with a 6000 ms backstop. —
+  Correct.
+- [ ] `:1083-1088` — "Testing the entry alone was wrong… one was killed". —
+  Keep: only a live shield blocks a second.
+- [ ] `:1134-1138` — "Every other timer in this mod returns early" on a
+  reload; `HushVanillaBark`'s timer does not either. — "Unlike the mod's
+  polling timers".
+- [ ] `:1200-1209` `HushVanillaBark` — "about ten times a second" and
+  "twenty times a second"; `TickSeconds` is 0.033, about thirty. "The rider
+  heard the result". — Correct the rate; cut the quote.
 
 ### Dead code (`tools/audit_code.py`)
 
