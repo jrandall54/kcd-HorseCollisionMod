@@ -34,11 +34,18 @@ Items that change behavior or delete a feature. Not applied without a decision.
   standing, delete `DynamicRecovery`, `RecoveryDelayByTier`,
   `RecoveryArmorScale*`, `RecoveryMinSec`, `RecoveryMaxSec`.
 
-- [ ] **RearChargeThrow ships at 0.6.** Its own comment says 1.0 lands a
-  charge where a gallop lands, so the shipped charge throws shorter than a
-  gallop. The standing ruling is that a charge throws a little further.
-  Proposal: confirm whether 0.6 was chosen on a ride; if not, set it above
-  1.0 by a small factor.
+- [x] **RearChargeThrow ships at 0.6.** Ruled correct; revisit only if the
+  publish test runs call for it. The comment keeps "1.0 throws like a gallop"
+  as the scale, with no claim about which tier throws further.
+
+- [ ] **The charge's bark set.** `Tiers.lua:422` says `VictimBarkByTier.Charge`
+  is `"rear"`; the settings file (`:381`, changed later in `cbe54cb`) ships
+  `"collision"`, and because it carries the whole table, `"collision"` is what
+  runs. The same risk applies to every tier table: the settings file ships a
+  full literal copy of all nine, so `Tiers.lua` is unreachable unless a player
+  deletes one. Proposal: make `Tiers.lua` match what ships (`"collision"`),
+  and have `build.ps1` refuse a settings tier table that differs from
+  `Tiers.lua`.
 
 ## Findings
 
@@ -230,8 +237,8 @@ Contradictions with the code:
   against `Lean.lua`.
 - [ ] `:560-566` `ThrowByTier` — "What makes a charge throw further than a
   gallop is the speed it is resolved at". The charge's throw is
-  `RearChargeThrow` times the lunge transfer. — Verify whether `ThrowByTier`
-  reaches the charge at all, then describe it.
+  `RearChargeThrow` times the lunge transfer; `ThrowByTier` is only trim on
+  `Knockback` and `Uplift` for both tiers. — Say so.
 - [ ] `:577-584` `ThrowProfileByTier` — describes the charge's cap as a
   counter-impulse held at the commanded speed; confirm against
   `Tiers.lua:371`. "armour" twice at `:588`. — Reduce to the three steps
@@ -318,6 +325,51 @@ does):
   `RiderBlurSteps`, `RagdollBrakeArmorScaleArmored`,
   `RagdollBrakeArmorScaleUnarmored`. — One line each, or move them under
   the Internals banner.
+
+### src/HorseCollisionMod/Tiers.lua
+
+- [ ] `:9-13`, `:21-23` header — "That shape is what let the rear and the
+  charge quietly fall out…", "the entry point carried a second copy of all
+  eight, and they drifted". There are nine tables. — Cut the history; say
+  nine.
+- [ ] `:67-70` `GetSpeedTier` — "It sat in `Log.lua` for as long as…". — Cut.
+- [ ] `:98-133` `ImpactDamageByTier` — "across the whole testing diary",
+  "measured live at `dealt=92.2 engineTook=29.1`", "The earlier 95 was set
+  when…", "Measured live at 117.2 and 116.0", "the rider wanted", "Making it
+  kill one in six would have cost 89", victims as "a man". The gallop
+  derivation says 113 before barding and 111 with it, but
+  `BardingDamageBonus` raises damage, so barding cannot lower the figure. —
+  Keep the arithmetic (health 100, variance 0.85 to 1.15, the threshold per
+  tier); verify and restate the barding step; "they".
+- [ ] `:146-173` `StaminaShareByTier` — "measured 210 on the test horse and
+  230 on another", "the diary records", "by the rider's ruling". — Keep the
+  derivation: 0.20 is one pool at level 0 and five at the top; the perk
+  unlock costs 0.72 and 0.60.
+- [ ] `:194-196` `ReactionByTier` — "The rear sits with the trot… the old
+  `RearReaction or TrotReaction` fallback" is history and ranks one tier
+  under another. — Cut.
+- [ ] `:205-222` `ThrowByTier` — "two such figures sat in the code for
+  months", "the audit's fourth ruling", "It was briefly made to scale…".
+  "What separates a charge from a gallop is the speed it is resolved at, and
+  everything downstream is the gallop's own machinery" is false: the charge
+  has its own launch and rail in `ThrowProfileByTier`. `ThrowByTier` reaches
+  both tiers only as trim on `Knockback` and `Uplift`
+  (`Reaction.lua:318`). — State that and stop. Resolves the settings file's
+  `ThrowByTier` finding.
+- [ ] `:228-297` `ThrowProfileByTier` — "years of circles", "every previous
+  attempt here was", the 0.02, 0.07, 25.9 and 0.3 to 1.0 m readings. "armour"
+  at `:269-270`, `:286`, `:316-319`, `:329` comment. — Keep the ownership
+  statement, the three steps and the formula; American spelling.
+- [ ] `:373-379` — "measured, a victim railed at 6.03 was driven to 8.64 and
+  9.17 m/s". — Constraint only: drag does not bind a ragdoll, so the rail is
+  enforced.
+- [ ] `:401-403` `HitStrengthByTier` — "The charge used to probe itself as a
+  minor injury…". — Cut.
+- [ ] `:452-478` `TierTables` — the drift story (`:457-462`) and "those
+  figures are now the same ones the shipped build runs". The claim of "one
+  literal per concern" is false while the settings file ships whole copies
+  of all nine tables (see the ruling). — Cut the history; describe the
+  binding.
 
 ### Dead code (`tools/audit_code.py`)
 
