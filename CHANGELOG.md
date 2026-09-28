@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.31.3] - 2026-09-27
+
 ### Changed
 - **The mod no longer touches the player's animations.** Henry and Theresa now
   use the game's own animation files untouched. The mod only ever animated the
