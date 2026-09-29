@@ -29,7 +29,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 
 **Next pass:** `tools/`, largest first: `audit_code.py`,
 `testworld.py`, `dev_subject.lua`, then the rest; `tools/legacy/` last. Then `.claude/`
-hooks and linter. The carried-forward items belong to it.
+hooks and linter.
 
 **Pass order** (dependencies first, then largest):
 
@@ -59,7 +59,7 @@ hooks and linter. The carried-forward items belong to it.
 - [ ] Tooling: `build.ps1`, `tools/`, `.claude/` hooks and linter
 
 **Carried forward:** findings in one file that point into a file not yet
-audited are listed here, so its pass picks them up.
+audited are listed here, so its pass picks them up. None open.
 
 
 ## Standard
