@@ -31,8 +31,8 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`. Next:
-`src/HorseCollisionMod_Settings.lua`. Read **Phase 2 plan** below in full
+order below. Done: `src/HorseCollisionMod.lua`,
+`src/HorseCollisionMod_Settings.lua`. Next: `Tiers.lua`. Read **Phase 2 plan** below in full
 before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -217,6 +217,10 @@ In this order, each its own commit and ride:
      directly instead of through `local threshold`.
    - Entry point: delete the `UIEvent` logging block at the head of
      `uiActionListener`, investigation scaffolding.
+   - Entry point: `RiderVocalByTier` defaults to the shipped settings
+     file's values (walk silent, trot and rear `v_henry_hit_soft` at 140).
+     `7a6cbc5` changed only the settings file. No change for a player; it
+     restores "deleting a line falls back to the default".
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -247,7 +251,9 @@ goes to the rider as a question. Includes the ruled comment corrections
 - Deleted: the four closed-question probes, `tools/legacy/`,
   `dev_target.lua`, `dev_subject.lua`, with their README rows. Deleting
   `dev_subject.lua` leaves `HorseCollisionMod.ImmortalSubjects` and its
-  read in `Health.lua` with no writer; delete them in the same commit.
+  read in `Health.lua` with no writer; delete them in the same commit, with
+  the test-subject restore in `ApplyImpactDamage` and
+  `ImpactDamageDelayMs`, which only that restore reads.
 - Remaining tool **Findings**, file by file.
 
 **Batch 6. Documentation.** *(L0, lint)*
@@ -365,6 +371,12 @@ One line per batch: batch, commit, what was verified.
   the in-game rider from the tester; review it with the `now` rule before
   batch 7 promotes either. Header rewritten against the six shipped data
   files and five tiers. Four code findings moved to batch 3, item 7.
+- **Batch 4, `src/HorseCollisionMod_Settings.lua`.** L1 `same`; build
+  passes and the tier tables agree (9 of 9). Comments rewritten for a
+  player: descriptive, no history. Warnings left are the "the rider"
+  false positive. A comparison of every shipped value against the entry
+  point's defaults found one drift, `RiderVocalByTier`, added to batch 3,
+  item 7.
 
 ## Standard
 
@@ -856,6 +868,13 @@ their comments are corrected here.
 
 ### src/HorseCollisionMod_Settings.lua
 
+Batch 4: comments rewritten throughout. Superseded by batch 2: the
+`DynamicRecovery` block, `ProtectMutt`, `RiderBarks` (so the
+`RiderBark`/`RiderBarks` pair is gone) and `LeanMinFlipMs`. Every key now
+carries a description. `ImpactDamageByTier`'s gallop note corrected to four
+in five (0.15 uniform variance on 111 against 100 health). The `Sound.lua`
+half of the crack finding is carried to that file's pass.
+
 Player-facing: descriptive only, no rationale, no measurements, no history.
 Developer reasoning belongs in the entry point's `@field` list or
 `docs/TECHNICAL_DETAILS.md`. Most orphans and duplicates in the entry point
@@ -863,139 +882,139 @@ recur here.
 
 Orphans and misplaced blocks:
 
-- [ ] `:36-40` — "They used to live here… which is why" is history. — Cut.
-- [ ] `:136-145` — describes a health floor ("Set it to 0 to restore the
+- [x] `:36-40` — "They used to live here… which is why" is history. — Cut.
+- [x] `:136-145` — describes a health floor ("Set it to 0 to restore the
   behavior 3.0.0 shipped with") above `SuppressAutoCureSec` and
   `AutoCureHealthLimit`, which are not a floor. — Rewrite for the two
   settings under it.
-- [ ] `:149-158` — the retaliation paragraph sits above the key bindings; the
+- [x] `:149-158` — the retaliation paragraph sits above the key bindings; the
   retaliation settings are at `:317`. — Move.
-- [ ] `:179-196` — five orphan paragraphs above `ImpactDustEffectRear`: the
+- [x] `:179-196` — five orphan paragraphs above `ImpactDustEffectRear`: the
   charge push, the rear as its own tier, the rear's landing sound, "Its level
   is fixed", and "The two armor layers sit further back than they did… Both
   were confirmed playing in the log". — Delete; keep one line on the rear
   dust.
-- [ ] `:199-208` — the charge's sound paragraph sits above the strike
+- [x] `:199-208` — the charge's sound paragraph sits above the strike
   settings, and says `hs_hp_soil` "is set back from the ear", which `:861`
   says does nothing because the event ignores position. — Delete; the
   charge's sound note goes beside `ImpactSoundByTier`.
-- [ ] `:342-361` — two damage-model paragraphs sit above `HitStrengthByTier`;
+- [x] `:342-361` — two damage-model paragraphs sit above `HitStrengthByTier`;
   the damage settings are at `:640-665`. The first says clothing sums to
   about 0.4 and is ignored; `ImpactDamageIgnoredArmor` is 0.5, which the
   worked example in the second uses. — Merge into one block above
   `ImpactDamageByTier`; use 0.5.
-- [ ] `:423-431` — "What a tier does to the victim's body" heads
+- [x] `:423-431` — "What a tier does to the victim's body" heads
   `ImpactSoundByTier`; it belongs to `ReactionByTier` (`:552`). — Move.
-- [ ] `:918-943` — the hit-readiness block (see the entry point finding),
+- [x] `:918-943` — the hit-readiness block (see the entry point finding),
   with its history ("The settle was 2000… That is what 'muddy and
   unresponsive' was"). Only `:944-948` describes `HitMinIntervalMs`. —
   Delete the rest; drop the two blank lines after.
 
 Contradictions with the code:
 
-- [ ] `:430-431` — layer format given as `{ event, delay, volume, optional
+- [x] `:430-431` — layer format given as `{ event, delay, volume, optional
   pitch }`. `Sound.lua:255-258` reads `{ trigger, delay, distance, chance }`.
   — Correct.
-- [ ] `:502-503` — `RiderVocalByTier` format given as `{ event, delay, pitch,
+- [x] `:502-503` — `RiderVocalByTier` format given as `{ event, delay, pitch,
   volume }`; `Sound.lua:518-521` reads `{ trigger, delay, distance, chance }`.
   — Correct.
-- [ ] `:272-278` — the lean doc names `LeanPeriod`, `LeanAmplitude` and "a
+- [x] `:272-278` — the lean doc names `LeanPeriod`, `LeanAmplitude` and "a
   period of 30 and a duration of 2"; the settings are `LeanTravelAmplitude`
   and `LeanHoldAmplitude`. `LeanPollMs`, `LeanDeadband`, `LeanMinFlipMs`,
   `LeanRunawayFactor` and `LeanShakePeriod` carry no comment. — Rewrite
   against `Lean.lua`.
-- [ ] `:560-566` `ThrowByTier` — "What makes a charge throw further than a
+- [x] `:560-566` `ThrowByTier` — "What makes a charge throw further than a
   gallop is the speed it is resolved at". The charge's throw is
   `RearChargeThrow` times the lunge transfer; `ThrowByTier` is only trim on
   `Knockback` and `Uplift` for both tiers. — Say so.
-- [ ] `:577-584` `ThrowProfileByTier` — describes the charge's cap as a
+- [x] `:577-584` `ThrowProfileByTier` — describes the charge's cap as a
   counter-impulse held at the commanded speed; confirm against
   `Tiers.lua:371`. "armour" twice at `:588`. — Reduce to the three steps
   and the formula; American spelling.
-- [ ] `:667-670` `CameraShake` and `:684` `RiderBlur` — "a gallop impact",
+- [x] `:667-670` `CameraShake` and `:684` `RiderBlur` — "a gallop impact",
   "Gallop only: a trot knockdown should stay a shove"; both are per tier and
   the trot shakes at 0.6. — Describe per tier.
-- [ ] `:766-771` `ImpactSound` — "the horse's own landing carries the weight,
+- [x] `:766-771` `ImpactSound` — "the horse's own landing carries the weight,
   and a blunt impact ten milliseconds later"; no tier is built that way. —
   Cut.
-- [ ] `:789-791` — "Walk names the cloth impact outright"; the walk tier is
+- [x] `:789-791` — "Walk names the cloth impact outright"; the walk tier is
   foley and bodyfall, no impact. — Cut.
-- [ ] `:867` `ImpactSoundCrack` — "gallop only"; `Sound.lua:244` plays it on
+- [x] `:867` `ImpactSoundCrack` — "gallop only"; `Sound.lua:244` plays it on
   gallop and charge. The same error is in the `Sound.lua:240` comment. —
   Correct both.
-- [ ] `:953-970` `ImpactDust` — describes a distance test against
+- [x] `:953-970` `ImpactDust` — describes a distance test against
   `ImpactDustSettleDistance`, which does not exist; the code watches
   vertical speed (`ImpactDustFallVz`, `ImpactDustLandVz`, `Marks.lua:319`).
   "The victim's height is position is sampled" is garbled. `arrow_soil` and
   "alternatives worth trying" as in the entry point. — Rewrite.
-- [ ] `:989-990` `CollisionIsCrime` — "at trot and gallop"; `Impact.lua:233`
+- [x] `:989-990` `CollisionIsCrime` — "at trot and gallop"; `Impact.lua:233`
   reports a crime for any impact that wounds, which includes the rear and
   the charge. — Correct.
-- [ ] `:1018-1021` `BarkCooldownMs` — "Keep at or below `HitCooldownMs`"; no
+- [x] `:1018-1021` `BarkCooldownMs` — "Keep at or below `HitCooldownMs`"; no
   such setting, and at 3000 it is already above `HitMinIntervalMs` (700). —
   Cut.
-- [ ] `:556` `ReactionByTier` — "a rear is a trot-class blow, not a gallop's"
+- [x] `:556` `ReactionByTier` — "a rear is a trot-class blow, not a gallop's"
   ranks one tier under another. — Cut.
-- [ ] `:640-648` `ImpactDamageByTier` — "kills about nine unarmored men in
+- [x] `:640-648` `ImpactDamageByTier` — "kills about nine unarmored men in
   ten": with 0.15 variance a 111 hit exceeds 100 health about 83% of the
   time. — Verify NPC health and restate, or cut.
 
-- [ ] `:127` `ArmorReferenceWeight` — "the weight counted as a full set";
+- [x] `:127` `ArmorReferenceWeight` — "the weight counted as a full set";
   it is the weight whose impulse multiplier is 1.0 (the block above says
   so). — Correct. (Found in the `Armor.lua` pass.)
-- [ ] `:730-732` barding — "Three flat effects rather than one multiplier";
+- [x] `:730-732` barding — "Three flat effects rather than one multiplier";
   damage is a multiplier. — Correct. (Found in the `Armor.lua` pass.)
 
 Duplicates:
 
-- [ ] `:780-865` — the layer format, the distance-is-volume paragraph and the
+- [x] `:780-865` — the layer format, the distance-is-volume paragraph and the
   token paragraph each appear three times, and the walk, trot and gallop
   notes appear twice (inside the table at `:433-466` and again as orphans at
   `:846-865`). — One copy of each above `ImpactSoundByTier`; the tier notes
   stay inside the table.
-- [ ] `RiderBark` (`:905`, default false) and `RiderBarks` (`:1017`, default
+- [x] `RiderBark` (`:905`, default false) and `RiderBarks` (`:1017`, default
   true) are separate switches with near-identical names; both are read
   (`Bark.lua:464`, `:1045`). — Say in each comment what the other does, or
   ruling on merging them.
 
 Fragments:
 
-- [ ] `:1040-1041` `ProtectMutt` — "around on his back" is a stray fragment.
+- [x] `:1040-1041` `ProtectMutt` — "around on his back" is a stray fragment.
   — Cut.
-- [ ] `:1114-1115` `RearChargeStrikePollMs` — "further hits" is a stray
+- [x] `:1114-1115` `RearChargeStrikePollMs` — "further hits" is a stray
   fragment. — Cut.
-- [ ] `:777` — trailing empty `--` line. — Cut.
+- [x] `:777` — trailing empty `--` line. — Cut.
 
 Narrative, rationale and people (player-facing, so reduce to what the setting
 does):
 
-- [ ] `:49-91` — the `DynamicRecovery` block and the "Native Engine Ragdoll
+- [x] `:49-91` — the `DynamicRecovery` block and the "Native Engine Ragdoll
   Stillness CVars" label are title-case banners; the stillness settings
   overwrite the player's own `wh_rd_Still*` cvars and do not say so. The
   first block follows the DynamicRecovery ruling. — Say what the cvars are.
-- [ ] `:159-168` — "the key a vanilla action answers to is not always
+- [x] `:159-168` — "the key a vanilla action answers to is not always
   visible…" is developer reasoning. — Keep the list of eight keys.
-- [ ] `:174-175` — "set by feel". — Cut.
-- [ ] `:212-228` `RearChargeImpactSpeed` and `:230-247` `RearChargeThrow` —
+- [x] `:174-175` — "set by feel". — Cut.
+- [x] `:212-228` `RearChargeImpactSpeed` and `:230-247` `RearChargeThrow` —
   measurements (0.02, 0.07, 25.9, 0.3 to 1.0 m) and design argument. —
   Keep: the figure is `RearChargeImpulse` over horse mass and should follow
   it; `RearChargeThrow` is the dial.
-- [ ] `:248-266`, `:303-315` fear bands — "a man", "where he is standing";
+- [x] `:248-266`, `:303-315` fear bands — "a man", "where he is standing";
   "the rank Henry's own lines were confirmed audible at". — Keep the reach
   derivation in one line; "they"; cut the history.
-- [ ] `:322-323`, `:980-985` — victims are "him", "a man". — "they".
-- [ ] `:524-526` `RiderBlurByTier` — "they came apart in tuning". — Cut.
-- [ ] `:755-761` `HorseBoltsWhenSpent` — "A horse that always bolts is a
+- [x] `:322-323`, `:980-985` — victims are "him", "a man". — "they".
+- [x] `:524-526` `RiderBlurByTier` — "they came apart in tuning". — Cut.
+- [x] `:755-761` `HorseBoltsWhenSpent` — "A horse that always bolts is a
   punishment…". — Cut.
-- [ ] `:896-916` `RiderBark`, `RiderBarkPriority` — points the player at
+- [x] `:896-916` `RiderBark`, `RiderBarkPriority` — points the player at
   `Bark.lua`; "confirmed audible in testing… makes the tested configuration
   the default". `RiderBarkKill` has no comment. — Describe each setting.
-- [ ] `:1057-1063` banner — "tuned by riding at people repeatedly and the
+- [x] `:1057-1063` banner — "tuned by riding at people repeatedly and the
   shipped values are the ones that felt right". — Keep only that deleting a
   line restores the default.
-- [ ] `:1086-1093` — "Raise the risk here", "came out of tuning them
+- [x] `:1086-1093` — "Raise the risk here", "came out of tuning them
   together", "adding to it fought that". — Describe.
-- [ ] Undocumented keys: `HorseVocal`, `HorseVocalCooldownMs`,
+- [x] Undocumented keys: `HorseVocal`, `HorseVocalCooldownMs`,
   `HorseVocalRankByTier`, `RiderBlurHoldMs`, `RiderBlurChroma`,
   `RiderBlurSteps`, `RagdollBrakeArmorScaleArmored`,
   `RagdollBrakeArmorScaleUnarmored`. — One line each, or move them under
@@ -2293,6 +2312,10 @@ victim is accurate (only men reach the fight branch) and stays.
 - [ ] `:248-251` — the return value of `ApplyImpactDamage` is ignored;
   resolves the carried item with the Health finding.
 - [ ] `:262` — `-- test reload` left at end of file. — Delete.
+- [ ] `:200-202` — "Spawned where they are struck rather than where they
+  land"; only the rear spawns on contact, every other tier waits for the
+  landing (`Marks.lua:208`, `DustWhenLanded`). — Correct. (Found in the
+  settings file pass.)
 
 ### src/HorseCollisionMod/Log.lua
 
