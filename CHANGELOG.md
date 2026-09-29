@@ -46,6 +46,7 @@ number.
   them.
 - `ProtectMutt`. Henry's dog, like every dog, is never a victim.
 - `RiderBarks` and `LeanMinFlipMs`, which had no effect.
+- `ImpactDamageDelayMs`, which only the development test subject read.
 
 ## [5.31.4] - 2026-09-27
 

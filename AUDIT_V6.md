@@ -30,9 +30,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 5, tooling, from the seventh bullet (the
-deletions: closed-question probes, `tools/legacy/`, the two test-subject
-tools); the bullets before it are done (see **Phase 2 log**). Read **Phase 2 plan** below in
+**Next step:** phase 2, batch 5, tooling, the last bullet: the remaining
+tool **Findings**, file by file, starting with `tools/build_adb.py`; every
+bullet before it is done (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -621,6 +621,21 @@ One line per batch: batch, commit, what was verified.
   `knocked flat` in `SpeedTrot`'s comment; the release build refused before
   its version gate, the development build warned and built, the file was
   restored and the release zip's hash was unchanged.
+- **Batch 5, deletions.** Deleted, with their README rows: the four
+  closed-question tools (`probe_fall_landing.lua`, `probe_horse_mass.lua`,
+  `probe_recovery_states.lua`, `restore_alive.lua`), `tools/legacy/`,
+  `dev_target.lua` and `dev_subject.lua`; with the last,
+  `HorseCollisionMod.ImmortalSubjects`, the test-subject restore in
+  `ApplyImpactDamage`, and `ImpactDamageDelayMs`, which only that restore
+  read (changelog entry under Removed). The findings in the deleted files are
+  ticked as superseded. Removed-name grep clean outside the diary, this
+  ledger and the changelog, except `build_adb.py:440`, which is rewritten
+  with that file's `FALL_SETTLE_AT` finding. `pre_release_check.py` skips a
+  tracked file deleted but not yet staged, which crashed it. L0: the three
+  Lua files parse; `audit_code.py` unchanged (the two cooldown buff keys it
+  lists were already there); `docs/api` regenerated. L2: `flow test` copied
+  the three changed Lua files, reloaded, `Settings: 32 applied, 0 ignored`,
+  no Lua error.
 
 ## Standard
 
@@ -3680,10 +3695,10 @@ and the section comments number the claims differently from the docstring.
 
 Accurate; the rationale sections run long.
 
-- [ ] `:23-27` — "seventy-five of the hundred-odd NPCs around a village
+- [x] `:23-27` — "seventy-five of the hundred-odd NPCs around a village
   already read 0/0/0". — "`AIMovementAbility` is descriptive; setting it
   does not stop an NPC's routine."
-- [ ] `:37-38` — "looks deliberate rather than arbitrary". — Cut.
+- [x] `:37-38` — "looks deliberate rather than arbitrary". — Cut.
 
 ### tools/nexus_settings_block.py
 
@@ -3763,7 +3778,7 @@ their header, and three answer questions that are closed (see the ruling).
 - [ ] `probe_bark.lua:21` — "The speaker.s voice". — "speaker's".
 - [ ] `probe_bark.lua:103-107`, `:164-165` — "the rider" as the person
   running the probe. — "you".
-- [ ] `probe_fall_landing.lua:5`, `probe_recovery_states.lua:16-17` — `--`
+- [x] `probe_fall_landing.lua:5`, `probe_recovery_states.lua:16-17` — `--`
   as dashes. — Rephrase.
 
 **History to cut** (keep the constraint each one supports):
@@ -3789,14 +3804,14 @@ their header, and three answer questions that are closed (see the ruling).
 
 **Wrong or stale:**
 
-- [ ] `dev_target.lua:107`, `:116-118` — sets `ai_IgnorePlayer 1` and says
+- [x] `dev_target.lua:107`, `:116-118` — sets `ai_IgnorePlayer 1` and says
   it "keeps the rest of the town from reacting"; `dev_peace.lua:21-27`
   records that this was never shown to do anything and forbids adding it
   without a test. — Delete the cvar and the claim (or see the ruling).
-- [ ] `dev_target.lua:5-7` — "a spawned entity has no soul, armour or AI";
+- [x] `dev_target.lua:5-7` — "a spawned entity has no soul, armour or AI";
   `dev_subject.lua` spawns with a guard soul and is the tool the rest of the
   project uses. "armour" twice. — See the ruling; "armor" if kept.
-- [ ] `dev_target.lua:10`, `:41-43` — skips Henry's dog by name, behind a
+- [x] `dev_target.lua:10`, `:41-43` — skips Henry's dog by name, behind a
   class filter that already excludes dogs (the `ProtectMutt` ruling). —
   Delete the name check.
 - [ ] `dev_survival.lua:14` — "established by reading them back rather than
@@ -3825,10 +3840,10 @@ their header, and three answer questions that are closed (see the ruling).
 Thirteen scripts from closed investigations. `README.md:309-312` states
 they are kept unmaintained. Not audited line by line; see the ruling.
 
-- [ ] Fifteen usage lines across eleven files still name the pre-move path
+- [x] Fifteen usage lines across eleven files still name the pre-move path
   (`--file tools/audition_batch.lua`, `python tools/make_audition.py`), so
   the documented command fails. — `tools/legacy/…`, if the directory stays.
-- [ ] Nine files say "the rider" and several open with the investigation's
+- [x] Nine files say "the rider" and several open with the investigation's
   account ("The question this answers is the rider's", "Everything so far
   inferred this…"). — Falls under the ruling.
 

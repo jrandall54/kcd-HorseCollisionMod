@@ -400,9 +400,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   no plate makes a body weigh less than the horse standing on it
 -- @field ImpactDamageVariance how far either side of the tier figure a single
 --   impact can land, as a fraction
--- @field ImpactDamageDelayMs how long after an impact a development test
---   subject's health is put back; a real impact's damage waits for the body
---   to stop instead
 -- @field ImpactDust whether an impact throws dust off the ground
 -- @field ImpactDustEffect the particle library node to spawn
 -- @field ImpactDustHeight meters above the victim's origin to spawn it
@@ -838,7 +835,6 @@ HorseCollisionMod.Config = {
 	ImpactDamageArmorFloor   = 0.14,
 	ImpactDamageIgnoredArmor = 0.5,
 	ImpactDamageVariance     = 0.15,
-	ImpactDamageDelayMs      = 600,
 
 	-- The rider's own half of an impact. A collision costs stamina and costs
 	-- the victim health, and in hardcore mode neither is visible from the
@@ -1145,15 +1141,6 @@ HorseCollisionMod.LastScoredHit = {}
 --
 -- @table LockedUntil
 HorseCollisionMod.LockedUntil = {}
-
---- Entities the development tooling created, which take no impact damage.
---
--- Populated only by `tools/dev_subject.lua`. Nothing in normal play writes to
--- it, and it is not a setting, so a shipped build can never have anything in
--- it. It exists because an NPC cannot be made unkillable through the engine.
---
--- @table ImmortalSubjects
-HorseCollisionMod.ImmortalSubjects = {}
 
 --- What each victim was doing when it was hit, keyed by entity id.
 --

@@ -428,7 +428,6 @@ Hand back whatever the engine charged for the collision, so the figures above ar
 | `ImpactDamageArmorFloor` | 0.14 | Least armor can reduce an impact to |
 | `ImpactDamageIgnoredArmor` | 0.5 | Smash_def that is clothing, not armor |
 | `ImpactDamageVariance` | 0.15 | Spread either side of the tier figure |
-| `ImpactDamageDelayMs` | 600 | Used only when a development test subject's health is put back; a real impact waits for the body to stop |
 
 The rider's own half of an impact: a kick to the camera, scaled per tier by CameraShakeByTier. Angle is degrees of rotation and shift is meters of displacement, both on all three axes. Frequency is the shake's period; vanilla's own shakes use 0.05. Randomness varies each shake so repeated collisions do not feel canned.
 
@@ -669,9 +668,6 @@ tools/
                           unconditional, with its wordless count and longest
                           line, for choosing the register of a reaction
   dev_console.py          talks to the running game over its remote console
-  dev_subject.lua         spawns a test subject in front of the horse
-  restore_alive.lua       returns nearby actors to the alive physicalization
-                          profile, repairing one left in another
   probe_inventory.lua     names what a named entity is carrying, resolving
                           item class GUIDs to readable names
   probe_tables.lua        dumps a game table's columns and rows through
@@ -679,17 +675,8 @@ tools/
   probe_health.lua        logs one entity's health whenever it changes, for
                           the case where health moves with no impact to
                           account for it
-  probe_recovery_states.lua  samples everything an actor exposes, from an
-                          impact until they stand again, so a trigger can be
-                          tied to a measured posture rather than a timer
-  probe_fall_landing.lua  reports the moment each fall clip puts a victim on
-                          the ground, by watching the head stop descending,
-                          and re-arms so a run of angles can be measured
   dev_peace.lua           stops the world reacting to the player, so a test
                           that kills someone is not also a test of a fight
-  dev_target.lua          puts a pinned test victim four meters in front of
-                          the rider, so a ride is not also a search for
-                          someone standing usefully
   dev_survival.lua        holds the player's nourishment and energy at 100,
                           so a test needing game time is not also a test of
                           finding food in hardcore
@@ -714,9 +701,6 @@ tools/
   probe_camera.lua        polls the first-person camera through a view shake,
                           which is the only way to see what that call does
                           rather than what its arguments suggest
-  probe_horse_mass.lua    reports the mass and physics identity of the horse,
-                          the player and the nearest NPC, which are the two
-                          sides of every collision the mod scores
   nexus_settings_block.py builds the mod page's settings block out of the
                           settings file, so the page cannot fall behind what
                           ships; --check reports what it is missing
@@ -725,15 +709,6 @@ tools/
   audit_code.py           reports settings nothing reads, settings missing from
                           the player's file, and functions and tables nothing
                           uses, so clutter is a fact rather than an impression
-  legacy/                 tools from investigations that are closed, kept rather
-                          than deleted because a probe already written costs
-                          nothing to keep and rebuilding one costs a whole
-                          working session. Nothing in here is maintained and
-                          none of it is checked: a moved Python tool may need
-                          the tools directory on sys.path before it can import
-                          bark_lines, and a probe may name an engine call since
-                          ruled out. Read the header first, which says what the
-                          probe was for and what it found
   set_version.py          writes the version into all fourteen places that
                           carry it, and dates the changelog section
   version_check.py        derives the next version from CHANGELOG.md

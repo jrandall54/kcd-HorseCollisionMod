@@ -555,55 +555,12 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 		atImpact = npc.soul:GetState("health")
 	end)
 
-	-- Subjects the development tooling created take no damage.
-	--
-	-- An NPC cannot be made unkillable through the engine: `SetMaxHealth`,
-	-- `SetStatLevel` and `SetDerivedStat` are absent from a soul, and
-	-- `SetState("health", n)` clamps at 100.
-	--
-	-- So the exemption lives here instead, and it is narrow on purpose: only
-	-- entities `tools/dev_subject.lua` spawned are in this table, nothing in
-	-- normal play ever puts anything in it, and it is not a setting. Damage is
-	-- the only thing skipped. The reaction, the impulse, the sound and every
-	-- log line still run, which is what a test of collision feedback needs.
-	local exempt = self.ImmortalSubjects and npc.id
-			and self.ImmortalSubjects[tostring(npc.id)]
-
 	-- Story characters the game protects are handled further down instead of
 	-- here, inside `deal`. Returning early would skip the shield lift and the
 	-- reclaim, and the reclaim is most of what keeps them whole: the engine
 	-- charges a collision whatever this mod does, and the mod is the only thing
 	-- in a position to give it back.
 	local protected = self:IsProtectedFromHarm(npc)
-
-	if exempt then
-		-- Skipping the mod's own damage is not enough on its own, because the
-		-- engine charges a collision too. So the health is put back to what it
-		-- was at the impact, after `ImpactDamageDelayMs`, since nothing is
-		-- dealt here to wait for.
-		local was = nil
-
-		pcall(function()
-			was = npc.soul:GetState("health")
-		end)
-
-		Script.SetTimer(self.Config.ImpactDamageDelayMs, function()
-			pcall(function()
-				if was then
-					npc.soul:SetState("health", was)
-				end
-			end)
-		end)
-
-		if self.Config.LogTelemetry then
-			self:Log("ImpactDamage " .. self:NameOf(npc)
-					.. " tier=" .. tostring(tierName)
-					.. " testSubject=true restoredTo="
-					.. string.format("%.1f", was or -1))
-		end
-
-		return
-	end
 
 	-- The shield keeps the engine from killing the victim during the wait,
 	-- however hurt they are, so the blow below is always the one that kills.

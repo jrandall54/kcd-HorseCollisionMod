@@ -46,7 +46,9 @@ def tracked_files():
         ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
         cwd=REPO_ROOT, capture_output=True, text=True).stdout
 
-    return sorted(p for p in out.splitlines() if p)
+    # A file deleted but not yet staged is still listed; it has nothing to check.
+    return sorted(p for p in out.splitlines()
+                  if p and os.path.exists(os.path.join(REPO_ROOT, p)))
 
 
 def read(path):

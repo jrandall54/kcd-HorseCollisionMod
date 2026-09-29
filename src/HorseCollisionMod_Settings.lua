@@ -470,9 +470,6 @@ HorseCollisionModSettings = {
 	ImpactDamageArmorFloor   = 0.14,  -- least armor can reduce an impact to
 	ImpactDamageIgnoredArmor = 0.5,   -- smash_def that is clothing, not armor
 	ImpactDamageVariance     = 0.15,  -- spread either side of the tier figure
-	ImpactDamageDelayMs      = 600,   -- used only when a development test
-	                                  -- subject's health is put back; a real
-	                                  -- impact waits for the body to stop
 
 	-- The rider's own half of an impact: a kick to the camera, scaled per tier
 	-- by CameraShakeByTier. Angle is degrees of rotation and shift is meters
