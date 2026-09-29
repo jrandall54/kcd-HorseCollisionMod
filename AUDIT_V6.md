@@ -12,7 +12,8 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** every source file audited; README.md audited.
+**Current status:** every source file audited; README.md and
+`docs/HOW_IT_WORKS.md` audited.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,8 +25,9 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `docs/HOW_IT_WORKS.md`, then the rest of `docs/*.md` except
-the diary, one file per pass.
+**Next pass:** `docs/DEV_LOOP.md`, then `ARCHITECTURE_NOTES.md`,
+`BALANCE_AUDIT.md`, `ENGINE_BINDS.md`, `TECHNICAL_DETAILS.md`, one file per
+pass.
 
 **Pass order** (dependencies first, then largest):
 
@@ -57,7 +59,8 @@ the diary, one file per pass.
 **Carried forward:** findings in one file that point into a file not yet
 audited are listed here, so its pass picks them up.
 
-None open.
+- `tools/verify_additive.py:10` docstring — "the two small declaration
+  files"; `intended_vanilla` holds three. (From `HOW_IT_WORKS.md`.)
 
 ## Standard
 
@@ -1973,8 +1976,9 @@ the file except `ThrowByTier`.
 - [ ] `:190` — "A few detection internals are omitted"; about 120 settings
   above the file's internals line are omitted. — Follows the settings-table
   ruling.
-- [ ] `:194-195` — "RPG tables are untouched"; the mod ships perk rows under
-  `src/Libs/Tables/rpg/`. — "RPG tables are extended, never replaced."
+- [ ] `:194-195` — "No vanilla file is replaced"; three declaration files
+  are (see `HOW_IT_WORKS.md` `:304-314`). "RPG tables are untouched"; the mod
+  ships perk rows under `src/Libs/Tables/rpg/`. — Correct both.
 - [ ] `:200-205` Planned — "a rear frightens people the hooves never reach"
   shipped in 5.25.0 (`Fear.lua`). — Keep the line and the polearm; add fear
   to **What happens**.
@@ -1984,6 +1988,71 @@ the file except `ThrowByTier`.
   paragraph of justification. — See the layout ruling; one line per entry.
 - [ ] `:342` — `-Version "3.0.0"`; `-Version` defaults to `dev`, and releases
   are versioned by `flow.ps1 land`. — Show the default build.
+
+### docs/HOW_IT_WORKS.md
+
+`lint_docs.py`: 0 errors; 13 warnings (`simply` twice, `which is why`, ten
+sentences over 40 words) and 27 eight-word sequences repeated from the
+changelog and README. Most of the page is history; the edit is a rewrite in
+the present tense against the findings below.
+
+- [ ] `:12-16` — three tiers; the rear and the charge are missing, and the
+  gallop is "knocked down harder" where it is a physics throw. — Five rows;
+  point at README's table rather than restating it.
+- [ ] `:21-23` — "lands about half as far away"; throw distance is not
+  measured. — Cut the figure.
+- [ ] `:25-29` — "That damage is the game's own rather than the mod's";
+  `:37-59` describe the mod's own damage. — State the mod applies it.
+- [ ] `:31-35`, `:41-42`, `:51-54`, `:124`, `:155`, `:198-199`, `:223-225`,
+  `:231-232`, `:279-302`, `:316-323` — history: what the trample "was
+  charged", "two hundred test impacts", "no longer tries", "no longer stand
+  up", "now runs out of patience", "It used to borrow a gallop's", "The first
+  version", "was narrowed after logging", "Before 3.0.0", "What 3.0.0 does
+  instead", the pre-3.0 download size, the `wh_female_fragmentids.xml`
+  account. — Cut; the constraint alone stays (shipping a whole database
+  breaks another mod's copy).
+- [ ] `:44-50` — the charge waits for the body to stop, then "The mod waits a
+  moment before charging"; `ImpactDamageDelayMs` is only for a test
+  subject (`Settings:663-665`). — Keep the first; cut the second. Same
+  error at README `:142`.
+- [ ] `:75-80` — "was found clean again after a night had passed"; README
+  says the marks wear off once the victim's routine takes them home. — One
+  statement, and only what is known.
+- [ ] `:76` — "a gallop draws blood"; every knockdown tier does, trot at
+  0.07. — "a harder blow draws more blood".
+- [ ] `:89-95` — "a moment and a half" for `RiderVocalCooldownMs` 1500. —
+  "a second and a half".
+- [ ] `:147-150` — "Henry himself says nothing"; `:97-102` gives his kill
+  lines, and `RiderBarkKill` ships on. — "Henry speaks only over a body."
+- [ ] `:152-176` Losing patience — omits the pull-down and the surrender
+  prompt, which README lists. — Add one sentence each.
+- [ ] `:181-182` — "R rears and drives forward, Q rears on the spot"; the rear
+  on the spot is `F` (`RearOnlyKey`). — Correct.
+- [ ] `:185`, `:192` — the rear is "its own kind of blow" and then "scored as
+  a trot"; it is its own tier with its own figures and shares only the
+  `"fall"` reaction. — "plays the same fall as a trot".
+- [ ] `:215` — keys "R, Q, Y, U, O and H"; the list is r, q, e, f, y, u, o,
+  h. — Point at README's single key list.
+- [ ] `:235-236` — "Nothing is hardcoded"; the source findings list unnamed
+  literals (`Log.lua:197`, `:250`, `Tutorial.lua:103-119`). — Cut, or state
+  it once the no-magic-numbers findings are applied.
+- [ ] `:238` "The three parts" — four follow. — "The parts".
+- [ ] `:240` — "Roughly twenty times a second"; `TickSeconds` is 0.033,
+  about thirty. — Cite the setting.
+- [ ] `:249-250` — the gallop "is given an impulse and the ragdoll takes
+  over"; the engine's collision throws the body and the impulse is trim
+  (`Reaction.lua:1030-1033`). — Correct.
+- [ ] `:252-272`, `:297` — "the stagger is the part that needs new data",
+  "four options, one per direction", "30 vanilla options + 4 new"; the mod
+  declares 19 tags (stagger, knockdown, fall, get-up, rear, charge, settle). —
+  Describe the option set without a count, or with the current one.
+- [ ] `:301-302` — database and download sizes. — Cut.
+- [ ] `:304-314` — "One small declaration file"; the mod replaces three:
+  `kcd_animationControlledTags.xml`, `kcd_horse_fragmentids.xml`,
+  `kcd_horse_controllerdefs.xml` (`verify_additive.py:110-114`). README `:194`
+  says none. — List all three here; README points at this section.
+- [ ] `:327-328` — "checks every claim on this page"; it checks the
+  animation layout and the packaged file set. — Say that.
 
 ### Dead code (`tools/audit_code.py`)
 
