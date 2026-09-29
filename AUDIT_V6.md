@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 1 complete. No source file has been edited.
+**Phase:** 1 complete, rulings decided. No source file has been edited.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -26,15 +26,14 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next step:** the rulings, decided together one at a time
-in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
-DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`, `land`'s build retry, `verify_additive.py`, the closed-question probes, `tools/legacy/`, the test-subject tools.
-Every ruling is decided. Next: phase 2, starting with moving the horse
-animation files into `src/`. Present each ruling with the code checked
-first; several phase-1 premises turned out wrong on inspection (the cooldown
-icon) or needed log evidence (the pull-down target). Phase 2 then applies the
-findings in small batches, each checked off here with its commit.
+**Rulings:** all decided; each entry under **Rulings needed** carries its
+ruling. Several set phase-2 checks for the publish test runs (the rise
+shortcut, `VictimFlatFraction`, the companion dog's class).
+
+**Next step:** phase 2. Apply the findings and rulings in small batches, each
+checked off here with its commit. First: move the three hand-authored horse
+animation files into `src/Animations/Mannequin/ADB/`, since until then they
+exist only in the working copy and the install.
 
 **Pass order** (dependencies first, then largest):
 
