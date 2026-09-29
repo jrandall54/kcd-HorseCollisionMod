@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Crime.lua findings recorded and committed.
+**Current status:** Impact.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Impact.lua`.
+**Next pass:** `Log.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -45,7 +45,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Marks.lua`
 - [x] `Fear.lua`
 - [x] `Crime.lua`
-- [ ] `Impact.lua`
+- [x] `Impact.lua`
 - [ ] `Log.lua`
 - [ ] `Tutorial.lua`
 - [ ] `Detection.lua`
@@ -56,18 +56,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Carried forward:** findings in one file that point into a file not yet
 audited are listed here, so its pass picks them up.
 
-- `Rear.lua`, `Retaliation.lua`, `Update.lua` — adopt the shared horse
-  lookup from the Lean findings.
-- `Impact.lua:218-223` — the comment on deferring `SendCombatHit` ("it
-  perfectly overrides the casual recovery dialogue") is in another register;
-  its `WhenVictimRises` depends on the early-return ruling.
-- `Impact.lua:51`, `:124-127` — `IsCombatCollision` returns the same value
-  twice; the comment contrasts `playerInDanger` with "the combined signal",
-  which no longer exists. Follows the Rider finding.
-- `Impact.lua:201-203` — the dust comment contradicts `DustWhenLanded`
-  (see Marks).
-- `Impact.lua:251` — ignores `ApplyImpactDamage`'s return value, which the
-  Health findings remove.
+None open.
 
 ## Standard
 
@@ -1531,8 +1520,8 @@ victim is accurate (only men reach the fight branch) and stays.
   `:295`, `:605`, where the rest of the mod reads `player`. The horse
   lookup `XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())` is
   repeated in `Rear.lua`, `Retaliation.lua` and `Update.lua`. — Return the
-  horse only; use `player`; one shared horse lookup, adopted by those files
-  in their passes.
+  horse only; use `player`; one shared horse lookup, adopted at every site
+  listed.
 - [ ] `:102-118` `LeanOffset` — "that is what made the two sides read
   differently", "Measured", "which is exactly what was reported". The 6 cm
   rest offset is also in the entry point's `LeanDistance` doc. — Keep:
@@ -1764,6 +1753,61 @@ victim is accurate (only men reach the fight branch) and stays.
   Once, in the doc.
 - [ ] `:255` `@tparam npc` — "who is also named as the attacker"; the horse
   is, and the victim only when there is no horse. — "victim entity".
+
+### src/HorseCollisionMod/Impact.lua
+
+- [ ] `:4` header — "ten times a second"; the interval is `TickSeconds`. —
+  Correct.
+- [ ] `:5-6` — the rear and the charge "sweep a corridor in front of a
+  standing horse"; the rear strikes an arc (`RearReach`, `RearArc`) and the
+  charge sweeps a corridor while the horse lunges. — Correct.
+- [ ] `:7-8`, `:13-16` — "why the two lived as two whole functions for as
+  long as they did", "Written twice, they drifted… for months". — Cut; keep
+  `:18-22`.
+- [ ] `:10-12` — "the same thirteen steps in the same order"; the list is
+  not in code order (the reaction follows the sound) and leaves out the
+  shield, the standing height and the auto-cure suppression. — Drop the
+  count and the list; the function is the list.
+- [ ] `:51`, `:124-127` — three returns where two are the same value;
+  "the combined signal… meant he could never be staggered at all".
+  Resolves the carried item with the Rider finding: take two returns, and
+  keep one line on why the player's danger decides.
+- [ ] `:53-56` — "The charge used to probe itself as a minor injury…". —
+  Cut.
+- [ ] `:58`, `:63` — `or "Tickle"`, `or 0`; `TierValue` falls back to the
+  shipped row, which every tier has. — Drop the fallbacks.
+- [ ] `:84-86` — "What actually prevents the lockup"; the 40-health
+  threshold is restated from `Health.lua`. — "Keeps vanilla's auto-cure
+  daycycle from taking a bleeding victim over"; no figure.
+- [ ] `:94-101` — "the rider reported impacts landing silently when this
+  was moved below", "which is worth remembering". — Keep: the request goes
+  out before the body is handed to physics.
+- [ ] `:107-118` — "measured across two builds… seven gallops… where three
+  such gallops in the older build produced three". — Keep: `Ragdoll` reads
+  the victim's animation state, so the reaction runs next to the probe and
+  before anything cosmetic.
+- [ ] `:118-119`, `:182-183` — comments and code run together without a
+  blank line. — Separate.
+- [ ] `:146-147` — `-1` stands in for a missing speed. — Log `none`.
+- [ ] `:156-157` — two blank lines. — One.
+- [ ] `:185-190` — "1500 ms" restates a setting; "two guards in one lunge
+  produced two grunts and a kill line over the top of each other". — Keep:
+  a charge resolves every victim inside one sweep tick, so the rider's and
+  the horse's vocals play once per charge, as the stamina is charged once.
+- [ ] `:202-204` — says dust is spawned where the victim is struck; it
+  waits for the landing except on the rear (`Marks.lua` `DustWhenLanded`).
+  Resolves the carried item. — Correct.
+- [ ] `:207-209` — `TraceFallLanding` follows the investigation-diagnostics
+  ruling.
+- [ ] `:218-223` — past 80 columns; "it perfectly overrides the casual
+  recovery dialogue". Resolves the carried item. — Keep: the combat hit and
+  the provocation wait until the victim stands, because the combat hit
+  makes `sb_switch_hitreactions.xml` broadcast the assault at once.
+  `WhenVictimRises` follows the early-return ruling.
+- [ ] `:224` — `reason, elapsed` unused. — Drop.
+- [ ] `:248-251` — the return value of `ApplyImpactDamage` is ignored;
+  resolves the carried item with the Health finding.
+- [ ] `:262` — `-- test reload` left at end of file. — Delete.
 
 ### Dead code (`tools/audit_code.py`)
 
