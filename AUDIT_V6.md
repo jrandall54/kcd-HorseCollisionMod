@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text.
-Next: the README settings table. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table.
+Next: DEV_LOOP's hook section. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -250,7 +250,7 @@ Items that change behavior or delete a feature. Not applied without a decision.
   the two unused cells, since only the Lua text can name a rebound key.
   **Ruled as proposed.**
 
-- [ ] **README settings table.** It lists 97 settings as "the ones worth
+- [x] **README settings table.** It lists 97 settings as "the ones worth
   changing" while the player section of the settings file holds about 120
   more (`ShowTutorials`, `ImpactDamage`, `Barks`, `RiderBark`, `RearFear`,
   `ProtectStoryCharacters` among them), and every row repeats a fact the
@@ -258,6 +258,10 @@ Items that change behavior or delete a feature. Not applied without a decision.
   mod page's block from the file. Proposal: generate the README table the
   same way, checked by `--check`, or cut it to a short list of headline
   toggles that points at the file.
+  **Ruled: generate.** `nexus_settings_block.py` gains a markdown output;
+  the README table is replaced with it, and the release checks refuse a
+  README that differs. Descriptions become the file's inline comments. The
+  README as a whole is expected to be revisited after the audit.
 
 - [ ] **DEV_LOOP's hook section.** `DEV_LOOP.md` is tracked and describes a
   pre-push hook whose script lives in the ignored `.claude/hooks/`, so a clone
