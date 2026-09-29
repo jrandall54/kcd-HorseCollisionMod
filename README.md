@@ -12,19 +12,19 @@ of your own.
 | Walk, 1.8+ m/s | Staggers and stays up. No damage. | No cost |
 | Trot, 4.5+ m/s | Knocked down by an animation, hurt. | Stamina cost |
 | Gallop, 8.5+ m/s | Thrown by physics. Often fatal without armor. | Higher cost |
-| Rear | Struck by the horse coming down. | Higher cost |
-| Charge | Everyone in a corridor ahead is knocked down. | Highest cost |
+| Rear | Struck by the horse coming down. | Same as a gallop, once per rear |
+| Charge | Everyone in a corridor ahead is knocked down. | Same as a gallop, once per charge |
 
 - **Two moves on two keys.** `F` rears the horse on the spot and brings its hooves
-  down on anyone in front. The charge is a rearing lunge that knocks down everyone
-  ahead of the horse. The horse must be standing still to rear.
+  down on anyone in front. `R` is the charge, a rearing lunge that knocks down
+  everyone ahead of the horse. The horse must be standing still for either.
 - **`Q` and `E` lean you out of the saddle** in first person, so the horse's head
   stops hiding what you are about to ride into.
 - **Damage follows what the victim wears.** An unarmored villager rarely survives a
   full gallop. A man in plate mostly walks away.
 - **Collision kills are yours or not, as you choose.** Trampling someone to death is
-  a crime and guards respond, unless you turn that off, in which case it genuinely
-  is not charged to you.
+  a crime and guards respond, unless you turn that off, in which case it is not
+  charged to you.
 - **Your Horsemanship decides what an impact costs your horse.** Early on a single
   gallop can empty its stamina; the cost falls as the skill rises. Barding adds
   damage and eases the stamina cost.
@@ -36,11 +36,13 @@ of your own.
 - **Shove the same person too often and they fight back.** They drag you out of the
   saddle first, and you can yield instead of killing them. The brawl itself is not a
   crime. Women raise the alarm rather than fighting.
+- **A rear or a charge frightens the people around it.** Bystanders the hooves
+  miss decide for themselves whether to run or turn on you.
 - **They carry the marks.** Dirt and blood on the side the horse struck, which build
   up and wear off once their own routine takes them home.
 - **The impact lands on you too.** Camera kick at a gallop, a brief blur in first
   person, and dust off the ground where a body lands.
-- **In combat every stamina cost is multiplied**, and the walk stagger is skipped.
+- **In combat every stamina cost is raised**, and the walk stagger is skipped.
   Knockdowns are not.
 - Your dog is never affected.
 
@@ -53,12 +55,8 @@ Kingdom Come: Deliverance 1.9, any patch.
 Vortex, or extract the zip into `Kingdom Come - Deliverance\Mods\`.
 
 Upgrading: delete the old version rather than installing over it. Settings you
-changed carry over, and anything this version no longer recognizes is ignored
+changed carry over, and anything this version does not recognize is ignored
 rather than breaking.
-
-Upgrading from 4.x: the charge is its own kind of impact now, with its own damage,
-stamina cost and reach, so numbers you tuned through the gallop settings no longer
-describe it. The rear on the spot moved to `F`, because leaning took `Q` and `E`.
 
 ## Settings
 
@@ -75,10 +73,8 @@ zip and going into the pak inside it does not work.
    than Extract:
    - installed by hand: `Mods\HorseCollisionMod\Data\HorseCollisionMod.pak`
    - installed by Vortex: right click the mod, **Open in File Manager**, then
-     `Data\HorseCollisionMod.pak`. This is the staging copy, which is the one
-     to edit; Vortex deploys by hard link, and an archive tool replaces a file
-     rather than editing it in place, so editing the deployed copy under
-     `Mods\` separates the two.
+     `Data\HorseCollisionMod.pak`. Edit this staging copy, not the deployed
+     one under `Mods\`.
 2. Go to `Scripts\Startup\` and open `HorseCollisionMod_Settings.lua`, not
    `HorseCollisionMod.lua`, which is the mod itself.
 3. Change the values you want, keeping the `=` and the comma.
@@ -609,17 +605,20 @@ place in the file.
 
 ## Compatibility
 
-Works alongside other animation mods. No vanilla file is replaced or renamed. AI
-behavior trees, quests and RPG tables are untouched.
+Works alongside other animation mods. No vanilla animation database is replaced.
+Three small declaration files are: `kcd_animationControlledTags.xml`,
+`kcd_horse_fragmentids.xml` and `kcd_horse_controllerdefs.xml`. Another mod that
+replaces one of them conflicts, and whichever loads later wins.
 
-The one conflict left is another mod pointing the same NPC classes at a different
-animation database, which is uncommon.
+The Horsemanship perks are added to the RPG tables as new rows; no vanilla row
+is changed. AI behavior trees and quests are untouched.
+
+The other possible conflict is another mod pointing the same NPC classes at a
+different animation database.
 
 ## Planned
 
-Morale, so a rear frightens people the hooves never reach and a charge through a
-line breaks it. A braced polearm stopping a charge.
-
+A charge breaking a line of people, and a braced polearm stopping a charge.
 `ROADMAP.md` has the detail.
 
 ## Repository layout
@@ -635,89 +634,16 @@ src/
   HorseCollisionMod.lua            the entry point: the table, the settings it
                                    reads, and the parts it loads
   HorseCollisionMod_Settings.lua   the values a player edits
-  HorseCollisionMod/               the rest of the mod, one file per concern,
-                                   pulled in by the entry point
-  Libs/                            RPG table extensions for Horsemanship perks
-  Localization/                    UI text and descriptions for perks
+  HorseCollisionMod/               the rest of the mod, one file per concern
+  Animations/                      the horse's animation database and
+                                   declarations
+  Libs/                            RPG table rows for the Horsemanship perks
+  Localization/                    UI text for the perks
   mod.manifest
-tools/
-  build_adb.py            generates the animation data from a game install
-  flow.ps1                the session's states: test, branch, land, shipping,
-                          world
-  dev_deploy.ps1          installs into the game without Vortex
-  testworld.py            what a branch changes about the installed settings
-                          for testing, written into the development install as
-                          a separate file so the settings themselves are never
-                          rewritten
-  testworlds.ini          named testing worlds, as data
-  bark_chain.py           walks a bark set from metarole to role to topic to
-                          sequences, showing each line with its cooldown, so
-                          what a speaker will say and when they run dry is
-                          readable without the game
-  bark_lines.py           prints the English text of any vanilla bark set, and
-                          searches by remembered words for the set holding a
-                          line, without starting the game
-  bark_alias.py           prints any topic addressable by alias with its lines,
-                          speakers and word counts, the alias namespace being
-                          the label column of topic.xml
-  henry_impact_lines.py   every line Henry can actually be made to say, with the
-                          full text of every member of each set, filtered to
-                          those whose sequence is always-true, repeatable, and
-                          recorded by his actor alone
-  npc_pain_sets.py        every NPC bark set whose sequences are all
-                          unconditional, with its wordless count and longest
-                          line, for choosing the register of a reaction
-  dev_console.py          talks to the running game over its remote console
-  probe_inventory.lua     names what a named entity is carrying, resolving
-                          item class GUIDs to readable names
-  probe_tables.lua        dumps a game table's columns and rows through
-                          the Database bind
-  probe_health.lua        logs one entity's health whenever it changes, for
-                          the case where health moves with no impact to
-                          account for it
-  dev_peace.lua           stops the world reacting to the player, so a test
-                          that kills someone is not also a test of a fight
-  dev_survival.lua        holds the player's nourishment and energy at 100,
-                          so a test needing game time is not also a test of
-                          finding food in hardcore
-  dev_time.lua            moves game time forward without the wait dialog,
-                          through the Calendar global
-  dev_horse.lua           hands the player a rideable horse, taken from the
-                          horse traders' stable data
-  dev_barding.lua         puts a set of barding on the player's horse, so the
-                          barding impulse multiplier can be judged
-  dev_fasthorse.lua       hands the player the fastest horse in the level, so
-                          a gait plateau is not only Pebbles' own
-  probe_gait_speed.lua    samples the mounted horse's speed and reports each
-                          gait's plateau, which the tier thresholds are set
-                          against
-  dev_watchfight.lua      samples everyone near the player once a second, with
-                          the player alongside them, so a fight reads as one
-                          timeline rather than an impression
-  probe_api.lua           lists the methods an object actually exposes in the
-                          running game, which the written references do not
-  probe_bark.lua          asks whether a vanilla spoken line can be triggered
-                          from Lua, using metaroles the speaker provably holds
-  probe_camera.lua        polls the first-person camera through a view shake,
-                          which is the only way to see what that call does
-                          rather than what its arguments suggest
-  nexus_settings_block.py builds the mod page's settings block out of the
-                          settings file, so the page cannot fall behind what
-                          ships; --check reports what it is missing
-  publish_nexus.ps1       uploads a built release to the Nexus Mods page
-  verify_additive.py      proves the release claims only the intended vanilla
-                          names
-  audit_code.py           reports settings nothing reads, settings missing from
-                          the player's file, and functions and tables nothing
-                          uses, so clutter is a fact rather than an impression
-  set_version.py          writes the version into all fourteen places that
-                          carry it, and dates the changelog section
-  version_check.py        derives the next version from CHANGELOG.md
-  pre_release_check.py    finds claims the repository makes that are no
-                          longer true
+tools/                    build, deploy and research tools; see docs/DEV_LOOP.md
 docs/
   HOW_IT_WORKS.md         plain-language overview of the mod and its layout
-  DEV_LOOP.md             the hot-reload development loop
+  DEV_LOOP.md             the development loop and the tools catalog
   TECHNICAL_DETAILS.md    engine behavior and the constraints on changing it
   ENGINE_BINDS.md         every Lua function the game exposes on the objects
                           this mod touches, from the engine's own registration
@@ -734,15 +660,15 @@ resolves paths from the repository root, so they can be run from any directory.
 Requires PowerShell and Python 3.
 
 ```
-powershell -ExecutionPolicy Bypass -File .\build.ps1 -Version "3.0.0"
+powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-Animation data is generated from your own game install rather than committed, so
-the first build runs `tools/build_adb.py` for you and resolves the game folder
-itself. Output goes to `releases\`.
+The human animation databases are generated from your own game install rather
+than committed, so the first build runs `tools/build_adb.py` for you and resolves the
+game folder itself. Output goes to `releases\`.
 
 `docs/HOW_IT_WORKS.md` explains how the mod is put together, and
-`docs/DEV_LOOP.md` covers the hot-reload development loop.
+`docs/DEV_LOOP.md` covers the development loop.
 
 ## License
 

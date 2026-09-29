@@ -311,16 +311,17 @@ def check_download_size(paths, version):
     return found
 
 
-def readme_layout():
-    """The paths listed in the README's repository layout block.
+def layout_block(path, heading):
+    """The paths listed in a document's layout block.
 
-    The block is indented by directory: a line at the left margin ending in a
-    slash opens a directory, indented lines under it are its members, and a
-    line at the left margin without a slash is a file in the root.
+    The block is the first fenced block under `heading`. It is indented by
+    directory: a line at the left margin ending in a slash opens a directory,
+    indented lines under it are its members, and a line at the left margin
+    without a slash is a file in the root.
     """
-    text = read("README.md")
-    m = re.search(r"^## Repository layout\s*\n+```\n(.*?)^```", text,
-                  re.S | re.M)
+    text = read(path)
+    m = re.search(r"^## " + re.escape(heading) + r"\s*\n[^#]*?^```\n(.*?)^```",
+                  text, re.S | re.M)
 
     if not m:
         return None
@@ -391,47 +392,53 @@ def check_supported_game_version():
              " supports block")]
 
 
-def check_readme_layout():
-    """The README's repository layout against what the repository holds.
+# Each layout block and the tree it must list completely: the README's
+# repository layout covers src/, and the development loop's catalog covers
+# tools/. Those are where files are added, so a missing entry there means the
+# description is wrong rather than merely brief.
+LAYOUTS = (
+    ("README.md", "Repository layout", "src/"),
+    ("docs/DEV_LOOP.md", "Tools", "tools/"),
+)
 
-    A layout block is the first thing a reader trusts and the first thing to
-    rot, because adding a file is not a moment anyone thinks about the README.
-    Only src and tools are required to be complete: they are where files are
-    added, and a missing entry there means the description is wrong rather
-    than merely brief.
+
+def check_layouts():
+    """Each layout block against what the repository holds.
 
     A listed directory covers what is inside it. The mod's Lua is split across
-    a directory of part files that grows one file at a time, and a layout block
-    that named every one would say less than a line describing the directory.
+    a directory of part files, and a line describing the directory says more
+    than a list of every file in it.
     """
-    listed = readme_layout()
-
-    if listed is None:
-        return [("README.md", 0, "layout", "no repository layout block")]
-
     found = []
-    directories = sorted(n for n in listed if n.endswith("/"))
-
-    for name in sorted(listed):
-        if not os.path.exists(os.path.join(REPO_ROOT, name)):
-            found.append(("README.md", 0, name,
-                          "the layout lists a %s that does not exist"
-                          % ("directory" if name.endswith("/") else "file")))
-
     tracked = set(tracked_files())
 
-    for path in sorted(tracked):
-        if not path.startswith(("src/", "tools/")):
+    for doc, heading, tree in LAYOUTS:
+        listed = layout_block(doc, heading)
+
+        if listed is None:
+            found.append((doc, 0, heading, "no layout block"))
             continue
 
-        if os.path.basename(path).startswith("__"):
-            continue
+        directories = sorted(n for n in listed if n.endswith("/"))
 
-        if path in listed or any(path.startswith(d) for d in directories):
-            continue
+        for name in sorted(listed):
+            if not os.path.exists(os.path.join(REPO_ROOT, name)):
+                found.append((doc, 0, name,
+                              "the layout lists a %s that does not exist"
+                              % ("directory" if name.endswith("/")
+                                 else "file")))
 
-        found.append(("README.md", 0, path,
-                      "tracked but missing from the layout"))
+        for path in sorted(tracked):
+            if not path.startswith(tree):
+                continue
+
+            if os.path.basename(path).startswith("__"):
+                continue
+
+            if path in listed or any(path.startswith(d) for d in directories):
+                continue
+
+            found.append((doc, 0, path, "tracked but missing from the layout"))
 
     return found
 
@@ -645,7 +652,7 @@ def main():
                 + check_links(paths)
                 + check_config_docs()
                 + check_supported_game_version()
-                + check_readme_layout()
+                + check_layouts()
                 + check_readme_settings()
                 + check_generated_docs()
                 + ([] if merge_only else check_release_notes(version))
