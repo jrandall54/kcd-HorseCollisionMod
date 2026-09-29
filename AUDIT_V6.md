@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Fear.lua findings recorded and committed.
+**Current status:** Crime.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Crime.lua`.
+**Next pass:** `Impact.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -44,7 +44,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Update.lua`
 - [x] `Marks.lua`
 - [x] `Fear.lua`
-- [ ] `Crime.lua`
+- [x] `Crime.lua`
 - [ ] `Impact.lua`
 - [ ] `Log.lua`
 - [ ] `Tutorial.lua`
@@ -1722,6 +1722,48 @@ victim is accurate (only men reach the fight branch) and stays.
   meters".
 - [ ] `:221-222` — "normalised". — "normalized".
 - [ ] `:227` `ChargeFearBand` — returns a count with no `@treturn`. — Add.
+
+### src/HorseCollisionMod/Crime.lua
+
+- [ ] `:3`, `:12` — "offence". — "offense".
+- [ ] `:9-13` header — "a harder impact is charged as a worse offence";
+  `:108-111` says strength changes nothing about the charge and the fine
+  follows the victim's social class. — Take `:108-111` as the fact; cut the
+  header sentence.
+- [ ] `:20-21` — `@release` runs straight into the `CombatAttackKind`
+  comment, so LDoc folds it into the module doc. — Separate.
+- [ ] `:28-33` — "for a blunt reason", "which is the better place for it
+  anyway". — One line: kept here because LDoc rejects a third annotated
+  table in `Enums.lua`.
+- [ ] `:50-52` `SendCombatHit` — "why this is worth trying at all", "have
+  always had to be played by seizing the actor". — Cut; `:48-50` stands.
+- [ ] `:60-62`, `:101-106` — the `Melee` substitution explained twice;
+  "Measured across nine runs". — Once: the crime system prosecutes `Melee`,
+  `MeleeStealth` and `Bullet` and ignores `Collision` and `Fall`, and
+  vanilla rewrites a ridden collision to `Melee` for that reason.
+- [ ] `:66` — "the same fault that made `daycycle:restartRequest` look
+  inert". — Cut.
+- [ ] `:97-100` — "Both overridable, so a single impact can be run at a
+  chosen setting without a rebuild… one impact per save load": nothing in
+  the function is overridable; residue of a removed test hook, and it runs
+  into the next comment. — Delete.
+- [ ] `:75`, `:165`, `:256` `@treturn` — no caller reads the result of
+  `SendCombatHit` (`Impact.lua:233`, `Health.lua:830`),
+  `SendProvocationHit` (`Retaliation.lua:1014`, `:1036`) or
+  `SendOffenseRelease` (`Retaliation.lua:301`). — Return nothing.
+- [ ] `:81-95`, `:171-185`, `:258-262` — the target id and the player WUID
+  are resolved inline in each sender, and again in `Fear.lua:48-52`,
+  `:151-155`. — Two helpers, used by both files.
+- [ ] `:211-213` `SendOffenseRelease` — "observed doing for twenty-two
+  seconds before the rider swung first". — Cut; "never strikes" stands.
+- [ ] `:227` — "and that is the whole trick". — "The attacker named is the
+  horse".
+- [ ] `:239` — "measured against a null control". — Keep the two sample
+  rows alone.
+- [ ] `:244-247`, `:264-268` — why the horse and not the victim, twice. —
+  Once, in the doc.
+- [ ] `:255` `@tparam npc` — "who is also named as the attacker"; the horse
+  is, and the victim only when there is no horse. — "victim entity".
 
 ### Dead code (`tools/audit_code.py`)
 
