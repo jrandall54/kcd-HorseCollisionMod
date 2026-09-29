@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`.
-Next: `land`'s build retry. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`, `land`'s build retry.
+Next: `verify_additive.py` runs only by hand. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -348,13 +348,19 @@ Items that change behavior or delete a feature. Not applied without a decision.
   **Ruled: delete** `:reload`, `reload_mod` and the help line (`:835`);
   `flow test` is the reload path, per the front-door ruling.
 
-- [ ] **`land`'s build retry.** `flow.ps1:382-398` retries a refused build
+- [x] **`land`'s build retry.** `flow.ps1:382-398` retries a refused build
   after staging, because "setting the version rewrites the `@release` line
   … which makes the generated API reference stale a second time".
   `pre_release_check.py:493-495` says the version does not appear in the
   LDoc output, and `docs/api` holds no version string. The retry also
   masks any other first-build failure. Proposal: delete the retry; if a
   real second-build cause exists, name it in the comment instead.
+  **Ruled, revised:** the premise was wrong. The API reference does carry
+  the version, as each module's **Release** field, and it is stale
+  (`docs/api/modules/HorseCollisionMod.Armor.html:78` reads 5.11.3 against
+  `@release 5.31.4`). Remove the cause: drop `@release` from every source
+  file and from `set_version.py`; delete the retry; correct the comment at
+  `pre_release_check.py:493-495`. The next build regenerates `docs/api`.
 
 - [ ] **`verify_additive.py` runs only by hand.** Its docstring says "Run
   it before publishing"; nothing calls it. `build.ps1`, `flow.ps1 land` and
