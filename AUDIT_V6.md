@@ -29,7 +29,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`. Next: the cooldown icon after a save load. Phase 2 then applies the
+rescue, `RearAnimSpeed`, the cooldown icon. Next: `CatchYieldImmediately`. Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
@@ -113,12 +113,14 @@ Items that change behavior or delete a feature. Not applied without a decision.
   settings file `:1108`), and `RearAnimMs` (`Rear.lua:420`), used only for
   the standing rear, stops dividing by it.
 
-- [ ] **The cooldown icon after a save load.** A load winds the clock back
-  with the deadline in place. `RearRequested` treats a gap larger than the
-  cooldown as a wind-back and lets the press through, but
-  `UpdateMoveCooldowns` only asks `now < nextAt`, so the icon can stay up
-  while the move is available. Proposal: apply the same wind-back test in
-  `UpdateMoveCooldowns`, or clear both clocks on load.
+- [x] **The cooldown icon after a save load.** Ruled not a bug: the load
+  handler already clears `RearNextAt` and `ChargeNextAt`
+  (`HorseCollisionMod.lua:1893-1894`), so `UpdateMoveCooldowns` takes the
+  icon down on the next tick. Delete the unreachable wind-back branch in
+  `RearRequested` (`Rear.lua:385-393`) so a cooldown is `now < nextAt`, and
+  correct its comment. Phase 2 also checks one unverified case: whether the
+  icon buff is written into the save, so that a relaunch and load of a save
+  taken with the icon up leaves it raised with `CooldownIconShown` empty.
 
 - [ ] **`CatchYieldImmediately`.** A module constant fixed at `false`
   (`HorseCollisionMod.lua:1547`) with no setting, so the yield branch in
