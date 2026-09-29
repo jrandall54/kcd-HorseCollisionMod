@@ -1097,7 +1097,13 @@ function HorseCollisionMod:HushVanillaBark(npc)
 				{ suppressNonexistentHandleError = true })
 	end)
 
+	-- A refresh re-arms the hush with a new stamp. Only the timer armed with
+	-- the current stamp may clear it, so a superseded timer does nothing.
 	Script.SetTimer(window, function()
+		if self.RecentHushes[id] ~= now then
+			return
+		end
+
 		pcall(function()
 			Contexts.ClearOption(npc, "suppressCollisionsBark", "hcmBark",
 					{ suppressNonexistentHandleError = true })

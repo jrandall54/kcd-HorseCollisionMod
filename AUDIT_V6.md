@@ -310,6 +310,12 @@ One line per batch: batch, commit, what was verified.
   test does not see a ragdolled body lie down and returns `flat=false` at
   any fraction. The derivation stands; the snap check is dropped from the
   publish test.
+- **Batch 3, item 2.** `HushVanillaBark`'s timer clears the option only when
+  `RecentHushes[id]` still holds the stamp it was armed with. Accepted
+  without an ear test: the ride cannot tell vanilla's line from the mod's
+  by ear and the engine does not log vanilla's, and the change can only
+  hold the mute longer. Walk contact after lingering: stagger, the mod's
+  `Shove` line sent, no errors.
 
 ## Standard
 
