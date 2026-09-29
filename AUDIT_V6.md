@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle.
-Next: `ProtectMutt`. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`.
+Next: two sets of tutorial text. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -228,15 +228,20 @@ Items that change behavior or delete a feature. Not applied without a decision.
   line: each correction is a shake entry in the rider's sixteen-entry
   queue, and the deadband keeps the rate down.
 
-- [ ] **`ProtectMutt` has no effect.** `Update.lua:276-279` says dogs
+- [x] **`ProtectMutt` has no effect.** `Update.lua:276-279` says dogs
   share the generic NPC class and are found by name; the human filter at
   `:312-316` admits only `NPC`, `NPC_Female` and `Player`, and dogs are class
   `Dog` (live scan in the diary, "The human filter was not one"). Henry's
   dog never reaches the `isProtected` test's consequences, and `:288-293` is
   an empty `if isMutt then end` left from removed collision filtering.
   `RearCanHit` (`Rear.lua:1094-1120`) repeats the name test behind the same
-  class filter. Proposal: delete `ProtectMutt`, both name checks and the
-  empty block; the class filter protects every dog.
+  class filter. **Ruled:** delete `ProtectMutt` (entry point, settings
+  file, README row), both name checks and the empty block; the class filter
+  protects every dog. Phase 2 first reads the companion dog's `ent.class`
+  live; if it is a human class, this reopens. Mutt occasionally takes
+  damage from an impact and runs off yelping; with the class filter in
+  front, that is the engine's own collision, not the mod's reaction path.
+  Not work: the rider raises it if it recurs.
 
 - [ ] **Two sets of tutorial text.** `Tutorial.lua:33-57` builds the
   banners in Lua, in English, with the configured keys; the localization
