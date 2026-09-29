@@ -1070,7 +1070,7 @@ HorseCollisionModSettings = {
 	-- after the horse has come down.
 	RearImpactSpeed          = 6.0,   -- the speed a rear is scored at, since
 	                                  -- the horse is barely moving
-	RearAnimSpeed            = 1.0,   -- how fast the rear plays
+	RearAnimSpeed            = 1.0,   -- how fast the charge's rear plays
 	RearChargeLungePeakMin   = 3.0,   -- top speed a lunge must reach to count
 	RearChargeLungeSpentAt   = 0.5,   -- fraction of its peak at which the
 	                                  -- lunge is treated as spent

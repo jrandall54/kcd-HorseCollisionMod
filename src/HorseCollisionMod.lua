@@ -221,7 +221,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   scored as a gallop rather than by the horse's speed
 -- @field RearFragTag the FragTag of the rear option in the mod's horse
 --   animation database
--- @field RearAnimSpeed how fast the rear plays
+-- @field RearAnimSpeed how fast the charge's rear plays; the standing rear
+--   always plays at normal speed
 -- @field RearStrikes whether the hooves coming down hit anyone in front
 -- @field RearStrikeMs when in the animation the hooves land
 -- @field RearReach how far in front the hooves reach, in meters

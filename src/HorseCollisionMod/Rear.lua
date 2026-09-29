@@ -394,8 +394,8 @@ end
 
 --- How long the standing rear holds the horse, in milliseconds.
 --
--- Read from the animation itself rather than declared, divided by the speed
--- it is played at.
+-- Read from the animation itself rather than declared. The standing rear
+-- plays at normal speed; `RearAnimSpeed` applies to the charge only.
 --
 -- @treturn number the length, or 0 when it cannot be read
 function HorseCollisionMod:RearAnimMs()
@@ -408,7 +408,7 @@ function HorseCollisionMod:RearAnimMs()
 		length = horseEnt:GetAnimationLength(0, "relaxed_rearing") or 0
 	end)
 
-	return (length * 1000) / (self.Config.RearAnimSpeed)
+	return length * 1000
 end
 
 --- The cooldown icons, one per commanded move.
