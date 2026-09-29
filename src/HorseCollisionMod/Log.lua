@@ -1,23 +1,22 @@
---- Logging, speed history and the speed tier.
+--- Logging, the clock and the speed history.
 --
 -- What every other part of the mod reads before it decides anything: the
--- engine clock, vector length, the rolling speed history an impact is judged
--- against, and the two log calls. Attached to the `HorseCollisionMod` table
--- created by the entry point, which pulls this file in with
--- `Script.ReloadScript`.
+-- engine clock, vector length, the detection interval, the rolling speed
+-- history an impact is scored from, entity names for the log, and the log
+-- calls. Attached to the `HorseCollisionMod` table created by the entry
+-- point, which pulls this file in with `Script.ReloadScript`.
 --
--- `TimeMs` and `VectorLength` are methods rather than file-locals. A local is
--- visible only inside the chunk that declares it, and these are called from
--- part files that are separate chunks.
+-- These are methods rather than file-locals: a local is visible only inside
+-- the chunk that declares it, and they are called from part files that are
+-- separate chunks.
 --
 -- @module HorseCollisionMod.Log
 -- @author jrandall54
+
 --- The engine clock in milliseconds.
 --
 -- `System.GetCurrTime` returns seconds as a float and `os.clock` returns nil
--- in this engine, so this is the only clock available. A method rather than a
--- file-local because the mod is split across files and a local is visible only
--- inside the one that declares it.
+-- in this engine, so this is the only clock available.
 --
 -- @treturn number milliseconds since the engine started
 function HorseCollisionMod:TimeMs()
@@ -25,9 +24,6 @@ function HorseCollisionMod:TimeMs()
 end
 
 --- Magnitude of a CryEngine vector.
---
--- A method for the same reason as `TimeMs`: callers are spread across the
--- mod's part files, which do not share locals.
 --
 -- @tparam ?table v vector with x, y and z components, or nil
 -- @treturn number length, or 0 when v is nil
@@ -58,33 +54,16 @@ end
 -- horse, so the speed on the tick of impact under-rates the blow. A collision
 -- should be scored by the speed the horse carried **into** it.
 --
--- The flaw that fixes is real and the hold must stay. What it could not do is
--- tell speed carried into a collision from speed produced by one. Walking a
--- horse into someone repeatedly kicks it off the body, the kick lands in this
--- history, and the hold then scores the next impact by it. Measured over one
--- run of walking shoves, the score climbed while the horse never left walking
--- pace:
+-- The hold alone cannot tell speed carried into a collision from speed
+-- produced by one: walking a horse into someone kicks it off the body, and a
+-- kick in the history would score a walking shove as a trot.
 --
---     score 3.06  sampled 3.05    agreeing
---     score 2.90  sampled 2.89    agreeing
---     score 3.79  sampled 2.24    diverging
---     score 6.23  sampled 2.05    scored a trot at 2 m/s
---
--- The victim took a knockdown, 16 damage and a camera shake from what the
--- rider experienced as walking into her, and the walk tier's whole contract is
--- that it shoves and does not knock anyone down.
---
--- **A single sample cannot set the peak.** The peak is the larger of each
--- neighbouring pair, so a figure has to be reached on two consecutive samples
--- before it counts. Real speed is sustained: a horse at a gallop reads 8.5
--- across many samples and is scored at 8.5, and one decelerating on contact
--- still has the samples before the contact to be rated by. A kick is one tick
--- wide and its neighbour is an ordinary reading, so it never wins.
---
--- This is the same rule `WatchLunge` already applies for the same reason,
--- where one-sample readings of 21.2, 25.5 and 25.8 m/s against 13.0 on the
--- same move were closing the charge window inside 200 ms. Both are the engine
--- reporting a speed the horse did not travel at.
+-- **A single sample cannot set the peak.** The peak is the largest of each
+-- neighboring pair's smaller reading, so a figure has to be reached on two
+-- consecutive samples before it counts. Real speed is sustained, and a horse
+-- decelerating on contact still has the samples before the contact to be
+-- rated by; a kick is one tick wide and its neighbor is an ordinary reading,
+-- so it never wins. `WatchLunge` applies the same rule to the charge.
 --
 -- @tparam number count how many of the most recent samples to consider
 -- @treturn number the highest speed held across two samples, meters per second
@@ -152,14 +131,10 @@ end
 -- someone.
 --
 -- Capped because the physics system reports occasional speeds above anything a
--- horse holds. What the cap protects is narrower than it used to claim: this
--- value selects the tier and gives `GetImpactDir` its direction, and nothing
--- downstream scales force by it. Every force figure is flat per tier, the
--- brake reads the body's own velocity, and `Impulse` is `Knockback` and
--- `Uplift` alone. Raising the ceiling from 11.0 to 13.0, which is what a
--- stat-capped horse actually sustains, changed the logged speed from 11.00 to
--- 11.79 on a measured impact and changed nothing a rider could feel, exactly
--- as that reading predicts.
+-- horse holds. This value selects the tier and gives `GetImpactDir` its
+-- direction; nothing downstream scales force by it. Every force figure is
+-- flat per tier, the brake reads the body's own velocity, and the impulse is
+-- `Knockback` and `Uplift`.
 --
 -- @treturn number the speed to score the impact at, in meters per second
 function HorseCollisionMod:ImpactSpeed()
@@ -178,8 +153,9 @@ end
 -- no reaction is indistinguishable from one that was never detected. This
 -- names the reason.
 --
--- Rate limited because the loop runs about twenty times a second and the
--- detection sphere returns everything nearby, including crates and doors.
+-- Rate limited, to once a second per entity, because the loop runs every
+-- `TickSeconds` and the detection sphere returns everything nearby, including
+-- crates and doors.
 --
 -- @tparam table npc the entity that was rejected
 -- @tparam string reason short label for which test rejected it
@@ -203,9 +179,6 @@ function HorseCollisionMod:LogRejection(npc, reason, detail)
 			.. " " .. tostring(detail))
 end
 
-
---- Current time in milliseconds.
--- @treturn number milliseconds since the game session started
 --- An entity's name, or "?" when it cannot be read.
 --
 -- Reading a name is not safe. An entity can be unstreamed between the moment
@@ -239,8 +212,8 @@ end
 --- The detection interval in milliseconds.
 --
 -- `TickSeconds` is the one figure the loop rate and the forward sweep are both
--- derived from, so a change to it moves them together. Clamped at the bottom
--- because a zero would book a timer that never rests.
+-- derived from, so a change to it moves them together. Clamped at one frame
+-- at 60 Hz, 0.016 s, because a zero would book a timer that never rests.
 --
 -- @treturn number milliseconds between detection ticks
 function HorseCollisionMod:TickMs()
