@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options.
-Next: the interactive `:reload`. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`.
+Next: `land`'s build retry. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -340,11 +340,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   **Ruled as proposed.** The `hcm_settle` comment (`:285-287`) drops its
   comparison with their rotations.
 
-- [ ] **The interactive `:reload`.** `dev_console.py` interactive mode's
+- [x] **The interactive `:reload`.** `dev_console.py` interactive mode's
   `:reload` (`reload_mod`, `:417-418`) re-executes only the entry point.
   `RELOAD_COMMANDS` (`:170-200`) documents why that leaves the settings
   stale and the detection loop stopped. Proposal: `:reload` queues
   `RELOAD_COMMANDS`; delete `reload_mod`.
+  **Ruled: delete** `:reload`, `reload_mod` and the help line (`:835`);
+  `flow test` is the reload path, per the front-door ruling.
 
 - [ ] **`land`'s build retry.** `flow.ps1:382-398` retries a refused build
   after staging, because "setting the version rewrites the `@release` line
