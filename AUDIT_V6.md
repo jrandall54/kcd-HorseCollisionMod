@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`.
-Next: the investigation diagnostics. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics.
+Next: the impact-throw probe. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -194,12 +194,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   what timing the rest needs. Trot and rear give-ups (about one in ten
   each, damage at `RagdollLandCeilingMs`) are a known cost, not work.
 
-- [ ] **The investigation diagnostics.** `WatchTurn` (a polearm victim
-  reported facing the wrong way) and `TraceFallLanding` (how often a
-  requested fall is held) were built to answer one question each.
-  `TraceFallLanding` runs on every impact whenever `LogTelemetry` is on.
-  Proposal: delete `WatchTurn`; keep `TraceFallLanding` only if its question
-  is still open, and gate it on `TraceRecovery` with the others.
+- [x] **The investigation diagnostics.** Ruled: delete both. `WatchTurn`
+  and its calls (`Reaction.lua:190`, `:1044`): its rows read `off by +0deg`,
+  so its question is answered. `TraceFallLanding` and its call
+  (`Impact.lua:209`): across the backed-up logs the ragdoll state arrives
+  after 1.5 s on about 80% of trot, gallop and charge impacts, too often to
+  be held falls, so the state it watches is not the landing and it cannot
+  answer its question.
 
 - [ ] **The impact-throw probe.** `ProbeImpactCost` measures throw distance
   from `GetWorldPos` (`Health.lua:213-220`, `:262-272`) and runs a rest
