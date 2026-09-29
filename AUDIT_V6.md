@@ -13,7 +13,7 @@ end of every pass, so it always says where the audit stands.
 **Phase:** 1, recording findings. No source file has been edited.
 
 **Current status:** every source file and every document except the diary
-audited; tooling pass started, `build.ps1` done.
+audited; tooling pass started, `build.ps1` and `dev_deploy.ps1` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -25,7 +25,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `dev_deploy.ps1`, `build_adb.py`,
+**Next pass:** `tools/`, largest first: `build_adb.py`,
 `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
 `verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
@@ -270,6 +270,15 @@ Items that change behavior or delete a feature. Not applied without a decision.
   build has generated since `5718d08`. It exists only for working copies
   older than that. Proposal: delete the block; a clean `mod_assets/`
   regeneration covers the same case.
+
+- [ ] **A full deploy into a running game.** `dev_deploy.ps1` warns and
+  continues when the game is running (`:935-940`), then deletes
+  `Mods\HorseCollisionMod_dev` (`:971-973`), whose pak the engine holds
+  open; under `$ErrorActionPreference = "Stop"` that aborts the deploy
+  midway. `flow.ps1 test` avoids it by running `-ScriptOnly` then
+  `-AnimOnly` when the game is up (`flow.ps1:260-266`), so only a direct
+  call reaches it. Proposal: with the game running, a full deploy syncs the
+  loose files as `-Reload` does and says the pak was left alone.
 
 ## Findings
 
@@ -2367,6 +2376,83 @@ instruction.
 - [ ] `:249`, `:503` — comment block runs straight on from the closing brace
   with no blank line, unlike every other section. `:632-633` trailing blank
   lines. — Format.
+
+### tools/dev_deploy.ps1
+
+Sound mechanics; the comments carry most of the project's deploy history, and
+four of them describe behavior that does not exist.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:157-165` — "That happened with wh_female_fragmentids.xml…". — Keep
+  `:157-160`: a withdrawn loose file goes on overriding vanilla.
+- [ ] `:193-201` `log_SpamDelay` — two comments that disagree: the first
+  says the delay leaves the mod's telemetry alone, the second why development
+  wants none; "was half of every line written to kcd.log". — One comment:
+  development keeps every repeat, because the overflow message differs only
+  by a pointer.
+- [ ] `:209-212` — "hunted across about 130 impacts … on the rider's console
+  the whole time". — Cut.
+- [ ] `:323-327` — "that is how a mod folder was lost rather than parked". —
+  Keep the half-parked failure; cut the account.
+- [ ] `:342-345` — "truncating the manifest on the second run orphaned the 31
+  items". — "Appended, because the park is rerun after a refusal."
+- [ ] `:356-363` — "the ten part files were added when the Lua was split",
+  `HorseCollisionMod_ItemData.lua` "left behind by every list written since".
+  — Keep "matched by location, not by a list, because one surviving loose
+  file masks the pak".
+- [ ] `:484-487` — "a restore that removed the whole tree destroyed a folder
+  of parked scripts". — Keep "things are put there by hand".
+- [ ] `:602-606` — "This used to name `Libs\Config` alone … simply absent
+  from the running game". — Cut.
+- [ ] `:633-638` — "That happened with -ScriptOnly … two test rides were
+  spent". — Keep `:640-642`.
+- [ ] `:662-665` — "Every installed file now matches … nothing left to
+  normalize away". — Cut; the check needs no comment.
+- [ ] `:778-780` — "a lean was added on two new keys … reported as doing
+  nothing". — Cut.
+- [ ] `:924-930` — "This used to refuse outright … indistinguishable from a
+  crash and cost several rides", "the rider". — Cut.
+- [ ] `:1074-1077` — "The `sys_DevMode = 1` line in system.cfg does nothing:
+  querying it … answers Unknown command". The `STYLE.md` rejected-example
+  table names this sentence. — Keep "Without -devmode the console refuses
+  `VF_CHEAT` commands, `lua_reload_script` among them."
+
+**Wrong or stale:**
+
+- [ ] `:12` usage — `-Crime` "keep riding people down a crime"; no such
+  parameter. `-NoDevMode`, `-NoLooseScript`, `-ScriptOnly`, `-AnimOnly`,
+  `-ReleaseSettings` and `-Force` are missing. — Rewrite the usage from
+  `param`.
+- [ ] `:366-367` — "Two vanilla file names are listed explicitly"; the list
+  holds four, and duplicates `$claimedVanillaAdb` (`:166-171`). — Use
+  `$claimedVanillaAdb`; drop the count.
+- [ ] `:516-535` — the doc for `Sync-LooseFiles` (copies, returns which
+  halves were written) sits above `Get-LooseFileMap`, run together with that
+  function's own doc. — Move `:516-528` above `Sync-LooseFiles` (`:727`).
+- [ ] `:617` — `TrimStart('')` trims nothing (the leading `\` survives);
+  works only because `Join-Path` tolerates it. — `TrimStart('\')`.
+- [ ] `:747-750` — "build.ps1 regenerates every animation database on each
+  run"; it runs `build_adb.py` only when `hcm_male_database.adb` is missing
+  (`build.ps1:422`). — "A regeneration rewrites every database whether or
+  not the bytes moved."
+- [ ] `:801-803` — "build.ps1 rejects a release that ships CollisionIsCrime
+  = false"; nothing checks `CollisionIsCrime`. The real reason is that the
+  settings file ships. — Say that.
+- [ ] `:932-934` — "The pak case is still real, so the refusal is kept for
+  it"; there is no refusal, only the warning below. A full deploy with the
+  game running then removes `$devDir` (`:971-973`), whose pak the engine
+  holds open. — Correct the comment; see the ruling.
+- [ ] `:1034-1037` — "The check below says so"; the check below is
+  `Test-InstalledFiles`, which compares hashes. `sys_PakPriority` is checked
+  by `Assert-DevEnvironment` (`:507-511`). — Point at that.
+- [ ] `:1084-1088` — "there are two user.cfg files in this install"; a
+  single machine's layout. — "The engine resolves `user.cfg` relative to
+  the working directory."
+- [ ] `:902` — `--` as a dash. — Rephrase.
+- [ ] `:1091-1096` — two branches differing only in the argument string. —
+  One call.
+- [ ] `:166-171` — four-space indentation in a tab-indented file. — Tabs.
 
 ### Dead code (`tools/audit_code.py`)
 
