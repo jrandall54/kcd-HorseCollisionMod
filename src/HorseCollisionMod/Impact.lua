@@ -26,7 +26,6 @@
 --
 -- @module HorseCollisionMod.Impact
 -- @author jrandall54
--- @release 5.31.4
 
 --- Everything one impact does to one victim.
 --

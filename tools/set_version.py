@@ -1,14 +1,8 @@
 """Sets the version everywhere it is written, in one command.
 
-The number lives in fourteen places: `src/mod.manifest`, the
-`HorseCollisionMod.Version` assignment, and an `@release` tag in the entry
-point and each of the eleven part files. `build.ps1` checks every one of them
-and refuses a release if any disagrees.
-
-Bumping them by hand is the chore this removes. Done that way it becomes a
-build, fix, build cycle repeated once per file, because the build reported
-only the first mismatch it found; that half is fixed in `build.ps1`, and this
-is the other half.
+The number lives in two places: `src/mod.manifest` and the
+`HorseCollisionMod.Version` assignment. `build.ps1` refuses a release if
+either disagrees with the version being built.
 
     python tools/set_version.py            derive the next version and apply it
     python tools/set_version.py 4.7.0      apply a version explicitly
@@ -37,19 +31,6 @@ REPO_ROOT = vc.REPO_ROOT
 MANIFEST = vc.MANIFEST
 CHANGELOG = vc.CHANGELOG
 ENTRY = vc.SCRIPT
-PARTS_DIR = os.path.join(REPO_ROOT, "src", "HorseCollisionMod")
-
-
-def lua_files():
-    """The entry point first, then every part file, in load order."""
-    out = [ENTRY]
-
-    if os.path.isdir(PARTS_DIR):
-        for name in sorted(os.listdir(PARTS_DIR)):
-            if name.endswith(".lua"):
-                out.append(os.path.join(PARTS_DIR, name))
-
-    return out
 
 
 def read(path):
@@ -89,15 +70,8 @@ def current():
     m = re.search(r"<version>([^<]+)</version>", read(MANIFEST))
     out["mod.manifest"] = (MANIFEST, m.group(1).strip() if m else None)
 
-    entry = read(ENTRY)
-    m = re.search(r'HorseCollisionMod\.Version\s*=\s*"([^"]+)"', entry)
+    m = re.search(r'HorseCollisionMod\.Version\s*=\s*"([^"]+)"', read(ENTRY))
     out["HorseCollisionMod.Version"] = (ENTRY, m.group(1) if m else None)
-
-    for path in lua_files():
-        m = re.search(r"^-- @release\s+(\S+)\s*$", read(path), re.M)
-
-        if m:
-            out["@release " + os.path.basename(path)] = (path, m.group(1))
 
     return out
 
@@ -114,28 +88,13 @@ def apply(version):
         write(MANIFEST, new)
         touched.append("mod.manifest")
 
-    for path in lua_files():
-        text = read(path)
-        new = text
+    text = read(ENTRY)
+    new = re.sub(r'(HorseCollisionMod\.Version\s*=\s*)"[^"]+"',
+                 r'\g<1>"%s"' % version, text, count=1)
 
-        if path == ENTRY:
-            new = re.sub(r'(HorseCollisionMod\.Version\s*=\s*)"[^"]+"',
-                         r'\g<1>"%s"' % version, new, count=1)
-
-        # Horizontal whitespace only, never `\s`, which matches newlines.
-        #
-        # With `\s*$` under re.M the match ran past the end of the line and
-        # swallowed the blank line separating the module header from the doc
-        # block below it. LDoc then reads the two as one block and fails with
-        # "'class' cannot have multiple values". That was misdiagnosed as a
-        # problem with the tables in the file it named, and "fixed" by moving
-        # them, which was never the cause.
-        new = re.sub(r"^(-- @release[ \t]+)\S+[ \t]*$",
-                     r"\g<1>%s" % version, new, flags=re.M)
-
-        if new != text:
-            write(path, new)
-            touched.append(os.path.relpath(path, REPO_ROOT))
+    if new != text:
+        write(ENTRY, new)
+        touched.append(os.path.relpath(ENTRY, REPO_ROOT))
 
     return touched
 

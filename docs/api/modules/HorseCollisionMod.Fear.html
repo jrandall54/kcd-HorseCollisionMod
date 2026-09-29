@@ -67,12 +67,19 @@
 <div id="content">
 
 <h1>Module <code>HorseCollisionMod.Fear</code></h1>
-<p>The band around a rear where nobody is touched.</p>
-<p> A rear either lands on somebody or does nothing at all, which makes a horse
- going up on its hind legs in a crowded street an event only one man in the
- street notices. The hooves keep their own band, <code>RearReach</code> and <code>RearArc</code>,
- and this file owns the wider one outside it: the people close enough to be
- frightened and far enough not to be hit.</p>
+<p>The band around a rear or a charge where nobody is touched.</p>
+<p> A rear either lands on somebody or does nothing at all, and a charge either
+ runs a man down or misses him, which makes a horse going up on its hind legs
+ in a crowded street, or driving through one, an event only the people it
+ touched notice. The hooves keep their own band, <code>RearReach</code> and <code>RearArc</code>,
+ and the charge keeps its corridor; this file owns the wider ground outside
+ both: the people close enough to be frightened and far enough not to be hit.</p>
+
+<p> The trot and the gallop have no band, and that is deliberate. An impact
+ that wounds is charged as an assault through <code>combat:hit</code> when
+ <code>CollisionIsCrime</code> is on, and vanilla's witnesses already react to that.
+ Fear covers the one case nothing else does: a move aimed at somebody that
+ hits nobody, which only the rear and the charge can produce.</p>
 
 <p> Nothing here decides who runs. The stimulus the band sends is vanilla's own
  <code>combat:stimulus:hostilePerception</code>, the message an NPC's brain receives
@@ -99,8 +106,20 @@
 	<td class="summary">Tells one NPC that the rider is a threat.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:FrightenBystander">HorseCollisionMod:FrightenBystander (npc, playerWuid, priority, overrideSuppress)</a></td>
+	<td class="summary">Frightens one bystander: the stimulus, and the scream that goes with it.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:FearBand">HorseCollisionMod:FearBand (horseEnt, struck)</a></td>
 	<td class="summary">Frightens everyone standing round a rear who was not hit by it.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ChargeFearBand">HorseCollisionMod:ChargeFearBand (horseEnt, pos, fx, fy, playerWuid, struck, feared, closing)</a></td>
+	<td class="summary">Frightens the people a charge goes past rather than through.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:CloseChargeFear">HorseCollisionMod:CloseChargeFear (horseEnt, playerWuid, struck, feared)</a></td>
+	<td class="summary">The single pass run as a charge dies.</td>
 	</tr>
 </table>
 
@@ -153,6 +172,66 @@
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:FrightenBystander"></a>
+    <strong>HorseCollisionMod:FrightenBystander (npc, playerWuid, priority, overrideSuppress)</strong>
+    </dt>
+    <dd>
+    Frightens one bystander: the stimulus, and the scream that goes with it. </p>
+
+<p> Both moves that can miss somebody want the same two things sent to the same
+ man in the same order, so the pair lives here rather than being written out
+ twice. Only the rank the scream is submitted at differs, and that comes
+ from the caller, because the rear and the charge carry their own settings.</p>
+
+<p> Startled, not hurt. One line, at the fright, and it is the scream rather
+ than the startle.</p>
+
+<p> The moment wanted two: a startled word as the horse comes at him, and a
+ scream once the man breaks and runs. The second one cannot be had. Measured
+ over several rides, a request sent to a man who is already fleeing is
+ accepted and never spoken, at priority 50 and with the context suppression
+ overridden, while the same set sent to the same speaker at the moment of the
+ fright is audible. The flee state itself is what eats it, and nothing
+ reachable from Lua reopens it.</p>
+
+<p> So the one line that is heard is the one worth having, and <code>NASILI_UTEK</code> is
+ the frightened set: "Help!", "Christ almighty!", "Oh god, oh god." A
+ startled "Hey!" followed by silent running was the weaker half of the pair.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         whoever is in the band
+        </li>
+        <li><span class="parameter">playerWuid</span>
+            <span class="types"><span class="type">userdata</span></span>
+         the rider, already resolved by the caller
+        </li>
+        <li><span class="parameter">priority</span>
+            <span class="types"><span class="type">number</span></span>
+         the rank the scream is submitted at
+        </li>
+        <li><span class="parameter">overrideSuppress</span>
+            <span class="types">optional <span class="type">boolean</span></span>
+         whether the scream is spoken over a
+   suppressed speech context
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the man was frightened
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:FearBand"></a>
     <strong>HorseCollisionMod:FearBand (horseEnt, struck)</strong>
     </dt>
@@ -195,6 +274,117 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod:ChargeFearBand"></a>
+    <strong>HorseCollisionMod:ChargeFearBand (horseEnt, pos, fx, fy, playerWuid, struck, feared, closing)</strong>
+    </dt>
+    <dd>
+    Frightens the people a charge goes past rather than through. </p>
+
+<p> The rear's band is a circle sampled once, because a rear happens in one
+ place. A charge does not: the horse covers ground, and the man it passed at
+ the start of the lunge is thirty feet behind by the end of it. So the band
+ is sampled along the sweep, from wherever the horse is at that moment, and
+ a set of who has already been frightened carries across the ticks so nobody
+ is startled twice by one charge.</p>
+
+<p> Who is left out is the difference from the rear. Anyone the corridor
+ reached is excluded for the reason the rear excludes them, a hit reaction
+ being a whole reaction already. But the lane in front is excluded too, at
+ any distance, because a man standing in it is not being missed: the horse
+ is coming for him and he is about to be ridden down. Frightening him a
+ stride before the chest arrives would put a scream and a flee on a man the
+ next tick knocks flat.</p>
+
+<p> The radius is wider than the rear's, because what is being missed is
+ different: a rear is a noise in one place and the fright is the hooves
+ landing a stride away, while a charge is a horse that will be where the man
+ is standing in a moment. <code>RearChargeFearReach</code> carries the derivation.</p>
+
+<p> That leaves the charge falling short of him, which is the case <code>closing</code>
+ answers. Run once as the lunge dies, it drops the lane test and frightens
+ whoever is still standing in front untouched: the horse came at him and
+ stopped, which is its own fright and the one the lane test would otherwise
+ swallow.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+        <li><span class="parameter">pos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         where the horse is this tick
+        </li>
+        <li><span class="parameter">fx</span>
+            <span class="types"><span class="type">number</span></span>
+         the horse's facing, x, already normalised
+        </li>
+        <li><span class="parameter">fy</span>
+            <span class="types"><span class="type">number</span></span>
+         the horse's facing, y, already normalised
+        </li>
+        <li><span class="parameter">playerWuid</span>
+            <span class="types"><span class="type">userdata</span></span>
+         the rider, resolved once by the caller
+        </li>
+        <li><span class="parameter">struck</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a set of entity ids the charge has run down
+        </li>
+        <li><span class="parameter">feared</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a set of entity ids already frightened by this charge
+        </li>
+        <li><span class="parameter">closing</span>
+            <span class="types">optional <span class="type">boolean</span></span>
+         true on the single pass run as the lunge ends
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:CloseChargeFear"></a>
+    <strong>HorseCollisionMod:CloseChargeFear (horseEnt, playerWuid, struck, feared)</strong>
+    </dt>
+    <dd>
+    The single pass run as a charge dies. </p>
+
+<p> Reads the horse's last position and facing itself, because the sweep that
+ calls it has already given up its own and is returning.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+        <li><span class="parameter">playerWuid</span>
+            <span class="types"><span class="type">userdata</span></span>
+         the rider, resolved by the sweep
+        </li>
+        <li><span class="parameter">struck</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a set of entity ids the charge ran down
+        </li>
+        <li><span class="parameter">feared</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a set of entity ids already frightened by this charge
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
 </dl>
 
 
@@ -202,7 +392,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-20 12:43:03 </i>
+<i style="float:right;">Last updated 2026-09-29 12:22:33 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

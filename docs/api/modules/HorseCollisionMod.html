@@ -43,6 +43,8 @@
 <ul class="nowrap">
   <li><strong>HorseCollisionMod</strong></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -57,6 +59,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -141,7 +145,6 @@
 </p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 5.11.3</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -164,12 +167,8 @@
 <h2><a href="#Tables">Tables</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#RecentHits">RecentHits</a></td>
-	<td class="summary">When each victim may react again, in milliseconds, keyed by entity id.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#LastScoredHit">LastScoredHit</a></td>
-	<td class="summary">When each victim was last scored, keyed the same way as <a href="../modules/HorseCollisionMod.html#RecentHits">RecentHits</a>.</td>
+	<td class="summary">When each victim was last scored, by entity id.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#LockedUntil">LockedUntil</a></td>
@@ -182,6 +181,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#VictimActivity">VictimActivity</a></td>
 	<td class="summary">What each victim was doing when it was hit, keyed by entity id.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#StandingHead">StandingHead</a></td>
+	<td class="summary">How high each victim carries their head standing, by entity id.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#Annoyance">Annoyance</a></td>
@@ -212,8 +215,8 @@
 	<td class="summary">Recent horse speeds, newest last, for spotting deceleration on impact.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#ImpactDamageByTier">ImpactDamageByTier</a></td>
-	<td class="summary">How often a provoked victim is sampled while the incident is open.</td>
+	<td class="name" nowrap><a href="#FallPending">FallPending</a></td>
+	<td class="summary">Every animation state that means the body is in a ragdoll.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#AnimationSets">AnimationSets</a></td>
@@ -245,6 +248,14 @@
 	<tr>
 	<td class="name" nowrap><a href="#ReplanHaltSpeed">ReplanHaltSpeed</a></td>
 	<td class="summary">How abruptly the replan is allowed to interrupt what the victim is doing.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#PhysicsReadyMs">PhysicsReadyMs</a></td>
+	<td class="summary">How long after <code>actor:Fall</code> the victim is a physics body, in milliseconds.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#RetaliationPollMs">RetaliationPollMs</a></td>
+	<td class="summary">How often a provoked victim is sampled while the incident is open.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#RetaliationSettledSamples">RetaliationSettledSamples</a></td>
@@ -401,35 +412,16 @@
 
     <dl class="function">
     <dt>
-    <a name = "RecentHits"></a>
-    <strong>RecentHits</strong>
-    </dt>
-    <dd>
-    When each victim may react again, in milliseconds, keyed by entity id. </p>
-
-<p> Holds the time a victim becomes eligible rather than the time it was last
- hit, because how long that takes depends on what the last impact did. A
- stagger is over quickly; a knockdown leaves them on the ground for several
- seconds.
-
-
-
-
-
-
-
-</dd>
-    <dt>
     <a name = "LastScoredHit"></a>
     <strong>LastScoredHit</strong>
     </dt>
     <dd>
-    When each victim was last scored, keyed the same way as <a href="../modules/HorseCollisionMod.html#RecentHits">RecentHits</a>. </p>
+    When each victim was last scored, by entity id. </p>
 
-<p> Separate from it deliberately. <a href="../modules/HorseCollisionMod.html#RecentHits">RecentHits</a> answers whether a victim is ready
- for an animated reaction; this answers whether the horse has already been
- charged for the contact it is still passing through. A gallop is exempt from
- the first and subject to the second.
+<p> Whether the horse has already been charged for the contact it is still
+ passing through, read by <code>ImpactIsNewContact</code>. It debounces one pass into
+ one impact and says nothing about the victim's recovery, which is
+ <code>IsVictimFlat</code> and is read from the body rather than from a clock.
 
 
 
@@ -487,6 +479,25 @@
  everyone else recovers on their own and is only interrupted by it.</p>
 
 <p> Cleared with the rest of the per-victim state on a load screen.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "StandingHead"></a>
+    <strong>StandingHead</strong>
+    </dt>
+    <dd>
+    How high each victim carries their head standing, by entity id. </p>
+
+<p> Recorded at the first impact that reaches them, when they are by definition
+ upright, and read by <code>IsVictimFlat</code> to tell a body lying on the ground from
+ one that has begun to get up. Measured rather than configured: no threshold
+ in this mod decides it.
 
 
 
@@ -663,65 +674,41 @@
 
 </dd>
     <dt>
-    <a name = "ImpactDamageByTier"></a>
-    <strong>ImpactDamageByTier</strong>
+    <a name = "FallPending"></a>
+    <strong>FallPending</strong>
     </dt>
     <dd>
-    How often a provoked victim is sampled while the incident is open. </p>
+    Every animation state that means the body is in a ragdoll. </p>
 
-<p> A poll interval, not a duration: it decides how promptly the mod notices a
- fight has ended, never how long the fight is allowed to last. One second is
- fine for a state that changes on the scale of a scuffle, and it keeps the
- telemetry readable rather than a wall of lines.
- What a tier costs an unarmored victim before armor scales it down, in
- health. A gallop into someone in a shirt usually kills and sometimes does
- not, which is the outcome asked for rather than a certainty either way.</p>
+<p> The engine has one per context and the mod only ever knew the first. Counted
+ over a session's log, <code>CombatBlendRagdoll</code> appears 185 times against
+ <code>BlendRagdoll</code>'s 175, so more than half of all ragdolled victims were
+ invisible to every test that compared against the single name: whether a
+ victim was already down, whether they were flat, whether they had finished
+ getting up, whether their recovery line was due.</p>
 
-<p> The trot figure is set the same way. At 25 an unarmored villager lost about
- a third of their health to a knockdown, 31 and 32 across two impacts, which
- kills in three. 18 makes it about a quarter and four impacts, which is the
- weight the rider wanted a trotting horse to carry.</p>
+<p> That is what made the mod's behavior depend on whether a victim happened to
+ be fighting, which reads from the saddle as random.
+ Victims whose fall clip has not yet handed the body to physics.</p>
 
-<p> The gallop figure is set from measurement rather than picked. At 90 the
- soft end killed six of eight, and both survivors finished on 3.5 and 0.5
- health, having been dealt 81.0 and 80.6 against a villager's 100. The
- engine's own trample adds a further 15 to 20 on top in most impacts but
- varies from nothing to 28, and that variation is what leaves any survivors
- at all. 95 carries those two over and lands the rate near the nine in ten
- asked for.</p>
+<p> A <code>hcm_fall_</code> clip carries its ragdoll as a ProcLayer that fires partway
+ through it, so between the clip starting and that layer firing there is a
+ handover in flight. Starting a second clip on the same victim in that window
+ cancels it, and the canceled handover then lands against whatever the
+ victim is doing later: they collapse seconds after the impact if they are
+ idle, or are yanked limp in the middle of another clip, which lifts the body
+ and drops it.</p>
 
-<p> Documented as an ordinary comment rather than an LDoc block: LDoc reads an
- annotated table as a set of named fields and refuses one holding an array.
+<p> The readiness cooldown used to prevent this as a side effect, and the diary
+ said so in as many words -- that it existed "to prevent ghost damage and the
+ awkward restart of a fall clip on a victim who is not standing". Removing
+ those timers removed that protection with them, which is what made both
+ symptoms reproducible.</p>
 
-
-    <h3>Fields:</h3>
-    <ul>
-        <li><span class="parameter">Walk</span>
-
+<p> Keyed by entity id, set when a fall clip starts and cleared when the body is
+ seen to ragdoll or the wait gives up.
 
 
-        </li>
-        <li><span class="parameter">Trot</span>
-
-
-
-        </li>
-        <li><span class="parameter">Gallop</span>
-
-
-
-        </li>
-        <li><span class="parameter">Rear</span>
-
-
-
-        </li>
-        <li><span class="parameter">Charge</span>
-
-
-
-        </li>
-    </ul>
 
 
 
@@ -848,33 +835,9 @@
         <li><span class="parameter">MaxSweepExtra</span>
          cap on the forward sweep, in meters
         </li>
-        <li><span class="parameter">HitCooldownStateDriven</span>
-         whether the knockdown wait reads the victim's
-   animation state instead of counting
-        </li>
         <li><span class="parameter">HitMinIntervalMs</span>
          the least time between two scored impacts on one
    victim, so a single pass through someone is one impact and not five
-        </li>
-        <li><span class="parameter">HitReadyByTier</span>
-         which tiers wait for a victim to be ready
-        </li>
-        <li><span class="parameter">HitReadySettleMs</span>
-         how long a victim must be neither animation-driven
-   nor ragdolling before another impact counts
-        </li>
-        <li><span class="parameter">HitReadyPollMs</span>
-         how often that state is sampled
-        </li>
-        <li><span class="parameter">HitReadyCeilingMs</span>
-         the wait's failsafe, for a victim never seen busy
-        </li>
-        <li><span class="parameter">HitCooldownMs</span>
-         minimum gap between reactions on the same victim
-        </li>
-        <li><span class="parameter">KnockdownRecoveryMs</span>
-         how long a knocked-down victim is left alone,
-   which is longer than the walk cooldown because they are still on the ground
         </li>
         <li><span class="parameter">ImpactSpeedSamples</span>
          ticks of speed history a collision is scored from
@@ -894,20 +857,6 @@
         <li><span class="parameter">Uplift</span>
          vertical ragdoll impulse at full strength
         </li>
-        <li><span class="parameter">RagdollMass</span>
-         what the horse collides with, in kilograms, divided by
-   the armor scale so armor is felt as weight rather than as a force
-        </li>
-        <li><span class="parameter">RagdollMassArmorScaled</span>
-         whether RagdollMass is divided by the armor
-   scale; false gives every victim the same mass, which is how the direction
-   of the effect is read
-        </li>
-        <li><span class="parameter">RagdollMassArmorExponent</span>
-         how sharply armor is felt as weight. The
-   base cancels out of the ratio between an armored victim's mass and an
-   unarmored one, so only this widens the gap between them
-        </li>
         <li><span class="parameter">ArmorReferenceWeight</span>
          armor weight that scales a target by exactly one
         </li>
@@ -921,14 +870,53 @@
          ceiling on the armor impulse multiplier, reached by
    an unarmored target
         </li>
+        <li><span class="parameter">ArmorStaminaFullWeight</span>
+         the armor weight counted as a full set for the
+   stamina surcharge, where it reaches its maximum
+        </li>
         <li><span class="parameter">ArmorStaminaExponent</span>
-         how sharply armor weight raises the stamina cost
+         how sharply armor weight raises the stamina
+   surcharge on the way to its maximum
         </li>
-        <li><span class="parameter">MinArmorStamina</span>
-         floor on the armor stamina multiplier
+        <li><span class="parameter">MaxArmorStaminaAdd</span>
+         the largest share of the horse's pool a victim's
+   armor can add, reached at ArmorReferenceWeight
         </li>
-        <li><span class="parameter">MaxArmorStamina</span>
-         ceiling on the armor stamina multiplier
+        <li><span class="parameter">DynamicRecovery</span>
+         scale ragdoll recovery get-up delay based on tier and armor
+        </li>
+        <li><span class="parameter">RecoveryDelayByTier</span>
+         base get-up stillness delay by impact tier
+        </li>
+        <li><span class="parameter">RecoveryArmorScaleArmored</span>
+         recovery delay multiplier for armored targets
+        </li>
+        <li><span class="parameter">RecoveryArmorScaleUnarmored</span>
+         recovery delay multiplier for unarmored targets
+        </li>
+        <li><span class="parameter">RecoveryMinSec</span>
+         minimum bound on recovery stillness duration
+        </li>
+        <li><span class="parameter">RecoveryMaxSec</span>
+         maximum bound on recovery stillness duration
+        </li>
+        <li><span class="parameter">RecoveryGroundBarks</span>
+         emit periodic pain barks while downed on the ground
+        </li>
+        <li><span class="parameter">RecoveryBarkIntervalMs</span>
+         interval between ground hurt barks in milliseconds
+        </li>
+        <li><span class="parameter">RisePollMs</span>
+         how often to look for a victim being back on their feet
+        </li>
+        <li><span class="parameter">RiseCeilingMs</span>
+         how long to wait for that before giving up
+        </li>
+        <li><span class="parameter">RagdollStillDuration</span>
+         seconds of stillness before a ragdoll stands up
+        </li>
+        <li><span class="parameter">RagdollStillSpeedThreshold</span>
+         speed threshold under which a ragdoll is still
         </li>
         <li><span class="parameter">ProtectMutt</span>
          when true, Henry's dog is never a valid victim
@@ -937,20 +925,16 @@
          when true, characters the game marks as
    protected take no damage from an impact
         </li>
-        <li><span class="parameter">StaminaDrainWalk</span>
-         horse stamina cost per victim at walk
-        </li>
-        <li><span class="parameter">StaminaDrainTrot</span>
-         horse stamina cost per victim at trot
-        </li>
-        <li><span class="parameter">StaminaDrainGallop</span>
-         horse stamina cost per victim at gallop
+        <li><span class="parameter">StaminaShareByTier</span>
+         what each kind of impact costs the horse, as a
+   share of the horse's own maximum stamina, before the rider's Horsemanship,
+   the horse's barding and the combat surcharge
         </li>
         <li><span class="parameter">ThrowRiderOnStaminaEmpty</span>
          dismount Henry when the horse is spent
         </li>
-        <li><span class="parameter">CombatStaminaMultiplier</span>
-         stamina cost multiplier while in a fight
+        <li><span class="parameter">CombatStaminaAdd</span>
+         share of the horse's pool added while in a fight
         </li>
         <li><span class="parameter">SuppressStaggerInCombat</span>
          skip the stagger animation during a fight
@@ -976,10 +960,6 @@
         </li>
         <li><span class="parameter">BarkOnRecovery</span>
          whether a knocked-down victim speaks again once up
-        </li>
-        <li><span class="parameter">BarkRecoveryDelayMs</span>
-         how long after the impact that second line comes,
-   timed to land during the get-up
         </li>
         <li><span class="parameter">BarkGapMs</span>
          least silence between a victim's cry and their recovery line
@@ -1020,11 +1000,6 @@
          how often the auto-cure exemption is rechecked,
    in seconds, or 0 to leave victims in the daycycle
         </li>
-        <li><span class="parameter">TrotReaction</span>
-         what a trot impact does: "knockdown" for an animated
-   fall and get-up, "fall" for an animated fall the game recovers from, or
-   "ragdoll" for the physics knockdown
-        </li>
         <li><span class="parameter">AutoCureHealthLimit</span>
          health at or above which the auto-cure exemption
    is dropped, matching vanilla's own limit
@@ -1051,7 +1026,21 @@
    meters per second, since a rear is a standstill move
         </li>
         <li><span class="parameter">RearCooldownMs</span>
-         how long before another rear is accepted
+         how long after a rear lands before another is accepted
+        </li>
+        <li><span class="parameter">ChargeCooldownMs</span>
+         how long after a charge lands before another is
+   accepted, on its own clock rather than the rear's
+        </li>
+        <li><span class="parameter">MoveCooldownIcons</span>
+         show a buff icon while either cooldown runs
+        </li>
+        <li><span class="parameter">RearCooldownBuff</span>
+         the id of the rear's icon buff, declared in the
+   mod's <code>buff__horsecollisionmod.xml</code>
+        </li>
+        <li><span class="parameter">ChargeCooldownBuff</span>
+         the id of the charge's, from the same file
         </li>
         <li><span class="parameter">RearChargeKey</span>
          which key rears and charges. One of r, q, y, u, o, h,
@@ -1084,52 +1073,31 @@
          how often it sweeps
         </li>
         <li><span class="parameter">RearChargeImpactSpeed</span>
-         the speed a charge is scored at
+         the speed a charge is resolved at, scoring and
+   physics alike, since the horse cannot be measured through a lunge
         </li>
-        <li><span class="parameter">ImpactSoundRear</span>
-         the layers the rear on the spot plays. Hooves coming
-   down on someone, not a horse riding into them
+        <li><span class="parameter">RearChargeFear</span>
+         whether a charge frightens the people it goes past
+   without running down
+        </li>
+        <li><span class="parameter">RearChargeFearReach</span>
+         how far that near miss reaches, in meters, all
+   round the horse as it goes. Wider than the rear's band, because the
+   margin is the ground a charging horse covers rather than the room a man
+   stands in
+        </li>
+        <li><span class="parameter">RearChargeFearScreamPriority</span>
+         the rank that scream is submitted at
         </li>
         <li><span class="parameter">ImpactDustEffectRear</span>
          the particle to spawn for a rear impact
         </li>
-        <li><span class="parameter">ImpactDustScaleRear</span>
-         how much dust a rear raises
-        </li>
-        <li><span class="parameter">CameraShakeRearScale</span>
-         how hard a rear shakes the rider's camera
-        </li>
-        <li><span class="parameter">RiderBlurRearScale</span>
-         how much a rear blurs the rider's view
-        </li>
-        <li><span class="parameter">RiderBlurRearLength</span>
-         how long that blur lasts
-        </li>
-        <li><span class="parameter">RearReaction</span>
-         what a rear does to its victim: "fall", "knockdown"
-   or a ragdoll, the same choices the trot tier offers. Only "fall" carries
-   the recovery that restores a victim's facing and re-plans their activity,
-   which is why both tiers default to it
-        </li>
-        <li><span class="parameter">ImpactSoundCharge</span>
-         the layers a charge plays. Its own set, so the
-   charge can be tuned without touching an ordinary gallop collision
-        </li>
-        <li><span class="parameter">ImpactDustScaleCharge</span>
-         how much dust a charge raises
-        </li>
-        <li><span class="parameter">CameraShakeChargeScale</span>
-         how hard a charge shakes the rider's camera
-        </li>
-        <li><span class="parameter">RiderBlurChargeScale</span>
-         how much a charge blurs the rider's view
-        </li>
-        <li><span class="parameter">RiderBlurChargeLength</span>
-         how long that blur lasts
-        </li>
         <li><span class="parameter">RearChargeThrow</span>
-         how hard a charge throws, as a scalar. The horse is
-   moving under physics as well, so its collider adds to this
+         how far a charge throws, against a gallop. The mod
+   commands a charge's throw outright, at the lunge speed times the tier's
+   transfer, and this multiplies the result. At 1.0 a charge lands where a
+   gallop does; it is allowed a wide range because a charge is an attack the
+   player commands rather than a consequence of riding into somebody
         </li>
         <li><span class="parameter">RearChargeImpulse</span>
          the physical push that carries the charge, applied
@@ -1146,15 +1114,6 @@
         </li>
         <li><span class="parameter">RearChargeWaitCeilingMs</span>
          push anyway by this point
-        </li>
-        <li><span class="parameter">RearChargeVictimLockMs</span>
-         how long a victim struck by a charge is closed
-   to further impacts, so one lunge is one hit
-        </li>
-        <li><span class="parameter">RearChargeStaminaCost</span>
-         what a landed charge costs the horse. Its own
-   figure, because the detection loop no longer scores a lunge and so no
-   longer charges it the gallop's drain
         </li>
         <li><span class="parameter">RearChargeLungePeakMin</span>
          the top speed a lunge must reach before it can
@@ -1298,6 +1257,49 @@
  wind-down is the point. Every vanilla call site that uses it is one of those.
  Sent to an NPC standing in the street it reads as a one-frame snap, and the
  activity it tears down takes any prop the NPC was holding with it.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "PhysicsReadyMs"></a>
+    <strong>PhysicsReadyMs</strong>
+    </dt>
+    <dd>
+    How long after <code>actor:Fall</code> the victim is a physics body, in milliseconds. </p>
+
+<p> One frame. Measured rather than chosen: the readiness probe this replaced
+ reported the handover at 16 ms on every impact ever logged, never at 0 and
+ never at any of the four longer rungs it also offered.</p>
+
+<p> Before this, the brake and the damping waited on a probe that wrote a mass
+ and read it back to find out. The answer never varied, so the probe was
+ machinery around a constant.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "RetaliationPollMs"></a>
+    <strong>RetaliationPollMs</strong>
+    </dt>
+    <dd>
+    How often a provoked victim is sampled while the incident is open. </p>
+
+<p> A poll interval, not a duration: it decides how promptly the mod notices a
+ fight has ended, never how long the fight is allowed to last. One second is
+ fine for a state that changes on the scale of a scuffle, and it keeps the
+ telemetry readable rather than a wall of lines.
+ The per-tier tables live in HorseCollisionMod/Tiers.lua, which owns the tier
+ concept and the single accessor every one of them is read through.
 
 
 
@@ -1500,7 +1502,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 12:22:33 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

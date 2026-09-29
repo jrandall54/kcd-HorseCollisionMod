@@ -4,7 +4,7 @@ param (
     # A development deploy, which installs but never ships.
     #
     # The release checks below are about what a release claims: that the
-    # version follows from the changelog, that every @release line agrees with
+    # version follows from the changelog, that the version strings agree with
     # it, and that no documentation describes an older build. None of that is
     # true of a build that only goes into the local install, and gating one on
     # it means the dev loop stops dead the moment work is written into
@@ -302,32 +302,6 @@ if ($isRelease) {
 
     if ($luaVersion -ne $Version) {
         Write-Host "Build failed: HorseCollisionMod.Version is $luaVersion, building $Version." -ForegroundColor Red
-        exit 1
-    }
-
-    # The LDoc header carries the version too, and it is the one that goes
-    # stale unnoticed because nothing reads it back. Checked in every part
-    # file that declares one, not just the entry point, since a part header is
-    # read even less often than the entry point's.
-    # Every mismatch is collected and reported together. Failing on the first
-    # one turns a version bump into a build, fix, build cycle repeated once per
-    # file, which is how twelve files were bumped one at a time. The remedy is
-    # named in the message, because `set_version.py` does all of them at once.
-    $staleReleases = @()
-
-    foreach ($script in (@($modScript) + $partScripts)) {
-        $raw = Get-Content $script -Raw
-        if ($raw -notmatch '@release\s+([^\s]+)') { continue }
-
-        if ($Matches[1] -ne $Version) {
-            $staleReleases += "  $(Split-Path -Leaf $script) says $($Matches[1])"
-        }
-    }
-
-    if ($staleReleases.Count -gt 0) {
-        Write-Host "Build failed: $($staleReleases.Count) @release tag(s) do not say $Version." -ForegroundColor Red
-        $staleReleases | ForEach-Object { Write-Host $_ -ForegroundColor Red }
-        Write-Host "         Fix them all at once:  python tools\set_version.py $Version"
         exit 1
     }
 

@@ -66,7 +66,6 @@
 --
 -- @module HorseCollisionMod
 -- @author jrandall54
--- @release 5.31.4
 HorseCollisionMod = {}
 
 HorseCollisionMod.Version = "5.31.4"

@@ -41,6 +41,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -55,6 +57,8 @@
   <li><strong>HorseCollisionMod.Rider</strong></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -90,6 +94,14 @@
 	<td class="summary">Throws the rider from the horse.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:DrainImpactStamina">HorseCollisionMod:DrainImpactStamina (horseEnt, playerEnt, tierName[, armor])</a></td>
+	<td class="summary">What one impact costs the horse, and charging it.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:MaxStaminaOf">HorseCollisionMod:MaxStaminaOf (ent)</a></td>
+	<td class="summary">The horse's maximum stamina, the pool every cost is a share of.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:DrainHorseStamina">HorseCollisionMod:DrainHorseStamina (horseEnt, playerEnt, staminaDrain)</a></td>
 	<td class="summary">Charges the horse for an impact and dismounts Henry when it is spent.</td>
 	</tr>
@@ -112,6 +124,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:HorsemanshipScale">HorseCollisionMod:HorsemanshipScale (playerEnt)</a></td>
 	<td class="summary">What the rider's horsemanship is worth against a collision.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:GrantPerks">HorseCollisionMod:GrantPerks ()</a></td>
+	<td class="summary">Grants the mod's Horsemanship perks directly to the player soul.</td>
 	</tr>
 </table>
 
@@ -150,6 +166,102 @@
         </li>
     </ul>
 
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:DrainImpactStamina"></a>
+    <strong>HorseCollisionMod:DrainImpactStamina (horseEnt, playerEnt, tierName[, armor])</strong>
+    </dt>
+    <dd>
+    What one impact costs the horse, and charging it. </p>
+
+<p> The single place the stamina figure is worked out. Every tier goes through
+ it, so the rider's Horsemanship, the horse's barding and the combat
+ surcharge reach a rear and a charge exactly as they reach a gallop. They did
+ not before: the rear and the charge each drained a flat setting at their own
+ call site and none of the three modifiers touched them, which meant levelling
+ Horsemanship made every impact cheaper except the two heaviest.</p>
+
+<p> The cost is a share of the horse's own maximum stamina, and the three
+ situational factors are surcharges on that share rather than multipliers on
+ it:</p>
+
+<pre><code> cost = maxStamina
+      * (tierShare + combatAdd + armorAdd - bardingRelief)
+      * horsemanship
+</code></pre>
+
+<p> A chain five multipliers deep and unbounded puts a gallop anywhere between
+ 14.85 and 1452 points against a pool of about 210. The tier
+ separation the rider tunes, a factor of 1.6, was invisible beside a modifier
+ stack spanning nearly a hundredfold, and the answer to that is not a clamp
+ on the product but a shape where every term is readable on its own. Adding
+ the surcharges makes the worst case the sum of the named maxima rather than
+ an emergent product: 0.38 of the pool before Horsemanship, which the log
+ prints term by term.</p>
+
+<p> Horsemanship stays a multiplier, because it is the one factor meant to
+ dominate. The progressive drain at low Horsemanship is settled design: at
+ level 0 a single gallop impact empties the horse, and that is the point.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse entity
+        </li>
+        <li><span class="parameter">playerEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player entity
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot", "Gallop", "Rear" or "Charge"
+        </li>
+        <li><span class="parameter">armor</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim's armor from <code>ArmorOf</code>, where this
+   impact has a single victim to read it from
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:MaxStaminaOf"></a>
+    <strong>HorseCollisionMod:MaxStaminaOf (ent)</strong>
+    </dt>
+    <dd>
+    The horse's maximum stamina, the pool every cost is a share of. </p>
+
+<p> <code>mst</code> is the engine's own derived stat for maximum stamina, the figure
+ vanilla's own feature tests read to check a stamina potion worked. It is
+ read per impact rather than cached because a buff or a potion can move it
+ between one impact and the next.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">ent</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         an entity with a soul
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span> or <span class="type">nil</span></span>
+        the maximum stamina, or nil when it cannot be read
+    </ol>
 
 
 
@@ -482,6 +594,23 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod:GrantPerks"></a>
+    <strong>HorseCollisionMod:GrantPerks ()</strong>
+    </dt>
+    <dd>
+    Grants the mod's Horsemanship perks directly to the player soul. </p>
+
+<p> Called on startup or settings apply when <code>AutoGrantPerks</code> is enabled in
+ the configuration.
+
+
+
+
+
+
+
+</dd>
 </dl>
 
 
@@ -489,7 +618,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 12:22:33 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

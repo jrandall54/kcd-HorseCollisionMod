@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batch 0 done.
+**Phase:** 2 in progress. Batches 0 and 1 done.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,7 +30,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 1, following **Phase 2 plan** below. Read
+**Next step:** phase 2, batch 2, following **Phase 2 plan** below. Read
 that section in full before starting; it gives the order, the procedure
 for every batch and how each is verified.
 
@@ -78,18 +78,32 @@ of behavior gets one named ride.
 - **L0, static.** `.\build.ps1` (syntax, style, scope and staleness checks),
   `python .claude\lint_docs.py`, `python tools\audit_code.py`. Every batch.
 - **L1, no code changed.** For a batch meant to touch only comments and
-  whitespace, the stripped LuaJIT bytecode of every changed Lua file must be
-  identical to the batch's base commit. `luajit -b -s` drops line numbers
-  and comments, so any difference is a code change. From Git Bash, with
-  `BASE` the commit the batch started from:
+  whitespace, the token stream of every changed Lua file, comments and
+  whitespace dropped, must be identical to the batch's base commit. Penlight's
+  lexer (`pl.lexer`, installed with LDoc) produces it. LuaJIT bytecode cannot
+  be used: this build randomizes string hashing, so one file compiled twice
+  gives different bytes. From Git Bash, with `BASE` the commit the batch
+  started from and `toks.lua` holding:
+
+  ```lua
+  local lexer = require "pl.lexer"
+  local f = assert(io.open(arg[1], "rb")); local s = f:read("*a"); f:close()
+  for t, v in lexer.lua(s, {space = true, comments = true}) do
+    io.write(t, "\t", tostring(v), "\n")
+  end
+  ```
 
   ```
+  export LUA_PATH='C:\Users\jummy\.luarocks\share\lua\5.1\?.lua;;'
+  tk() { luajit toks.lua "$1"; }
   for f in $(git diff --name-only $BASE -- '*.lua'); do
-    git show $BASE:$f > /tmp/a.lua; luajit -b -s /tmp/a.lua /tmp/a.out
-    luajit -b -s $f /tmp/b.out
-    cmp -s /tmp/a.out /tmp/b.out && echo "same  $f" || echo "DIFF  $f"
+    git show $BASE:$f > a.lua
+    cmp -s <(tk a.lua) <(tk $f) && echo "same  $f" || echo "DIFF  $f"
   done
   ```
+
+  Checked against a comment edit (same), an operator change and a string
+  change (both DIFF).
 
   Python and PowerShell have no equivalent; for them, `git diff -w $BASE`
   must show only comment lines.
@@ -247,6 +261,25 @@ One line per batch: batch, commit, what was verified.
   `verify_additive.py` 35 of 35; `lint_docs.py` errors only in this ledger;
   `audit_code.py` unchanged. The old copies in `mod_assets/` are left for the
   rider to delete; they are byte-identical and harmless meanwhile.
+- **Batch 1.** `@release` removed from the entry point and the sixteen part
+  files that carried it, from `set_version.py` (two places remain) and from
+  `build.ps1`'s release gate; `DEV_LOOP.md` and a `dev_deploy.ps1` comment
+  follow. The `flow.ps1` retry and `pre_release_check.py:493` still mention
+  it; both go in batch 5. L1 replaced (bytecode is not deterministic, see
+  **Verification levels**); all 17 Lua files `same`. `audit_code.py` treats
+  a key named as a string as read: 0 unread keys. Seven Python tools
+  re-indented: `git diff -w` empty, only docstrings changed in the syntax
+  tree, every `--help` runs, `nexus_settings_block.py` output identical.
+  Hook comments cut to the standard (history, `.agent_instructions.md`,
+  British spellings); every hook passes `bash -n`. `lint_docs.py` gains a
+  `NARRATIVE` rule list (exempting `CHANGELOG.md`) and an escape-damage
+  check, as warnings. **Starting figure for the comment batches: 288
+  narrative warnings outside this ledger; 0 errors outside it.** The
+  timeless `now` rule also matches "is now in flight"; review it before
+  batch 7 promotes it. `.claude/` is untracked, so the hook and linter
+  edits are local and absent from the commit. `docs/api` regenerated with `ldoc .`;
+  the orphan `docs/api/modules/Retaliation.html` (unlinked, last written
+  2 September, still showing `Release: 4.6.1`) deleted.
 
 ## Standard
 
@@ -590,18 +623,18 @@ Format: `file:line` — problem — planned edit.
 
 ### Tooling and enforcement
 
-- [ ] `.claude/lint_docs.py` — passes with 0 errors while
+- [x] `.claude/lint_docs.py` — passes with 0 errors while
   `src/HorseCollisionMod.lua` alone carries about 41 narrative lines. The
   rules match a few exact phrases. — Add rules for timeless words, `the rider`,
   `It was <number>`, `used to <verb>`, `before this`, `no longer`, and
   `shipped before`. Promote to errors where false positives are rare.
-- [ ] `.claude/hooks/pre-commit`, `.claude/hooks/style-check.sh` — the hook
+- [x] `.claude/hooks/pre-commit`, `.claude/hooks/style-check.sh` — the hook
   comments are themselves narrative ("was broken repeatedly anyway"). —
   Rewrite in the standard.
-- [ ] `tools/audit_code.py` — reports `RearCooldownBuff` and
+- [x] `tools/audit_code.py` — reports `RearCooldownBuff` and
   `ChargeCooldownBuff` as unread; `Rear.lua:431` reads them by string. —
   Recognize string references, or record the exemption.
-- [ ] `tools/*.py` — seven files are tab-indented (`audit_code`,
+- [x] `tools/*.py` — seven files are tab-indented (`audit_code`,
   `bark_alias`, `bark_lines`, `henry_impact_lines`, `nexus_settings_block`,
   `npc_pain_sets`, `testworld`); the rest use four spaces. — Four spaces
   (PEP 8) throughout.
@@ -2988,6 +3021,11 @@ the docstrings.
   the check quietly passed. A check that never fires is worse than the one
   it replaced." — Keep "subprocess does not apply `PATHEXT` to a bare name".
 
+- [ ] LDoc never deletes a page whose module it no longer produces, and the
+  staleness check compares only the pages it regenerates, so an orphan in
+  `docs/api/modules/` passes. — Report files present in `docs/api` that the
+  regeneration does not write. Batch 5.
+
 ### tools/flow.ps1
 
 The verbs work as documented. Defects: a hardcoded game path the deploy it
@@ -3293,7 +3331,7 @@ it is checked by anything: `.git/info/exclude` excludes `/.claude/`, so
 - [ ] `lint_docs.py`, `build.ps1:259` — both enumerate files through git, so
   `.claude/` is never checked. — Have the linter and the control-character
   check also walk `.claude/`.
-- [ ] `hooks/diary-check.sh:5`, `:86`; `hooks/pre-commit:21`;
+- [x] `hooks/diary-check.sh:5`, `:86`; `hooks/pre-commit:21`;
   `hooks/pre-push:8` — cite `.agent_instructions.md`, which no longer
   exists; `AGENTS.md` is the instructions file. — Name `AGENTS.md`, or drop
   the citation.
@@ -3330,21 +3368,21 @@ it is checked by anything: `.git/info/exclude` excludes `/.claude/`, so
 **History to cut** (the existing finding at the top of this section
 covers the hooks' tone; these are the specific lines):
 
-- [ ] `hooks/diary-check.sh:5-8`, `:26-30`; `hooks/pre-commit:10-11`,
+- [x] `hooks/diary-check.sh:5-8`, `:26-30`; `hooks/pre-commit:10-11`,
   `:20-23`; `hooks/pre-merge-commit:10-11`; `hooks/pre-push:6-9`, `:76-83`,
   `:119-122`, `:146` ("now"); `hooks/style-check.sh:4-5`; `HOOKS.md:56-57`,
   `:79-83`; `lint_docs.py:30-31`.
-- [ ] British spelling: `hooks/pre-commit:78` "recognised";
+- [x] British spelling: `hooks/pre-commit:78` "recognised";
   `hooks/pre-push:24-26` "Behaviour", "behaviour"; `hooks/commit-msg:9`
   "acknowledgement".
 
 **Linter rules to add** (extends the `lint_docs.py` finding above):
 
-- [ ] ` -- ` used as a dash inside a comment or paragraph.
-- [ ] An escape-corrupted path: a control character, or a line ending in a
+- [x] ` -- ` used as a dash inside a comment or paragraph.
+- [x] An escape-corrupted path: a control character, or a line ending in a
   known directory name (`releases`, `tools`, `src`) whose next line starts a
   path fragment.
-- [ ] `the rider`, `no longer`, `used to <verb>`, `now` in the timeless
+- [x] `the rider`, `no longer`, `used to <verb>`, `now` in the timeless
   sense, and quoted speech (`> "` or `"…" the rider`).
 
 ### Dead code (`tools/audit_code.py`)

@@ -908,8 +908,8 @@ if ($Version -eq "") {
 
 if (-not $NoBuild) {
 	# -Development, because this installs and never ships. Without it the
-	# build applies the release gate -- version against changelog, @release
-	# lines, documentation staleness -- and refuses to deploy over work that
+	# build applies the release gate -- version against changelog and
+	# manifest, documentation staleness -- and refuses to deploy over work that
 	# has been written into [Unreleased] but not yet versioned, which is the
 	# normal state of a branch being tested.
 	& powershell.exe -ExecutionPolicy Bypass `

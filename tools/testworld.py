@@ -56,7 +56,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORLD = os.path.join(REPO_ROOT, ".hcm_testworld")
 PRESETS = os.path.join(REPO_ROOT, "tools", "testworlds.ini")
 INSTALLED = os.path.join("Data", "Scripts", "Startup",
-		"HorseCollisionMod_TestWorld.lua")
+        "HorseCollisionMod_TestWorld.lua")
 
 # A key is a settings name, optionally one table member deep: `Key` or
 # `Key.Member`. Two levels is all the settings file has and all it needs.
@@ -68,246 +68,246 @@ BARE = re.compile(r"^(?:true|false|nil|-?\d+(?:\.\d+)?|\{.*\}|\".*\"|'.*')$")
 
 
 def read_presets():
-	"""Named groups of overrides, as data rather than as code.
+    """Named groups of overrides, as data rather than as code.
 
-	Adding one is an edit to an ini file, which is the whole point: nobody
-	should have to touch a script to describe a testing environment.
-	"""
-	out, current = {}, None
+    Adding one is an edit to an ini file, which is the whole point: nobody
+    should have to touch a script to describe a testing environment.
+    """
+    out, current = {}, None
 
-	if not os.path.exists(PRESETS):
-		return out
+    if not os.path.exists(PRESETS):
+        return out
 
-	for line in io.open(PRESETS, encoding="utf-8"):
-		bare = line.split("#")[0].strip()
+    for line in io.open(PRESETS, encoding="utf-8"):
+        bare = line.split("#")[0].strip()
 
-		if not bare:
-			continue
+        if not bare:
+            continue
 
-		header = re.match(r"^\[(\w+)\]$", bare)
+        header = re.match(r"^\[(\w+)\]$", bare)
 
-		if header:
-			current = header.group(1)
-			out.setdefault(current, [])
-			continue
+        if header:
+            current = header.group(1)
+            out.setdefault(current, [])
+            continue
 
-		if current and "=" in bare:
-			key, value = bare.split("=", 1)
-			out[current].append((key.strip(), value.strip()))
+        if current and "=" in bare:
+            key, value = bare.split("=", 1)
+            out[current].append((key.strip(), value.strip()))
 
-	return out
+    return out
 
 
 def read_world():
-	"""The overrides this branch is carrying, in the order they were added."""
-	out = []
+    """The overrides this branch is carrying, in the order they were added."""
+    out = []
 
-	if not os.path.exists(WORLD):
-		return None
+    if not os.path.exists(WORLD):
+        return None
 
-	for line in io.open(WORLD, encoding="utf-8"):
-		bare = line.split("#")[0].strip()
+    for line in io.open(WORLD, encoding="utf-8"):
+        bare = line.split("#")[0].strip()
 
-		if not bare or "=" not in bare:
-			continue
+        if not bare or "=" not in bare:
+            continue
 
-		key, value = bare.split("=", 1)
-		out.append((key.strip(), value.strip()))
+        key, value = bare.split("=", 1)
+        out.append((key.strip(), value.strip()))
 
-	return out
+    return out
 
 
 def write_world(pairs):
-	lines = [
-		"# The testing world for this branch. Written by tools/testworld.py,",
-		"# applied by flow.ps1 test, and cleared by flow.ps1 land.",
-		"#",
-		"# Every line is one setting the development install overrides. A key",
-		"# may name a table member: StaminaShareByTier.Gallop = 0",
-		"",
-	]
+    lines = [
+        "# The testing world for this branch. Written by tools/testworld.py,",
+        "# applied by flow.ps1 test, and cleared by flow.ps1 land.",
+        "#",
+        "# Every line is one setting the development install overrides. A key",
+        "# may name a table member: StaminaShareByTier.Gallop = 0",
+        "",
+    ]
 
-	for key, value in pairs:
-		lines.append("%s = %s" % (key, value))
+    for key, value in pairs:
+        lines.append("%s = %s" % (key, value))
 
-	io.open(WORLD, "w", encoding="utf-8", newline="\n").write(
-			"\n".join(lines) + "\n")
+    io.open(WORLD, "w", encoding="utf-8", newline="\n").write(
+            "\n".join(lines) + "\n")
 
 
 def merge(pairs, additions):
-	"""Later wins, and a key keeps the position it was first given."""
-	out = list(pairs)
+    """Later wins, and a key keeps the position it was first given."""
+    out = list(pairs)
 
-	for key, value in additions:
-		for index, (have, _old) in enumerate(out):
-			if have == key:
-				out[index] = (key, value)
-				break
-		else:
-			out.append((key, value))
+    for key, value in additions:
+        for index, (have, _old) in enumerate(out):
+            if have == key:
+                out[index] = (key, value)
+                break
+        else:
+            out.append((key, value))
 
-	return out
+    return out
 
 
 def lua_value(value):
-	return value if BARE.match(value) else '"%s"' % value.replace('"', '\\"')
+    return value if BARE.match(value) else '"%s"' % value.replace('"', '\\"')
 
 
 def lua_for(pairs):
-	"""The override file, as Lua that assigns into the settings global.
+    """The override file, as Lua that assigns into the settings global.
 
-	Guarded on the global existing. The settings file defines it, and if that
-	has not run there is nothing to override and nothing worth failing over.
-	"""
-	body = [
-		"-- The testing world for this branch, written by tools/testworld.py.",
-		"--",
-		"-- Not part of the mod. This file exists only in a development",
-		"-- install; build.ps1 packs from src/, which never contains it.",
-		"--",
-		"-- Loaded after HorseCollisionMod_Settings.lua because startup",
-		"-- scripts run in name order, so it can assign into the same global",
-		"-- and be applied by ApplySettings with the same type checking.",
-		"",
-		'if type(HorseCollisionModSettings) == "table" then',
-	]
+    Guarded on the global existing. The settings file defines it, and if that
+    has not run there is nothing to override and nothing worth failing over.
+    """
+    body = [
+        "-- The testing world for this branch, written by tools/testworld.py.",
+        "--",
+        "-- Not part of the mod. This file exists only in a development",
+        "-- install; build.ps1 packs from src/, which never contains it.",
+        "--",
+        "-- Loaded after HorseCollisionMod_Settings.lua because startup",
+        "-- scripts run in name order, so it can assign into the same global",
+        "-- and be applied by ApplySettings with the same type checking.",
+        "",
+        'if type(HorseCollisionModSettings) == "table" then',
+    ]
 
-	# A member key needs its parent table to exist first. The settings file
-	# usually defines it, but a world may reach a table a player has deleted.
-	parents = []
+    # A member key needs its parent table to exist first. The settings file
+    # usually defines it, but a world may reach a table a player has deleted.
+    parents = []
 
-	for key, _value in pairs:
-		if "." in key:
-			parent = key.split(".")[0]
+    for key, _value in pairs:
+        if "." in key:
+            parent = key.split(".")[0]
 
-			if parent not in parents:
-				parents.append(parent)
+            if parent not in parents:
+                parents.append(parent)
 
-	for parent in parents:
-		body.append('\tHorseCollisionModSettings.%s = '
-				'HorseCollisionModSettings.%s or {}' % (parent, parent))
+    for parent in parents:
+        body.append('\tHorseCollisionModSettings.%s = '
+                'HorseCollisionModSettings.%s or {}' % (parent, parent))
 
-	if parents:
-		body.append("")
+    if parents:
+        body.append("")
 
-	for key, value in pairs:
-		body.append("\tHorseCollisionModSettings.%s = %s"
-				% (key, lua_value(value)))
+    for key, value in pairs:
+        body.append("\tHorseCollisionModSettings.%s = %s"
+                % (key, lua_value(value)))
 
-	shown = ", ".join("%s=%s" % (k, v) for k, v in pairs) or "none"
+    shown = ", ".join("%s=%s" % (k, v) for k, v in pairs) or "none"
 
-	body += [
-		"",
-		"\t-- Announced at load, so what is live is a matter of record rather",
-		"\t-- than of memory. A test run against a world nobody could see is",
-		"\t-- how a setting left on silently corrupts the next comparison.",
-		'\tSystem.LogAlways("[HorseCollisionMod] test world: %s")' % shown,
-		"end",
-		"",
-	]
+    body += [
+        "",
+        "\t-- Announced at load, so what is live is a matter of record rather",
+        "\t-- than of memory. A test run against a world nobody could see is",
+        "\t-- how a setting left on silently corrupts the next comparison.",
+        '\tSystem.LogAlways("[HorseCollisionMod] test world: %s")' % shown,
+        "end",
+        "",
+    ]
 
-	return "\n".join(body)
+    return "\n".join(body)
 
 
 def main():
-	ap = argparse.ArgumentParser(description=__doc__,
-			formatter_class=argparse.RawDescriptionHelpFormatter)
-	ap.add_argument("--list", action="store_true", help="print the world")
-	ap.add_argument("--set", action="append", metavar="KEY=VALUE", default=[],
-			help="add or replace one override")
-	ap.add_argument("--unset", action="append", metavar="KEY", default=[],
-			help="remove one override")
-	ap.add_argument("--preset", action="append", metavar="NAME", default=[],
-			help="add every override in a named preset")
-	ap.add_argument("--clear", action="store_true",
-			help="carry no overrides, so the install runs shipped values")
-	ap.add_argument("--reset", action="store_true",
-			help="forget the world entirely, so the default preset returns")
-	ap.add_argument("--write", metavar="GAMEROOT",
-			help="write the world into a development install")
-	ap.add_argument("--default", metavar="NAME", default="dev",
-			help="the preset used when no world has been set (default: dev)")
-	args = ap.parse_args()
+    ap = argparse.ArgumentParser(description=__doc__,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--list", action="store_true", help="print the world")
+    ap.add_argument("--set", action="append", metavar="KEY=VALUE", default=[],
+            help="add or replace one override")
+    ap.add_argument("--unset", action="append", metavar="KEY", default=[],
+            help="remove one override")
+    ap.add_argument("--preset", action="append", metavar="NAME", default=[],
+            help="add every override in a named preset")
+    ap.add_argument("--clear", action="store_true",
+            help="carry no overrides, so the install runs shipped values")
+    ap.add_argument("--reset", action="store_true",
+            help="forget the world entirely, so the default preset returns")
+    ap.add_argument("--write", metavar="GAMEROOT",
+            help="write the world into a development install")
+    ap.add_argument("--default", metavar="NAME", default="dev",
+            help="the preset used when no world has been set (default: dev)")
+    args = ap.parse_args()
 
-	presets = read_presets()
-	world = read_world()
+    presets = read_presets()
+    world = read_world()
 
-	if args.reset:
-		if os.path.exists(WORLD):
-			os.remove(WORLD)
+    if args.reset:
+        if os.path.exists(WORLD):
+            os.remove(WORLD)
 
-		world = None
-		args.list = True
+        world = None
+        args.list = True
 
-	# No world file at all means nobody has chosen one, so the default preset
-	# applies. An empty world file is a choice: run the shipped values.
-	if world is None and not args.clear:
-		world = list(presets.get(args.default, []))
+    # No world file at all means nobody has chosen one, so the default preset
+    # applies. An empty world file is a choice: run the shipped values.
+    if world is None and not args.clear:
+        world = list(presets.get(args.default, []))
 
-	if args.clear:
-		world = []
+    if args.clear:
+        world = []
 
-	for name in args.preset:
-		if name not in presets:
-			sys.stderr.write("no preset named '%s'. Known: %s\n"
-					% (name, ", ".join(sorted(presets)) or "none"))
-			return 2
+    for name in args.preset:
+        if name not in presets:
+            sys.stderr.write("no preset named '%s'. Known: %s\n"
+                    % (name, ", ".join(sorted(presets)) or "none"))
+            return 2
 
-		world = merge(world, presets[name])
+        world = merge(world, presets[name])
 
-	for entry in args.set:
-		if "=" not in entry:
-			sys.stderr.write("--set wants KEY=VALUE, got '%s'\n" % entry)
-			return 2
+    for entry in args.set:
+        if "=" not in entry:
+            sys.stderr.write("--set wants KEY=VALUE, got '%s'\n" % entry)
+            return 2
 
-		key, value = entry.split("=", 1)
-		key, value = key.strip(), value.strip()
+        key, value = entry.split("=", 1)
+        key, value = key.strip(), value.strip()
 
-		if not KEY.match(key):
-			sys.stderr.write("'%s' is not a settings key\n" % key)
-			return 2
+        if not KEY.match(key):
+            sys.stderr.write("'%s' is not a settings key\n" % key)
+            return 2
 
-		world = merge(world, [(key, value)])
+        world = merge(world, [(key, value)])
 
-	for key in args.unset:
-		world = [(k, v) for k, v in world if k != key.strip()]
+    for key in args.unset:
+        world = [(k, v) for k, v in world if k != key.strip()]
 
-	if args.preset or args.set or args.unset or args.clear:
-		write_world(world)
+    if args.preset or args.set or args.unset or args.clear:
+        write_world(world)
 
-	# Printed after any change, because a switch whose effect you cannot see is
-	# how a setting stays on through the next three tests.
-	if args.list or not args.write:
-		if world:
-			for key, value in world:
-				sys.stdout.write("  %s = %s\n" % (key, value))
-		else:
-			sys.stdout.write("  (no overrides, shipped values)\n")
+    # Printed after any change, because a switch whose effect you cannot see is
+    # how a setting stays on through the next three tests.
+    if args.list or not args.write:
+        if world:
+            for key, value in world:
+                sys.stdout.write("  %s = %s\n" % (key, value))
+        else:
+            sys.stdout.write("  (no overrides, shipped values)\n")
 
-	if args.write:
-		target = os.path.join(args.write, INSTALLED)
-		folder = os.path.dirname(target)
+    if args.write:
+        target = os.path.join(args.write, INSTALLED)
+        folder = os.path.dirname(target)
 
-		if not os.path.isdir(folder):
-			sys.stderr.write("no startup folder at %s\n" % folder)
-			return 1
+        if not os.path.isdir(folder):
+            sys.stderr.write("no startup folder at %s\n" % folder)
+            return 1
 
-		if not world:
-			# Removed rather than emptied. A file that assigns nothing still
-			# loads, and one left behind from a previous branch is exactly the
-			# silent leftover this is meant to prevent.
-			if os.path.exists(target):
-				os.remove(target)
-				sys.stdout.write("  removed the installed test world\n")
+        if not world:
+            # Removed rather than emptied. A file that assigns nothing still
+            # loads, and one left behind from a previous branch is exactly the
+            # silent leftover this is meant to prevent.
+            if os.path.exists(target):
+                os.remove(target)
+                sys.stdout.write("  removed the installed test world\n")
 
-			return 0
+            return 0
 
-		io.open(target, "w", encoding="utf-8", newline="\n").write(
-				lua_for(world))
-		sys.stdout.write("  wrote %d override(s) to the install\n" % len(world))
+        io.open(target, "w", encoding="utf-8", newline="\n").write(
+                lua_for(world))
+        sys.stdout.write("  wrote %d override(s) to the install\n" % len(world))
 
-	return 0
+    return 0
 
 
 if __name__ == "__main__":
-	sys.exit(main())
+    sys.exit(main())

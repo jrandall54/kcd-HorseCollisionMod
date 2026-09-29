@@ -24,7 +24,6 @@
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
--- @release 5.31.4
 --- Applies the appropriate reaction for one collision.
 --
 -- Enforces the per-victim cooldown, then dispatches on gait.

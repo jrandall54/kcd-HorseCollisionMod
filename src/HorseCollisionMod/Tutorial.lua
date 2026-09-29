@@ -7,7 +7,6 @@
 --
 -- @module HorseCollisionMod.Tutorial
 -- @author jrandall54
--- @release 5.31.4
 
 HorseCollisionMod.TutorialsShown = HorseCollisionMod.TutorialsShown or {}
 
