@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Update.lua findings recorded and committed.
+**Current status:** Marks.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Marks.lua`.
+**Next pass:** `Fear.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -42,7 +42,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Sound.lua`
 - [x] `Lean.lua`
 - [x] `Update.lua`
-- [ ] `Marks.lua`
+- [x] `Marks.lua`
 - [ ] `Fear.lua`
 - [ ] `Crime.lua`
 - [ ] `Impact.lua`
@@ -56,7 +56,6 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Carried forward:** findings in one file that point into a file not yet
 audited are listed here, so its pass picks them up.
 
-- `Marks.lua` — check the dust comments against the vertical-speed test.
 - `Rear.lua`, `Retaliation.lua`, `Update.lua` — adopt the shared horse
   lookup from the Lean findings.
 - `Impact.lua:218-223` — the comment on deferring `SendCombatHit` ("it
@@ -65,6 +64,8 @@ audited are listed here, so its pass picks them up.
 - `Impact.lua:51`, `:124-127` — `IsCombatCollision` returns the same value
   twice; the comment contrasts `playerInDanger` with "the combined signal",
   which no longer exists. Follows the Rider finding.
+- `Impact.lua:201-203` — the dust comment contradicts `DustWhenLanded`
+  (see Marks).
 - `Impact.lua:251` — ignores `ApplyImpactDamage`'s return value, which the
   Health findings remove.
 
@@ -1654,11 +1655,55 @@ victim is accurate (only men reach the fight branch) and stays.
 - [ ] `:397-400` — "Those were separate figures until the impact sound made
   the difference audible… agreed only by accident". — Keep: the interval
   is `TickSeconds`, which the forward sweep also uses.
-- [ ] `:405-406` — `TrackHorseSpeed` exists "because the rear's standstill
-  gate cannot trust `GetVelocity`"; correct, but the reading is also this
-  file's only horse-speed source outside `SafeUpdate`. — Keep as is.
 - [ ] `:419` — "CRITICAL ERROR IN UPDATE TIMER" in capitals, unlike every
   other log row. — `UpdateError err=`.
+
+### src/HorseCollisionMod/Marks.lua
+
+- [ ] `:8-12` header — "Both arguments are deltas": `AddDirt` takes one.
+  `` `actor:AddBlood
+(zone, n)` `` breaks a code span across lines. —
+  "Each amount is a delta"; keep the span on one line.
+- [ ] `:17` — "a rider who is run down from behind"; the victim. — Correct.
+- [ ] `:83-84` `MarkVictim` — "from the trot and gallop branches of
+  `OnImpact`"; `ResolveImpact` (`Impact.lua:215`) calls it for every tier,
+  and the rear and the charge carry figures. `:95` `@tparam tierName`
+  names two tiers. — "an impact tier name"; the tier tables decide, and
+  the walk has no row.
+- [ ] `:98`, `:188` `@treturn` — neither caller reads the result
+  (`Impact.lua:205`, `:215`), and `ImpactDust` returns true at `:246`
+  whether or not dust is ever spawned. — Return nothing.
+- [ ] `:102`, `:192` — `tierName == "Walk"`; the walk has no row in any of
+  the three tier tables, so the lookups already return nil. — Drop the
+  special case.
+- [ ] `:119-121` — `0.75` and `0.5` express "a quarter either way" without
+  a name. — Name the jitter.
+- [ ] `:171` — "one call covers all three tiers"; five tiers, the rear
+  branching off. `:187` `@tparam tierName` lists three. — Correct.
+- [ ] `:216-219` — "since `Update` does not wrap this"; the caller is
+  `ResolveImpact`. — Cut the clause; the `pcall` needs no defense.
+- [ ] `:229` — `cfg.ImpactDustEffectRear or cfg.ImpactDustEffect`; the rear
+  effect is declared. — Drop the fallback.
+- [ ] `:230` — `1.3` unnamed chest height. — Name it.
+- [ ] `:236` — `INSTANT` in capitals in a log row. — `onContact=true` or
+  drop it; the tier already says rear.
+- [ ] `:276-286` — "All three look reasonable and all three were wrong in
+  game", "Frame-by-frame footage caught it". — "These do not report the
+  landing:" and the three reasons.
+- [ ] `:288-290` — "its transform follows the body… Anything asking this
+  question again should start there". `Reaction.lua:421-428` says the
+  entity does not follow a ragdoll. — Cut the advice; the claim belongs to
+  the `WhenBodyStops` ruling, which decides which file is right.
+- [ ] `:292-294`, `:363-373` — the 0.7 m terrain measurement twice;
+  "which is why the dust appeared on some collisions and not others with
+  the spawn reporting success every time". — Once, on `GroundUnder`; cut
+  the history.
+- [ ] `:381-383` — `1.0` and `-3.0` unnamed; `table_`. — Name the cast
+  height and depth; `results`.
+- [ ] Carried to `Impact.lua:201-203` — says dust is "Spawned where they are
+  struck rather than where they land… dust that follows a body reads as
+  smoke"; `ImpactDust` waits for the landing (`DustWhenLanded`), except on
+  the rear.
 
 ### Dead code (`tools/audit_code.py`)
 
