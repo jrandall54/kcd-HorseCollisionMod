@@ -18,8 +18,8 @@ audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
 `verify_additive.py`, `version_check.py`, `set_version.py`,
 `audit_code.py`, `testworld.py`, `dev_subject.lua`,
 `nexus_settings_block.py`, the bark scripts, the probes, the
-`dev_` helpers, `restore_alive.lua`, `testworlds.ini` done. `tools/` is
-complete except `tools/legacy/`.
+`dev_` helpers, `restore_alive.lua`, `testworlds.ini` done. `tools/legacy/`
+recorded as a ruling. `tools/` is complete.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -31,7 +31,8 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/legacy/`, then the `.claude/` hooks and linter.
+**Next pass:** the `.claude/` hooks and linter (untracked), which closes
+phase 1.
 
 **Pass order** (dependencies first, then largest):
 
@@ -326,6 +327,14 @@ Items that change behavior or delete a feature. Not applied without a decision.
   them to `tools/legacy/`; the findings live in the diary.
   `restore_alive.lua` belongs with them: it repairs actors left in the
   `unragdoll` profile, which nothing in `src/` sets any more.
+
+- [ ] **`tools/legacy/`.** Tracked, unmaintained, and by construction a
+  record of how investigations went, which the standard says belongs in the
+  diary and version control. Every script is recoverable from git history
+  (`1984553`). Proposal: delete the directory and the README row; the
+  diary already names each script where it was used. Alternative: keep it,
+  fix the fifteen stale paths, and exempt it from the narrative rule in
+  `STYLE.md` as an archive.
 
 - [ ] **Two test-subject tools.** `dev_target.lua` moves an existing NPC
   and pins it with `AI.SetIgnorant`; `dev_subject.lua` spawns a guard soul
@@ -3008,6 +3017,18 @@ their header, and three answer questions that are closed (see the ruling).
   horse."
 - [ ] `testworlds.ini:16` — "interrupts the rider mid-test". — "interrupts
   a test".
+
+### tools/legacy/
+
+Thirteen scripts from closed investigations. `README.md:309-312` states
+they are kept unmaintained. Not audited line by line; see the ruling.
+
+- [ ] Fifteen usage lines across eleven files still name the pre-move path
+  (`--file tools/audition_batch.lua`, `python tools/make_audition.py`), so
+  the documented command fails. — `tools/legacy/…`, if the directory stays.
+- [ ] Nine files say "the rider" and several open with the investigation's
+  account ("The question this answers is the rider's", "Everything so far
+  inferred this…"). — Falls under the ruling.
 
 ### Dead code (`tools/audit_code.py`)
 
