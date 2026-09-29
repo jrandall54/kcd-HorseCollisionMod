@@ -31,8 +31,8 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 5, tooling, the last bullet: the remaining
-tool **Findings**, file by file, starting with `tools/build_adb.py`; every
-bullet before it is done (see **Phase 2 log**). Read **Phase 2 plan** below in
+tool **Findings**, file by file, from `tools/dev_console.py`; every bullet
+before it, and `build_adb.py`, are done (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -636,6 +636,15 @@ One line per batch: batch, commit, what was verified.
   lists were already there); `docs/api` regenerated. L2: `flow test` copied
   the three changed Lua files, reloaded, `Settings: 32 applied, 0 ignored`,
   no Lua error.
+- **Batch 5, `build_adb.py`.** Every finding applied; the get-up and settle
+  comments (`:277-291`) were already separated by batch 2's removal of the
+  get-up options, and the sweep comment (`:907-910`) by batch 0. Option counts
+  are read from the patched male database (32 in `AnimationControlled`, 29
+  `Interactive`; 99 in `HitDeath`, 83 with no collider, 77 with no movement
+  layer). `FALL_SETTLE_AT` is documented as what it is: every figure is the
+  clip length times 0.68 (male) or 0.50 (female). `GENDERS` loses `ctrl`, and
+  `hcm_pb_` goes from both prefix tests. Regenerated: the two parent
+  databases and the tag file byte-identical to the files before the change.
 
 ## Standard
 
@@ -3329,78 +3338,78 @@ comments contradict the values beside them.
 
 **Wrong or stale:**
 
-- [ ] `:9-29` docstring — "Four files are generated now" and lists three;
+- [x] `:9-29` docstring — "Four files are generated now" and lists three;
   one is `wh_female_fragmentids.xml`, which is no longer generated (`:785`).
   Three are generated: the two parent databases and
   `kcd_animationControlledTags.xml`. "vanilla's 16 FragTags plus this mod's
   4"; the file adds 19 (17 reactions, 2 horse). "The last two keep vanilla's
   names"; one does. "Before 2.1.0" is history. — Rewrite from what
   `write_additive` writes.
-- [ ] `:4` "Vanilla ships 30 options" against `:324` "29 of the 32
+- [x] `:4` "Vanilla ships 30 options" against `:324` "29 of the 32
   options". — One figure, from the patched database.
-- [ ] `:170-171` — orphaned comment ("The subTagDef … with four tags
+- [x] `:170-171` — orphaned comment ("The subTagDef … with four tags
   added") above `HORSE_TAGS`; it describes `TAGS_ENTRY`. — Move it to
   `TAGS_ENTRY`; drop the count.
-- [ ] `:185-193` `GENDERS` — "All three are read only" over four keys;
+- [x] `:185-193` `GENDERS` — "All three are read only" over four keys;
   `ids` and `ctrl` described as "copied", which nothing does. `ids` and
   `tags` are referenced by the parent's `FragDef`/`TagDef`; `ctrl` is read
   by nothing. — Describe `db`, `ids`, `tags`; delete `ctrl`.
-- [ ] `:265-271` — "the settle layer … is left disabled and recovery is
+- [x] `:265-271` — "the settle layer … is left disabled and recovery is
   driven from Lua"; every `hcm_fall_` option carries the settle layer
   (`FALL_SETTLE_AT`, `settle_for` `:644-651`). — Cut the paragraph; the fall
   tier's handover is documented at `:414`.
-- [ ] `:277-291` — the get-up comment ("The recovery half of the
+- [x] `:277-291` — the get-up comment ("The recovery half of the
   knockdown") sits above `hcm_settle`, with the settle comment run on after
   it. — Put each above its own entries.
-- [ ] `:389-392` — "at zero the clip plays in a flat plane and a body on a
+- [x] `:389-392` — "at zero the clip plays in a flat plane and a body on a
   slope is buried", above `MCM_ZMOVE = 0`, run together with the
   `MCM_DECLARE` comment. — Split; state why `ZMove` ships 0 when the
   comment names 0 as the failure, or cut the claim.
-- [ ] `:443-463` `FALL_SETTLE_AT` — the head-stop derivation and "Both now
+- [x] `:443-463` `FALL_SETTLE_AT` — the head-stop derivation and "Both now
   carry their measured landing"; male left and right ship 2.80 and 2.08, the
   clip-pose figures `bcd2c31` restored because a head-stop handover gives
   physics a half-posed body. — Replace with that derivation; keep the
   clip-length table.
-- [ ] `:653`, `:841` — `hcm_pb_` prefix; no option carries it. — Delete.
-- [ ] `:728` `write_shared_tags` — "Adds the stagger FragTags"; it adds
+- [x] `:653`, `:841` — `hcm_pb_` prefix; no option carries it. — Delete.
+- [x] `:728` `write_shared_tags` — "Adds the stagger FragTags"; it adds
   every reaction tag and the horse tags. — Correct.
-- [ ] `:559`, `:573` — "Normalises", "normalised". — American spelling.
-- [ ] `:566` — em dash. — Rephrase.
-- [ ] `:322`, `:877`, `:927` — one blank line between top-level
+- [x] `:559`, `:573` — "Normalises", "normalised". — American spelling.
+- [x] `:566` — em dash. — Rephrase.
+- [x] `:322`, `:877`, `:927` — one blank line between top-level
   definitions. — Two.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `:210-217` — `hcm_shove_*` "existed briefly … Add them back here when
+- [x] `:210-217` — `hcm_shove_*` "existed briefly … Add them back here when
   the trot tier moves off the physics ragdoll". — Cut.
-- [ ] `:222-223`, `:229` — "since 2.0.0", "Trot, replacing the physics
+- [x] `:222-223`, `:229` — "since 2.0.0", "Trot, replacing the physics
   ragdoll"; trot ships `fall`, and `knockdown` is a selectable style no
   tier uses. — "Knockdown: an animated fall and get-up."
-- [ ] `:329-334` — "An earlier value of None was chosen by matching…". —
+- [x] `:329-334` — "An earlier value of None was chosen by matching…". —
   Keep the collider reason.
-- [ ] `:355-359` — "the physics knockdown the trot tier moved away from". —
+- [x] `:355-359` — "the physics knockdown the trot tier moved away from". —
   Cut.
-- [ ] `:386` — "False restores the build before this." — Cut.
-- [ ] `:465-469` — "Handover timing was tested against it". — Cut.
-- [ ] `:532-538` — "a player reported being locked in place picking a herb
+- [x] `:386` — "False restores the build before this." — Cut.
+- [x] `:465-469` — "Handover timing was tested against it". — Cut.
+- [x] `:532-538` — "a player reported being locked in place picking a herb
   as Theresa". — Keep "the base pak is the launch game; patches replace whole
   files".
-- [ ] `:566-567` — "It happened during this fix: the first version of the
+- [x] `:566-567` — "It happened during this fix: the first version of the
   resolver silently picked 1.7.1b." — Cut.
-- [ ] `:640-642` — "which is what the knockdown tier did from Lua with a
+- [x] `:640-642` — "which is what the knockdown tier did from Lua with a
   timer". — Cut.
-- [ ] `:732-744` — "An earlier layout did that, and unrelated animations
+- [x] `:732-744` — "An earlier layout did that, and unrelated animations
   stopped playing: the beggar's kneeling…". — Keep "copies of the id and
   controller files would sit in the resolution path of every human
   fragment".
-- [ ] `:760-764` — "That has happened … seventy-seven rears that worked,
+- [x] `:760-764` — "That has happened … seventy-seven rears that worked,
   then seventeen". — Keep "regenerating without them deletes them, and an
   unresolvable fragment is not an error".
-- [ ] `:785-811` — the account of `wh_female_fragmentids.xml`. — Two
+- [x] `:785-811` — the account of `wh_female_fragmentids.xml`. — Two
   sentences: it is not generated because patch 1.9 declares the fragment,
   and a copy would override the patched file; `read_vanilla` resolves
   through `Data/patch/` so the same mistake raises.
-- [ ] `:907-910` — "This sweep did exactly that to the horse database". —
+- [x] `:907-910` — "This sweep did exactly that to the horse database". —
   Keep "hand-authored files here are not in git".
 
 ### tools/dev_console.py
