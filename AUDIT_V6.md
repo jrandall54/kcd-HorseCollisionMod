@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 2 done.
+**Phase:** 2 in progress. Batches 0 to 3 done.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,7 +30,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 3, following **Phase 2 plan** below. Read
+**Next step:** phase 2, batch 4, following **Phase 2 plan** below. Read
 that section in full before starting; it gives the order, the procedure
 for every batch and how each is verified.
 
@@ -329,6 +329,19 @@ One line per batch: batch, commit, what was verified.
   window:** the rider heard vanilla's collision bark after the mod's `Shove`
   line on a walk stagger, so item 2 does not close every path by which
   vanilla speaks inside the mod's window.
+- **Batch 3, item 4.** `RearAnimMs` no longer divides by `RearAnimSpeed`,
+  documented as the charge's playback speed. No ride: at the shipped 1.0
+  the division changed nothing.
+- **Batch 3, items 5 and 6.** `PullRiderDown` returns `true` once polling
+  starts, and `ProvokeIfAnnoyed` clears the annoyance count before calling
+  it, so a deferred provocation does not re-roll on every contact. Ride with
+  retaliation on: Tonda pulled the rider down at 6544 ms after three
+  requests and the offense was released on `dismounted`; Berthold was
+  offered the pull (`can=2`), never took it, and fought on the 8000 ms
+  ceiling; a beggar surrendered. No swing while mounted. The rider found it
+  slow: the engine runs the accepted request when its brain is ready, 1 to
+  5 s here, which this change does not affect. Retaliation switches
+  restored afterwards.
 
 ## Standard
 

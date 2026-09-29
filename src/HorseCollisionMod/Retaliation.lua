@@ -1008,15 +1008,13 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 		self:ShowSurrenderHint(npc)
 	end
 
-	if self:PullRiderDown(npc) then
-		return true
-	end
-
-	self:ReleaseWhenFighting(npc)
-
 	-- The count is spent. Without this a victim already fighting keeps
 	-- rolling on every further contact during the brawl.
 	self.Annoyance[tostring(npc.id)] = nil
+
+	if not self:PullRiderDown(npc) then
+		self:ReleaseWhenFighting(npc)
+	end
 
 	return true
 end
@@ -1164,4 +1162,6 @@ function HorseCollisionMod:PullRiderDown(npc)
 	end
 
 	attempt()
+
+	return true
 end
