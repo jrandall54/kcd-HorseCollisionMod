@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`, `Update.lua`. Next: `Marks.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`, `Update.lua`, `Marks.lua`. Next: `Fear.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -284,6 +284,12 @@ In this order, each its own commit and ride:
      read once per tick; the airborne log's 1000 ms repeat gap is named,
      and `sinceImpactMs` logs `none` rather than `-1`; the loop's error row
      is `UpdateError err=` rather than capitals.
+   - `Marks.lua`: `MarkVictim` and `ImpactDust` return nothing; drop the
+     `tierName == "Walk"` special cases, since the walk has no row in any
+     of the tables; name the jitter's 0.75 and 0.5, the rear dust's 1.3 m
+     chest height, and `GroundUnder`'s 1.0 m cast height and 3.0 m depth;
+     drop the `ImpactDustEffectRear or ImpactDustEffect` fallback; the
+     rear's dust row drops `INSTANT`; `table_` becomes `results`.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -477,6 +483,8 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Update.lua`.** L1 `same` for it and `Bark.lua`. Rates named
   as `TickSeconds`; the removed readiness wait's history cut; the charge
   stand-aside described as it works.
+- **Batch 4, `Marks.lua`.** L1 `same`. Tier docs follow the tables; the
+  three failed landing signals kept as constraints without the history.
 
 ## Standard
 
@@ -2368,46 +2376,53 @@ batch 3, item 7.
 
 ### src/HorseCollisionMod/Marks.lua
 
-- [ ] `:8-12` header — "Both arguments are deltas": `AddDirt` takes one.
+Batch 4: applied. The "entity follows the body" advice is cut in line with
+the `WhenBodyStops` ruling; the doc now says only that the entity's
+`GetVelocity` reports the vertical motion the dust needs. The measured
+gallop trace stays as the derivation of the two thresholds. The carried
+`Impact.lua` dust finding stays with that file's pass. Code findings went
+to batch 3, item 7.
+
+- [x] `:8-12` header — "Both arguments are deltas": `AddDirt` takes one.
   `:9-10` breaks the `actor:AddBlood(zone, n)` code span across lines. —
   "Each amount is a delta"; keep the span on one line.
-- [ ] `:17` — "a rider who is run down from behind"; the victim. — Correct.
-- [ ] `:83-84` `MarkVictim` — "from the trot and gallop branches of
+- [x] `:17` — "a rider who is run down from behind"; the victim. — Correct.
+- [x] `:83-84` `MarkVictim` — "from the trot and gallop branches of
   `OnImpact`"; `ResolveImpact` (`Impact.lua:215`) calls it for every tier,
   and the rear and the charge carry figures. `:95` `@tparam tierName`
   names two tiers. — "an impact tier name"; the tier tables decide, and
   the walk has no row.
-- [ ] `:98`, `:188` `@treturn` — neither caller reads the result
+- [x] `:98`, `:188` `@treturn` — neither caller reads the result
   (`Impact.lua:205`, `:215`), and `ImpactDust` returns true at `:246`
   whether or not dust is ever spawned. — Return nothing.
-- [ ] `:102`, `:192` — `tierName == "Walk"`; the walk has no row in any of
+- [x] `:102`, `:192` — `tierName == "Walk"`; the walk has no row in any of
   the three tier tables, so the lookups already return nil. — Drop the
   special case.
-- [ ] `:119-121` — `0.75` and `0.5` express "a quarter either way" without
+- [x] `:119-121` — `0.75` and `0.5` express "a quarter either way" without
   a name. — Name the jitter.
-- [ ] `:171` — "one call covers all three tiers"; five tiers, the rear
+- [x] `:171` — "one call covers all three tiers"; five tiers, the rear
   branching off. `:187` `@tparam tierName` lists three. — Correct.
-- [ ] `:216-219` — "since `Update` does not wrap this"; the caller is
+- [x] `:216-219` — "since `Update` does not wrap this"; the caller is
   `ResolveImpact`. — Cut the clause; the `pcall` needs no defense.
-- [ ] `:229` — `cfg.ImpactDustEffectRear or cfg.ImpactDustEffect`; the rear
+- [x] `:229` — `cfg.ImpactDustEffectRear or cfg.ImpactDustEffect`; the rear
   effect is declared. — Drop the fallback.
-- [ ] `:230` — `1.3` unnamed chest height. — Name it.
-- [ ] `:236` — `INSTANT` in capitals in a log row. — `onContact=true` or
+- [x] `:230` — `1.3` unnamed chest height. — Name it.
+- [x] `:236` — `INSTANT` in capitals in a log row. — `onContact=true` or
   drop it; the tier already says rear.
-- [ ] `:276-286` — "All three look reasonable and all three were wrong in
+- [x] `:276-286` — "All three look reasonable and all three were wrong in
   game", "Frame-by-frame footage caught it". — "These do not report the
   landing:" and the three reasons.
-- [ ] `:288-290` — "its transform follows the body… Anything asking this
+- [x] `:288-290` — "its transform follows the body… Anything asking this
   question again should start there". `Reaction.lua:421-428` says the
   entity does not follow a ragdoll. — Cut the advice; the claim belongs to
   the `WhenBodyStops` ruling, which decides which file is right.
-- [ ] `:292-294`, `:363-373` — the 0.7 m terrain measurement twice;
+- [x] `:292-294`, `:363-373` — the 0.7 m terrain measurement twice;
   "which is why the dust appeared on some collisions and not others with
   the spawn reporting success every time". — Once, on `GroundUnder`; cut
   the history.
-- [ ] `:381-383` — `1.0` and `-3.0` unnamed; `table_`. — Name the cast
+- [x] `:381-383` — `1.0` and `-3.0` unnamed; `table_`. — Name the cast
   height and depth; `results`.
-- [ ] Carried to `Impact.lua:201-203` — says dust is "Spawned where they are
+- [x] Carried to `Impact.lua:201-203` — says dust is "Spawned where they are
   struck rather than where they land… dust that follows a body reads as
   smoke"; `ImpactDust` waits for the landing (`DustWhenLanded`), except on
   the rear.

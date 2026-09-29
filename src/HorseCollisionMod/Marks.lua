@@ -6,15 +6,16 @@
 -- evidence on their body and their clothes.
 --
 -- Two engine calls do the work, both on the actor. `actor:AddDirt(n)` adds
--- dirt to everything the victim is wearing and takes no zone. `actor:AddBlood
--- (zone, n)` takes a named zone of the body and adds blood to the body and to
--- whatever covers it. Both arguments are deltas in the range -1 to 1, so
--- repeated collisions accumulate and a negative figure would wash it off.
+-- dirt to everything the victim is wearing and takes no zone.
+-- `actor:AddBlood(zone, n)` takes a named zone of the body and adds blood to
+-- the body and to whatever covers it. Each amount is a delta in the range -1
+-- to 1, so repeated collisions accumulate and a negative figure would wash it
+-- off.
 -- Vanilla uses both this way: `deadBody.xml` bloods a corpse on spawn, and
 -- `q_huntPtacek.xml` dirties a man dragged through a wood.
 --
 -- The zones are chosen from the impact direction `Detection.lua` already
--- computes for the reaction clips, so a rider who is run down from behind is
+-- computes for the reaction clips, so a victim run down from behind is
 -- marked across the back rather than the face. Only zone names that vanilla
 -- itself passes are used: the engine reads them from a database this mod
 -- cannot see, and an unrecognized name fails silently, which would look
@@ -79,8 +80,8 @@ HorseCollisionMod.BloodZones = {
 
 --- Marks a victim with the dirt and blood their impact earned.
 --
--- Called at the moment of impact, from the trot and gallop branches of
--- `OnImpact`. Nothing is applied at a walk.
+-- Called at the moment of impact from `ResolveImpact`, for every tier. The
+-- tier tables decide what is applied; the walk has no row and gets nothing.
 --
 -- The amounts come from the settings, per tier, and each application is
 -- jittered by a quarter either way so a victim ridden down twice does not
@@ -91,7 +92,7 @@ HorseCollisionMod.BloodZones = {
 -- impact and this line and a raw error would kill the collision tick.
 --
 -- @tparam table npc victim entity
--- @tparam string tierName "Trot" or "Gallop"; "Walk" leaves no mark
+-- @tparam string tierName an impact tier name
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
 -- @treturn boolean true when something was applied
@@ -167,7 +168,8 @@ end
 -- `Particle.SpawnEffect(name, pos, dir, scale)` is the same call vanilla uses
 -- for a bullet hitting flesh in `BasicActor.lua` and for a fish breaking the
 -- surface in `Fish.lua`. It takes a world position, so it is indifferent to
--- what the victim's body is doing, and one call covers all three tiers.
+-- what the victim's body is doing; the rear spawns on contact and every
+-- other tier on landing.
 --
 -- The effect is spawned at the victim's feet rather than at their center,
 -- because the dust belongs to the ground and an emitter at chest height puts
@@ -183,8 +185,8 @@ end
 -- the ground to do.
 --
 -- @tparam table npc the victim entity
--- @tparam string tierName "Walk", "Trot" or "Gallop"
--- @treturn boolean true when an effect was spawned
+-- @tparam string tierName an impact tier name
+-- @treturn boolean true when an effect was spawned or is waiting to be
 function HorseCollisionMod:ImpactDust(npc, tierName)
 	local cfg = self.Config
 
@@ -208,14 +210,13 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 	--
 	-- A rear is a standing attack and the victim is directly in front of the
 	-- hooves, so there is no flight to wait out and the dust belongs at chest
-	-- height where the blow lands rather than at the feet.
+	-- height, 1.3 m above the victim's origin, where the blow lands rather
+	-- than at the feet.
 	if tierName == "Rear" then
 		local pos = nil
 
-		-- Read through `pcall` like every other position read in this mod.
-		-- Bare, a victim who has been removed between the impact and this
-		-- call throws out of `ImpactDust` and takes the rest of the caller's
-		-- impact handling with it, since `Update` does not wrap this.
+		-- Read through `pcall` like every other position read in this mod,
+		-- since the victim can be removed between the impact and this call.
 		pcall(function()
 			pos = npc:GetWorldPos()
 		end)
@@ -270,27 +271,17 @@ end
 --     n=9   z 80.396   vz +0.157     ground, 450 ms after contact
 --     n=14  z 80.309   vz  0.027     at rest, 700 ms
 --
--- ### Three signals that do not report it
---
--- All three look reasonable and all three were wrong in game:
+-- ### Signals that do not report it
 --
 -- * **Height falling.** A galloped victim is thrown almost flat, so their
---   height barely changes for the first tenth of a second and the test passed
---   immediately, putting the dust back at the collision. Frame-by-frame
---   footage caught it.
--- * **Total distance moved.** That is a body at rest, which the same trace
---   puts 250 ms after the ground contact, and it read as a visible delay.
--- * **`actor:IsFlying()`.** It reads false on the first sample and nil on
---   every one after, because a ragdolled victim has left actor movement
---   entirely. Actor state stops describing them the moment they are thrown.
+--   height barely changes for the first tenth of a second, and the test fires
+--   at the collision.
+-- * **Total distance moved.** That is a body at rest, about 250 ms after the
+--   ground contact.
+-- * **`actor:IsFlying()`.** It reads false on the first sample and nil after,
+--   because a ragdolled victim has left actor movement entirely.
 --
--- What does survive the ragdoll is the entity itself: its transform follows
--- the body and `GetVelocity` reports real physics. Anything asking this
--- question again should start there rather than from the actor.
---
--- Terrain height is not usable either. `System.GetTerrainElevation` under the
--- same victim read 0.7 m above the body they were lying on, because the road
--- surface they landed on is geometry rather than terrain.
+-- The entity's `GetVelocity` does report the vertical motion this needs.
 --
 -- The sample count is capped so a victim who never lands, because they were
 -- thrown into water or off a ledge, does not leave a poll running.
@@ -360,16 +351,14 @@ end
 --
 -- The dust has to come off the surface the body is lying on, and the body's
 -- own origin is not that surface. A ragdoll's origin sits inside the mesh and
--- can end up well under the ground it is resting on: measured on one victim it
--- read 0.70 m below the terrain sample at the same spot. An emitter placed
--- there is buried and renders nothing, which is why the dust appeared on some
--- collisions and not others with the spawn reporting success every time.
+-- can end up well under the ground it is resting on, and an emitter placed
+-- there is buried and renders nothing while reporting success.
 --
--- Cast from a meter above the body straight down, against terrain and static
--- geometry, which is vanilla's own pattern for placing a blood splat on the
--- ground in `BasicActor.lua`. Terrain elevation alone is not enough: a victim
--- who lands on a road or a bridge is on geometry, and the terrain underneath
--- it read 0.7 m out on the same measurement.
+-- Cast from a meter above the body three meters straight down, against
+-- terrain and static geometry, which is vanilla's own pattern for placing a
+-- blood splat on the ground in `BasicActor.lua`. Terrain elevation alone is
+-- not enough: a victim who lands on a road or a bridge is on geometry, and
+-- the terrain under it can read 0.7 m out.
 --
 -- @tparam table pos a world position
 -- @treturn table the surface point below it, or nil when nothing was hit
