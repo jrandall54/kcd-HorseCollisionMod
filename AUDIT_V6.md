@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe.
-Next: unused sound tokens. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens.
+Next: the lean's correction throttle. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -209,11 +209,10 @@ Items that change behavior or delete a feature. Not applied without a decision.
   with `height()` and `baseZ`, all of which read entity position that does
   not follow a ragdoll.
 
-- [ ] **Unused sound tokens.** `Sound.lua` resolves six tokens; no shipped
-  tier names `foley` or `face`. `foley` carries its own table
-  (`BodyFoleySounds`) and resolver (`BodyFoleySound`, `:97-120`); the walk
-  names its foley triggers literally. Proposal: delete `foley`, its table and
-  resolver, and `face`; document the tokens that remain.
+- [x] **Unused sound tokens.** Ruled as proposed: delete `face`, `foley`,
+  `BodyFoleySounds`, `BodyFoleySound` (`Sound.lua:97-120`) and the `foley`
+  branch in `ResolveTrigger`; the doc above `ImpactTokens` lists the four
+  that remain (`body`, `body_armed`, `face_armed`, `blunt`).
 
 - [ ] **The lean's correction throttle is never applied.** `FlipLean`
   skips a flip inside `LeanMinFlipMs` unless `force` is set, and every call
