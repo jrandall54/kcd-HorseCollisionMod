@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout.
-Next: the stale armor-table sweep. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep.
+Next: a full deploy into a running game. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -294,11 +294,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `docs/`; `tools/` becomes one line pointing at `docs/DEV_LOOP.md`, which
   takes the catalog.
 
-- [ ] **The stale armor-table sweep.** `build.ps1:431-440` deletes
+- [x] **The stale armor-table sweep.** `build.ps1:431-440` deletes
   `mod_assets/Scripts/Startup/HorseCollisionMod_ItemData.lua`, a file no
   build has generated since `5718d08`. It exists only for working copies
   older than that. Proposal: delete the block; a clean `mod_assets/`
   regeneration covers the same case.
+  **Ruled as proposed.** The only working copy's `Scripts/Startup/` is
+  already empty.
 
 - [ ] **A full deploy into a running game.** `dev_deploy.ps1` warns and
   continues when the game is running (`:935-940`), then deletes
