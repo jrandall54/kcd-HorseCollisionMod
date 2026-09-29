@@ -1,9 +1,8 @@
---- In-game tutorial guidance for horseback maneuvers.
+--- In-game tutorial banners for the horseback maneuvers.
 --
--- Explains how to execute the Rear, Rear Charge, and Saddle Lean maneuvers,
--- detailing key controls, standstill requirements, stamina drain, and crime
--- consequences. Attached to the `HorseCollisionMod` table created by the
--- entry point, which pulls this file in with `Script.ReloadScript`.
+-- Shows each maneuver's banner once, when it is first available: the rear,
+-- the charge and the lean. Attached to the `HorseCollisionMod` table created
+-- by the entry point, which pulls this file in with `Script.ReloadScript`.
 --
 -- @module HorseCollisionMod.Tutorial
 -- @author jrandall54
@@ -23,7 +22,7 @@ end
 -- Dynamically adapts button prompts based on whether the player is currently
 -- using a gamepad or keyboard.
 --
--- @tparam string name tutorial identifier ("rear", "charge", "lean", etc.)
+-- @tparam string name "rear", "charge" or "lean"
 -- @treturn string formatted tutorial message
 function HorseCollisionMod:FormatTutorialText(name)
 	local cfg = self.Config
@@ -60,7 +59,7 @@ end
 
 --- Displays an on-screen tutorial banner for a maneuver.
 --
--- @tparam string name tutorial identifier ("rear", "charge", "lean", etc.)
+-- @tparam string name "rear", "charge" or "lean"
 -- @tparam[opt] boolean force true to bypass settings and CVar checks
 -- @treturn boolean true if the tutorial was displayed
 function HorseCollisionMod:ShowTutorial(name, force)
@@ -111,12 +110,14 @@ function HorseCollisionMod:ShowTutorial(name, force)
 	return ok
 end
 
---- Displays newly acquired maneuver tutorials in order, scheduling subsequent banners.
+--- Shows the banners for newly available maneuvers, one after another.
 --
--- When multiple perks are acquired at once (e.g. in the perk menu), this shows
--- the first banner immediately and schedules subsequent banners to appear after
--- the preceding banner's 10-second display duration expires, ensuring every
--- tutorial plays in full in sequence.
+-- When several perks are acquired at once, in the perk menu, this shows the
+-- first banner at once and schedules the next for when the first banner's
+-- 10 second display ends, so every banner plays in full.
+--
+-- Without `RequirePerks` only the rear's banner is shown here; the charge's
+-- and the lean's appear on their first use.
 function HorseCollisionMod:QueueNextTutorial()
 	if not self.Config.ShowTutorials then
 		return
@@ -169,24 +170,23 @@ function HorseCollisionMod:QueueNextTutorial()
 	end
 end
 
---- Checks whether newly acquired maneuver tutorials should be shown on mount.
+--- Shows any newly available maneuver banners on mounting.
 --
 -- @tparam table playerEnt the player entity table
 function HorseCollisionMod:CheckMountTutorials(playerEnt)
 	self:QueueNextTutorial()
 end
 
---- Checks whether newly acquired maneuver tutorials should be shown when leaving menus.
+--- Shows any newly available maneuver banners on leaving a menu.
 function HorseCollisionMod:CheckMenuTutorials()
 	self:QueueNextTutorial()
 end
 
---- Synchronizes tutorial state against the player's actual abilities in the loaded save.
+--- Matches the shown banners to the abilities in the loaded save.
 --
--- Called on save load (sys_loadingimagescreen OnEnd). If a loaded character
--- already has an ability, mark its tutorial as already shown so the player is
--- not spammed. If the loaded character does NOT have the ability in this save,
--- clear the flag so unlocking it later in this save cleanly displays the banner.
+-- Called from the load screen handler. An ability the loaded character
+-- already has marks its banner as shown, so it is not repeated; one they lack
+-- clears the mark, so unlocking it later in this save shows the banner.
 function HorseCollisionMod:SyncTutorialsOnLoad()
 	self.TutorialsShown = self.TutorialsShown or {}
 	self.TutorialTimerPending = false
