@@ -16,7 +16,8 @@ end of every pass, so it always says where the audit stands.
 audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
 `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
 `verify_additive.py`, `version_check.py`, `set_version.py`,
-`audit_code.py`, `testworld.py` done.
+`audit_code.py`, `testworld.py`, `dev_subject.lua`,
+`nexus_settings_block.py`, the bark scripts done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -28,9 +29,8 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `dev_subject.lua`,
-`nexus_settings_block.py`, the bark scripts, the `probe_` and `dev_` Lua,
-`testworlds.ini`; `tools/legacy/` last. Then `.claude/`
+**Next pass:** `tools/`, the `probe_` and `dev_` Lua,
+`restore_alive.lua`, `testworlds.ini`; `tools/legacy/` last. Then `.claude/`
 hooks and linter.
 
 **Pass order** (dependencies first, then largest):
@@ -2864,6 +2864,53 @@ Accurate; the rationale sections run long.
 - [ ] `:10-11` — `--` as dashes. — Rephrase.
 - [ ] `:28-29` — paths relative to the working directory. — Resolve from
   `__file__`.
+
+### Bark research scripts
+
+`bark_lines.py`, `bark_alias.py`, `bark_chain.py`, `henry_impact_lines.py`,
+`npc_pain_sets.py`. Offline readers of the shipped dialogue tables. One
+correctness bug; the rest is history in the docstrings and duplicated
+plumbing.
+
+**Wrong or stale:**
+
+- [ ] `npc_pain_sets.py:91` — `if -1 in gate["timeouts"]`; the timeouts are
+  strings read from XML, so a once-only sequence is never reported and a
+  set carrying one passes as unconditional. — Compare against `"-1"`.
+- [ ] `bark_chain.py:63-65` — `for topic, speaker, txt in B.lines(): pass`
+  parses every dialogue line and discards it. `:68` imports `re` inside the
+  function. `walk`'s `only_role` and `role_name` are unused. — Delete the
+  loop and the unused names; import at the top.
+- [ ] `henry_impact_lines.py:6-20` — "Three things have to be true" over a
+  list of five; "The third point is the reason this tool exists" means the
+  fifth. — "Five conditions"; "The fifth is the reason".
+- [ ] `bark_alias.py:153-156` — cites
+  `pick-bark-sets-by-line-length-not-just-fit`, an assistant memory file
+  that is not in the repository. — State the rule: one long member spoils
+  the whole alias, because the dialog system picks the member.
+- [ ] `bark_alias.py:49-67` — `_read` duplicated from `bark_lines.py`
+  ("Lifted from"). — Import it.
+- [ ] `bark_lines.py:34`, `bark_alias.py:44` — `KCD_ROOT`; the build tools
+  use `KCD_PATH`. — `KCD_PATH`, as in the `dev_console.py` finding.
+- [ ] `bark_alias.py:117` — "labelled". — "labeled".
+- [ ] `bark_alias.py:13`, `:15`; `henry_impact_lines.py:11` — `--` as
+  dashes. — Rephrase.
+
+**History and people to cut:**
+
+- [ ] `bark_alias.py:3-5`, `:10-20` — "the diary proves it works",
+  "The diary recorded the alias route as a dead end … the second of them is
+  wrong", "Around 795 aliases had never been seen by this project". — Keep
+  "`topic.xml` carries the alias namespace as its `label` column".
+- [ ] `henry_impact_lines.py:22-28` — "the rider had to discover that by
+  hearing it" and a quoted remark. — Cut.
+- [ ] `henry_impact_lines.py:94-95` — "Three of the rider's picks were
+  silent for this reason alone". — Cut.
+- [ ] `henry_impact_lines.py:62-64`, `:16-17` — "refused every single time
+  in testing". — "A two-actor sequence is a conversation; a monolog request
+  for one is refused."
+- [ ] `npc_pain_sets.py:4-5` — `RANENY_NA_ZEMI` "reads far too strong"; it
+  ships as `HurtDown` (`Bark.lua:148`). — Cut the judgment.
 
 ### Dead code (`tools/audit_code.py`)
 
