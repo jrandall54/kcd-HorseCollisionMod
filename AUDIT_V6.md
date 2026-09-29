@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`, `Update.lua`, `Marks.lua`. Next: `Fear.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`, `Update.lua`, `Marks.lua`, `Fear.lua`. Next: `Crime.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -290,6 +290,12 @@ In this order, each its own commit and ride:
      chest height, and `GroundUnder`'s 1.0 m cast height and 3.0 m depth;
      drop the `ImpactDustEffectRear or ImpactDustEffect` fallback; the
      rear's dust row drops `INSTANT`; `table_` becomes `results`.
+   - `Fear.lua`: drop the reads of `RearFearScreamOverrideSuppress` and
+     `RearChargeFearScreamOverrideSuppress`, which were never declared in
+     `Config` (since `00d6637` and `823eb6a`), so they are always nil and
+     the scream never overrides suppression; behavior unchanged. Use
+     `player` rather than the `playerEnt` alias; the target id and player
+     WUID go through the helpers recorded under `Crime.lua`.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -485,6 +491,9 @@ One line per batch: batch, commit, what was verified.
   stand-aside described as it works.
 - **Batch 4, `Marks.lua`.** L1 `same`. Tier docs follow the tables; the
   three failed landing signals kept as constraints without the history.
+- **Batch 4, `Fear.lua`.** L1 `same`. The flee-state measurement reduced
+  to its constraint; people-neutral wording; `ChargeFearBand`'s return
+  documented. Two undeclared settings found, recorded for item 7.
 
 ## Standard
 
@@ -2429,21 +2438,27 @@ to batch 3, item 7.
 
 ### src/HorseCollisionMod/Fear.lua
 
-- [ ] `:29-31` header — no `@release`. — Add.
-- [ ] `:72-92` `FrightenBystander` — "Startled, not hurt. One line, at the
+Batch 4: applied. `@release` is not added (batch 1 removed it). The
+`ProtectMutt` wording follows that ruling: `RearCanHit` admits living
+humans. Found in this pass: the two scream override settings the bands
+read were never declared, so they are always nil; recorded in batch 3,
+item 7. Code findings went there too.
+
+- [x] `:29-31` header — no `@release`. — Add.
+- [x] `:72-92` `FrightenBystander` — "Startled, not hurt. One line, at the
   fright, and it is the scream rather than the startle" is a fragment;
   "The moment wanted two… Measured over several rides", "was the weaker
   half of the pair". — Keep: a line sent to an NPC already fleeing is
   accepted and never spoken, so the one line goes out with the stimulus,
   from `NASILI_UTEK` (the `Panic` alias).
-- [ ] `:127-129` `FearBand` — "a living human who is not Henry's dog";
+- [x] `:127-129` `FearBand` — "a living human who is not Henry's dog";
   follows the `ProtectMutt` ruling.
-- [ ] `:140`, `:235` — `local playerEnt = player` aliases the global for no
+- [x] `:140`, `:235` — `local playerEnt = player` aliases the global for no
   reason. — Use `player`.
-- [ ] `:195` — "thirty feet"; the mod measures in meters. — "several
+- [x] `:195` — "thirty feet"; the mod measures in meters. — "several
   meters".
-- [ ] `:221-222` — "normalised". — "normalized".
-- [ ] `:227` `ChargeFearBand` — returns a count with no `@treturn`. — Add.
+- [x] `:221-222` — "normalised". — "normalized".
+- [x] `:227` `ChargeFearBand` — returns a count with no `@treturn`. — Add.
 
 ### src/HorseCollisionMod/Crime.lua
 
