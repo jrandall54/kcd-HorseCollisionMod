@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Log.lua findings recorded and committed.
+**Current status:** Tutorial.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Tutorial.lua`.
+**Next pass:** `Detection.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -47,7 +47,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Crime.lua`
 - [x] `Impact.lua`
 - [x] `Log.lua`
-- [ ] `Tutorial.lua`
+- [x] `Tutorial.lua`
 - [ ] `Detection.lua`
 - [ ] `Enums.lua`
 - [ ] Documentation: `README`, `docs/*.md` except the diary
@@ -225,6 +225,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `RearCanHit` (`Rear.lua:1094-1120`) repeats the name test behind the same
   class filter. Proposal: delete `ProtectMutt`, both name checks and the
   empty block; the class filter protects every dog.
+
+- [ ] **Two sets of tutorial text.** `Tutorial.lua:33-57` builds the
+  banners in Lua, in English, with the configured keys; the localization
+  table carries `ui_tutorial_hcm_rear` and `ui_tutorial_hcm_charge`, which
+  nothing reads, with different text and no lean entry. Proposal: delete
+  the two unused cells, since only the Lua text can name a rebound key.
 
 ## Findings
 
@@ -1837,6 +1843,37 @@ victim is accurate (only men reach the fight branch) and stays.
 - [ ] `:206-209` — two blank lines, then an orphan doc ("Current time in
   milliseconds", `@treturn`) that LDoc merges into `NameOf`'s. — Delete.
 - [ ] `:250` — `0.016` unnamed. — Name it (one frame at 60 Hz).
+
+### src/HorseCollisionMod/Tutorial.lua
+
+- [ ] `:1-6` header — "detailing key controls, standstill requirements,
+  stamina drain, and crime consequences" describes the banner text, not
+  the file. — "Shows each maneuver's banner once, when it is first
+  available."
+- [ ] `:12`, `:87`, `:131`, `:192` — `TutorialsShown or {}` four times; the
+  first runs when the file loads. — Keep `:12`; drop the rest.
+- [ ] `:27`, `:64` `@tparam name` — "etc."; there are three. — Name them.
+- [ ] `:65` `force` — no caller passes it. — Remove the parameter and its
+  two tests.
+- [ ] `:103`, `:119`, `:158` — the 10 s display and the `10500` ms follow-up
+  are separate literals. — One named duration; derive the follow-up from
+  it.
+- [ ] `:115`, `:180`, `:185` — summaries past 80 columns; `:187-190`
+  "spammed", "does NOT". — Shorten; plain case.
+- [ ] `:126`, `:195` — `rawget(_G, "player")`. — `player`.
+- [ ] `:134-138`, `:201-205` — the banner-to-ability table twice, and again
+  as the perk ids in `Rider.lua` `GrantPerks`. — One table, beside the
+  Rider perk table.
+- [ ] `:166-170` — without `RequirePerks` only the rear's banner is shown on
+  mount; the charge's and the lean's appear on first use
+  (`Rear.lua:260`, `Lean.lua:313`). — Say so in the doc.
+- [ ] `:173-183` — `CheckMountTutorials(playerEnt)` ignores its argument, and
+  both it and `CheckMenuTutorials` only call `QueueNextTutorial`. — Call
+  `QueueNextTutorial` from `Update.lua:160` and
+  `HorseCollisionMod.lua:1858`; delete both.
+- [ ] Whole file — no blank line after local declarations or before
+  `return` and control blocks (`:18-19`, `:76-77`, `:95-96`, `:100-101`,
+  `:141-148`, `:156-158`), unlike every other module. — Match the mod.
 
 ### Dead code (`tools/audit_code.py`)
 
