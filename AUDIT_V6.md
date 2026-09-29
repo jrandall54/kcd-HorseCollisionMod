@@ -3680,15 +3680,16 @@ and the section comments number the claims differently from the docstring.
 
 ### tools/set_version.py
 
-- [ ] `:3-6` — "fourteen places … each of the eleven part files"; twenty
+- [x] `:3-6` — "fourteen places … each of the eleven part files"; twenty
   part files carry `@release`. (Carried forward from `DEV_LOOP.md`.) — Drop
   the counts: "the manifest, `HorseCollisionMod.Version`, and the
-  `@release` tag in every Lua file".
-- [ ] `:8-11` — "because the build reported only the first mismatch it
-  found; that half is fixed in `build.ps1`". — Cut.
-- [ ] `:127-132` — "That was misdiagnosed as a problem with the tables …
+  `@release` tag in every Lua file". Superseded by batch 1.
+- [x] `:8-11` — "because the build reported only the first mismatch it
+  found; that half is fixed in `build.ps1`". — Cut. Superseded by batch 1.
+- [x] `:127-132` — "That was misdiagnosed as a problem with the tables …
   which was never the cause." — Keep the LDoc failure it prevents.
-- [ ] `:164-165` — "That failure was silent and therefore the worst kind". —
+  Superseded by batch 1.
+- [x] `:164-165` — "That failure was silent and therefore the worst kind". —
   Cut.
 
 ### tools/audit_code.py

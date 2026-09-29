@@ -117,11 +117,9 @@ def promote_changelog(version):
 
     # Located with the same pattern the blocks were parsed with, rather than by
     # rebuilding the original text out of the heading and the captured body.
-    # The captured body carries its own leading newlines, so joining them does
-    # not reproduce what is in the file and the replace matched nothing.
-    #
-    # That failure was silent and therefore the worst kind: the version files
-    # were rewritten, the changelog was not, and the tool reported success.
+    # The captured body carries its own leading newlines, so a rebuilt text
+    # would not match the file, and the changelog would be left unmoved while
+    # the version files were rewritten.
     pattern = re.compile(r"^(## +\[Unreleased\][^\n]*\n)(.*?)(?=^## |\Z)",
                          re.M | re.S)
     m = pattern.search(text)
