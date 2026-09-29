@@ -14,7 +14,7 @@ end of every pass, so it always says where the audit stands.
 
 **Current status:** every source file and every document except the diary
 audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
-`dev_console.py` done.
+`dev_console.py`, `publish_nexus.ps1` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -26,7 +26,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `publish_nexus.ps1`,
+**Next pass:** `tools/`, largest first:
 `pre_release_check.py`, `flow.ps1`, `verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
 
@@ -2619,6 +2619,48 @@ through them, and two comment blocks sit above the wrong constants.
   Cut.
 - [ ] `:773-776` — "which failed the deploy's reload step". — Keep "stderr
   output fails a PowerShell caller".
+
+### tools/publish_nexus.ps1
+
+The upload flow and its safeguards are sound. One corrupted string, one
+comment that contradicts `build.ps1`, and release history in the comments.
+
+**Wrong or stale:**
+
+- [ ] `:516-517` — `releases\notes-$Version.md` was written through an
+  escaping tool: `\n` became a line break, so the `-ChangelogOnly` error
+  reads "Write releases" / "otes-…". `build.ps1`'s control-character check
+  (`:257-278`) excludes LF, so it cannot catch this. — Restore the
+  backslash. Extend the check: a line break inside a quoted string whose
+  next line starts a path fragment is not detectable in general, so add
+  `releases\n`, `tools\n`, `src\n` and similar known-path breaks to the
+  linter's patterns instead.
+- [ ] `:461-466` — "Compress-Archive stores Windows separators, so the
+  release zip does does hold `Data\HorseCollisionMod.pak`. Harmless for the
+  outer zip". `build.ps1:555-591` builds the outer zip entry by entry because
+  a backslash entry breaks the install, and refuses one. The replace at
+  `:467` is then a no-op. — Cut the comment; keep the replace only if an
+  older zip must still validate, otherwise delete it.
+- [ ] `:454-457` — "its <version> is maintained by hand and can drift";
+  `set_version.py` writes it and `build.ps1:298-301` refuses a mismatch. —
+  "Checked again against the zip, since `-Zip` can name any file."
+- [ ] `:359-363` — game root is `KCD_PATH` or one hardcoded path; the other
+  tools also search Steam libraries. — Share the resolution.
+- [ ] `:620-621` — "around 190 KB"; the current zip is 239 KB. — Cut the
+  figure.
+- [ ] `:663` — "Finalising" in output. — "Finalizing" (the endpoint keeps
+  its own spelling).
+- [ ] `:533-534` — two blank lines. — One.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:144-145` — "4.2.2 went out with none". — Cut.
+- [ ] `:354` — "Version 4.0.0 was published without this check." — Cut.
+- [ ] `:418-420` — "which is what happened to 4.2.2". — Keep "found without
+  being asked, because the field is optional".
+- [ ] `:724-731` — "A changelog posted for 4.2.2 … That was concluded twice
+  from the page alone … both were wrong." — Keep "the public changelog page
+  lags; its absence is not evidence the call failed".
 
 ### Dead code (`tools/audit_code.py`)
 
