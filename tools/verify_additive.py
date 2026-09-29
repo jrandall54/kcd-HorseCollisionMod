@@ -6,7 +6,7 @@ asserted in documentation. Run it before publishing.
 
 The claims, in order:
 
- 1. The only vanilla names claimed are the two small declaration files, and
+ 1. The only vanilla names claimed are the three declaration files, and
     what is claimed stays small enough for another author to merge by hand.
     No animation database is claimed.
  2. The release ships exactly the intended file set, no more, and every Lua
@@ -63,14 +63,7 @@ def read_pak_text(pak, entry):
 
 
 def vanilla_text(entry):
-    """The vanilla entry as the running game serves it.
-
-    Not from the launch pak. This script used to read `Animations-part1.pak`
-    directly, and so verified the mod against the game as it was in February
-    2018: it reported the female `AnimationControlled` declaration as absent,
-    which is true at launch and false in every patched install, and that wrong
-    answer is what the mod was built to satisfy.
-    """
+    """The vanilla entry resolved through the patches, as the game serves it."""
     return build_adb.read_vanilla(entry)[0].decode("ascii", "replace")
 
 
@@ -93,8 +86,8 @@ def main():
     pak = zipfile.ZipFile(io.BytesIO(pak_bytes))
     shipped = {i.filename: i for i in pak.infolist()}
 
-    # ---- 1. no vanilla filename is claimed --------------------------------
-    heading("1. The release overrides no vanilla file")
+    # ---- 1. only the intended vanilla names are claimed --------------------
+    heading("1. The release claims only the intended vanilla names")
 
     vanilla_names = set()
 
@@ -104,10 +97,7 @@ def main():
     # The vanilla names the mod is allowed to claim, and no others.
     #
     # Each one has to be a small list of declarations that no patch has ever
-    # rewritten. `wh_female_fragmentids.xml` was on this list and failed both
-    # tests: it is the game's own 20 KB animation index, and the patches rewrite
-    # it, so the launch copy the mod shipped deleted 103 fragment ids from every
-    # female character.
+    # rewritten, since a copy of a patched file overrides the patch.
     intended_vanilla = {
         build_adb.TAGS_ENTRY,
         "Animations/Mannequin/ADB/kcd_horse_fragmentids.xml",
@@ -212,10 +202,7 @@ def main():
               lost or "%d inherited" % len(van_opts))
 
         # `reactions_for` yields (tag, clips) for this character set, where
-        # clips is one name or several played in order. The table it reads was
-        # called STAGGERS when the mod shipped only the walk tier; it is
-        # REACTIONS now and carries knockdowns, falls and get-ups too, and this
-        # check went unrun for long enough that the rename was not noticed.
+        # clips is one name or several played in order.
         wanted = [t for t, _ in build_adb.reactions_for(gender)]
         missing = [t for t in wanted if t not in our_opts]
         check(not missing, "all %d reaction options present" % len(wanted),
@@ -274,7 +261,8 @@ def main():
                       if r not in shipped
                       and build_adb.pak_key(r) not in vanilla_names]
         check(not unresolved, "every referenced path resolves", unresolved)
-    # ---- 6. tags -----------------------------------------------------------
+
+    # ---- 3, continued. the shared tag file ---------------------------------
     heading("Tag definitions")
 
     our_tags = pak.read(build_adb.TAGS_ENTRY).decode("ascii", "replace")
@@ -291,7 +279,7 @@ def main():
                  for t, _ in entry)
     check(wanted <= ot, "every reaction FragTag is declared", sorted(wanted - ot))
 
-    # ---- 7. pak hygiene ----------------------------------------------------
+    # ---- 6. pak hygiene ----------------------------------------------------
     heading("Pak packaging")
 
     backslashed = [n for n in shipped if "\\" in n]
@@ -299,16 +287,20 @@ def main():
           "entry names use forward slashes, so CryEngine can find them",
           backslashed)
 
-    # ---- 8. the Lua redirect ----------------------------------------------
+    # ---- 7. the Lua redirect ----------------------------------------------
     heading("The Lua redirect targets classes the engine spawns")
 
     lua = pak.read("Scripts/Startup/HorseCollisionMod.lua").decode("ascii", "replace")
     table = re.search(r"HorseCollisionMod\.AnimationDatabases = \{(.*?)\n\}", lua, re.S)
     redirected = set(re.findall(r"(\w+)\s*=", table.group(1))) if table else set()
 
-    scripts = r"C:\Games\Kingdom Come - Deliverance\Data\Scripts.pak"
+    # Without the game's scripts there is nothing to compare against, and the
+    # check below would pass on zero classes.
+    scripts = os.path.join(build_adb.GAME_ROOT, "Data", "Scripts.pak")
     exposed = {}
-    if os.path.exists(scripts):
+    if not os.path.exists(scripts):
+        check(False, "the game's Scripts.pak is readable", scripts)
+    else:
         with zipfile.ZipFile(scripts) as z:
             names = [n for n in z.namelist() if n.lower().endswith(".lua")]
         for n in names:

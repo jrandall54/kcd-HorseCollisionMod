@@ -31,8 +31,9 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 5, tooling, the last bullet: the remaining
-tool **Findings**, file by file, from `tools/verify_additive.py`; every
-bullet before it, `build_adb.py` and `dev_console.py` are done (see **Phase 2 log**). Read **Phase 2 plan** below in
+tool **Findings**, file by file, from `tools/version_check.py`; every
+bullet before it, `build_adb.py`, `dev_console.py` and `verify_additive.py`
+are done (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -652,6 +653,12 @@ One line per batch: batch, commit, what was verified.
   `setup_commands`. Tests: `--help`; `--lua` against the running game
   answered; a 6 KB `--file` went to disk under the resolved install and ran
   (`hcm oversized ok 499`), and the scratch file was removed after.
+- **Batch 5, `verify_additive.py`.** Every finding applied; claim 1 reads
+  "claims only the intended vanilla names" here and in the README row; the
+  sections number as the docstring does, the tag check as part of claim 3.
+  `Scripts.pak` comes from `build_adb.GAME_ROOT`, and a missing one fails
+  rather than passing the redirect check on zero classes. 35 of 35 on the
+  5.31.4 zip; with `Scripts.pak` hidden from the check, it failed.
 
 ## Standard
 
@@ -3625,32 +3632,32 @@ and the section comments number the claims differently from the docstring.
 
 **Wrong or stale:**
 
-- [ ] `:9-10` — "the two small declaration files"; `intended_vanilla`
+- [x] `:9-10` — "the two small declaration files"; `intended_vanilla`
   (`:111-115`) holds three. (Carried forward from `HOW_IT_WORKS.md`.) —
   "the three declaration files".
-- [ ] `:97` heading — "The release overrides no vanilla file"; it claims
+- [x] `:97` heading — "The release overrides no vanilla file"; it claims
   three by design. `README.md:305` repeats it ("proves the release
   overrides no vanilla file"). — "The release claims only the intended
   vanilla names", in both.
-- [ ] `:96`, `:188`, `:277`, `:294`, `:302` — section comments number tags
+- [x] `:96`, `:188`, `:277`, `:294`, `:302` — section comments number tags
   6, pak hygiene 7 and the redirect 8; the docstring numbers pak hygiene 6
   and the redirect 7, and `TECHNICAL_DETAILS.md` cites "claim 7" for the
   redirect. Tags are not a docstring claim. — Number by the docstring; fold
   the tag check into claim 3.
-- [ ] `:309` — `Scripts.pak` is a hardcoded path, not
+- [x] `:309` — `Scripts.pak` is a hardcoded path, not
   `build_adb.GAME_ROOT`. When it is absent, `exposed` is empty and the
   redirect check passes on zero classes. — Use `GAME_ROOT`; fail when the
   pak is missing.
-- [ ] `:276-277` — no blank line before the next section comment. — Add one.
+- [x] `:276-277` — no blank line before the next section comment. — Add one.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `:68-72` — "This script used to read `Animations-part1.pak` directly,
+- [x] `:68-72` — "This script used to read `Animations-part1.pak` directly,
   and so verified the mod against the game as it was in February 2018". —
   "Resolved through the patches, as the game serves it."
-- [ ] `:106-110` — "`wh_female_fragmentids.xml` was on this list and failed
+- [x] `:106-110` — "`wh_female_fragmentids.xml` was on this list and failed
   both tests … deleted 103 fragment ids". — Keep the two tests.
-- [ ] `:214-218` — "The table it reads was called STAGGERS … this check
+- [x] `:214-218` — "The table it reads was called STAGGERS … this check
   went unrun for long enough that the rename was not noticed." — Keep the
   first sentence.
 

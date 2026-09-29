@@ -705,7 +705,8 @@ tools/
                           settings file, so the page cannot fall behind what
                           ships; --check reports what it is missing
   publish_nexus.ps1       uploads a built release to the Nexus Mods page
-  verify_additive.py      proves the release overrides no vanilla file
+  verify_additive.py      proves the release claims only the intended vanilla
+                          names
   audit_code.py           reports settings nothing reads, settings missing from
                           the player's file, and functions and tables nothing
                           uses, so clutter is a fact rather than an impression
