@@ -1,8 +1,8 @@
 """Every NPC bark set that a horse could actually make a victim speak.
 
 The question this answers: which metarole is the right register for being
-knocked about by a horse at a middling speed? The set in use, `RANENY_NA_ZEMI`,
-is vanilla's *dying* bark and reads far too strong. The obvious replacements,
+knocked about by a horse at a middling speed? `RANENY_NA_ZEMI` is vanilla's
+*dying* bark. The obvious alternatives,
 `ZASAH_ZBRANI_SLABY` and `ZASAH_ZBRANI_SILNY`, cannot be driven at all: their
 only sequences are gated on `var('hitStrength')`, a variable written by the
 engine's own hit resolution and by nothing a mod can send.
@@ -54,7 +54,7 @@ def conditions():
 
         entry = out.setdefault(int(topic), {"conds": set(), "timeouts": set()})
         entry["conds"].add(cond or "")
-        entry["timeouts"].add(timeout_of.get(sid))
+        entry["timeouts"].add((timeout_of.get(sid) or "").strip())
 
     return out
 
@@ -88,7 +88,7 @@ def main():
                     if cond not in ("1", ""):
                         bad.add(cond)
 
-                if -1 in gate["timeouts"]:
+                if "-1" in gate["timeouts"]:
                     bad.add("timeout -1, once per playthrough")
 
             for _speaker, text in by_topic.get(topic, ()):

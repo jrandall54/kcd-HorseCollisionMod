@@ -659,6 +659,14 @@ One line per batch: batch, commit, what was verified.
   commit. `ResetTutorials` deleted: nothing calls it, and neither the diary
   nor any document names it as a console helper; L2 reload clean, and
   `audit_code.py` reports no uncalled function.
+- **Batch 5, bark research scripts.** Every finding applied. The once-only
+  check in `npc_pain_sets.py` compares the stripped string `"-1"`; the gate
+  now sees it on 1660 topics, none in a set the tool lists, so its output is
+  unchanged. `bark_lines.py` takes the game from `build_adb.GAME_ROOT`, and
+  `bark_alias.py` imports its reader and paths from `bark_lines.py`. Every
+  `--help` runs; `bark_alias.py`, `henry_impact_lines.py` and
+  `npc_pain_sets.py` produce the same output as before apart from
+  "labeled", and `bark_chain.py` traces a set.
 - **Batch 5, `verify_additive.py`.** Every finding applied; claim 1 reads
   "claims only the intended vanilla names" here and in the README row; the
   sections number as the docstring does, the tag check as part of claim 3.
@@ -3747,42 +3755,42 @@ plumbing.
 
 **Wrong or stale:**
 
-- [ ] `npc_pain_sets.py:91` — `if -1 in gate["timeouts"]`; the timeouts are
+- [x] `npc_pain_sets.py:91` — `if -1 in gate["timeouts"]`; the timeouts are
   strings read from XML, so a once-only sequence is never reported and a
   set carrying one passes as unconditional. — Compare against `"-1"`.
-- [ ] `bark_chain.py:63-65` — `for topic, speaker, txt in B.lines(): pass`
+- [x] `bark_chain.py:63-65` — `for topic, speaker, txt in B.lines(): pass`
   parses every dialogue line and discards it. `:68` imports `re` inside the
   function. `walk`'s `only_role` and `role_name` are unused. — Delete the
   loop and the unused names; import at the top.
-- [ ] `henry_impact_lines.py:6-20` — "Three things have to be true" over a
+- [x] `henry_impact_lines.py:6-20` — "Three things have to be true" over a
   list of five; "The third point is the reason this tool exists" means the
   fifth. — "Five conditions"; "The fifth is the reason".
-- [ ] `bark_alias.py:153-156` — cites
+- [x] `bark_alias.py:153-156` — cites
   `pick-bark-sets-by-line-length-not-just-fit`, an assistant memory file
   that is not in the repository. — State the rule: one long member spoils
   the whole alias, because the dialog system picks the member.
-- [ ] `bark_alias.py:49-67` — `_read` duplicated from `bark_lines.py`
+- [x] `bark_alias.py:49-67` — `_read` duplicated from `bark_lines.py`
   ("Lifted from"). — Import it.
-- [ ] `bark_lines.py:34`, `bark_alias.py:44` — `KCD_ROOT`; the build tools
+- [x] `bark_lines.py:34`, `bark_alias.py:44` — `KCD_ROOT`; the build tools
   use `KCD_PATH`. — `KCD_PATH`, as in the `dev_console.py` finding.
-- [ ] `bark_alias.py:117` — "labelled". — "labeled".
-- [ ] `bark_alias.py:13`, `:15`; `henry_impact_lines.py:11` — `--` as
+- [x] `bark_alias.py:117` — "labelled". — "labeled".
+- [x] `bark_alias.py:13`, `:15`; `henry_impact_lines.py:11` — `--` as
   dashes. — Rephrase.
 
 **History and people to cut:**
 
-- [ ] `bark_alias.py:3-5`, `:10-20` — "the diary proves it works",
+- [x] `bark_alias.py:3-5`, `:10-20` — "the diary proves it works",
   "The diary recorded the alias route as a dead end … the second of them is
   wrong", "Around 795 aliases had never been seen by this project". — Keep
   "`topic.xml` carries the alias namespace as its `label` column".
-- [ ] `henry_impact_lines.py:22-28` — "the rider had to discover that by
+- [x] `henry_impact_lines.py:22-28` — "the rider had to discover that by
   hearing it" and a quoted remark. — Cut.
-- [ ] `henry_impact_lines.py:94-95` — "Three of the rider's picks were
+- [x] `henry_impact_lines.py:94-95` — "Three of the rider's picks were
   silent for this reason alone". — Cut.
-- [ ] `henry_impact_lines.py:62-64`, `:16-17` — "refused every single time
+- [x] `henry_impact_lines.py:62-64`, `:16-17` — "refused every single time
   in testing". — "A two-actor sequence is a conversation; a monolog request
   for one is refused."
-- [ ] `npc_pain_sets.py:4-5` — `RANENY_NA_ZEMI` "reads far too strong"; it
+- [x] `npc_pain_sets.py:4-5` — `RANENY_NA_ZEMI` "reads far too strong"; it
   ships as `HurtDown` (`Bark.lua:148`). — Cut the judgment.
 
 ### Probe scripts (`tools/probe_*.lua`)

@@ -31,7 +31,8 @@ import re
 import sys
 import zipfile
 
-GAME = os.environ.get("KCD_ROOT", r"C:\Games\Kingdom Come - Deliverance")
+from build_adb import GAME_ROOT as GAME
+
 TABLES = os.path.join(GAME, "Data", "Tables.pak")
 LOCALE = os.path.join(GAME, "Localization", "English_xml.pak")
 

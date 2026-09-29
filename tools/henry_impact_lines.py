@@ -3,28 +3,22 @@
 This answers one question and answers it completely: **if the mod sends
 `dialog:monologRequest` with this alias, what words come out?**
 
-Three things have to be true for a line to be usable, and an earlier pass got
-the third one wrong:
+Five conditions have to hold for a line to be usable:
 
 1. The topic's label is in `topic.xml`, which is the alias namespace.
-2. One of its sequences has `entry_condition = '1'`. Anything else --
-   `IsQuestStarted(...)`, `IsObjectiveCompleted(...)` -- refuses silently, so the
-   request is accepted and nothing is spoken.
+2. One of its sequences has `entry_condition = '1'`. Anything else, such as
+   `IsQuestStarted(...)` or `IsObjectiveCompleted(...)`, refuses silently, so
+   the request is accepted and nothing is spoken.
 3. That sequence's `timeout` is not `-1`, which means usable once per
    playthrough and then never again.
-4. Its shipped audio exists and carries exactly one actor, Henry's. A sequence
-   with two actors is a conversation, and asking for one as a bark was refused
-   every time it was tried.
+4. Its shipped audio exists and carries exactly one actor, Henry's. A
+   two-actor sequence is a conversation; a monolog request for one is refused.
 5. **Every** line in the topic is short and usable, not just the first one.
 
-The third point is the reason this tool exists. A topic holds a whole set of
+The fifth is the reason this tool exists. A topic holds a whole set of
 recorded lines and the dialog system picks which member plays, so a shortlist
-built from one member per topic is a shortlist of guesses. Lines were chosen
-from labels like "Oh, shit!" that turned out to be the opening of "Oh shit,
-where's that damn ring?", and the rider had to discover that by hearing it:
-
-> "I choose it because it was labeled as saying 'oh shit' but it actually has
-> many more words attached to the line."
+built from one member per topic is a shortlist of guesses: a label like
+"Oh, shit!" can open a much longer line.
 
 So every member is printed, and `--max-words` rejects a topic on its **longest**
 member rather than its first.
@@ -59,9 +53,8 @@ def speakers_by_sequence():
 
     This is the filter nothing in the tables can replace. A sequence with no
     audio can never be heard however reachable it looks, and a sequence recorded
-    by two actors is a conversation rather than a monolog: asking for one as a
-    bark was refused every single time in testing, while every line that did play
-    had exactly one actor on it, and that actor was Henry's.
+    by two actors is a conversation rather than a monolog, and a monolog request
+    for one is refused.
     """
     root = os.path.join(B.GAME, "Localization")
     out = collections.defaultdict(set)
@@ -90,9 +83,8 @@ def load():
 
     seq_xml = B._read(B.TABLES, "Libs/Tables/text/sequence.xml").decode("utf-8", "replace")
 
-    # `-1` means the sequence may be used once in a playthrough and never again.
-    # Three of the rider's picks were silent for this reason alone: the quest
-    # they belong to had long since spent them.
+    # `-1` means the sequence may be used once in a playthrough and never again,
+    # so a line from a quest that has already spent it is silent.
     once_only = set()
     for sid, timeout in B._rows(seq_xml, "sequence_id", "timeout"):
         if (timeout or "").strip() == "-1":

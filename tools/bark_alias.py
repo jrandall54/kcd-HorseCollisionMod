@@ -1,25 +1,15 @@
 """Enumerate the whole `alias` namespace offline, with lines, speakers and lengths.
 
-`dialog:monologRequest` carries an `alias` field, and the diary proves it works:
-sent to Henry with `alias = "dudeSurrender_combat"` he said "Shit, leave me be,
-enough". An alias names **one topic**, which is much finer control than a
-metarole: a metarole is a whole bark set and the dialog system chooses which of
-its lines plays, whereas a topic holding a single short line is effectively a
-line the mod chose.
+`dialog:monologRequest` carries an `alias` field: sent to Henry with
+`alias = "dudeSurrender_combat"` he says "Shit, leave me be, enough". An alias
+names **one topic**, which is much finer control than a metarole: a metarole is
+a whole bark set and the dialog system chooses which of its lines plays,
+whereas a topic holding a single short line is effectively a line the mod
+chose.
 
-The diary recorded the alias route as a dead end for two reasons, and the second
-of them is wrong:
-
-  * "the 861 known labels are almost entirely quest and scene scoped" -- true of
-    the 861, and still true of most of what is here.
-  * "Nor can more labels be recovered ... the alias namespace is only visible
-    where vanilla's XML happens to reference it" -- **not true.** The namespace
-    is a shipped column. `Libs/Tables/text/topic.xml` carries `label` next to
-    `topic_id`, and it holds **1656 distinct labels** against the 861 that
-    vanilla's AI files happen to mention. Around 795 aliases had never been seen
-    by this project at all.
-
-So this reads the column rather than the references:
+The alias namespace is a shipped column: `Libs/Tables/text/topic.xml` carries
+`label` next to `topic_id`, which is far more than vanilla's AI files happen to
+reference. So this reads the column rather than the references:
 
     topic.xml           label -> topic_id           the alias namespace
     text_ui_dialog.xml  key "t<topic_id>_s<n>_<n>_<speaker>_<hash>"
@@ -36,35 +26,10 @@ reaches Henry if Henry recorded it.
 """
 
 import argparse
-import os
 import re
 import sys
-import zipfile
 
-GAME = os.environ.get("KCD_ROOT", r"C:\Games\Kingdom Come - Deliverance")
-TABLES = os.path.join(GAME, "Data", "Tables.pak")
-LOCALE = os.path.join(GAME, "Localization", "English_xml.pak")
-
-
-def _read(pak, member):
-    """Read one member out of a .pak.
-
-    The paks store their entries with backslash separators in the local file
-    header while the central directory uses forward slashes, which zipfile
-    rejects as a mismatch. Rewriting orig_filename before the read satisfies
-    the check without touching the archive. Lifted from `bark_lines.py`, which
-    documents the same quirk.
-    """
-    zf = zipfile.ZipFile(pak)
-    info = zf.getinfo(member)
-    for spelling in (info.filename.replace("/", "\\"), info.filename):
-        info.orig_filename = spelling
-        try:
-            with zf.open(info) as handle:
-                return handle.read()
-        except zipfile.BadZipFile:
-            continue
-    raise SystemExit("could not read %s from %s" % (member, pak))
+from bark_lines import LOCALE, TABLES, _read
 
 
 def aliases():
@@ -114,14 +79,14 @@ def main():
             help="only aliases whose EVERY line is at most this many words")
     ap.add_argument("--grep", help="only aliases with a line matching this text")
     ap.add_argument("--speaker-tally", action="store_true",
-            help="who records labelled topics, and how many")
+            help="who records labeled topics, and how many")
     ap.add_argument("--limit", type=int, default=60)
     args = ap.parse_args()
 
     alias = aliases()
     by_topic = lines_by_topic()
 
-    sys.stdout.write("%d labelled topics, %d topics carry dialogue lines\n\n"
+    sys.stdout.write("%d labeled topics, %d topics carry dialogue lines\n\n"
             % (len(alias), len(by_topic)))
 
     if args.speaker_tally:
@@ -150,9 +115,8 @@ def main():
 
         return
 
-    # The filtered survey. A set is only usable if EVERY line in it passes, for
-    # the reason `pick-bark-sets-by-line-length-not-just-fit` records: the mod
-    # picks the topic and the dialog system still picks which of its lines
+    # The filtered survey. A set is only usable if EVERY line in it passes: the
+    # mod picks the topic and the dialog system still picks which of its lines
     # plays, so one long member spoils the whole alias.
     want = args.speaker or ("henry" if args.henry else None)
     shown = 0
