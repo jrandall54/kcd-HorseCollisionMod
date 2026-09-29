@@ -1,14 +1,15 @@
---- Rider: what a collision costs the player and the horse.
+--- Rider: what a collision does to the player and the horse.
 --
 -- The anti-bulldozing budget. Riding through a crowd has to end with Henry on
 -- the ground rather than being a free way to scatter a dozen people, so every
--- impact at trot or gallop draws horse stamina, and a spent horse throws its
--- rider.
+-- impact but a walk draws horse stamina, and a spent horse throws its rider
+-- and sometimes bolts. The file also holds the rider's camera shake and blur,
+-- the Horsemanship scale, and `GrantPerks`.
 --
 -- `IsCombatCollision` lives here despite its name. It decides how hard an
--- impact counts, not whether it is an offence, and the stamina multiplier is
--- its only consumer: charging into a fight costs the horse more than riding
--- through a market. Whether a collision is a crime is `Crime.lua`.
+-- impact counts, not whether it is an offense: charging into a fight costs
+-- the horse more than riding through a market. Whether a collision is a crime
+-- is `Crime.lua`.
 --
 -- Attached to the `HorseCollisionMod` table created by the entry point, which
 -- pulls this file in with `Script.ReloadScript`. Every threshold and
@@ -16,6 +17,13 @@
 --
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
+
+--- Whether an impact happens in a fight, for the combat stamina surcharge.
+--
+-- @tparam ?table npc the victim, whose drawn weapon is logged only
+-- @treturn boolean true when the player is in combat danger
+-- @treturn string the readings, for the log
+-- @treturn boolean the same answer as the first return
 function HorseCollisionMod:IsCombatCollision(npc)
 	local danger = false
 	local dangerOk = false
@@ -38,20 +46,8 @@ function HorseCollisionMod:IsCombatCollision(npc)
 			.. " armed=" .. tostring(armed) .. "/" .. tostring(armedOk)
 
 	-- The player's own combat state decides this, and nothing else. The
-	-- victim having a weapon drawn used to count as well, on the reasoning
-	-- that townsfolk do not walk around armed, so a drawn weapon meant a fight
-	-- the player's own check had missed.
-	--
-	-- Guards patrol with weapons drawn. Measured, riding one down out of combat
-	-- logged `danger=false armed=true`, took the combat multiplier anyway, and
-	-- cost 103 stamina against a horse pool of about 210, where the impact
-	-- should have cost 21.
-	--
-	-- The signal never earned its place either. In the session that introduced
-	-- it, `IsInCombatDanger` read true for all ten combat impacts and the
-	-- weapon check corroborated eight of them without rescuing a single one.
-	-- It is still logged, because a disagreement between the two is worth
-	-- seeing, but it no longer decides anything.
+	-- victim's drawn weapon is logged only, because guards patrol with weapons
+	-- drawn and would take the surcharge out of combat.
 	return danger == true, detail, danger == true
 end
 
@@ -59,8 +55,7 @@ end
 --
 -- Prefers the horse's own `RearAndThrowDown`, which plays the animation of
 -- the animal rearing and unseating its rider. Falls back to ragdolling the
--- player, which is what earlier builds did and which reads as the player
--- collapsing rather than being thrown.
+-- player, which reads as the player collapsing rather than being thrown.
 --
 -- `RearAndThrowDown` is undocumented. It sits on the horse entity's `horse`
 -- extension, alongside `HasRider` and `IsMountable`.
@@ -71,8 +66,8 @@ function HorseCollisionMod:ThrowRider(horseEnt, playerEnt)
 	local thrown = false
 
 	-- The method lives on the horse's own `horse` extension, found by
-	-- enumerating what the entity actually carries. The other entries are
-	-- kept as fallbacks in case a different mount type differs.
+	-- enumerating what the entity actually carries; the other two holders are
+	-- fallbacks. The first holder that has it and accepts the call wins.
 	local candidates = {
 		{ name = "horse.horse", holder = horseEnt.horse },
 		{ name = "horse", holder = horseEnt },
@@ -107,10 +102,7 @@ end
 --
 -- The single place the stamina figure is worked out. Every tier goes through
 -- it, so the rider's Horsemanship, the horse's barding and the combat
--- surcharge reach a rear and a charge exactly as they reach a gallop. They did
--- not before: the rear and the charge each drained a flat setting at their own
--- call site and none of the three modifiers touched them, which meant levelling
--- Horsemanship made every impact cheaper except the two heaviest.
+-- surcharge reach a rear and a charge exactly as they reach a gallop.
 --
 -- The cost is a share of the horse's own maximum stamina, and the three
 -- situational factors are surcharges on that share rather than multipliers on
@@ -120,14 +112,10 @@ end
 --          * (tierShare + combatAdd + armorAdd - bardingRelief)
 --          * horsemanship
 --
--- A chain five multipliers deep and unbounded puts a gallop anywhere between
--- 14.85 and 1452 points against a pool of about 210. The tier
--- separation the rider tunes, a factor of 1.6, was invisible beside a modifier
--- stack spanning nearly a hundredfold, and the answer to that is not a clamp
--- on the product but a shape where every term is readable on its own. Adding
--- the surcharges makes the worst case the sum of the named maxima rather than
--- an emergent product: 0.38 of the pool before Horsemanship, which the log
--- prints term by term.
+-- Adding the surcharges makes every term readable on its own and the worst
+-- case the sum of the named maxima rather than an emergent product: 0.20 +
+-- 0.13 + 0.05 = 0.38 of the pool before Horsemanship, which the log prints
+-- term by term.
 --
 -- Horsemanship stays a multiplier, because it is the one factor meant to
 -- dominate. The progressive drain at low Horsemanship is settled design: at
@@ -135,7 +123,7 @@ end
 --
 -- @tparam table horseEnt the player's horse entity
 -- @tparam table playerEnt the player entity
--- @tparam string tierName "Walk", "Trot", "Gallop", "Rear" or "Charge"
+-- @tparam string tierName an impact tier name
 -- @tparam[opt] table armor the victim's armor from `ArmorOf`, where this
 --   impact has a single victim to read it from
 function HorseCollisionMod:DrainImpactStamina(horseEnt, playerEnt, tierName, armor)
@@ -166,7 +154,7 @@ function HorseCollisionMod:DrainImpactStamina(horseEnt, playerEnt, tierName, arm
 	local combatAdd = 0.0
 
 	-- Decided by the player's own combat state and nothing about the victim,
-	-- which is why this answers correctly for a rear and a charge with no
+	-- so this answers correctly for a rear and a charge with no
 	-- victim to hand.
 	if self:IsCombatCollision(nil) then
 		combatAdd = self.Config.CombatStaminaAdd
@@ -229,10 +217,10 @@ end
 
 --- Charges the horse for an impact and dismounts Henry when it is spent.
 --
--- Stamina is written with `soul:SetState`, never `soul:DealDamage`. That
--- call takes `(stamina, health, attacker, ...)`  -  stamina first  -  even though
--- vanilla's own debug helper names the parameters health-first, so using it
--- here silently injures the horse instead.
+-- Stamina is written with `soul:SetState`, never `soul:DealDamage`.
+-- `C_ScriptBindSoul` declares that call `DealDamage(float stamina, float
+-- health)`, stamina first, while vanilla's own debug helper names the
+-- parameters health-first, so it is easy to injure the horse by mistake.
 --
 -- @tparam table horseEnt the player's horse entity
 -- @tparam table playerEnt the player entity
@@ -278,9 +266,8 @@ function HorseCollisionMod:DrainHorseStamina(horseEnt, playerEnt, staminaDrain)
 			local _, seat = self:HorsemanshipScale(playerEnt)
 
 			-- Only on the impact that empties the horse. Rolled on every
-			-- impact it lets a rider keep their seat on a horse already at
-			-- zero and go on hitting people indefinitely, which was measured:
-			-- two saves in a row at 0.0 stamina with the streak continuing.
+			-- impact it would let a rider keep their seat on a horse already
+			-- at zero and go on hitting people indefinitely.
 			if before <= 0 then
 				seat = 0
 			end
@@ -302,19 +289,15 @@ function HorseCollisionMod:DrainHorseStamina(horseEnt, playerEnt, staminaDrain)
 	end)
 end
 
---- Shakes the rider's camera on a gallop impact.
+--- Shakes the rider's camera on an impact.
 --
 -- A collision costs the rider stamina and costs the victim health, and neither
 -- is visible from the saddle: hardcore mode hides the bars, and the horse's
--- own gait does not change. Half a ton of horse hitting a person should be
--- felt by the person riding it, and this is the only part of an impact that
--- reaches the player directly.
+-- own gait does not change. This is the part of an impact that reaches the
+-- player directly.
 --
--- A trot gets a fraction of it through `CameraShakeTrotScale`, which scales
--- the angle, the shift and the duration together. A trot knockdown should
--- still read as a shove that happens to put someone down rather than as half a
--- ton of horse at speed, so the difference between the tiers is kept as a
--- difference of degree.
+-- `CameraShakeByTier` scales the angle, the shift and the duration together,
+-- so the tiers differ by degree; a tier with no entry does not shake.
 --
 -- ### The call
 --
@@ -336,7 +319,7 @@ end
 -- with no positional component, so the shake it produces is a rotation only.
 --
 -- @tparam table playerEnt the player entity
--- @tparam string tierName "Walk", "Trot" or "Gallop"; a walk never pulses
+-- @tparam string tierName an impact tier name
 -- @treturn boolean true when a shake was requested
 function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 	local cfg = self.Config
@@ -365,9 +348,8 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 		return false
 	end
 
-	-- A trot is the same kick at a fraction of it, on one number rather than a
-	-- second set of values, for the same reason `BlurRiderView` scales: the
-	-- shape is right and only the weight should differ between the tiers.
+	-- Each tier is the same kick at its own weight, on one number rather than
+	-- a set of values per tier.
 	local tier = self:TierValue("CameraShakeByTier", tierName) or 0
 
 	if tier <= 0 then
@@ -400,7 +382,7 @@ end
 --- Blurs the rider's view for a moment on an impact.
 --
 -- The dust the collision throws up is on the ground behind the horse's neck,
--- and from the saddle in first person it is very nearly never seen: the impact
+-- and from the saddle in first person it is almost never seen: the impact
 -- happens below the field of view at ten meters a second. Third person gets
 -- the whole thing and first person gets none of it, so first person needs
 -- something of its own, and it has to be on the camera rather than in the
@@ -411,8 +393,7 @@ end
 -- `System.SetScreenFx(param, value)` is the only Lua surface onto the
 -- renderer's post effects. No script bind exposes the material effect or HUD
 -- systems at all, so the flowgraphs the game drives its own screen effects
--- through are out of reach. What was confirmed working in game, by setting
--- each and looking:
+-- through are out of reach. In game:
 --
 --     ScreenFrost_Amount          frosts the screen
 --     WaterDroplets_Amount        droplets on the lens
@@ -434,30 +415,26 @@ end
 --
 -- ### Telling the views apart
 --
--- `System.GetViewCameraPos` sits on the player in first person and meters away
--- in third: measured at 7.7 m behind and 4.6 m above with a third-person
--- camera mod running. Comparing it against the player's own position separates
--- them, which is what `RiderBlurFirstPersonOnly` uses, so a third-person
--- player does not get their screen blurred over an impact they can already
--- see.
+-- `CameraIsFirstPerson` tells the views apart, which is what
+-- `RiderBlurFirstPersonOnly` uses, so a third-person player does not get
+-- their screen blurred over an impact they can already see.
 --
--- **The blur amount is clamped.** Raising it from 0.9 to 1.3 to 2.0 produced
--- the same picture three times, so anything past about 1.0 is thrown away and
--- weight has to come from how long it is held and from what is layered under
--- it. `RiderBlurChroma` adds a chromatic shift on the same envelope, which is
--- a different distortion rather than more of the same one.
+-- **The blur amount has no effect past about 1.0**, so weight comes from how
+-- long it is held and from what is layered under it. `RiderBlurChroma` adds a
+-- chromatic shift on the same envelope, a different distortion rather than
+-- more of the same one.
 --
 -- The blur is held at full for `RiderBlurHoldMs` before the decay starts. A
 -- pulse that begins decaying on its first step never reaches the eye during a
--- gallop: it is competing with the camera shake and with the horse's own
--- motion, and raising the amount alone stopped helping well before it read.
+-- gallop, competing with the camera shake and the horse's own motion.
 --
 -- The pulse always ends by writing zero. This parameter is global renderer
 -- state rather than anything owned by the mod, so a decay that stopped partway
 -- would leave the player's screen blurred for the rest of the session.
 --
 -- @tparam table playerEnt the player entity
--- @tparam string tierName "Walk", "Trot" or "Gallop"; a walk never pulses
+-- @tparam string tierName an impact tier name; a tier with no entry never
+--   pulses
 -- @treturn boolean true when a pulse was started
 function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 	local cfg = self.Config
@@ -466,10 +443,9 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 		return false
 	end
 
-	-- A trot is the same pulse at a fraction of it, on two numbers rather than
-	-- a second set of five: one for how heavy it is and one for how long it
-	-- lasts. They came apart in tuning, because a trot wanted the strength
-	-- kept and the length cut, and a single scale could not do both.
+	-- Each tier is the same pulse on two numbers: how heavy it is and how
+	-- long it lasts. They are separate because a trot keeps the strength and
+	-- cuts the length.
 	local tier = self:TierValue("RiderBlurByTier", tierName) or 0
 	local length = self:TierValue("RiderBlurLengthByTier", tierName) or tier
 
@@ -562,17 +538,8 @@ end
 --- Sends the horse off after it has thrown its rider.
 --
 -- A horse that has just dumped its rider because it was ridden into people
--- until it was spent should sometimes want nothing more to do with them. Not
--- every time: a horse that always bolts is a punishment, and one that
--- sometimes bolts is a horse.
---
--- ### Why this is a chance and not a health system
---
--- The horse taking health damage from impacts was built and removed. It worked
--- and it was legible in the log, but from the saddle it was a second invisible
--- stat racing the first to the same outcome, and the rider could not tell what
--- it was contributing. What was actually wanted from it was this one moment,
--- so this is the moment on its own.
+-- until it was spent sometimes wants nothing more to do with them, on
+-- `HorseBoltChance`.
 --
 -- ### How, and why not by message
 --
@@ -583,16 +550,11 @@ end
 -- `sb_combat_playerHorse.xml` is a bare `Wait` with no behavior in it, so the
 -- player's horse has no combat brain to receive anything.
 --
--- What is used instead is the behavior already observed in game. Emptying the
--- horse's health throws the rider and sends the horse off, which is how the
--- 2.0.0-dev1 bug behaved when it charged 25 health an impact by mistake, and
--- how this reads when a horse is attacked. So the roll takes the health rather
--- than asking the AI for anything.
---
--- The health is restored a moment later, once the horse has already left. The
--- point is the bolt, not a crippled horse the rider has to nurse: nothing here
--- is a fight they chose, and a permanent cost for running out of stamina is
--- not what was wanted.
+-- Emptying the horse's health throws the rider and sends the horse off, as it
+-- does when a horse is attacked, so the roll takes the health rather than
+-- asking the AI for anything. The health is restored after
+-- `HorseBoltRestoreMs`, once the horse has left, so the cost is the bolt and
+-- not a crippled horse.
 --
 -- @tparam table horseEnt the player's horse entity
 -- @tparam table playerEnt the player entity
@@ -688,12 +650,8 @@ function HorseCollisionMod:HorsemanshipScale(playerEnt)
 		fraction = 1
 	end
 
-	-- Linear across the whole scale. Two curved shapes do not work, both
-	-- measured in game: one spends the benefit in the first few levels, which
-	-- leaves 13 riding like 20, and one withholds it until the last quarter,
-	-- which makes every level below 16 feel identical. A straight line spreads
-	-- the difference evenly, so each level is worth the same and the ends are
-	-- still far apart.
+	-- Linear across the whole scale, so each level is worth the same and the
+	-- ends are still far apart.
 	local remaining = 1.0 - fraction
 	local worst = cfg.HorsemanshipStaminaWorst
 	local best = cfg.HorsemanshipStaminaBest
@@ -706,8 +664,8 @@ end
 
 --- Grants the mod's Horsemanship perks directly to the player soul.
 --
--- Called on startup or settings apply when `AutoGrantPerks` is enabled in
--- the configuration.
+-- Called from `ApplySettings` on every load screen when `AutoGrantPerks` is
+-- on. The ids are the perks in `perk__horsecollisionmod.xml`.
 function HorseCollisionMod:GrantPerks()
 	local player = player or (type(g_localActor) == "userdata" and g_localActor)
 
@@ -716,9 +674,9 @@ function HorseCollisionMod:GrantPerks()
 	end
 
 	local perks = {
-		"13ed04b3-297d-43ca-9fb8-d3a3a1192f9c",
-		"da38020a-eecf-45b5-8203-34b0b678600a",
-		"6a0ca946-cce5-4c2b-831a-585db059027d",
+		"13ed04b3-297d-43ca-9fb8-d3a3a1192f9c", -- HCM Lean
+		"da38020a-eecf-45b5-8203-34b0b678600a", -- HCM Rear
+		"6a0ca946-cce5-4c2b-831a-585db059027d", -- HCM Charge
 	}
 
 	for _, perkId in ipairs(perks) do
@@ -727,4 +685,3 @@ function HorseCollisionMod:GrantPerks()
 		end)
 	end
 end
-

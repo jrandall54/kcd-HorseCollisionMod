@@ -22728,3 +22728,10 @@ the `apr` flag. Between the impact and the body coming to rest, victims lost 6
 to 32 health to the engine, and six of ten were driven onto the clamp, which is
 why the collision shield spans the whole throw rather than the moment of
 contact.
+
+## Moved from `Rider.lua` comments
+
+The Horsemanship stamina scale is linear because two curved shapes were
+measured in game and rejected: one spent the benefit in the first few levels,
+leaving a rider at 13 riding like one at 20, and one withheld it until the last
+quarter, making every level below 16 feel identical.
