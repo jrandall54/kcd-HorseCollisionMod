@@ -2210,6 +2210,11 @@ victim is accurate (only men reach the fight branch) and stays.
   is `TickSeconds`, which the forward sweep also uses.
 - [ ] `:419` — "CRITICAL ERROR IN UPDATE TIMER" in capitals, unlike every
   other log row. — `UpdateError err=`.
+- [ ] `:84-89` — "`RearCharging` is cleared by `ChargeForward`… measured
+  at 144 to 256 ms"; `WatchLunge` clears it. `ChargeScoringUntil` is
+  stamped at the key press, so it covers the rear and about 150 ms of the
+  lunge, not the sweep's whole run. — Correct. (Found in the `Rear.lua`
+  pass.)
 
 ### src/HorseCollisionMod/Marks.lua
 
