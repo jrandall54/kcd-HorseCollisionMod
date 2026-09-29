@@ -216,8 +216,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   before the horse has gone anywhere
 -- @field RearChargeLungeSpentAt the fraction of its own peak speed the horse
 --   must fall to for the lunge to count as finished
--- @field RearChargeWindowMs how long after a charge starts that impacts are
---   scored as a gallop rather than by the horse's speed
+-- @field RearChargeWindowMs the ceiling on a charge's `RearCharging` mark, for
+--   a lunge never seen to decay
 -- @field RearFragTag the FragTag of the rear option in the mod's horse
 --   animation database
 -- @field RearAnimSpeed how fast the charge's rear plays; the standing rear

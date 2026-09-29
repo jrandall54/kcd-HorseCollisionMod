@@ -144,7 +144,7 @@ HorseCollisionModSettings = {
 	RearChargeFearScreamPriority = 50, -- the rank the scream is sent at
 	RearChargeImpulse        = 6000,  -- how hard the charge is pushed
 	RearChargeLift           = 0.2,   -- how much of that is upward
-	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop
+	RearChargeWindowMs       = 2600,  -- ceiling on a charge that never decays
 	RearStrikes              = true,  -- the rear on the spot hits who is in front
 	RearStrikeMs             = 700,   -- when in the animation they land
 	-- Leaning out to see past the horse's head, in first person. The camera

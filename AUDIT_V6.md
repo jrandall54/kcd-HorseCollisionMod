@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`. Next: `Rear.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`. Next: `Retaliation.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -230,6 +230,11 @@ In this order, each its own commit and ride:
      `ImpulseVictim`, log `ImpulseApplied` straight after the call and
      delete the 300 ms timer and the `GetWorldPos` movement figure, which
      reads an entity that does not follow a ragdoll.
+   - `Rear.lua`: `CheckRearKeys` builds its "choose one of" list from
+     `RearKeys` (it omits e and f); delete the unread `tierName` in
+     `RearHorse`; delete `LogActionEnd` and its call, since the standing
+     rear never reads `AnimationControlled` and every `ActionEnd` line in
+     the log reports the first poll (400 to 432 ms).
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -395,6 +400,10 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Reaction.lua`.** L1 `same` for it, the entry point and the
   settings file. Measurements, anecdotes and the two banner blocks cut; the
   dead `RagDollize` paragraph deleted; blank lines normalized.
+- **Batch 4, `Rear.lua`.** L1 `same` for it, the entry point and the
+  settings file. The charge's scoring comments corrected throughout: the
+  loop stands aside and the sweep scores; `WatchLunge` clears
+  `RearCharging`. `LogActionEnd` shown by the log to measure nothing.
 
 ## Standard
 
@@ -1322,56 +1331,68 @@ derivation in the comment. Code findings (the unused callback parameters,
 
 ### src/HorseCollisionMod/Rear.lua
 
+Batch 4: applied. Superseded by batch 2: the cooldown wind-back branch and
+its "e.g." comment, and the physics-proxy rescue, so `SetAnimationDrivenMotion`
+is now left to the engine and the comment says so. `ImpactIsNewContact` in
+the sweep is kept as a guard: `ChargeScoringUntil` is stamped at the press
+and closes about 150 ms into the lunge (push at about 1450 ms, window 1600),
+while the sweep runs until the lunge is spent, 128 to 416 ms after the push.
+Every charge contact in the current log is `tier=Charge` from the sweep, so
+the overlap is not observed scoring. `RearChargeWindowMs` corrected in the
+settings file and the entry point. The `600` in `RearHorse` keeps its
+literal with the reason in the comment. Code findings went to batch 3,
+item 7.
+
 The detection loop stands aside while `ChargeScoringUntil` is open
 (`Update.lua:91`); it never scores a charge contact. Several comments here
 say the opposite, and `RearCharging` is cleared by `WatchLunge`, not
 `ChargeForward`. Those two corrections recur below.
 
-- [ ] `:3-5`, `:1135-1137` — the "everything else needs speed" framing is
+- [x] `:3-5`, `:1135-1137` — the "everything else needs speed" framing is
   said twice; the second adds "a stationary rider has never had anything to
   do but shove people". — Keep it once, in the module header.
-- [ ] `:64-67` — the log lists the keys as `r, q, y, u, o, h`; `RearKeys`
+- [x] `:64-67` — the log lists the keys as `r, q, y, u, o, h`; `RearKeys`
   and the action map also declare `e` and `f`. — Build the list from
   `RearKeys`.
-- [ ] `:92-100` `HookRearKey` — "bound to `jump`, this reared the horse and
+- [x] `:92-100` `HookRearKey` — "bound to `jump`, this reared the horse and
   then jumped anyway" is history. — Constraint only: consuming a press does
   not stop the game acting on it, and a hold and a tap both deliver one
   `press`, so the mod uses its own action.
-- [ ] `:172-184` `TrackHorseSpeed` — measurements (0.24, 0.12 m, 128 ms,
+- [x] `:172-184` `TrackHorseSpeed` — measurements (0.24, 0.12 m, 128 ms,
   0.94 m/s) and "The slide is the whole defect". — Keep: `GetVelocity`
   under-reports a slow horse, so speed is derived from two positions.
-- [ ] `:220-224` — "These gates all returned silently… after seven attempts
+- [x] `:220-224` — "These gates all returned silently… after seven attempts
   at the action map had not." — One line: each refusal logs its reason.
-- [ ] `:275-278` — "Asking only the horse is what made the gate useless". —
+- [x] `:275-278` — "Asking only the horse is what made the gate useless". —
   Constraint: a nil velocity would read as zero and pass every press.
-- [ ] `:295-310` — "is not established", "was briefly thought", "the rider
+- [x] `:295-310` — "is not established", "was briefly thought", "the rider
   riding away", "is now short enough". — Keep: horizontal speed only,
   because the vertical component carries the settling fall.
-- [ ] `:331-342` — measurements (0.24, 0.11 m/s, 1.4 cm, 0.00). — Keep:
+- [x] `:331-342` — measurements (0.24, 0.11 m/s, 1.4 cm, 0.00). — Keep:
   only the locomotion state predicts whether a rear slides.
-- [ ] `:361-366` — "a second press there doubled the push" is history. —
+- [x] `:361-366` — "a second press there doubled the push" is history. —
   Keep the constraint: between the rear and the push the horse reads idle
   at 0 m/s, so the move's own state gates a second press.
-- [ ] `:376-377` — "They used to share `RearNextAt`". — Cut.
-- [ ] `:386-387` — "e.g." and a run-on, out of the file's register. —
+- [x] `:376-377` — "They used to share `RearNextAt`". — Cut.
+- [x] `:386-387` — "e.g." and a run-on, out of the file's register. —
   Rewrite; see the ruling on the cooldown icon after a wind-back.
-- [ ] `:466` `UpdateMoveCooldowns` — "on a save load, which drops the
+- [x] `:466` `UpdateMoveCooldowns` — "on a save load, which drops the
   deadline": a load winds the clock back and leaves the deadline in place
   (`:386`, `:1328-1329`). — Correct once that ruling is settled.
-- [ ] `:488-495`, `:759-760`, `:832-833` — stray blank lines. — Remove.
-- [ ] `:498-518` `ChargeForward` — "used to travel by root motion", the
+- [x] `:488-495`, `:759-760`, `:832-833` — stray blank lines. — Remove.
+- [x] `:498-518` `ChargeForward` — "used to travel by root motion", the
   three movement-control measurements, "measured at 4300… at 20000". —
   Keep: inside an interactive action an impulse is discarded or stored and
   discharged later, so the rear plays in place and the push follows it.
   Move the measurements to the diary if absent there.
-- [ ] `:538-546` — "The rider can steer during the rear, and does";
+- [x] `:538-546` — "The rider can steer during the rear, and does";
   paragraph on the old fragment. — One line: the heading is read at the
   push because the player can steer during the rear.
-- [ ] `:564-568` — measured delays (1856 ms, 1408 ms). — Cut; the log line
+- [x] `:564-568` — measured delays (1856 ms, 1408 ms). — Cut; the log line
   reports it.
-- [ ] `:573-575` — "Started at the press it swept while…". — Constraint:
+- [x] `:573-575` — "Started at the press it swept while…". — Constraint:
   the strike starts with the lunge, not the press.
-- [ ] `:605-642` `WatchLunge` — "The rider's definition", "What came before
+- [x] `:605-642` `WatchLunge` — "The rider's definition", "What came before
   was three numbers… All three were guesses", "the first version of this",
   measured spikes, and an open question ("is not settled… `moved=` is here
   to tell them apart"). `:634` says the peak is "the larger of each
@@ -1379,75 +1400,75 @@ say the opposite, and `RearCharging` is cleared by `WatchLunge`, not
   window closes when speed decays to `RearChargeLungeSpentAt` of the peak;
   the peak is the smaller of two consecutive samples, so one spike cannot
   set it; `RearChargeLungePeakMin` guards an early dip. "neighboring".
-- [ ] `:714-717` `LogActionEnd` — "costs a ride per guess". Its instrument
+- [x] `:714-717` `LogActionEnd` — "costs a ride per guess". Its instrument
   is `AnimationControlled`, but the standing rear starts with
   `StartAnimation` (`:879`), which bypasses Mannequin, so for the rear it
   likely reports on the first poll. — Cut the phrase; verify the log line
   still measures anything, and delete the function if not.
-- [ ] `:761-782` `RearHorse` — describes the standing rear reaching
+- [x] `:761-782` `RearHorse` — describes the standing rear reaching
   `relaxed_rearing` through `StartInteractiveActionByName` and an `hcm_rear`
   option; the standing rear calls `StartAnimation` directly and only the
   charge uses the interactive action (`hcm_rear_charge`). "Reaching it took
   the whole chain", "Every earlier attempt passed the name only". Missing
   `@tparam fragTag`. — Rewrite for both paths; keep the four-file
   requirement and the `ObjectId` argument as constraints.
-- [ ] `:787` `tierName` — assigned, never read. — Delete.
-- [ ] `:793-797` — says the detection loop scores the charge "as a
+- [x] `:787` `tierName` — assigned, never read. — Delete.
+- [x] `:793-797` — says the detection loop scores the charge "as a
   gallop"; it stands aside. "not what the rider asked for". — `RearCharging`
   gates the sweep, the lunge watcher and a second press.
-- [ ] `:802-803` "The rider's voice" means Henry's. — "Henry's voice".
-- [ ] `:807-817` — lockout anecdote ("the same woman", "the rider saw three
+- [x] `:802-803` "The rider's voice" means Henry's. — "Henry's voice".
+- [x] `:807-817` — lockout anecdote ("the same woman", "the rider saw three
   charges"); "2.6 seconds" duplicates the setting. — Keep: a new press is a
   new attack, so the previous lunge's lockouts are cleared.
-- [ ] `:820-829` — "How long the detection loop scores a contact as a
+- [x] `:820-829` — "How long the detection loop scores a contact as a
   charge": it is how long the loop stands aside. "cleared by
   `ChargeForward`", "measured at 144 to 256 ms", "before the loop took it
   over". — Rewrite: the loop defers to the sweep for `RearChargeStrikeMs`.
-- [ ] `:836-844` — "which `ChargeForward` decides" (`WatchLunge` does);
+- [x] `:836-844` — "which `ChargeForward` decides" (`WatchLunge` does);
   "any impact the detection loop finds is scored as a gallop"; "A fixed
   2600 ms outlives the move…". — One line: this timer is the ceiling for a
   lunge never seen to decay.
-- [ ] `:876-878` — "SetAnimationDrivenMotion is left alone" beside
+- [x] `:876-878` — "SetAnimationDrivenMotion is left alone" beside
   `:858-865`, which sets it; "gracefully". — Settle with the ruling below.
-- [ ] `:882` `-- hcm_rear_charge` — restates the branch. — Cut.
-- [ ] `:888-891` — "the ordinary detection loop scores it" (the charge). —
+- [x] `:882` `-- hcm_rear_charge` — restates the branch. — Cut.
+- [x] `:888-891` — "the ordinary detection loop scores it" (the charge). —
   The charge has its own sweep; the standing rear has `RearStrike`.
-- [ ] `:901-904` — "The call returns true for any string" describes
+- [x] `:901-904` — "The call returns true for any string" describes
   `StartInteractiveActionByName`, which the standing rear does not use;
   `600` is a literal. — Scope the comment to the charge; name the delay.
-- [ ] `:919-929` `ChargeStrike` — "until the horse was given a physical
+- [x] `:919-929` `ChargeStrike` — "until the horse was given a physical
   push", "Whether a special move connects should not rest on how well the
   physics behaved", "The rider asked for". — Keep: the sweep is the only
   thing that scores a charge; no cap, each victim once per charge.
-- [ ] `:960-968` — "the sweep ran for 1600", "closed when the horse slows
+- [x] `:960-968` — "the sweep ran for 1600", "closed when the horse slows
   below walking pace" (it closes at a fraction of the peak). — Keep: the
   sweep lives while `RearCharging`; `RearChargeStrikeMs` is the ceiling.
-- [ ] `:1007-1013` — "The detection loop is scoring the same lunge at the
+- [x] `:1007-1013` — "The detection loop is scoring the same lunge at the
   same time": it stands aside. "Loop first, then sweep, was the half of the
   double hit that survived". — Check whether `ImpactIsNewContact` is still
   needed here given the stand-down; if kept, state it as a guard.
-- [ ] `:1034-1043` — readings 0.02, 0.07, 25.9; "never once clears its own
+- [x] `:1034-1043` — readings 0.02, 0.07, 25.9; "never once clears its own
   minimum… at that 3.0 floor… at 10.5". — Keep: the horse is
   `AnimationControlled` through the lunge and cannot be measured, so the
   charge scores at `RearChargeImpactSpeed`.
-- [ ] `:1086-1087` `RearCanHit` — "a faction test gave dogs a human
+- [x] `:1086-1087` `RearCanHit` — "a faction test gave dogs a human
   fragment… reached women only by a fallback". — Constraint: humans are
   matched by class.
-- [ ] `:1230-1235`, `:1247-1248` `RearHit` — the doc says "the trot
+- [x] `:1230-1235`, `:1247-1248` `RearHit` — the doc says "the trot
   treatment… the charge is the move that earns the ragdoll", but the
   function serves the charge too; the fixed-speed sentence is repeated in
   the body. Missing `@tparam tier` and `hitSpeed`. — Rewrite for both
   tiers; keep the sentence once.
-- [ ] `:1264-1269` — "That is the double hit on one lunge". — Keep the
+- [x] `:1264-1269` — "That is the double hit on one lunge". — Keep the
   constraint: the contact is recorded so `HitMinIntervalMs` can measure
   from it.
-- [ ] `:1272-1277` — "applying it to both tiers closed a victim out… after
+- [x] `:1272-1277` — "applying it to both tiers closed a victim out… after
   an ordinary rear as well". — One line: only tiers listed in
   `VictimLockMsByTier` carry a lockout.
-- [ ] `:1325-1331` `LoadRearActionMap` — "Nothing here was ever the cause…
+- [x] `:1325-1331` `LoadRearActionMap` — "Nothing here was ever the cause…
   several rides were spent", "+112 ms". — Cut; the refusal logs in
   `RearRequested` say which gate refused.
-- [ ] Settings `:269` `RearChargeWindowMs` — "how long a charge counts as a
+- [x] Settings `:269` `RearChargeWindowMs` — "how long a charge counts as a
   gallop"; it is the ceiling on `RearCharging`. — Correct.
 
 ### src/HorseCollisionMod/Retaliation.lua

@@ -91,13 +91,10 @@ end
 --
 -- The action itself is the mod's own, loaded from `Libs/Config/
 -- hcm_actionmaps.xml` through `ActionMapManager.LoadFromXML`, because a
--- vanilla key cannot be borrowed. Consuming a press here does not stop the
--- game acting on it: bound to `jump`, this reared the horse and then jumped
--- anyway. Nor is there a hold to distinguish one use from another, since a two
--- second hold and a tap both deliver a single `press` and no `release`.
---
--- So the mod brings its own action on its own key and disturbs no existing
--- control.
+-- vanilla action cannot be borrowed: consuming a press here does not stop the
+-- game acting on it, and a hold and a tap both deliver a single `press` and no
+-- `release`, so there is no second use to separate out. The mod's own action
+-- on its own key disturbs no existing control.
 function HorseCollisionMod:HookRearKey()
 	if type(rawget(_G, "Player")) ~= "table" then
 		return
@@ -169,18 +166,8 @@ end
 
 --- Keeps a real speed for the player's horse, derived from where it has been.
 --
--- `GetVelocity` cannot be trusted for this. At the moment a rear was requested
--- it read 0.24 m/s; the horse then covered 0.12 m in the next 128 ms, which is
--- 0.94 m/s. That is the same unreliability this project already documented on
--- the vertical axis, where a stationary horse reports 1 to 2 m/s because the
--- reading carries its settling fall.
---
--- It matters because the standstill gate is built on that number, and a gate
--- reading a quarter of the true speed lets through exactly the rears that
--- slide. The slide is the whole defect: the horse travels about 0.12 m in the
--- first 128 ms of a rear and is then frozen by the fragment for the rest of
--- the animation.
---
+-- `GetVelocity` under-reports a slow horse, and the standstill gate is built
+-- on this number, so a low reading lets through exactly the rears that slide.
 -- Two positions and the time between them cannot be wrong in that way.
 --
 -- @tparam table horseEnt the player's horse
@@ -217,11 +204,8 @@ end
 function HorseCollisionMod:RearRequested(fragTag)
 	local cfg = self.Config
 
-	-- Every way out of this function says which one it took. These gates all
-	-- returned silently, and a press that arrives and is then dropped by one of
-	-- them looks, from outside the game, exactly like a press that never
-	-- arrived. Telling those two apart is what found the cooldown surviving a
-	-- save load, after seven attempts at the action map had not.
+	-- Every way out of this function logs its reason, so a press dropped by a
+	-- gate can be told from a press that never arrived.
 	local function refuse(why)
 		self:Log("Rear refused, " .. why)
 
@@ -273,9 +257,8 @@ function HorseCollisionMod:RearRequested(fragTag)
 	end
 
 	-- The horse first and the player second, the same chain the detection loop
-	-- uses. Asking only the horse is what made the gate useless: a nil velocity
-	-- measures as zero, so every request read as standing still and the horse
-	-- could be reared at a gallop, which throws the rider hard enough to hurt.
+	-- uses. A missing velocity refuses the press, because read as zero it
+	-- would pass every press and let the horse rear at a gallop.
 	local velocity = nil
 
 	pcall(function()
@@ -292,22 +275,9 @@ function HorseCollisionMod:RearRequested(fragTag)
 		return refuse("no velocity")
 	end
 
-	-- Horizontal speed, not the length of the whole vector.
-	--
-	-- Whether this gate has anything to do with the sideways push is not
-	-- established. What is established is that it was measuring the wrong
-	-- quantity. `GetVelocity` on a horse standing perfectly
-	-- still reports 1 to 2 m/s, because it carries the vertical settling fall,
-	-- so a three dimensional length is mostly that noise: it refuses rears from
-	-- a dead stop, which is a known fault, and passes a horse genuinely walking
-	-- sideways because the horizontal part of the number was never isolated.
-	--
-	-- The ceiling itself is unchanged. Entry speed was briefly thought to
-	-- predict how far the horse ends up displaced, and it does not: a rear
-	-- entered at 0.09 m/s measured 1.76 m ahead and 0.97 m to the side a
-	-- second later. That reading was the rider riding away after the rear, not
-	-- the rear, which is why the sample window is now short enough that it
-	-- cannot contain a decision to move off.
+	-- Horizontal speed, not the length of the whole vector. `GetVelocity` on a
+	-- horse standing still reports 1 to 2 m/s because it carries the vertical
+	-- settling fall, so the full length would refuse rears from a dead stop.
 	local speed = 0
 
 	if velocity then
@@ -329,17 +299,9 @@ function HorseCollisionMod:RearRequested(fragTag)
 	end
 
 	-- The horse's own locomotion state, which is the only reliable answer to
-	-- "is this horse moving".
-	--
-	-- Neither velocity source can be trusted here. A rear entered with
-	-- `GetVelocity` reading 0.24 m/s, and a second with a position-derived
-	-- 0.11 m/s, both slid 0.12 m in the opening 128 ms; 0.11 m/s over that
-	-- window is 1.4 cm, so the horse accelerates once the rear begins and no
-	-- reading taken beforehand predicts it. A rear entered from a genuine stop
-	-- slides nothing at all, measured flat at 0.00 for the whole animation.
-	--
-	-- `MotionIdle` against `MotionMovement` is a state rather than an estimate,
-	-- and it is the difference between those two cases.
+	-- "is this horse moving". A horse still in `MotionMovement` accelerates once
+	-- the rear begins and slides, however slow it read beforehand; one in
+	-- `MotionIdle` does not slide at all.
 	if cfg.RearIdleOnly then
 		local state = "?"
 
@@ -360,8 +322,7 @@ function HorseCollisionMod:RearRequested(fragTag)
 
 	-- One move at a time. The idle and speed gates above do not cover this:
 	-- between the charge's rear ending and its push the horse reads
-	-- `MotionIdle` at 0 m/s, and a second press there doubled the push and
-	-- stacked the horse's voice. The standing rear reads `MotionIdle`
+	-- `MotionIdle` at 0 m/s, and the standing rear reads `MotionIdle`
 	-- throughout. So the press is refused on the move's own state, the
 	-- charge's `RearCharging` and the rear's animation length.
 	if self.RearCharging then
@@ -454,7 +415,8 @@ end
 --- Takes a cooldown icon off once its move is available again.
 --
 -- Read from the move's clock every tick, so an icon clears at the moment a
--- press would be taken, and on a save load, which drops the deadline.
+-- press would be taken, and after a save load, whose handler clears the
+-- deadline.
 --
 -- @tparam number now the mod's clock, in milliseconds
 function HorseCollisionMod:UpdateMoveCooldowns(now)
@@ -477,40 +439,19 @@ function HorseCollisionMod:UpdateMoveCooldowns(now)
 	end
 end
 
-
-
-
-
-
-
-
 --- Drives the charge forward with physics once the rear has finished.
 --
--- The charge used to travel by root motion, blending the rear into
--- `relaxed_gallop_jump`. An interactive action moves the actor kinematically
--- with collision off, and every fault on this feature came from that: riding
--- through walls, wedging in fences, and a divergence the engine discharged at
--- over 20 m/s when the action ended.
+-- An interactive action moves the actor kinematically with collision off,
+-- and none of the three movement control methods gives travel and collision
+-- together inside one: `eMCM_Animation` travels without colliding,
+-- `eMCM_AnimationHCollision` builds a divergence the engine discharges when
+-- the action ends, and `eMCM_Entity` zeroes an impulse on the next frame. Once
+-- the action has ended the horse is an ordinary horse and an impulse moves it.
 --
--- All three movement control methods were measured and none gives travel and
--- collision together. `eMCM_Animation` travels without colliding.
--- `eMCM_AnimationHCollision` collides while the animation keeps demanding a
--- position collision refuses, which is the discharge. `eMCM_Entity` admits no
--- divergence but hands the horse to its movement controller, which zeroes an
--- impulse on the next frame.
---
--- That last one is only true *inside* the action. Once it has ended the horse
--- is an ordinary horse and an impulse moves it: measured at 4300 the horse
--- reached 8.33 m/s and traveled, and at 20000 it went a very long way.
---
--- So the rear plays in place and the travel is a real push afterwards. The
--- horse then collides with the world by default, reports a genuine velocity,
--- and the detection loop scores the collision exactly as it scores a gallop,
--- with no synthetic speed and no raycast brake.
---
--- Waited for rather than timed, because the action's length is not fixed and
--- an impulse applied while it still holds the horse is stored and discharged
--- later.
+-- So the rear plays in place and the travel is a real push afterwards, and
+-- the horse collides with the world like any moving horse. Waited for rather
+-- than timed, because the action's length is not fixed and an impulse applied
+-- while it still holds the horse is stored and discharged later.
 --
 -- @tparam table horseEnt the player's horse
 function HorseCollisionMod:ChargeForward(horseEnt)
@@ -524,18 +465,8 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 	local started = self:TimeMs()
 	local deadline = started + (cfg.RearChargeWaitCeilingMs)
 
-	-- The direction is taken at the moment of the push, not at the key press.
-	--
-	-- The rider can steer during the rear, and does. Sampling at the press meant
-	-- the push used a heading up to a second and a half stale, so any correction
-	-- sent the horse off diagonally.
-	--
-	-- Sampling late was wrong only for the old fragment, which blended into
-	-- `relaxed_gallop_jump`: that clip traveled and turned the horse, so the
-	-- heading at the end was whatever the animation had done rather than what
-	-- the rider wanted. With the charge rearing in place, nothing turns the
-	-- horse but the rider.
-
+	-- The direction is taken at the moment of the push, not at the key press,
+	-- because the player can steer during the rear.
 	local function push()
 		local ok = pcall(function()
 			local d = horseEnt:GetDirectionVector(1)
@@ -552,18 +483,14 @@ function HorseCollisionMod:ChargeForward(horseEnt)
 			}, cfg.RearChargeImpulse, 1)
 		end)
 
-		-- The elapsed time is the delay before the horse can move: the impulse
-		-- cannot fire until the interactive action ends, so it is the rear up
-		-- to its blend point plus whatever the landing clip runs. Measured at
-		-- 1856 ms with the landing played whole, and 1408 ms once its front
-		-- was skipped with `StartTime`.
+		-- `after=` is the delay before the horse can move: the impulse cannot
+		-- fire until the interactive action ends.
 		self:Log(string.format("ChargeForward pushed=%s impulse=%s after=%.0fms",
 				tostring(ok), tostring(cfg.RearChargeImpulse),
 				self:TimeMs() - started))
 
-		-- The strike starts with the lunge, not with the key press. Started at
-		-- the press it swept while the horse was still up on its hind legs and
-		-- knocked people down before the charge had happened.
+		-- The strike starts with the lunge, not with the key press, so nobody
+		-- is struck while the horse is still up on its hind legs.
 		self:ChargeStrike(horseEnt)
 		self:WatchLunge(horseEnt)
 	end
@@ -593,44 +520,23 @@ end
 
 --- Closes the charge window when the lunge has spent itself.
 --
--- The rider's definition, and it is a better one than any threshold: the charge
--- is over the moment the horse is no longer being carried by the impulse.
---
--- What came before was three numbers that had to agree with each other -- a
--- speed under which the horse counted as stopped, a floor before that test was
--- allowed to run, and a ceiling in case it never fired. All three were guesses,
--- and the rider could finish the whole animation and then walk into someone and
--- have it score as a charge.
---
--- The impulse is a single shove rather than sustained drive, so the horse
--- reaches its top speed within a frame or two of the push and everything after
--- that is friction taking it back. That makes the shape of the lunge readable
--- without any absolute figure in it: track the peak, and call the move finished
--- once the speed has decayed to a fraction of it. A horse walking away
+-- The charge is over the moment the horse stops being carried by the
+-- impulse. The impulse is a single shove rather than sustained drive, so the
+-- horse reaches its top speed within a frame or two of the push and everything
+-- after that is friction taking it back. The move is finished once the speed
+-- has decayed to `RearChargeLungeSpentAt` of its peak; a horse walking away
 -- afterwards is nowhere near its own peak, so it cannot hold the window open.
 --
--- Started at the push and not at the key press, which is what removes the need
--- for a floor: the horse is stationary through the rear itself, and a watcher
--- begun there would have closed on the animation rather than on the lunge.
+-- Started at the push and not at the key press, because the horse is
+-- stationary through the rear itself.
 --
 -- **A single sample cannot set the peak.** `HorseSpeed` is derived from two
--- positions rather than read from `GetVelocity`, for the reasons in
--- `TrackHorseSpeed`, and the first version of this closed every window inside
--- 200 ms because of it: measured peaks of 21.2, 25.5 and 25.8 m/s appeared for
--- one sample each, against 13.0 on the same move, and half of a spike is
--- reached by the very next ordinary reading. The lunge then ended before the
--- horse had traveled, the sweep died with it, and the charge landed as an
--- ordinary walk stagger.
---
--- So the peak is the larger of each neighbouring pair, which a lone spike can
--- never win. `RearChargeLungePeakMin` is the second guard, against a dip early
--- on being read as decay before the horse has gone anywhere.
---
--- Whether those spikes are measurement noise or the engine really discharging
--- the horse at 25 m/s is not settled, and it matters: the second would explain
--- bodies thrown thirty meters. `moved=` is here to tell them apart. A real
--- 25 m/s for even a tenth of a second puts the horse meters further along than
--- a 13 m/s lunge does.
+-- positions, which spike for one sample at a time, and half of a spike is
+-- reached by the next ordinary reading. So the peak is the smaller of
+-- each neighboring pair, which a lone spike can never set.
+-- `RearChargeLungePeakMin` is the second guard, against a dip early on being
+-- read as decay before the horse has gone anywhere. The log's `spike=` and
+-- `moved=` record the raw peak and the distance covered.
 --
 -- @tparam table horseEnt the player's horse
 function HorseCollisionMod:WatchLunge(horseEnt)
@@ -702,13 +608,10 @@ end
 
 --- Reports how long an interactive action held the horse.
 --
--- The charge gets this figure for free, because it has to wait for the action
--- to end before it can push and logs the wait as `after=`. The rear waits for
--- nothing, so without this its length can only be judged by eye, and choosing
--- where to cut it then costs a ride per guess.
---
--- Same instrument as the charge's wait: the action owns the horse for exactly
--- as long as `GetCurrentAnimationState` reads `AnimationControlled`.
+-- The action owns the horse for exactly as long as
+-- `GetCurrentAnimationState` reads `AnimationControlled`. The standing rear,
+-- its only caller, starts through `StartAnimation` rather than an interactive
+-- action, so it never reads that state and the line reports the first poll.
 --
 -- @tparam table horseEnt the player's horse
 -- @tparam string tag the fragment tag that was started, for the log line
@@ -748,31 +651,26 @@ function HorseCollisionMod:LogActionEnd(horseEnt, tag)
 	Script.SetTimer(self.Config.RearChargeWaitMs, poll)
 end
 
-
---- Rears the horse.
+--- Rears the horse, on the spot or into a charge.
 --
--- The horse plays its own `relaxed_rearing` clip and the rider stays in the
--- saddle, because nothing is dismounted: this is the animation, not a throw
--- caught in mid-air.
+-- The horse plays a rear and the rider stays in the saddle, because nothing
+-- is dismounted: this is the animation, not a throw caught in mid-air.
 --
--- Reaching it took the whole chain. The horse has a `Rear` fragment in
--- `kcd_horse_database.adb`, but a fragment is not something Lua can ask for.
--- `StartInteractiveActionByName` resolves its argument against the FragTags of
--- one fragment, `AnimationControlled`, which the horse does not have, so the
--- mod ships four files: a parent database defining that fragment with an
--- `hcm_rear` option carrying vanilla's `Rear` contents, the horse fragment ids
--- with `AnimationControlled` declared, the tag itself, and the horse
--- controller definition giving the fragment a `FullBody` scope. A fragment
--- with no scope can never play whatever the database says, and humans needed
--- no equivalent only because vanilla already declares the fragment for them.
---
--- The last piece is the call itself. The bind takes
--- `ActionName, ObjectId, UpdateVisibility, AnimSpeed`, and with the name
--- alone it does nothing at all and still returns true: the horse must be given
--- as its own object. Every earlier attempt passed the name only, which is why
--- correct data looked like broken data.
+-- The standing rear plays `relaxed_rearing` directly with `StartAnimation`,
+-- outside Mannequin. The charge's rear is the `hcm_rear_charge` option,
+-- reached through `StartInteractiveActionByName`, which resolves its argument
+-- against the FragTags of one fragment, `AnimationControlled`, which the horse
+-- does not have in vanilla. So the mod ships four files: a parent database
+-- defining that fragment with the rear options, the horse fragment ids with
+-- `AnimationControlled` declared, the tags, and the horse controller
+-- definition giving the fragment a `FullBody` scope; a fragment with no scope
+-- never plays. The bind takes `ActionName, ObjectId, UpdateVisibility,
+-- AnimSpeed`, and with the name alone it does nothing and still returns true:
+-- the horse must be given as its own object.
 --
 -- @tparam table horseEnt the player's horse
+-- @tparam[opt] string fragTag `RearFragTag` for the charge or `RearOnlyFragTag`
+--   for the standing rear; the charge when omitted
 function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 	local tag = fragTag or self.Config.RearFragTag
 	local tierName = (tag == (self.Config.RearOnlyFragTag)) and "Rear" or "Charge"
@@ -781,58 +679,34 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 		pcall(function() PlayAudioTrigger(player, "v_henry_hyje") end)
 	end
 
-	-- Marked for as long as the charge could be touching anyone, so the
-	-- detection loop scores whatever it finds as a gallop rather than by the
-	-- horse's own speed. The lunge covers about five and a half meters in a
-	-- second, which reads as a trot, and a deliberate charge producing the
-	-- animated knockdown instead of a ragdoll is not what the rider asked for.
+	-- `RearCharging` marks the charge as in progress, from the press until
+	-- `WatchLunge` sees the lunge spent. It keeps the sweep alive and refuses
+	-- a second press.
 	if tag == (self.Config.RearFragTag) then
 		self.RearCharging = true
 
-		-- Cleared here so the detection loop's once-per-lunge stamina drain
-		-- is once per lunge rather than once per session. The rider's voice is
-		-- the same question and is cleared with it.
+		-- Cleared here so the charge's stamina drain and Henry's voice happen
+		-- once per lunge rather than once per session.
 		self.ChargeDrained = false
 		self.ChargeVoiced = false
 
 		-- A new lunge clears every lockout the last one wrote.
-		--
-		-- `VictimLockMsByTier.Charge` closes a victim out for 2.6 seconds so
-		-- that one lunge cannot strike the same person twice. It is a rule
-		-- about a single charge, and holding it on a clock made it a rule about
-		-- the player as well: charging the same woman again a second later was
-		-- refused, and the rider saw three charges in a row land on nobody with
-		-- her right in front of the horse.
-		--
-		-- Pressing the key is a new deliberate attack, so the previous lunge's
-		-- bookkeeping has no say in it.
+		-- `VictimLockMsByTier.Charge` stops one lunge striking the same person
+		-- twice; a new press is a new attack, so the previous lunge's lockouts
+		-- have no say in it.
 		self.LockedUntil = {}
 
-		-- How long the detection loop scores a contact as a charge, which is
-		-- not the same question as whether the lunge is still moving.
-		--
-		-- `RearCharging` answers the second and is cleared by `ChargeForward`
-		-- the moment the horse's speed falls off its own peak, measured at 144
-		-- to 256 ms after the push. The horse reaches most of its victims
-		-- after that, so scoring off it left a charge landing as a `Walk`
-		-- stagger. This is the window the corridor sweep used for exactly this
-		-- job before the loop took it over, so it is the figure that was
-		-- already tuned against the move rather than a new one.
+		-- How long the detection loop stands aside so the charge's own sweep
+		-- scores its contacts. Stamped at the press, so it covers the rear and
+		-- the start of the lunge; `ImpactIsNewContact` guards the overlap after
+		-- it closes.
 		self.ChargeScoringUntil = self:TimeMs()
 				+ (self.Config.RearChargeStrikeMs)
 
-
 		local generation = self.TimerTick
 
-		-- The window ends when the lunge is spent, which `ChargeForward`
-		-- decides because it is the only thing that knows when the push
-		-- happened. This timer is the ceiling for a lunge never seen to decay.
-		--
-		-- While the window is open, any impact the detection loop finds is
-		-- scored as a gallop whatever the horse's real speed. A fixed 2600 ms
-		-- outlives the move by a long way: the action ends around 1050 ms and
-		-- the lunge covers one to two meters, so more than a second remains in
-		-- which walking into someone plays a full charge reaction.
+		-- The ceiling on `RearCharging`, for a lunge `WatchLunge` never sees
+		-- decay.
 		Script.SetTimer(self.Config.RearChargeWindowMs, function()
 			if generation == self.TimerTick then
 				self.RearCharging = false
@@ -852,23 +726,21 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 			-- be re-triggered without requiring the horse to move.
 			horseEnt:StopAnimation(0, 0)
 
-			-- Bypass Mannequin entirely for the standing rear.
-			-- SetAnimationDrivenMotion is left alone. Leaving it completely
-			-- up to the engine means it will never rubberband, and if the player
-			-- moves, Mannequin gracefully interrupts with MotionWalk.
+			-- Mannequin is bypassed for the standing rear, and
+			-- `SetAnimationDrivenMotion` is left to the engine, so the horse
+			-- does not rubberband and a move by the player interrupts the rear
+			-- with ordinary locomotion.
 			horseEnt:StartAnimation(0, "relaxed_rearing")
 		end)
 	else
-		-- hcm_rear_charge
 		ok = pcall(function()
 			horseEnt.actor:StartInteractiveActionByName(tag, horseEnt.id, false, animSpeed)
 		end)
 	end
 
-	-- Only the rear on the spot needs this. A charge physically drives the
-	-- horse into people and the ordinary detection loop scores it; a rear that
-	-- does not travel is invisible to that loop, because detection is driven by
-	-- the horse's speed and the horse never moves.
+	-- The rear on the spot strikes with `RearStrike`; the charge has its own
+	-- sweep, started with the lunge. A rear that does not travel is invisible
+	-- to the detection loop, which is driven by the horse's speed.
 	if tag == (self.Config.RearOnlyFragTag) then
 		Script.SetTimer(self.Config.RearStrikeMs, function()
 			self:RearStrike(horseEnt)
@@ -878,9 +750,10 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 	end
 
 	if self.Config.LogTelemetry then
-		-- The call returns true for any string at all, including names that do
-		-- not exist, so this is only evidence that it was reached. The state a
-		-- moment later is the evidence that it played.
+		-- For the charge, `StartInteractiveActionByName` returns true for any
+		-- string, including names that do not exist, so `ok` is only evidence
+		-- that it was reached. The horse's state 600 ms later, well inside the
+		-- rear, is the evidence that it played.
 		Script.SetTimer(600, function()
 			local state = "?"
 
@@ -896,17 +769,11 @@ end
 
 --- The charge's own strike, swept along the lunge.
 --
--- The charge does not use the mod's ordinary detection loop. That loop is
--- driven by the horse's speed, which is a poor fit here: it exits below
--- walking pace, so a charge detected nobody at all until the horse was given a
--- physical push, and it then depended on the impulse landing cleanly for
--- anyone to be hit. Whether a special move connects should not rest on how
--- well the physics behaved.
---
--- So the charge carries its own detection, the way the rear on the spot
--- already does. The rider asked for a move that knocks several people down at
--- once, so there is no cap and no cooldown between victims: everyone in the
--- corridor goes down, and each is hit once per charge.
+-- The charge does not use the mod's ordinary detection loop, which is driven
+-- by the horse's speed and would make whether the move connects depend on how
+-- the physics behaved. The sweep is the only thing that scores a charge. It
+-- knocks several people down at once: there is no cap and no cooldown between
+-- victims, and each is hit once per charge.
 --
 -- Swept rather than sampled once, because the horse is moving and a single
 -- test at one instant would miss anyone it passes. The corridor is measured
@@ -927,8 +794,8 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 
 	-- Who the near miss has already reached. It belongs to the charge and not
 	-- to a tick, because the band is sampled every tick from a horse that has
-	-- moved, and the same man would otherwise be frightened once a tick for as
-	-- long as the lunge kept him inside the radius.
+	-- moved, and the same bystander would otherwise be frightened once a tick
+	-- for as long as the lunge kept them inside the radius.
 	local feared = {}
 	local playerWuid = nil
 
@@ -937,22 +804,16 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 	end)
 
 	local function sweep()
-		-- The sweep lives exactly as long as the charge does.
-		--
-		-- `RearChargeStrikeMs` is a ceiling and not the definition. The lunge
-		-- ends around 1050 ms and the sweep ran for 1600, so it kept striking
-		-- anyone within 1.8 m after the horse had stopped, scoring them as a
-		-- charge. `RearCharging` is the one fact that says whether the move is
-		-- still happening, and it is already closed when the horse slows below
-		-- walking pace, so the sweep reads it rather than keeping a second
-		-- clock that has to agree with the first.
+		-- The sweep lives exactly as long as the charge does, read from
+		-- `RearCharging`, so it does not strike anyone after the horse has
+		-- stopped. `RearChargeStrikeMs` is only its ceiling.
 		if generation ~= self.TimerTick or not self.RearCharging
 				or self:TimeMs() > deadline then
 			-- The lunge is over. Whoever is still standing in front of the
 			-- horse untouched was charged at and not reached, which the lane
 			-- test inside the band suppresses while the charge is still
 			-- coming, so the closing pass is the only thing that speaks for
-			-- him. Not run on a script reload, where `generation` has moved
+			-- them. Not run on a script reload, where `generation` has moved
 			-- on and there is no charge to close.
 			if generation == self.TimerTick then
 				self:CloseChargeFear(horseEnt, playerWuid, hit, feared)
@@ -984,13 +845,10 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 			for _, npc in pairs(found) do
 				local id = npc and npc.id
 
-				-- `hit` only knows about this sweep. The detection loop is
-				-- scoring the same lunge at the same time, and it writes its
-				-- contacts where `ImpactIsNewContact` can see them, so without
-				-- asking that question here the two paths honor different
-				-- rules: the loop respects a contact the sweep wrote, and the
-				-- sweep ignores one the loop wrote. Loop first, then sweep,
-				-- was the half of the double hit that survived the lockout.
+				-- `hit` only knows about this sweep. Once `ChargeScoringUntil`
+				-- closes, the detection loop can reach the same victim while
+				-- the sweep still runs, so the sweep also honors a contact the
+				-- loop wrote, through `ImpactIsNewContact`.
 				if id and not hit[tostring(id)] and npc ~= playerEnt
 						and npc ~= horseEnt and npc.actor
 						and self:ImpactIsNewContact(tostring(id), now)
@@ -1009,23 +867,11 @@ function HorseCollisionMod:ChargeStrike(horseEnt)
 						hit[tostring(id)] = true
 
 						-- Struck at the charge's own speed, which is declared
-						-- rather than measured.
-						--
-						-- The horse cannot be measured through a lunge. Its
-						-- speed here is derived from its positions, and the rear
-						-- holds it `AnimationControlled`, so the readings come
-						-- back 0.02 and 0.07 with occasional snaps of 25.9.
-						-- Neither works as the scoring figure: the
-						-- instantaneous reading collapses the velocity vector,
-						-- and a two-sample peak never once clears its own
-						-- minimum, so every impact in a whole run scores at that
-						-- 3.0 floor while the horse strikes bodies at 10.5.
-						--
-						-- So the charge is normalized, the way the rear already
-						-- is: one figure that says what this attack hits like.
-						-- `RearChargeImpactSpeed` carries the derivation, and it
-						-- is the speed the whole impact is resolved at, the
-						-- launch in `ImpulseVictim` included.
+						-- rather than measured: the rear holds the horse
+						-- `AnimationControlled`, so it cannot be measured
+						-- through a lunge. `RearChargeImpactSpeed` carries the
+						-- derivation, and it is the speed the whole impact is
+						-- resolved at, the launch in `ImpulseVictim` included.
 						self:RearHit(npc, horseEnt, playerEnt,
 								{ x = fx, y = fy, z = 0 }, "Charge",
 								cfg.RearChargeImpactSpeed)
@@ -1063,8 +909,7 @@ end
 --
 -- The same three tests the detection loop applies, for the same reasons. The
 -- sphere returns crates, doors and dropped weapons as readily as people;
--- humans are named by class, because a faction test gave dogs a human
--- fragment on a dog skeleton and reached women only by a fallback. Corpses are
+-- humans are matched by class, which admits men and women and no animal. Corpses are
 -- already ragdolls and reacting to them twitches bodies around. Dogs, Henry's
 -- included, are class `Dog` and fail the class test.
 --
@@ -1094,10 +939,6 @@ function HorseCollisionMod:RearCanHit(npc)
 end
 
 --- Brings the hooves down on whoever is in front.
---
--- The rear is the only thing this mod does that does not need speed. Every
--- other reaction is scored from how fast the horse was going, which is why a
--- stationary rider has never had anything to do but shove people at a walk.
 --
 -- Fired on a delay rather than with the request, because the strike is the
 -- hooves landing and not the horse going up. `RearStrikeMs` is when that
@@ -1141,8 +982,8 @@ function HorseCollisionMod:RearStrike(horseEnt)
 	local arc = math.cos(math.rad((cfg.RearArc) / 2))
 	local hit = 0
 
-	-- Who the hooves reached, so the fear band can leave them out: a man with
-	-- a hit reaction to get through does not also need a reason to run.
+	-- Who the hooves reached, so the fear band can leave them out: a victim
+	-- with a hit reaction to get through does not also need a reason to run.
 	local struck = {}
 
 	for _, npc in pairs(found) do
@@ -1188,27 +1029,25 @@ function HorseCollisionMod:RearStrike(horseEnt)
 	self:FearBand(horseEnt, struck)
 end
 
---- What a hoof landing on someone does.
+--- What a rear or a charge landing on someone does.
 --
--- The trot treatment, not the gallop one. A horse coming down on its front
--- hooves from a standstill is a real blow but it is not a charge, and the
--- charge is the move that earns the ragdoll.
---
--- Scored at a fixed speed rather than the horse's own, which is zero here:
--- what matters is the hooves, not ground the horse covered.
+-- Shared by the standing rear's strike and the charge's sweep; the tier's own
+-- tables decide the reaction. Scored at a fixed speed rather than the horse's
+-- own, which is zero for a rear and unmeasurable through a lunge.
 --
 -- @tparam table npc the victim
 -- @tparam table horseEnt the player's horse
 -- @tparam table playerEnt the player
 -- @tparam table heading the horse's facing, which the victim is thrown along
+-- @tparam[opt] string tier "Rear" or "Charge"; "Rear" when omitted
+-- @tparam[opt] number hitSpeed the speed to score at; `RearImpactSpeed` when
+--   omitted
 function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 		hitSpeed)
 	local cfg = self.Config
 
 	tier = tier or "Rear"
 
-	-- Scored at a fixed speed rather than the horse's own, which is zero here.
-	-- What matters is the hooves, not ground the horse covered.
 	local speed = hitSpeed or cfg.RearImpactSpeed
 	local velocity = { x = heading.x * speed, y = heading.y * speed, z = 0 }
 	local horsePos, horseWuid = nil, nil
@@ -1225,19 +1064,13 @@ function HorseCollisionMod:RearHit(npc, horseEnt, playerEnt, heading, tier,
 	local now = self:TimeMs()
 
 	-- Both strikes record their contact, because neither goes through the
-	-- detection loop and the loop cannot honor a gap it was never told about.
-	-- Without this the sweep reaches 1.8 m ahead and hits, the loop comes round
-	-- and hits the same person again, and `HitMinIntervalMs` is powerless
-	-- because no contact was ever written for it to measure from. That is the
-	-- double hit on one lunge.
+	-- detection loop and the loop cannot honor a gap it was never told about;
+	-- `HitMinIntervalMs` measures from this stamp.
 	self.LastScoredHit[victimId] = now
 
 	-- A lockout longer than the gap between two passes, for a move that is one
-	-- deliberate act rather than a series of collisions. Only the charge
-	-- carries one, and it says so in the table: applying it to both tiers
-	-- closed a victim out of every impact for 2.6 seconds after an ordinary
-	-- rear as well, which is one feature's rule governing another because the
-	-- two share this function.
+	-- deliberate act rather than a series of collisions. Only tiers listed in
+	-- `VictimLockMsByTier` carry one.
 	local lock = self:TierValue("VictimLockMsByTier", tier)
 
 	if lock and lock > 0 then
@@ -1278,20 +1111,12 @@ function HorseCollisionMod:LoadRearActionMap()
 	-- every load screen. Those are two different needs.
 	--
 	-- Reading the file again once the map is registered registers the actions a
-	-- second and third time, and one press then arrives three times over. That
-	-- is what the guard below is for, and it is the only thing established about
-	-- re-reading the file.
+	-- second and third time, and one press then arrives three times over, so
+	-- the guard below reads it once.
 	--
 	-- Re-pointing every load is because the listener is the player, whose entity
-	-- the world reload replaces.
-	--
-	-- Nothing here was ever the cause of the rear keys being dead after a load,
-	-- though several rides were spent on the assumption that it was. Logging the
-	-- presses showed them reaching the hook at +112 ms with the map reporting
-	-- itself listening and enabled, while the mod's own cooldown, stamped on a
-	-- clock the load winds back, refused all of them. Do not read a dead key as
-	-- evidence about this function without checking the gates in
-	-- `RearRequested` first: they say which one refused.
+	-- the world reload replaces. For a key that does nothing, the refusal lines
+	-- from `RearRequested` say which gate refused it.
 	local loaded = self.RearActionMapLoaded
 
 	if not loaded then
