@@ -38,17 +38,17 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- enumerating an inventory per use would repeat the work several times.
 	local armor = self:ArmorOf(npc)
 	local armorImpulse = self:ArmorImpulseScale(armor)
-	local isCombat, combatDetail, playerInDanger = self:IsCombatCollision(npc)
+	local isCombat, combatDetail = self:IsCombatCollision(npc)
 
 	-- How hard the engine is told this hit, as a name rather than a number so
 	-- the settings file reads as English.
 	local strength = self.HitReactionStrength[
-			self:TierValue("HitStrengthByTier", tierName) or "Tickle"]
+			self:TierValue("HitStrengthByTier", tierName)]
 
 	-- Whether this tier wounds at all, which several things below turn on.
 	-- Read from the damage table rather than by naming the walk, so a tier
 	-- set to zero damage behaves like a shove everywhere at once.
-	local wounds = (self:TierValue("ImpactDamageByTier", tierName) or 0) > 0
+	local wounds = self:TierValue("ImpactDamageByTier", tierName) > 0
 
 	-- The shield spans the whole time the engine can charge for this
 	-- collision, and `ApplyImpactDamage` lifts it once the body is at rest.
@@ -104,7 +104,7 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	local style = self:TierValue("ReactionByTier", tierName)
 	local staggerRefused = style == "stagger"
 			and (not cfg.WalkStagger
-					or (cfg.SuppressStaggerInCombat and playerInDanger))
+					or (cfg.SuppressStaggerInCombat and isCombat))
 
 	if not staggerRefused then
 		self:PlayTierReaction(npc, tierName, velocity, speed,
@@ -118,8 +118,9 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 		local bardingForce = self:BardingForceBonus(horseEnt)
 
 		self:Log("Impact tier=" .. tierName
-				.. " speed=" .. string.format("%.2f", speed or -1)
-				.. " sampled=" .. string.format("%.2f", ctx.sampledSpeed or speed or -1)
+				.. " speed=" .. (speed and string.format("%.2f", speed) or "none")
+				.. " sampled=" .. ((ctx.sampledSpeed or speed)
+						and string.format("%.2f", ctx.sampledSpeed or speed) or "none")
 				.. (cfg.DiagnoseMisses
 						and (" trail=[" .. self:SpeedTrail(self.SpeedHistorySize) .. "]")
 						or "")
@@ -177,13 +178,13 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- itself on having dirt and blood figures for the tier, and a tier that
 	-- does no damage is not a combat hit: telling the engine a shove was one
 	-- starts a fight over a nudge.
-	self:MarkVictim(npc, tierName, velocity, speed)
+	self:MarkVictim(npc, tierName, velocity)
 	self:SendHitReaction(npc, ctx.horseWuid, strength)
 
 	-- The combat hit and the provocation wait until the victim rises, because
 	-- `sb_switch_hitreactions.xml` broadcasts the assault the moment the hit
 	-- arrives, and a victim on the ground would react to it there.
-	self:WhenVictimRises(npc, function(reason, elapsed)
+	self:WhenVictimRises(npc, function()
 		local isDead = false
 
 		pcall(function()

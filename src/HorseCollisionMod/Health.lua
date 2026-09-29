@@ -5,6 +5,8 @@
 --   and the mod's blow is the one that kills.
 -- * `PredictImpactFatal` answers at the moment of contact whether that damage
 --   will kill, for Henry's line.
+-- * `ShieldFromEngineDamage` makes a victim immortal across contact so the
+--   engine's collision damage lands on nothing; `LiftCollisionShield` ends it.
 -- * `IsProtectedFromHarm` exempts the characters the game protects.
 -- * `SuppressAutoCure` keeps a hurt victim out of vanilla's auto-cure daycycle.
 -- * `ProbeImpactCost` logs health across an impact, since nothing in the
@@ -331,6 +333,145 @@ function HorseCollisionMod:IsProtectedFromHarm(npc)
 	return protected
 end
 
+--- Makes a victim briefly immortal so the engine's collision damage lands on
+-- nothing.
+--
+-- The engine charges a victim health for being struck by a moving physical
+-- body and the mod cannot stop it. `BasicActor`'s collision multipliers belong
+-- to CryEngine's legacy damage path rather than to the RPG layer that charges
+-- `soul` health, and the one parameter that does work,
+-- `CollisionVelocityDeltaToDmgR`, is global and also governs arrows.
+--
+-- So rather than stop the damage, this stops it **landing**. `imm=1` is the
+-- parameter behind the game's own `immortality` and `death_protection` buffs,
+-- and `immortality_nonpersistent` carries it without being able to survive a
+-- save. Applied ahead of contact and removed once the engine has settled, the
+-- victim is untouchable for exactly the window the trample occupies, and the
+-- mod's own damage lands afterwards on a mortal target.
+--
+-- **This is deliberately narrow.** It is one buff instance, on one victim,
+-- until `ApplyImpactDamage` lifts it after the body comes to rest, with
+-- `ShieldWindowMs` as the backstop.
+--
+-- @tparam table npc somebody in front of the horse
+function HorseCollisionMod:ShieldFromEngineDamage(npc)
+	if not self.Config.ShieldVictimFromEngineDamage or not npc or not npc.soul then
+		return
+	end
+
+	local id = tostring(npc.id or "?")
+	local existing = self.ShieldedVictims[id]
+
+	-- Only a **live** shield blocks a second one: a record whose buff has
+	-- already been removed still reads truthy, and must not leave a later
+	-- impact unshielded.
+	if existing and not existing.removed then
+		return
+	end
+
+	-- The instance handle, not the GUID, is what gets handed back later.
+	--
+	-- `RemoveAllBuffsByGuid` would strip **every** instance of this buff from
+	-- the victim, and immortality is exactly what a quest uses to keep a story
+	-- character alive. Shielding such a character and then clearing by GUID
+	-- would quietly remove protection this mod never granted. Removing the
+	-- single instance that was added cannot.
+	local ok, instance = pcall(function()
+		return npc.soul:AddBuff(self.ImmortalityBuffGuid)
+	end)
+
+	if not ok or instance == nil then
+		self.ShieldedVictims[id] = nil
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield failed on " .. self:NameOf(npc))
+		end
+
+		return
+	end
+
+	-- Held in a record rather than bare, so the backstop timer can close over
+	-- it. A script reload replaces the whole `HorseCollisionMod` table and with
+	-- it this map, and the one thing that must survive a reload is the removal.
+	-- A closure survives; a table lookup does not.
+	local state = { instance = instance, removed = false }
+	self.ShieldedVictims[id] = state
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield on " .. self:NameOf(npc) .. " ok=true")
+	end
+
+	-- Nothing here decides when the shield ends. `ApplyImpactDamage` lifts it as
+	-- the first thing it does, and that call waits for the victim's body to
+	-- come to rest, so the shield covers the window the engine can charge the
+	-- body for.
+	--
+	-- This timer is a crash backstop and nothing else: if the damage call never
+	-- happens, nobody is left permanently unkillable. Reaching it means
+	-- something else went wrong, so it logs.
+	--
+	-- **Deliberately not generation guarded**, unlike the mod's polling timers:
+	-- the work it does is removing immortality, and skipping it on a script
+	-- reload would leave a victim unkillable for the rest of the session.
+	Script.SetTimer(self.Config.ShieldWindowMs, function()
+		if state.removed then
+			return
+		end
+
+		state.removed = true
+
+		if self.ShieldedVictims[id] == state then
+			self.ShieldedVictims[id] = nil
+		end
+
+		local lifted = pcall(function()
+			npc.soul:RemoveBuff(state.instance)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield backstop fired on " .. self:NameOf(npc)
+					.. " ok=" .. tostring(lifted)
+					.. " (the damage call never lifted it)")
+		end
+	end)
+end
+
+--- Takes the collision shield off a victim, now.
+--
+-- Called from `ApplyImpactDamage` immediately before it charges the victim, so
+-- the immortality that swallowed the engine's trample cannot also swallow the
+-- mod's own damage. Safe to call on somebody who was never shielded.
+--
+-- @tparam table npc the victim
+-- @treturn boolean true when a removal was attempted
+function HorseCollisionMod:LiftCollisionShield(npc)
+	if not npc or not npc.soul then
+		return false
+	end
+
+	local id = tostring(npc.id or "?")
+	local state = self.ShieldedVictims[id]
+
+	if state == nil or state.removed then
+		return false
+	end
+
+	state.removed = true
+	self.ShieldedVictims[id] = nil
+
+	-- The instance this mod added, never every instance by GUID, so a quest's
+	-- own immortality on the same victim is untouched.
+	local ok = pcall(function()
+		npc.soul:RemoveBuff(state.instance)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield lifted on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
+	end
+
+	return ok
+end
+
 --- Charges a victim for being ridden down.
 --
 -- The engine charges a collision itself, at `CollisionVelocityDeltaToDmgR`, a
@@ -375,17 +516,16 @@ end
 -- @tparam[opt] table horseEnt the player's horse, for the barding bonus
 -- @tparam[opt] number hitStrength the `HitReactionStrength` the crime hit
 --   carries on a death
--- @treturn number the rolled damage, before the deferred path deals it
 function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 		playerEnt, horseEnt, hitStrength)
 	if not self.Config.ImpactDamage or not npc or not npc.soul then
-		return 0
+		return
 	end
 
 	local base = self:TierValue("ImpactDamageByTier", tierName)
 
 	if type(base) ~= "number" or base <= 0 then
-		return 0
+		return
 	end
 
 	local scale = self:ImpactDamageScale(armor)
@@ -405,14 +545,6 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 	-- and the armor curve actually decided.
 	local intended = base * scale * bardingDamage
 	local damage = intended * spread
-
-	local attacker = nil
-
-	if self.Config.CollisionIsCrime and playerEnt then
-		pcall(function()
-			attacker = XGenAIModule.GetMyWUID(playerEnt)
-		end)
-	end
 
 	-- The victim's health at the moment of the impact, before anything has had
 	-- a chance to charge them for it. Sampled again when the damage is dealt,
@@ -470,7 +602,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 					.. string.format("%.1f", was or -1))
 		end
 
-		return 0
+		return
 	end
 
 	-- The shield keeps the engine from killing the victim during the wait,
@@ -584,11 +716,8 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 			-- A dead victim's hit skips the reaction stimulus, so nothing is
 			-- shouted.
 			if self.Config.CollisionIsCrime and playerEnt then
-				local strength = hitStrength
-						or (self.HitReactionStrength
-							and self.HitReactionStrength[
-								self:TierValue("HitStrengthByTier", tierName) or "Tickle"])
-						or 0
+				local strength = hitStrength or self.HitReactionStrength[
+						self:TierValue("HitStrengthByTier", tierName)]
 				self:SendCombatHit(npc, playerEnt, strength)
 				npc.hcm_combat_injected = true
 			end
@@ -620,9 +749,7 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 					.. " engineTook=" .. string.format("%.1f", reclaimed)
 					.. " health=" .. string.format("%.1f", before or -1)
 					.. " after=" .. string.format("%.1f", after or -1)
-					.. " fatal=" .. tostring(after ~= nil and after <= 0
-							and (before == nil or before > 0))
-					.. " attributed=" .. tostring(attacker ~= nil)
+					.. " fatal=" .. tostring(fatal)
 					.. " ok=" .. tostring(ok)
 					.. " err=" .. tostring(err))
 		end
@@ -632,8 +759,8 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 	-- the damage the moment the body stops moving. The shield has to span the
 	-- whole throw, because the engine charges the body while it moves.
 	--
-	-- A walk stagger never moves the body, so it deals immediately.
-	if tierName == "Walk" then
+	-- A stagger never moves the body, so it deals immediately.
+	if self:TierValue("ReactionByTier", tierName) == "stagger" then
 		deal()
 	else
 		self:WhenBodyStops(npc, function(why, waited)
@@ -646,6 +773,4 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 			deal()
 		end)
 	end
-
-	return damage
 end

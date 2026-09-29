@@ -134,58 +134,6 @@ function HorseCollisionMod:RearmVictim(npc)
 	end
 end
 
---- Rearms a disarmed victim once they stand. Nothing calls it.
---
--- @tparam table npc victim entity
-function HorseCollisionMod:WatchRecoveryForRearm(npc)
-	if not self.NeedsWeaponRedraw or not self.NeedsWeaponRedraw[tostring(npc.id)] then
-		return
-	end
-
-	self:WhenVictimStands(npc, function(why, waited)
-		self:RearmVictim(npc)
-	end)
-end
-
---- Runs something once a victim leaves the ragdoll state, polling every
--- `RisePollMs` up to `RiseCeilingMs`. Only `WatchRecoveryForRearm` calls it.
---
--- @tparam table npc victim entity
--- @tparam function fn called with the reason and the wait in milliseconds
-function HorseCollisionMod:WhenVictimStands(npc, fn)
-	local generation = self.TimerTick
-	local gap = self.Config.RisePollMs
-	local ceiling = self.Config.RiseCeilingMs
-	local spent = 0
-
-	local function poll()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		if spent >= ceiling then
-			fn("gave up", spent)
-			return
-		end
-
-		local state = nil
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		-- Out of the ragdoll state is standing.
-		if state and not self:IsRagdollState(state) and state ~= "?" then
-			fn("stood", spent)
-			return
-		end
-
-		spent = spent + gap
-		Script.SetTimer(gap, poll)
-	end
-
-	Script.SetTimer(gap, poll)
-end
-
 --- Whether a victim is lying flat rather than upright or getting up.
 --
 -- The single answer to "can this body take an animation right now", read from
@@ -214,7 +162,7 @@ end
 -- @treturn string the animation state, `"unrecorded"` or `"?"`
 function HorseCollisionMod:IsVictimFlat(npc)
 	if not npc or not npc.id then
-		return false
+		return false, -1, -1, "?"
 	end
 
 	local standing = self.StandingHead[tostring(npc.id)]
@@ -770,47 +718,4 @@ function HorseCollisionMod:RebuildVictim(npc)
 	end
 
 	return ok
-end
-
---- Whether enough time has passed since this victim was last scored.
---
--- One contact should be one impact. The detection loop runs every 33 ms and a
--- galloping horse takes about 150 ms to clear a person, so a single pass
--- crosses four or five ticks and every one of them is a collision by the
--- loop's reckoning. This asks whether the horse has already been charged for
--- the contact it is still in, which is a different question from whether a
--- victim can take an animation (`IsVictimFlat`).
---
--- The interval only has to outlast one pass. It must not approach the time a
--- player needs to turn around and come back, because a deliberate second run
--- is a second impact and should be scored as one.
---
--- @tparam string npcId the victim's id, as the table is keyed
--- @tparam number now the current time in milliseconds
--- @treturn boolean true when this impact should be scored
-function HorseCollisionMod:ImpactIsNewContact(npcId, now)
-	local interval = self.Config.HitMinIntervalMs
-
-	if interval <= 0 then
-		return true
-	end
-
-	-- An explicit lockout outlives the ordinary interval.
-	--
-	-- A charge is one deliberate move, not a series of collisions, so a victim
-	-- it strikes is closed to further impacts for the whole of it rather than
-	-- for the `HitMinIntervalMs` that separates two passes of a gallop.
-	local until_ = self.LockedUntil and self.LockedUntil[npcId]
-
-	if until_ and now < until_ then
-		return false
-	end
-
-	local last = self.LastScoredHit[npcId]
-
-	if last and now - last < interval then
-		return false
-	end
-
-	return true
 end

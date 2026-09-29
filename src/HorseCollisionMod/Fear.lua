@@ -44,11 +44,7 @@
 -- @tparam userdata playerWuid the rider, already resolved by the caller
 -- @treturn boolean true when the call was accepted
 function HorseCollisionMod:SendHostilePerception(npc, playerWuid)
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
+	local target = self:MessageTarget(npc)
 
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("combat:stimulus:hostilePerception", {
@@ -82,16 +78,13 @@ end
 -- @tparam table npc whoever is in the band
 -- @tparam userdata playerWuid the rider, already resolved by the caller
 -- @tparam number priority the rank the scream is submitted at
--- @tparam ?boolean overrideSuppress whether the scream is spoken over a
---   suppressed speech context
 -- @treturn boolean true when the bystander was frightened
-function HorseCollisionMod:FrightenBystander(npc, playerWuid, priority,
-		overrideSuppress)
+function HorseCollisionMod:FrightenBystander(npc, playerWuid, priority)
 	if not self:SendHostilePerception(npc, playerWuid) then
 		return false
 	end
 
-	self:Bark(npc, "Panic", true, priority, overrideSuppress)
+	self:Bark(npc, "Panic", true, priority)
 
 	return true
 end
@@ -122,7 +115,6 @@ function HorseCollisionMod:FearBand(horseEnt, struck)
 		return
 	end
 
-	local playerEnt = player
 	local horsePos = nil
 
 	pcall(function()
@@ -133,11 +125,7 @@ function HorseCollisionMod:FearBand(horseEnt, struck)
 		return
 	end
 
-	local playerWuid = nil
-
-	pcall(function()
-		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
-	end)
+	local playerWuid = self:PlayerWuid()
 
 	if not playerWuid then
 		return
@@ -156,12 +144,11 @@ function HorseCollisionMod:FearBand(horseEnt, struck)
 	local sent = 0
 
 	for _, npc in pairs(found) do
-		if npc ~= playerEnt and npc ~= horseEnt and npc.actor
+		if npc ~= player and npc ~= horseEnt and npc.actor
 				and not (struck and struck[tostring(npc.id)])
 				and self:RearCanHit(npc) then
 			if self:FrightenBystander(npc, playerWuid,
-					cfg.RearFearScreamPriority,
-					cfg.RearFearScreamOverrideSuppress) then
+					cfg.RearFearScreamPriority) then
 				sent = sent + 1
 			end
 		end
@@ -217,7 +204,6 @@ function HorseCollisionMod:ChargeFearBand(horseEnt, pos, fx, fy, playerWuid,
 		return 0
 	end
 
-	local playerEnt = player
 	local found = nil
 
 	pcall(function()
@@ -235,7 +221,7 @@ function HorseCollisionMod:ChargeFearBand(horseEnt, pos, fx, fy, playerWuid,
 	for _, npc in pairs(found) do
 		local id = npc and npc.id and tostring(npc.id)
 
-		if id and npc ~= playerEnt and npc ~= horseEnt and npc.actor
+		if id and npc ~= player and npc ~= horseEnt and npc.actor
 				and not struck[id] and not feared[id]
 				and self:RearCanHit(npc) then
 			local inLane = false
@@ -253,8 +239,7 @@ function HorseCollisionMod:ChargeFearBand(horseEnt, pos, fx, fy, playerWuid,
 				feared[id] = true
 
 				if self:FrightenBystander(npc, playerWuid,
-						cfg.RearChargeFearScreamPriority,
-						cfg.RearChargeFearScreamOverrideSuppress) then
+						cfg.RearChargeFearScreamPriority) then
 					sent = sent + 1
 				end
 			end

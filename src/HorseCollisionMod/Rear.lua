@@ -54,6 +54,13 @@ end
 -- second unreachable because the first match wins.
 function HorseCollisionMod:CheckRearKeys()
 	local cfg = self.Config
+	local offered = {}
+
+	for key in pairs(self.RearKeys) do
+		offered[#offered + 1] = key
+	end
+
+	table.sort(offered)
 
 	for _, entry in ipairs({
 		{ cfg.RearChargeKey, "RearChargeKey" },
@@ -63,8 +70,8 @@ function HorseCollisionMod:CheckRearKeys()
 
 		if type(key) ~= "string" or not self.RearKeys[string.lower(key)] then
 			self:Log("Rear " .. entry[2] .. " is " .. tostring(key)
-					.. ", which the action map does not declare. Choose one of"
-					.. " r, q, y, u, o, h.")
+					.. ", which the action map does not declare. Choose one of "
+					.. table.concat(offered, ", ") .. ".")
 		end
 	end
 
@@ -246,11 +253,7 @@ function HorseCollisionMod:RearRequested(fragTag)
 		self:ShowTutorial("rear")
 	end
 
-	local horseEnt = nil
-
-	pcall(function()
-		horseEnt = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
-	end)
+	local horseEnt = self:PlayerHorse()
 
 	if not horseEnt then
 		return refuse("no horse")
@@ -363,10 +366,7 @@ function HorseCollisionMod:RearAnimMs()
 	local length = 0
 
 	pcall(function()
-		local horseEnt = XGenAIModule.GetEntityByWUID(
-				player.player:GetPlayerHorse())
-
-		length = horseEnt:GetAnimationLength(0, "relaxed_rearing") or 0
+		length = self:PlayerHorse():GetAnimationLength(0, "relaxed_rearing") or 0
 	end)
 
 	return length * 1000
@@ -606,51 +606,6 @@ function HorseCollisionMod:WatchLunge(horseEnt)
 	Script.SetTimer(cfg.RearChargeWaitPollMs, watch)
 end
 
---- Reports how long an interactive action held the horse.
---
--- The action owns the horse for exactly as long as
--- `GetCurrentAnimationState` reads `AnimationControlled`. The standing rear,
--- its only caller, starts through `StartAnimation` rather than an interactive
--- action, so it never reads that state and the line reports the first poll.
---
--- @tparam table horseEnt the player's horse
--- @tparam string tag the fragment tag that was started, for the log line
-function HorseCollisionMod:LogActionEnd(horseEnt, tag)
-	if not self.Config.LogTelemetry then
-		return
-	end
-
-	local generation = self.TimerTick
-	local started = self:TimeMs()
-	local deadline = started + (self.Config.RearChargeWaitCeilingMs)
-
-	local function poll()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local state = "?"
-
-		pcall(function()
-			state = tostring(horseEnt.actor:GetCurrentAnimationState())
-		end)
-
-		if state ~= "AnimationControlled" or self:TimeMs() > deadline then
-			self:Log(string.format("ActionEnd %s held=%.0fms state=%s",
-					tostring(tag), self:TimeMs() - started, state))
-
-			return
-		end
-
-		Script.SetTimer(self.Config.RearChargeWaitPollMs, poll)
-	end
-
-	-- Started after the same delay the charge uses, because the state does not
-	-- read back as `AnimationControlled` the instant the call returns and a poll
-	-- that begins too early ends immediately with a length of nothing.
-	Script.SetTimer(self.Config.RearChargeWaitMs, poll)
-end
-
 --- Rears the horse, on the spot or into a charge.
 --
 -- The horse plays a rear and the rider stays in the saddle, because nothing
@@ -673,7 +628,6 @@ end
 --   for the standing rear; the charge when omitted
 function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 	local tag = fragTag or self.Config.RearFragTag
-	local tierName = (tag == (self.Config.RearOnlyFragTag)) and "Rear" or "Charge"
 
 	if player and self.Config.RiderVocal and type(PlayAudioTrigger) == "function" then
 		pcall(function() PlayAudioTrigger(player, "v_henry_hyje") end)
@@ -745,8 +699,6 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 		Script.SetTimer(self.Config.RearStrikeMs, function()
 			self:RearStrike(horseEnt)
 		end)
-
-		self:LogActionEnd(horseEnt, tag)
 	end
 
 	if self.Config.LogTelemetry then

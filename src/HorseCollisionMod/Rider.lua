@@ -4,7 +4,7 @@
 -- the ground rather than being a free way to scatter a dozen people, so every
 -- impact but a walk draws horse stamina, and a spent horse throws its rider
 -- and sometimes bolts. The file also holds the rider's camera shake and blur,
--- the Horsemanship scale, and `GrantPerks`.
+-- the Horsemanship scale, `GrantPerks`, and `PlayerHorse`.
 --
 -- `IsCombatCollision` lives here despite its name. It decides how hard an
 -- impact counts, not whether it is an offense: charging into a fight costs
@@ -18,12 +18,25 @@
 -- @module HorseCollisionMod.Rider
 -- @author jrandall54
 
+--- The player's horse entity.
+--
+-- @treturn ?table the horse, or nil when the player has none or it cannot be
+--   read
+function HorseCollisionMod:PlayerHorse()
+	local horse = nil
+
+	pcall(function()
+		horse = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
+	end)
+
+	return horse
+end
+
 --- Whether an impact happens in a fight, for the combat stamina surcharge.
 --
 -- @tparam ?table npc the victim, whose drawn weapon is logged only
 -- @treturn boolean true when the player is in combat danger
 -- @treturn string the readings, for the log
--- @treturn boolean the same answer as the first return
 function HorseCollisionMod:IsCombatCollision(npc)
 	local danger = false
 	local dangerOk = false
@@ -48,7 +61,7 @@ function HorseCollisionMod:IsCombatCollision(npc)
 	-- The player's own combat state decides this, and nothing else. The
 	-- victim's drawn weapon is logged only, because guards patrol with weapons
 	-- drawn and would take the surcharge out of combat.
-	return danger == true, detail, danger == true
+	return danger == true, detail
 end
 
 --- Throws the rider from the horse.
@@ -74,7 +87,7 @@ function HorseCollisionMod:ThrowRider(horseEnt, playerEnt)
 		{ name = "horse.actor", holder = horseEnt.actor }
 	}
 
-	for _, candidate in pairs(candidates) do
+	for _, candidate in ipairs(candidates) do
 		if not thrown and candidate.holder
 				and type(candidate.holder.RearAndThrowDown) == "function" then
 			local ok = pcall(function()
@@ -339,7 +352,7 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 	-- Suppressed rather than scaled, because any amplitude at all flips the
 	-- direction. The shake is feedback and the lean is aim, and the aim wins
 	-- while it is deliberately held.
-	if cfg.LeanSuppressShake ~= false and self.LeanHeld then
+	if cfg.LeanSuppressShake and self.LeanHeld then
 		if cfg.LogTelemetry then
 			self:Log("CameraShake suppressed tier=" .. tostring(tierName)
 					.. " reason=leaning")
@@ -356,15 +369,14 @@ function HorseCollisionMod:ShakeRiderCamera(playerEnt, tierName)
 		return false
 	end
 
-	local angle = (cfg.CameraShakeAngle) * tier
-			* (g_Deg2Rad or 0.0174532925)
-	local shift = (cfg.CameraShakeShift) * tier
+	local angle = math.rad(cfg.CameraShakeAngle * tier)
+	local shift = cfg.CameraShakeShift * tier
 
 	local ok = pcall(function()
 		playerEnt.actor:SetViewShake(
 				{ x = angle, y = angle, z = angle },
 				{ x = shift, y = shift, z = shift },
-				(cfg.CameraShakeDurationSec) * tier,
+				cfg.CameraShakeDurationSec * tier,
 				cfg.CameraShakeFrequency,
 				cfg.CameraShakeRandomness)
 	end)
@@ -453,7 +465,7 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 		return false
 	end
 
-	local amount = (cfg.RiderBlurAmount) * tier
+	local amount = cfg.RiderBlurAmount * tier
 
 	if amount <= 0 then
 		return false
@@ -463,11 +475,11 @@ function HorseCollisionMod:BlurRiderView(playerEnt, tierName)
 		return false
 	end
 
-	local steps = cfg.RiderBlurSteps
-	local hold = math.floor((cfg.RiderBlurHoldMs) * length)
-	local every = math.floor(((cfg.RiderBlurMs) * length) / steps)
+	local steps = math.max(1, cfg.RiderBlurSteps)
+	local hold = math.floor(cfg.RiderBlurHoldMs * length)
+	local every = math.floor((cfg.RiderBlurMs * length) / steps)
 
-	local chroma = (cfg.RiderBlurChroma) * tier
+	local chroma = cfg.RiderBlurChroma * tier
 
 	pcall(function()
 		System.SetScreenFx("FilterBlurring_Type", 0)
@@ -532,7 +544,7 @@ function HorseCollisionMod:CameraIsFirstPerson(playerEnt)
 	local dz = cam.z - pos.z
 	local away = math.sqrt((dx * dx) + (dy * dy) + (dz * dz))
 
-	return away <= (self.Config.RiderBlurFirstPersonRange)
+	return away <= self.Config.RiderBlurFirstPersonRange
 end
 
 --- Sends the horse off after it has thrown its rider.
@@ -583,7 +595,7 @@ function HorseCollisionMod:BoltHorse(horseEnt, playerEnt)
 	end
 
 	local ok, err = pcall(function()
-		horseEnt.soul:DealDamage(0, before, nil, true)
+		horseEnt.soul:DealDamage(0, before)
 	end)
 
 	-- Given back once it has gone. The bolt is the whole point and a horse
@@ -657,31 +669,39 @@ function HorseCollisionMod:HorsemanshipScale(playerEnt)
 	local best = cfg.HorsemanshipStaminaBest
 
 	local stamina = best + ((worst - best) * remaining)
-	local seat = (cfg.HorsemanshipSeatChance) * (1.0 - remaining)
+	local seat = cfg.HorsemanshipSeatChance * (1.0 - remaining)
 
 	return stamina, seat
 end
 
+--- The mod's Horsemanship maneuvers, in the order their banners are shown.
+--
+-- `perk` is the perk in `perk__horsecollisionmod.xml` that grants the
+-- maneuver, `ability` the ability that perk unlocks, and `banner` the name
+-- `ShowTutorial` knows it by.
+--
+-- @table Maneuvers
+HorseCollisionMod.Maneuvers = {
+	{ banner = "lean", ability = "hcm_lean",
+		perk = "13ed04b3-297d-43ca-9fb8-d3a3a1192f9c" },
+	{ banner = "rear", ability = "hcm_rear",
+		perk = "da38020a-eecf-45b5-8203-34b0b678600a" },
+	{ banner = "charge", ability = "hcm_charge",
+		perk = "6a0ca946-cce5-4c2b-831a-585db059027d" },
+}
+
 --- Grants the mod's Horsemanship perks directly to the player soul.
 --
 -- Called from `ApplySettings` on every load screen when `AutoGrantPerks` is
--- on. The ids are the perks in `perk__horsecollisionmod.xml`.
+-- on.
 function HorseCollisionMod:GrantPerks()
-	local player = player or (type(g_localActor) == "userdata" and g_localActor)
-
 	if not player or not player.soul then
 		return
 	end
 
-	local perks = {
-		"13ed04b3-297d-43ca-9fb8-d3a3a1192f9c", -- HCM Lean
-		"da38020a-eecf-45b5-8203-34b0b678600a", -- HCM Rear
-		"6a0ca946-cce5-4c2b-831a-585db059027d", -- HCM Charge
-	}
-
-	for _, perkId in ipairs(perks) do
+	for _, maneuver in ipairs(self.Maneuvers) do
 		pcall(function()
-			player.soul:AddPerk(perkId)
+			player.soul:AddPerk(maneuver.perk)
 		end)
 	end
 end

@@ -121,12 +121,11 @@ end
 -- @tparam table npc victim entity
 -- @tparam string tierName an impact tier name
 -- @tparam[opt] table armor the victim's armor total, for the body layer
--- @treturn boolean true when at least one layer was played
 function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	local cfg = self.Config
 
 	if not cfg.ImpactSound or not npc then
-		return false
+		return
 	end
 
 	local layers = self:TierValue("ImpactSoundByTier", tierName)
@@ -147,13 +146,13 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	end
 
 	if type(layers) ~= "table" then
-		return false
+		return
 	end
 
 	-- The global is vanilla's, declared in Scripts/Utils/SoundUtils.lua, and
 	-- is absent if that file has not loaded yet.
 	if type(PlayAudioTrigger) ~= "function" then
-		return false
+		return
 	end
 
 	-- A copy, because the crack is appended per collision and the config list
@@ -171,7 +170,7 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 
 	if (tierName == "Gallop" or tierName == "Charge")
 			and type(cfg.ImpactSoundCrack) == "table"
-			and math.random() < (cfg.ImpactSoundCrackChance) then
+			and math.random() < cfg.ImpactSoundCrackChance then
 		plan[#plan + 1] = cfg.ImpactSoundCrack
 		cracked = true
 	end
@@ -202,26 +201,7 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 			names[#names + 1] = trigger
 					.. (distance > 0 and ("@" .. tostring(distance)) or "")
 
-			-- Captured, because the loop variable is reused and a timer fires
-			-- long after this iteration has ended.
-			local queued = trigger
-			local far = distance
-
-			local function fire()
-				pcall(function()
-					if far > 0 then
-						self:PlayAtDistance(npc, queued, far)
-					else
-						PlayAudioTrigger(npc, queued)
-					end
-				end)
-			end
-
-			if delay <= 0 then
-				fire()
-			else
-				Script.SetTimer(delay, fire)
-			end
+			self:PlayTriggerAfter(npc, trigger, delay, distance)
 		end
 	end
 
@@ -231,8 +211,31 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 				.. " played=" .. table.concat(names, ",")
 				.. " cracked=" .. tostring(cracked))
 	end
+end
 
-	return played > 0
+--- Plays a trigger on an entity now, or after a delay.
+--
+-- @tparam table entity the entity the sound belongs to
+-- @tparam string trigger the audio trigger name
+-- @tparam number delay milliseconds to wait, 0 or less to play at once
+-- @tparam number distance meters to push the sound back by through
+--   `PlayAtDistance`, 0 or less to play it where it is
+function HorseCollisionMod:PlayTriggerAfter(entity, trigger, delay, distance)
+	local function fire()
+		pcall(function()
+			if distance > 0 then
+				self:PlayAtDistance(entity, trigger, distance)
+			else
+				PlayAudioTrigger(entity, trigger)
+			end
+		end)
+	end
+
+	if delay <= 0 then
+		fire()
+	else
+		Script.SetTimer(delay, fire)
+	end
 end
 
 --- Henry's own grunt as the collision goes through him.
@@ -282,113 +285,21 @@ end
 -- With the shipped ranks the worst case is two grunts in one window, rank 2
 -- then rank 3. Riding through a crowd is all one tier and gets one grunt.
 --
--- The stamp is taken when the grunt is *scheduled* rather than when it plays,
--- so collisions arriving inside the tier's own delay are still caught.
---
 -- @tparam table playerEnt the player entity, as `ShakeRiderCamera` takes it
 -- @tparam string tierName an impact tier name
--- @treturn boolean true when a trigger resolved and was played
 function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
-	local cfg = self.Config
-
-	if not cfg.RiderVocal or not playerEnt then
-		return false
+	if not self.Config.RiderVocal or not playerEnt then
+		return
 	end
-
-	local layer = self:TierValue("RiderVocalByTier", tierName)
-	local rank = self:TierValue("RiderVocalRankByTier", tierName) or 1
-
-	if type(layer) ~= "table" then
-		return false
-	end
-
-	local trigger = layer[1]
-	local delay = layer[2] or 0
-	local distance = layer[3] or 0
-	local chance = layer[4] or 1
-
-	if type(trigger) ~= "string" or trigger == "" then
-		return false
-	end
-
-	-- The global is vanilla's, declared in Scripts/Utils/SoundUtils.lua, and is
-	-- absent if that file has not loaded yet. Checked for the same reason
-	-- `PlayImpactSound` checks it, and before the telemetry below so a line
-	-- cannot claim a play that had nothing to play it.
-	if type(PlayAudioTrigger) ~= "function" then
-		return false
-	end
-
-	local now = self:TimeMs()
-	local cooldown = cfg.RiderVocalCooldownMs
 
 	-- One gate for everything that comes out of Henry's mouth, shared with
 	-- `BarkRiderImpact`. A spoken line and a grunt on the same impact is two
-	-- voices at once, so whichever goes out first holds the other off.
-	local until_ = self.RiderVoiceUntil or 0
-	local longest = math.max(cooldown, cfg.RiderBarkCooldownMs)
-
-	-- A hold further out than the longest cooldown means the save clock was
-	-- wound back by a load; it is ignored, as in `RiderVoiceReady`.
-	if (until_ - now) > longest then
-		until_ = 0
-	end
-
-	-- A harder impact still speaks. A spoken line stamps a rank above every
-	-- grunt, so no grunt interrupts it.
-	if now < until_ and rank <= (self.RiderVoiceRank or 0) then
-		if cfg.LogTelemetry then
-			self:Log("RiderVocal tier=" .. tostring(tierName)
-					.. " trigger=" .. trigger .. " skipped=cooldown"
-					.. " for=" .. string.format("%.0f", until_ - now) .. "ms more"
-					.. " rank=" .. tostring(rank)
-					.. " held=" .. tostring(self.RiderVoiceRank))
-		end
-
-		return false
-	end
-
-	-- Rolled before the timer is set, so the telemetry line says what the
-	-- collision actually did rather than what it intended.
-	--
-	-- After the cooldown, not before it: a roll that loses should not also
-	-- start a cooldown, or a lost roll would silence the next impact too.
-	if chance < 1 and math.random() >= chance then
-		if cfg.LogTelemetry then
-			self:Log("RiderVocal tier=" .. tostring(tierName)
-					.. " trigger=" .. trigger .. " skipped=chance")
-		end
-
-		return false
-	end
-
-	self.RiderVoiceUntil = now + cooldown
-	self.RiderVoiceRank = rank
-
-	local function fire()
-		pcall(function()
-			if distance > 0 then
-				self:PlayAtDistance(playerEnt, trigger, distance)
-			else
-				PlayAudioTrigger(playerEnt, trigger)
-			end
-		end)
-	end
-
-	if delay <= 0 then
-		fire()
-	else
-		Script.SetTimer(delay, fire)
-	end
-
-	if cfg.LogTelemetry then
-		self:Log("RiderVocal tier=" .. tostring(tierName)
-				.. " trigger=" .. trigger
-				.. " delay=" .. tostring(delay) .. "ms"
-				.. " distance=" .. tostring(distance))
-	end
-
-	return true
+	-- voices at once, so whichever goes out first holds the other off. A
+	-- spoken line stamps a rank above every grunt, so no grunt interrupts it.
+	self:PlayGatedVocal(playerEnt, tierName,
+			self:TierValue("RiderVocalByTier", tierName),
+			self:TierValue("RiderVocalRankByTier", tierName) or 1,
+			self:RiderVoiceGate())
 end
 
 --- Plays a horse vocalization on the horse entity at each impact tier.
@@ -400,91 +311,98 @@ end
 --
 -- @tparam table horseEnt the horse entity
 -- @tparam string tierName an impact tier name
--- @treturn boolean true when a trigger resolved and was played
 function HorseCollisionMod:PlayHorseVocal(horseEnt, tierName)
 	local cfg = self.Config
 
 	if not cfg.HorseVocal or not horseEnt then
-		return false
+		return
 	end
 
-	local layer = self:TierValue("HorseVocalByTier", tierName)
-	local rank  = self:TierValue("HorseVocalRankByTier", tierName) or 1
+	self:PlayGatedVocal(horseEnt, tierName,
+			self:TierValue("HorseVocalByTier", tierName),
+			self:TierValue("HorseVocalRankByTier", tierName) or 1,
+			{
+				name = "HorseVocal",
+				untilKey = "HorseVoiceUntil",
+				rankKey = "HorseVoiceRank",
+				cooldown = cfg.HorseVocalCooldownMs,
+				longest = cfg.HorseVocalCooldownMs,
+			})
+end
+
+--- Plays one vocal layer through a ranked voice gate.
+--
+-- The hold is stamped when the sound is *scheduled* rather than when it
+-- plays, so collisions arriving inside the layer's own delay are still
+-- caught.
+--
+-- @tparam table entity who the sound comes out of
+-- @tparam string tierName an impact tier name, for the log line
+-- @tparam ?table layer `{ trigger, delayMs, distance, chance }`; a missing
+--   layer or a `""` trigger is silent
+-- @tparam number rank this sound's weight against the hold
+-- @tparam table gate a gate as `VoiceGateOpen` reads it, plus `name` for the
+--   log line and `cooldown`, the hold this sound stamps
+function HorseCollisionMod:PlayGatedVocal(entity, tierName, layer, rank, gate)
+	local cfg = self.Config
 
 	if type(layer) ~= "table" then
-		return false
+		return
 	end
 
-	local trigger  = layer[1]
-	local delay    = layer[2] or 0
+	local trigger = layer[1]
+	local delay = layer[2] or 0
 	local distance = layer[3] or 0
-	local chance   = layer[4] or 1
+	local chance = layer[4] or 1
 
 	if type(trigger) ~= "string" or trigger == "" then
-		return false
+		return
 	end
 
-	-- Same guard as PlayRiderVocal: the global may not exist yet.
+	-- The global is vanilla's, declared in Scripts/Utils/SoundUtils.lua, and is
+	-- absent if that file has not loaded yet. Checked before the telemetry
+	-- below so a line cannot claim a play that had nothing to play it.
 	if type(PlayAudioTrigger) ~= "function" then
-		return false
+		return
 	end
 
-	local now      = self:TimeMs()
-	local cooldown = cfg.HorseVocalCooldownMs
+	local now = self:TimeMs()
 
-	local until_ = self.HorseVoiceUntil or 0
-	local longest = cooldown
-
-	if (until_ - now) > longest then
-		until_ = 0
-	end
-
-	if now < until_ and rank <= (self.HorseVoiceRank or 0) then
+	if not self:VoiceGateOpen(gate, rank) then
 		if cfg.LogTelemetry then
-			self:Log("HorseVocal tier=" .. tostring(tierName)
+			self:Log(gate.name .. " tier=" .. tostring(tierName)
 					.. " trigger=" .. trigger .. " skipped=cooldown"
-					.. " for=" .. string.format("%.0f", until_ - now) .. "ms more"
+					.. " for=" .. string.format("%.0f", self[gate.untilKey] - now)
+					.. "ms more"
 					.. " rank=" .. tostring(rank)
-					.. " held=" .. tostring(self.HorseVoiceRank))
+					.. " held=" .. tostring(self[gate.rankKey]))
 		end
-		return false
+
+		return
 	end
 
+	-- Rolled after the gate, not before it: a roll that loses should not also
+	-- start a hold, or a lost roll would silence the next impact too.
 	if chance < 1 and math.random() >= chance then
 		if cfg.LogTelemetry then
-			self:Log("HorseVocal tier=" .. tostring(tierName)
+			self:Log(gate.name .. " tier=" .. tostring(tierName)
 					.. " trigger=" .. trigger .. " skipped=chance")
 		end
-		return false
+
+		return
 	end
 
-	self.HorseVoiceUntil = now + cooldown
-	self.HorseVoiceRank  = rank
+	self[gate.untilKey] = now + gate.cooldown
+	self[gate.rankKey] = rank
 
-	local function fire()
-		pcall(function()
-			if distance > 0 then
-				self:PlayAtDistance(horseEnt, trigger, distance)
-			else
-				PlayAudioTrigger(horseEnt, trigger)
-			end
-		end)
-	end
-
-	if delay <= 0 then
-		fire()
-	else
-		Script.SetTimer(delay, fire)
-	end
+	self:PlayTriggerAfter(entity, trigger, delay, distance)
 
 	if cfg.LogTelemetry then
-		self:Log("HorseVocal tier=" .. tostring(tierName)
+		self:Log(gate.name .. " tier=" .. tostring(tierName)
 				.. " trigger=" .. trigger
 				.. " delay=" .. tostring(delay) .. "ms"
 				.. " distance=" .. tostring(distance))
 	end
-
-	return true
 end
 
 --- Plays a trigger as if it came from further away, which is the only volume
@@ -521,14 +439,16 @@ function HorseCollisionMod:PlayAtDistance(entity, trigger, distance)
 	local offset = self:AwayFromListener(entity, distance)
 	local proxy = entity:CreateAuxAudioProxy()
 
-	entity:SetAudioProxyOffset(offset, proxy)
-	entity:ExecuteAudioTrigger(id, proxy)
-
+	-- Scheduled before anything else touches the proxy, so a call below that
+	-- throws cannot leave it behind.
 	Script.SetTimer(self.AudioProxyLifetimeMs, function()
 		pcall(function()
 			entity:RemoveAuxAudioProxy(proxy)
 		end)
 	end)
+
+	entity:SetAudioProxyOffset(offset, proxy)
+	entity:ExecuteAudioTrigger(id, proxy)
 
 	return true
 end

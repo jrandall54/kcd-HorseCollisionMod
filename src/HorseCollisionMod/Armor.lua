@@ -142,14 +142,12 @@ end
 -- The player is the exception, carrying whatever has been picked up, but the
 -- player is never the victim of an impact.
 --
--- Saddles and horseshoes are filed as armor; `TackTypes` names them. `tack`
--- true sums only those, false sums everything else, which is both a
--- person's armor and a horse's barding.
+-- Saddles and horseshoes are filed as armor; `TackTypes` names them and they
+-- are skipped, so the sum is a person's armor or a horse's barding.
 --
 -- @tparam table entity any entity with an inventory
--- @tparam[opt] boolean tack true to sum tack instead of armor
 -- @treturn table weight, smashDef, pieces, heaviest and heaviestType
-function HorseCollisionMod:ArmorOf(entity, tack)
+function HorseCollisionMod:ArmorOf(entity)
 	local total = {
 		weight = 0,
 		smashDef = 0,
@@ -188,9 +186,7 @@ function HorseCollisionMod:ArmorOf(entity, tack)
 				return
 			end
 
-			local isTack = self.TackTypes[row[3]] == true
-
-			if isTack ~= (tack == true) then
+			if self.TackTypes[row[3]] then
 				return
 			end
 
@@ -226,8 +222,8 @@ end
 -- `weight` is the target's armor weight and `reference` the weight that
 -- changes nothing, so the ratio between them is the whole signal; `exponent`
 -- sets how sharply it bites and 0 switches the scaling off entirely. Armor
--- makes a target harder to throw, so the impulse takes the reciprocal of the
--- ratio (`invert`, which `ArmorImpulseScale`, the only caller, always sets).
+-- makes a target harder to throw, so the multiplier is `reference / weight`
+-- raised to `exponent`.
 --
 -- Clamped, because the curve has no natural floor or ceiling and an unclamped
 -- extreme reads in game as a target that cannot be moved at all, or one that
@@ -236,11 +232,10 @@ end
 -- @tparam number weight the target's armor weight
 -- @tparam number reference the weight that produces 1.0
 -- @tparam number exponent how strongly weight matters, 0 to disable
--- @tparam boolean invert true to take the reciprocal of the ratio
 -- @tparam number low the smallest multiplier allowed
 -- @tparam number high the largest
 -- @treturn number the multiplier
-function HorseCollisionMod:ArmorCurve(weight, reference, exponent, invert, low, high)
+function HorseCollisionMod:ArmorCurve(weight, reference, exponent, low, high)
 	if exponent == 0 or reference <= 0 then
 		return 1.0
 	end
@@ -254,13 +249,7 @@ function HorseCollisionMod:ArmorCurve(weight, reference, exponent, invert, low, 
 		w = 0.5
 	end
 
-	local ratio = w / reference
-
-	if invert then
-		ratio = reference / w
-	end
-
-	local scale = math.pow(ratio, exponent)
+	local scale = math.pow(reference / w, exponent)
 
 	if scale < low then
 		return low
@@ -281,7 +270,7 @@ function HorseCollisionMod:ArmorImpulseScale(armor)
 	local cfg = self.Config
 
 	return self:ArmorCurve(armor.weight, cfg.ArmorReferenceWeight,
-			cfg.ArmorImpulseExponent, true,
+			cfg.ArmorImpulseExponent,
 			cfg.MinArmorImpulse, cfg.MaxArmorImpulse)
 end
 
@@ -496,11 +485,6 @@ function HorseCollisionMod:BardingCoverage(horseEnt)
 	end
 
 	local barding = self:ArmorOf(horseEnt)
-
-	if not barding then
-		return 0
-	end
-
 	local full = cfg.BardingFullSmashDef
 
 	if full <= 0 then

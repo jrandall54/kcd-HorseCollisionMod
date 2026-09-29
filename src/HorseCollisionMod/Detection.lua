@@ -132,8 +132,7 @@ end
 --
 -- @tparam table horsePos world position of the horse
 -- @tparam number now engine clock in milliseconds
--- @treturn table the entities near the horse, possibly from the last tick
--- @treturn boolean true when the query actually ran
+-- @treturn ?table the entities near the horse, possibly from the last tick
 function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
 	local cache = self.SphereCache
 
@@ -145,7 +144,7 @@ function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
 
 		if moved < self.SphereCacheTravel
 				and (now - cache.at) < self.SphereCacheMaxAgeMs then
-			return cache.ents, false
+			return cache.ents
 		end
 	end
 
@@ -156,14 +155,14 @@ function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
 	end)
 
 	if type(found) ~= "table" then
-		return nil, true
+		return nil
 	end
 
 	cache.ents = found
 	cache.pos = { x = horsePos.x, y = horsePos.y, z = horsePos.z }
 	cache.at = now
 
-	return found, true
+	return found
 end
 
 --- Works out which side of the victim the impact lands on.
@@ -181,9 +180,8 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number speed horse speed in meters per second
 -- @treturn string one of "so_forward", "so_back", "so_left", "so_right"
-function HorseCollisionMod:GetImpactDir(npc, velocity, speed)
+function HorseCollisionMod:GetImpactDir(npc, velocity)
 	local forward = nil
 
 	pcall(function()
@@ -192,15 +190,17 @@ function HorseCollisionMod:GetImpactDir(npc, velocity, speed)
 		end
 	end)
 
-	if not forward or not velocity or speed <= 0 then
+	if not forward or not velocity then
 		return "so_forward"
 	end
 
 	-- The blow arrives from the direction the horse came from, which is the
 	-- opposite of its travel. Flattened to the ground plane, since a rider
 	-- is always above a pedestrian and the height would bias every result.
-	local fromX = -velocity.x / speed
-	local fromY = -velocity.y / speed
+	-- Left unnormalized: the comparisons below depend only on the signs and
+	-- the ratio, and a horse at rest resolves to `so_forward`.
+	local fromX = -velocity.x
+	local fromY = -velocity.y
 
 	-- Projected onto the victim's axes: dot is how much the blow comes from
 	-- ahead of them (negative means from behind), cross is how much it comes

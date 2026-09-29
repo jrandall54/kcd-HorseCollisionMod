@@ -20,6 +20,10 @@
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
 
+-- The shortest gap between two `HorseAirborne` log lines, so one jump is one
+-- line rather than one per tick of upward speed.
+HorseCollisionMod.HorseAirborneLogGapMs = 1000
+
 --- Applies the appropriate reaction for one collision.
 --
 -- Stands out of a charge, scores the tier from the speed, refuses a contact
@@ -94,6 +98,49 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 	})
 end
 
+--- Whether enough time has passed since this victim was last scored.
+--
+-- One contact should be one impact. The detection loop runs every 33 ms and a
+-- galloping horse takes about 150 ms to clear a person, so a single pass
+-- crosses four or five ticks and every one of them is a collision by the
+-- loop's reckoning. This asks whether the horse has already been charged for
+-- the contact it is still in, which is a different question from whether a
+-- victim can take an animation (`IsVictimFlat`).
+--
+-- The interval only has to outlast one pass. It must not approach the time a
+-- player needs to turn around and come back, because a deliberate second run
+-- is a second impact and should be scored as one.
+--
+-- @tparam string npcId the victim's id, as the table is keyed
+-- @tparam number now the current time in milliseconds
+-- @treturn boolean true when this impact should be scored
+function HorseCollisionMod:ImpactIsNewContact(npcId, now)
+	local interval = self.Config.HitMinIntervalMs
+
+	if interval <= 0 then
+		return true
+	end
+
+	-- An explicit lockout outlives the ordinary interval.
+	--
+	-- A charge is one deliberate move, not a series of collisions, so a victim
+	-- it strikes is closed to further impacts for the whole of it rather than
+	-- for the `HitMinIntervalMs` that separates two passes of a gallop.
+	local until_ = self.LockedUntil and self.LockedUntil[npcId]
+
+	if until_ and now < until_ then
+		return false
+	end
+
+	local last = self.LastScoredHit[npcId]
+
+	if last and now - last < interval then
+		return false
+	end
+
+	return true
+end
+
 --- One tick of collision detection.
 --
 -- Bails out early unless the player is mounted and moving at least at
@@ -103,16 +150,15 @@ end
 -- or partially initialized at any moment and an uncaught error would kill the
 -- timer loop for the rest of the session.
 function HorseCollisionMod:SafeUpdate()
-	if type(player) == "nil"
-			or (not player)
-			or type(player.human) == "nil"
-			or type(player.player) == "nil" then
+	if not player or not player.human or not player.player then
 		return
 	end
 
+	local now = self:TimeMs()
+
 	-- Before the mount check, so an icon still clears if the rider has
 	-- dismounted while the cooldown ran.
-	self:UpdateMoveCooldowns(self:TimeMs())
+	self:UpdateMoveCooldowns(now)
 
 	local isMounted = false
 
@@ -127,7 +173,7 @@ function HorseCollisionMod:SafeUpdate()
 
 	if not self.WasMounted then
 		self.WasMounted = true
-		self:CheckMountTutorials(player)
+		self:QueueNextTutorial()
 	end
 
 	local horseWuid = nil
@@ -165,8 +211,9 @@ function HorseCollisionMod:SafeUpdate()
 	local speed = self:VectorLength(velocity)
 
 	-- The horse leaving the ground, logged when its upward speed crosses
-	-- `HorseAirborneVz`, at most once a second. It costs nothing: the loop
-	-- already reads the horse's velocity every tick for the speed history.
+	-- `HorseAirborneVz`, at most once every `HorseAirborneLogGapMs`. It costs
+	-- nothing: the loop already reads the horse's velocity every tick for the
+	-- speed history.
 	--
 	-- Vertical speed rather than height, because height off a slope is
 	-- ordinary and a horse moving upward at several meters a second is not. A
@@ -175,15 +222,14 @@ function HorseCollisionMod:SafeUpdate()
 		local vz = velocity.z or 0
 		local trigger = self.Config.HorseAirborneVz
 		local last = self.HorseAirborneAt or 0
-		local now = self:TimeMs()
 
-		if vz >= trigger and (now - last) >= 1000 then
+		if vz >= trigger and (now - last) >= self.HorseAirborneLogGapMs then
 			self.HorseAirborneAt = now
 
 			self:Log("HorseAirborne vz=" .. string.format("%.2f", vz)
 					.. " speed=" .. string.format("%.2f", speed)
-					.. " sinceImpactMs=" .. tostring(
-					self.LastImpactAt and (now - self.LastImpactAt) or -1))
+					.. " sinceImpactMs=" .. (self.LastImpactAt
+							and tostring(now - self.LastImpactAt) or "none"))
 		end
 	end
 
@@ -219,7 +265,7 @@ function HorseCollisionMod:SafeUpdate()
 	-- The broad phase, which is the only expensive call in this loop and is
 	-- reused between ticks while the horse has not moved far enough for the
 	-- answer to have changed. `EntitiesNearHorse` documents why that is safe.
-	local hitEnts = self:EntitiesNearHorse(horsePos, self:TimeMs())
+	local hitEnts = self:EntitiesNearHorse(horsePos, now)
 
 	if type(hitEnts) ~= "table" then
 		return
@@ -331,10 +377,7 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	-- The horse's real speed, derived from where it has been rather than asked
 	-- for, because the rear's standstill gate cannot trust `GetVelocity`.
 	pcall(function()
-		local horseEnt = XGenAIModule.GetEntityByWUID(
-				player.player:GetPlayerHorse())
-
-		self:TrackHorseSpeed(horseEnt)
+		self:TrackHorseSpeed(self:PlayerHorse())
 	end)
 
 	local success, err = pcall(function()
@@ -342,6 +385,6 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	end)
 
 	if not success then
-		self:Log("CRITICAL ERROR IN UPDATE TIMER: " .. tostring(err))
+		self:Log("UpdateError err=" .. tostring(err))
 	end
 end

@@ -38,6 +38,31 @@ HorseCollisionMod.CombatAttackKind = {
 	DogBite = 5
 }
 
+--- The id a message to this character is addressed to.
+--
+-- @tparam table npc the character
+-- @return `npc.this.id` where the entity carries one, its own id otherwise
+function HorseCollisionMod:MessageTarget(npc)
+	if npc.this and npc.this.id then
+		return npc.this.id
+	end
+
+	return npc.id
+end
+
+--- The player's WUID.
+--
+-- @treturn ?userdata the WUID, or nil when it cannot be read
+function HorseCollisionMod:PlayerWuid()
+	local wuid = nil
+
+	pcall(function()
+		wuid = XGenAIModule.GetMyWUID(player)
+	end)
+
+	return wuid
+end
+
 --- Sends the victim a real combat hit, attributed to the player.
 --
 -- `hitReaction` is a physical event, consumed by `sb_switch_hitreactions.xml`,
@@ -70,26 +95,16 @@ HorseCollisionMod.CombatAttackKind = {
 -- @tparam table npc victim entity
 -- @tparam table playerEnt the player entity
 -- @tparam number strength a `HitReactionStrength` value
--- @treturn boolean true when the call was accepted
 function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 	if not self.Config.CollisionIsCrime or not playerEnt then
-		return false
+		return
 	end
 
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
-
-	local playerWuid = nil
-
-	pcall(function()
-		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
-	end)
+	local target = self:MessageTarget(npc)
+	local playerWuid = self:PlayerWuid()
 
 	if not playerWuid then
-		return false
+		return
 	end
 
 	-- Melee, not Collision; see the doc above.
@@ -109,8 +124,6 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 				.. " strength=" .. tostring(strength)
 				.. " err=" .. tostring(err))
 	end
-
-	return ok
 end
 
 --- Sends the victim a fight-starting stimulus that no bystander witnesses.
@@ -145,26 +158,16 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table playerEnt the player entity
--- @treturn boolean true when the call was accepted
 function HorseCollisionMod:SendProvocationHit(npc, playerEnt)
 	if not playerEnt then
-		return false
+		return
 	end
 
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
-
-	local playerWuid = nil
-
-	pcall(function()
-		playerWuid = XGenAIModule.GetMyWUID(playerEnt)
-	end)
+	local target = self:MessageTarget(npc)
+	local playerWuid = self:PlayerWuid()
 
 	if not playerWuid then
-		return false
+		return
 	end
 
 	local ok, err = pcall(function()
@@ -183,8 +186,6 @@ function HorseCollisionMod:SendProvocationHit(npc, playerEnt)
 				.. " ok=" .. tostring(ok)
 				.. " err=" .. tostring(err))
 	end
-
-	return ok
 end
 
 --- Releases a defense-only fighter into actually attacking.
@@ -236,13 +237,8 @@ end
 -- only adds one alongside it.
 --
 -- @tparam table npc victim entity
--- @treturn boolean true when the message was sent
 function HorseCollisionMod:SendOffenseRelease(npc)
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
+	local target = self:MessageTarget(npc)
 
 	-- The horse, falling back to the victim; see the doc above.
 	local attacker = nil
@@ -258,7 +254,7 @@ function HorseCollisionMod:SendOffenseRelease(npc)
 	end
 
 	if not attacker then
-		return false
+		return
 	end
 
 	local ok, err = pcall(function()
@@ -276,6 +272,4 @@ function HorseCollisionMod:SendOffenseRelease(npc)
 				.. " ok=" .. tostring(ok)
 				.. " err=" .. tostring(err))
 	end
-
-	return ok
 end

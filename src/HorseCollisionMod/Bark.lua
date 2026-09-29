@@ -240,35 +240,62 @@ end
 -- back by a load; it is ignored.
 --
 -- Ranked, so that the more important sound wins a contest rather than whichever
--- was asked first: `RiderVoiceRanks.Grunt`, then an impact line, then a line
--- about a death, so a grunt at the contact cannot silence a kill line.
+-- was asked first: a grunt at its `RiderVocalRankByTier`, then an impact line,
+-- then a line about a death, so a grunt at the contact cannot silence a kill
+-- line.
 --
 -- Equal rank still loses, so two death lines do not talk over each other.
 --
 -- @tparam ?number rank what is asking, defaulting to the lowest
 -- @treturn boolean true when nothing of equal or greater weight is holding him
 function HorseCollisionMod:RiderVoiceReady(rank)
-	local cfg = self.Config
-	local now = self:TimeMs()
-	local until_ = self.RiderVoiceUntil or 0
-	local longest = math.max(cfg.RiderBarkCooldownMs,
-			cfg.RiderVocalCooldownMs)
-
-	if (until_ - now) > longest then
-		return true
-	end
-
-	if now >= until_ then
-		return true
-	end
-
-	return (rank or 0) > (self.RiderVoiceRank or 0)
+	return self:VoiceGateOpen(self:RiderVoiceGate(), rank)
 end
 
---- What each kind of sound out of Henry is worth against the others.
+--- Henry's voice gate, as `VoiceGateOpen` and `PlayGatedVocal` read it.
+--
+-- `cooldown` is the grunt's hold; a spoken line stamps its own.
+--
+-- @treturn table the gate
+function HorseCollisionMod:RiderVoiceGate()
+	local cfg = self.Config
+
+	return {
+		name = "RiderVocal",
+		untilKey = "RiderVoiceUntil",
+		rankKey = "RiderVoiceRank",
+		cooldown = cfg.RiderVocalCooldownMs,
+		longest = math.max(cfg.RiderBarkCooldownMs, cfg.RiderVocalCooldownMs),
+	}
+end
+
+--- Whether a ranked voice gate lets a sound through.
+--
+-- A gate is a hold stamped on this table: `untilKey` names the field holding
+-- when it ends and `rankKey` the rank that set it. A sound of higher rank
+-- passes a hold; equal or lower is refused. A hold further out than
+-- `longest`, the longest the gate can legitimately carry, means the save
+-- clock was wound back by a load, and it is ignored.
+--
+-- @tparam table gate `untilKey`, `rankKey` and `longest`
+-- @tparam ?number rank what is asking, defaulting to the lowest
+-- @treturn boolean true when nothing of equal or greater weight is holding it
+function HorseCollisionMod:VoiceGateOpen(gate, rank)
+	local now = self:TimeMs()
+	local until_ = self[gate.untilKey] or 0
+
+	if (until_ - now) > gate.longest or now >= until_ then
+		return true
+	end
+
+	return (rank or 0) > (self[gate.rankKey] or 0)
+end
+
+--- What each kind of spoken line out of Henry is worth against the others,
+-- above every grunt's `RiderVocalRankByTier`.
 --
 -- @table RiderVoiceRanks
-HorseCollisionMod.RiderVoiceRanks = { Grunt = 3, Impact = 4, Killed = 5 }
+HorseCollisionMod.RiderVoiceRanks = { Impact = 4, Killed = 5 }
 
 --- Henry says something about the impact, drawn from `RiderBarkAliases`.
 --
@@ -306,7 +333,7 @@ function HorseCollisionMod:BarkRiderImpact(playerEnt, tierName)
 
 	-- Rolled after the cooldown so a losing roll does not start one, which
 	-- would silence the following impact as well.
-	if math.random() >= (cfg.RiderBarkChance) then
+	if math.random() >= cfg.RiderBarkChance then
 		return false
 	end
 
@@ -359,7 +386,7 @@ function HorseCollisionMod:SendRiderAlias(playerEnt, pool, tag, rank)
 	if ok then
 		-- Both spoken ranks sit above every grunt, so no breath follows a line
 		-- inside the hold, and a death line can still cut across an impact one.
-		self.RiderVoiceUntil = self:TimeMs() + (cfg.RiderBarkCooldownMs)
+		self.RiderVoiceUntil = self:TimeMs() + cfg.RiderBarkCooldownMs
 		self.RiderVoiceRank = rank or self.RiderVoiceRanks.Impact
 	end
 
@@ -526,12 +553,12 @@ function HorseCollisionMod:BarkOnCooldown(entity)
 	local now = self:TimeMs()
 	local last = self.RecentBarks[id]
 
-	if last and (now - last) < (self.Config.BarkCooldownMs) then
+	if last and (now - last) < self.Config.BarkCooldownMs then
 		-- Logged, so a silent second shove can be told from a missed impact.
 		if self.Config.LogTelemetry then
 			self:Log("BarkCooldown " .. self:NameOf(entity)
 					.. " silent for another "
-					.. tostring((self.Config.BarkCooldownMs)
+					.. tostring(self.Config.BarkCooldownMs
 							- (now - last)) .. "ms")
 		end
 
@@ -783,7 +810,7 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 		-- only this caller sequences two lines from one speaker.
 		local last = self.RecentBarks[tostring(npc.id or "?")]
 
-		if last and (self:TimeMs() - last) < (self.Config.BarkGapMs) then
+		if last and (self:TimeMs() - last) < self.Config.BarkGapMs then
 			if self.Config.LogTelemetry then
 				self:Log("BarkRecovered " .. self:NameOf(npc)
 						.. " skipped, only " .. tostring(self:TimeMs() - last)
@@ -811,145 +838,6 @@ function HorseCollisionMod:BarkRear(npc, struck)
 	end
 
 	self:Bark(npc, struck and "Panic" or "Startle")
-end
-
---- Makes a victim briefly immortal so the engine's collision damage lands on
--- nothing.
---
--- The engine charges a victim health for being struck by a moving physical
--- body and the mod cannot stop it. `BasicActor`'s collision multipliers belong
--- to CryEngine's legacy damage path rather than to the RPG layer that charges
--- `soul` health, and the one parameter that does work,
--- `CollisionVelocityDeltaToDmgR`, is global and also governs arrows.
---
--- So rather than stop the damage, this stops it **landing**. `imm=1` is the
--- parameter behind the game's own `immortality` and `death_protection` buffs,
--- and `immortality_nonpersistent` carries it without being able to survive a
--- save. Applied ahead of contact and removed once the engine has settled, the
--- victim is untouchable for exactly the window the trample occupies, and the
--- mod's own damage lands afterwards on a mortal target.
---
--- **This is deliberately narrow.** It is one buff instance, on one victim,
--- until `ApplyImpactDamage` lifts it after the body comes to rest, with
--- `ShieldWindowMs` as the backstop.
---
--- @tparam table npc somebody in front of the horse
-function HorseCollisionMod:ShieldFromEngineDamage(npc)
-	if not self.Config.ShieldVictimFromEngineDamage or not npc or not npc.soul then
-		return
-	end
-
-	local id = tostring(npc.id or "?")
-	local existing = self.ShieldedVictims[id]
-
-	-- Only a **live** shield blocks a second one: a record whose buff has
-	-- already been removed still reads truthy, and must not leave a later
-	-- impact unshielded.
-	if existing and not existing.removed then
-		return
-	end
-
-	-- The instance handle, not the GUID, is what gets handed back later.
-	--
-	-- `RemoveAllBuffsByGuid` would strip **every** instance of this buff from
-	-- the victim, and immortality is exactly what a quest uses to keep a story
-	-- character alive. Shielding such a character and then clearing by GUID
-	-- would quietly remove protection this mod never granted. Removing the
-	-- single instance that was added cannot.
-	local ok, instance = pcall(function()
-		return npc.soul:AddBuff(self.ImmortalityBuffGuid)
-	end)
-
-	if not ok or instance == nil then
-		self.ShieldedVictims[id] = nil
-
-		if self.Config.LogTelemetry then
-			self:Log("Shield failed on " .. self:NameOf(npc))
-		end
-
-		return
-	end
-
-	-- Held in a record rather than bare, so the backstop timer can close over
-	-- it. A script reload replaces the whole `HorseCollisionMod` table and with
-	-- it this map, and the one thing that must survive a reload is the removal.
-	-- A closure survives; a table lookup does not.
-	local state = { instance = instance, removed = false }
-	self.ShieldedVictims[id] = state
-
-	if self.Config.LogTelemetry then
-		self:Log("Shield on " .. self:NameOf(npc) .. " ok=true")
-	end
-
-	-- Nothing here decides when the shield ends. `ApplyImpactDamage` lifts it as
-	-- the first thing it does, and that call waits for the victim's body to
-	-- come to rest, so the shield covers the window the engine can charge the
-	-- body for.
-	--
-	-- This timer is a crash backstop and nothing else: if the damage call never
-	-- happens, nobody is left permanently unkillable. Reaching it means
-	-- something else went wrong, so it logs.
-	--
-	-- **Deliberately not generation guarded**, unlike the mod's polling timers:
-	-- the work it does is removing immortality, and skipping it on a script
-	-- reload would leave a victim unkillable for the rest of the session.
-	Script.SetTimer(self.Config.ShieldWindowMs, function()
-		if state.removed then
-			return
-		end
-
-		state.removed = true
-
-		if self.ShieldedVictims[id] == state then
-			self.ShieldedVictims[id] = nil
-		end
-
-		local lifted = pcall(function()
-			npc.soul:RemoveBuff(state.instance)
-		end)
-
-		if self.Config.LogTelemetry then
-			self:Log("Shield backstop fired on " .. self:NameOf(npc)
-					.. " ok=" .. tostring(lifted)
-					.. " (the damage call never lifted it)")
-		end
-	end)
-end
-
---- Takes the collision shield off a victim, now.
---
--- Called from `ApplyImpactDamage` immediately before it charges the victim, so
--- the immortality that swallowed the engine's trample cannot also swallow the
--- mod's own damage. Safe to call on somebody who was never shielded.
---
--- @tparam table npc the victim
--- @treturn boolean true when a removal was attempted
-function HorseCollisionMod:LiftCollisionShield(npc)
-	if not npc or not npc.soul then
-		return false
-	end
-
-	local id = tostring(npc.id or "?")
-	local state = self.ShieldedVictims[id]
-
-	if state == nil or state.removed then
-		return false
-	end
-
-	state.removed = true
-	self.ShieldedVictims[id] = nil
-
-	-- The instance this mod added, never every instance by GUID, so a quest's
-	-- own immortality on the same victim is untouched.
-	local ok = pcall(function()
-		npc.soul:RemoveBuff(state.instance)
-	end)
-
-	if self.Config.LogTelemetry then
-		self:Log("Shield lifted on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
-	end
-
-	return ok
 end
 
 --- Switches off vanilla's collision bark on somebody near the horse.

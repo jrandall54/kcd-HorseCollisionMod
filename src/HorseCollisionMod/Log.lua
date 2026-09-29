@@ -13,6 +13,13 @@
 -- @module HorseCollisionMod.Log
 -- @author jrandall54
 
+-- The shortest gap between two `Miss` lines for one entity.
+HorseCollisionMod.RejectionLogGapMs = 1000
+
+-- The shortest detection interval `TickMs` allows, in seconds: one frame at
+-- 60 Hz.
+HorseCollisionMod.MinTickSeconds = 0.016
+
 --- The engine clock in milliseconds.
 --
 -- `System.GetCurrTime` returns seconds as a float and `os.clock` returns nil
@@ -147,15 +154,15 @@ function HorseCollisionMod:ImpactSpeed()
 	return peak
 end
 
---- Logs why a candidate was passed over, at most once per second per entity.
+--- Logs why a candidate was passed over, rate limited per entity.
 --
 -- Every rejection in the detection loop is silent, so an impact that produces
 -- no reaction is indistinguishable from one that was never detected. This
 -- names the reason.
 --
--- Rate limited, to once a second per entity, because the loop runs every
--- `TickSeconds` and the detection sphere returns everything nearby, including
--- crates and doors.
+-- Rate limited, to once per `RejectionLogGapMs` per entity, because the loop
+-- runs every `TickSeconds` and the detection sphere returns everything
+-- nearby, including crates and doors.
 --
 -- @tparam table npc the entity that was rejected
 -- @tparam string reason short label for which test rejected it
@@ -169,7 +176,7 @@ function HorseCollisionMod:LogRejection(npc, reason, detail)
 	local now = self:TimeMs()
 	local last = self.RecentRejections[id]
 
-	if last and (now - last) < 1000 then
+	if last and (now - last) < self.RejectionLogGapMs then
 		return
 	end
 
@@ -212,15 +219,15 @@ end
 --- The detection interval in milliseconds.
 --
 -- `TickSeconds` is the one figure the loop rate and the forward sweep are both
--- derived from, so a change to it moves them together. Clamped at one frame
--- at 60 Hz, 0.016 s, because a zero would book a timer that never rests.
+-- derived from, so a change to it moves them together. Clamped at
+-- `MinTickSeconds`, because a zero would book a timer that never rests.
 --
 -- @treturn number milliseconds between detection ticks
 function HorseCollisionMod:TickMs()
 	local seconds = self.Config.TickSeconds
 
-	if seconds < 0.016 then
-		seconds = 0.016
+	if seconds < self.MinTickSeconds then
+		seconds = self.MinTickSeconds
 	end
 
 	return math.floor(seconds * 1000)

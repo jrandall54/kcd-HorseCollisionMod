@@ -78,15 +78,27 @@ HorseCollisionMod.BloodZones = {
 	}
 }
 
+-- How far each mark's amount is varied either way, as a fraction of it, so a
+-- victim ridden down twice does not carry two identical marks.
+HorseCollisionMod.MarkJitter = 0.25
+
+-- Where the rear's dust spawns above the victim's origin: chest height, where
+-- the hooves land.
+HorseCollisionMod.RearDustHeight = 1.3
+
+-- The ground cast under a landed body: how far above its origin it starts and
+-- how far down it reaches.
+HorseCollisionMod.GroundCastHeight = 1.0
+HorseCollisionMod.GroundCastDepth = 3.0
+
 --- Marks a victim with the dirt and blood their impact earned.
 --
 -- Called at the moment of impact from `ResolveImpact`, for every tier. The
 -- tier tables decide what is applied; the walk has no row and gets nothing.
 --
 -- The amounts come from the settings, per tier, and each application is
--- jittered by a quarter either way so a victim ridden down twice does not
--- carry two identical marks. An amount of zero skips its call rather than
--- passing a delta the engine would ignore.
+-- jittered by `MarkJitter` either way. An amount of zero skips its call rather
+-- than passing a delta the engine would ignore.
 --
 -- Every call is wrapped, because an actor can be unstreamed between the
 -- impact and this line and a raw error would kill the collision tick.
@@ -94,30 +106,30 @@ HorseCollisionMod.BloodZones = {
 -- @tparam table npc victim entity
 -- @tparam string tierName an impact tier name
 -- @tparam table velocity horse velocity vector
--- @tparam number speed horse speed in meters per second
--- @treturn boolean true when something was applied
-function HorseCollisionMod:MarkVictim(npc, tierName, velocity, speed)
+function HorseCollisionMod:MarkVictim(npc, tierName, velocity)
 	local cfg = self.Config
 
-	if not cfg.VictimMarks or tierName == "Walk" then
-		return false
-	end
-
-	if not npc or not npc.actor then
-		return false
+	if not cfg.VictimMarks or not npc or not npc.actor then
+		return
 	end
 
 	local dirt = self:TierValue("VictimDirtByTier", tierName)
 	local blood = self:TierValue("VictimBloodByTier", tierName)
 
-	local direction = self:GetImpactDir(npc, velocity, speed)
+	if not dirt and not blood then
+		return
+	end
+
+	local direction = self:GetImpactDir(npc, velocity)
 	local zones = self.BloodZones[direction] or self.BloodZones.so_forward
 	local applied = false
 
-	-- A quarter either side of the figure asked for. Enough that two impacts
-	-- do not stamp the same mark twice, not enough to change the tier.
+	-- Enough that two impacts do not stamp the same mark twice, not enough to
+	-- change the tier.
+	local spread = self.MarkJitter
+
 	local function jitter(amount)
-		return amount * (0.75 + (math.random() * 0.5))
+		return amount * (1 - spread + (math.random() * 2 * spread))
 	end
 
 	if dirt and dirt > 0 and type(npc.actor.AddDirt) == "function" then
@@ -146,8 +158,6 @@ function HorseCollisionMod:MarkVictim(npc, tierName, velocity, speed)
 				.. " zones=" .. tostring(#zones)
 				.. " applied=" .. tostring(applied))
 	end
-
-	return applied
 end
 
 --- Throws up dust where a body hits the ground.
@@ -186,32 +196,30 @@ end
 --
 -- @tparam table npc the victim entity
 -- @tparam string tierName an impact tier name
--- @treturn boolean true when an effect was spawned or is waiting to be
 function HorseCollisionMod:ImpactDust(npc, tierName)
 	local cfg = self.Config
 
-	if not cfg.ImpactDust or not npc or tierName == "Walk" then
-		return false
+	if not cfg.ImpactDust or not npc then
+		return
 	end
 
 	local scale = self:TierValue("ImpactDustScaleByTier", tierName) or 0
 
 	if scale <= 0 then
-		return false
+		return
 	end
 
 	-- The global is CryEngine's own, and is absent if the particle bindings
 	-- have not loaded.
 	if type(Particle) ~= "table" or type(Particle.SpawnEffect) ~= "function" then
-		return false
+		return
 	end
 
 	-- The rear spawns on contact rather than on landing.
 	--
 	-- A rear is a standing attack and the victim is directly in front of the
-	-- hooves, so there is no flight to wait out and the dust belongs at chest
-	-- height, 1.3 m above the victim's origin, where the blow lands rather
-	-- than at the feet.
+	-- hooves, so there is no flight to wait out and the dust belongs at
+	-- `RearDustHeight`, where the blow lands, rather than at the feet.
 	if tierName == "Rear" then
 		local pos = nil
 
@@ -222,28 +230,26 @@ function HorseCollisionMod:ImpactDust(npc, tierName)
 		end)
 
 		if not pos then
-			return false
+			return
 		end
 
 		local ok = pcall(function()
-			Particle.SpawnEffect(cfg.ImpactDustEffectRear or cfg.ImpactDustEffect,
-					{ x = pos.x, y = pos.y, z = pos.z + 1.3 },
+			Particle.SpawnEffect(cfg.ImpactDustEffectRear,
+					{ x = pos.x, y = pos.y, z = pos.z + self.RearDustHeight },
 					{ x = 0, y = 0, z = 1 },
 					scale)
 		end)
 
 		if cfg.LogTelemetry then
-			self:Log("ImpactDust tier=Rear INSTANT scale="
+			self:Log("ImpactDust tier=Rear scale="
 					.. string.format("%.2f", scale)
 					.. " ok=" .. tostring(ok))
 		end
 
-		return ok
+		return
 	end
 
 	self:DustWhenLanded(npc, tierName, scale, 0)
-
-	return true
 end
 
 --- Waits until a thrown victim meets the ground, then throws up the dust.
@@ -306,14 +312,14 @@ function HorseCollisionMod:DustWhenLanded(npc, tierName, scale, samples, falling
 
 	local vz = vel and vel.z or 0
 
-	if vz <= (cfg.ImpactDustFallVz) then
+	if vz <= cfg.ImpactDustFallVz then
 		falling = true
 	end
 
-	local landed = falling and vz > (cfg.ImpactDustLandVz)
-	local givenUp = samples >= (cfg.ImpactDustMaxSamples)
+	local landed = falling and vz > cfg.ImpactDustLandVz
+	local givenUp = samples >= cfg.ImpactDustMaxSamples
 	local expired = not falling
-			and samples >= (cfg.ImpactDustFallWaitSamples)
+			and samples >= cfg.ImpactDustFallWaitSamples
 
 	if not landed and not givenUp and not expired then
 		Script.SetTimer(cfg.ImpactDustSampleMs, function()
@@ -328,7 +334,7 @@ function HorseCollisionMod:DustWhenLanded(npc, tierName, scale, samples, falling
 
 	local ok = pcall(function()
 		Particle.SpawnEffect(cfg.ImpactDustEffect,
-				{ x = at.x, y = at.y, z = at.z + (cfg.ImpactDustHeight) },
+				{ x = at.x, y = at.y, z = at.z + cfg.ImpactDustHeight },
 				{ x = 0, y = 0, z = 1 },
 				scale)
 	end)
@@ -354,8 +360,8 @@ end
 -- can end up well under the ground it is resting on, and an emitter placed
 -- there is buried and renders nothing while reporting success.
 --
--- Cast from a meter above the body three meters straight down, against
--- terrain and static geometry, which is vanilla's own pattern for placing a
+-- Cast from `GroundCastHeight` above the body `GroundCastDepth` straight down,
+-- against terrain and static geometry, which is vanilla's own pattern for placing a
 -- blood splat on the ground in `BasicActor.lua`. Terrain elevation alone is
 -- not enough: a victim who lands on a road or a bridge is on geometry, and
 -- the terrain under it can read 0.7 m out.
@@ -366,13 +372,13 @@ function HorseCollisionMod:GroundUnder(pos)
 	local hits, hit = 0, nil
 
 	pcall(function()
-		local from = { x = pos.x, y = pos.y, z = pos.z + 1.0 }
-		local down = { x = 0, y = 0, z = -3.0 }
-		local table_ = {}
+		local from = { x = pos.x, y = pos.y, z = pos.z + self.GroundCastHeight }
+		local down = { x = 0, y = 0, z = -self.GroundCastDepth }
+		local results = {}
 
 		hits = Physics.RayWorldIntersection(from, down, 1,
-				ent_terrain + ent_static, nil, nil, table_)
-		hit = table_[1]
+				ent_terrain + ent_static, nil, nil, results)
+		hit = results[1]
 	end)
 
 	if hits > 0 and hit and hit.pos then

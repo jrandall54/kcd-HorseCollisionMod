@@ -779,10 +779,10 @@ HorseCollisionMod.Config = {
 	},
 
 	RiderVocalByTier         = {
-		Walk   = { "v_henry_hit_soft", 140, 0, 1 },
-		Trot   = { "v_henry_hit_medium", 110, 0, 1 },
+		Walk   = { "", 140, 0, 1 },
+		Trot   = { "v_henry_hit_soft", 140, 0, 1 },
 		Gallop = { "v_henry_hit_heavy", 90, 0, 1 },
-		Rear   = { "v_henry_hit_medium", 110, 0, 1 },
+		Rear   = { "v_henry_hit_soft", 140, 0, 1 },
 		Charge = { "v_henry_hit_heavy", 90, 0, 1 },
 	},
 
@@ -1112,9 +1112,8 @@ HorseCollisionMod.Config = {
 	RagdollDampFloorMs       = 200,
 	RagdollDampCeilingMs     = 6000,
 
-	-- How `WhenVictimStands` waits for a victim to be back on their feet: how
-	-- often it looks, and how long it looks before giving up and reporting the
-	-- wait as spent.
+	-- How the `FallToBlend` trace waits for a victim to be back on their feet:
+	-- how often it looks, and how long it looks before giving up.
 	RisePollMs                = 160,
 	RiseCeilingMs             = 15000,
 
@@ -1289,7 +1288,6 @@ HorseCollisionMod.ReactionAnimationState = "AnimationControlled"
 
 --- How often the recovery waits in `Recovery.lua` read the victim's state.
 HorseCollisionMod.ReactionPollMs = 100
-HorseCollisionMod.ReactionEndCeilingMs = 12000
 
 --- How abruptly the replan is allowed to interrupt what the victim is doing.
 --
@@ -1388,8 +1386,6 @@ HorseCollisionMod.RetaliationReleaseTries = 20
 -- a proxy is cheap, so the lifetime is the only part of this worth bounding.
 HorseCollisionMod.AudioProxyLifetimeMs = 2000
 
-HorseCollisionMod.RagdollAnimationState = "BlendRagdoll"
-
 --- Victims whose fall clip has not yet handed the body to physics.
 --
 -- A `hcm_fall_` clip carries its ragdoll as a ProcLayer that fires partway
@@ -1440,8 +1436,6 @@ HorseCollisionMod.RagdollLandCeilingMs = 3000
 -- how often that is read, by `WhenBodyStops`.
 HorseCollisionMod.RestStillMeters = 0.05
 HorseCollisionMod.RestPollMs = 200
-
-HorseCollisionMod.ReactionAnimationState = "AnimationControlled"
 
 
 --- Applies HorseCollisionMod_Settings.lua over the defaults above.
@@ -1495,8 +1489,7 @@ function HorseCollisionMod:ApplySettings()
 
 	-- The engine's ragdoll stillness test, global and overwritten on every
 	-- load; see `RagdollStillDuration` in Config.
-	local threshold = self.Config.RagdollStillSpeedThreshold
-	System.SetCVar("wh_rd_StillSpeedThreshold", threshold)
+	System.SetCVar("wh_rd_StillSpeedThreshold", self.Config.RagdollStillSpeedThreshold)
 	System.SetCVar("wh_rd_StillDuration", self.Config.RagdollStillDuration)
 
 	return applied, rejected
@@ -1617,25 +1610,12 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		return
 	end
 
-	if self.Config and self.Config.LogTelemetry then
-		local a = string.lower(actionName or "")
-		local e = string.lower(eventName or "")
-		if string.match(a, "dialog") or string.match(e, "dialog")
-			or string.match(a, "item") or string.match(e, "item")
-			or string.match(a, "money") or string.match(e, "money")
-			or string.match(a, "msg") or string.match(e, "msg")
-			or string.match(a, "surrender") or string.match(e, "surrender")
-			or string.match(a, "inventory") or string.match(e, "inventory") then
-			self:Log("UIEvent action=" .. tostring(actionName) .. " event=" .. tostring(eventName))
-		end
-	end
-
 	if actionName == "igm_inventory" then
 		if eventName == "OnStart" then
 			self.InventoryOpen = true
 		elseif eventName == "OnEnd" then
 			self.InventoryOpen = false
-			self:CheckMenuTutorials()
+			self:QueueNextTutorial()
 		end
 	end
 
@@ -1696,10 +1676,6 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		if applied > 0 or rejected > 0 then
 			self:Log("Settings: " .. tostring(applied) .. " applied, "
 					.. tostring(rejected) .. " ignored")
-		end
-
-		if self.Config.AutoGrantPerks then
-			self:GrantPerks()
 		end
 
 		if self.SyncTutorialsOnLoad then

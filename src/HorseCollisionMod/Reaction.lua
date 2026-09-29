@@ -67,16 +67,15 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number speed horse speed in meters per second
 -- @tparam string prefix the reaction family, `hcm_stagger_`, `hcm_fall_` or
 --   `hcm_knockdown_`, completed with the impact direction
 -- @treturn boolean true when the call was accepted without error
-function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
+function HorseCollisionMod:PlayReaction(npc, velocity, prefix)
 	if not npc.actor or type(npc.actor.StartInteractiveActionByName) ~= "function" then
 		return false
 	end
 
-	local dir = self:GetImpactDir(npc, velocity, speed)
+	local dir = self:GetImpactDir(npc, velocity)
 
 	-- `GetImpactDir` speaks the engine's `so_left` vocabulary; this mod's option
 	-- names and per-direction tables use the bare word.
@@ -255,15 +254,15 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 	end
 
 	if style == "stagger" then
-		return self:PlayReaction(npc, velocity, speed, "hcm_stagger_")
+		return self:PlayReaction(npc, velocity, "hcm_stagger_")
 	end
 
 	if style == "knockdown" then
-		return self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
+		return self:PlayReaction(npc, velocity, "hcm_knockdown_")
 	end
 
 	if style == "fall" then
-		return self:PlayReaction(npc, velocity, speed, "hcm_fall_")
+		return self:PlayReaction(npc, velocity, "hcm_fall_")
 	end
 
 	if style ~= "ragdoll" then
@@ -783,9 +782,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	-- not match the distance seen on screen.
 	--
 	-- `BlendRagdoll` is what `IsRagdollState` already recognizes, and the poll
-	-- interval and ceiling are `RisePollMs` and `RiseCeilingMs`, the same pair
-	-- every other wait on this victim uses. Nothing here is a figure of this
-	-- watcher's own.
+	-- interval and ceiling are `RisePollMs` and `RiseCeilingMs`.
 	if self.Config.LogTelemetry then
 		local generation = self.TimerTick
 		local gap = self.Config.RisePollMs
@@ -859,7 +856,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	-- for a body that physics owns.
 	self:WhenVictimIsPhysical(npc, function()
 		self:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt,
-				profile, armorScale)
+				profile)
 		self:DampVictim(npc, armorScale, profile)
 	end)
 
@@ -867,7 +864,7 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	self:TraceRecovery(npc, "engine-ragdoll")
 
 	local generation = self.TimerTick
-	self:WhenVictimIsUp(npc, function(state, waitedForBody)
+	self:WhenVictimIsUp(npc, function()
 		if generation ~= self.TimerTick then
 			return
 		end
@@ -889,9 +886,8 @@ end
 -- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
 -- @tparam[opt] table profile the tier's resolved throw profile, which carries
 --   the launch when there is one
--- @tparam[opt] number armorScale unused
 function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
-										horseEnt, profile, armorScale)
+										horseEnt, profile)
 	-- Barding is a flat addition to the two force figures rather than a factor
 	-- on the result, so a barded horse adds the same absolute push whoever it
 	-- hits, and the victim's own armor still scales the whole thing.
@@ -1050,12 +1046,6 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 			-- No tier both brakes and launches, so this never has to be
 			-- ordered against the brake.
 			Script.SetTimer(self.Config.ImpulseDelayMs, function()
-				local before, after = nil, nil
-
-				pcall(function()
-					before = npc:GetWorldPos()
-				end)
-
 				-- The launch, decided here rather than where the trim was,
 				-- because it is a floor under the body's speed and the body's
 				-- speed is only knowable at the moment the impulse lands.
@@ -1147,29 +1137,13 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 					npc:AddImpulse(-1, hitPos, sendDir, sendMag, 1)
 				end)
 
-				-- Reported from inside the timer, because the line written
-				-- when the impulse is computed says only what was intended;
-				-- the call itself happens `ImpulseDelayMs` later.
-				Script.SetTimer(300, function()
-					pcall(function()
-						after = npc:GetWorldPos()
-					end)
-
-					local moved = 0
-
-					if before and after then
-						moved = math.sqrt(((after.x - before.x) ^ 2)
-								+ ((after.y - before.y) ^ 2)
-								+ ((after.z - before.z) ^ 2))
-					end
-
-					if self.Config.LogTelemetry then
-						self:Log("ImpulseApplied " .. self:NameOf(npc)
-								.. " ok=" .. tostring(ok)
-								.. " err=" .. tostring(err)
-								.. " movedIn300ms=" .. string.format("%.2f", moved) .. "m")
-					end
-				end)
+				-- The line written when the impulse is computed says only
+				-- what was intended; this one reports the call itself.
+				if self.Config.LogTelemetry then
+					self:Log("ImpulseApplied " .. self:NameOf(npc)
+							.. " ok=" .. tostring(ok)
+							.. " err=" .. tostring(err))
+				end
 			end)
 		end
 	end)

@@ -62,22 +62,6 @@ function HorseCollisionMod:LeanActionFor(key, side)
 	return "hcm_lean_" .. side .. "_" .. string.lower(key)
 end
 
-local function GetPlayerAndHorse()
-	local playerEnt = rawget(_G, "player")
-
-	if not playerEnt or not playerEnt.player then
-		return nil, nil
-	end
-
-	local horse = nil
-
-	pcall(function()
-		horse = XGenAIModule.GetEntityByWUID(playerEnt.player:GetPlayerHorse())
-	end)
-
-	return horse, playerEnt
-end
-
 --- Where the camera sits across the horse, in meters from its centerline.
 --
 -- Measured against the **horse**, not against where the camera happened to be
@@ -95,7 +79,7 @@ end
 --
 -- @treturn ?number offset across the horse, positive to the horse's right
 function HorseCollisionMod:LeanOffset()
-	local horse, playerEnt = GetPlayerAndHorse()
+	local horse = self:PlayerHorse()
 
 	if not horse then
 		return nil
@@ -134,7 +118,7 @@ end
 -- @treturn ?number degrees, 0 looking straight ahead, never negative
 -- @treturn boolean true if pitch limit was exceeded
 function HorseCollisionMod:LeanViewAngle()
-	local horse, playerEnt = GetPlayerAndHorse()
+	local horse = self:PlayerHorse()
 
 	if not horse then
 		return nil, false
@@ -196,9 +180,7 @@ end
 --   returns the camera home
 function HorseCollisionMod:FlipLean(amplitude, sign, seconds)
 	local cfg = self.Config
-	local playerEnt = rawget(_G, "player")
-
-	if not playerEnt or not playerEnt.actor then
+	if not player or not player.actor then
 		return
 	end
 
@@ -209,10 +191,10 @@ function HorseCollisionMod:FlipLean(amplitude, sign, seconds)
 	self.LeanLastFlip = now
 	self.LeanFlips = (self.LeanFlips or 0) + 1
 
-	local forward = amplitude * (cfg.LeanForwardShare)
+	local forward = amplitude * cfg.LeanForwardShare
 
 	pcall(function()
-		playerEnt.actor:SetViewShake(
+		player.actor:SetViewShake(
 				{ x = 0, y = 0, z = 0 },
 				{ x = amplitude * sign, y = forward, z = 0 },
 				seconds, cfg.LeanShakePeriod, 0)
@@ -234,9 +216,7 @@ function HorseCollisionMod:StartLean(sign)
 		return
 	end
 
-	local playerEnt = rawget(_G, "player")
-
-	if not playerEnt or not playerEnt.actor then
+	if not player or not player.actor then
 		return
 	end
 
@@ -245,7 +225,7 @@ function HorseCollisionMod:StartLean(sign)
 	local mounted = false
 
 	pcall(function()
-		mounted = playerEnt.human:IsMounted()
+		mounted = player.human:IsMounted()
 	end)
 
 	if not mounted then
@@ -290,7 +270,7 @@ function HorseCollisionMod:StartLean(sign)
 	local timerTick = self.TimerTick
 	-- A position across the horse rather than a distance traveled, so both
 	-- sides finish the same distance from the head.
-	local target = (cfg.LeanDistance) * sign
+	local target = cfg.LeanDistance * sign
 	local pollMs = cfg.LeanPollMs
 	local reached = false
 	local last = nil
@@ -312,7 +292,7 @@ function HorseCollisionMod:StartLean(sign)
 		local isMounted = false
 
 		pcall(function()
-			isMounted = playerEnt.human:IsMounted()
+			isMounted = player.human:IsMounted()
 		end)
 
 		if not isMounted then
@@ -349,7 +329,7 @@ function HorseCollisionMod:StartLean(sign)
 				-- Only a turn heading toward the limit leads it. Coming back
 				-- toward the horse's line should not cancel anything.
 				if rate > 0 then
-					projected = turned + (rate * ((cfg.LeanTurnLeadMs) / 1000))
+					projected = turned + (rate * (cfg.LeanTurnLeadMs / 1000))
 				end
 			end
 
@@ -375,7 +355,7 @@ function HorseCollisionMod:StartLean(sign)
 		-- camera moves at nearly three meters a second on the way out, so a
 		-- correction that does not land is meters away in a few seconds. A
 		-- ceiling costs one comparison a poll and bounds any failure in here.
-		local ceiling = (cfg.LeanDistance) * (cfg.LeanRunawayFactor)
+		local ceiling = cfg.LeanDistance * cfg.LeanRunawayFactor
 
 		if math.abs(offset) > ceiling then
 			self:StopLean()
@@ -473,17 +453,18 @@ function HorseCollisionMod:StopLean()
 	self.LeanHeld = nil
 	self.LeanGeneration = (self.LeanGeneration or 0) + 1
 
-	self.LeanHomeUntil = self:TimeMs() + (cfg.LeanHomeMs)
+	self.LeanHomeUntil = self:TimeMs() + cfg.LeanHomeMs
 
-	self:FlipLean(cfg.LeanHoldAmplitude, sign or 1, cfg.LeanReleaseSec)
+	self:FlipLean(cfg.LeanHoldAmplitude, sign, cfg.LeanReleaseSec)
 
 	if cfg.LogTelemetry then
 		local offset = self:LeanOffset()
+		local angle = self:LeanViewAngle()
 
-		self:Log("LeanBack side=" .. ((sign or 1) < 0 and "left" or "right")
-				.. " from=" .. string.format("%.2f", offset or -9)
+		self:Log("LeanBack side=" .. (sign < 0 and "left" or "right")
+				.. " from=" .. (offset and string.format("%.2f", offset) or "none")
 				.. " target=" .. string.format("%.2f", cfg.LeanDistance)
-				.. " angle=" .. string.format("%.0f", self:LeanViewAngle() or -1)
+				.. " angle=" .. (angle and string.format("%.0f", angle) or "none")
 				.. " flips=" .. tostring(self.LeanFlips or 0))
 	end
 end
@@ -513,12 +494,11 @@ function HorseCollisionMod:HandleLeanAction(action, activation)
 	end
 
 	if cfg.RequirePerks then
-		local playerEnt = rawget(_G, "player")
 		local hasAbility = false
 
-		if playerEnt and playerEnt.soul then
+		if player and player.soul then
 			pcall(function()
-				hasAbility = playerEnt.soul:HasAbility("hcm_lean")
+				hasAbility = player.soul:HasAbility("hcm_lean")
 			end)
 		end
 

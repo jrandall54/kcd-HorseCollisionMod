@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 4 done; batch 3 items 7 and 8 open.
+**Phase:** 2 in progress. Batches 0 to 4 done except batch 3, item 8.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,11 +30,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 3, items 7 and 8: the code changes batch 4
-found, applied as described under **Batches**. Batch 4 is complete: every
-source file's comments are done, one commit per file. Read **Phase 2 plan**
-below in full before starting; it gives the procedure for every batch and
-how each is verified. Then batch 5.
+**Next step:** phase 2, batch 3, item 8 (`SphereCacheTravel` 0.8 to 0.7),
+then batch 5. Read **Phase 2 plan** below in full before starting; it gives
+the procedure for every batch and how each is verified.
 
 **Pass order** (dependencies first, then largest):
 
@@ -534,6 +532,23 @@ One line per batch: batch, commit, what was verified.
   Narrative warnings outside this ledger 507 to 334, the rest largely the
   "the rider" false positive; 0 errors. Histories the diary lacked were
   moved into it. Code findings are batch 3, items 7 and 8.
+- **Batch 3, item 7.** Base `6220b69`. Every listed change applied in one
+  commit. Beyond the list, where a change left something unused: the
+  `speed` parameter of `PlayReaction` and `MarkVictim`, which only fed
+  `GetImpactDir`; `FrightenBystander`'s `overrideSuppress`, which only
+  carried the two undeclared settings; `MarkVictim` returns early when the
+  tier has neither dirt nor blood, as the walk check did. The shared horse
+  lookup is `PlayerHorse` in `Rider.lua`; `Retaliation.lua` no longer had a
+  copy. The two message helpers are `MessageTarget` and `PlayerWuid` in
+  `Crime.lua`; the banner, ability and perk table is `Maneuvers` beside
+  `GrantPerks`; the rider's and horse's gates are `VoiceGateOpen` and
+  `PlayGatedVocal`, with `RiderVoiceReady` reading the same gate. L0: build
+  passes, tier tables agree, `audit_code.py` reports no unread keys and one
+  uncalled function, `ResetTutorials`, already a finding; `lint_docs.py`
+  clean outside this ledger. L2: `flow.ps1 test` into the running game, no
+  Lua error from the reload on, loop running, and `PlayerHorse`,
+  `PlayerWuid`, `RiderVoiceReady` and `Maneuvers` answer live. No
+  player-visible change, so no changelog entry.
 
 ## Standard
 

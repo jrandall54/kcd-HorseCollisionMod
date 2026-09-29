@@ -611,7 +611,10 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 		end
 
 		if not anyoneLeft then
-			self:Log("SurrenderHint nobody left to surrender to")
+			if self.Config.LogTelemetry then
+				self:Log("SurrenderHint nobody left to surrender to")
+			end
+
 			self:HideSurrenderHint(true)
 
 			return
@@ -920,7 +923,9 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	-- The surrender prompt, except for a soldier, whose arrest raises the
 	-- game's own; see `SurrenderIsTheGames`.
 	if self:SurrenderIsTheGames(npc) then
-		self:Log("SurrenderHint left to the game for " .. self:NameOf(npc))
+		if self.Config.LogTelemetry then
+			self:Log("SurrenderHint left to the game for " .. self:NameOf(npc))
+		end
 	else
 		self:ShowSurrenderHint(npc)
 	end
@@ -995,15 +1000,15 @@ function HorseCollisionMod:PullRiderDown(npc)
 			return
 		end
 
-		local mounted = false
+		local stillMounted = false
 
 		pcall(function()
-			mounted = player.human:IsMounted()
+			stillMounted = player.human:IsMounted()
 		end)
 
 		local elapsed = self:TimeMs() - startedAt
 
-		if not mounted or elapsed >= ceilingMs then
+		if not stillMounted or elapsed >= ceilingMs then
 			if self.Config.LogTelemetry then
 				-- What the victim looked like when the pull ended.
 				local state, dist, hostile = "?", -1, "?"
@@ -1021,7 +1026,7 @@ function HorseCollisionMod:PullRiderDown(npc)
 				end)
 
 				self:Log("PullDown " .. self:NameOf(npc)
-						.. " done why=" .. (mounted and "ceiling" or "dismounted")
+						.. " done why=" .. (stillMounted and "ceiling" or "dismounted")
 						.. " atMs=" .. string.format("%.0f", elapsed)
 						.. " polls=" .. tostring(polls)
 						.. " bestCan=" .. tostring(bestCan)
