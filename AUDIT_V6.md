@@ -3694,16 +3694,16 @@ and the section comments number the claims differently from the docstring.
 
 ### tools/audit_code.py
 
-- [ ] `:14-15`, `:143-146`, `:173-175` — "Each found real drift at 5.26.0",
+- [x] `:14-15`, `:143-146`, `:173-175` — "Each found real drift at 5.26.0",
   "Seventeen of them disagreed … at 5.26.0, among them
   `CameraShakeFrequency or 12`", "`ShieldVictimFromEngineDamage` read
   `false`…". — Keep each check's reason; cut the tallies and examples.
-- [ ] `:98` — "reports all eight"; `Tiers.lua` declares nine. — Drop the
+- [x] `:98` — "reports all eight"; `Tiers.lua` declares nine. — Drop the
   count.
-- [ ] `:39-42`, `:272` — `src` and `tools` are relative to the working
+- [x] `:39-42`, `:272` — `src` and `tools` are relative to the working
   directory, so the script only works from the repository root. — Resolve
   from `__file__`, as the other tools do.
-- [ ] `:3` — "judgement". — "judgment".
+- [x] `:3` — "judgement". — "judgment".
 
 ### tools/testworld.py
 

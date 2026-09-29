@@ -1,7 +1,7 @@
 """Mechanical audit of the mod's Lua: settings, functions and tables nobody uses.
 
-Everything here is a fact about the source rather than a judgement about it.
-Three questions, each of which has produced real clutter before:
+Everything here is a fact about the source rather than a judgment about it.
+Three questions:
 
   * **Settings.** A key in `Config` that no file ever reads is dead weight in the
     player's settings file. A key in the settings file that `Config` does not
@@ -12,7 +12,7 @@ Three questions, each of which has produced real clutter before:
     same problem one level up, and bark pools have been left behind this way.
 
 Three more ask the opposite question: not what has no declaration, but what has
-two. Each found real drift at 5.26.0, and each is the kind a reader cannot see.
+two. Each is drift a reader cannot see.
 
   * **Tier tables.** One declared in `Tiers.lua` but missing from the binding
     loop at its foot never reaches `Config`, so `ApplySettings` refuses a
@@ -36,7 +36,9 @@ import os
 import re
 import sys
 
-SRC = "src"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(REPO_ROOT, "src")
+TOOLS = os.path.join(REPO_ROOT, "tools")
 ENTRY = os.path.join(SRC, "HorseCollisionMod.lua")
 SETTINGS = os.path.join(SRC, "HorseCollisionMod_Settings.lua")
 TIERS = os.path.join(SRC, "HorseCollisionMod", "Tiers.lua")
@@ -95,7 +97,7 @@ def tier_tables(text):
     They are settings like any other and the settings file may override them,
     but they are not written in the `Config` literal: `Tiers.lua` declares each
     one beside its derivation and the loop at its foot puts it into `Config`.
-    Reading only the literal reports all eight as keys the settings file
+    Reading only the literal reports every one as a key the settings file
     declares and `Config` does not, which is the opposite of the truth.
     """
     out = {}
@@ -140,10 +142,9 @@ def main():
     #
     # `Config` is a literal and `ApplySettings` never writes a nil into it, so
     # the right-hand side is unreachable. It is not harmless: it is the same
-    # number written twice, and the two drift. Seventeen of them disagreed with
-    # the shipped default at 5.26.0, among them `CameraShakeFrequency or 12`
-    # against a shipped 0.05. It also breaks a boolean setting outright, since
-    # `cfg.Flag or true` reads `true` when the player set `false`.
+    # number written twice, and the two drift. It also breaks a boolean setting
+    # outright, since `cfg.Flag or true` reads `true` when the player set
+    # `false`.
     fallback = re.compile(
             r"(?:self\.Config|cfg)\.(\w+)\s+or\s+"
             r"(-?\d+\.?\d*|true|false|\"[^\"]*\")")
@@ -170,9 +171,7 @@ def main():
     #
     # A player who deletes a line from their settings file falls back to
     # `Config`, so the two disagreeing means the documented default is not the
-    # one the mod runs. `ShieldVictimFromEngineDamage` read `false` in `Config`
-    # while the settings file shipped `true`, which is the difference between a
-    # research switch and the mechanism the damage model rests on.
+    # one the mod runs.
     def scalars(text):
         out = {}
         start = text.index("HorseCollisionMod.Config"
@@ -268,7 +267,7 @@ def main():
 
     tools = ""
 
-    for root, _dirs, names in os.walk("tools"):
+    for root, _dirs, names in os.walk(TOOLS):
         for name in names:
             if name.endswith((".lua", ".py", ".ps1")):
                 tools += read(os.path.join(root, name))
