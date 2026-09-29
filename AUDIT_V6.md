@@ -235,6 +235,10 @@ In this order, each its own commit and ride:
      `RearHorse`; delete `LogActionEnd` and its call, since the standing
      rear never reads `AnimationControlled` and every `ActionEnd` line in
      the log reports the first poll (400 to 432 ms).
+   - `Retaliation.lua`: gate the `SurrenderHint nobody left` and
+     `SurrenderHint left to the game` log lines on `LogTelemetry`; rename
+     the inner `mounted` in `PullRiderDown`'s `attempt`, which shadows the
+     outer one.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
