@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics.
-Next: the impact-throw probe. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe.
+Next: unused sound tokens. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -202,12 +202,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
   be held falls, so the state it watches is not the landing and it cannot
   answer its question.
 
-- [ ] **The impact-throw probe.** `ProbeImpactCost` measures throw distance
-  from `GetWorldPos` (`Health.lua:213-220`, `:262-272`) and runs a rest
-  watcher to log `ImpactThrow` (`:296-348`). Throw distance was closed as
-  not measurable from Lua, and the entity does not follow a ragdoll.
-  Proposal: delete the rest watcher and the `travel=` field; keep the health
-  and state samples, which answer what an impact cost.
+- [x] **The impact-throw probe.** Ruled: `ProbeImpactCost` keeps the health,
+  state, exhaust and armor fields, which answer what an impact cost. Delete
+  the `ImpactThrow` rest watcher (`Health.lua:296-348`, with its unnamed
+  8000 ms ceiling), `origin`, the `travel=` field, and the `z=`/`dz=` fields
+  with `height()` and `baseZ`, all of which read entity position that does
+  not follow a ragdoll.
 
 - [ ] **Unused sound tokens.** `Sound.lua` resolves six tokens; no shipped
   tier names `foley` or `face`. `foley` carries its own table
