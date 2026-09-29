@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 3 done.
+**Phase:** 2 in progress. Batches 0 to 3 done; batch 4 under way.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,9 +30,12 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 4, following **Phase 2 plan** below. Read
-that section in full before starting; it gives the order, the procedure
-for every batch and how each is verified.
+**Next step:** phase 2, batch 4, one source file per commit in the pass
+order below. Done: `src/HorseCollisionMod.lua`. Next:
+`src/HorseCollisionMod_Settings.lua`. Read **Phase 2 plan** below in full
+before starting; it gives the procedure for every batch and how each is
+verified. Code changes found on the way go to batch 3, item 7, applied
+after the comment passes.
 
 **Pass order** (dependencies first, then largest):
 
@@ -203,6 +206,17 @@ In this order, each its own commit and ride:
    the deferral it documents has never happened. Asked of the rider before
    applying. Ride together with item 5: the victim pulls the rider down
    before throwing a punch.
+7. Code changes found during batch 4, applied as one commit after the
+   comment passes, since each deletes code nothing reaches or repeats. L0
+   and L2; no ride.
+   - Entry point: delete the second `ReactionAnimationState` assignment,
+     and the unread `RagdollAnimationState` and `ReactionEndCeilingMs`.
+   - Entry point: delete the `GrantPerks` call in `uiActionListener`;
+     `ApplySettings` already makes it on the same load.
+   - Entry point: `ApplySettings` passes `RagdollStillSpeedThreshold`
+     directly instead of through `local threshold`.
+   - Entry point: delete the `UIEvent` logging block at the head of
+     `uiActionListener`, investigation scaffolding.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -231,7 +245,9 @@ goes to the rider as a question. Includes the ruled comment corrections
   by the build. Test: edit one inline comment, confirm the build refuses,
   revert.
 - Deleted: the four closed-question probes, `tools/legacy/`,
-  `dev_target.lua`, `dev_subject.lua`, with their README rows.
+  `dev_target.lua`, `dev_subject.lua`, with their README rows. Deleting
+  `dev_subject.lua` leaves `HorseCollisionMod.ImmortalSubjects` and its
+  read in `Health.lua` with no writer; delete them in the same commit.
 - Remaining tool **Findings**, file by file.
 
 **Batch 6. Documentation.** *(L0, lint)*
@@ -342,6 +358,13 @@ One line per batch: batch, commit, what was verified.
   slow: the engine runs the accepted request when its brain is ready, 1 to
   5 s here, which this change does not affect. Retaliation switches
   restored afterwards.
+- **Batch 4, `src/HorseCollisionMod.lua`.** Base `5a6a7ed`. L1 `same`;
+  build passes; `audit_code.py` unchanged. Narrative warnings in the file
+  32 to 18; the 18 left are false positives: "the rider" meaning Henry in
+  game, and "before this table exists". The `the rider` rule cannot tell
+  the in-game rider from the tester; review it with the `now` rule before
+  batch 7 promotes either. Header rewritten against the six shipped data
+  files and five tiers. Four code findings moved to batch 3, item 7.
 
 ## Standard
 
@@ -703,126 +726,131 @@ Format: `file:line` — problem — planned edit.
 
 ### src/HorseCollisionMod.lua
 
-- [ ] `:1-66` module header — says three tiers (there are five); lists
+Batch 4: comments applied. Four findings need code and moved to batch 3,
+item 7: the duplicate `ReactionAnimationState`, the second `GrantPerks`, the
+needless `local threshold`, and the `uiActionListener` UI-event logging;
+their comments are corrected here.
+
+- [x] `:1-66` module header — says three tiers (there are five); lists
   `hcm_<set>_fragmentids.xml` and `hcm_<set>_controllerdefs.xml`, which do
   not ship; names `hcm_animationControlledTags.xml` (ships as
   `kcd_animationControlledTags.xml`); says seven data files (six); option
   counts stale. — Rewrite against `build.ps1:474-479`.
-- [ ] `@field` list — truncated or merged entries: `RagdollMinEnergy`,
+- [x] `@field` list — truncated or merged entries: `RagdollMinEnergy`,
   `RagdollDampCeilingMs` carries a fragment of the former. `RiderBlur` and
   `CameraShake` say "a gallop" but apply per tier. `ThrowProfileByTier`
   describes a "brake" or "launch" entry mode; verify against `Tiers.lua`. —
   Correct each against the code.
-- [ ] Config comments — orphans whose settings moved or were removed:
+- [x] Config comments — orphans whose settings moved or were removed:
   "What a trot impact does" (describes `ReactionByTier`), the recovery-line
   delay paragraph above `BarkGapMs`, the retaliation paragraph now above the
   rear settings, "What a collision is worth" above `ImpactSoundByTier`. —
   Delete or move beside the setting they describe.
-- [ ] Config comments — contradict the code: "keep at or below
+- [x] Config comments — contradict the code: "keep at or below
   `HitCooldownMs`" (setting is `HitMinIntervalMs`); "Gallop only: a trot
   knockdown should stay a shove" (trot shake is 0.6); `ShieldWindowMs` has two
   spliced half-sentences. — Correct.
-- [ ] Config comments — narrative throughout (`TickSeconds`, `MaxImpactSpeed`,
+- [x] Config comments — narrative throughout (`TickSeconds`, `MaxImpactSpeed`,
   `BarkCooldownMs`, `ShieldVictimFromEngineDamage`, blur/blood notes). —
   Reduce each to the constraint or derivation.
 
-- [ ] `:895-898` `CameraShake` and `:911` `RiderBlur` — "a gallop impact" and
+- [x] `:895-898` `CameraShake` and `:911` `RiderBlur` — "a gallop impact" and
   "Gallop only: a trot knockdown should stay a shove" contradict the per-tier
   tables. (The shake half is also listed above; fix once.) — Describe per
   tier.
-- [ ] `:980-1077` impact sound block — the layer format
+- [x] `:980-1077` impact sound block — the layer format
   `{ trigger, delay, distance, chance }`, the distance-is-volume paragraph and
   the token paragraph each appear three times, from successive rewrites
   spliced together. Four orphan per-tier paragraphs (walk, trot, gallop, "no
   hoofstep") follow `ImpactSoundDistance` with no setting under them. — One
   copy of each above the per-tier table; tier notes beside
   `ImpactSoundByTier`.
-- [ ] `:1058-1061` `ImpactSoundCrack` — "came out at cartoon volume whatever was
+- [x] `:1058-1061` `ImpactSoundCrack` — "came out at cartoon volume whatever was
   done to it". — State that the 2D event cannot be attenuated.
-- [ ] `:1063-1068` `RiderVocal` — "which is what made every earlier attempt at
+- [x] `:1063-1068` `RiderVocal` — "which is what made every earlier attempt at
   Henry's half unusable". — Cut.
-- [ ] `:1102-1108` `RiderBarkPriority` — "confirmed audible in testing … makes
+- [x] `:1102-1108` `RiderBarkPriority` — "confirmed audible in testing … makes
   the tested configuration the default". — State the constraint (a request
   below the top is discarded) and the value.
-- [ ] `:1110-1136` hit-readiness block — orphan with no setting under it; names
+- [x] `:1110-1136` hit-readiness block — orphan with no setting under it; names
   `HitCooldownStateDriven`, `HitCooldownMs`, `KnockdownRecoveryMs`,
   `HitReadySettleMs` and `HitReadyCeilingMs`, none of which exist anywhere in
   `src/`. A second paragraph ("Which tiers wait…") is spliced on. — Delete.
-- [ ] `:1138-1147` `ImpactDust` — says `arrow_soil` is the chosen effect; the
+- [x] `:1138-1147` `ImpactDust` — says `arrow_soil` is the chosen effect; the
   default is `explosion_dust` and `arrow_soil` is the rear's. "The
   alternatives worth trying" is a note to self. — Correct; cut.
-- [ ] `:1157-1162` `VictimMarks` — "applied at trot and gallop only";
+- [x] `:1157-1162` `VictimMarks` — "applied at trot and gallop only";
   `VictimBloodByTier` carries rear and charge. — Correct.
-- [ ] `:1173` orphan: "How long after the action ends before the displacement
+- [x] `:1173` orphan: "How long after the action ends before the displacement
   is read back." — Delete.
-- [ ] `:1184-1191` `ImpulseDelayMs` — "has been measured throwing one victim
+- [x] `:1184-1191` `ImpulseDelayMs` — "has been measured throwing one victim
   four meters and another none". — State the constraint.
-- [ ] `:1213-1244` ragdoll block — the damping paragraph runs into the brake
+- [x] `:1213-1244` ragdoll block — the damping paragraph runs into the brake
   paragraph with no break, so `RagdollDamping` and `RagdollMinEnergy` sit
   under the brake's text. Eight `RagdollDamp*`, `RagdollSpeedSoftCapSpan` and
   `SettleFragTag` keys have no comment. — Split; document or point to the
   `@field` list.
-- [ ] `:1232` "-- Dynamic Ragdoll Recovery" and `:1255` "-- Native Engine
+- [x] `:1232` "-- Dynamic Ragdoll Recovery" and `:1255` "-- Native Engine
   Ragdoll Stillness" — title-case labels unlike every other comment. The first
   goes with the DynamicRecovery ruling. — Replace with a sentence.
-- [ ] `:1246-1252` `RisePollMs` — "Both were read from `Config` and declared
+- [x] `:1246-1252` `RisePollMs` — "Both were read from `Config` and declared
   nowhere, so `ApplySettings` refused them…". — Keep the first sentence.
-- [ ] Victims are "he" throughout the retaliation and repair docs (`Baseline`,
+- [x] Victims are "he" throughout the retaliation and repair docs (`Baseline`,
   `RepairFloor`, `RepairFightCost`, `CatchYieldImmediately`,
   `RetaliationReleaseMs`); women are victims too. — "they".
-- [ ] `:1344` a stray `--- Last time each entity was reported as a miss` heads
+- [x] `:1344` a stray `--- Last time each entity was reported as a miss` heads
   the `SphereCache` doc; it belongs to `RecentRejections` (`:1374`), which has
   none. `SphereCache` states its budget as "Measured in game it takes…". —
   Move the line; keep the figures as a derivation.
-- [ ] `:1398-1408` `SpeedHistory` — "That would explain a gallop being recorded
+- [x] `:1398-1408` `SpeedHistory` — "That would explain a gallop being recorded
   as a walk" is a hypothesis. — State the purpose.
-- [ ] `:1413-1422` orphan: "How long after a reaction begins the victim is
+- [x] `:1413-1422` orphan: "How long after a reaction begins the victim is
   rebuilt, per tier … Not settings" spliced onto the `ReactionAnimationState`
   doc. — Delete.
-- [ ] **`ReactionAnimationState` is assigned twice**, `:1438` and `:1776`, with
+- [x] **`ReactionAnimationState` is assigned twice**, `:1438` and `:1776`, with
   different docs. — Keep one.
-- [ ] `:1442-1444` orphan: "How long after the rebuild the victim is asked to
+- [x] `:1442-1444` orphan: "How long after the rebuild the victim is asked to
   re-plan". — Delete.
-- [ ] `:1458-1467` `PhysicsReadyMs` — "the readiness probe this replaced …
+- [x] `:1458-1467` `PhysicsReadyMs` — "the readiness probe this replaced …
   Before this, the brake and the damping waited on a probe". — One frame; the
   handover is observed at 16 ms.
-- [ ] `:1469-1477` `RetaliationPollMs` — "The per-tier tables live in Tiers.lua"
+- [x] `:1469-1477` `RetaliationPollMs` — "The per-tier tables live in Tiers.lua"
   is spliced into its doc. — Delete the sentence.
-- [ ] `:1519-1527` `RepairStepValue` — sweep narrative. — One step is 0.1389,
+- [x] `:1519-1527` `RepairStepValue` — sweep narrative. — One step is 0.1389,
   the argument is ignored, the ceiling is 0.8430.
-- [ ] `:1535-1546` `CatchYieldImmediately` — "measured as `YieldCaught…`",
+- [x] `:1535-1546` `CatchYieldImmediately` — "measured as `YieldCaught…`",
   "Turn it on only if a victim is ever seen running". — Constraint only.
-- [ ] `:1576-1582` orphan "How the ragdoll handover is watched…" heads the
+- [x] `:1576-1582` orphan "How the ragdoll handover is watched…" heads the
   `AudioProxyLifetimeMs` doc, which also carries "measured at four
   microseconds". — Move the orphan to `RagdollAnimationState`; trim.
-- [ ] `:1591-1618` the `FallPending` doc is spliced into the middle of the
+- [x] `:1591-1618` the `FallPending` doc is spliced into the middle of the
   `RagdollAnimationStates` doc, so each table sits under the other's text.
   Both are history ("the mod only ever knew the first. Counted over a
   session's log…"; "The readiness cooldown used to prevent this… the diary
   said so"). — Separate; constraint only.
-- [ ] `:1636-1648` `RagdollLandCeilingMs` — "On the fifteen second ceiling that
+- [x] `:1636-1648` `RagdollLandCeilingMs` — "On the fifteen second ceiling that
   victim waited out…". — Keep the 1.9 to 2.9 s derivation.
-- [ ] `:1707-1716` `ApplySettings` — stillness cvars under a title-case comment,
+- [x] `:1707-1716` `ApplySettings` — stillness cvars under a title-case comment,
   with a needless `local threshold`. They overwrite the player's own
   `wh_rd_Still*` cvars on every load. — Tidy; say so in the settings file.
-- [ ] **`GrantPerks` runs twice on every load**: in `ApplySettings` (`:1703`)
+- [x] **`GrantPerks` runs twice on every load**: in `ApplySettings` (`:1703`)
   and again in `uiActionListener` (`:1938`). — Remove one.
-- [ ] `:1720-1758` `AnimationDatabases` doc — "the reason given on
+- [x] `:1720-1758` `AnimationDatabases` doc — "the reason given on
   ImpactProbeSamples above" (it lives in `Health.lua`), "what 2.0.0 shipped",
   "the last point where the mod touched Theresa", a trailing empty `--`. —
   Fix the pointer; cut the history.
-- [ ] `:1784-1790` `AnimationSets` — "it resolves correctly, but … and stops"
+- [x] `:1784-1790` `AnimationSets` — "it resolves correctly, but … and stops"
   reads as a finding. — State the constraint.
-- [ ] `:1860-1897` load-screen reset — "was missed, which is the whole of
+- [x] `:1860-1897` load-screen reset — "was missed, which is the whole of
   why…", "Measured: presses reached the hook at +112 ms…", "the other
   deadline missed when the rear's was fixed". — One sentence: level time
   rewinds on load, so every deadline stamped against it is cleared.
-- [ ] `:543` — "Knockdown impulse. Trot and gallop only"; `ThrowByTier` trims
+- [x] `:543` — "Knockdown impulse. Trot and gallop only"; `ThrowByTier` trims
   `Knockback` and `Uplift` for the charge too (`Reaction.lua:318`). —
   Correct. (Found in the `Armor.lua` pass.)
-- [ ] `:955-958` barding — "Three flat effects rather than one multiplier";
+- [x] `:955-958` barding — "Three flat effects rather than one multiplier";
   damage is a multiplier. — Correct. (Found in the `Armor.lua` pass.)
-- [ ] `:1842-1853` `uiActionListener` logs every UI event whose name contains
+- [x] `:1842-1853` `uiActionListener` logs every UI event whose name contains
   dialog, item, money, msg, surrender or inventory whenever `LogTelemetry` is
   on. Investigation scaffolding. — Remove, or ruling.
 
