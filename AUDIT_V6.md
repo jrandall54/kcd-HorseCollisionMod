@@ -15,7 +15,7 @@ end of every pass, so it always says where the audit stands.
 **Current status:** every source file and every document except the diary
 audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
 `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
-`verify_additive.py` done.
+`verify_additive.py`, `version_check.py`, `set_version.py` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -27,8 +27,8 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `version_check.py`,
-`audit_code.py`, `testworld.py`, `dev_subject.lua`, `set_version.py`, then the rest; `tools/legacy/` last. Then `.claude/`
+**Next pass:** `tools/`, largest first: `audit_code.py`,
+`testworld.py`, `dev_subject.lua`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
 
 **Pass order** (dependencies first, then largest):
@@ -61,8 +61,6 @@ hooks and linter. The carried-forward items belong to it.
 **Carried forward:** findings in one file that point into a file not yet
 audited are listed here, so its pass picks them up.
 
-- `tools/set_version.py:3-5` docstring — "fourteen places", "eleven part
-  files"; it lists the directory, which holds twenty. (From `DEV_LOOP.md`.)
 
 ## Standard
 
@@ -2790,6 +2788,36 @@ and the section comments number the claims differently from the docstring.
 - [ ] `:214-218` — "The table it reads was called STAGGERS … this check
   went unrun for long enough that the rename was not noticed." — Keep the
   first sentence.
+
+### tools/version_check.py
+
+- [ ] `:29-33` `NOT_BREAKING` — nothing reads it; the comment says so
+  ("no longer excuses anything; it is documentation"). — Delete the
+  constant; the changelog marker needs no code.
+- [ ] `:115-119` `implied_bump` docstring — lists major, minor, patch and
+  omits the rule at `:135-139` that a dropped setting is a minor. — Add it.
+- [ ] `:121-128` — "and made ordinary cleanup expensive". — Cut.
+- [ ] `:203-207` — prerelease headings "under this project's workflow"
+  (`4.0.0-dev.1`); `set_version.py` writes plain versions and the changelog
+  holds no prerelease heading. "Matching only a bare x.y.z reported…" is
+  history. — "A prerelease heading counts as the release it precedes."
+- [ ] `:235-243` — "Comparing against the newest tag made a build of the
+  version that had just been tagged fail against itself: 4.6.0 tagged …". —
+  Keep `:232-233` and `:242-243`.
+- [ ] `:220` — `--release` with no value raises `IndexError`. — Report it.
+
+### tools/set_version.py
+
+- [ ] `:3-6` — "fourteen places … each of the eleven part files"; twenty
+  part files carry `@release`. (Carried forward from `DEV_LOOP.md`.) — Drop
+  the counts: "the manifest, `HorseCollisionMod.Version`, and the
+  `@release` tag in every Lua file".
+- [ ] `:8-11` — "because the build reported only the first mismatch it
+  found; that half is fixed in `build.ps1`". — Cut.
+- [ ] `:127-132` — "That was misdiagnosed as a problem with the tables …
+  which was never the cause." — Keep the LDoc failure it prevents.
+- [ ] `:164-165` — "That failure was silent and therefore the worst kind". —
+  Cut.
 
 ### Dead code (`tools/audit_code.py`)
 
