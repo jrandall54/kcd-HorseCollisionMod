@@ -246,7 +246,17 @@ if ($layoutErrors.Count -gt 0) {
 # vertical tab. The result is invisible in an editor and survives review.
 $controlChars = @()
 
-foreach ($tracked in (git ls-files)) {
+# `.claude/` is excluded from git on this machine, so it is walked separately.
+$localFiles = @()
+$claudeDir = Join-Path $repoRoot ".claude"
+
+if (Test-Path $claudeDir) {
+    $localFiles = @(Get-ChildItem $claudeDir -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\__pycache__\\' } |
+        ForEach-Object { $_.FullName.Substring($repoRoot.Length + 1).Replace("\", "/") })
+}
+
+foreach ($tracked in (@(git ls-files) + $localFiles)) {
     if ($tracked -notmatch '\.(md|ps1|py|lua|ld|json|manifest|css|html|xml)$') { continue }
 
     $full = Join-Path $repoRoot $tracked

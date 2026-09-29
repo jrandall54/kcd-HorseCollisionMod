@@ -230,8 +230,8 @@ if ($PrepareShippingTest) {
 		@{ Dir = "Data\Animations\Mannequin\ADB"; Filter = "hcm_*" },
 		@{ Dir = "Data\Animations\Mannequin\ADB"; Names = $claimedVanillaAdb },
 		@{ Dir = "Data\Libs\Config"; Filter = "hcm_*" },
-		@{ Dir = "Data\Libs\Tables\rpg"; Filter = "*horsecollisionmod*" },
-		@{ Dir = "Data\Libs\Tables\text"; Filter = "*horsecollisionmod*" }
+		@{ Dir = "Data\Libs\Tables\rpg"; Filter = "*__horsecollision*" },
+		@{ Dir = "Data\Libs\Tables\text"; Filter = "*__horsecollision*" }
 	)
 
 	$found = @()
@@ -376,6 +376,32 @@ function Get-ShippedAdbFiles {
 	}
 }
 
+# The data overrides the mod ships under Libs, as relative path to source file:
+# mod_assets\Libs, then src\Libs, the order build.ps1 packs them in, so a
+# file in src\Libs wins over a copy of the same path in mod_assets.
+#
+# Tables are read once at startup, so a file that lands here still needs the
+# game restarted before it means anything.
+function Get-ShippedLibsFiles {
+	$map = [ordered]@{}
+
+	foreach ($base in @("mod_assets", "src")) {
+		$dir = Join-Path $repoRoot "$base\Libs"
+
+		if (-not (Test-Path $dir)) {
+			continue
+		}
+
+		$prefix = (Resolve-Path $dir).Path
+
+		foreach ($file in Get-ChildItem -Path $dir -File -Recurse) {
+			$map[$file.FullName.Substring($prefix.Length).TrimStart('\')] = $file.FullName
+		}
+	}
+
+	return $map
+}
+
 # Every loose file the mod owns, as repo source paired with installed target.
 #
 # Split out of Sync-LooseFiles so the verification below checks every file
@@ -433,25 +459,13 @@ function Get-LooseFileMap {
 		}
 	}
 
-	# Everything else under mod_assets\Libs, mirrored by its own relative path,
-	# so a data override anywhere under Libs reaches the loose install as it
-	# reaches the build.
-	#
-	# Tables are read once at startup, so a file that lands here still needs
-	# the game restarted before it means anything.
-	$libsSrc = Join-Path $repoRoot "mod_assets\Libs"
+	$libs = Get-ShippedLibsFiles
 
-	if (Test-Path $libsSrc) {
-		$prefix = (Resolve-Path $libsSrc).Path
-
-		foreach ($file in Get-ChildItem -Path $libsSrc -File -Recurse) {
-			$relative = $file.FullName.Substring($prefix.Length).TrimStart('\')
-
-			$files += @{
-				Half = "Anim"
-				From = $file.FullName
-				To   = Join-Path $Root (Join-Path "Data\Libs" $relative)
-			}
+	foreach ($relative in $libs.Keys) {
+		$files += @{
+			Half = "Anim"
+			From = $libs[$relative]
+			To   = Join-Path $Root (Join-Path "Data\Libs" $relative)
 		}
 	}
 
@@ -564,12 +578,40 @@ function Remove-WithdrawnAnimOverrides {
 #
 # Returns which halves changed, as @{ Script = $bool; Anim = $bool }, so the
 # caller reloads only the subsystem that needs it.
+# Deletes loose table overrides the mod installed once and no longer ships, for
+# the same reason as the animation overrides above. The engine loads every
+# `<table>__<suffix>.xml` it finds, so a withdrawn one goes on adding its rows.
+# Scoped to the mod's own `__horsecollision` suffix.
+function Remove-WithdrawnTableOverrides {
+	param ([string]$Root)
+
+	$shipped = @((Get-ShippedLibsFiles).Keys | ForEach-Object { Split-Path $_ -Leaf })
+
+	foreach ($sub in @("rpg", "text")) {
+		$dir = Join-Path $Root "Data\Libs\Tables\$sub"
+
+		if (-not (Test-Path $dir)) {
+			continue
+		}
+
+		foreach ($file in (Get-ChildItem -Path $dir -Filter "*__horsecollision*" -File)) {
+			if ($shipped -contains $file.Name) {
+				continue
+			}
+
+			Remove-Item $file.FullName -Force
+			Write-Host "[DEPLOY] removed withdrawn override $($file.Name)" -ForegroundColor Yellow
+		}
+	}
+}
+
 function Sync-LooseFiles {
 	param ([string]$Root)
 
 	$changed = @{ Script = $false; Anim = $false }
 
 	Remove-WithdrawnAnimOverrides -Root $Root
+	Remove-WithdrawnTableOverrides -Root $Root
 
 	foreach ($file in (Get-LooseFileMap -Root $Root)) {
 		if (-not (Test-Path $file.From)) {

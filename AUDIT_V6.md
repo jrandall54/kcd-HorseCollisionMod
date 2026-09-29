@@ -31,9 +31,8 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 5, tooling, the last bullet: the remaining
-tool **Findings**, file by file, from `tools/version_check.py`; every
-bullet before it, `build_adb.py`, `dev_console.py` and `verify_additive.py`
-are done (see **Phase 2 log**). Read **Phase 2 plan** below in
+nothing: every tool finding is applied. Close batch 5 (L0 over the whole
+tree, one `flow test`, the log's closing line), then batch 6 (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -671,6 +670,35 @@ One line per batch: batch, commit, what was verified.
   `probe_tables.lua` reads `LineCount`, and run live printed `rows=15` where
   it printed `nil`; `probe_gait_speed.lua` names three gaits. L1 `same` for
   the other nine Lua files, all comment edits.
+- **Batch 5, `.claude/`.** Local and untracked, so absent from the commits
+  except where it touches `build.ps1`. `RELEASING.md` rewritten against
+  `flow.ps1 land`, `flow.ps1 shipping` and `publish_nexus.ps1`'s own
+  verification, with both escape-damaged paths restored;
+  `RESEARCH_BRIEF.md` points at the decompilation guide, history cut;
+  `diary-check.sh` watches `src/` and `tools/`; `pre-merge-commit` execs
+  `pre-commit`; `pre-commit`'s parse check falls back to `luajit -bl` (only
+  LuaJIT is installed here, so it had been checking nothing) and drops the
+  unused `python`; `pre-push` and `HOOKS.md` describe what runs, and the
+  unread `release` is gone. `lint_docs.py` and `build.ps1`'s
+  control-character check walk `.claude/`; `STYLE.md` and `lint_docs.py`
+  are exempt from the prose rules, since each quotes what it rejects. The
+  walk found two unspaced headings in `STYLE.md` and two style hits in the
+  brief, fixed. A form feed planted in `STYLE.md` failed the build; the
+  clean build passes. Every hook passes `bash -n`.
+- **Batch 5, install hygiene.** The deploy mirrored only `mod_assets/Libs`,
+  so `src/Libs`, the tables' source, reached the loose install only by
+  hand, and a stale `mod_assets` copy would have overridden the pak at
+  `sys_PakPriority 0`. It now mirrors both, `src` winning, as the build
+  packs them; the stale `mod_assets/Libs/Tables` copies (identical to
+  `src`) are deleted. Withdrawn `*__horsecollision*` table overrides are
+  removed the way withdrawn animation overrides are, and the park matches
+  the same pattern. The first run removed the three `__horsecollision.xml`
+  tables, which mapped the perks to duplicate abilities 901 to 903, and
+  `Data/Libs/Tables/text/topictorole__horsecollisionmod.xml`, which was not
+  examined before the deploy deleted it: the diary records a `topictorole`
+  override experiment as reverted rather than shipped, so it was that
+  experiment's leftover, and it cannot be recovered. Both take effect at the
+  next game start, since tables are read once.
 - **Batch 5, `verify_additive.py`.** Every finding applied; claim 1 reads
   "claims only the intended vanilla names" here and in the README row; the
   sections number as the docstring does, the tag check as part of claim 3.
@@ -3898,42 +3926,42 @@ it is checked by anything: `.git/info/exclude` excludes `/.claude/`, so
 
 **Wrong or stale:**
 
-- [ ] `RELEASING.md:76` — `releases\file-description` holds a form feed
+- [x] `RELEASING.md:76` — `releases\file-description` holds a form feed
   (0x0C) where `\f` was; `:116-117` — `HorseCollisionMod\nexus.cred` holds a
   line break where `\n` was. The same escaping defect as
   `publish_nexus.ps1:516`. — Restore both backslashes.
-- [ ] `lint_docs.py`, `build.ps1:259` — both enumerate files through git, so
+- [x] `lint_docs.py`, `build.ps1:259` — both enumerate files through git, so
   `.claude/` is never checked. — Have the linter and the control-character
   check also walk `.claude/`.
 - [x] `hooks/diary-check.sh:5`, `:86`; `hooks/pre-commit:21`;
   `hooks/pre-push:8` — cite `.agent_instructions.md`, which no longer
   exists; `AGENTS.md` is the instructions file. — Name `AGENTS.md`, or drop
   the citation.
-- [ ] `hooks/diary-check.sh:35-36` — watches `src/HorseCollisionMod.lua`
+- [x] `hooks/diary-check.sh:35-36` — watches `src/HorseCollisionMod.lua`
   and four tools; the twenty part files, the settings file and `flow.ps1`
   are not watched, so almost every mod change never raises the reminder. —
   Watch `src/` and `tools/` as `flow.ps1 land` does (`:338`).
-- [ ] `hooks/pre-push:15-31`, `HOOKS.md:72-75` — "Four levels" over three,
+- [x] `hooks/pre-push:15-31`, `HOOKS.md:72-75` — "Four levels" over three,
   and a "Releases" level that adds the mod page on a release version; the
   hook runs `pre_release_check.py --merge` only (`:145-150`), and `release`
   (`:94-100`) is computed and never read. `:22` "not older than the source";
   the check regenerates and compares. — Describe what runs; delete
   `release`.
-- [ ] `hooks/pre-merge-commit` — a copy of `pre-commit` without the main
+- [x] `hooks/pre-merge-commit` — a copy of `pre-commit` without the main
   check, printing "pre-commit:". — `exec` `pre-commit`, which already exempts
   a merge through `MERGE_HEAD`.
-- [ ] `hooks/pre-commit:56-60` — parses Lua with `luac` or `luac5.1` only;
+- [x] `hooks/pre-commit:56-60` — parses Lua with `luac` or `luac5.1` only;
   `build.ps1` uses `luajit`. On a machine with only LuaJIT the parse check
   silently does nothing. — Fall back to `luajit -bl`, as
   `dev_console.py:350` does. `:37-38` `python` is set and unused.
-- [ ] `RELEASING.md:8-19` — step 1 bumps the version by hand;
+- [x] `RELEASING.md:8-19` — step 1 bumps the version by hand;
   `set_version.py` and `flow.ps1 land` do it. `:40-42` "Thirty-one checks",
   "the two intended declaration files" (three). `:56-63`, `:103-111` —
   shipping test via `-SetPlayEnvironment` and back via
   `-SetDevEnvironment`; the tooling is `flow.ps1 shipping` and
   `flow.ps1 test`, which also park and restore the loose files. — Rewrite
   against `flow.ps1`, and add `verify_additive.py` per its ruling.
-- [ ] `RESEARCH_BRIEF.md:3-4`, `:16-21` — "Written after a previous run of
+- [x] `RESEARCH_BRIEF.md:3-4`, `:16-21` — "Written after a previous run of
   it lost almost everything"; `:40` points at the flat
   `references/WHGame_Decompiled.c`, where `AGENTS.md` sends engine
   questions to `references/decomp/RESEARCH_GUIDE.md`. — Point at the guide;
@@ -3967,9 +3995,9 @@ covers the hooks' tone; these are the specific lines):
 
 ### Install hygiene (not repository)
 
-- [ ] Game install `Data/Libs/Tables/rpg/` holds stale
+- [x] Game install `Data/Libs/Tables/rpg/` holds stale
   `*__horsecollision.xml` tables (without `mod`) alongside the current ones. —
   Confirm they are unused and remove through the deploy tooling.
-- [ ] `mod_assets/Libs/Tables/rpg/` holds stale generated copies of the perk
+- [x] `mod_assets/Libs/Tables/rpg/` holds stale generated copies of the perk
   tables; the source of truth is `src/Libs/Tables/rpg/`. — Confirm the build
   never reads them; clear.
