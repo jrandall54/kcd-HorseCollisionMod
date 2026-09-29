@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 1 complete, rulings decided. No source file has been edited.
+**Phase:** 2 in progress. Batch 0 done.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,7 +30,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 0, following **Phase 2 plan** below. Read
+**Next step:** phase 2, batch 1, following **Phase 2 plan** below. Read
 that section in full before starting; it gives the order, the procedure
 for every batch and how each is verified.
 
@@ -237,7 +237,16 @@ rider asks.
 
 ### Phase 2 log
 
-One line per batch: batch, commit, what was verified. Empty until batch 0.
+One line per batch: batch, commit, what was verified.
+
+- **Batch 0.** The three horse files moved to `src/Animations/Mannequin/ADB/`;
+  `build.ps1` packs `src/Animations` beside `src/Libs`; `dev_deploy.ps1` reads
+  ADB files from both folders, including in its withdrawn-override cleanup,
+  which would otherwise have deleted the installed horse files. Dev build: zip
+  and pak entry lists and every pak file's bytes identical to v5.31.4;
+  `verify_additive.py` 35 of 35; `lint_docs.py` errors only in this ledger;
+  `audit_code.py` unchanged. The old copies in `mod_assets/` are left for the
+  rider to delete; they are byte-identical and harmless meanwhile.
 
 ## Standard
 
@@ -2672,6 +2681,10 @@ instruction.
   libraries (`:57-64`). — "Check that the game install resolves."
 - [ ] `:282-284` — "-dev and -diag builds skip every check below"; so does
   `-Development` at a plain version (`:285`). — Name both.
+- [ ] The build does not stop on a PowerShell error: a failed pak step still
+  printed "Successfully built" over a broken zip. — Set
+  `$ErrorActionPreference = "Stop"` at the top, then confirm a clean build
+  still passes. Batch 5.
 - [ ] `:249`, `:503` — comment block runs straight on from the closing brace
   with no blank line, unlike every other section. `:632-633` trailing blank
   lines. — Format.

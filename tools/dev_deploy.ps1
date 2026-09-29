@@ -513,6 +513,18 @@ $devDir = Join-Path $modsDir $devMod
 
 Write-Host "[DEPLOY] game: $gameRoot"
 
+# The animation files the mod ships: generated ones from mod_assets and
+# hand-authored ones from src, the same two sources build.ps1 packs.
+function Get-ShippedAdbFiles {
+	foreach ($base in @("mod_assets", "src")) {
+		$dir = Join-Path $repoRoot "$base\Animations\Mannequin\ADB"
+
+		if (Test-Path $dir) {
+			Get-ChildItem -Path $dir -File
+		}
+	}
+}
+
 # Copies the parts of the mod that can be replaced under a running game.
 #
 # Both live under Data, because sys_game_folder is "Data" and that is where
@@ -579,20 +591,17 @@ function Get-LooseFileMap {
 	}
 
 	if ($Anim) {
-		$source = Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB"
-
-		if (-not (Test-Path $source)) {
+		if (-not (Test-Path (Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB"))) {
 			Write-Host "[DEPLOY] no mod_assets yet. Run build.ps1 first." -ForegroundColor Yellow
 		}
-		else {
-			$adbDir = Join-Path $Root "Data\Animations\Mannequin\ADB"
 
-			foreach ($file in Get-ChildItem -Path $source -File) {
-				$files += @{
-					Half = "Anim"
-					From = $file.FullName
-					To   = Join-Path $adbDir $file.Name
-				}
+		$adbDir = Join-Path $Root "Data\Animations\Mannequin\ADB"
+
+		foreach ($file in Get-ShippedAdbFiles) {
+			$files += @{
+				Half = "Anim"
+				From = $file.FullName
+				To   = Join-Path $adbDir $file.Name
 			}
 		}
 	}
@@ -689,7 +698,7 @@ function Test-InstalledFiles {
 
 # Deletes loose animation overrides the mod installed once and no longer ships.
 #
-# A deploy only ever writes, so withdrawing a file from mod_assets leaves the
+# A deploy only ever writes, so withdrawing a file from the shipped set leaves the
 # installed copy behind, still overriding vanilla at sys_PakPriority = 0, and
 # every check downstream passes: the pak is right, the build is right, and the
 # verify pass compares only files the repository still has.
@@ -699,14 +708,14 @@ function Test-InstalledFiles {
 function Remove-WithdrawnAnimOverrides {
 	param ([string]$Root)
 
-	$source = Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB"
 	$installed = Join-Path $Root "Data\Animations\Mannequin\ADB"
 
-	if (-not (Test-Path $source) -or -not (Test-Path $installed)) {
+	if (-not (Test-Path (Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB")) -or
+	    -not (Test-Path $installed)) {
 		return
 	}
 
-	$shipped = @(Get-ChildItem -Path $source -File | ForEach-Object { $_.Name })
+	$shipped = @(Get-ShippedAdbFiles | ForEach-Object { $_.Name })
 
 	foreach ($file in (Get-ChildItem -Path $installed -File | Sort-Object Name)) {
 		if ($shipped -contains $file.Name) {

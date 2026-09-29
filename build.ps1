@@ -411,11 +411,10 @@ if ($partScripts.Count -gt 0) {
     }
 }
 
-# Data overrides live under mod_assets/ mirroring the game's own layout and
-# are copied in wholesale. They are derived from the game's paks, so they are
-# not committed; regenerate them from a local install instead. A fresh clone
-# therefore has no mod_assets/ and would silently build a Lua-only mod, so
-# generate it here rather than leaving that trap for the next person.
+# Generated data overrides live under mod_assets/, mirroring the game's own
+# layout, and are copied in wholesale. They are derived from the game's paks,
+# so they are not committed; a fresh clone has no mod_assets/ and generates it
+# here. Hand-authored data lives under src/ and is copied after it.
 # Tests for the generated file rather than the directory, because a failed or
 # interrupted run can leave mod_assets/ present but empty, which would
 # otherwise skip generation and fail later with a less obvious message.
@@ -442,10 +441,12 @@ if (Test-Path $staleItemData) {
 Write-Host "Including data overrides from mod_assets ..."
 Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 
-$srcLibs = Join-Path $srcDir "Libs"
-if (Test-Path $srcLibs) {
-    New-Item -ItemType Directory -Force -Path "$buildDir\pak\Libs" | Out-Null
-    Copy-Item "$srcLibs\*" -Destination "$buildDir\pak\Libs\" -Recurse -Force
+foreach ($srcDataName in @("Libs", "Animations")) {
+    $srcData = Join-Path $srcDir $srcDataName
+    if (Test-Path $srcData) {
+        New-Item -ItemType Directory -Force -Path "$buildDir\pak\$srcDataName" | Out-Null
+        Copy-Item "$srcData\*" -Destination "$buildDir\pak\$srcDataName\" -Recurse -Force
+    }
 }
 
 # The animation chain needs every one of these present or the stagger silently

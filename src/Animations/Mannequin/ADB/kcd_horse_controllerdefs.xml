@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<ControllerDef>
+  <Tags filename="Animations/Mannequin/ADB/kcd_horse_tags.xml" />
+  <Fragments filename="Animations/Mannequin/ADB/kcd_horse_fragmentids.xml" />
+  <FragmentDefs>
+    <MotionMovement scopes="FullBody" />
+    <MotionIdle scopes="FullBody" />
+    <MotionTurn scopes="FullBody" flags="AutoReinstall" />
+    <MotionJump scopes="FullBody" />
+    <MotionLand scopes="FullBody" />
+    <HitDeath scopes="FullBody" />
+    <Mount scopes="FullBody" />
+    <Dismount scopes="FullBody" />
+    <Rear scopes="FullBody" />
+    <FastStop scopes="FullBody" />
+    <BlendRagdoll scopes="FullBody" />
+    <MotionIdleVAR scopes="FullBody" />
+    <Eating scopes="FullBody" />
+    <MotionIdle_Var scopes="FullBody" />
+    <Exhausted scopes="Head" />
+    <!--
+      Added by HorseCollisionMod. Declaring AnimationControlled in the
+      fragment ids and defining it in the database is not enough: a
+      fragment with no scope here can never play, which is why the horse
+      accepted the call and did nothing. Humans needed no equivalent
+      change because vanilla already declares this fragment for them,
+      for doors and cabinets.
+    -->
+    <AnimationControlled scopes="FullBody" />
+  </FragmentDefs>
+  <ScopeContextDefs>
+    <Char3P />
+    <SlaveChar />
+    <SlaveObject />
+  </ScopeContextDefs>
+  <ScopeDefs>
+    <FullBody layer="0" numLayers="3" context="Char3P" />
+    <Head layer="1" numLayers="3" context="Char3P" />
+    <GroundAlignment3P layer="13" numLayers="1" context="Char3P" />
+    <SlaveChar layer="0" numLayers="3" context="SlaveChar" />
+    <SlaveObject layer="0" numLayers="3" context="SlaveObject" />
+  </ScopeDefs>
+</ControllerDef>

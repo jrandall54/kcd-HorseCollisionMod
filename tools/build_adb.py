@@ -900,18 +900,11 @@ def write_additive():
     keep = set(["hcm_male_database.adb", "hcm_female_database.adb",
                 TAGS_ENTRY.rsplit("/", 1)[-1]])
 
-    # Only files this generator has produced before may be removed.
-    #
-    # Everything else in this directory is hand authored and, because
-    # `mod_assets` is excluded from git, deleting one destroys it outright.
-    # This sweep did exactly that to the horse database and the two horse
-    # declaration files, which carry work no generator can reproduce, and they
-    # were recoverable only because the game folder still held installed
-    # copies.
-    #
-    # The horse set is named rather than pattern matched, so a file this
-    # generator does not know about is left alone by default instead of being
-    # removed by default.
+    # Only files this generator has produced before may be removed. The set is
+    # named rather than pattern matched, so a file this generator does not know
+    # about is left alone rather than deleted; `mod_assets` is not in git, so a
+    # deletion here cannot be recovered. Hand-authored animation data lives in
+    # `src/Animations` and is never in this directory.
     generated = set(["hcm_male_database.adb", "hcm_female_database.adb",
                      "kcd_male_database.adb", "wh_female_database.adb",
                      TAGS_ENTRY.rsplit("/", 1)[-1],
