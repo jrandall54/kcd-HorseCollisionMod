@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 4 done; batch 5 under way.
+**Phase:** 2 in progress. Batches 0 to 5 done.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,11 +30,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 5, tooling, the last bullet: the remaining
-nothing: every tool finding is applied. Close batch 5 (L0 over the whole
-tree, one `flow test`, the log's closing line), then batch 6 (see **Phase 2 log**). Read **Phase 2 plan** below in
-full before starting; it gives the procedure for every batch and how each is
-verified.
+**Next step:** phase 2, batch 6, documentation. Read **Phase 2 plan** below
+in full before starting; it gives the procedure for every batch and how each
+is verified.
 
 **Pass order** (dependencies first, then largest):
 
@@ -705,6 +703,16 @@ One line per batch: batch, commit, what was verified.
   `Scripts.pak` comes from `build_adb.GAME_ROOT`, and a missing one fails
   rather than passing the redirect check on zero classes. 35 of 35 on the
   5.31.4 zip; with `Scripts.pak` hidden from the check, it failed.
+- **Batch 5, complete.** Base `6aa076c`. Every tooling finding and ruling
+  applied, each in its own commit. L0 over the tree: the development build
+  passes; `lint_docs.py`, now walking `.claude/` too, reports no error
+  outside this ledger and 495 warnings (522 at the batch's start);
+  `audit_code.py` reports no unread key, uncalled function or unindexed
+  table; `pre_release_check.py --merge` reports only this ledger and five
+  README layout rows (the three horse files, `check_tiers.lua`,
+  `game_root.ps1`), which batch 6's README layout work absorbs. The game was
+  restarted once, announced, to test the closed-game deploy, and every
+  reload since has loaded clean. No test-world override was left changed.
 
 ## Standard
 
