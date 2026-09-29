@@ -13,7 +13,7 @@ end of every pass, so it always says where the audit stands.
 **Phase:** 1, recording findings. No source file has been edited.
 
 **Current status:** every source file and every document except the diary
-audited; `docs/TECHNICAL_DETAILS.md` was the last.
+audited; tooling pass started, `build.ps1` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -25,8 +25,10 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** tooling: `build.ps1`, then `tools/`, then `.claude/` hooks and
-linter. The carried-forward `verify_additive.py` item belongs to it.
+**Next pass:** `tools/`, largest first: `dev_deploy.ps1`, `build_adb.py`,
+`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
+`verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
+hooks and linter. The carried-forward items belong to it.
 
 **Pass order** (dependencies first, then largest):
 
@@ -262,6 +264,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
 - [ ] **README repository layout.** A player-facing README carries 120 lines
   of developer tooling. Proposal: keep the top-level layout in the README and
   move the `tools/` catalog to `DEV_LOOP.md`.
+
+- [ ] **The stale armor-table sweep.** `build.ps1:431-440` deletes
+  `mod_assets/Scripts/Startup/HorseCollisionMod_ItemData.lua`, a file no
+  build has generated since `5718d08`. It exists only for working copies
+  older than that. Proposal: delete the block; a clean `mod_assets/`
+  regeneration covers the same case.
 
 ## Findings
 
@@ -2310,6 +2318,55 @@ defects are history mixed into it and sections describing removed code.
 - [ ] `:1688` — "the same mechanism third-party perk mods use"; the mod's own
   four `rpg/*__horsecollisionmod.xml` tables use it. — Say so; README
   `:194` depends on it.
+
+### build.ps1
+
+The checks are sound; the defects are history in the comments and one stale
+instruction.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:10-13` `-Development` — "That cost a working session, and the fix
+  belongs here rather than in a habit of bumping the version by hand". — Keep
+  "release checks describe a release; a development deploy is not one".
+- [ ] `:159-162` — "was one 2,558-line file and was split across ten part
+  files", and how the split "would be undone". Twenty part files ship. — Cut;
+  keep `:164-168`, the rule and what the entry point owns.
+- [ ] `:253-256` — "has reached this repository four times: it broke
+  dev_deploy.ps1's build path and corrupted two documented commands. Cheaper
+  to fail the build than to keep noticing it by hand." — Keep the mechanism
+  (`\b`, `\v` written by an escaping tool); cut the tally.
+- [ ] `:312-315` — "which is how twelve files were bumped one at a time". —
+  Keep "reported together; `set_version.py` fixes all of them".
+- [ ] `:465-472` — "which put this mod in the resolution path of every human
+  animation and broke unrelated ones", and `wh_female_fragmentids.xml` "was in
+  this list", "the copy that shipped was the launch one". — State the
+  constraint: never ship `wh_female_fragmentids.xml`, because a copy
+  overrides the patched file and drops its fragment ids.
+- [ ] `:507-508` — "which is what made this bug so slow to spot". — Cut.
+- [ ] `:555-562` — "Same defect as the pak above, and it reached players",
+  "which is why manual testing never caught it". — "Built entry by entry for
+  the same reason as the pak; a backslash entry extracts as one file in 7-Zip
+  and Vortex."
+- [ ] `:576-578` — "and it did once". — Cut.
+- [ ] `:598-612` archive — "which matters more than it first appears", "the
+  one thing worse than a full directory". — Keep the rule: move, never
+  delete, because a tagged release cannot be rebuilt; keep the two names.
+
+**Wrong or stale:**
+
+- [ ] `:454-459` — "the additive layout, which claims no vanilla filename"
+  and "Any file under a vanilla name is a bug"; `:462-464` and the list ship
+  three vanilla-named files. — "No vanilla filename beyond the three
+  declaration files below."
+- [ ] `:426` — "Check the game path at the top of it"; `build_adb.py`
+  resolves the game from `--game-root`, `KCD_PATH`, then the Steam
+  libraries (`:57-64`). — "Check that the game install resolves."
+- [ ] `:282-284` — "-dev and -diag builds skip every check below"; so does
+  `-Development` at a plain version (`:285`). — Name both.
+- [ ] `:249`, `:503` — comment block runs straight on from the closing brace
+  with no blank line, unlike every other section. `:632-633` trailing blank
+  lines. — Format.
 
 ### Dead code (`tools/audit_code.py`)
 
