@@ -13,7 +13,7 @@ end of every pass, so it always says where the audit stands.
 **Phase:** 1, recording findings. No source file has been edited.
 
 **Current status:** every source file and every document except the diary
-audited; tooling pass started, `build.ps1` and `dev_deploy.ps1` done.
+audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -25,8 +25,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `build_adb.py`,
-`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
+**Next pass:** `tools/`, largest first: `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
 `verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
 
@@ -279,6 +278,21 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `-AnimOnly` when the game is up (`flow.ps1:260-266`), so only a direct
   call reaches it. Proposal: with the game running, a full deploy syncs the
   loose files as `-Reload` does and says the pak was left alone.
+
+- [ ] **The horse animation files are not in git.** `hcm_horse_database.adb`,
+  `kcd_horse_fragmentids.xml` and `kcd_horse_controllerdefs.xml` are hand
+  authored (`build_adb.py:905-910`) and live only in the ignored
+  `mod_assets/`. `build.ps1:473-480` requires them, so a fresh clone cannot
+  build, and a lost working copy loses them. `hcm_actionmaps.xml` is already
+  force-tracked there. Proposal: move the three to
+  `src/Animations/Mannequin/ADB/` and copy them into the pak as `src/Libs`
+  is; correct `build.ps1:414-418`, which says everything in `mod_assets` is
+  derived.
+
+- [ ] **Unused get-up options.** `hcm_getup_{forward,back,left,right}`
+  (`build_adb.py:293-296`) ship on both databases and nothing in `src/`
+  requests them; the knockdown chains its get-up inside its own option.
+  Proposal: delete the four.
 
 ## Findings
 
@@ -2453,6 +2467,88 @@ four of them describe behavior that does not exist.
 - [ ] `:1091-1096` — two branches differing only in the argument string. —
   One call.
 - [ ] `:166-171` — four-space indentation in a tab-indented file. — Tabs.
+
+### tools/build_adb.py
+
+The generator is correct; its module docstring and several constant comments
+describe the layout before `wh_female_fragmentids.xml` was withdrawn, and two
+comments contradict the values beside them.
+
+**Wrong or stale:**
+
+- [ ] `:9-29` docstring — "Four files are generated now" and lists three;
+  one is `wh_female_fragmentids.xml`, which is no longer generated (`:785`).
+  Three are generated: the two parent databases and
+  `kcd_animationControlledTags.xml`. "vanilla's 16 FragTags plus this mod's
+  4"; the file adds 19 (17 reactions, 2 horse). "The last two keep vanilla's
+  names"; one does. "Before 2.1.0" is history. — Rewrite from what
+  `write_additive` writes.
+- [ ] `:4` "Vanilla ships 30 options" against `:324` "29 of the 32
+  options". — One figure, from the patched database.
+- [ ] `:170-171` — orphaned comment ("The subTagDef … with four tags
+  added") above `HORSE_TAGS`; it describes `TAGS_ENTRY`. — Move it to
+  `TAGS_ENTRY`; drop the count.
+- [ ] `:185-193` `GENDERS` — "All three are read only" over four keys;
+  `ids` and `ctrl` described as "copied", which nothing does. `ids` and
+  `tags` are referenced by the parent's `FragDef`/`TagDef`; `ctrl` is read
+  by nothing. — Describe `db`, `ids`, `tags`; delete `ctrl`.
+- [ ] `:265-271` — "the settle layer … is left disabled and recovery is
+  driven from Lua"; every `hcm_fall_` option carries the settle layer
+  (`FALL_SETTLE_AT`, `settle_for` `:644-651`). — Cut the paragraph; the fall
+  tier's handover is documented at `:414`.
+- [ ] `:277-291` — the get-up comment ("The recovery half of the
+  knockdown") sits above `hcm_settle`, with the settle comment run on after
+  it. — Put each above its own entries.
+- [ ] `:389-392` — "at zero the clip plays in a flat plane and a body on a
+  slope is buried", above `MCM_ZMOVE = 0`, run together with the
+  `MCM_DECLARE` comment. — Split; state why `ZMove` ships 0 when the
+  comment names 0 as the failure, or cut the claim.
+- [ ] `:443-463` `FALL_SETTLE_AT` — the head-stop derivation and "Both now
+  carry their measured landing"; male left and right ship 2.80 and 2.08, the
+  clip-pose figures `bcd2c31` restored because a head-stop handover gives
+  physics a half-posed body. — Replace with that derivation; keep the
+  clip-length table.
+- [ ] `:653`, `:841` — `hcm_pb_` prefix; no option carries it. — Delete.
+- [ ] `:728` `write_shared_tags` — "Adds the stagger FragTags"; it adds
+  every reaction tag and the horse tags. — Correct.
+- [ ] `:559`, `:573` — "Normalises", "normalised". — American spelling.
+- [ ] `:566` — em dash. — Rephrase.
+- [ ] `:322`, `:877`, `:927` — one blank line between top-level
+  definitions. — Two.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:210-217` — `hcm_shove_*` "existed briefly … Add them back here when
+  the trot tier moves off the physics ragdoll". — Cut.
+- [ ] `:222-223`, `:229` — "since 2.0.0", "Trot, replacing the physics
+  ragdoll"; trot ships `fall`, and `knockdown` is a selectable style no
+  tier uses. — "Knockdown: an animated fall and get-up."
+- [ ] `:329-334` — "An earlier value of None was chosen by matching…". —
+  Keep the collider reason.
+- [ ] `:355-359` — "the physics knockdown the trot tier moved away from". —
+  Cut.
+- [ ] `:386` — "False restores the build before this." — Cut.
+- [ ] `:465-469` — "Handover timing was tested against it". — Cut.
+- [ ] `:532-538` — "a player reported being locked in place picking a herb
+  as Theresa". — Keep "the base pak is the launch game; patches replace whole
+  files".
+- [ ] `:566-567` — "It happened during this fix: the first version of the
+  resolver silently picked 1.7.1b." — Cut.
+- [ ] `:640-642` — "which is what the knockdown tier did from Lua with a
+  timer". — Cut.
+- [ ] `:732-744` — "An earlier layout did that, and unrelated animations
+  stopped playing: the beggar's kneeling…". — Keep "copies of the id and
+  controller files would sit in the resolution path of every human
+  fragment".
+- [ ] `:760-764` — "That has happened … seventy-seven rears that worked,
+  then seventeen". — Keep "regenerating without them deletes them, and an
+  unresolvable fragment is not an error".
+- [ ] `:785-811` — the account of `wh_female_fragmentids.xml`. — Two
+  sentences: it is not generated because patch 1.9 declares the fragment,
+  and a copy would override the patched file; `read_vanilla` resolves
+  through `Data/patch/` so the same mistake raises.
+- [ ] `:907-910` — "This sweep did exactly that to the horse database". —
+  Keep "hand-authored files here are not in git".
 
 ### Dead code (`tools/audit_code.py`)
 
