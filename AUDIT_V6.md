@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 3 done; batch 4 under way.
+**Phase:** 2 in progress. Batches 0 to 4 done; batch 3 items 7 and 8 open.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,11 +30,11 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: every file in the pass order through `Impact.lua`. Next: `Log.lua`. Read **Phase 2 plan**
-below in full before starting; it gives the procedure for every batch and how each is
-verified. Code changes found on the way go to batch 3, item 7, applied
-after the comment passes.
+**Next step:** phase 2, batch 3, items 7 and 8: the code changes batch 4
+found, applied as described under **Batches**. Batch 4 is complete: every
+source file's comments are done, one commit per file. Read **Phase 2 plan**
+below in full before starting; it gives the procedure for every batch and
+how each is verified. Then batch 5.
 
 **Pass order** (dependencies first, then largest):
 
@@ -304,6 +304,23 @@ In this order, each its own commit and ride:
      `Rider.lua` item); drop the `or "Tickle"` and `or 0` fallbacks, since
      every tier has a shipped row; log `none` for a missing speed; drop the
      unused `reason, elapsed` parameters of the `WhenVictimRises` callback.
+   - `Log.lua`: name `LogRejection`'s 1000 ms interval and `TickMs`'s
+     0.016 s floor.
+   - `Tutorial.lua`: `TutorialsShown or {}` once, at load; remove
+     `ShowTutorial`'s `force`, which nothing passes; one named banner
+     duration with the 10500 ms follow-up derived from it; `player` rather
+     than `rawget(_G, "player")`; one banner-to-ability table, beside the
+     `GrantPerks` perk table; delete `CheckMountTutorials` and
+     `CheckMenuTutorials`, calling `QueueNextTutorial` from their callers;
+     blank lines around locals and before `return` as the other modules do.
+   - `Detection.lua`: `EntitiesNearHorse` returns the list only;
+     `GetImpactDir` drops the division by `speed` and the parameter, since
+     its comparisons are scale-free (callers `MarkVictim` and the
+     reaction).
+8. `SphereCacheTravel` 0.8 to 0.7. The footprint's far corner is 1.57 m
+   out, so 0.8 m of travel leaves 0.13 m against the 0.22 m a walking
+   victim covers in `SphereCacheMaxAgeMs`; 0.7 leaves 0.23 m. Costs a few
+   more broad-phase queries; changes no reaction. L0 and L2.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -507,6 +524,10 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Impact.lua`.** L1 `same`. Header rewritten without the
   drift history or step list; the dust, stagger and vocal comments match
   the code.
+- **Batch 4, `Log.lua`.** L1 `same`. The pair rule described as coded; orphan doc deleted.
+- **Batch 4, `Enums.lua`.** L1 `same`.
+- **Batch 4, `Tutorial.lua`.** L1 `same`. Code rework recorded for item 7.
+- **Batch 4, `Detection.lua`.** L1 `same` for it and the entry point. The broad-phase cache margin corrected; a small gap recorded as batch 3, item 8.
 
 ## Standard
 
@@ -2590,103 +2611,111 @@ findings went to batch 3, item 7.
 
 ### src/HorseCollisionMod/Log.lua
 
-- [ ] `:1-5` header — "and the speed tier"; `GetSpeedTier` is in
+Batch 4: applied. The header lists what the file holds; the methods-not-locals reason is stated once. `RecentPeak`'s doc says the peak is the largest of each pair's smaller reading, which is what the code takes; the measurements were already in the diary. The orphan "Current time" doc above `NameOf` is deleted. Code findings went to batch 3, item 7.
+
+- [x] `:1-5` header — "and the speed tier"; `GetSpeedTier` is in
   `Tiers.lua`. "the two log calls"; the file also holds `NameOf`,
   `SpeedTrail`, `ImpactSpeed` and `TickMs`. — Correct the summary.
-- [ ] `:15-16` — `@release` runs straight into `TimeMs`'s doc, and LDoc
+- [x] `:15-16` — `@release` runs straight into `TimeMs`'s doc, and LDoc
   folds it into the module: `TimeMs` is missing from
   `docs/api/modules/HorseCollisionMod.Log.html`. The same merge drops
   `TriggerCollision` from the Update page, confirming the Update and Crime
   findings. — Separate.
-- [ ] `:9-11`, `:19-21`, `:30-31` — why these are methods, three times. —
+- [x] `:9-11`, `:19-21`, `:30-31` — why these are methods, three times. —
   Once, in the header.
-- [ ] `:62-88` `RecentPeak` — "The flaw that fixes is real and the hold
+- [x] `:62-88` `RecentPeak` — "The flaw that fixes is real and the hold
   must stay. What it could not do…", the four-row measurement, "what the
   rider experienced as walking into her", the `WatchLunge` readings of
   21.2 to 25.8 m/s; "neighbouring". — Keep: the peak is the larger of each
   neighbouring pair's minimum, so a one-tick kick off a body cannot set it
   while sustained speed and the samples before a deceleration still do;
   `ChargeForward` applies the same rule. "neighboring".
-- [ ] `:155-163` `ImpactSpeed` — "narrower than it used to claim",
+- [x] `:155-163` `ImpactSpeed` — "narrower than it used to claim",
   "Raising the ceiling from 11.0 to 13.0… changed nothing a rider could
   feel". — Keep: capped against physics spikes, and the speed only picks
   the tier and gives `GetImpactDir` a direction; no force scales by it.
-- [ ] `:182` `LogRejection` — "about twenty times a second"; the interval is
+- [x] `:182` `LogRejection` — "about twenty times a second"; the interval is
   `TickSeconds`. `:197` `1000` unnamed. — Correct; name the interval.
-- [ ] `:206-209` — two blank lines, then an orphan doc ("Current time in
+- [x] `:206-209` — two blank lines, then an orphan doc ("Current time in
   milliseconds", `@treturn`) that LDoc merges into `NameOf`'s. — Delete.
-- [ ] `:250` — `0.016` unnamed. — Name it (one frame at 60 Hz).
+- [x] `:250` — `0.016` unnamed. — Name it (one frame at 60 Hz).
 
 ### src/HorseCollisionMod/Tutorial.lua
 
-- [ ] `:1-6` header — "detailing key controls, standstill requirements,
+Batch 4: comments applied: the header describes the file, the tier lists name the three banners, and the queue doc says what happens without `RequirePerks`. The code findings went to batch 3, item 7.
+
+- [x] `:1-6` header — "detailing key controls, standstill requirements,
   stamina drain, and crime consequences" describes the banner text, not
   the file. — "Shows each maneuver's banner once, when it is first
   available."
-- [ ] `:12`, `:87`, `:131`, `:192` — `TutorialsShown or {}` four times; the
+- [x] `:12`, `:87`, `:131`, `:192` — `TutorialsShown or {}` four times; the
   first runs when the file loads. — Keep `:12`; drop the rest.
-- [ ] `:27`, `:64` `@tparam name` — "etc."; there are three. — Name them.
-- [ ] `:65` `force` — no caller passes it. — Remove the parameter and its
+- [x] `:27`, `:64` `@tparam name` — "etc."; there are three. — Name them.
+- [x] `:65` `force` — no caller passes it. — Remove the parameter and its
   two tests.
-- [ ] `:103`, `:119`, `:158` — the 10 s display and the `10500` ms follow-up
+- [x] `:103`, `:119`, `:158` — the 10 s display and the `10500` ms follow-up
   are separate literals. — One named duration; derive the follow-up from
   it.
-- [ ] `:115`, `:180`, `:185` — summaries past 80 columns; `:187-190`
+- [x] `:115`, `:180`, `:185` — summaries past 80 columns; `:187-190`
   "spammed", "does NOT". — Shorten; plain case.
-- [ ] `:126`, `:195` — `rawget(_G, "player")`. — `player`.
-- [ ] `:134-138`, `:201-205` — the banner-to-ability table twice, and again
+- [x] `:126`, `:195` — `rawget(_G, "player")`. — `player`.
+- [x] `:134-138`, `:201-205` — the banner-to-ability table twice, and again
   as the perk ids in `Rider.lua` `GrantPerks`. — One table, beside the
   Rider perk table.
-- [ ] `:166-170` — without `RequirePerks` only the rear's banner is shown on
+- [x] `:166-170` — without `RequirePerks` only the rear's banner is shown on
   mount; the charge's and the lean's appear on first use
   (`Rear.lua:260`, `Lean.lua:313`). — Say so in the doc.
-- [ ] `:173-183` — `CheckMountTutorials(playerEnt)` ignores its argument, and
+- [x] `:173-183` — `CheckMountTutorials(playerEnt)` ignores its argument, and
   both it and `CheckMenuTutorials` only call `QueueNextTutorial`. — Call
   `QueueNextTutorial` from `Update.lua:160` and
   `HorseCollisionMod.lua:1858`; delete both.
-- [ ] Whole file — no blank line after local declarations or before
+- [x] Whole file — no blank line after local declarations or before
   `return` and control blocks (`:18-19`, `:76-77`, `:95-96`, `:100-101`,
   `:141-148`, `:156-158`), unlike every other module. — Match the mod.
 
 ### src/HorseCollisionMod/Detection.lua
 
-- [ ] `:15-16` — `@release` runs straight into `IsInHorseFootprint`'s doc;
+Batch 4: applied. The cache margin is restated from the footprint's far corner (1.57 m, leaving 0.93 m, of which `SphereCacheTravel` spends 0.8): a walking victim can be picked up one refresh late, and the margin is horizontal only. The entry point's `SphereCache*` docs, which claimed 1.1 m and 0.3 m, corrected in the same commit. Batch 3, item 8 proposes 0.7 m. Code findings went to item 7.
+
+- [x] `:15-16` — `@release` runs straight into `IsInHorseFootprint`'s doc;
   the function is missing from the generated Detection page. — Separate.
-- [ ] `:18-21` — "under a meter wide"; `HorseHalfWidth` is 0.70, a 1.4 m
+- [x] `:18-21` — "under a meter wide"; `HorseHalfWidth` is 0.70, a 1.4 m
   footprint. "what makes collisions feel like they reach too far". — Cut
   the figures; the sphere catches people beside and behind the horse.
-- [ ] `:29-32`, `:118-119` — the diagnostic string is "the most expensive
+- [x] `:29-32`, `:118-119` — the diagnostic string is "the most expensive
   thing in the loop", and `GetEntitiesInSphere` is "the most expensive call
   the mod makes". — Keep the second; the first says only that the string
   is built on request.
-- [ ] `:81-84` — "gating it on `LogTelemetry` instead wrote a line for every
+- [x] `:81-84` — "gating it on `LogTelemetry` instead wrote a line for every
   tick". — Keep the first sentence.
-- [ ] `:101-102` — two blank lines. — One.
-- [ ] `:103-109` `FootprintDetail` — no `@tparam`s. — Add, or refer to
+- [x] `:101-102` — two blank lines. — One.
+- [x] `:103-109` `FootprintDetail` — no `@tparam`s. — Add, or refer to
   `IsInHorseFootprint`.
-- [ ] `:123-128` `EntitiesNearHorse` — the margin is argued from
+- [x] `:123-128` `EntitiesNearHorse` — the margin is argued from
   `HorseFrontReach` plus `MaxSweepExtra` (1.40 m); the footprint's far
   corner is 1.57 m out with `HorseHalfWidth`, leaving 0.93 m against the
   0.8 m `SphereCacheTravel`, and the argument ignores the victim's own
   movement over the 150 ms cache life and the 2.35 m vertical allowance,
   which the sphere does not contain. — State the corner, the margin and
   what it assumes.
-- [ ] `:137` `@treturn boolean` — the caller (`Update.lua:260`) reads one
+- [x] `:137` `@treturn boolean` — the caller (`Update.lua:260`) reads one
   value. — Return the list only.
-- [ ] `:200-204` `GetImpactDir` — divides the velocity by `speed`, which is
+- [x] `:200-204` `GetImpactDir` — divides the velocity by `speed`, which is
   the capped impact speed rather than the velocity's own length; the
   comparisons are scale-free, so the division does nothing. — Drop it and
   the `speed` parameter (callers `MarkVictim`, the reaction).
 
 ### src/HorseCollisionMod/Enums.lua
 
+Batch 4: applied. `Exhausting` added to the no-health strengths, checked against `TypeDefinitions.xml`.
+
 Values checked against `vanilla_scripts/Libs/AI/TypeDefinitions.xml`; all
 match.
 
-- [ ] `:1` header — "used by the collision reaction calls"; `Crime.lua`
+- [x] `:1` header — "used by the collision reaction calls"; `Crime.lua`
   uses both for the combat hit and the offense release. — "used by the
   messages the mod sends".
-- [ ] `:29` — "`Tickle` and `Unpleasant` cost the victim no health"; the
+- [x] `:29` — "`Tickle` and `Unpleasant` cost the victim no health"; the
   type definition gives `Exhausting` as no health loss too. — Add it.
 
 ### README.md

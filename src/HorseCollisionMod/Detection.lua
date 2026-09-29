@@ -12,12 +12,12 @@
 --
 -- @module HorseCollisionMod.Detection
 -- @author jrandall54
+
 --- Tests whether a victim is actually under the horse.
 --
--- The sphere search is a broad-phase cull and nothing more. A horse is about
--- two meters long and under a meter wide, so a sphere around its origin also
--- catches people walking alongside or trailing behind it, which is what makes
--- collisions feel like they reach too far.
+-- The sphere search is a broad-phase cull and nothing more: a sphere around
+-- the horse's origin also catches people walking alongside or trailing
+-- behind it.
 --
 -- This narrows the sphere to an oriented box: the victim must be within the
 -- horse's width laterally, between its rear and front reach along its facing,
@@ -25,10 +25,8 @@
 -- horse travels in one tick so that fast victims are not missed between
 -- frames.
 --
--- The measurements are only formatted when somebody asks for them. This runs
--- for every entity near the horse on every tick, thirty times a second, and
--- building a diagnostic string that is then discarded is the most expensive
--- thing in the loop.
+-- The measurements are only formatted when somebody asks for them, since this
+-- runs for every entity near the horse on every tick.
 --
 -- @tparam table npc victim entity
 -- @tparam table horsePos world position of the horse
@@ -78,9 +76,7 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 			and lateralDistance <= cfg.HorseHalfWidth
 
 	-- Formatted only when it will be read. `DiagnoseMisses` is the switch that
-	-- turns the loop's diagnostics on, and the footprint line is one of them:
-	-- gating it on `LogTelemetry` instead wrote a line for every tick a victim
-	-- stood in range, which is thirty a second in ordinary play.
+	-- turns the loop's diagnostics on, and the footprint line is one of them.
 	if not wantDetail and not cfg.DiagnoseMisses then
 		return inside, nil
 	end
@@ -98,11 +94,11 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 	return inside, detail
 end
 
-
 --- Measurements for a candidate the footprint test rejected.
 --
 -- Same geometry as the test itself rather than a second copy of it, so the
--- numbers reported are the numbers the decision was made on.
+-- numbers reported are the numbers the decision was made on. The parameters
+-- are `IsInHorseFootprint`'s.
 --
 -- @treturn string the distances and the limits they were checked against
 function HorseCollisionMod:FootprintDetail(npc, horsePos, horseForward, speed)
@@ -119,12 +115,16 @@ end
 -- reused until the horse has traveled `SphereCacheTravel`, or the result is
 -- older than `SphereCacheMaxAgeMs`, whichever comes first.
 --
--- That is safe rather than merely cheap. The sphere reaches `HitRadius` and
--- the footprint can never reach beyond `HorseFrontReach` plus `MaxSweepExtra`,
--- so anyone the query did not return is at least the difference away from
--- being hit. Both thresholds are set inside that difference, and keying the
--- refresh on distance traveled rather than on elapsed ticks means the
--- guarantee does not depend on how fast the horse is going.
+-- The sphere reaches `HitRadius`, 2.5 m. The footprint's far corner is
+-- `HorseFrontReach` plus `MaxSweepExtra` ahead and `HorseHalfWidth` across,
+-- about 1.57 m out, so anyone the query did not return is at least 0.93 m
+-- from being hit. `SphereCacheTravel` spends 0.8 m of that, leaving 0.13 m
+-- for the victim's own movement, less than a walking victim covers in
+-- `SphereCacheMaxAgeMs`; such a victim can be picked up one refresh late.
+-- The margin is horizontal: the sphere does not contain the whole
+-- `HorseMaxVerticalDiff` allowance. Keying the refresh on distance traveled
+-- rather than on elapsed ticks keeps the margin independent of the horse's
+-- speed.
 --
 -- A cached entity may have been unstreamed since. Every use of one is already
 -- wrapped, and its position is read fresh each tick, so a stale list costs a
