@@ -413,10 +413,6 @@ class Console(object):
         # sys_DevMode, which is not a CVar in this build at all.
         self.queue("#" + code)
 
-
-    def reload_mod(self):
-        self.lua('Script.ReloadScript("%s")' % MOD_SCRIPT)
-
     def drained(self):
         return not self.outbox
 
@@ -832,17 +828,12 @@ def interactive(console):
     reader.start()
 
     print("commands go to the game. '#' prefix evaluates Lua. Ctrl-C to quit.")
-    print("  :reload   reload the mod's Lua script")
 
     try:
         while console.alive:
             line = input("> ").strip()
 
             if not line:
-                continue
-
-            if line == ":reload":
-                console.reload_mod()
                 continue
 
             console.queue(line)

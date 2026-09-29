@@ -30,8 +30,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 5, tooling, from the second bullet (`:reload`);
-the front door is done (see **Phase 2 log**). Read **Phase 2 plan** below in
+**Next step:** phase 2, batch 5, tooling, from the third bullet (`land`'s
+retry); the front door and `:reload` are done (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -577,6 +577,9 @@ One line per batch: batch, commit, what was verified.
   `flow test` built `5.31.4-dev`, copied nothing, and left the release zip
   alone; `flow test -Launch` relaunched with `-devmode`. L0: build passes;
   `lint_docs.py` errors unchanged (all in this ledger), warnings 522 to 514.
+- **Batch 5, `:reload`.** `reload_mod`, the `:reload` command and its help
+  line deleted; `flow test` is the reload path. `--help` runs; interactive
+  mode connects and passes `:reload` to the game as an ordinary command.
 
 ## Standard
 
