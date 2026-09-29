@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table.
-Next: DEV_LOOP's hook section. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section.
+Next: the balance plan. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -263,10 +263,15 @@ Items that change behavior or delete a feature. Not applied without a decision.
   README that differs. Descriptions become the file's inline comments. The
   README as a whole is expected to be revisited after the audit.
 
-- [ ] **DEV_LOOP's hook section.** `DEV_LOOP.md` is tracked and describes a
+- [x] **DEV_LOOP's hook section.** `DEV_LOOP.md` is tracked and describes a
   pre-push hook whose script lives in the ignored `.claude/hooks/`, so a clone
   can never follow it. Proposal: cut the section; the hooks are local
   workflow and `STYLE.md` keeps those off the remote.
+  **Ruled as proposed.** It also names `.githooks`, which does not exist;
+  the local path is `.claude/hooks`. Delete the subsection (`:33-50`); keep
+  the staleness-sweep scopes and drop their pre-push mention. The rider
+  intends the dev loop to become its own tool for other KCD modders later,
+  once its design generalizes; not work for this audit.
 
 - [ ] **The balance plan.** `docs/BALANCE_AUDIT.md` is a tracked session
   plan whose stages have run. Its figures and derivations already live in the
