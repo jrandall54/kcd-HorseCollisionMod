@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`.
-Next: `VictimFlatFraction`. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`.
+Next: `WhenBodyStops` reads `GetWorldPos`. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -177,12 +177,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   on a gallop or charge hit, the recovery line or retaliation must not
   start while the victim is still down; if it does, this reopens.
 
-- [ ] **`VictimFlatFraction` ships at 0.45 against a derivation for about
-  0.13.** The comment (`Recovery.lua:275-287`) says flat reads 0.04 to 0.10
-  of standing, a rising body 0.17 or more, and that a halfway split refused
-  victims who were visibly getting up. `2910119` raised the value from 0.15
-  to 0.45 without touching the comment. Proposal: find the reason for 0.45
-  in the diary; restore 0.15 or rewrite the derivation for 0.45.
+- [x] **`VictimFlatFraction` ships at 0.45 against a derivation for about
+  0.13.** Ruled: restore 0.15 in the entry point (`:884`) and the settings
+  file (`:421`); the derivation stands. `60f12a2` set 0.15 with the
+  measurement; `2910119`, an unrelated weapon-unequip commit, raised it to
+  0.45 with no reason in the commit or the diary. Publish-test check: a
+  second hit on a victim still down must not snap them upright; if it does,
+  that is the reason for a higher value, and the comment records it.
 
 - [ ] **`WhenBodyStops` reads `GetWorldPos`.** `Reaction.lua:421-428` says
   the entity does not follow a ragdoll and reads `GetCenterOfMassPos`;
