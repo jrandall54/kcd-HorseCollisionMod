@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens.
-Next: the lean's correction throttle. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle.
+Next: `ProtectMutt`. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -214,15 +214,19 @@ Items that change behavior or delete a feature. Not applied without a decision.
   branch in `ResolveTrigger`; the doc above `ImpactTokens` lists the four
   that remain (`body`, `body_armed`, `face_armed`, `blunt`).
 
-- [ ] **The lean's correction throttle is never applied.** `FlipLean`
+- [x] **The lean's correction throttle is never applied.** `FlipLean`
   skips a flip inside `LeanMinFlipMs` unless `force` is set, and every call
   site passes `force = true` (`Lean.lua:368`, `:487`, `:496`, `:526`,
   `:566`), including the hold corrections the throttle exists for. The
   queue-overflow protection that `:238-257` and the entry point's
-  `LeanMinFlipMs` doc describe is therefore off. Proposal: leave `:526`
-  unforced for a `turning` correction and forced only for the expiry
-  refresh; or, if the hold is judged fine as it ships, delete
-  `LeanMinFlipMs`, the `force` parameter and the throttle.
+  `LeanMinFlipMs` doc describe is therefore off. **Ruled:** delete
+  `LeanMinFlipMs` (entry point and settings file), the `force` parameter and
+  the throttle block; no behavior change. `979d124` forced the hold
+  corrections deliberately to fix a snap-back, and the logs attribute
+  animation-queue overflows to many characters, dogs and NPCs among them,
+  including sessions with no lean. The comment at `:238-257` becomes one
+  line: each correction is a shake entry in the rider's sixteen-entry
+  queue, and the deadband keeps the rate down.
 
 - [ ] **`ProtectMutt` has no effect.** `Update.lua:276-279` says dogs
   share the generic NPC class and are found by name; the human filter at
