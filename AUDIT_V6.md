@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files.
-Next: unused get-up options. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options.
+Next: the interactive `:reload`. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -333,10 +333,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
   files exist only in the working copy and the install. `build_adb.py`
   already deleted them once (`:905-910`).
 
-- [ ] **Unused get-up options.** `hcm_getup_{forward,back,left,right}`
+- [x] **Unused get-up options.** `hcm_getup_{forward,back,left,right}`
   (`build_adb.py:293-296`) ship on both databases and nothing in `src/`
   requests them; the knockdown chains its get-up inside its own option.
   Proposal: delete the four.
+  **Ruled as proposed.** The `hcm_settle` comment (`:285-287`) drops its
+  comparison with their rotations.
 
 - [ ] **The interactive `:reload`.** `dev_console.py` interactive mode's
   `:reload` (`reload_mod`, `:417-418`) re-executes only the entry point.
