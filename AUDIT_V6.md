@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path.
-Next: the empty impact pool. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool.
+Next: `HushVanillaBark` clears its own refresh. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -147,11 +147,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `RiderBarkKillAliases`) is unaffected. Resolves the settings file's
   `RiderBark`/`RiderBarks` finding.
 
-- [ ] **The empty impact pool.** `RiderBarkAliases` is empty and `RiderBark`
-  ships false, so `BarkRiderImpact` never sends. Its doc (`Bark.lua:211-297`)
-  says it is kept so a line can be put back. Proposal: keep the mechanism;
-  reduce the doc to what an entry must satisfy (the four filters) and move the
-  survey and audition history to the diary if absent there.
+- [x] **The empty impact pool.** Ruled as proposed: keep
+  `RiderBarkAliases`, `BarkRiderImpact` and `RiderBark`. Reduce the doc
+  (`Bark.lua:211-296`) to what the pool is, that it is empty because an
+  impact gets `PlayRiderVocal`'s grunt and sentences belong to kills, the
+  four filters an entry must pass, and that a candidate is fired and heard
+  in game before it is added. Move any survey or audition history the
+  diary lacks (the survey is already at `TESTING_DIARY.md:21295`).
 
 - [x] **The charge's impact cry is silent.** Ruled: `PainByTier.Charge`
   (`Bark.lua:613`) becomes `HurtDown`, as trot and gallop use; `HurtHard`
