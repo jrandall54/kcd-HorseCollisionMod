@@ -17,7 +17,7 @@ audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
 `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
 `verify_additive.py`, `version_check.py`, `set_version.py`,
 `audit_code.py`, `testworld.py`, `dev_subject.lua`,
-`nexus_settings_block.py`, the bark scripts done.
+`nexus_settings_block.py`, the bark scripts, the probes done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -29,7 +29,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, the `probe_` and `dev_` Lua,
+**Next pass:** `tools/`, the `dev_` Lua,
 `restore_alive.lua`, `testworlds.ini`; `tools/legacy/` last. Then `.claude/`
 hooks and linter.
 
@@ -314,6 +314,16 @@ Items that change behavior or delete a feature. Not applied without a decision.
   manual step. It needs the game install, so it cannot gate a clone's
   build. Proposal: `publish_nexus.ps1` runs it against the zip it is about
   to upload, unless `-Force`.
+
+- [ ] **Probes for closed questions.** Three probes exist to answer a
+  question the project has settled:
+  `probe_fall_landing.lua` measures head-stop landing to set
+  `FALL_SETTLE_AT`, and `bcd2c31` ruled head-stop the wrong criterion;
+  `probe_horse_mass.lua` starts from measuring the throw against victim
+  mass, and throw distance was closed as not measurable from Lua;
+  `probe_recovery_states.lua` searched for a flat-versus-rising signal,
+  which `IsVictimFlat` now implements. Proposal: delete the three, or move
+  them to `tools/legacy/`; the findings live in the diary.
 
 ## Findings
 
@@ -2911,6 +2921,51 @@ plumbing.
   for one is refused."
 - [ ] `npc_pain_sets.py:4-5` — `RANENY_NA_ZEMI` "reads far too strong"; it
   ships as `HurtDown` (`Bark.lua:148`). — Cut the judgment.
+
+### Probe scripts (`tools/probe_*.lua`)
+
+Console diagnostics. Several carry the investigation that produced them as
+their header, and three answer questions that are closed (see the ruling).
+
+**Wrong or stale:**
+
+- [ ] `probe_gait_speed.lua:8-9`, `:13`, `:104` — "the four gaits",
+  "canter ~15 s", "ride walk, trot, canter, then gallop". The horse has three
+  commandable gaits. — Walk, trot, gallop.
+- [ ] `probe_gait_speed.lua:3-7` — cites "Stage 2 step 1 of
+  docs/BALANCE_AUDIT.md" (proposed for deletion), "the 2.0.0 era", "the
+  diary records". — "Samples the mounted horse's speed so each gait's
+  plateau can be read against `SpeedWalk`, `SpeedTrot`, `SpeedGallop`."
+- [ ] `probe_tables.lua:38` — `info.RowCount`; the field is `LineCount`
+  (`dev_subject.lua:149`, `dev_console.py:250`), so the row count prints
+  `nil`. — `LineCount`.
+- [ ] `probe_camera.lua:40-42` — "The horse's own right vector … Taken from
+  the head direction"; the code takes the camera's direction
+  (`GetViewCameraDir`). — "The camera's right vector".
+- [ ] `probe_bark.lua:21` — "The speaker.s voice". — "speaker's".
+- [ ] `probe_bark.lua:103-107`, `:164-165` — "the rider" as the person
+  running the probe. — "you".
+- [ ] `probe_fall_landing.lua:5`, `probe_recovery_states.lua:16-17` — `--`
+  as dashes. — Rephrase.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `probe_api.lua:18-20` — "The counts this found on a 1.9.7 build". —
+  Cut.
+- [ ] `probe_bark.lua:3-26` — "The project had recorded this as
+  impossible … Two faults put it there … Corrected, it works … By ear, Henry
+  speaks…", and "a six candidate run asks the rider to hold six
+  observations … four lines were lost that way". — Keep `:18-20` (audio is
+  the gate, not holding) and "one per run".
+- [ ] `probe_bark.lua:52-53` — "which is how the first attempt at this was
+  wasted". — Cut.
+- [ ] `probe_bark.lua:112-113`, `:34-35` — "of the 1626 souls … 234 are
+  horses", "zero of the 5025 souls". — Keep the class filter's reason; cut
+  the tallies.
+- [ ] `probe_camera.lua:12-14` — "what made a smooth animation look jerky
+  earlier in this project". — "Per-sample logging costs frames."
+- [ ] `probe_health.lua:10-12` — "This lived in the mod as
+  HorseCollisionMod:WatchHealth until 4.9.3". — Cut.
 
 ### Dead code (`tools/audit_code.py`)
 
