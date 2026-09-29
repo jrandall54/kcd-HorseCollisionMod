@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Detection.lua findings recorded and committed.
+**Current status:** every source file audited; Enums.lua was the last.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Enums.lua`.
+**Next pass:** documentation — `README`, then `docs/*.md` except the diary.
 
 **Pass order** (dependencies first, then largest):
 
@@ -49,7 +49,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Log.lua`
 - [x] `Tutorial.lua`
 - [x] `Detection.lua`
-- [ ] `Enums.lua`
+- [x] `Enums.lua`
 - [ ] Documentation: `README`, `docs/*.md` except the diary
 - [ ] Tooling: `build.ps1`, `tools/`, `.claude/` hooks and linter
 
@@ -1904,6 +1904,17 @@ victim is accurate (only men reach the fight branch) and stays.
   the capped impact speed rather than the velocity's own length; the
   comparisons are scale-free, so the division does nothing. — Drop it and
   the `speed` parameter (callers `MarkVictim`, the reaction).
+
+### src/HorseCollisionMod/Enums.lua
+
+Values checked against `vanilla_scripts/Libs/AI/TypeDefinitions.xml`; all
+match.
+
+- [ ] `:1` header — "used by the collision reaction calls"; `Crime.lua`
+  uses both for the combat hit and the offense release. — "used by the
+  messages the mod sends".
+- [ ] `:29` — "`Tickle` and `Unpleasant` cost the victim no health"; the
+  type definition gives `Exhausting` as no health loss too. — Add it.
 
 ### Dead code (`tools/audit_code.py`)
 
