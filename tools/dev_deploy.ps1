@@ -1,46 +1,29 @@
-# Builds the mod and installs it straight into the game, skipping Vortex.
+# Installs the mod straight into the game for development, skipping Vortex.
 #
-# Vortex's deploy step does one thing that matters here: it copies a pak and a
-# manifest into Mods\<name>\ and lists that folder in Mods\mod_order.txt. None
-# of that needs a mod manager, and doing it directly removes four manual steps
-# from every test cycle.
+# Internal to tools\flow.ps1, which is the only thing that calls it. Run
+# `flow.ps1 test`, `flow.ps1 shipping` or `flow.ps1 land` instead; each decides
+# which of these the install's state calls for.
 #
-#   .\tools\dev_deploy.ps1                      build, deploy
-#   .\tools\dev_deploy.ps1 -Reload              push what changed into the running game
-#   .\tools\dev_deploy.ps1 -Launch              build, deploy, start the game
-#   .\tools\dev_deploy.ps1 -NoBuild -Launch     deploy what was built last, start the game
-#   .\tools\dev_deploy.ps1 -Crime               keep riding people down a crime
-#   .\tools\dev_deploy.ps1 -ParkVortexMod       move the Vortex-installed copy aside first
-#   .\tools\dev_deploy.ps1 -GameRoot "D:\..."   use an install somewhere else
-#   .\tools\dev_deploy.ps1 -SetDevEnvironment    switch system.cfg to development values
-#   .\tools\dev_deploy.ps1 -SetPlayEnvironment   switch it back to shipping values
-#   .\tools\dev_deploy.ps1 -PrepareShippingTest  park every loose file and switch to
-#                                               shipping values, to test a release zip
-#   .\tools\dev_deploy.ps1 -RestoreDevEnvironment   put it all back
+#   -Launch                  build, install, start the game with -devmode
+#   -Reload                  copy the loose files that changed, reload them live
+#   -ReleaseSettings         with -Reload: install the shipped world
+#   -SetDevEnvironment       switch system.cfg to development values
+#   -PrepareShippingTest     park every loose file, switch to shipping values
+#   -RestoreDevEnvironment   put it all back
 #
-# The game folder is found automatically: -GameRoot, then the KCD_PATH
-# environment variable, then the usual Steam and GOG install locations.
+# With no switch it builds and installs. That refuses while the game is
+# running, because the engine holds the installed pak open.
 #
-# The release build for Nexus still goes through build.ps1 on its own. This is
-# a development path only, and the folder it writes is never what ships.
+# The game folder is resolved by tools\game_root.ps1. The release build for
+# Nexus goes through build.ps1 on its own; the folder this writes never ships.
 
 param (
-	[string]$GameRoot = "",
-	[string]$Version = "",
-	[switch]$NoBuild,
 	[switch]$Launch,
-	[switch]$ParkVortexMod,
-	[switch]$NoDevMode,
-	[switch]$NoLooseScript,
 	[switch]$Reload,
-	[switch]$ScriptOnly,
-	[switch]$AnimOnly,
 	[switch]$ReleaseSettings,
 	[switch]$SetDevEnvironment,
-	[switch]$SetPlayEnvironment,
 	[switch]$PrepareShippingTest,
-	[switch]$RestoreDevEnvironment,
-	[switch]$Force
+	[switch]$RestoreDevEnvironment
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,95 +33,10 @@ $ErrorActionPreference = "Stop"
 # so the script can be run from anywhere.
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 
-# Where the game is installed. Resolved rather than hardcoded, because a clone
-# only works when this matches, and it matches on exactly one machine.
-#
-# Order: -GameRoot, then KCD_PATH in the environment, then the usual install
-# locations, then every Steam library listed in libraryfolders.vdf, since a
-# Steam install can sit on any drive.
-function Resolve-GameRoot {
-	param ([string]$Explicit)
+. (Join-Path $PSScriptRoot "game_root.ps1")
 
-	# An explicitly given path is authoritative. Falling through to a different
-	# install when it is wrong would deploy somewhere the caller did not mean,
-	# which is a far worse failure than stopping here and saying so.
-	foreach ($source in @(, @("-GameRoot", $Explicit)) + @(, @("KCD_PATH", $env:KCD_PATH))) {
-		$label = $source[0]
-		$given = $source[1]
-
-		if (-not $given) {
-			continue
-		}
-
-		if (Test-Path (Join-Path $given "Bin\Win64\KingdomCome.exe")) {
-			return $given
-		}
-
-		Write-Host "[DEPLOY] $label points at $given" -ForegroundColor Red
-		Write-Host "         but Bin\Win64\KingdomCome.exe is not there."
-		exit 1
-	}
-
-	$candidates = New-Object System.Collections.Generic.List[string]
-
-	$candidates.Add("C:\Games\Kingdom Come - Deliverance")
-	$candidates.Add("C:\Program Files (x86)\Steam\steamapps\common\KingdomComeDeliverance")
-	$candidates.Add("C:\Program Files\Steam\steamapps\common\KingdomComeDeliverance")
-	$candidates.Add("C:\GOG Games\Kingdom Come Deliverance")
-	$candidates.Add("C:\Program Files (x86)\GOG Galaxy\Games\Kingdom Come Deliverance")
-
-	foreach ($key in @("HKLM:\SOFTWARE\WOW6432Node\Valve\Steam",
-			"HKCU:\SOFTWARE\Valve\Steam")) {
-		$install = (Get-ItemProperty -Path $key -Name InstallPath `
-			-ErrorAction SilentlyContinue).InstallPath
-
-		if (-not $install) {
-			continue
-		}
-
-		$vdf = Join-Path $install "steamapps\libraryfolders.vdf"
-
-		if (-not (Test-Path $vdf)) {
-			continue
-		}
-
-		# Valve's key/value text format. Only the "path" entries matter, and
-		# they carry doubled backslashes.
-		$body = Get-Content -Raw $vdf
-
-		foreach ($match in [regex]::Matches($body, '"path"\s+"([^"]+)"')) {
-			$library = $match.Groups[1].Value -replace '\\', '\'
-			$candidates.Add((Join-Path $library "steamapps\common\KingdomComeDeliverance"))
-		}
-
-		break
-	}
-
-	# The executable is what identifies a directory as the game, rather than a
-	# folder that merely exists.
-	foreach ($candidate in $candidates) {
-		if ($candidate -and (Test-Path (Join-Path $candidate "Bin\Win64\KingdomCome.exe"))) {
-			return $candidate
-		}
-	}
-
-	Write-Host "[DEPLOY] no Kingdom Come: Deliverance install found." -ForegroundColor Red
-	Write-Host "         Looked for Bin\Win64\KingdomCome.exe under:"
-
-	foreach ($candidate in $candidates) {
-		Write-Host "           $candidate"
-	}
-
-	Write-Host ""
-	Write-Host "         Point at it with either of:"
-	Write-Host '           .\tools\dev_deploy.ps1 -GameRoot "D:\path\to\game"'
-	Write-Host '           $env:KCD_PATH = "D:\path\to\game"'
-	exit 1
-}
-
-$gameRoot = Resolve-GameRoot -Explicit $GameRoot
+$gameRoot = Resolve-GameRoot
 $modsDir = Join-Path $gameRoot "Mods"
-$parkDir = Join-Path $gameRoot "mods_old"
 $exe = Join-Path $gameRoot "Bin\Win64\KingdomCome.exe"
 
 # A fixed folder name, deliberately not versioned. Vortex names its folders
@@ -156,27 +54,25 @@ $parkedDir = "hcm_dev_parked"
 #
 # Named because a file the mod no longer ships still has to be cleaned out of an
 # install that has it. At sys_PakPriority = 0 a loose override wins, so a
-# withdrawn file goes on overriding vanilla forever and the verify pass calls the
+# withdrawn file goes on overriding vanilla, and the verify pass calls the
 # install correct, because it only checks files the repository still has.
-#
-# That happened with wh_female_fragmentids.xml. It was withdrawn for deleting
-# 103 fragment ids from every female character, the build and the pak were
-# clean, and the stale loose copy sat in the install being read in preference to
-# the game's own.
 $claimedVanillaAdb = @(
-    "kcd_animationControlledTags.xml",
-    "wh_female_fragmentids.xml",
-    "kcd_horse_fragmentids.xml",
-    "kcd_horse_controllerdefs.xml"
+	"kcd_animationControlledTags.xml",
+	"wh_female_fragmentids.xml",
+	"kcd_horse_fragmentids.xml",
+	"kcd_horse_controllerdefs.xml"
 )
+
+function Game-Running {
+	return [bool](Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue)
+}
 
 # ---------------------------------------------------------------------------
 # Which configuration the install is in
 # ---------------------------------------------------------------------------
 
-# Verifying a release switches this install to shipping values, and nothing
-# switches it back, so an install left over from a release is configured for
-# play rather than for development.
+# Testing a release switches this install to shipping values, and an install in
+# that state is configured for play rather than for development.
 #
 # That failure is invisible. At sys_PakPriority = 2 the engine ignores loose
 # files completely and logs nothing about it, so a deploy, a reload and a
@@ -190,26 +86,15 @@ $DevEnvironment = @(
 	   Why = "Mannequin refuses to reload its animation databases" },
 	@{ Name = "log_EnableRemoteConsole"; Dev = "1"; Play = "1"
 	   Why = "dev_console.py has no port to connect to" },
-	# Warhorse's own backend cannot be reached and retries about twice a
-	# second, which was half of every line written to kcd.log and made the
-	# in-game console unreadable. The delay collapses repeats of an identical
-	# line; the mod's own telemetry carries changing numbers on every line and
-	# is not affected.
-	# Development wants every repeat. The overflow message is byte identical for
-	# a given character apart from a pointer, so a delay collapses exactly the
-	# evidence a hunt needs, and the cost is more backend noise in a log that is
-	# already verbose.
+	# Development keeps every repeat. The animation queue overflow message is
+	# byte identical for a given character apart from a pointer, so a delay
+	# collapses exactly the evidence a hunt needs.
 	@{ Name = "log_SpamDelay"; Dev = "0"; Play = "30"
 	   Why = "repeats of an identical engine warning are collapsed" },
 	# The file and the console have separate verbosities, and the file ships at
 	# 0. Every engine warning and error therefore renders on the in-game console
 	# and is never written to kcd.log, which is the only thing this project can
 	# read after the fact.
-	#
-	# That gap is not small. An animation queue overflow was hunted across about
-	# 130 impacts and four tiers, reported as not reproducing, and was on the
-	# rider's console the whole time. The instrument was blind and the negative
-	# result was worthless.
 	@{ Name = "log_WriteToFileVerbosity"; Dev = "3"; Play = "0"
 	   Why = "engine warnings and errors never reach kcd.log" },
 	# Gates the animation warnings, including the queue filling up before it
@@ -288,24 +173,12 @@ function Assert-DevEnvironment {
 	Write-Host "[DEPLOY] this install is not configured for development." -ForegroundColor Red
 	$wrong | ForEach-Object { Write-Host $_ }
 	Write-Host ""
-	Write-Host "         Switch it:  .\tools\dev_deploy.ps1 -SetDevEnvironment"
-	Write-Host "         then restart the game."
-	Write-Host "         -Force deploys anyway, into an install that will ignore it."
-	exit 1
-}
-
-if ($SetDevEnvironment -and $SetPlayEnvironment) {
-	Write-Host "[DEPLOY] pick one of -SetDevEnvironment and -SetPlayEnvironment." -ForegroundColor Red
+	Write-Host "         .\tools\flow.ps1 test switches it; then restart the game."
 	exit 1
 }
 
 if ($SetDevEnvironment) {
 	Set-CfgValues -Root $gameRoot -Which "Dev"
-	exit 0
-}
-
-if ($SetPlayEnvironment) {
-	Set-CfgValues -Root $gameRoot -Which "Play"
 	exit 0
 }
 
@@ -323,12 +196,11 @@ if ($PrepareShippingTest) {
 	# The pak is the one that matters: parking it fails with "the process
 	# cannot access the file", after the loose files have already moved and
 	# before the manifest line that would let the restore find it again. The
-	# result is a half-parked install whose restore cannot put the mod back,
-	# and that is how a mod folder was lost rather than parked.
+	# result is a half-parked install whose restore cannot put the mod back.
 	#
 	# Checked before anything moves, so the install is either untouched or
 	# fully parked.
-	if (Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue) {
+	if (Game-Running) {
 		Write-Host "[DEPLOY] the game is running, so its pak cannot be parked." -ForegroundColor Red
 		Write-Host "         Quit the game and run this again. Nothing was moved."
 		exit 1
@@ -338,11 +210,8 @@ if ($PrepareShippingTest) {
 	New-Item -ItemType Directory -Force $park | Out-Null
 
 	# Where each item came from, so the restore does not have to infer it.
-	#
-	# An existing manifest is kept and appended to. The park is idempotent and
-	# gets run twice whenever the first run refused, and truncating the manifest
-	# on the second run orphaned the 31 items the first run had already moved:
-	# they were still in the park with nothing left to say where they belonged.
+	# Appended rather than rewritten, because the park is rerun after a
+	# refusal and the first run's entries must survive it.
 	$manifest = Join-Path $park "parked.txt"
 
 	if (-not (Test-Path $manifest)) {
@@ -351,27 +220,15 @@ if ($PrepareShippingTest) {
 
 	$moved = 0
 
-	# What gets parked is discovered in the game folder, not listed here.
-	#
-	# A list of names only covers what this script currently deploys, and the
-	# set of files the mod ships changes: the ten part files were added when
-	# the Lua was split, and HorseCollisionMod_ItemData.lua was deployed by an
-	# earlier version of this script and left behind by every list written
-	# since. A single survivor invalidates the whole test, and it does so by
-	# making it pass: at sys_PakPriority 2 the engine ignores loose files, but
-	# the moment the priority is wrong the stale file is read instead of the
-	# pak's copy, and nothing says so.
-	#
-	# So this matches on where the mod puts things rather than on what it is
-	# expected to have put there. Two vanilla file names are listed explicitly
-	# because the mod claims them and they carry no hcm_ prefix.
+	# Matched by location, not by a list of names, because one surviving loose
+	# file masks the pak: the moment sys_PakPriority is wrong, the stale file
+	# is read instead of the pak's copy, and nothing says so. The claimed
+	# vanilla names are listed because they carry no hcm_ prefix.
 	$patterns = @(
 		@{ Dir = "Data\Scripts\Startup"; Filter = "HorseCollisionMod*" },
 		@{ Dir = "Data\Scripts\HorseCollisionMod"; Filter = "*" },
 		@{ Dir = "Data\Animations\Mannequin\ADB"; Filter = "hcm_*" },
-		@{ Dir = "Data\Animations\Mannequin\ADB"
-		   Names = @("kcd_animationControlledTags.xml", "wh_female_fragmentids.xml",
-		             "kcd_horse_fragmentids.xml", "kcd_horse_controllerdefs.xml") },
+		@{ Dir = "Data\Animations\Mannequin\ADB"; Names = $claimedVanillaAdb },
 		@{ Dir = "Data\Libs\Config"; Filter = "hcm_*" },
 		@{ Dir = "Data\Libs\Tables\rpg"; Filter = "*horsecollisionmod*" },
 		@{ Dir = "Data\Libs\Tables\text"; Filter = "*horsecollisionmod*" }
@@ -432,16 +289,13 @@ if ($PrepareShippingTest) {
 	Set-CfgValues -Root $gameRoot -Which "Play"
 
 	Write-Host "[DEPLOY] $moved item(s) parked in $parkedDir."
-	Write-Host "[DEPLOY] install the release zip through Vortex, then launch"
-	Write-Host "         the game normally. No -devmode."
-	Write-Host "[DEPLOY] undo with: .\tools\dev_deploy.ps1 -RestoreDevEnvironment"
 	exit 0
 }
 
 if ($RestoreDevEnvironment) {
 	# Same reason as the park above: the pak cannot be moved back into place
 	# while the game holds the copy it is running from.
-	if (Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue) {
+	if (Game-Running) {
 		Write-Host "[DEPLOY] the game is running, so the pak cannot be restored." -ForegroundColor Red
 		Write-Host "         Quit the game and run this again. Nothing was moved."
 		exit 1
@@ -482,9 +336,7 @@ if ($RestoreDevEnvironment) {
 	}
 
 	# Only the manifest and what it listed may be deleted. The park is a
-	# plain folder inside the game install and things get put there by hand:
-	# a restore that removed the whole tree destroyed a folder of parked
-	# scripts that no manifest ever mentioned, and said nothing about it.
+	# plain folder inside the game install, and things get put there by hand.
 	Remove-Item $manifest -Force -ErrorAction SilentlyContinue
 
 	$leftovers = @(Get-ChildItem $park -Force -ErrorAction SilentlyContinue)
@@ -504,11 +356,10 @@ if ($RestoreDevEnvironment) {
 	exit 0
 }
 
-# Every deploy path runs this, including -ScriptOnly and -AnimOnly, which are
-# the ones most likely to be aimed at an install left in shipping values.
-if (-not $Force) {
-	Assert-DevEnvironment -Root $gameRoot
-}
+# Every deploy path runs this, -Reload included, since that is the one most
+# likely to be aimed at an install left in shipping values.
+Assert-DevEnvironment -Root $gameRoot
+
 $devDir = Join-Path $modsDir $devMod
 
 Write-Host "[DEPLOY] game: $gameRoot"
@@ -525,32 +376,12 @@ function Get-ShippedAdbFiles {
 	}
 }
 
-# Copies the parts of the mod that can be replaced under a running game.
-#
-# Both live under Data, because sys_game_folder is "Data" and that is where
-# the engine's file system is rooted. One level higher is never found, and the
-# failure is quiet: "Loading and executing script file" is logged before the
-# read is attempted and a miss logs nothing.
-#
-# Neither is what ships. The packed copies inside the pak stay exactly as they
-# are; these are only what a running game reads first, and only while
-# sys_PakPriority is 0.
-#
-# Returns which halves were written, as @{ Script = $bool; Anim = $bool }, so
-# the caller reloads only the subsystem that needs it.
 # Every loose file the mod owns, as repo source paired with installed target.
 #
-# Split out of Sync-LooseFiles so the verification below can ask for both
-# halves whatever a given deploy copied. That distinction is the whole point:
-# the failure this guards against is a -ScriptOnly deploy leaving the animation
-# databases stale, which is silent, survives a reload, and makes the running
-# game disagree with the repository while every message says success.
+# Split out of Sync-LooseFiles so the verification below checks every file
+# whatever a given deploy copied.
 function Get-LooseFileMap {
-	param (
-		[string]$Root,
-		[switch]$Script,
-		[switch]$Anim
-	)
+	param ([string]$Root)
 
 	$files = @()
 
@@ -558,78 +389,68 @@ function Get-LooseFileMap {
 	# separate Startup script, so a settings edit that is not copied leaves the
 	# running game reading the packed values while the edited file sits on disk
 	# looking applied.
-	if ($Script) {
-		$startup = Join-Path $Root "Data\Scripts\Startup"
+	$startup = Join-Path $Root "Data\Scripts\Startup"
 
-		foreach ($name in @("HorseCollisionMod.lua", "HorseCollisionMod_Settings.lua")) {
+	foreach ($name in @("HorseCollisionMod.lua", "HorseCollisionMod_Settings.lua")) {
+		$files += @{
+			Half = "Script"
+			From = Join-Path $repoRoot "src\$name"
+			To   = Join-Path $startup $name
+		}
+	}
+
+	# The part files the entry point pulls in with Script.ReloadScript.
+	# They sit beside Scripts\Startup rather than in it, because that
+	# folder is enumerated and executed by the engine. Walked rather than
+	# named, so a new part needs no change here. A missing part does not
+	# fail loudly: the entry point loads, the methods it expected are nil,
+	# and the mod silently does less.
+	$partsSrc = Join-Path $repoRoot "src\HorseCollisionMod"
+
+	if (Test-Path $partsSrc) {
+		$partsDest = Join-Path $Root "Data\Scripts\HorseCollisionMod"
+
+		foreach ($part in (Get-ChildItem -Path $partsSrc -Filter *.lua -File | Sort-Object Name)) {
 			$files += @{
 				Half = "Script"
-				From = Join-Path $repoRoot "src\$name"
-				To   = Join-Path $startup $name
-			}
-		}
-
-		# The part files the entry point pulls in with Script.ReloadScript.
-		# They sit beside Scripts\Startup rather than in it, because that
-		# folder is enumerated and executed by the engine. Walked rather than
-		# named, so a later slice needs no change here. A missing part does not
-		# fail loudly: the entry point loads, the methods it expected are nil,
-		# and the mod silently does less.
-		$partsSrc = Join-Path $repoRoot "src\HorseCollisionMod"
-
-		if (Test-Path $partsSrc) {
-			$partsDest = Join-Path $Root "Data\Scripts\HorseCollisionMod"
-
-			foreach ($part in (Get-ChildItem -Path $partsSrc -Filter *.lua -File | Sort-Object Name)) {
-				$files += @{
-					Half = "Script"
-					From = $part.FullName
-					To   = Join-Path $partsDest $part.Name
-				}
+				From = $part.FullName
+				To   = Join-Path $partsDest $part.Name
 			}
 		}
 	}
 
-	if ($Anim) {
-		if (-not (Test-Path (Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB"))) {
-			Write-Host "[DEPLOY] no mod_assets yet. Run build.ps1 first." -ForegroundColor Yellow
+	if (-not (Test-Path (Join-Path $repoRoot "mod_assets\Animations\Mannequin\ADB"))) {
+		Write-Host "[DEPLOY] no mod_assets yet. Run build.ps1 first." -ForegroundColor Yellow
+	}
+
+	$adbDir = Join-Path $Root "Data\Animations\Mannequin\ADB"
+
+	foreach ($file in Get-ShippedAdbFiles) {
+		$files += @{
+			Half = "Anim"
+			From = $file.FullName
+			To   = Join-Path $adbDir $file.Name
 		}
+	}
 
-		$adbDir = Join-Path $Root "Data\Animations\Mannequin\ADB"
+	# Everything else under mod_assets\Libs, mirrored by its own relative path,
+	# so a data override anywhere under Libs reaches the loose install as it
+	# reaches the build.
+	#
+	# Tables are read once at startup, so a file that lands here still needs
+	# the game restarted before it means anything.
+	$libsSrc = Join-Path $repoRoot "mod_assets\Libs"
 
-		foreach ($file in Get-ShippedAdbFiles) {
+	if (Test-Path $libsSrc) {
+		$prefix = (Resolve-Path $libsSrc).Path
+
+		foreach ($file in Get-ChildItem -Path $libsSrc -File -Recurse) {
+			$relative = $file.FullName.Substring($prefix.Length).TrimStart('\')
+
 			$files += @{
 				Half = "Anim"
 				From = $file.FullName
-				To   = Join-Path $adbDir $file.Name
-			}
-		}
-	}
-
-	# Everything else under mod_assets\Libs, mirrored by its own relative path.
-	#
-	# This used to name `Libs\Config` alone, for the action map the rear key
-	# needs, and so a data override anywhere else was written into the build and
-	# never into a loose install. A table override sat in the repository,
-	# deployed without complaint, and was simply absent from the running game.
-	# Walking the tree keeps the two in step whatever is added next.
-	#
-	# Note that tables are read once at startup, so a file that lands here still
-	# needs the game restarted before it means anything.
-	if ($Anim) {
-		$libsSrc = Join-Path $repoRoot "mod_assets\Libs"
-
-		if (Test-Path $libsSrc) {
-			$prefix = (Resolve-Path $libsSrc).Path
-
-			foreach ($file in Get-ChildItem -Path $libsSrc -File -Recurse) {
-				$relative = $file.FullName.Substring($prefix.Length).TrimStart('')
-
-				$files += @{
-					Half = "Anim"
-					From = $file.FullName
-					To   = Join-Path $Root (Join-Path "Data\Libs" $relative)
-				}
+				To   = Join-Path $Root (Join-Path "Data\Libs" $relative)
 			}
 		}
 	}
@@ -637,60 +458,53 @@ function Get-LooseFileMap {
 	return $files
 }
 
-# Reports any installed loose file whose bytes differ from the repository.
+function Test-SameBytes {
+	param ([string]$A, [string]$B)
+
+	if (-not (Test-Path $B)) {
+		return $false
+	}
+
+	return (Get-FileHash $A -Algorithm SHA256).Hash -eq (Get-FileHash $B -Algorithm SHA256).Hash
+}
+
+# Reports any installed loose file whose bytes differ from the repository, so a
+# deploy that reports success cannot leave the running game executing
+# something the repository no longer contains.
 #
-# This exists because a deploy can succeed, print nothing but success, reload
-# the running game, and still leave it executing something the repository no
-# longer contains. That happened with -ScriptOnly after an animation database
-# was reverted: the revert never reached the install, two test rides were spent
-# against a fragment believed to be gone, and the symptom was read as new
-# behavior rather than as stale data.
-#
-# Both halves are always checked, whatever the deploy copied, since the whole
-# failure is a half that was not copied. Hashes rather than timestamps, because
-# a copy can be newer and still be the wrong bytes.
+# Hashes rather than timestamps, because a copy can be newer and still be the
+# wrong bytes.
 #
 # @return the number of files that do not match
 function Test-InstalledFiles {
 	param ([string]$Root)
 
-	$stale = 0
-	$missing = 0
+	$bad = 0
 
-	foreach ($file in (Get-LooseFileMap -Root $Root -Script -Anim)) {
+	foreach ($file in (Get-LooseFileMap -Root $Root)) {
 		if (-not (Test-Path $file.From)) {
 			continue
 		}
 
 		if (-not (Test-Path $file.To)) {
 			Write-Host "[VERIFY] missing  $(Split-Path -Leaf $file.To)" -ForegroundColor Red
-			$missing++
+			$bad++
 			continue
 		}
 
-		# Every installed file now matches the repository byte for byte,
-		# including the settings. The testing world is a separate file written
-		# beside them rather than a rewrite of them, so there is nothing left
-		# to normalize away and nothing this check has to forgive.
-		$from = (Get-FileHash $file.From -Algorithm SHA256).Hash
-		$to = (Get-FileHash $file.To -Algorithm SHA256).Hash
-
-		if ($from -ne $to) {
+		if (-not (Test-SameBytes $file.From $file.To)) {
 			Write-Host "[VERIFY] STALE    $(Split-Path -Leaf $file.To)" -ForegroundColor Red
 			Write-Host "         installed does not match $($file.From)" -ForegroundColor Red
-			$stale++
+			$bad++
 		}
 	}
-
-	$bad = $stale + $missing
 
 	if ($bad -eq 0) {
 		Write-Host "[VERIFY] installed files match the repository."
 	}
 	else {
 		Write-Host "[VERIFY] $bad file(s) do not match. The running game is not" -ForegroundColor Red
-		Write-Host "         what the repository says. Re-run without -ScriptOnly" -ForegroundColor Red
-		Write-Host "         or -AnimOnly to sync every half." -ForegroundColor Red
+		Write-Host "         what the repository says." -ForegroundColor Red
 	}
 
 	return $bad
@@ -733,37 +547,37 @@ function Remove-WithdrawnAnimOverrides {
 	}
 }
 
+# Copies the loose files whose bytes differ from the installed copy.
+#
+# They live under Data, because sys_game_folder is "Data" and that is where
+# the engine's file system is rooted. One level higher is never found, and the
+# failure is quiet: "Loading and executing script file" is logged before the
+# read is attempted and a miss logs nothing.
+#
+# None of them is what ships. The packed copies inside the pak stay exactly as
+# they are; these are only what a running game reads first, and only while
+# sys_PakPriority is 0.
+#
+# Compared by content rather than by timestamp: a regeneration rewrites every
+# database whether or not the bytes moved, and a Mannequin reload is a visible
+# hitch in the running game.
+#
+# Returns which halves changed, as @{ Script = $bool; Anim = $bool }, so the
+# caller reloads only the subsystem that needs it.
 function Sync-LooseFiles {
-	param (
-		[string]$Root,
-		[switch]$Script,
-		[switch]$Anim,
-		[switch]$ChangedOnly
-	)
+	param ([string]$Root)
 
 	$changed = @{ Script = $false; Anim = $false }
-	$files = Get-LooseFileMap -Root $Root -Script:$Script -Anim:$Anim
 
-	if ($Anim) {
-		Remove-WithdrawnAnimOverrides -Root $Root
-	}
+	Remove-WithdrawnAnimOverrides -Root $Root
 
-	foreach ($file in $files) {
+	foreach ($file in (Get-LooseFileMap -Root $Root)) {
 		if (-not (Test-Path $file.From)) {
 			continue
 		}
 
-		# Compared by content rather than by timestamp. build.ps1 regenerates
-		# every animation database on each run whether or not the bytes moved,
-		# and a Mannequin reload is a visible hitch in the running game, so a
-		# rebuild that changed nothing should not cause one.
-		if ($ChangedOnly -and (Test-Path $file.To)) {
-			$from = (Get-FileHash $file.From -Algorithm SHA256).Hash
-			$to = (Get-FileHash $file.To -Algorithm SHA256).Hash
-
-			if ($from -eq $to) {
-				continue
-			}
+		if (Test-SameBytes $file.From $file.To) {
+			continue
 		}
 
 		$dir = Split-Path -Parent $file.To
@@ -776,25 +590,13 @@ function Sync-LooseFiles {
 		Write-Host "[DEPLOY] updated $(Split-Path -Leaf $file.To)"
 		$changed[$file.Half] = $true
 
-		# The action map is read once, at startup, and never again.
-		#
-		# Rear.lua guards ActionMapManager.LoadFromXML behind a flag set the
-		# first time it succeeds, because re-reading a file whose map is already
-		# registered registers every action a second time and one press then
-		# arrives twice over. So a script reload cannot pick up a new action, and
-		# a key added to this file is silently dead until the game is restarted.
-		#
-		# Worth a line rather than a ride: a lean was added on two new keys,
-		# deployed into a running game, reported as doing nothing, and the log
-		# read loaded=true from the flag rather than from the new file.
-		if ((Split-Path -Leaf $file.To) -eq "hcm_actionmaps.xml") {
-			$running = @(Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue).Count -gt 0
-
-			if ($running) {
-				Write-Host "[DEPLOY] hcm_actionmaps.xml changed while the game is running." -ForegroundColor Yellow
-				Write-Host "[DEPLOY] Action maps are read once at startup, so any new key is" -ForegroundColor Yellow
-				Write-Host "[DEPLOY] dead until the game is restarted." -ForegroundColor Yellow
-			}
+		# The action map is read once, at startup. Rear.lua loads it behind a
+		# flag, because loading a registered map again registers every action a
+		# second time, so a script reload cannot pick up a new key.
+		if ((Split-Path -Leaf $file.To) -eq "hcm_actionmaps.xml" -and (Game-Running)) {
+			Write-Host "[DEPLOY] hcm_actionmaps.xml changed while the game is running." -ForegroundColor Yellow
+			Write-Host "[DEPLOY] Action maps are read once at startup, so any new key is" -ForegroundColor Yellow
+			Write-Host "[DEPLOY] dead until the game is restarted." -ForegroundColor Yellow
 		}
 	}
 
@@ -803,22 +605,24 @@ function Sync-LooseFiles {
 	# `HorseCollisionMod_TestWorld.lua` loads after the settings file because
 	# startup scripts run in name order, and assigns into the same global, so
 	# the mod applies it through ApplySettings with the same type checking and
-	# without knowing it exists. That is what keeps it out of a release: the
-	# build packs from src\, which never holds it.
+	# without knowing it exists. The build packs from src\, which never holds
+	# it, so it cannot ship; the repository's settings file cannot carry a
+	# testing value, because it does ship.
 	#
-	# This has to happen between the copy and the reload the caller runs next.
-	# The repository's settings file cannot carry a testing value, because
-	# build.ps1 rejects a release that ships CollisionIsCrime = false, and
-	# writing after the reload is too late: the value the engine already read
-	# is the one a later save load keeps.
-	#
-	# Run unconditionally rather than only when a script moved. The world
-	# depends on `.hcm_testworld` as well as on the files, so a deploy that
-	# changes no script but does change the world still has to write it.
+	# Written before the caller's reload: a value written after it is not the
+	# one the engine read, and not the one a later save load keeps. A changed
+	# world counts as a changed script, so a world switch alone still reloads.
 	#
 	# -ReleaseSettings asks for the shipped world, which is the world with no
 	# overrides in it, and is what a branch wants once it stops being tested.
 	$worldTool = Join-Path $PSScriptRoot "testworld.py"
+	$worldFile = Join-Path $Root "Data\Scripts\Startup\HorseCollisionMod_TestWorld.lua"
+
+	$before = $null
+
+	if (Test-Path $worldFile) {
+		$before = (Get-FileHash $worldFile -Algorithm SHA256).Hash
+	}
 
 	if ($ReleaseSettings) {
 		Write-Host "[DEPLOY] release settings: the installed world is the shipped one"
@@ -828,12 +632,20 @@ function Sync-LooseFiles {
 		& python $worldTool --write $Root | Out-String | Write-Host -NoNewline
 	}
 
+	$after = $null
+
+	if (Test-Path $worldFile) {
+		$after = (Get-FileHash $worldFile -Algorithm SHA256).Hash
+	}
+
+	if ($before -ne $after) {
+		$changed.Script = $true
+	}
+
 	return $changed
 }
 
-# Reloads the halves that were written. The console commands are known here, so
-# printing them to be pasted into a second shell would put a manual step in the
-# middle of a loop that is run many times in a testing session.
+# Reloads the halves that were written, through the remote console.
 function Invoke-LiveReload {
 	param ([hashtable]$Changed)
 
@@ -853,7 +665,7 @@ function Invoke-LiveReload {
 
 	# Nothing to reload into. The files are in place and the engine reads them
 	# at startup, so this is a note rather than a failure.
-	if (-not (Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue)) {
+	if (-not (Game-Running)) {
 		Write-Host "[DEPLOY] the game is not running. The files are in place for the next start."
 		return
 	}
@@ -862,26 +674,13 @@ function Invoke-LiveReload {
 	& python (Join-Path $repoRoot "tools\dev_console.py") @flags
 }
 
-# The inner loops: push what changed, then reload it from the console. Both
-# deliberately skip the running-game guard below, because that guard is about
-# the pak, which the engine holds open. A loose file is not locked and can be
-# replaced underneath a running game.
-if ($Reload -or $ScriptOnly -or $AnimOnly) {
-	# -Reload is the everyday form: it works out which halves moved and reloads
-	# those. -ScriptOnly and -AnimOnly name one half and skip the comparison,
-	# which is what is wanted when a file has been reverted to a state matching
-	# the copy already installed, or when only one subsystem should be
-	# disturbed.
-	$named = $ScriptOnly -or $AnimOnly
+# The inner loop: copy what changed, then reload it from the console. A loose
+# file is not locked, so it can be replaced underneath a running game.
+if ($Reload) {
+	$changed = Sync-LooseFiles -Root $gameRoot
 
-	$changed = Sync-LooseFiles -Root $gameRoot `
-		-Script:($ScriptOnly -or -not $named) `
-		-Anim:($AnimOnly -or -not $named) `
-		-ChangedOnly:(-not $named)
-
-	# Verified before the reload, not after, so a stale half is named while
-	# there is still a chance to act on it rather than after the game has been
-	# told to reload something that did not move.
+	# Verified before the reload, not after, so a stale file is named while
+	# there is still a chance to act on it.
 	$bad = Test-InstalledFiles -Root $gameRoot
 
 	if (-not ($changed.Script -or $changed.Anim)) {
@@ -898,83 +697,49 @@ if ($Reload -or $ScriptOnly -or $AnimOnly) {
 	exit 0
 }
 
-# Read the version from the manifest when none is given, so the two cannot
-# drift apart and deploy a build that is not the one just made.
-if ($Version -eq "") {
-	$manifest = [xml](Get-Content (Join-Path $repoRoot "src\mod.manifest"))
-	$Version = $manifest.kcd_mod.info.version
-	Write-Host "[DEPLOY] version from mod.manifest: $Version"
+# A full deploy replaces Mods\HorseCollisionMod_dev, whose pak the engine holds
+# open while the game runs. Refused before anything is built or touched; flow.ps1
+# uses -Reload for a running game.
+if (Game-Running) {
+	Write-Host "[DEPLOY] the game is running, so its pak cannot be replaced." -ForegroundColor Red
+	Write-Host "         .\tools\flow.ps1 test reloads the loose files instead. Nothing was changed."
+	exit 1
 }
 
-if (-not $NoBuild) {
-	# -Development, because this installs and never ships. Without it the
-	# build applies the release gate -- version against changelog and
-	# manifest, documentation staleness -- and refuses to deploy over work that
-	# has been written into [Unreleased] but not yet versioned, which is the
-	# normal state of a branch being tested.
-	& powershell.exe -ExecutionPolicy Bypass `
-		-File (Join-Path $repoRoot "build.ps1") -Version $Version -Development
-	if ($LASTEXITCODE -ne 0) {
-		Write-Host "[DEPLOY] build failed, nothing deployed" -ForegroundColor Red
-		exit 1
-	}
+# Built as a prerelease of the manifest's version, so the deploy never
+# overwrites releases\HorseCollisionMod_v<version>.zip, which is the released
+# artifact once that version is tagged.
+$manifest = [xml](Get-Content (Join-Path $repoRoot "src\mod.manifest"))
+$Version = "$($manifest.kcd_mod.info.version)-dev"
+
+# -Development, because this installs and never ships. Without it the build
+# applies the release gate (version against changelog and manifest,
+# documentation staleness) and refuses to deploy over work that has been
+# written into [Unreleased] but not yet versioned, which is the normal state of
+# a branch being tested.
+& powershell.exe -ExecutionPolicy Bypass `
+	-File (Join-Path $repoRoot "build.ps1") -Version $Version -Development
+
+if ($LASTEXITCODE -ne 0) {
+	Write-Host "[DEPLOY] build failed, nothing deployed" -ForegroundColor Red
+	exit 1
 }
 
 $zip = Join-Path $repoRoot "releases\HorseCollisionMod_v$Version.zip"
 
 if (-not (Test-Path $zip)) {
 	Write-Host "[DEPLOY] no build at $zip" -ForegroundColor Red
-	Write-Host "         run without -NoBuild, or pass the -Version that was built."
 	exit 1
-}
-
-# A development deploy writes into the running game deliberately.
-#
-# This used to refuse outright, on the stated grounds that the engine holds its
-# paks open. That is true of the shipping layout and irrelevant to this one: a
-# development install runs at sys_PakPriority 0 and loads loose files, which
-# nothing holds open, and reloading them from the console is the whole point of
-# the loop. The refusal did not protect anything, and the only way past it was
-# to kill the game, which from the rider's side is indistinguishable from a
-# crash and cost several rides.
-#
-# The pak case is still real, so the refusal is kept for it. -PrepareShippingTest
-# has its own handling further up, and a shipping-configured install is caught by
-# Assert-DevEnvironment before reaching here.
-$running = Get-Process -Name "KingdomCome" -ErrorAction SilentlyContinue
-
-if ($running) {
-	Write-Host "[DEPLOY] the game is running. Writing loose files into it." -ForegroundColor Yellow
-	Write-Host "         Reload from the console to pick them up, or load a save."
 }
 
 # Vortex installed its own copy under a versioned folder name. Two folders both
 # providing Scripts/Startup/HorseCollisionMod.lua is decided by mod_order, which
 # is a confusing way to find out which build is actually being tested.
-$stale = Get-ChildItem -Path $modsDir -Directory -ErrorAction SilentlyContinue |
+$others = Get-ChildItem -Path $modsDir -Directory -ErrorAction SilentlyContinue |
 	Where-Object { $_.Name -like "HorseCollisionMod*" -and $_.Name -ne $devMod }
 
-if ($stale) {
-	foreach ($s in $stale) {
-		if ($ParkVortexMod) {
-			if (-not (Test-Path $parkDir)) {
-				New-Item -ItemType Directory -Force -Path $parkDir | Out-Null
-			}
-
-			$dest = Join-Path $parkDir $s.Name
-
-			if (Test-Path $dest) {
-				Remove-Item -Recurse -Force $dest
-			}
-
-			Move-Item -Path $s.FullName -Destination $dest
-			Write-Host "[DEPLOY] moved $($s.Name) to mods_old\" -ForegroundColor Yellow
-		}
-		else {
-			Write-Host "[DEPLOY] warning: $($s.Name) is also installed." -ForegroundColor Yellow
-			Write-Host "         Pass -ParkVortexMod to move it to mods_old\, or remove it in Vortex."
-		}
-	}
+foreach ($other in $others) {
+	Write-Host "[DEPLOY] warning: $($other.Name) is also installed. Remove it in Vortex." -ForegroundColor Yellow
 }
 
 if (Test-Path $devDir) {
@@ -1035,24 +800,15 @@ $noBom = New-Object System.Text.UTF8Encoding($false)
 Write-Host "[DEPLOY] $Version installed to Mods\$devMod" -ForegroundColor Green
 Write-Host "[DEPLOY] load order: $($order -join ' -> ')"
 
-# The script also goes down loose, next to the game's own Scripts tree, so an
-# edit on disk can be picked up by `dev_console.py --reload` without a restart.
-# The packed copy inside the pak stays where it is and remains what ships; this
-# is only what the running game reads first.
-#
-# It only works with sys_PakPriority = 0 in system.cfg. The stock value is 2,
-# pak-only, under which loose files are ignored entirely and a reload re-reads
-# the same packed bytes. The check below says so rather than leaving a silent
-# no-op to be discovered later.
-if (-not $NoLooseScript) {
-	Sync-LooseFiles -Root $gameRoot -Script -Anim | Out-Null
+# The scripts and animation data also go down loose, next to the game's own
+# trees, so an edit on disk can be reloaded without a restart. The packed copy
+# inside the pak stays where it is and remains what ships; this is only what the
+# running game reads first, and only at sys_PakPriority = 0, which
+# Assert-DevEnvironment has already checked.
+Sync-LooseFiles -Root $gameRoot | Out-Null
 
-	# The same guard the reload path gets. A full deploy is the path least
-	# likely to leave a half behind, which is exactly why a silent mismatch
-	# here would go unnoticed longest.
-	if ((Test-InstalledFiles -Root $gameRoot) -gt 0) {
-		exit 1
-	}
+if ((Test-InstalledFiles -Root $gameRoot) -gt 0) {
+	exit 1
 }
 
 if ($Launch) {
@@ -1075,32 +831,16 @@ if ($Launch) {
 		Write-Host "         Properties > Compatibility > untick 'Run this program as an administrator'"
 	}
 
-	if (-not (Test-Path $exe)) {
-		Write-Host "[DEPLOY] game executable not found at $exe" -ForegroundColor Red
-		exit 1
-	}
+	# Without -devmode the console refuses VF_CHEAT commands,
+	# lua_reload_script among them.
+	#
+	# Started with the executable's own folder as the working directory, which
+	# is what a double-click does. The engine resolves user.cfg relative to the
+	# working directory, so the graphics settings depend on it.
+	Write-Host "[DEPLOY] launching -devmode..."
 
-	# Dev mode comes from the command line, not from a config file. The
-	# "sys_DevMode = 1" line in system.cfg does nothing: querying it over the
-	# remote console answers "Unknown command: sys_DevMode". Without -devmode the
-	# console refuses anything marked VF_CHEAT, which includes lua_reload_script.
-	$launchArgs = @()
-
-	if (-not $NoDevMode) {
-		$launchArgs = $launchArgs + "-devmode"
-	}
-
-	# Started with the executable's own folder as the working directory, which is
-	# what a double-click does. Note there are two user.cfg files in this install,
-	# one in the game root and one next to the executable, and which of them the
-	# engine picks up depends on this. Do not change it without checking that the
-	# graphics settings in Bin\Win64\user.cfg still apply.
-	Write-Host "[DEPLOY] launching $(if ($launchArgs) { $launchArgs -join ' ' } else { '(no flags)' })..."
-
-	if ($launchArgs) {
-		Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "`"$exe`" $($launchArgs -join ' ')"; CurrentDirectory = (Split-Path $exe -Parent) } | Out-Null
-	}
-	else {
-		Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = "`"$exe`""; CurrentDirectory = (Split-Path $exe -Parent) } | Out-Null
-	}
+	Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+		CommandLine = "`"$exe`" -devmode"
+		CurrentDirectory = (Split-Path $exe -Parent)
+	} | Out-Null
 }

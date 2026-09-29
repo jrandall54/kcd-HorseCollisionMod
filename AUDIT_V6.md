@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 4 done.
+**Phase:** 2 in progress. Batches 0 to 4 done; batch 5 under way.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,8 +30,10 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 5, tooling. Read **Phase 2 plan** below in full before starting; it gives
-the procedure for every batch and how each is verified.
+**Next step:** phase 2, batch 5, tooling, from the second bullet (`:reload`);
+the front door is done (see **Phase 2 log**). Read **Phase 2 plan** below in
+full before starting; it gives the procedure for every batch and how each is
+verified.
 
 **Pass order** (dependencies first, then largest):
 
@@ -554,6 +556,27 @@ One line per batch: batch, commit, what was verified.
   still gave the old 1.1 m and 0.3 m figures. L0: build passes, no new lint
   warnings. L2: reloaded into the running game, the value reads 0.7 live, no
   Lua error. **Batch 3 complete.**
+- **Batch 5, front door.** Base `6aa076c`. `dev_deploy.ps1` is internal to
+  `flow.ps1`: its switches are the six `flow` calls (`-Launch`, `-Reload`,
+  `-ReleaseSettings`, `-SetDevEnvironment`, `-PrepareShippingTest`,
+  `-RestoreDevEnvironment`); `-ScriptOnly`, `-AnimOnly`, `-NoBuild`,
+  `-GameRoot`, `-Version`, `-ParkVortexMod`, `-NoDevMode`, `-NoLooseScript`,
+  `-SetPlayEnvironment` and `-Force` deleted, since `flow` reached none of
+  them or reached them only as the two-call pair `-Reload` replaces. The game
+  path comes from `tools/game_root.ps1`, shared by both (`publish_nexus.ps1`
+  follows with its own findings); it also halves the doubled backslashes in
+  Steam library paths, which the old replace left doubled. Every sync copies
+  only files whose bytes differ, and a changed testing-world file counts as
+  a script change, so `flow test -Set` into a running game still reloads.
+  Deploy builds are `<version>-dev`. Pointers in `AGENTS.md`, `DEV_LOOP.md`,
+  `publish_nexus.ps1`, `dev_console.py` and `.claude/RELEASING.md` name
+  `flow`. Tests: `flow test` into the running game, nothing changed, no
+  reload; a world flip reloaded and logged the new world, then flipped back;
+  a direct full deploy with the game running exited 1 and left `Mods`, the
+  loose trees and `releases/` byte-identical; the game closed (announced),
+  `flow test` built `5.31.4-dev`, copied nothing, and left the release zip
+  alone; `flow test -Launch` relaunched with `-devmode`. L0: build passes;
+  `lint_docs.py` errors unchanged (all in this ledger), warnings 522 to 514.
 
 ## Standard
 
@@ -3168,75 +3191,75 @@ four of them describe behavior that does not exist.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `:157-165` — "That happened with wh_female_fragmentids.xml…". — Keep
+- [x] `:157-165` — "That happened with wh_female_fragmentids.xml…". — Keep
   `:157-160`: a withdrawn loose file goes on overriding vanilla.
-- [ ] `:193-201` `log_SpamDelay` — two comments that disagree: the first
+- [x] `:193-201` `log_SpamDelay` — two comments that disagree: the first
   says the delay leaves the mod's telemetry alone, the second why development
   wants none; "was half of every line written to kcd.log". — One comment:
   development keeps every repeat, because the overflow message differs only
   by a pointer.
-- [ ] `:209-212` — "hunted across about 130 impacts … on the rider's console
+- [x] `:209-212` — "hunted across about 130 impacts … on the rider's console
   the whole time". — Cut.
-- [ ] `:323-327` — "that is how a mod folder was lost rather than parked". —
+- [x] `:323-327` — "that is how a mod folder was lost rather than parked". —
   Keep the half-parked failure; cut the account.
-- [ ] `:342-345` — "truncating the manifest on the second run orphaned the 31
+- [x] `:342-345` — "truncating the manifest on the second run orphaned the 31
   items". — "Appended, because the park is rerun after a refusal."
-- [ ] `:356-363` — "the ten part files were added when the Lua was split",
+- [x] `:356-363` — "the ten part files were added when the Lua was split",
   `HorseCollisionMod_ItemData.lua` "left behind by every list written since".
   — Keep "matched by location, not by a list, because one surviving loose
   file masks the pak".
-- [ ] `:484-487` — "a restore that removed the whole tree destroyed a folder
+- [x] `:484-487` — "a restore that removed the whole tree destroyed a folder
   of parked scripts". — Keep "things are put there by hand".
-- [ ] `:602-606` — "This used to name `Libs\Config` alone … simply absent
+- [x] `:602-606` — "This used to name `Libs\Config` alone … simply absent
   from the running game". — Cut.
-- [ ] `:633-638` — "That happened with -ScriptOnly … two test rides were
+- [x] `:633-638` — "That happened with -ScriptOnly … two test rides were
   spent". — Keep `:640-642`.
-- [ ] `:662-665` — "Every installed file now matches … nothing left to
+- [x] `:662-665` — "Every installed file now matches … nothing left to
   normalize away". — Cut; the check needs no comment.
-- [ ] `:778-780` — "a lean was added on two new keys … reported as doing
+- [x] `:778-780` — "a lean was added on two new keys … reported as doing
   nothing". — Cut.
-- [ ] `:924-930` — "This used to refuse outright … indistinguishable from a
+- [x] `:924-930` — "This used to refuse outright … indistinguishable from a
   crash and cost several rides", "the rider". — Cut.
-- [ ] `:1074-1077` — "The `sys_DevMode = 1` line in system.cfg does nothing:
+- [x] `:1074-1077` — "The `sys_DevMode = 1` line in system.cfg does nothing:
   querying it … answers Unknown command". The `STYLE.md` rejected-example
   table names this sentence. — Keep "Without -devmode the console refuses
   `VF_CHEAT` commands, `lua_reload_script` among them."
 
 **Wrong or stale:**
 
-- [ ] `:12` usage — `-Crime` "keep riding people down a crime"; no such
+- [x] `:12` usage — `-Crime` "keep riding people down a crime"; no such
   parameter. `-NoDevMode`, `-NoLooseScript`, `-ScriptOnly`, `-AnimOnly`,
   `-ReleaseSettings` and `-Force` are missing. — Rewrite the usage from
   `param`.
-- [ ] `:366-367` — "Two vanilla file names are listed explicitly"; the list
+- [x] `:366-367` — "Two vanilla file names are listed explicitly"; the list
   holds four, and duplicates `$claimedVanillaAdb` (`:166-171`). — Use
   `$claimedVanillaAdb`; drop the count.
-- [ ] `:516-535` — the doc for `Sync-LooseFiles` (copies, returns which
+- [x] `:516-535` — the doc for `Sync-LooseFiles` (copies, returns which
   halves were written) sits above `Get-LooseFileMap`, run together with that
   function's own doc. — Move `:516-528` above `Sync-LooseFiles` (`:727`).
-- [ ] `:617` — `TrimStart('')` trims nothing (the leading `\` survives);
+- [x] `:617` — `TrimStart('')` trims nothing (the leading `\` survives);
   works only because `Join-Path` tolerates it. — `TrimStart('\')`.
-- [ ] `:747-750` — "build.ps1 regenerates every animation database on each
+- [x] `:747-750` — "build.ps1 regenerates every animation database on each
   run"; it runs `build_adb.py` only when `hcm_male_database.adb` is missing
   (`build.ps1:422`). — "A regeneration rewrites every database whether or
   not the bytes moved."
-- [ ] `:801-803` — "build.ps1 rejects a release that ships CollisionIsCrime
+- [x] `:801-803` — "build.ps1 rejects a release that ships CollisionIsCrime
   = false"; nothing checks `CollisionIsCrime`. The real reason is that the
   settings file ships. — Say that.
-- [ ] `:932-934` — "The pak case is still real, so the refusal is kept for
+- [x] `:932-934` — "The pak case is still real, so the refusal is kept for
   it"; there is no refusal, only the warning below. A full deploy with the
   game running then removes `$devDir` (`:971-973`), whose pak the engine
   holds open. — Correct the comment; see the ruling.
-- [ ] `:1034-1037` — "The check below says so"; the check below is
+- [x] `:1034-1037` — "The check below says so"; the check below is
   `Test-InstalledFiles`, which compares hashes. `sys_PakPriority` is checked
   by `Assert-DevEnvironment` (`:507-511`). — Point at that.
-- [ ] `:1084-1088` — "there are two user.cfg files in this install"; a
+- [x] `:1084-1088` — "there are two user.cfg files in this install"; a
   single machine's layout. — "The engine resolves `user.cfg` relative to
   the working directory."
-- [ ] `:902` — `--` as a dash. — Rephrase.
-- [ ] `:1091-1096` — two branches differing only in the argument string. —
+- [x] `:902` — `--` as a dash. — Rephrase.
+- [x] `:1091-1096` — two branches differing only in the argument string. —
   One call.
-- [ ] `:166-171` — four-space indentation in a tab-indented file. — Tabs.
+- [x] `:166-171` — four-space indentation in a tab-indented file. — Tabs.
 
 ### tools/build_adb.py
 
@@ -3473,49 +3496,49 @@ comments.
 
 **Wrong or stale:**
 
-- [ ] `:70` — `$gameRoot` is hardcoded; `dev_deploy.ps1` resolves
+- [x] `:70` — `$gameRoot` is hardcoded; `dev_deploy.ps1` resolves
   `-GameRoot`, `KCD_PATH` and Steam libraries. `Dev-Configured`, `Parked`
   and `Enter-Shipping` read the hardcoded path while the deploy writes to the
   resolved one. — Resolve the same way; one shared resolver for the
   PowerShell tools.
-- [ ] `:9-13` usage — omits `world`, `test -Launch` and the world switches'
+- [x] `:9-13` usage — omits `world`, `test -Launch` and the world switches'
   pointer. — Add `world`; point at the `param` block for the switches.
-- [ ] `:255-258`, `:265-269`, `:277` — "The deploy carries no world switches
+- [x] `:255-258`, `:265-269`, `:277` — "The deploy carries no world switches
   any more … nothing to splat"; `$deployArgs` is always empty and every call
   splats it. — Delete `$deployArgs`; pass `-NoBuild -Launch` directly.
-- [ ] `:142-157` — an empty `status` section header, then the world helpers,
+- [x] `:142-157` — an empty `status` section header, then the world helpers,
   then `Show-Status` after a double blank line. — Put `Show-Status` under
   its header; one blank line.
-- [ ] `:338-339` — `$src_changed`, `$diary_changed`; the file is camelCase.
+- [x] `:338-339` — `$src_changed`, `$diary_changed`; the file is camelCase.
   — Rename.
-- [ ] `:192` — "the world is its own file now". — Cut "now".
+- [x] `:192` — "the world is its own file now". — Cut "now".
 
 **History and people to cut** (keep the constraint each one supports):
 
-- [ ] `:5-7` — "every one of them was previously a list of steps". — Cut.
-- [ ] `:194-195` — "and the rider has paid for that more than once". — Cut.
-- [ ] `:231-232` — "a rider mid-test suddenly has a horse that tires". —
+- [x] `:5-7` — "every one of them was previously a list of steps". — Cut.
+- [x] `:194-195` — "and the rider has paid for that more than once". — Cut.
+- [x] `:231-232` — "a rider mid-test suddenly has a horse that tires". —
   Keep "a switch persists until `land`".
-- [ ] `:263` — "and has cost rides". — Cut.
-- [ ] `:272-276` — "Passed as a bare switch in front of a splat it was
+- [x] `:263` — "and has cost rides". — Cut.
+- [x] `:272-276` — "Passed as a bare switch in front of a splat it was
   accepted and did nothing … Same family as the splatting defect above";
   the defect above no longer exists. — Cut with the splat.
-- [ ] `:454-466` — two comments run together, "a rider wondering why their
+- [x] `:454-466` — two comments run together, "a rider wondering why their
   horse never tired", "So the next branch started with crime". — One
   comment: the deploy writes an empty world, then `--reset` removes the
   file, because no file and an empty file mean different things.
-- [ ] `:471-473` — "Re-entering here is what left main carrying a branch's
+- [x] `:471-473` — "Re-entering here is what left main carrying a branch's
   test values." — Cut.
-- [ ] `:480-481` — "The rider had to ask for this three times before it was
+- [x] `:480-481` — "The rider had to ask for this three times before it was
   automated". — Cut.
 
-- [ ] Every `flow test` builds at the manifest version with
+- [x] Every `flow test` builds at the manifest version with
   `-Development`, so `releases/HorseCollisionMod_v<version>.zip` is
   overwritten by each deploy and is not the released artifact; the
   original v5.31.4 zip was lost this way and only the tag can rebuild it. —
   Deploy builds use a `-dev` version, leaving the release zip alone.
   Batch 5.
-- [ ] Every deploy reports every file `updated` and warns that
+- [x] Every deploy reports every file `updated` and warns that
   `hcm_actionmaps.xml` changed while the game runs, whether or not anything
   changed. — Copy and report only files whose bytes differ. Batch 5.
 

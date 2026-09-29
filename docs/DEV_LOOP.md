@@ -16,19 +16,12 @@ mn_allowEditableDatabasesInPureGame = 1  allow Mannequin reloads
 At its shipping value of `2` the engine reads only paks, and every loose file
 below is ignored.
 
-Verifying a release requires the shipping values, so an install used for a
-release is left configured for play. `dev_deploy.ps1` switches between the two
-and refuses to deploy into an install configured for play, because at
+Verifying a release requires the shipping values. `flow.ps1 shipping` switches
+the install to them and parks every loose file; `flow.ps1 test` switches it
+back. The deploy refuses an install configured for play, because at
 `sys_PakPriority = 2` a deploy, a reload and a console command all report
-success while the game keeps running the packed build.
-
-```
-.\tools\dev_deploy.ps1 -SetDevEnvironment     development values
-.\tools\dev_deploy.ps1 -SetPlayEnvironment    shipping values
-```
-
-Restart the game after either. `-Force` deploys into an install that will
-ignore what it is given.
+success while the game keeps running the packed build. Restart the game after
+either switch.
 
 ### The pre-push hook
 
@@ -69,31 +62,26 @@ python tools\pre_release_check.py            repository and mod page
 ## Deploying
 
 ```
-.\tools\dev_deploy.ps1 -Reload             push what changed and reload it
-.\tools\dev_deploy.ps1 -Launch             build, install, start the game
-.\tools\dev_deploy.ps1 -NoBuild -Launch    install what was built last
-.\tools\dev_deploy.ps1 -ScriptOnly         push the Lua whether or not it changed
-.\tools\dev_deploy.ps1 -AnimOnly           push the animation data, same
-.\tools\dev_deploy.ps1 -ParkVortexMod      move the Vortex-installed copy to mods_old\
-.\tools\dev_deploy.ps1 -GameRoot "D:\..."  use an install somewhere else
+.\tools\flow.ps1 test            deploy, and reload into a running game
+.\tools\flow.ps1 test -Launch    the same, and start the game if it is closed
 ```
 
-It installs to `Mods\HorseCollisionMod_dev`, overwriting the last build, and
-launches with `-devmode`. It refuses to run while the game holds its paks open.
-`-Reload`, `-ScriptOnly` and `-AnimOnly` skip that guard, because loose files
-are not locked and can be replaced under a running game.
+`flow.ps1` is the only entry point; `tools\dev_deploy.ps1` is its internal
+helper. The game install is found through `KCD_PATH`, then the usual install
+locations and every Steam library.
 
-`-Reload` compares every loose file against its source, copies the ones whose
-contents differ, and runs the console reload for whichever halves moved. It
-reports `nothing changed since the last deploy` when they all match, and says so
-rather than reloading when the game is not running. The comparison is on
-contents rather than timestamps, because `build.ps1` rewrites all four animation
-databases on every run and a Mannequin reload is a visible hitch in the running
-game.
+With the game closed, `test` builds, installs to `Mods\HorseCollisionMod_dev`,
+overwriting the last build, and copies the loose files; `-Launch` then starts
+the game with `-devmode`. The build is named `<version>-dev`, so it never
+overwrites a release zip.
 
-`-ScriptOnly` and `-AnimOnly` name one half and skip the comparison. Use them
-for a file that has been reverted to a state matching the installed copy, or
-when only one subsystem should be disturbed.
+With the game running, the engine holds the installed pak open, so `test`
+copies only the loose files whose contents differ from the repository and runs
+the console reload for whichever halves moved. A change to the testing world
+counts as a script change. It reports `nothing changed since the last deploy`
+when everything matches. The comparison is on contents rather than timestamps,
+because a regeneration rewrites every animation database and a Mannequin
+reload is a visible hitch in the running game.
 
 Loose files go under `<game>\Data`, mirroring the pak layout:
 
@@ -192,15 +180,15 @@ Verbosity is raised on connect, since it resets on every game restart;
 `--verbose` raises it further for engine-level messages.
 
 Cheat-marked commands, `lua_reload_script` among them, need `-devmode`, which
-`dev_deploy.ps1` passes.
+`flow.ps1 test -Launch` passes.
 
 ## The loop
 
 ```
-.\tools\dev_deploy.ps1 -Launch      once, at the start of a session
+.\tools\flow.ps1 test -Launch    once, at the start of a session
 
                               edit src/, or regenerate the databases
-.\tools\dev_deploy.ps1 -Reload      push what moved, reload it live
+.\tools\flow.ps1 test            push what moved, reload it live
 ```
 
 Both halves can change in one pass, and Mannequin is reloaded before the Lua, so
@@ -288,7 +276,7 @@ check failing on the next build.
 ### Two things that used to bite
 
 Rebuilding a version that is already tagged works. The version check compares
-against the newest tag *older than* the build target, so `dev_deploy.ps1` runs
+against the newest tag *older than* the build target, so `flow.ps1 test` runs
 normally after a merge; it used to fail against the tag it had just created
 and needed `-NoBuild` to get past.
 

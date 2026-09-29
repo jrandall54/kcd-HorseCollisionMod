@@ -774,7 +774,7 @@ def main():
         # SyntaxWarning on import, and PowerShell treats anything a native
         # command writes to stderr as an error, which failed the deploy's
         # reload step for a message that is only ever printed on advice.
-        print(r"    .\tools\dev_deploy.ps1 -NoBuild -Launch")
+        print(r"    .\tools\flow.ps1 test -Launch")
 
     console.close()
     console.report_muted()

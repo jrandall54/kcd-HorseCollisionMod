@@ -389,8 +389,8 @@ if (-not $DryRun -and -not $Force) {
                 Write-Host "  sys_PakPriority = 0, so paks are not read first" -ForegroundColor Red
             }
 
-            throw ("Test the release first: .\tools\dev_deploy.ps1 " +
-                   "-PrepareShippingTest, install the zip through Vortex, " +
+            throw ("Test the release first: .\tools\flow.ps1 " +
+                   "shipping, install the zip through Vortex, " +
                    "launch without -devmode, and ride into someone at each " +
                    "speed tier.")
         }

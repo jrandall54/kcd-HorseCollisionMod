@@ -2,15 +2,19 @@
 #
 # A session goes: read the handoff, decide what to do, start a branch, test a
 # lot, land it, start the next one. Each of those states needs the install and
-# the repository in a particular condition, and every one of them was previously
-# a list of steps with two or three predictable failures in it. That is what
-# this replaces.
+# the repository in a particular condition, and each verb puts them there.
 #
-#   .\tools\flow.ps1 test        get into, or back into, a testable state
-#   .\tools\flow.ps1 branch NAME start a branch and get testable
-#   .\tools\flow.ps1 land "msg"  finish: checks, version, build, tag, push
-#   .\tools\flow.ps1 shipping    park the mod to test a release build
-#   .\tools\flow.ps1 status      say where everything stands
+#   .\tools\flow.ps1 test          get into, or back into, a testable state
+#   .\tools\flow.ps1 test -Launch  the same, and start the game if it is closed
+#   .\tools\flow.ps1 branch NAME   start a branch and get testable
+#   .\tools\flow.ps1 land "msg"    finish: checks, version, build, tag, push
+#   .\tools\flow.ps1 shipping      park the mod to test a release build
+#   .\tools\flow.ps1 world         show or change the testing world
+#   .\tools\flow.ps1 status        say where everything stands
+#
+# The testing world's switches are described in the param block below.
+#
+# This is the only front door; tools\dev_deploy.ps1 is its internal helper.
 #
 # The verbs are idempotent. Running `test` when already testing re-syncs and
 # says so rather than failing.
@@ -67,7 +71,10 @@ $Unset = @($Unset | ForEach-Object { $_ -split ',' } |
 
 $repo = Split-Path $PSScriptRoot -Parent
 $deploy = Join-Path $PSScriptRoot "dev_deploy.ps1"
-$gameRoot = "C:\Games\Kingdom Come - Deliverance"
+
+. (Join-Path $PSScriptRoot "game_root.ps1")
+
+$gameRoot = Resolve-GameRoot
 
 # Git writes ordinary notices to stderr: the line-ending warning, "Switched to
 # branch", the push summary. Windows PowerShell wraps any native stderr line in
@@ -139,8 +146,6 @@ function Working-Tree-Dirty {
 	return -not [string]::IsNullOrWhiteSpace((Invoke-Git status --porcelain))
 }
 
-# ---------------------------------------------------------------- status
-
 # ------------------------------------------------------- test world state
 
 # The testing world lives in tools/testworld.py, which owns `.hcm_testworld`,
@@ -154,6 +159,7 @@ function Invoke-World {
 	& python $script:worldTool @WorldArgs 2>&1 | Out-String
 }
 
+# ---------------------------------------------------------------- status
 
 function Show-Status {
 	$branch = Current-Branch
@@ -188,11 +194,11 @@ function Show-Status {
 	Say "game        $(if ($running) { 'running' } else { 'not running' })"
 
 	# What a test would actually be run against. Asked of the tool that writes
-	# it, rather than read back out of the installed file: the world is its own
-	# file now, and one source for it is the whole point.
+	# it, rather than read back out of the installed file, so there is one
+	# source for it.
 	#
-	# Printed every time because a value left on silently is what corrupts the
-	# next comparison, and the rider has paid for that more than once.
+	# Printed every time because a value left on silently corrupts the next
+	# comparison.
 	$world = (Invoke-World @("--list")).TrimEnd()
 
 	if ($world) {
@@ -227,9 +233,8 @@ function Enter-Test {
 	}
 
 	# Anything asked for on this invocation is added to the branch's world and
-	# stays there until `land` clears it. A switch given once should not
-	# evaporate on the next deploy: a rider mid-test suddenly has a horse that
-	# tires, and no reason to connect that to a deploy they did not run.
+	# persists until `land` clears it, so a switch given once survives the next
+	# deploy.
 	$worldArgs = @()
 
 	if ($Shipped) {
@@ -252,34 +257,23 @@ function Enter-Test {
 		Write-Host (Invoke-World $worldArgs) -NoNewline
 	}
 
-	# The deploy carries no world switches any more. It writes whatever
-	# `.hcm_testworld` holds, so there is nothing to splat and nothing that can
-	# be dropped between here and there.
-	$deployArgs = @{}
-
+	# The deploy writes whatever `.hcm_testworld` holds, so no world switch is
+	# passed to it.
 	if (Game-Running) {
-		# A running game holds the pak, so only the loose halves can be
-		# replaced. Both, always: a script-only deploy leaving the animation
-		# databases stale is silent, survives a reload, and has cost rides.
+		# A running game holds the pak, so only the loose files can be
+		# replaced, and the deploy refuses a full install.
 		Say "game is running, syncing loose files"
-		& $deploy -ScriptOnly @deployArgs
-		& $deploy -AnimOnly @deployArgs
+		& $deploy -Reload
+	}
+	elseif ($Launch) {
+		& $deploy -Launch
 	}
 	else {
-		& $deploy @deployArgs
+		& $deploy
+	}
 
-		if ($Launch) {
-			# -Launch goes in the hashtable rather than beside it. Passed as a
-			# bare switch in front of a splat it was accepted and did nothing:
-			# the deploy ran, installed and never launched, while this script
-			# said "ready to test" and the status line said the game was not
-			# running. Same family as the splatting defect above, same rule.
-			$launchArgs = $deployArgs.Clone()
-			$launchArgs.NoBuild = $true
-			$launchArgs.Launch = $true
-
-			& $deploy @launchArgs
-		}
+	if ($LASTEXITCODE -ne 0) {
+		Fail "the deploy failed. The report above says why."
 	}
 
 	Say "ready to test" Green
@@ -335,9 +329,9 @@ function Land {
 
 	Say "verifying the testing diary was updated"
 	$base = & git.exe -C $repo merge-base main HEAD
-	$src_changed = & git.exe -C $repo diff --name-only $base HEAD -- src/ tools/
-	$diary_changed = & git.exe -C $repo diff --name-only $base HEAD -- docs/TESTING_DIARY.md
-	if (-not [string]::IsNullOrWhiteSpace($src_changed) -and [string]::IsNullOrWhiteSpace($diary_changed)) {
+	$srcChanged = & git.exe -C $repo diff --name-only $base HEAD -- src/ tools/
+	$diaryChanged = & git.exe -C $repo diff --name-only $base HEAD -- docs/TESTING_DIARY.md
+	if (-not [string]::IsNullOrWhiteSpace($srcChanged) -and [string]::IsNullOrWhiteSpace($diaryChanged)) {
 		Fail "Source files were modified on this branch, but docs/TESTING_DIARY.md was not updated. You must document your testing results before landing."
 	}
 
@@ -451,34 +445,27 @@ function Land {
 
 	Say "landed v$version" Green
 
-	# The branch is over, so its testing world goes with it. Without this the
-	# install keeps whatever the branch was riding with and the next branch
-	# inherits a world nobody chose, which is the drift that had a rider
-	# wondering why their horse never tired.
-	# The deploy first, then forget the world.
+	# The branch is over, so its testing world goes with it, or the next branch
+	# inherits a world nobody chose.
 	#
-	# -ReleaseSettings asks the tool for a world with nothing in it, and asking
-	# for that writes an empty file. Done before this, the file it writes
-	# survives, and an empty file is not the same as no file: no file means
-	# nobody has chosen and the default preset applies, while an empty one is a
-	# choice to run shipped values. So the next branch started with crime and
-	# every other interruption switched on, and a preset asked for afterwards
-	# landed on nothing instead of on the defaults.
-	& $deploy -ScriptOnly -ReleaseSettings | Out-Null
+	# The deploy installs the shipped world, which writes an empty world file,
+	# and `--reset` then removes that file. The order matters, because no file
+	# and an empty file mean different things: no file means nobody has chosen
+	# and the default preset applies, while an empty one is a choice to run
+	# shipped values.
+	& $deploy -Reload -ReleaseSettings | Out-Null
 	Write-Host (Invoke-World @("--reset")) -NoNewline
 	Say "testing world cleared, install back to shipped values"
 
-	# Deliberately not re-entering the testing world. Landing returns to main,
-	# and main is the shipped world: the next branch seeds its own. Re-entering
-	# here is what left main carrying a branch's test values.
+	# Not re-entering the testing world. Landing returns to main, and main is
+	# the shipped world: the next branch seeds its own.
 	Show-Status
 }
 
 # Deletes every local branch already merged into main. This is part of landing
 # rather than a separate chore: a merged branch carries no work, and leaving it
 # behind turns repository tidiness into something a person has to notice and
-# decide about. The rider had to ask for this three times before it was
-# automated, which is the argument for automating it.
+# decide about.
 #
 # `git branch --merged main` is the safe list by construction: a branch appears
 # only when main already contains every one of its commits, so nothing can be
