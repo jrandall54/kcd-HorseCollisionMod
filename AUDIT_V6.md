@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Impact.lua findings recorded and committed.
+**Current status:** Log.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Log.lua`.
+**Next pass:** `Tutorial.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -46,7 +46,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Fear.lua`
 - [x] `Crime.lua`
 - [x] `Impact.lua`
-- [ ] `Log.lua`
+- [x] `Log.lua`
 - [ ] `Tutorial.lua`
 - [ ] `Detection.lua`
 - [ ] `Enums.lua`
@@ -1808,6 +1808,35 @@ victim is accurate (only men reach the fight branch) and stays.
 - [ ] `:248-251` — the return value of `ApplyImpactDamage` is ignored;
   resolves the carried item with the Health finding.
 - [ ] `:262` — `-- test reload` left at end of file. — Delete.
+
+### src/HorseCollisionMod/Log.lua
+
+- [ ] `:1-5` header — "and the speed tier"; `GetSpeedTier` is in
+  `Tiers.lua`. "the two log calls"; the file also holds `NameOf`,
+  `SpeedTrail`, `ImpactSpeed` and `TickMs`. — Correct the summary.
+- [ ] `:15-16` — `@release` runs straight into `TimeMs`'s doc, and LDoc
+  folds it into the module: `TimeMs` is missing from
+  `docs/api/modules/HorseCollisionMod.Log.html`. The same merge drops
+  `TriggerCollision` from the Update page, confirming the Update and Crime
+  findings. — Separate.
+- [ ] `:9-11`, `:19-21`, `:30-31` — why these are methods, three times. —
+  Once, in the header.
+- [ ] `:62-88` `RecentPeak` — "The flaw that fixes is real and the hold
+  must stay. What it could not do…", the four-row measurement, "what the
+  rider experienced as walking into her", the `WatchLunge` readings of
+  21.2 to 25.8 m/s; "neighbouring". — Keep: the peak is the larger of each
+  neighbouring pair's minimum, so a one-tick kick off a body cannot set it
+  while sustained speed and the samples before a deceleration still do;
+  `ChargeForward` applies the same rule. "neighboring".
+- [ ] `:155-163` `ImpactSpeed` — "narrower than it used to claim",
+  "Raising the ceiling from 11.0 to 13.0… changed nothing a rider could
+  feel". — Keep: capped against physics spikes, and the speed only picks
+  the tier and gives `GetImpactDir` a direction; no force scales by it.
+- [ ] `:182` `LogRejection` — "about twenty times a second"; the interval is
+  `TickSeconds`. `:197` `1000` unnamed. — Correct; name the interval.
+- [ ] `:206-209` — two blank lines, then an orphan doc ("Current time in
+  milliseconds", `@treturn`) that LDoc merges into `NameOf`'s. — Delete.
+- [ ] `:250` — `0.016` unnamed. — Name it (one frame at 60 Hz).
 
 ### Dead code (`tools/audit_code.py`)
 
