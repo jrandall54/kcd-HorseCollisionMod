@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Sound.lua findings recorded and committed.
+**Current status:** Lean.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Lean.lua`.
+**Next pass:** `Update.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -40,7 +40,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Health.lua`
 - [x] `Rider.lua`
 - [x] `Sound.lua`
-- [ ] `Lean.lua`
+- [x] `Lean.lua`
 - [ ] `Update.lua`
 - [ ] `Marks.lua`
 - [ ] `Fear.lua`
@@ -61,6 +61,8 @@ audited are listed here, so its pass picks them up.
   "the moment the horse stops accelerating"; `WatchLunge` clears it when
   speed decays to a fraction of the peak. "the old double hit" is history.
 - `Update.lua` — receives `ImpactIsNewContact` from `Recovery.lua`.
+- `Rear.lua`, `Retaliation.lua`, `Update.lua` — adopt the shared horse
+  lookup from the Lean findings.
 - `Impact.lua:218-223` — the comment on deferring `SendCombatHit` ("it
   perfectly overrides the casual recovery dialogue") is in another register;
   its `WhenVictimRises` depends on the early-return ruling.
@@ -217,6 +219,16 @@ Items that change behavior or delete a feature. Not applied without a decision.
   (`BodyFoleySounds`) and resolver (`BodyFoleySound`, `:97-120`); the walk
   names its foley triggers literally. Proposal: delete `foley`, its table and
   resolver, and `face`; document the tokens that remain.
+
+- [ ] **The lean's correction throttle is never applied.** `FlipLean`
+  skips a flip inside `LeanMinFlipMs` unless `force` is set, and every call
+  site passes `force = true` (`Lean.lua:368`, `:487`, `:496`, `:526`,
+  `:566`), including the hold corrections the throttle exists for. The
+  queue-overflow protection that `:238-257` and the entry point's
+  `LeanMinFlipMs` doc describe is therefore off. Proposal: leave `:526`
+  unforced for a `turning` correction and forced only for the expiry
+  refresh; or, if the hold is judged fine as it ships, delete
+  `LeanMinFlipMs`, the `force` parameter and the throttle.
 
 ## Findings
 
@@ -1488,6 +1500,95 @@ victim is accurate (only men reach the fight branch) and stays.
   in for the listener.
 - [ ] `:668` — `0.5` unnamed. — Name it or give its derivation.
 - [ ] `:693` — trailing blank line at end of file. — Remove.
+
+### src/HorseCollisionMod/Lean.lua
+
+- [ ] `:1-57` header — no `@release`, unlike the other modules. "What the
+  shake actually does, measured", "Polled from… every 100 ms", "Four
+  identical calls two seconds apart drove the camera out…", "Sampling a
+  short window is what makes this mechanism easy to get wrong… twenty times
+  too large" are how it was found. "the argument names suggest". The
+  160 ms return is stated at `:35` and again at `:51-52` (and at `:546`,
+  `:562`, `:394`). — Keep: no `cl_cam*` CVar or bone moves the mounted
+  first-person camera and `PlayerSetViewAngles` only turns it, so the lean
+  is `SetViewShake`'s positional vector; the peak is about 0.63 of the
+  amplitude and arrives at t = period; a shake fired over a running one
+  reverses the camera; an expired shake returns home in about 160 ms (once).
+  Add `@release`.
+- [ ] `:47-49`, `:283-285` — the residual wobble is "travel speed times the
+  poll interval… under a centimeter"; the hold only corrects outside
+  `LeanDeadband` (0.06 m), so the deadband sets the wobble. — Say so; the
+  entry point's `LeanHoldAmplitude` doc makes the same claim.
+- [ ] `:83-97`, `:122`, `:162` — `GetPlayerAndHorse` returns `playerEnt`,
+  which neither caller uses; `rawget(_G, "player")` here and at `:232`,
+  `:295`, `:605`, where the rest of the mod reads `player`. The horse
+  lookup `XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())` is
+  repeated in `Rear.lua`, `Retaliation.lua` and `Update.lua`. — Return the
+  horse only; use `player`; one shared horse lookup, adopted by those files
+  in their passes.
+- [ ] `:102-118` `LeanOffset` — "that is what made the two sides read
+  differently", "Measured", "which is exactly what was reported". The 6 cm
+  rest offset is also in the entry point's `LeanDistance` doc. — Keep:
+  measured from the horse's centerline, because a world baseline moves with
+  the horse and the camera rests about 6 cm left of center, so both sides
+  finish the same distance from the head.
+- [ ] `:159` `@treturn` — "always positive"; it can be 0. — "never
+  negative".
+- [ ] `:179-188`, `:203` — the flattening is explained twice, and the
+  first block's opening line and the paragraph under it say the same thing.
+  — One comment: pitch is checked first, because the flattened yaw loses
+  meaning as the view nears vertical, which is also where the camera is
+  nearest the rider's model.
+- [ ] `:226-230` `FlipLean` — `force` is undocumented. — Add `@tparam`.
+- [ ] `:238-257` — "Unrated, this floods… at the twenty second lifetime
+  those were still occupying the queue", "Measured, 176
+  `Animation-queue overflow` errors… ran until the scripts were
+  reloaded", "a runaway of ten meters on fast taps"; "three centimeter
+  deadband" (it ships at 0.06); no blank line between the two paragraphs at
+  `:252-253`. — Keep: each shake holds one of the rider's sixteen animation
+  queue entries for its life, and an overflowed queue rejects animations,
+  so corrections are throttled; the press, the arrival and the release are
+  not, because dropping one leaves the camera traveling. Depends on the
+  throttle ruling.
+- [ ] `:261`, `:268`, `:360`, `:424`, `:451`, `:564` — settings in stray
+  parentheses. — Remove.
+- [ ] `:302` — "the same check the rear uses". — Cut.
+- [ ] `:315-328` — the home-return comment sits above the angle check,
+  while its check is at `:340-344`; it runs straight into the angle
+  comment. `:320-325` is the history of a fixed bug ("`now` was read from a
+  global that does not exist… stayed dead through a save load"); "the
+  pumping bug". — Move the first comment to `:340` as: a re-press before
+  the camera is home would take its target from a displaced camera; cut the
+  bug history.
+- [ ] `:391-403` — "clips through Henry's back", "A rider turning slowly
+  still gets the full 45 degrees" (copies the setting). — Keep: the return
+  takes about 160 ms, so the angle is projected ahead by the turn rate and
+  the limit tightens only for a fast turn.
+- [ ] `:446-450` — "which the rider has seen", "including ones not yet
+  found". — Keep: a ceiling bounds any failure in the loop.
+- [ ] `:464-481` — "Measured across eight deliberate double taps" and the
+  log table. — Keep: against a running shake a press reverses rather than
+  choosing a side, so the direction is checked and corrected up to twice.
+- [ ] `:498-511` — "Releases aimed at 0.65 landed at 0.11, -0.05 and
+  -0.08". The stated cause, a shake reversing at its period, cannot occur at
+  `LeanShakePeriod` 40 with `LeanShakeSec` 1.5; the expiry refresh at
+  `:522` is a flip the loop makes without the correction logic. — Keep:
+  direction is taken from two samples, never remembered, because the camera
+  can reverse without a correction.
+- [ ] `:518-522` — "to keep the animation queue" is an unfinished sentence;
+  `150` is unnamed; two comments run together. — Finish it (the hold is
+  renewed before its shake expires and sends the camera home); name the
+  margin or derive it from `LeanPollMs`.
+- [ ] `:544-547` `StopLean` doc and `:562-563` — the 160 ms return twice
+  more. — Once, in the doc.
+- [ ] `:566`, `:571` — `sign or 1`; `sign` is `LeanHeld`, checked non-nil
+  at `:549`. — `sign`.
+- [ ] `:572`, `:574` — `-9` and `-1` stand in for an unreadable offset and
+  angle in the log. — Log `none`.
+- [ ] Carried back to the settings file: `LeanHomeMs` is commented "how
+  often the hold is corrected" (it is the wait after a release); `LeanShakeSec`
+  "long enough to outlast a held lean" (a hold renews it before expiry).
+  Part of the settings lean rewrite.
 
 ### Dead code (`tools/audit_code.py`)
 
