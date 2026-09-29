@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section.
-Next: the balance plan. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan.
+Next: README repository layout. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -273,13 +273,19 @@ Items that change behavior or delete a feature. Not applied without a decision.
   intends the dev loop to become its own tool for other KCD modders later,
   once its design generalizes; not work for this audit.
 
-- [ ] **The balance plan.** `docs/BALANCE_AUDIT.md` is a tracked session
+- [x] **The balance plan.** `docs/BALANCE_AUDIT.md` is a tracked session
   plan whose stages have run. Its figures and derivations already live in the
   settings file and `Tiers.lua`, as its own last rule requires; what remains
   is superseded tables and the account of the rulings. `HANDOFF.md:134-141`
   and `tools/probe_gait_speed.lua:3` cite it. Proposal: move the account of
   the four rulings to the diary, confirm each derivation is in the code, and
   delete the file.
+  **Ruled: delete.** Every stage has run (diary `:22188-22379`, stage 3 at
+  `:22611`; step 4 closed by the charge's 0.6 ruling, step 5 by the
+  `DynamicRecovery` ruling). Before deleting, confirm the four rulings'
+  derivations are in the code and their account is in the diary. Drop the
+  settled fear notes from `HANDOFF.md:128-145` and the reference in
+  `probe_gait_speed.lua:3`; the diary's references stay as history.
 
 - [ ] **README repository layout.** A player-facing README carries 120 lines
   of developer tooling. Proposal: keep the top-level layout in the README and
