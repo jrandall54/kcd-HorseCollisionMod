@@ -30,10 +30,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2. Apply the findings and rulings in small batches, each
-checked off here with its commit. First: move the three hand-authored horse
-animation files into `src/Animations/Mannequin/ADB/`, since until then they
-exist only in the working copy and the install.
+**Next step:** phase 2, batch 0, following **Phase 2 plan** below. Read
+that section in full before starting; it gives the order, the procedure
+for every batch and how each is verified.
 
 **Pass order** (dependencies first, then largest):
 
@@ -65,6 +64,180 @@ exist only in the working copy and the install.
 **Carried forward:** findings in one file that point into a file not yet
 audited are listed here, so its pass picks them up. None open.
 
+
+## Phase 2 plan
+
+Agreed with the rider at the end of the rulings session. Every item under
+**Rulings needed** and **Findings** is applied in the batches below, in this
+order. Each batch is tested only as far as it can break something: a
+comment edit is proved not to have changed code and needs no game; a change
+of behavior gets one named ride.
+
+### Verification levels
+
+- **L0, static.** `.\build.ps1` (syntax, style, scope and staleness checks),
+  `python .claude\lint_docs.py`, `python tools\audit_code.py`. Every batch.
+- **L1, no code changed.** For a batch meant to touch only comments and
+  whitespace, the stripped LuaJIT bytecode of every changed Lua file must be
+  identical to the batch's base commit. `luajit -b -s` drops line numbers
+  and comments, so any difference is a code change. From Git Bash, with
+  `BASE` the commit the batch started from:
+
+  ```
+  for f in $(git diff --name-only $BASE -- '*.lua'); do
+    git show $BASE:$f > /tmp/a.lua; luajit -b -s /tmp/a.lua /tmp/a.out
+    luajit -b -s $f /tmp/b.out
+    cmp -s /tmp/a.out /tmp/b.out && echo "same  $f" || echo "DIFF  $f"
+  done
+  ```
+
+  Python and PowerShell have no equivalent; for them, `git diff -w $BASE`
+  must show only comment lines.
+- **L2, loads.** `.\tools\flow.ps1 test` into the running game, then read
+  `kcd.log` for Lua errors and the mod's startup line. No ride.
+- **L3, one ride.** Before the ride, name the tier, what the rider should
+  see if the change works, and what failure looks like. Confirm from the log
+  that the change is live before asking for a verdict. One change per ride,
+  nothing else running, and every test-world override restored afterwards
+  (`flow.ps1 test -Unset`).
+
+### Procedure for every batch
+
+1. Note the base commit (`git rev-parse HEAD`).
+2. Make the batch's edits. A finding whose line was deleted by an earlier
+   batch is ticked as "superseded by batch N" rather than applied.
+3. Run the batch's verification levels. A failure is fixed inside the batch
+   or the batch is reverted; never carried forward.
+4. Player-visible changes get an `[Unreleased]` entry in `CHANGELOG.md`.
+5. Tick the batch's items in this ledger, add a line to **Phase 2 log**
+   below, update **Resuming**, and commit together. The commit-msg hook
+   rejects AI attribution trailers; add none.
+
+### Batches
+
+**Batch 0. Protect the horse animation files.** *(L0; pak comparison)*
+Move `hcm_horse_database.adb`, `kcd_horse_fragmentids.xml` and
+`kcd_horse_controllerdefs.xml` from `mod_assets/Animations/Mannequin/ADB/`
+into `src/Animations/Mannequin/ADB/`; `build.ps1` copies them into the pak as
+it does `src/Libs`, and the required-file list and `build_adb.py`'s sweep
+follow the move. Correct `build.ps1:414-418`. Test: build, then compare the
+new zip's pak entry list and the three files' bytes against
+`releases/HorseCollisionMod_v5.31.4.zip`; identical means no ride.
+`python tools\verify_additive.py <zip>` must pass 35 of 35.
+
+**Batch 1. Enforcement and mechanical sweeps.** *(L0, L1)*
+- `lint_docs.py` rules from **Tooling and enforcement**, added as
+  **warnings**. Promoting them to errors now would block every commit until
+  the comment batches finish; that happens in batch 7. Record the warning
+  count in the log as the comment batches' starting figure.
+- `audit_code.py` recognizes string references (`Rear.lua:431`).
+- Hook comments rewritten in the standard.
+- The seven tab-indented Python tools to four spaces (`git diff -w` empty;
+  each tool's `--help` still runs).
+- `@release` dropped from every source file and from `set_version.py`
+  (the `land` ruling). L1 proves the Lua untouched. The build regenerates
+  `docs/api`; commit it without comment.
+
+**Batch 2. Dead code and removed features.** *(L0, L2, then one sweep ride)*
+Intended to change nothing a player can see. Apply the rulings:
+`DynamicRecovery` and its settings; `BarkDeath`, `RiderBarkSets`,
+`RiderBarks` and `Bark`'s `rider` parameter; `CatchYieldImmediately`,
+`sawYield`, `caught`, `SendStandDown`; the pull-down horse query, fallback
+and angle tracking; the physics-proxy rescue and `HasRescuedPhysicsProxy`;
+the cooldown wind-back branch; `WatchTurn`; `TraceFallLanding`; the throw
+and height fields of `ProbeImpactCost`; the `face` and `foley` tokens; the
+lean throttle and `LeanMinFlipMs`; the two tutorial cells; the four get-up
+options (regenerate the databases; `verify_additive.py` must pass).
+`ProtectMutt` goes last in the batch, after reading the companion dog's
+class live (`python tools\dev_console.py --lua` against the entity named
+`dogCompanion`); a human class reopens that ruling instead.
+
+Checks specific to this batch:
+- `git grep` for every removed name returns nothing outside the diary and
+  this ledger.
+- A removed setting must not break a player's settings file that still
+  carries it. `ApplySettings` refuses keys `Config` lacks
+  (`Tiers.lua:455`); confirm that a stale key is skipped and logged rather
+  than aborting the load, by adding one to the test world and reading the
+  log. If it aborts, make it skip before deleting any setting.
+- Sweep ride (L3): one impact at each of walk, trot, gallop, rear and
+  charge, telemetry on. Works: every tier reacts as before, the kill line
+  and victim barks still play, no Lua errors, and `ImpactCost` rows still
+  appear without `travel=` or `dz=`.
+
+**Batch 3. Behavior changes, one ride each.** *(L0, L2, L3)*
+In this order, each its own commit and ride:
+1. `VictimFlatFraction` 0.15. Ride: trot knockdown, then strike the victim
+   again while down. Works: no snap upright; the recovery line lands as
+   they rise. Failure: a snap upright, which means 0.45 had a reason;
+   record it in the comment and restore 0.45.
+2. `HushVanillaBark` stamp check. Ride: hold the horse in front of an NPC
+   for over three seconds, then walk into them. Works: only the mod's line.
+   Failure: vanilla's collision bark plays.
+3. The charge's bark set (`Charge = "collision"`, and the build refuses a
+   settings tier table that differs from `Tiers.lua`) and impact cry
+   (`PainByTier.Charge = HurtDown`). Ride: charge a villager. Works: a
+   pain cry on impact, then a collision line.
+4. `RearAnimMs` stops dividing by `RearAnimSpeed`. Ride: standing rear,
+   then try to move. Works: control returns as the rear visibly ends.
+5. The retaliation deletions from batch 2, if the sweep did not reach them.
+   Ride: provoke a guard into pulling you off. Works: the pull-down happens
+   and a `PullDown … done` row is logged.
+
+**Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
+All remaining **Findings** under `src/`, in the pass order. L1 must report
+every file `same`; a finding that turns out to need a code change becomes
+a new batch-3 item rather than riding along. Findings that say "settle
+from the diary" are settled by reading it; one the diary cannot settle
+goes to the rider as a question. Includes the ruled comment corrections
+(the rise shortcut, `WhenBodyStops`, the impact pool, `RearAnimSpeed`).
+
+**Batch 5. Tooling.** *(L0; each tool run)*
+- `flow.ps1` the only front door: `dev_deploy.ps1` header marks it
+  internal; a full deploy refuses with the game running, before touching
+  the install; pointers in `AGENTS.md`, `publish_nexus.ps1:392`,
+  `dev_console.py:777`, `DEV_LOOP.md` and `.claude/RELEASING.md` name
+  `flow` commands; any switch `flow` cannot reach is added to `flow` or
+  deleted. Test: `flow test` with the game closed and with it running; a
+  direct full `dev_deploy` with the game running refuses and leaves the
+  install folder unchanged.
+- `:reload` and `reload_mod` deleted.
+- `land`'s retry deleted; `pre_release_check.py:493-495` corrected. Not
+  tested by landing, which is the rider's call; verified when it happens.
+- `publish_nexus.ps1` runs `verify_additive.py` on the zip unless `-Force`.
+  Test with `-DryRun`.
+- The stale armor-table sweep deleted from `build.ps1`.
+- README settings table generated by `nexus_settings_block.py` and checked
+  by the build. Test: edit one inline comment, confirm the build refuses,
+  revert.
+- Deleted: the four closed-question probes, `tools/legacy/`,
+  `dev_target.lua`, `dev_subject.lua`, with their README rows.
+- Remaining tool **Findings**, file by file.
+
+**Batch 6. Documentation.** *(L0, lint)*
+README layout (the `tools/` catalog to `DEV_LOOP.md`), DEV_LOOP's hook
+section, `BALANCE_AUDIT.md` deleted after confirming its derivations are in
+the code and its rulings in the diary, the settled fear notes out of
+`HANDOFF.md`, then the remaining document **Findings** file by file.
+
+**Batch 7. Close.** *(L0 through L3)*
+Promote the new lint rules to errors; the tree must pass. Full build and
+`verify_additive.py`. A final sweep ride on shipped values
+(`flow.ps1 test -Shipped`), every tier once, plus the publish-test checks
+below. Then this ledger is deleted and the branch is ready to land when the
+rider asks.
+
+### Publish-test checks carried from the rulings
+
+- A gallop or charge victim's recovery line or retaliation must not start
+  while they are still on the ground (the rise shortcut).
+- A second hit on a victim who is down must not snap them upright
+  (`VictimFlatFraction`).
+- Mutt taking damage and fleeing is the rider's to raise if it recurs.
+
+### Phase 2 log
+
+One line per batch: batch, commit, what was verified. Empty until batch 0.
 
 ## Standard
 
