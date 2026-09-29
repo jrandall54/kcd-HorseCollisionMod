@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door).
-Next: the horse animation files are not in git. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files.
+Next: unused get-up options. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -320,7 +320,7 @@ Items that change behavior or delete a feature. Not applied without a decision.
   cannot reach (`-Reload` alone among them) becomes a `flow` option if
   still needed, or is deleted.
 
-- [ ] **The horse animation files are not in git.** `hcm_horse_database.adb`,
+- [x] **The horse animation files are not in git.** `hcm_horse_database.adb`,
   `kcd_horse_fragmentids.xml` and `kcd_horse_controllerdefs.xml` are hand
   authored (`build_adb.py:905-910`) and live only in the ignored
   `mod_assets/`. `build.ps1:473-480` requires them, so a fresh clone cannot
@@ -329,6 +329,9 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `src/Animations/Mannequin/ADB/` and copy them into the pak as `src/Libs`
   is; correct `build.ps1:414-418`, which says everything in `mod_assets` is
   derived.
+  **Ruled as proposed, and first in phase 2**: until it lands these three
+  files exist only in the working copy and the install. `build_adb.py`
+  already deleted them once (`:905-910`).
 
 - [ ] **Unused get-up options.** `hcm_getup_{forward,back,left,right}`
   (`build_adb.py:293-296`) ship on both databases and nothing in `src/`
