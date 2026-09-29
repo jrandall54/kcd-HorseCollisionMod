@@ -4,25 +4,20 @@
 -- Charge each have their own sound, their own dust, their own camera shake,
 -- their own reaction and so on. Each of those is one table keyed by tier, read
 -- through one accessor, rather than a run of loose settings keys behind a
--- hand-written `if` chain at each point of use.
---
--- That shape is what let the rear and the charge quietly fall out of the
--- Horsemanship progression: nine separate chains, each typed by hand, and no
--- single place where all five tiers could be seen beside each other. A table
--- keyed by tier is one row per concern, so a tier that is missing a value is
--- missing it visibly.
+-- hand-written `if` chain at each point of use. A table keyed by tier shows
+-- all five side by side, so a tier missing a value is missing it visibly.
 --
 -- `TierValue` is the only way those tables are read. It takes the settings
 -- file's table when there is one and the compiled-in default when there is
 -- not, per key rather than per table, so a player who overrides three tiers
 -- still gets shipped values for the other two.
 --
--- This file defines the data, one accessor, and the binding at its foot that
--- puts every table into `Config` so the settings file can reach it. It is the
--- only declaration of any of those figures: the entry point carried a second
--- copy of all eight, and they drifted. It is pulled in by
--- `Script.ReloadScript` from `Scripts/Startup/HorseCollisionMod.lua` and
--- re-running it is harmless.
+-- This file defines nine of those tables with their derivations, one
+-- accessor, and the binding at its foot that puts each table into `Config` so
+-- the settings file can reach it; the entry point declares none of them. The
+-- settings file ships its own copy of each, and `build.ps1` refuses a copy
+-- that differs from this one. It is pulled in by `Script.ReloadScript` from
+-- `Scripts/Startup/HorseCollisionMod.lua` and re-running it is harmless.
 --
 -- @module HorseCollisionMod.Tiers
 -- @author jrandall54
@@ -64,9 +59,7 @@ end
 --- Resolves a speed to the tier it falls in.
 --
 -- The three loop tiers are speed bands and this is where a speed becomes one
--- of them. It sat in `Log.lua` for as long as the telemetry was the only thing
--- that named a gait out loud; tier identity is this file's subject, so it
--- belongs beside the tables that say what each tier is worth.
+-- of them.
 --
 -- The rear and the charge are not reachable from here. They are commanded
 -- moves rather than speed bands, and their entry points name their own tier
@@ -95,41 +88,30 @@ end
 --- What each tier is worth in health, before armor.
 --
 -- Every figure here is derived from the outcome it should produce against an
--- unarmored man, and the arithmetic is the same each time. NPC health is a
--- flat 100: across the whole testing diary every health reading tops out at
--- exactly 100.00, while stamina runs to 121 and 132, so health is not a
--- vitality-scaled pool. `ImpactDamageVariance` rolls the figure uniformly
--- across 0.85 to 1.15. The mod's damage is the only damage the victim keeps:
--- `ShieldVictimFromEngineDamage` hands the engine's own trample straight back,
--- measured live at `dealt=92.2 engineTook=29.1` leaving a victim on 7.8, so a
--- tier reaches 100 on its own or it does not reach it. A rear charges no
--- engine collision at all, since the horse is standing still.
+-- unarmored victim on a bare horse, and the arithmetic is the same each time.
+-- NPC health is a flat 100, not a vitality-scaled pool.
+-- `ImpactDamageVariance` rolls the figure uniformly across 0.85 to 1.15, and
+-- barding raises it by up to `BardingDamageBonus`. The mod's damage is the
+-- only damage the victim keeps, because `ShieldVictimFromEngineDamage` hands
+-- the engine's own trample back, so a tier reaches 100 on its own or it does
+-- not reach it.
 --
--- Walk is 0 deliberately: a shove staggers, it does not wound. A trot is worth
--- far less than the gallop rather than proportionally less, because the mod
--- puts a man on the ground at a trot and being knocked down is most of the
--- weight the rider wanted a trotting horse to carry.
+-- Walk is 0: a shove staggers, it does not wound. A trot is worth far less
+-- than the gallop rather than proportionally less, because being knocked down
+-- is most of what a trot impact carries.
 --
--- The gallop is the blow that kills, at about nine in ten. That needs the roll
--- to clear 100 nine times in ten, which is a threshold of 0.88, so the figure
--- is 100 / 0.88 = 113 before the horse's barding and 111 with it. The earlier
--- 95 was set when the trample was believed to add 15 to 20 on top of it, and
--- measured live it kills about two in five.
+-- The gallop is the blow that usually kills. At 111 the roll clears 100 above
+-- 0.90, about four times in five.
 --
--- The rear and the charge are commanded moves rather than speed bands, so
--- neither is derived from a speed.
---
--- A rear never kills a healthy man outright. At 75 its span is 65 to 88, so a
--- man on full health always survives one and a man already hurt does not: it
--- takes two rears to put someone down. This keeps clear air between the rear
--- and the gallop, which the rear is below in reaction, hit strength, dirt,
--- blood and vocal rank. Making it kill one in six would have cost 89 and
--- collapsed that gap.
+-- A rear never kills a healthy victim outright. At 75 its span is 64 to 86,
+-- and 99 at most on a fully barded horse, so a victim on full health always
+-- survives one and one already hurt does not: it takes two rears to put
+-- someone down. This keeps the rear clearly below the gallop, as it is in
+-- reaction, hit strength, dirt, blood and vocal rank.
 --
 -- A charge is the heaviest thing the mod does and the only impact a player
 -- spends a perk, a key and most of the horse's stamina on. It is the one blow
--- that kills on every roll: 118 x the worst roll of 0.85 is 100.3. Measured
--- live at 117.2 and 116.0 dealt, both fatal from full health.
+-- that kills on every roll: 118 x the worst roll of 0.85 is 100.3.
 HorseCollisionMod.ImpactDamageByTier = {
 	Walk = 0,
 	Trot = 18,
@@ -142,30 +124,27 @@ HorseCollisionMod.ImpactDamageByTier = {
 --- stamina, before the rider's Horsemanship, the horse's barding and the
 --- combat surcharge.
 --
--- A share rather than a point figure because the pool is not fixed: it
--- measured 210 on the test horse and 230 on another, so it is that horse's own
--- stamina stat and a flat cost would mean different things on different
--- mounts.
+-- A share rather than a point figure because the pool is that horse's own
+-- stamina stat and differs between mounts, so a flat cost would mean
+-- different things on different horses.
 --
--- The gallop's 0.20 is the anchor and everything else is derived from it. It
--- comes from two statements of intent held together: a horse should not become
--- a tank but Henry should be able to ride down a few people with ease, and one
--- gallop impact empties the horse at level 0 Horsemanship. With the
--- Horsemanship span running 5.0 down to 1.0, 0.20 of the pool is exactly one
--- full pool at level 0 and five back-to-back impacts at the top of the skill.
--- A trot is 0.13, about eight impacts back to back, because it puts a man on
--- the ground without being the blow that kills and should not be rationed the
--- way the gallop is. Walk is 0 for the same reason it deals no damage: a shove
--- is not an impact. These are back-to-back counts, and the diary records
--- stamina refilling between passes, so a player who circles and lines up again
--- gets more than the figure says.
+-- The gallop's 0.20 is the anchor and everything else is derived from it: a
+-- horse should not become a tank, Henry should be able to ride down a few
+-- people with ease, and one gallop impact empties the horse at level 0
+-- Horsemanship. With the Horsemanship span running 5.0 down to 1.0, 0.20 is
+-- exactly one full pool at level 0 and five back-to-back impacts at the top of
+-- the skill. A trot is 0.13, about eight back to back, because it knocks a
+-- victim down without being the blow that kills. Walk is 0 for the same
+-- reason it deals no damage: a shove is not an impact. Stamina refills
+-- between passes, so a player who circles and lines up again gets more than
+-- these back-to-back counts.
 --
--- The rear and the charge cost the same 0.20 as the gallop, by the rider's
--- ruling. They are commanded attacks rather than consequences of riding, so
--- stamina is not what rations them: the cooldown on the move itself is, and
--- their share is only a cost the player feels. They are perk-gated, the rear
--- at Horsemanship 7 and the charge at 10, so a freshly unlocked move costs
--- 0.72 and 0.60 of the pool and never empties a full horse on its own.
+-- The rear and the charge cost the same 0.20 as the gallop. They are
+-- commanded attacks, rationed by the cooldown on the move rather than by
+-- stamina, so their share is only a cost the player feels. They are
+-- perk-gated, the rear at Horsemanship 7 and the charge at 10, so a freshly
+-- unlocked move costs 0.72 and 0.60 of the pool and never empties a full
+-- horse on its own.
 --
 -- A charge is charged once for the whole lunge rather than once per victim,
 -- which is decided at the call site, because riding down a group is the move
@@ -189,10 +168,6 @@ HorseCollisionMod.StaminaShareByTier = {
 --     through the clip and owns the timing.
 --   * `ragdoll` drops the victim at the moment of contact and drives the
 --     throw from this mod.
---
--- The rear sits with the trot rather than with the gallop, which is what the
--- old `RearReaction or TrotReaction` fallback was saying in a way that could
--- silently change the rear by changing the trot.
 HorseCollisionMod.ReactionByTier = {
 	Walk = "stagger",
 	Trot = "fall",
@@ -204,21 +179,14 @@ HorseCollisionMod.ReactionByTier = {
 --- The tier's share of the configured impulse, for the tiers that ragdoll.
 --
 -- Only the `ragdoll` tiers appear. The others hand the body to physics through
--- Mannequin and this mod never pushes it, so a figure for them would be a
--- number that looks live and is not; two such figures sat in the code for
--- months behind branches that shipped settings never reached.
+-- Mannequin and this mod never pushes it, so a figure for them would look live
+-- and do nothing.
 --
--- Both tiers are 1.0, and the reason is worth keeping. This scales `Knockback`
--- and `Uplift`, together a velocity change of about 0.73 m/s on an 80 kg body,
--- so it is trim, and the audit's fourth ruling said so. It was briefly made to
--- scale the ragdoll brake and the airborne speed cap as well, to give the
--- charge its distance, and that stacked three multipliers on one throw: an
--- unarmored victim launched at 10.9 m/s under a ceiling raised by the same
--- factor traveled 20 meters.
---
--- One factor in one place. What separates a charge from a gallop is the speed
--- it is resolved at, `RearChargeImpactSpeed`, and everything downstream is the
--- gallop's own machinery working on a faster impact.
+-- This scales `Knockback` and `Uplift` and nothing else, together a velocity
+-- change of about 0.73 m/s on an 80 kg body, so it is trim and both tiers sit
+-- at 1.0. It must not scale the brake or the airborne cap as well: stacked
+-- multipliers on one throw run away. How far a charge throws is
+-- `ThrowProfileByTier` and `RearChargeThrow`.
 HorseCollisionMod.ThrowByTier = {
 	Gallop = 1.0,
 	Charge = 1.0,
@@ -239,16 +207,12 @@ HorseCollisionMod.ThrowByTier = {
 -- **The charge sidesteps physics.** The lunge starts from a stop and ends at a
 -- stop. The horse only moves because this mod hands it `RearChargeImpulse`,
 -- and through the rear Mannequin holds it `AnimationControlled`, so its own
--- velocity reads 0.02 to 0.07 with occasional snaps of 25.9 and cannot be
--- measured at all. The engine's collision does not reliably deliver anything:
--- measured with no mod throw in place, charge victims moved 0.3 to 1.0 m.
+-- velocity cannot be read, and the engine's collision alone moves a victim
+-- under a meter.
 --
 -- So the mod owns the charge outright. It commands the throw, and nothing
--- downstream is allowed to take it back out. Half-ownership is what produced
--- years of circles here -- the mod launched the victim and then ran the
--- gallop's subtractive brake, ceiling and a per-poll cap enforcement over the
--- top, two systems fighting over one body, and the charge came out traveling
--- *less* than a gallop.
+-- downstream may take it back out: the gallop's brake and ceiling never run
+-- on a charge, because two systems over one body fight.
 --
 -- ## The steps
 --
@@ -265,32 +229,29 @@ HorseCollisionMod.ThrowByTier = {
 --     which is the same for every tier and lives in the `RagdollDamp*`
 --     settings.
 --
--- Both endpoints of every pair are blended across the victim's armour, so
--- armour is what decides distance within a tier, in both tiers.
+-- Both endpoints of every pair are blended across the victim's armor, so
+-- armor is what decides distance within a tier, in both tiers.
 --
 -- ## The charge's throw is 1:1 with the horse
 --
--- The charge commands a speed, so that speed has to come from somewhere real
--- or it is an invented constant, which is what every previous attempt here
--- was. It is derived from the lunge the mod itself commanded:
+-- The charge commands a speed, derived from the lunge the mod itself
+-- commanded rather than from an invented constant:
 --
 --     throw = RearChargeImpactSpeed * transfer * RearChargeThrow
 --
--- `RearChargeImpactSpeed` is the lunge, already declared rather than measured
--- for exactly this reason: `RearChargeImpulse` of 6000 on a horse of about 480
--- kg is 12.5 m/s, and the setting says 12.3.
+-- `RearChargeImpactSpeed` is the lunge, declared rather than measured:
+-- `RearChargeImpulse` of 6000 on a horse of about 480 kg is 12.5 m/s, and the
+-- setting says 12.3.
 --
 -- `transfer` is the fraction of a striker's speed a struck body leaves with,
--- and the gallop supplies it, because the gallop is tuned and accepted. Its
--- ceilings are the speeds this mod has settled on as right for each armour
--- class -- 6.0 unarmored and 2.5 in full mail -- so the transfer that
--- reproduces them off a 12.3 m/s lunge is 6.0/12.3 = 0.49 and 2.5/12.3 = 0.20.
--- That is what makes a charge at `RearChargeThrow` of 1.0 land like a gallop.
+-- and the gallop supplies it. Its ceilings are 6.0 m/s unarmored and 2.5 in
+-- full mail, so the transfer that reproduces them off a 12.3 m/s lunge is
+-- 6.0/12.3 = 0.49 and 2.5/12.3 = 0.20. That is what makes a charge at
+-- `RearChargeThrow` of 1.0 land like a gallop.
 --
 -- `RearChargeThrow` is then the only dial, and it has a wide range on purpose:
 -- a charge is an offensive attack the player commands, not a consequence of
--- riding into somebody, so it is allowed to be tuned well past what a gallop
--- would ever do.
+-- riding into somebody.
 --
 -- The drag is the gallop's, 20.0 in mail and 4.0 unarmored, because drag is
 -- not a distance axis in either tier. It is what makes a ceiling true.
@@ -312,10 +273,10 @@ HorseCollisionMod.ThrowProfileByTier = {
 	},
 }
 
---- Resolves a tier's throw profile against a victim's armour.
+--- Resolves a tier's throw profile against a victim's armor.
 --
 -- Returns a flat table of the figures the throw pipeline needs, with every
--- armour pair already blended, or nil for a tier that does not ragdoll. The
+-- armor pair already blended, or nil for a tier that does not ragdoll. The
 -- pipeline reads only what comes back from here, so no part of it knows which
 -- tier it is working for.
 --
@@ -369,13 +330,9 @@ function HorseCollisionMod:ThrowProfile(tierName, armorScale)
 				* (self.Config.RearChargeThrow)
 		profile.cap = profile.launch
 
-		-- And the rail is enforced, which is the half that makes ownership
-		-- real. Drag does not bind a ragdoll: measured, a victim railed at
-		-- 6.03 was driven to 8.64 and 9.17 m/s by the horse's collider with
-		-- the drag applied throughout, and lowering the commanded speed did
-		-- not shorten a single throw, because the commanded speed was only
-		-- ever a floor. A tier that owns its throw has to hold it at both
-		-- ends.
+		-- And the rail is enforced. Drag does not bind a ragdoll the horse's
+		-- collider keeps pushing, so without enforcement the commanded speed
+		-- is only a floor. A tier that owns its throw holds it at both ends.
 		profile.railEnforce = true
 	end
 
@@ -396,10 +353,6 @@ end
 -- Named rather than numbered so the settings file reads as English and so a
 -- value that is not a strength fails visibly instead of becoming a plausible
 -- integer.
---
--- The charge used to probe itself as a minor injury while sending a major one.
--- The probe was written once for both rear tiers and the send was branched, so
--- the two disagreed and the telemetry named the wrong figure.
 HorseCollisionMod.HitStrengthByTier = {
 	Walk = "Tickle",
 	Trot = "MinorInjury",
@@ -453,15 +406,8 @@ HorseCollisionMod.StaminaPerVictimByTier = {
 --
 -- `ApplySettings` refuses a settings key that `Config` does not already
 -- declare, so a tier table that lived only on this module could never be
--- overridden at all. Both were therefore declared, with the value written out
--- twice: once here beside its derivation and once as a bare literal in the
--- entry point. The two drifted. `VictimBarkByTier.Charge` read "rear" in one
--- and "collision" in the other, and `RiderVocalByTier` was a whole tier apart,
--- and neither difference was visible, because a whole-table override hides the
--- module copy until a player overrides a single tier.
---
--- Bound rather than copied, so there is one literal per concern and the two
--- lookups `TierValue` makes have distinct jobs rather than duplicate contents:
+-- overridden at all. Bound rather than copied, so the entry point carries no
+-- second literal, and the two lookups `TierValue` makes have distinct jobs:
 --
 --   * `Config[name]` is the whole table, replaced outright when the settings
 --     file carries one, because `ApplySettings` assigns rather than merges.
@@ -469,8 +415,7 @@ HorseCollisionMod.StaminaPerVictimByTier = {
 --     reach, and is therefore the per-tier floor under a partial override.
 --
 -- A player who writes `ImpactDamageByTier = { Gallop = 200 }` gets 200 for a
--- gallop and the shipped figures for the other four, and those figures are now
--- the same ones the shipped build runs.
+-- gallop and the shipped figures for the other four.
 --
 -- Re-running this file rebinds `Config` to the shipped tables and so discards
 -- an applied override, which is harmless: every path that reloads the mod

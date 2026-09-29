@@ -31,8 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`,
-`src/HorseCollisionMod_Settings.lua`. Next: `Tiers.lua`. Read **Phase 2 plan** below in full
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`. Next: `Armor.lua`.lua`. Read **Phase 2 plan** below in full
 before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -377,6 +376,8 @@ One line per batch: batch, commit, what was verified.
   false positive. A comparison of every shipped value against the entry
   point's defaults found one drift, `RiderVocalByTier`, added to batch 3,
   item 7.
+- **Batch 4, `Tiers.lua`.** L1 `same`; lint clean for the file. History,
+  readings and "armour" cut; derivations kept and rechecked.
 
 ## Standard
 
@@ -1022,12 +1023,18 @@ does):
 
 ### src/HorseCollisionMod/Tiers.lua
 
-- [ ] `:9-13`, `:21-23` header — "That shape is what let the rear and the
+Batch 4: applied. The gallop derivation is restated as arithmetic: at 111
+the roll clears 100 above 0.90, about four in five on a bare horse; the
+barding step is gone, since barding raises damage. The rear's span
+corrected to 64 to 86 (99 fully barded). The header now says the settings
+file ships a copy of each table that the build checks.
+
+- [x] `:9-13`, `:21-23` header — "That shape is what let the rear and the
   charge quietly fall out…", "the entry point carried a second copy of all
   eight, and they drifted". There are nine tables. — Cut the history; say
   nine.
-- [ ] `:67-70` `GetSpeedTier` — "It sat in `Log.lua` for as long as…". — Cut.
-- [ ] `:98-133` `ImpactDamageByTier` — "across the whole testing diary",
+- [x] `:67-70` `GetSpeedTier` — "It sat in `Log.lua` for as long as…". — Cut.
+- [x] `:98-133` `ImpactDamageByTier` — "across the whole testing diary",
   "measured live at `dealt=92.2 engineTook=29.1`", "The earlier 95 was set
   when…", "Measured live at 117.2 and 116.0", "the rider wanted", "Making it
   kill one in six would have cost 89", victims as "a man". The gallop
@@ -1035,14 +1042,14 @@ does):
   `BardingDamageBonus` raises damage, so barding cannot lower the figure. —
   Keep the arithmetic (health 100, variance 0.85 to 1.15, the threshold per
   tier); verify and restate the barding step; "they".
-- [ ] `:146-173` `StaminaShareByTier` — "measured 210 on the test horse and
+- [x] `:146-173` `StaminaShareByTier` — "measured 210 on the test horse and
   230 on another", "the diary records", "by the rider's ruling". — Keep the
   derivation: 0.20 is one pool at level 0 and five at the top; the perk
   unlock costs 0.72 and 0.60.
-- [ ] `:194-196` `ReactionByTier` — "The rear sits with the trot… the old
+- [x] `:194-196` `ReactionByTier` — "The rear sits with the trot… the old
   `RearReaction or TrotReaction` fallback" is history and ranks one tier
   under another. — Cut.
-- [ ] `:205-222` `ThrowByTier` — "two such figures sat in the code for
+- [x] `:205-222` `ThrowByTier` — "two such figures sat in the code for
   months", "the audit's fourth ruling", "It was briefly made to scale…".
   "What separates a charge from a gallop is the speed it is resolved at, and
   everything downstream is the gallop's own machinery" is false: the charge
@@ -1050,16 +1057,16 @@ does):
   both tiers only as trim on `Knockback` and `Uplift`
   (`Reaction.lua:318`). — State that and stop. Resolves the settings file's
   `ThrowByTier` finding.
-- [ ] `:228-297` `ThrowProfileByTier` — "years of circles", "every previous
+- [x] `:228-297` `ThrowProfileByTier` — "years of circles", "every previous
   attempt here was", the 0.02, 0.07, 25.9 and 0.3 to 1.0 m readings. "armour"
   at `:269-270`, `:286`, `:316-319`, `:329` comment. — Keep the ownership
   statement, the three steps and the formula; American spelling.
-- [ ] `:373-379` — "measured, a victim railed at 6.03 was driven to 8.64 and
+- [x] `:373-379` — "measured, a victim railed at 6.03 was driven to 8.64 and
   9.17 m/s". — Constraint only: drag does not bind a ragdoll, so the rail is
   enforced.
-- [ ] `:401-403` `HitStrengthByTier` — "The charge used to probe itself as a
+- [x] `:401-403` `HitStrengthByTier` — "The charge used to probe itself as a
   minor injury…". — Cut.
-- [ ] `:452-478` `TierTables` — the drift story (`:457-462`) and "those
+- [x] `:452-478` `TierTables` — the drift story (`:457-462`) and "those
   figures are now the same ones the shipped build runs". The claim of "one
   literal per concern" is false while the settings file ships whole copies
   of all nine tables (see the ruling). — Cut the history; describe the
