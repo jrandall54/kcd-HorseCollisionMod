@@ -445,7 +445,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field HorseBoltChance how often it does
 -- @field HorseBoltRestoreMs how long until its health is given back
 -- @field ImpactSound whether a collision makes a noise
--- @field ImpactSoundDistance meters added to every layer, the master level
+-- @field ImpactSoundDistance meters added to every trot and gallop layer, the
+--   master level
 -- @field ImpactSoundCrack the occasional bone crack layer
 -- @field ImpactSoundCrackChance how often a gallop or a charge adds it
 -- @field RiderVocal whether Henry grunts as the collision goes through him
@@ -958,11 +959,11 @@ HorseCollisionMod.Config = {
 	-- armor.
 	--
 	-- `ImpactSoundDistance` is the master level, in meters, added to every
-	-- layer of every tier. Higher is quieter. The per-layer distances set the
-	-- balance between the layers; this sets how loud that balance is as a
-	-- whole. The listener follows the camera, so a third-person camera hears
-	-- the mix from several meters further back than first person, the loudest
-	-- case, which it is tuned in.
+	-- layer of the trot and gallop tiers. Higher is quieter. The per-layer
+	-- distances set the balance between the layers; this sets how loud that
+	-- balance is as a whole. The listener follows the camera, so a third-person
+	-- camera hears the mix from several meters further back than first person,
+	-- the loudest case, which it is tuned in.
 	ImpactSoundDistance      = 2.0,
 
 	-- The occasional injury, gallop and charge only. A foley event, so unlike
@@ -987,8 +988,7 @@ HorseCollisionMod.Config = {
 	RiderVocalCooldownMs     = 1500,
 
 	-- Whether the horse vocalizes on impact. The trigger is played on the
-	-- horse entity, not the victim; horse audio triggers carry engine-level
-	-- `path="horse"` metadata and must not be fired on a human proxy.
+	-- horse entity, not the victim.
 	HorseVocal               = true,
 
 	-- How long the horse stays quiet after vocalizing. Mirrors the rider

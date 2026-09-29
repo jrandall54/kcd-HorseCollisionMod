@@ -554,9 +554,10 @@ HorseCollisionModSettings = {
 	-- plays nothing, and an empty list silences that tier alone.
 	ImpactSound              = true,
 
-	-- The master level, in meters, added to every layer of every tier. Higher
-	-- is quieter. The listener follows the camera, so third person hears the
-	-- mix from further back; these values are set in first person.
+	-- The master level, in meters, added to every layer of the trot and gallop
+	-- tiers. Higher is quieter. The listener follows the camera, so third
+	-- person hears the mix from further back; these values are set in first
+	-- person.
 	ImpactSoundDistance      = 2.0,
 
 	-- The occasional bone crack, at a gallop or a charge, as an impact layer.

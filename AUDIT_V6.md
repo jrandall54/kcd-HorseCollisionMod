@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`. Next: `Sound.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`. Next: `Lean.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -263,6 +263,15 @@ In this order, each its own commit and ride:
      `RiderBlurSteps` at 1, since 0 leaves the screen blurred; `BoltHorse`
      calls `DealDamage` with two arguments; `GrantPerks` uses `player` as
      the rest of the mod does, without the `g_localActor` fallback.
+   - `Sound.lua`: `PlayImpactSound`, `PlayRiderVocal` and `PlayHorseVocal`
+     return nothing, since no caller reads the result; drop the stray
+     parentheses on `ImpactSoundCrackChance`; one helper for the
+     fire-now-or-later closure the three repeat; `PlayRiderVocal` calls
+     `RiderVoiceReady(rank)` instead of reimplementing it; delete the
+     unread `RiderVoiceRanks.Grunt`; one gated player shared by the rider
+     and horse vocals, the gate state passed in; `PlayAtDistance` sets the
+     proxy's removal timer before executing the trigger, so a throw cannot
+     leak the proxy.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -446,6 +455,10 @@ One line per batch: batch, commit, what was verified.
   function; the prediction doc matches the code.
 - **Batch 4, `Rider.lua`.** L1 `same`. Tier docs follow the per-tier
   tables; the `DealDamage` signature matches `Health.lua`; history cut.
+- **Batch 4, `Sound.lua`.** L1 `same` for it, the entry point and the
+  settings file. Quotes, experiments and measurements cut; the grunt
+  worst case and ranks match the shipped tables; the master level's scope
+  corrected in three files.
 
 ## Standard
 
@@ -2068,87 +2081,97 @@ item 7.
 
 ### src/HorseCollisionMod/Sound.lua
 
-- [ ] `:3-5` header — "eighty kilograms of person was struck by half a ton
+Batch 4: applied. The unused-tokens finding was settled in batch 2; the
+`ImpactTokens` doc lists the four that remain. The trigger vocabulary now
+cites `references/audio_triggers.tsv`. `ImpactSoundDistance` applies only
+to the trot and gallop (`PlayImpactSound`), so the entry point's field and
+Config comment and the settings file, which said every tier, are corrected
+in this commit. The horse-proxy corruption claim had no source and is cut
+here and from the entry point's `HorseVocal` comment. The `0.5` in
+`AwayFromListener` is described as the half meter under which there is no
+direction. Code findings went to batch 3, item 7.
+
+- [x] `:3-5` header — "eighty kilograms of person was struck by half a ton
   of horse". — Cut to: vanilla plays nothing for a collision.
-- [ ] `:15-17` — the vocabulary is "242 distinct `audio_trigger` parameters"
+- [x] `:15-17` — the vocabulary is "242 distinct `audio_trigger` parameters"
   in the `.animevents`, and "a name outside it does not resolve". The grunts
   (`voices.xml`) and the horse calls (`animals.xml`) are outside it and
   resolve; the vocabulary is the trigger list in
   `references/audio_triggers.tsv`. — Correct and cite the table.
-- [ ] `:19-31` "Why this is not in the animation data" — "built, tested in
+- [x] `:19-31` "Why this is not in the animation data" — "built, tested in
   game, and abandoned", "The rider's verdict… 'way off'". — Keep: a
   fragment's `PlaySound` starts with the reaction, a detection tick and an
   interactive-action call after contact, so the sound lands late.
-- [ ] `:40-45` `ArmorMaterial` — "the heaviest type a victim is wearing";
+- [x] `:40-45` `ArmorMaterial` — "the heaviest type a victim is wearing";
   `heaviestType` is the type of the heaviest piece by weight
   (`Armor.lua:210-213`). Same at `:99-100`. — Correct.
-- [ ] `:149-151` — "A footprint reaching sixty milliseconds of travel
+- [x] `:149-151` — "A footprint reaching sixty milliseconds of travel
   further forward" is an experiment. — Keep: sounding ahead of contact
   plays near misses and sounds a victim twice.
-- [ ] `:155-163` — layers are "`{ trigger, delayMs }` pairs", then `:168`
+- [x] `:155-163` — layers are "`{ trigger, delayMs }` pairs", then `:168`
   gives four fields. "`a_o_jump_landing`… A blunt body impact ten
   milliseconds later": only the rear uses the landing, at 0 ms beside its
   body layer, and the gallop settings exclude the hoofstep family. "of
   twenty three candidates" is measurement. — One format line; the reason
   for layers is that no single sample is a horse striking a person.
-- [ ] `:172-174` — "Two literal trigger names are tokens"; `ImpactTokens`
+- [x] `:172-174` — "Two literal trigger names are tokens"; `ImpactTokens`
   has five plus `foley`. — List them from the table, or point at it.
   Follows the unused-tokens ruling.
-- [ ] `:181` — "names the same sample two or four times"; no tier names one
+- [x] `:181` — "names the same sample two or four times"; no tier names one
   four times. — "more than once".
-- [ ] `:196` `@tparam tierName` — three tiers; the rear and the charge
+- [x] `:196` `@tparam tierName` — three tiers; the rear and the charge
   arrive too (`:244`). — "an impact tier name". Same at `:375`, `:502`.
-- [ ] `:198`, `:376`, `:503` `@treturn` — no caller reads the result
+- [x] `:198`, `:376`, `:503` `@treturn` — no caller reads the result
   (`Impact.lua:102`, `:198-199`). — Return nothing.
-- [ ] `:239-241` — "gallop only"; the code plays the crack on the gallop and
+- [x] `:239-241` — "gallop only"; the code plays the crack on the gallop and
   the charge (carried from Settings). — Correct.
-- [ ] `:246` — `(cfg.ImpactSoundCrackChance)` in stray parentheses. —
+- [x] `:246` — `(cfg.ImpactSoundCrackChance)` in stray parentheses. —
   Remove.
-- [ ] `:260-263` — repeats `:168-170` and `PlayAtDistance`. — Cut to one
+- [x] `:260-263` — repeats `:168-170` and `PlayAtDistance`. — Cut to one
   line.
-- [ ] `:282-296`, `:458-472`, `:564-578` — the same fire-now-or-later
+- [x] `:282-296`, `:458-472`, `:564-578` — the same fire-now-or-later
   closure three times. — One helper taking entity, trigger, delay and
   distance.
-- [ ] `:310-373` `PlayRiderVocal` — "until now the rider was silent",
+- [x] `:310-373` `PlayRiderVocal` — "until now the rider was silent",
   "Every earlier attempt", "The rider's verdict on the first build" and the
   quote. — Keep: a named FMOD event cannot answer with a monolog and joins
   no dialog auction; the cooldown stops a group impact from stacking grunts.
-- [ ] `:313-319` — "three severities… each tier names one"; the tiers use
+- [x] `:313-319` — "three severities… each tier names one"; the tiers use
   `soft` and `heavy`, and `medium` is unused. `:367-369` — "three grunts in
   one window, soft then medium then heavy"; the worst case is two, rank 2
   then 3. — Correct both.
-- [ ] `:363-365` — "Ranks are the mod's own reading of severity rather than
+- [x] `:363-365` — "Ranks are the mod's own reading of severity rather than
   config"; they are `RiderVocalRankByTier` in the settings file. — Cut.
-- [ ] `:414-439` — reimplements `RiderVoiceReady` (`Bark.lua:415-431`)
+- [x] `:414-439` — reimplements `RiderVoiceReady` (`Bark.lua:415-431`)
   inline. `:420-421` credits the rewind guard to "the hit cooldown in
   `Update.lua`"; `Update.lua` has none, and the load handler
   (`HorseCollisionMod.lua:1883`) resets the rear's deadline instead. — Call
   `RiderVoiceReady(rank)`; drop the `Update.lua` reference.
-- [ ] `:427-428` — "A spoken line stamps rank 3, which nothing outranks";
+- [x] `:427-428` — "A spoken line stamps rank 3, which nothing outranks";
   lines stamp 4 or 5 (`Bark.lua:436`), grunts reach 3. `RiderVoiceRanks.Grunt
   = 3` duplicates the top of `RiderVocalRankByTier` and nothing reads it;
   `Bark.lua:406` names it `RiderVoiceGrunt`, which does not exist. — "A
   spoken line outranks every grunt"; delete `Grunt` and fix `:406`.
-- [ ] `:484-499` `PlayHorseVocal` — "corrupts CryEngine's audio proxy
+- [x] `:484-499` `PlayHorseVocal` — "corrupts CryEngine's audio proxy
   because the triggers carry `path="horse"` metadata"; no source in the
   diary, the references or the commit (`9d4ef0d`). `:497-499` restates the
   settings. — Cut both; the horse's voice plays on the horse.
-- [ ] `:504-588` — a copy of `PlayRiderVocal` with its own gate;
+- [x] `:504-588` — a copy of `PlayRiderVocal` with its own gate;
   `local longest = cooldown` is a pointless local; column-aligned `=` and no
   blank line before `return` depart from the file. — Share one gated
   player with `PlayRiderVocal`, the gate state passed in.
-- [ ] `:606-610` — "Measured through speakers placed at verified
+- [x] `:606-610` — "Measured through speakers placed at verified
   distances". — Keep: only 3D events respond to distance, and
   `hoofsteps_player` ignores position, so `a_o_jump_landing` has a fixed
   level.
-- [ ] `:624-633` — the proxy is created before `ExecuteAudioTrigger`, and
+- [x] `:624-633` — the proxy is created before `ExecuteAudioTrigger`, and
   its removal timer set after; a throw between them leaks the proxy. — Set
   the timer first.
-- [ ] `:640-645` `AwayFromListener` — measures from the player, while
+- [x] `:640-645` `AwayFromListener` — measures from the player, while
   `:188-192` says the listener follows the camera. — Say the player stands
   in for the listener.
-- [ ] `:668` — `0.5` unnamed. — Name it or give its derivation.
-- [ ] `:693` — trailing blank line at end of file. — Remove.
+- [x] `:668` — `0.5` unnamed. — Name it or give its derivation.
+- [x] `:693` — trailing blank line at end of file. — Remove.
 
 ### src/HorseCollisionMod/Lean.lua
 

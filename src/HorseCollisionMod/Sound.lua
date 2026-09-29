@@ -1,8 +1,7 @@
 --- Sound: the noise a collision makes.
 --
--- A collision is silent. The victim's bark and the horse's own foley are all
--- there is, and nothing in the moment says that eighty kilograms of person was
--- struck by half a ton of horse.
+-- Vanilla plays nothing for a collision beyond the victim's bark and the
+-- horse's own foley.
 --
 -- Vanilla's audio triggers are reachable from Lua through a global helper in
 -- `Scripts/Utils/SoundUtils.lua`:
@@ -12,23 +11,15 @@
 --                 entity:GetDefaultAuxAudioProxyID())
 --     end
 --
--- The trigger names come from the game's own `.animevents` files, which carry
--- 242 distinct `audio_trigger` parameters between them. That is the authored
--- vocabulary, and a name outside it does not resolve.
+-- The trigger names are the game's audio triggers, listed with their events in
+-- `references/audio_triggers.tsv`. A name that does not exist plays nothing.
 --
 -- ### Why this is not in the animation data
 --
--- The animation databases this mod generates can carry a `PlaySound`
--- procedural layer, and that route works: a trigger fired that way is audible,
--- and the stock male database ships twenty four of them. It was built, tested
--- in game, and abandoned, because a fragment cannot make a sound before it
--- starts. Even at `ExitTime="0.0"` the noise arrives after the horse has
--- already hit, since the reaction animation begins a detection tick and an
--- interactive-action call later than the contact that caused it. The rider's
--- verdict on that build was that the timing was "way off".
---
--- Firing from here instead puts the sound on the same line as the impact that
--- detected it, and leaves the animation data unchanged.
+-- A fragment's `PlaySound` procedural layer starts with the reaction, which
+-- begins a detection tick and an interactive-action call after the contact,
+-- so even at `ExitTime="0.0"` the sound lands late. Firing from here puts the
+-- sound on the same line as the impact that detected it.
 --
 -- Attached to the `HorseCollisionMod` table created by the entry point, which
 -- pulls this file in with `Script.ReloadScript`.
@@ -38,8 +29,8 @@
 
 --- The material a victim's armor sounds like, by engine armor type.
 --
--- `Armor.lua` reports the heaviest type a victim is wearing, transcribed in
--- `ArmorTypeNames`: 4 is chain and 5 is plate. Everything lighter, leather
+-- `ArmorOf` reports the type of the heaviest piece a victim is wearing,
+-- transcribed in `ArmorTypeNames`: 4 is chain and 5 is plate. Everything lighter, leather
 -- included, sounds like cloth, because the blunt impact families are only
 -- authored for three materials.
 --
@@ -98,54 +89,37 @@ end
 -- Called from `OnImpact` before the reaction is chosen, so the request goes
 -- out ahead of the animation rather than behind it.
 --
--- Firing it earlier than the collision does not work. A footprint reaching
--- sixty milliseconds of travel further forward sounds near misses, and sounds
--- the same victim twice, which is worse than a sound that is slightly late.
+-- Firing it earlier than the collision does not work: sounding ahead of
+-- contact plays near misses, and sounds the same victim twice.
 --
 -- ### Layers
 --
--- A tier names a list of `{ trigger, delayMs }` pairs rather than one sound,
--- because no single sound in the game is a horse striking a person. Vanilla
--- never makes that noise, so its library does not contain it: of twenty three
--- candidates, every one reads as a weapon, a footstep or a dropped object.
---
--- What works is the horse's own weight underneath a body impact:
--- `a_o_jump_landing` is the sound of the horse landing from a jump, and it is
--- the only sample in the game carrying that mass. A blunt body impact ten
--- milliseconds later reads as the thing it struck.
---
--- The offsets are small on purpose. Far enough apart to thicken the hit,
--- close enough that the ear takes them as one event rather than as a stack.
---
--- A layer is `{ trigger, delay, distance, chance }`. Distance is the volume
--- control and chance is how often the layer appears at all, which is the only
--- lever on a sample whose level cannot be changed.
---
--- A trigger name that is a key of `ImpactTokens` (`body`, `body_armed`,
--- `face_armed`, `blunt`) is replaced with the sample matching the victim's
--- armor.
+-- A tier names a list of layers rather than one sound, because no single
+-- sound in the game is a horse striking a person. A layer is
+-- `{ trigger, delay, distance, chance }`. The offsets are small, so the ear
+-- takes the layers as one event. Distance is the volume control and chance is
+-- how often the layer appears at all, which is the only lever on a sample
+-- whose level cannot be changed. A trigger name that is a key of
+-- `ImpactTokens` is replaced with the sample matching the victim's armor.
 --
 -- ### Balancing layers without a volume control
 --
 -- There is no gain on a trigger. Distance is the substitute, and it only
--- reaches events authored in 3D; `PlayAtDistance` documents what was measured.
--- Loudness upward comes from repetition instead, which is why a tier names the
--- same sample two or four times a few milliseconds apart.
+-- reaches events authored in 3D; see `PlayAtDistance`. Loudness upward comes
+-- from repetition instead: a tier names the same sample more
+-- than once a few milliseconds apart.
 --
 -- Levels can only be judged from the saddle. Every sample here is clearly
 -- audible standing still and most of them disappear under the horse's own
 -- hoofbeats at speed, so a mix that sounds correct while parked is not the
 -- mix that will be heard.
 --
--- And they can only be judged from the camera the player uses.
--- `ImpactSoundDistance` is added to every layer for exactly that reason: the
--- listener follows the camera, so a third-person view starts several meters
--- further from the victim than a first-person one and hears the whole mix
--- quieter. The per-layer distances set the balance between the layers; the
--- master sets where that balance sits.
+-- And they can only be judged from the camera the player uses: the listener
+-- follows the camera, so a third-person view starts several meters further
+-- from the victim than a first-person one and hears the whole mix quieter.
 --
 -- @tparam table npc victim entity
--- @tparam string tierName "Walk", "Trot" or "Gallop"
+-- @tparam string tierName an impact tier name
 -- @tparam[opt] table armor the victim's armor total, for the body layer
 -- @treturn boolean true when at least one layer was played
 function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
@@ -157,10 +131,11 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 
 	local layers = self:TierValue("ImpactSoundByTier", tierName)
 
-	-- The master level control, added to every layer of the tier so the mix
-	-- comes down as a whole and the balance between the layers is left alone.
+	-- The master level control, `ImpactSoundDistance`, added to every layer
+	-- of the tier so the mix comes down as a whole and the balance between
+	-- the layers is left alone.
 	--
-	-- Only the two loop tiers that ride into someone take it. Walk is movement
+	-- Only the two loop tiers that ride into someone, trot and gallop, take it. Walk is movement
 	-- foley rather than an impact, its samples are the quietest in use and are
 	-- already doubled to be audible at all, so there is no headroom in them to
 	-- give away. The rear and the charge are tuned as their own moves.
@@ -188,7 +163,7 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 		plan[#plan + 1] = layer
 	end
 
-	-- The bone crack is occasional and gallop only. Every gallop cracking
+	-- The bone crack is occasional, on a gallop or a charge. Every gallop cracking
 	-- bones would stop reading as an injury and start reading as a sound
 	-- effect attached to the tier.
 	local cracked = false
@@ -261,29 +236,23 @@ end
 
 --- Henry's own grunt as the collision goes through him.
 --
--- The victim makes a noise and the camera kicks, and until now the rider was
--- silent through both. The game authors him three severities of taking a hit:
+-- The game authors him three severities of taking a hit:
 --
 --     v_henry_hit_soft     event:/voice/henry_hit_soft
 --     v_henry_hit_medium   event:/voice/henry_hit_medium
 --     v_henry_hit_heavy    event:/voice/henry_hit_heavy
 --
--- which is the same shape as the tiers, so each tier names one.
+-- and `RiderVocalByTier` names one per tier; the shipped tiers use `soft` and
+-- `heavy`.
 --
 -- ### Why this is not a bark
 --
--- Every earlier attempt at giving Henry something to say went through
--- `dialog:monologRequest`, and the sets available to him answered with full
--- Skalitz monologs rather than a grunt, because the mod chooses a set and the
--- dialog system chooses the line out of it. `Bark.lua` still carries that
--- constraint and it is real.
---
--- These are not dialogue. They are FMOD events fired straight at the entity's
--- audio proxy, the same call the impact foley above uses, so the mod names the
--- exact event and the dialog system is not consulted. A named event cannot
--- answer with a monolog, which removes the only thing that made Henry's half
--- unusable. It also means no priority auction and no cooldown: this cannot be
--- taken by a crime reaction the way a collision bark is.
+-- A bark names a set and the dialog system chooses the line, and the sets
+-- available to Henry answer with full monologs. These are FMOD events fired
+-- straight at the entity's audio proxy, the same call the impact foley above
+-- uses, so the mod names the exact event and the dialog system is not
+-- consulted: no monolog, no priority auction, and nothing a crime reaction can
+-- take.
 --
 -- What it does not give is a choice of sample. An FMOD event may hold several
 -- takes and randomize inside them, and that is internal to FMOD. The severity
@@ -304,27 +273,19 @@ end
 -- ### Why there is a cooldown
 --
 -- Riding into a group lands several collisions inside a second, and one grunt
--- per collision does not read as a man being jolted repeatedly, it reads as
--- broken audio. The rider's verdict on the first build:
+-- per collision reads as broken audio rather than a rider being jolted. So
+-- `RiderVocalCooldownMs` holds the next one off. One exception: a **harder**
+-- impact, by `RiderVocalRankByTier`, is still allowed through, because a
+-- gallop silenced by the walk shove just before it is the worse fault.
 --
--- > "Henry only needs to grunt or make sound once within a short period as
--- > with multiple impacts happening within a short interval sounds weird."
---
--- So `RiderVocalCooldownMs` holds the next one off. One exception: a **harder**
--- impact is still allowed through, because a gallop silenced by the walk shove
--- that happened just before it is a worse fault than the one being fixed. Ranks
--- are the mod's own reading of severity rather than config, so changing a
--- trigger cannot scramble them.
---
--- The worst case is therefore three grunts in one window, soft then medium then
--- heavy, which needs three impacts of rising tier inside the cooldown. Riding
--- through a crowd is all one tier and gets one grunt.
+-- With the shipped ranks the worst case is two grunts in one window, rank 2
+-- then rank 3. Riding through a crowd is all one tier and gets one grunt.
 --
 -- The stamp is taken when the grunt is *scheduled* rather than when it plays,
 -- so collisions arriving inside the tier's own delay are still caught.
 --
 -- @tparam table playerEnt the player entity, as `ShakeRiderCamera` takes it
--- @tparam string tierName "Walk", "Trot", "Gallop", "Charge" or "Rear"
+-- @tparam string tierName an impact tier name
 -- @treturn boolean true when a trigger resolved and was played
 function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
 	local cfg = self.Config
@@ -366,18 +327,14 @@ function HorseCollisionMod:PlayRiderVocal(playerEnt, tierName)
 	local until_ = self.RiderVoiceUntil or 0
 	local longest = math.max(cooldown, cfg.RiderBarkCooldownMs)
 
-	-- A hold further out than any cooldown that can be written was not written
-	-- against this clock. `System.GetCurrTime` is persisted in the save, so
-	-- loading an earlier one moves it backwards, and trusting the stamp would
-	-- mute the rider until the rewind had been ridden back through. The hit
-	-- cooldown in `Update.lua` guards the same hazard for the same reason.
+	-- A hold further out than the longest cooldown means the save clock was
+	-- wound back by a load; it is ignored, as in `RiderVoiceReady`.
 	if (until_ - now) > longest then
 		until_ = 0
 	end
 
-	-- A harder impact still speaks: a gallop silenced by the walk shove just
-	-- before it is a worse fault than the repetition this prevents. A spoken
-	-- line stamps rank 3, which nothing outranks.
+	-- A harder impact still speaks. A spoken line stamps a rank above every
+	-- grunt, so no grunt interrupts it.
 	if now < until_ and rank <= (self.RiderVoiceRank or 0) then
 		if cfg.LogTelemetry then
 			self:Log("RiderVocal tier=" .. tostring(tierName)
@@ -435,23 +392,13 @@ end
 
 --- Plays a horse vocalization on the horse entity at each impact tier.
 --
--- Mirrors `PlayRiderVocal` but targets the horse rather than the rider.
--- Playing a horse trigger on a human entity corrupts CryEngine's audio
--- proxy because the triggers carry `path="horse"` metadata that the engine
--- applies structurally, not just as routing. Every call here goes to
--- `horseEnt` only.
---
--- The horse gets its own independent voice gate (`HorseVoiceUntil` /
--- `HorseVoiceRank`) so a rapid series of collisions does not produce a
--- chorus. The gate mirrors the rider-vocal logic: a harder impact is still
--- let through, but equal or lighter ones are held off.
---
--- Config: `HorseVocal` boolean master switch, `HorseVocalByTier` for per-tier
--- `{ trigger, delayMs, distance, chance }`, `HorseVocalRankByTier` for
--- severity ordering.
+-- Mirrors `PlayRiderVocal`, played on the horse. The horse has its own voice
+-- gate (`HorseVoiceUntil` and `HorseVoiceRank`), so a rapid series of
+-- collisions does not produce a chorus: a harder impact is still let through,
+-- and equal or lighter ones are held off.
 --
 -- @tparam table horseEnt the horse entity
--- @tparam string tierName "Walk", "Trot", "Gallop", "Charge" or "Rear"
+-- @tparam string tierName an impact tier name
 -- @treturn boolean true when a trigger resolved and was played
 function HorseCollisionMod:PlayHorseVocal(horseEnt, tierName)
 	local cfg = self.Config
@@ -551,15 +498,13 @@ end
 -- level changes. Offsetting along an arbitrary axis instead moves the sound
 -- across the stereo field, which is audible as panning rather than as volume.
 --
--- `SetAudioProxyOffset` takes an entity-local vector, which is why the world
+-- `SetAudioProxyOffset` takes an entity-local vector, so the world
 -- direction is converted through the entity's own axes. `Lightning.lua` uses
 -- the same call for distant thunder.
 --
--- It only works on events authored in 3D. Measured through speakers placed at
--- verified distances of 2 and 25 meters, `blunt_unarmed_body_fabric` was
--- inaudible at the far one and `a_o_jump_landing` was identical at both: the
--- landing lives under `hoofsteps_player` and ignores position entirely, so its
--- level is fixed and no distance will lower it.
+-- It only works on events authored in 3D. `a_o_jump_landing` lives under
+-- `hoofsteps_player`, which ignores position, so its level is fixed and no
+-- distance lowers it.
 --
 -- @tparam table entity the entity the sound belongs to
 -- @tparam string trigger the audio trigger name
@@ -589,11 +534,13 @@ end
 
 --- An entity-local offset that pushes a sound directly away from the listener.
 --
--- The world vector from the player to the entity, normalized and scaled, then
+-- The player's position stands in for the listener, which follows the camera.
+-- The world vector from the player to the entity, normalized and scaled, is
 -- expressed in the entity's own frame, because that is the space
 -- `SetAudioProxyOffset` reads. Falls back to straight up when the listener is
--- on top of the entity, which happens while mounted and would otherwise push
--- the sound into the ground.
+-- within half a meter of the entity, as it is while mounted, where there is
+-- no direction to push along and a guess could push the sound into the
+-- ground.
 --
 -- @tparam table entity the entity the proxy belongs to
 -- @tparam number distance meters to push back by
@@ -642,4 +589,3 @@ function HorseCollisionMod:AwayFromListener(entity, distance)
 		z = (vx * az.x) + (vy * az.y) + (vz * az.z)
 	}
 end
-
