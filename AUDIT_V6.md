@@ -12,9 +12,8 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** every source file audited; README.md,
-`docs/HOW_IT_WORKS.md`, `docs/DEV_LOOP.md`, `docs/ARCHITECTURE_NOTES.md`,
-`docs/BALANCE_AUDIT.md` and `docs/ENGINE_BINDS.md` audited.
+**Current status:** every source file and every document except the diary
+audited; `docs/TECHNICAL_DETAILS.md` was the last.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -26,7 +25,8 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `docs/TECHNICAL_DETAILS.md`, then tooling.
+**Next pass:** tooling: `build.ps1`, then `tools/`, then `.claude/` hooks and
+linter. The carried-forward `verify_additive.py` item belongs to it.
 
 **Pass order** (dependencies first, then largest):
 
@@ -52,7 +52,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Tutorial.lua`
 - [x] `Detection.lua`
 - [x] `Enums.lua`
-- [ ] Documentation: `README`, `docs/*.md` except the diary
+- [x] Documentation: `README`, `docs/*.md` except the diary
 - [ ] Tooling: `build.ps1`, `tools/`, `.claude/` hooks and linter
 
 **Carried forward:** findings in one file that point into a file not yet
@@ -60,6 +60,8 @@ audited are listed here, so its pass picks them up.
 
 - `tools/verify_additive.py:10` docstring — "the two small declaration
   files"; `intended_vanilla` holds three. (From `HOW_IT_WORKS.md`.)
+- `tools/set_version.py:3-5` docstring — "fourteen places", "eleven part
+  files"; it lists the directory, which holds twenty. (From `DEV_LOOP.md`.)
 
 ## Standard
 
@@ -2217,6 +2219,97 @@ reference; the findings are in the prose and the markers.
   author credited as the source. — Keep the source as a citation; cut the
   tally.
 - [ ] `:630` — `3,319,760 read at day 38`. — Cut the sample.
+
+### docs/TECHNICAL_DETAILS.md
+
+`lint_docs.py`: 0 errors; 25 warnings (four `which is why`, 21 sentences over
+40 words) and 22 repeated sequences. The reference content is sound; the
+defects are history mixed into it and sections describing removed code.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:80-82`, `:110-114`, `:138-156`, `:331-334`, `:405-413`, `:438-452`,
+  `:465-475`, `:500-504`, `:528-532`, `:573-576`, `:634`, `:644-650`,
+  `:713-723`, `:753-754`, `:814-821`, `:830-832`, `:857-858`, `:906-908`,
+  `:970-973`, `:979-980`, `:986`, `:1047-1069`, `:1083-1084`, `:1088-1095`,
+  `:1118-1149`, `:1195`, `:1304-1305`, `:1357-1358`, `:1420-1421`,
+  `:1463-1464`, `:1487-1491`, `:1519-1524`, `:1553-1554`, `:1559-1562`,
+  `:1578-1589`, `:1593-1597`, `:1606-1607`, `:1636-1638`, `:1647-1662`. —
+  Each is how something was found, what it used to be, or a closing lesson
+  ("The general lesson is", "cost seven attempts", "the rider described the
+  victims as bricks", "A player reported it after 90 hours"). Move the
+  accounts the diary lacks; cut the rest.
+
+**Wrong or stale:**
+
+- [ ] `:117-118`, `:1195` — "the one vanilla file the mod still replaces",
+  "without replacing a vanilla file"; three are replaced
+  (`verify_additive.py:110-114`). — Name all three.
+- [ ] `:119-120`, `:1231`, `:1235` — the mod's options are "standing hit
+  reactions", "vanilla's 30 options + this mod's 4", "vanilla's 16 FragTags +
+  this mod's 4"; the mod declares 19 tags across stagger, knockdown, fall,
+  get-up, rear, charge and settle. — Describe the set.
+- [ ] `:182-216` — "thirteen part files", a load list of thirteen and a table
+  of thirteen; the entry point loads twenty (`Tiers`, `Bark`, `Lean`,
+  `Rear`, `Fear`, `Impact`, `Tutorial` missing). `Rider.lua` holds "the combat
+  multiplier"; it is an additive surcharge. — Drop the count and the copied
+  load list; complete the table.
+- [ ] `:255` — ` - ` used as a dash; `:924`, `:970` `--`. — Rephrase.
+- [ ] `:261-262` — "reloads only `Scripts/Startup/HorseCollisionMod.lua`";
+  `--reload` runs the settings file first (`DEV_LOOP.md:210`). — Correct.
+- [ ] `:376-383` — plateaus give a trot at 6.38 to 7.03 and a gallop from
+  9.18, then "the gap between 8.03 and 8.84 m/s is empty". The two
+  measurements disagree. — One set of plateaus, as `probe_gait_speed.lua`
+  last reported.
+- [ ] `:357-363` — the cache margin is `HorseFrontReach` plus `MaxSweepExtra`
+  and omits the footprint's corner; same defect as `Detection.lua`
+  `:123-128`. — Apply that finding here.
+- [ ] `:428` — "tested ten times a second"; `TickSeconds` is 0.033. — "every
+  tick".
+- [ ] `:494` `RagdollSpeedSoftCap` — no such setting; the cap is per tier in
+  `ThrowProfileByTier`. — Name it.
+- [ ] `:556-557` — "by the rider's ruling". — Cut.
+- [ ] `:679-683` against `:1544-1548` — refused "only while the victim is
+  flat" (`IsVictimFlat`), and later "a victim already in
+  `AnimationControlled` or `BlendRagdoll` is not given a second action". —
+  Keep the first; correct the second.
+- [ ] `:830` and `Settings:1019-1020` — `HitCooldownMs` does not exist; the
+  per-victim interval is `HitMinIntervalMs`. — Correct both.
+- [ ] `:916-920` — two events "may be worth adding". `:947-949` — death
+  sounds "Not yet implemented; the mechanism is proven". — Roadmap
+  material; move to `ROADMAP.md` if still wanted.
+- [ ] `:871` — "line 3610277 of the decompilation". — Name the function.
+- [ ] `:1100` `WhenRagdollResolves` — no such function. — Cut the bullet or
+  name the current one.
+- [ ] `:1139-1144` — a gallop "deals `95 * …`" and survives seven times in
+  ten; shipped figure is 111. — Cut with the section.
+- [ ] `:1227-1236` layout — "Seven files, all named `hcm_*`", including
+  `hcm_<set>_fragmentids.xml`, `hcm_<set>_controllerdefs.xml` and
+  `hcm_animationControlledTags.xml`. The build ships
+  `kcd_animationControlledTags.xml` under vanilla's name, no human fragment
+  ids or controller defs, and a horse database with `kcd_horse_*`
+  declarations. — Rewrite from the build's file list.
+- [ ] `:1263-1267` requirement 4 — "`ActionController` must be redirected as
+  well"; `:1309-1312`, the entry point (`HorseCollisionMod.lua:1777`) and
+  `verify_additive.py` claim 7 all say it stays on vanilla. — Delete
+  requirement 4; "The four requirements" becomes three.
+- [ ] `:1387-1402` — the watcher polls "once a second" and ends as
+  `natural`, `runaway` or `ceiling` on `RetaliationFleeSpeed`,
+  `RetaliationFleeIgnoreRange` and `RetaliationFleeSamples`; none of the
+  three settings exists, and the endings in `Retaliation.lua` are
+  `settled` and `ceiling`. — Rewrite from `WatchRetaliation`.
+- [ ] `:1468-1477` against `:1499-1511` — the charge is `relaxed_rearing` cut
+  at 0.8 s into `relaxed_gallop_jump`, then the fragment "rears in place",
+  cut at 1.0 s into `relaxed_idle_jump_land`, with travel from an impulse. —
+  Keep the second; cut the first.
+- [ ] `:1479-1480` — "`RearCharging` forces it to a gallop"; the loop stands
+  out for `ChargeScoringUntil` and scores nothing during a charge
+  (`Update.lua:85-92`). — Correct.
+- [ ] `:1574-1575` — `RearChargeVictimLockMs` is `VictimLockMsByTier.Charge`;
+  the charge's throw is `RearChargeThrow`, not "throw scalar". — Correct.
+- [ ] `:1688` — "the same mechanism third-party perk mods use"; the mod's own
+  four `rpg/*__horsecollisionmod.xml` tables use it. — Say so; README
+  `:194` depends on it.
 
 ### Dead code (`tools/audit_code.py`)
 
