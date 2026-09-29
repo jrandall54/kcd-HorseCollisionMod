@@ -737,8 +737,8 @@ HorseCollisionModSettings = {
 	RearActionMap            = "hcm_rear",
 	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
 	SettleFragTag            = "hcm_settle",
-	SendHitReaction          = true,  -- posting this is what makes vanilla's
-	                                  -- own barks fire on an impact
+	SendHitReaction          = true,  -- tells the victim's brain it was hit,
+	                                  -- which feeds its perception
 	TraceRecovery            = false  -- times every animation state during a
 	                                  -- recovery; diagnostic only
 

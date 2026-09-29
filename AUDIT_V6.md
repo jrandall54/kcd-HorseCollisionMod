@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`. Next: `Reaction.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`. Next: `Rear.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -224,6 +224,12 @@ In this order, each its own commit and ride:
      so it always excludes tack; drop `ArmorCurve`'s `invert`, which its
      only caller always sets; delete the unreachable `if not barding` in
      `BardingCoverage`. Trim the two docs that describe the parameters.
+   - `Reaction.lua`: drop the unused `state, waitedForBody` parameters of
+     the `WhenVictimIsUp` callback in `Ragdoll`; drop `ImpulseVictim`'s
+     unused `armorScale` and its argument, with its doc line; in
+     `ImpulseVictim`, log `ImpulseApplied` straight after the call and
+     delete the 300 ms timer and the `GetWorldPos` movement figure, which
+     reads an entity that does not follow a ragdoll.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -386,6 +392,9 @@ One line per batch: batch, commit, what was verified.
   for the three effects (weight to impulse and stamina, `smash_def` to
   damage) plus barding; the `TackTypes` doc separated from the module doc.
   Three code findings moved to batch 3, item 7.
+- **Batch 4, `Reaction.lua`.** L1 `same` for it, the entry point and the
+  settings file. Measurements, anecdotes and the two banner blocks cut; the
+  dead `RagDollize` paragraph deleted; blank lines normalized.
 
 ## Standard
 
@@ -1157,148 +1166,156 @@ to 2, light 2, guard 2 to 3, mail 3, heavy mail 3 to 4, plate 4 to 6.
 
 ### src/HorseCollisionMod/Reaction.lua
 
-- [ ] `:1-19` module header — "`Ragdoll` and `ImpulseVictim` hand the body
+Batch 4: applied. `SendHitReaction` settled from the diary ("The bark does
+not come from the mod"): the message feeds perception and does not cause
+vanilla's bark, so this file was right and the settings file and the entry
+point's `@field` were corrected in the same commit. The 50 ms first release,
+the brake's `+ 10` and the `+ 1.0` chest height keep their literals with the
+derivation in the comment. Code findings (the unused callback parameters,
+`armorScale`, the `ImpulseApplied` movement figure) went to batch 3, item 7.
+
+- [x] `:1-19` module header — "`Ragdoll` and `ImpulseVictim` hand the body
   to physics": `Ragdoll` does, `ImpulseVictim` only pushes a body already
   handed over. No blank line or `---` between `@release` and the
   `SendHitReaction` doc (same LDoc fold as `Armor.lua`). — Correct; separate.
-- [ ] `:26-27` `SendHitReaction` — says the message does not produce the
+- [x] `:26-27` `SendHitReaction` — says the message does not produce the
   bark; the settings file (`:1139-1140`, "posting this is what makes
   vanilla's own barks fire") and the entry point's `@field` (`:171`, "so
   barks still fire") say it does. — Settle which is true from the diary;
   make all three agree.
-- [ ] `:72-73` `PlayReaction` `prefix` — lists `hcm_stagger_` at walk and
+- [x] `:72-73` `PlayReaction` `prefix` — lists `hcm_stagger_` at walk and
   `hcm_knockdown_` at trot. Shipped: walk stagger, trot and rear `hcm_fall_`;
   nothing ships `knockdown`. — List the three prefixes without tiers.
-- [ ] `:80-89` — two comments on the same `so_` strip; the second is
+- [x] `:80-89` — two comments on the same `so_` strip; the second is
   history ("which is how every direction ended up sharing one ragdoll
   timing"). — One line: option names and per-direction tables use the bare
   word.
-- [ ] `:92`, `:1374-1379` — stray blank lines (double blank inside a
+- [x] `:92`, `:1374-1379` — stray blank lines (double blank inside a
   function; five trailing). — Remove.
-- [ ] `:97-102` — "This used to say the women had no AnimationControlled
+- [x] `:97-102` — "This used to say the women had no AnimationControlled
   fragment…". — Cut.
-- [ ] `:119`, `:920-933` — misindented `local ok, err`, comment block and
+- [x] `:119`, `:920-933` — misindented `local ok, err`, comment block and
   `local function requestFall`. — Reindent.
-- [ ] `:132-145` release repeats — "Victims were still being carried
+- [x] `:132-145` release repeats — "Victims were still being carried
   through walls occasionally". The first attempt's 50 ms is a literal. —
   Keep: a fragment re-applies its movement layer while blending, so the
   release repeats. Name the 50 or tie it to `ImpulseDelayMs`.
-- [ ] `:160-183` fall handover — two comments spliced; "The innkeeper
+- [x] `:160-183` fall handover — two comments spliced; "The innkeeper
   leaning on nothing" anecdote; "Until then both tiers that can knock
   someone down default to fall" is roadmap. — Keep: the fragment's Ragdoll
   ProcLayer times the handover; only `hcm_fall_` carries one, so only it
   gets the rebuild wait.
-- [ ] `:185` "is now in flight" — timeless word. — "is in flight".
-- [ ] `:215-219` `PlayTierReaction` — "Every tier used to decide this at its
+- [x] `:185` "is now in flight" — timeless word. — "is in flight".
+- [x] `:215-219` `PlayTierReaction` — "Every tier used to decide this at its
   own call site…". — Cut to: the one place a tier becomes a reaction.
-- [ ] `:239-241` — "reads exactly like vanilla's non-reactions, which is the
+- [x] `:239-241` — "reads exactly like vanilla's non-reactions, which is the
   thing this mod exists to replace". — Constraint only: a victim getting
   up still takes the reaction.
-- [ ] `:268-275` — "which is why it is so hard to reproduce on purpose";
+- [x] `:268-275` — "which is why it is so hard to reproduce on purpose";
   "The readiness cooldown used to prevent this… the diary said so". — Keep
   the mechanism (a second clip cancels the first's pending handover); cut
   the rest.
-- [ ] `:331`, `:1291` "armour", `:624` "neighbouring" — British spelling. —
+- [x] `:331`, `:1291` "armour", `:624` "neighbouring" — British spelling. —
   American.
-- [ ] `:344-364` `WhenVictimIsPhysical` — "`actor:Fall` requests the fall":
+- [x] `:344-364` `WhenVictimIsPhysical` — "`actor:Fall` requests the fall":
   `Ragdoll` plays `SettleFragTag`, not `actor:Fall`. Carries measurements
   (1.81 m to 1.57 m over 18 impacts), "the rider described the victims as
   bricks", and a paragraph on the removed mass probe and its three
   settings. — Keep: physics writes to a body not yet ragdolled are
   discarded; the wait is `PhysicsReadyMs`, one frame.
-- [ ] `:399-401` `DampVictim` `armorScale` — "Chooses the commanded throw
+- [x] `:399-401` `DampVictim` `armorScale` — "Chooses the commanded throw
   distance". In this function it is only printed on the telemetry line;
   armor reaches the throw through `profile`. — "Logged only".
-- [ ] `:421-432` `bodyPos` — "this project established that once already",
+- [x] `:421-432` `bodyPos` — "this project established that once already",
   "every one was fiction… while the rider watched". — One sentence: the
   entity does not follow a ragdoll; read the physics body.
-- [ ] `:445-447`, `:529-531` banner blocks ("The Impact Parachute", "The
+- [x] `:445-447`, `:529-531` banner blocks ("The Impact Parachute", "The
   Anti-Slide") — no other module uses them; the names appear nowhere else.
   — Replace with one plain line each, or drop.
-- [ ] `:515-519` brake timing — "the diary checked exactly this and found
+- [x] `:515-519` brake timing — "the diary checked exactly this and found
   16.83 m/s against a later `airPeak` of 12.51". `:524` `+ 10` is a
   literal. — Keep: the gallop's victim is thrown at contact, so the brake
   fires at the impulse delay. Name the 10 or record why it follows the
   impulse.
-- [ ] `:586-591` — "It was computed and then dropped from this line…". —
+- [x] `:586-591` — "It was computed and then dropped from this line…". —
   Cut.
-- [ ] `:599-625` `release` — twenty lines of diagnosis ("Diagnosed from the
+- [x] `:599-625` `release` — twenty lines of diagnosis ("Diagnosed from the
   rider's cure", "That is why the symptom was intermittent"). — Keep: a
   sleeping body discards writes, so wake it first; otherwise `min_energy`
   stays set and a corpse can sleep mid-air.
-- [ ] `:642-648` — "A ceiling of 6 m/s was letting bodies travel eight to
+- [x] `:642-648` — "A ceiling of 6 m/s was letting bodies travel eight to
   twelve meters because it was watching the wrong thing". — Keep: the cap
   and drag act on this speed, so it must be the body's.
-- [ ] `:699-735` cap — carried forward from `Tiers.lua`. A table of 24
+- [x] `:699-735` cap — carried forward from `Tiers.lua`. A table of 24
   throws, "the 1,208 kg the mod used to write", "The rewrite is gone". —
   Keep: the cap is a ceiling, not a subtraction, so it holds however the
   body got its speed; on a launch tier it is a rail at the commanded speed.
-- [ ] `:743-762` rail enforcement — "Measured on a victim railed at 6.03…",
+- [x] `:743-762` rail enforcement — "Measured on a victim railed at 6.03…",
   "the enforcement that was removed". — Keep: drag does not bind a ragdoll;
   a counter-impulse of `mass * (speed - cap)` does, every poll, and cannot
   shorten the commanded throw.
-- [ ] `:809-824` drag — measured peaks, "The rider rode armored victims at a
+- [x] `:809-824` drag — measured peaks, "The rider rode armored victims at a
   flat 15.0 and reported no syrup". — Keep: `strength` saturates at
   `cap + span`, so the drag figure itself is armor scaled.
-- [ ] `:863-868` `Ragdoll` doc — "Used at trot and gallop" (shipped: gallop
+- [x] `:863-868` `Ragdoll` doc — "Used at trot and gallop" (shipped: gallop
   and charge); "`actor:Fall` switches the victim". — Correct both.
-- [ ] `:873` `tierScale` — "share of the configured impulse, 0 to 1"; it is
+- [x] `:873` `tierScale` — "share of the configured impulse, 0 to 1"; it is
   `ThrowByTier`, trim on `Knockback` and `Uplift`, and nothing clamps it. —
   "the tier's `ThrowByTier` trim".
-- [ ] `:874-875` `armorScale` — "sets their ragdoll mass and nothing else".
+- [x] `:874-875` `armorScale` — "sets their ragdoll mass and nothing else".
   The mod writes no mass (`:1194-1195` says so); it is passed on for
   logging. — Correct.
-- [ ] `:882-885` `tierName` — justifies itself by `ImpactDamage` returning
+- [x] `:882-885` `tierName` — justifies itself by `ImpactDamage` returning
   early. — "Logged on the `FallToBlend` line."
-- [ ] `:888-899` damping clear — "one cause for three symptoms that looked
+- [x] `:888-899` damping clear — "one cause for three symptoms that looked
   separate", "Measured, a commanded 3.00 m/s… eight centimeters" (the same
   figure again at `:910-911`). — Keep: a body under `min_energy` sleeps and
   ignores impulses, so clear it first.
-- [ ] `:906-919` — describes calling `RagDollize` then `Fall`; neither is in
+- [x] `:906-919` — describes calling `RagDollize` then `Fall`; neither is in
   the code, and `:1025-1029` says `RagDollize` must never be added. —
   Delete.
-- [ ] `:920-932` settle fragment — "the delayed reaction bug where a victim
+- [x] `:920-932` settle fragment — "the delayed reaction bug where a victim
   takes the hit, walks three steps". — Keep: `actor:Fall` is queued behind
   an uninterruptible animation; an interactive action with a Ragdoll
   ProcLayer at ExitTime 0 is not.
-- [ ] `:947-961` `FallToBlend` — "the two moments the rider named", "Every
+- [x] `:947-961` `FallToBlend` — "the two moments the rider named", "Every
   earlier attempt read a position during the ragdoll and failed". — Keep:
   the two readings sit outside the ragdoll, where the entity matches the
   body.
-- [ ] `:1031-1034` — "Nothing below throws the victim. The throw is the
+- [x] `:1031-1034` — "Nothing below throws the victim. The throw is the
   engine resolving its own collision". False for the charge:
   `ImpulseVictim` adds the launch. — Rewrite: the gallop is thrown by the
   engine and braked; the charge is thrown by the launch; both wait for a
   physical body.
-- [ ] `:1041-1049` — "This tier uses actor:Fall" (it does not); both
+- [x] `:1041-1049` — "This tier uses actor:Fall" (it does not); both
   comments describe `WatchTurn` and `TraceRecovery` as controls for an
   investigation. They are diagnostics gated on `TraceRecovery`. — One line:
   traced as `engine-ragdoll` for comparison with the fall path.
-- [ ] `:1052` `state, waitedForBody` — unused. — Drop.
-- [ ] `:1063-1072` `ImpulseVictim` doc — "Separated from `Ragdoll` because
+- [x] `:1052` `state, waitedForBody` — unused. — Drop.
+- [x] `:1063-1072` `ImpulseVictim` doc — "Separated from `Ragdoll` because
   the fall tier… needs the push without the rest": `Ragdoll` is the only
   caller. `profile` and `armorScale` undocumented; `horseEnt` and
   `horsePos` documented out of order. `armorScale` is unused in the body.
   — Rewrite the doc; drop `armorScale`.
-- [ ] `:1094-1097` — "Leaving early on their account was what stopped the
+- [x] `:1094-1097` — "Leaving early on their account was what stopped the
   charge being thrown at all". — Keep: a launch tier proceeds with zero
   trim.
-- [ ] `:1112` `+ 1.0` chest height — literal. — Name it, or record the
+- [x] `:1112` `+ 1.0` chest height — literal. — Name it, or record the
   derivation.
-- [ ] `:1119-1124` — "the same target took 67.3 at full speed and 37.7…". —
+- [x] `:1119-1124` — "the same target took 67.3 at full speed and 37.7…". —
   Keep the first paragraph; cut the measurement.
-- [ ] `:1132-1138` — "which is exactly what a charge did whenever…". — Keep:
+- [x] `:1132-1138` — "which is exactly what a charge did whenever…". — Keep:
   with no velocity there is no direction; drop the impulse.
-- [ ] `:1187-1190` — "which left a report of armored targets moving
+- [x] `:1187-1190` — "which left a report of armored targets moving
   further…". — Cut; keep the mass explanation.
-- [ ] `:1234-1238` — "a fixed 50 ms produced throws of four meters and of
+- [x] `:1234-1238` — "a fixed 50 ms produced throws of four meters and of
   nothing at all". — Keep: an impulse before physicalization is ignored.
-- [ ] `:1283-1289` — "a quarter of a second after impact" (`ImpulseDelayMs`
+- [x] `:1283-1289` — "a quarter of a second after impact" (`ImpulseDelayMs`
   ships 50); measurements 12.44 / 14.04 / 21.73 m. — Keep: floor here,
   ceiling in the watch.
-- [ ] `:1310-1317` — "threw a peasant ten meters… thirteen samples", "a
+- [x] `:1310-1317` — "threw a peasant ten meters… thirteen samples", "a
   man". — Keep: the launch goes along the horse's line; the lift is trim.
-- [ ] `:1345-1369` `ImpulseApplied` — reads `GetWorldPos`, which `:421-428`
+- [x] `:1345-1369` `ImpulseApplied` — reads `GetWorldPos`, which `:421-428`
   says does not follow a ragdoll, so `movedIn300ms` does not measure the
   body. "a quarter of a second later" (it is 50 ms). `300` is a literal. —
   Read `GetCenterOfMassPos`, or drop the movement figure.

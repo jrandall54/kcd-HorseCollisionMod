@@ -154,7 +154,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field ShieldWindowMs crash backstop only, in milliseconds: the shield is
 --   lifted when the victim's body lands, and this bounds the case where that
 --   never happens
--- @field SendHitReaction post the native brain message so barks still fire
+-- @field SendHitReaction post the native hit reaction message to the victim's
+--   brain, which feeds their perception; vanilla's collision bark does not
+--   depend on it
 -- @field WalkStagger whether the walk tier plays a stagger animation
 -- @field SuppressAutoCureSec how often the auto-cure exemption is rechecked,
 --   in seconds, or 0 to leave victims in the daycycle
