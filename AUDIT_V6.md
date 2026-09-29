@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`.
-Next: two sets of tutorial text. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text.
+Next: the README settings table. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -243,11 +243,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
   front, that is the engine's own collision, not the mod's reaction path.
   Not work: the rider raises it if it recurs.
 
-- [ ] **Two sets of tutorial text.** `Tutorial.lua:33-57` builds the
+- [x] **Two sets of tutorial text.** `Tutorial.lua:33-57` builds the
   banners in Lua, in English, with the configured keys; the localization
   table carries `ui_tutorial_hcm_rear` and `ui_tutorial_hcm_charge`, which
   nothing reads, with different text and no lean entry. Proposal: delete
   the two unused cells, since only the Lua text can name a rebound key.
+  **Ruled as proposed.**
 
 - [ ] **README settings table.** It lists 97 settings as "the ones worth
   changing" while the player section of the settings file holds about 120
