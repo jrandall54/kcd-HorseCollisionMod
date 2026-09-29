@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Marks.lua findings recorded and committed.
+**Current status:** Fear.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Fear.lua`.
+**Next pass:** `Crime.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -43,7 +43,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Lean.lua`
 - [x] `Update.lua`
 - [x] `Marks.lua`
-- [ ] `Fear.lua`
+- [x] `Fear.lua`
 - [ ] `Crime.lua`
 - [ ] `Impact.lua`
 - [ ] `Log.lua`
@@ -233,8 +233,9 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `Dog` (live scan in the diary, "The human filter was not one"). Henry's
   dog never reaches the `isProtected` test's consequences, and `:288-293` is
   an empty `if isMutt then end` left from removed collision filtering.
-  Proposal: delete `ProtectMutt`, the name check and the empty block; the
-  class filter protects every dog.
+  `RearCanHit` (`Rear.lua:1094-1120`) repeats the name test behind the same
+  class filter. Proposal: delete `ProtectMutt`, both name checks and the
+  empty block; the class filter protects every dog.
 
 ## Findings
 
@@ -1661,8 +1662,7 @@ victim is accurate (only men reach the fight branch) and stays.
 ### src/HorseCollisionMod/Marks.lua
 
 - [ ] `:8-12` header — "Both arguments are deltas": `AddDirt` takes one.
-  `` `actor:AddBlood
-(zone, n)` `` breaks a code span across lines. —
+  `:9-10` breaks the `actor:AddBlood(zone, n)` code span across lines. —
   "Each amount is a delta"; keep the span on one line.
 - [ ] `:17` — "a rider who is run down from behind"; the victim. — Correct.
 - [ ] `:83-84` `MarkVictim` — "from the trot and gallop branches of
@@ -1704,6 +1704,24 @@ victim is accurate (only men reach the fight branch) and stays.
   struck rather than where they land… dust that follows a body reads as
   smoke"; `ImpactDust` waits for the landing (`DustWhenLanded`), except on
   the rear.
+
+### src/HorseCollisionMod/Fear.lua
+
+- [ ] `:29-31` header — no `@release`. — Add.
+- [ ] `:72-92` `FrightenBystander` — "Startled, not hurt. One line, at the
+  fright, and it is the scream rather than the startle" is a fragment;
+  "The moment wanted two… Measured over several rides", "was the weaker
+  half of the pair". — Keep: a line sent to an NPC already fleeing is
+  accepted and never spoken, so the one line goes out with the stimulus,
+  from `NASILI_UTEK` (the `Panic` alias).
+- [ ] `:127-129` `FearBand` — "a living human who is not Henry's dog";
+  follows the `ProtectMutt` ruling.
+- [ ] `:140`, `:235` — `local playerEnt = player` aliases the global for no
+  reason. — Use `player`.
+- [ ] `:195` — "thirty feet"; the mod measures in meters. — "several
+  meters".
+- [ ] `:221-222` — "normalised". — "normalized".
+- [ ] `:227` `ChargeFearBand` — returns a count with no `@treturn`. — Add.
 
 ### Dead code (`tools/audit_code.py`)
 
