@@ -13,8 +13,8 @@ end of every pass, so it always says where the audit stands.
 **Phase:** 1, recording findings. No source file has been edited.
 
 **Current status:** every source file audited; README.md,
-`docs/HOW_IT_WORKS.md`, `docs/DEV_LOOP.md`, `docs/ARCHITECTURE_NOTES.md` and
-`docs/BALANCE_AUDIT.md` audited.
+`docs/HOW_IT_WORKS.md`, `docs/DEV_LOOP.md`, `docs/ARCHITECTURE_NOTES.md`,
+`docs/BALANCE_AUDIT.md` and `docs/ENGINE_BINDS.md` audited.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -26,7 +26,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `docs/ENGINE_BINDS.md`, then `docs/TECHNICAL_DETAILS.md`.
+**Next pass:** `docs/TECHNICAL_DETAILS.md`, then tooling.
 
 **Pass order** (dependencies first, then largest):
 
@@ -2178,6 +2178,45 @@ ruling. If it is kept, these stand:
   too far"; the charge has its own throw (`RearChargeThrow`). — Update or cut.
 - [ ] `:515-519` Stage 3 — "Give `Fear.lua` the tier-table shape"; `:225-232`
   resolved against it. `ROADMAP.md` item 2 is already corrected. — Cut.
+
+### docs/ENGINE_BINDS.md
+
+`lint_docs.py`: 0 errors; five warnings. The tables are extracted
+reference; the findings are in the prose and the markers.
+
+- [ ] `:5-7` — "A name here has not been called unless it is marked", and
+  the dagger marks "Entries this mod calls". The daggers are wrong both
+  ways: `CanHuntAttack`, `CanStealthKill`, `CanStealthKnockout` carry one
+  and nothing in `src/` calls them; `RequestHorsePullDown`, `AddBlood`,
+  `AddDirt`, `SetViewShake`, `RagDollize`, `HolsterWeapon`, `IsWeaponDrawn`
+  and `GetCenterOfMassPos` are called and carry none. — Regenerate the marks
+  from a grep of `src/`; one meaning for the dagger.
+- [ ] `:744-785` "Actor and human methods vanilla uses" — "Already used by
+  this mod" names `SetPhysicalizationProfile`, `SetHealth`, `ForceDismount`,
+  none called in `src/`; "Untried" names `AddBlood`, `AddDirt`,
+  `SetViewShake`, `CanHorsePullDown`, `RequestHorsePullDown`,
+  `IsWeaponDrawn`, all shipped; "the cosmetic roadmap item" and "never
+  considered" have shipped. — Fold into the dagger; delete the section's
+  status claims.
+- [ ] `:787-804` pull-down — "Whether an NPC can be the `user` … is
+  untested"; the retaliation pull-down ships on it. — State that it works
+  and what gates it.
+- [ ] `:806-820` — "The roadmap item about striking a heavy target rearing
+  the horse" has no roadmap entry. — Cut the sentence.
+- [ ] `:822-827`, `:855-860` — "The lists above were gathered by reading
+  vanilla scripts…", and `SetVelocity` "matters most": `Knockback` "has
+  never meant anything", "50 was measured as indistinguishable", "600 threw
+  a villager 27 meters". Narrative, and it contradicts the settled design
+  (the engine's collision throws; `Knockback` is trim). — Cut; list
+  `SetVelocity` without advocacy.
+- [ ] `:860-861` — "the opposite of what this project recorded". — Cut.
+- [ ] `:895-896` — "`human:HolsterWeapon()` is the clean answer to forcing
+  an unarmed brawl"; the mod calls it. — Mark it used; cut the claim.
+- [ ] `:617`, `:737` — "which is why". `:694` 42 words. — Rephrase.
+- [ ] `:614-623` — "43 entry points out of 43 tried" and the Cheat mod's
+  author credited as the source. — Keep the source as a citation; cut the
+  tally.
+- [ ] `:630` — `3,319,760 read at day 38`. — Cut the sample.
 
 ### Dead code (`tools/audit_code.py`)
 
