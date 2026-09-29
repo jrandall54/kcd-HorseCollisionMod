@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`.
-Next: `WhenBodyStops` reads `GetWorldPos`. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`.
+Next: the investigation diagnostics. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -185,12 +185,14 @@ Items that change behavior or delete a feature. Not applied without a decision.
   second hit on a victim still down must not snap them upright; if it does,
   that is the reason for a higher value, and the comment records it.
 
-- [ ] **`WhenBodyStops` reads `GetWorldPos`.** `Reaction.lua:421-428` says
-  the entity does not follow a ragdoll and reads `GetCenterOfMassPos`;
-  `WhenBodyStops` (`Recovery.lua:604`) times the damage from the entity. The
-  current log's four `BodyStopped` rows all report `stopped` (1008 to
-  2608 ms), so the entity moves on these victims. Proposal: use the same
-  body reading as `Reaction.lua`, so the two do not disagree.
+- [x] **`WhenBodyStops` reads `GetWorldPos`.** Ruled not a bug; no code
+  change. Across the backed-up logs the entity reading reports `stopped` on
+  about 98% of gallop and charge impacts and about 80% of trot and rear,
+  and `RestStillMeters` is tuned against entity readings. The doc above
+  `WhenBodyStops` (`Recovery.lua:563`) is corrected to say the entity does
+  not track a ragdoll's distance but moves until the body settles, which is
+  what timing the rest needs. Trot and rear give-ups (about one in ten
+  each, damage at `RagdollLandCeilingMs`) are a known cost, not work.
 
 - [ ] **The investigation diagnostics.** `WatchTurn` (a polearm victim
   reported facing the wrong way) and `TraceFallLanding` (how often a
