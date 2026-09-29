@@ -213,10 +213,3 @@ function HorseCollisionMod:SyncTutorialsOnLoad()
 				.. " lean=" .. tostring(self.TutorialsShown["lean"]))
 	end
 end
-
---- Clears the history of displayed tutorials.
-function HorseCollisionMod:ResetTutorials()
-	self.TutorialsShown = {}
-	self.TutorialTimerPending = false
-	self:Log("Tutorials reset")
-end

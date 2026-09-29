@@ -653,6 +653,12 @@ One line per batch: batch, commit, what was verified.
   `setup_commands`. Tests: `--help`; `--lua` against the running game
   answered; a 6 KB `--file` went to disk under the resolved install and ran
   (`hcm oversized ok 499`), and the scratch file was removed after.
+- **Batch 5, small tools.** `version_check.py`, `set_version.py` (three of
+  its four findings went with `@release` in batch 1) and `audit_code.py`
+  (identical output run from the root and from `tools/`) each in its own
+  commit. `ResetTutorials` deleted: nothing calls it, and neither the diary
+  nor any document names it as a console helper; L2 reload clean, and
+  `audit_code.py` reports no uncalled function.
 - **Batch 5, `verify_additive.py`.** Every finding applied; claim 1 reads
   "claims only the intended vanilla names" here and in the README row; the
   sections number as the docstring does, the tag check as part of claim 3.
@@ -3943,8 +3949,8 @@ covers the hooks' tone; these are the specific lines):
 
 ### Dead code (`tools/audit_code.py`)
 
-- [ ] `Recovery.lua:177` `WatchRecoveryForRearm` — nothing calls it. — Delete.
-- [ ] `Tutorial.lua:229` `ResetTutorials` — nothing calls it. — If it is a
+- [x] `Recovery.lua:177` `WatchRecoveryForRearm` — nothing calls it. — Delete. Done in batch 3, item 7.
+- [x] `Tutorial.lua:229` `ResetTutorials` — nothing calls it. — If it is a
   console helper, say so in its doc; otherwise delete.
 
 ### Install hygiene (not repository)
