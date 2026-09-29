@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`. Next: `Lean.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`. Next: `Update.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -272,6 +272,13 @@ In this order, each its own commit and ride:
      and horse vocals, the gate state passed in; `PlayAtDistance` sets the
      proxy's removal timer before executing the trigger, so a throw cannot
      leak the proxy.
+   - `Lean.lua`: `GetPlayerAndHorse` returns the horse only; read `player`
+     rather than `rawget(_G, "player")`; one shared horse lookup for the
+     `XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())` chain,
+     adopted in `Rear.lua`, `Retaliation.lua` and `Update.lua` too; drop
+     the stray parentheses around settings; `StopLean` uses `sign` rather
+     than `sign or 1`, and logs `none` for an unreadable offset or angle
+     instead of `-9` and `-1`.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -459,6 +466,9 @@ One line per batch: batch, commit, what was verified.
   settings file. Quotes, experiments and measurements cut; the grunt
   worst case and ranks match the shipped tables; the master level's scope
   corrected in three files.
+- **Batch 4, `Lean.lua`.** L1 `same` for it, the entry point and the
+  settings file. Measurements and bug history moved to the diary; the
+  unfinished expiry sentence completed.
 
 ## Standard
 
@@ -2175,7 +2185,17 @@ direction. Code findings went to batch 3, item 7.
 
 ### src/HorseCollisionMod/Lean.lua
 
-- [ ] `:1-57` header — no `@release`, unlike the other modules. "What the
+Batch 4: applied. Superseded by batch 2: the throttle, `force` and their
+comment. `@release` is not added (batch 1 removed it everywhere). The
+header keeps the shake's rules and moves the measurements to the diary
+("Moved from `Lean.lua` comments", with the two fixed bugs). The deadband,
+not the poll interval, bounds the hold's wobble: corrected here and in the
+entry point's `LeanHoldAmplitude` field. The "remembered direction" comment
+now names the expiry refresh as the other thing that turns the camera. The
+settings file's `LeanShakeSec` comment corrected. Code findings went to
+batch 3, item 7.
+
+- [x] `:1-57` header — no `@release`, unlike the other modules. "What the
   shake actually does, measured", "Polled from… every 100 ms", "Four
   identical calls two seconds apart drove the camera out…", "Sampling a
   short window is what makes this mechanism easy to get wrong… twenty times
@@ -2187,32 +2207,32 @@ direction. Code findings went to batch 3, item 7.
   amplitude and arrives at t = period; a shake fired over a running one
   reverses the camera; an expired shake returns home in about 160 ms (once).
   Add `@release`.
-- [ ] `:47-49`, `:283-285` — the residual wobble is "travel speed times the
+- [x] `:47-49`, `:283-285` — the residual wobble is "travel speed times the
   poll interval… under a centimeter"; the hold only corrects outside
   `LeanDeadband` (0.06 m), so the deadband sets the wobble. — Say so; the
   entry point's `LeanHoldAmplitude` doc makes the same claim.
-- [ ] `:83-97`, `:122`, `:162` — `GetPlayerAndHorse` returns `playerEnt`,
+- [x] `:83-97`, `:122`, `:162` — `GetPlayerAndHorse` returns `playerEnt`,
   which neither caller uses; `rawget(_G, "player")` here and at `:232`,
   `:295`, `:605`, where the rest of the mod reads `player`. The horse
   lookup `XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())` is
   repeated in `Rear.lua`, `Retaliation.lua` and `Update.lua`. — Return the
   horse only; use `player`; one shared horse lookup, adopted at every site
   listed.
-- [ ] `:102-118` `LeanOffset` — "that is what made the two sides read
+- [x] `:102-118` `LeanOffset` — "that is what made the two sides read
   differently", "Measured", "which is exactly what was reported". The 6 cm
   rest offset is also in the entry point's `LeanDistance` doc. — Keep:
   measured from the horse's centerline, because a world baseline moves with
   the horse and the camera rests about 6 cm left of center, so both sides
   finish the same distance from the head.
-- [ ] `:159` `@treturn` — "always positive"; it can be 0. — "never
+- [x] `:159` `@treturn` — "always positive"; it can be 0. — "never
   negative".
-- [ ] `:179-188`, `:203` — the flattening is explained twice, and the
+- [x] `:179-188`, `:203` — the flattening is explained twice, and the
   first block's opening line and the paragraph under it say the same thing.
   — One comment: pitch is checked first, because the flattened yaw loses
   meaning as the view nears vertical, which is also where the camera is
   nearest the rider's model.
-- [ ] `:226-230` `FlipLean` — `force` is undocumented. — Add `@tparam`.
-- [ ] `:238-257` — "Unrated, this floods… at the twenty second lifetime
+- [x] `:226-230` `FlipLean` — `force` is undocumented. — Add `@tparam`.
+- [x] `:238-257` — "Unrated, this floods… at the twenty second lifetime
   those were still occupying the queue", "Measured, 176
   `Animation-queue overflow` errors… ran until the scripts were
   reloaded", "a runaway of ten meters on fast taps"; "three centimeter
@@ -2222,42 +2242,42 @@ direction. Code findings went to batch 3, item 7.
   so corrections are throttled; the press, the arrival and the release are
   not, because dropping one leaves the camera traveling. Depends on the
   throttle ruling.
-- [ ] `:261`, `:268`, `:360`, `:424`, `:451`, `:564` — settings in stray
+- [x] `:261`, `:268`, `:360`, `:424`, `:451`, `:564` — settings in stray
   parentheses. — Remove.
-- [ ] `:302` — "the same check the rear uses". — Cut.
-- [ ] `:315-328` — the home-return comment sits above the angle check,
+- [x] `:302` — "the same check the rear uses". — Cut.
+- [x] `:315-328` — the home-return comment sits above the angle check,
   while its check is at `:340-344`; it runs straight into the angle
   comment. `:320-325` is the history of a fixed bug ("`now` was read from a
   global that does not exist… stayed dead through a save load"); "the
   pumping bug". — Move the first comment to `:340` as: a re-press before
   the camera is home would take its target from a displaced camera; cut the
   bug history.
-- [ ] `:391-403` — "clips through Henry's back", "A rider turning slowly
+- [x] `:391-403` — "clips through Henry's back", "A rider turning slowly
   still gets the full 45 degrees" (copies the setting). — Keep: the return
   takes about 160 ms, so the angle is projected ahead by the turn rate and
   the limit tightens only for a fast turn.
-- [ ] `:446-450` — "which the rider has seen", "including ones not yet
+- [x] `:446-450` — "which the rider has seen", "including ones not yet
   found". — Keep: a ceiling bounds any failure in the loop.
-- [ ] `:464-481` — "Measured across eight deliberate double taps" and the
+- [x] `:464-481` — "Measured across eight deliberate double taps" and the
   log table. — Keep: against a running shake a press reverses rather than
   choosing a side, so the direction is checked and corrected up to twice.
-- [ ] `:498-511` — "Releases aimed at 0.65 landed at 0.11, -0.05 and
+- [x] `:498-511` — "Releases aimed at 0.65 landed at 0.11, -0.05 and
   -0.08". The stated cause, a shake reversing at its period, cannot occur at
   `LeanShakePeriod` 40 with `LeanShakeSec` 1.5; the expiry refresh at
   `:522` is a flip the loop makes without the correction logic. — Keep:
   direction is taken from two samples, never remembered, because the camera
   can reverse without a correction.
-- [ ] `:518-522` — "to keep the animation queue" is an unfinished sentence;
+- [x] `:518-522` — "to keep the animation queue" is an unfinished sentence;
   `150` is unnamed; two comments run together. — Finish it (the hold is
   renewed before its shake expires and sends the camera home); name the
   margin or derive it from `LeanPollMs`.
-- [ ] `:544-547` `StopLean` doc and `:562-563` — the 160 ms return twice
+- [x] `:544-547` `StopLean` doc and `:562-563` — the 160 ms return twice
   more. — Once, in the doc.
-- [ ] `:566`, `:571` — `sign or 1`; `sign` is `LeanHeld`, checked non-nil
+- [x] `:566`, `:571` — `sign or 1`; `sign` is `LeanHeld`, checked non-nil
   at `:549`. — `sign`.
-- [ ] `:572`, `:574` — `-9` and `-1` stand in for an unreadable offset and
+- [x] `:572`, `:574` — `-9` and `-1` stand in for an unreadable offset and
   angle in the log. — Log `none`.
-- [ ] Carried back to the settings file: `LeanHomeMs` is commented "how
+- [x] Carried back to the settings file: `LeanHomeMs` is commented "how
   often the hold is corrected" (it is the wait after a release); `LeanShakeSec`
   "long enough to outlast a held lean" (a hold renews it before expiry).
   Part of the settings lean rewrite.

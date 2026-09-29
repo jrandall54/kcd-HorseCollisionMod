@@ -238,8 +238,8 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field LeanTravelAmplitude how hard the camera is driven on the way out,
 --   which sets how fast it gets there
 -- @field LeanHoldAmplitude the amplitude used once the target is reached.
---   Lower is a steadier hold, because the residual wobble is the travel speed
---   times the poll interval
+--   Lower is a steadier hold; the wobble about the target is bounded by
+--   LeanDeadband
 -- @field LeanPollMs how often the held offset is checked and corrected
 -- @field LeanMaxAngleDeg how far off the horse's line the rider may be
 --   looking and still lean, in degrees. Past it the camera travels through the

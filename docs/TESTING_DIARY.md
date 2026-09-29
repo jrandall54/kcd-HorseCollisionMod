@@ -22735,3 +22735,19 @@ The Horsemanship stamina scale is linear because two curved shapes were
 measured in game and rejected: one spent the benefit in the first few levels,
 leaving a rider at 13 riding like one at 20, and one withheld it until the last
 quarter, making every level below 16 feel identical.
+
+## Moved from `Lean.lua` comments
+
+The shake's curve, polled from `System.GetViewCameraPos` every 100 ms across a
+full cycle at amplitude 2.0 and period 8.0, reached 1.264 m at 8.0 s and fell
+away again (0.41 at 2 s, 0.78 at 4 s, 1.02 at 6 s, 0.485 at 12 s): the peak is
+about 0.63 of the amplitude and arrives at t = period. Over its first eighth
+the curve is indistinguishable from a straight line, and reading a velocity off
+that window gave an amplitude twenty times too large. Four identical calls two
+seconds apart drove the camera out, back through center, out again and back.
+
+Two lean bugs, both fixed: re-basing against a still-displaced camera ratcheted
+the offset further out on every release and re-press (the "pumping" bug), which
+`LeanHomeMs` now refuses; and `StartLean` once read `now` from a global that did
+not exist, so every press after the first threw inside the action hook's pcall
+and the lean died silently until the scripts were reloaded.

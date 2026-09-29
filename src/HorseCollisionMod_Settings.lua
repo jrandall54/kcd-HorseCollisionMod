@@ -168,7 +168,7 @@ HorseCollisionModSettings = {
 	LeanTurnLeadMs           = 200,   -- cancel this far ahead of a fast turn
 	LeanHomeMs               = 220,    -- wait before another lean, while the camera returns
 	LeanShakePeriod          = 40.0,  -- the camera shake period a lean is driven by
-	LeanShakeSec             = 1.5,  -- long enough to outlast a held lean
+	LeanShakeSec             = 1.5,  -- how long each shake lives; a hold renews it
 	LeanReleaseSec           = 0.05,  -- a short shake, so it expires and comes home
 
 	RearReach                = 2.5,   -- how far in front they reach
