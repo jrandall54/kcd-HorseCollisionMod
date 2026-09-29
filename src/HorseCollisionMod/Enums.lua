@@ -1,4 +1,4 @@
---- Engine enums used by the collision reaction calls.
+--- Engine enums used by the messages the mod sends.
 --
 -- Both tables are transcribed from `Libs/AI/TypeDefinitions.xml` and are
 -- attached to the `HorseCollisionMod` table created by the entry point. This
@@ -25,7 +25,8 @@ HorseCollisionMod.HitReactionType = {
 
 --- Engine enum, transcribed from `Libs/AI/TypeDefinitions.xml`.
 --
--- Ascending severity. `Tickle` and `Unpleasant` cost the victim no health.
+-- Ascending severity. `Tickle`, `Unpleasant` and `Exhausting` cost the victim
+-- no health.
 --
 -- @table HitReactionStrength
 HorseCollisionMod.HitReactionStrength = {
