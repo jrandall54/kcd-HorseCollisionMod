@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: every file in the pass order through `Crime.lua`. Next: `Impact.lua`. Read **Phase 2 plan**
+order below. Done: every file in the pass order through `Impact.lua`. Next: `Log.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -300,6 +300,10 @@ In this order, each its own commit and ride:
      `SendOffenseRelease` return nothing, since no caller reads them; two
      helpers, one for a message target id (`npc.this.id` or `npc.id`) and
      one for the player's WUID, used by this file and `Fear.lua`.
+   - `Impact.lua`: take `IsCombatCollision`'s two returns (with the
+     `Rider.lua` item); drop the `or "Tickle"` and `or 0` fallbacks, since
+     every tier has a shipped row; log `none` for a missing speed; drop the
+     unused `reason, elapsed` parameters of the `WhenVictimRises` callback.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -500,6 +504,9 @@ One line per batch: batch, commit, what was verified.
   documented. Two undeclared settings found, recorded for item 7.
 - **Batch 4, `Crime.lua`.** L1 `same`. Duplicated explanations collapsed,
   the stale test-hook comment deleted, "offense".
+- **Batch 4, `Impact.lua`.** L1 `same`. Header rewritten without the
+  drift history or step list; the dust, stagger and vocal comments match
+  the code.
 
 ## Standard
 
@@ -2517,59 +2524,66 @@ findings went to batch 3, item 7.
 
 ### src/HorseCollisionMod/Impact.lua
 
-- [ ] `:4` header — "ten times a second"; the interval is `TickSeconds`. —
+Batch 4: applied, including both carried dust findings. Superseded by
+batch 2: the `TraceFallLanding` call. The stray `-- test reload` comment at
+the end of the file is deleted. The deferred crime comment states the
+constraint; `WhenVictimRises` follows its ruling. The ignored
+`ApplyImpactDamage` return is handled by the `Health.lua` item. Code
+findings went to batch 3, item 7.
+
+- [x] `:4` header — "ten times a second"; the interval is `TickSeconds`. —
   Correct.
-- [ ] `:5-6` — the rear and the charge "sweep a corridor in front of a
+- [x] `:5-6` — the rear and the charge "sweep a corridor in front of a
   standing horse"; the rear strikes an arc (`RearReach`, `RearArc`) and the
   charge sweeps a corridor while the horse lunges. — Correct.
-- [ ] `:7-8`, `:13-16` — "why the two lived as two whole functions for as
+- [x] `:7-8`, `:13-16` — "why the two lived as two whole functions for as
   long as they did", "Written twice, they drifted… for months". — Cut; keep
   `:18-22`.
-- [ ] `:10-12` — "the same thirteen steps in the same order"; the list is
+- [x] `:10-12` — "the same thirteen steps in the same order"; the list is
   not in code order (the reaction follows the sound) and leaves out the
   shield, the standing height and the auto-cure suppression. — Drop the
   count and the list; the function is the list.
-- [ ] `:51`, `:124-127` — three returns where two are the same value;
+- [x] `:51`, `:124-127` — three returns where two are the same value;
   "the combined signal… meant he could never be staggered at all".
   Resolves the carried item with the Rider finding: take two returns, and
   keep one line on why the player's danger decides.
-- [ ] `:53-56` — "The charge used to probe itself as a minor injury…". —
+- [x] `:53-56` — "The charge used to probe itself as a minor injury…". —
   Cut.
-- [ ] `:58`, `:63` — `or "Tickle"`, `or 0`; `TierValue` falls back to the
+- [x] `:58`, `:63` — `or "Tickle"`, `or 0`; `TierValue` falls back to the
   shipped row, which every tier has. — Drop the fallbacks.
-- [ ] `:84-86` — "What actually prevents the lockup"; the 40-health
+- [x] `:84-86` — "What actually prevents the lockup"; the 40-health
   threshold is restated from `Health.lua`. — "Keeps vanilla's auto-cure
   daycycle from taking a bleeding victim over"; no figure.
-- [ ] `:94-101` — "the rider reported impacts landing silently when this
+- [x] `:94-101` — "the rider reported impacts landing silently when this
   was moved below", "which is worth remembering". — Keep: the request goes
   out before the body is handed to physics.
-- [ ] `:107-118` — "measured across two builds… seven gallops… where three
+- [x] `:107-118` — "measured across two builds… seven gallops… where three
   such gallops in the older build produced three". — Keep: `Ragdoll` reads
   the victim's animation state, so the reaction runs next to the probe and
   before anything cosmetic.
-- [ ] `:118-119`, `:182-183` — comments and code run together without a
+- [x] `:118-119`, `:182-183` — comments and code run together without a
   blank line. — Separate.
-- [ ] `:146-147` — `-1` stands in for a missing speed. — Log `none`.
-- [ ] `:156-157` — two blank lines. — One.
-- [ ] `:185-190` — "1500 ms" restates a setting; "two guards in one lunge
+- [x] `:146-147` — `-1` stands in for a missing speed. — Log `none`.
+- [x] `:156-157` — two blank lines. — One.
+- [x] `:185-190` — "1500 ms" restates a setting; "two guards in one lunge
   produced two grunts and a kill line over the top of each other". — Keep:
   a charge resolves every victim inside one sweep tick, so the rider's and
   the horse's vocals play once per charge, as the stamina is charged once.
-- [ ] `:202-204` — says dust is spawned where the victim is struck; it
+- [x] `:202-204` — says dust is spawned where the victim is struck; it
   waits for the landing except on the rear (`Marks.lua` `DustWhenLanded`).
   Resolves the carried item. — Correct.
-- [ ] `:207-209` — `TraceFallLanding` follows the investigation-diagnostics
+- [x] `:207-209` — `TraceFallLanding` follows the investigation-diagnostics
   ruling.
-- [ ] `:218-223` — past 80 columns; "it perfectly overrides the casual
+- [x] `:218-223` — past 80 columns; "it perfectly overrides the casual
   recovery dialogue". Resolves the carried item. — Keep: the combat hit and
   the provocation wait until the victim stands, because the combat hit
   makes `sb_switch_hitreactions.xml` broadcast the assault at once.
   `WhenVictimRises` follows the early-return ruling.
-- [ ] `:224` — `reason, elapsed` unused. — Drop.
-- [ ] `:248-251` — the return value of `ApplyImpactDamage` is ignored;
+- [x] `:224` — `reason, elapsed` unused. — Drop.
+- [x] `:248-251` — the return value of `ApplyImpactDamage` is ignored;
   resolves the carried item with the Health finding.
-- [ ] `:262` — `-- test reload` left at end of file. — Delete.
-- [ ] `:200-202` — "Spawned where they are struck rather than where they
+- [x] `:262` — `-- test reload` left at end of file. — Delete.
+- [x] `:200-202` — "Spawned where they are struck rather than where they
   land"; only the rear spawns on contact, every other tier waits for the
   landing (`Marks.lua:208`, `DustWhenLanded`). — Correct. (Found in the
   settings file pass.)
