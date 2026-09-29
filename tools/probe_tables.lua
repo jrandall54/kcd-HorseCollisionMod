@@ -35,7 +35,7 @@ for _, name in pairs(WANTED) do
 		end
 
 		System.LogAlways("[TBL] " .. name
-				.. " rows=" .. tostring(info.RowCount)
+				.. " rows=" .. tostring(info.LineCount)
 				.. " cols=" .. tostring(info.ColumnCount))
 
 		-- Column names in batches, because one line long enough to hold them

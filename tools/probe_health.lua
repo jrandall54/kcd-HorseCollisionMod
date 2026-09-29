@@ -6,10 +6,6 @@
 --
 -- Edit WATCH to the entity to follow. It samples twice a second and writes
 -- only on a change, so a quiet watch costs two lines.
---
--- This lived in the mod as HorseCollisionMod:WatchHealth until 4.9.3. It was
--- never called by anything the mod does, only from the console, so it was
--- lifted here rather than shipped to players.
 
 local WATCH = "rat_guard22"
 local SECONDS = 90

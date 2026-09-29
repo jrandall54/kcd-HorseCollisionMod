@@ -11,7 +11,6 @@
 --
 --     python tools/dev_console.py --file tools/dev_survival.lua
 --
--- The state names were established by reading them back rather than assumed.
 -- `hunger` is nourishment and `exhaust` is energy, and both run the way that
 -- reads oddly: **higher is better**, 100 being fully fed and fully rested. A
 -- healthy player reads about 99 exhaust, and the mod's own telemetry logs

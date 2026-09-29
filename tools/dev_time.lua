@@ -3,17 +3,15 @@
 -- Waiting is the most expensive thing a test can ask of this project. The
 -- wait wheel caps at 24 hours, runs at `wh_pl_SkipTimeMaxWorldTimeRatio` 360,
 -- which is about four real minutes a day, and in hardcore it also demands
--- food and a bed. A question needing several in-game days was therefore
--- abandoned rather than answered.
+-- food and a bed.
 --
 -- None of that is necessary. `Calendar` is a Lua global and world time is
 -- directly settable. This is the same call spraguep's Cheat mod makes, and
 -- the follow-up message is vanilla's own way of telling the world to catch up
 -- after a jump.
 --
--- WARNING. Setting HOURS jumps the world clock, and doing so broke a running
--- session: the rider reported that "everything broke" after a 24 hour jump and
--- had to reload. It also does not run NPCs through their day, so anything that
+-- WARNING. Setting HOURS jumps the world clock. A jump can leave the session
+-- inconsistent; reload if it does. It also does not run NPCs through their day, so anything that
 -- depends on a routine will not have happened. For those, raise
 -- `wh_pl_SkipTimeMaxWorldTimeRatio` from its default of 360 to something like
 -- 7200 and use the game's own wait, which takes about twelve seconds a day and

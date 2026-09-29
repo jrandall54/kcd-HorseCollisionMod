@@ -1,10 +1,10 @@
 --- Hands the player the fastest horse loaded in the level.
 --
--- Every measurement this project has ever taken was ridden on Pebbles, so the
--- gait plateaus behind `SpeedWalk`, `SpeedTrot` and `SpeedGallop` are one
--- horse's. A horse's speed rides on its `agi` stat, which is one of the four
--- Horsetraders prices a horse on, so the widest spread available is Pebbles
--- against the highest `agi` horse standing in the level.
+-- The gait plateaus behind `SpeedWalk`, `SpeedTrot` and `SpeedGallop` were
+-- measured on one horse, Pebbles. A horse's speed rides on its `agi` stat,
+-- which is one of the four Horsetraders prices a horse on, so the widest
+-- spread available is Pebbles against the highest `agi` horse standing in the
+-- level.
 --
 -- Same two calls as tools/dev_horse.lua, which is what the cheat mod uses; the
 -- only difference is that this ranks the stable registry instead of taking the

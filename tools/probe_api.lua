@@ -14,10 +14,6 @@
 -- A bound C++ object keeps its methods on its metatable's `__index` rather
 -- than as direct keys, so the walk follows that chain. Depth is capped
 -- because those chains can be circular.
---
--- The counts this found on a 1.9.7 build, for comparison: Entity 290, player
--- 437, player.actor 100, player.soul 56, player.human 43, player.player 30,
--- player.inventory 20.
 
 local WANTED = {
 	{ "Entity", function() return rawget(_G, "Entity") end },

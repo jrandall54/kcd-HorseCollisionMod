@@ -10,8 +10,7 @@
 -- moves ten times that. `System.GetViewCameraPos` is the camera itself.
 --
 -- Samples are accumulated and written as one line at the end rather than one
--- line per sample. Per-sample logging during a reaction is what made a smooth
--- animation look jerky earlier in this project.
+-- line per sample, because per-sample logging costs frames.
 --
 -- The horse must be standing still. Displacement is measured against the
 -- camera position at t0, so a moving horse would swamp the signal.
@@ -37,8 +36,8 @@ pcall(function()
 	base = System.GetViewCameraPos()
 end)
 
--- The horse's own right vector, so the sideways component can be separated
--- from any drift along the line of travel. Taken from the head direction
+-- The camera's right vector, so the sideways component can be separated from
+-- any drift along the line of travel. Taken from the camera direction
 -- flattened, rotated ninety degrees.
 pcall(function()
 	local hd = System.GetViewCameraDir()

@@ -667,6 +667,10 @@ One line per batch: batch, commit, what was verified.
   `--help` runs; `bark_alias.py`, `henry_impact_lines.py` and
   `npc_pain_sets.py` produce the same output as before apart from
   "labeled", and `bark_chain.py` traces a set.
+- **Batch 5, probes and dev helpers.** Every remaining finding applied.
+  `probe_tables.lua` reads `LineCount`, and run live printed `rows=15` where
+  it printed `nil`; `probe_gait_speed.lua` names three gaits. L1 `same` for
+  the other nine Lua files, all comment edits.
 - **Batch 5, `verify_additive.py`.** Every finding applied; claim 1 reads
   "claims only the intended vanilla names" here and in the README row; the
   sections number as the docstring does, the tag check as part of claim 3.
@@ -3800,42 +3804,42 @@ their header, and three answer questions that are closed (see the ruling).
 
 **Wrong or stale:**
 
-- [ ] `probe_gait_speed.lua:8-9`, `:13`, `:104` — "the four gaits",
+- [x] `probe_gait_speed.lua:8-9`, `:13`, `:104` — "the four gaits",
   "canter ~15 s", "ride walk, trot, canter, then gallop". The horse has three
   commandable gaits. — Walk, trot, gallop.
-- [ ] `probe_gait_speed.lua:3-7` — cites "Stage 2 step 1 of
+- [x] `probe_gait_speed.lua:3-7` — cites "Stage 2 step 1 of
   docs/BALANCE_AUDIT.md" (proposed for deletion), "the 2.0.0 era", "the
   diary records". — "Samples the mounted horse's speed so each gait's
   plateau can be read against `SpeedWalk`, `SpeedTrot`, `SpeedGallop`."
-- [ ] `probe_tables.lua:38` — `info.RowCount`; the field is `LineCount`
+- [x] `probe_tables.lua:38` — `info.RowCount`; the field is `LineCount`
   (`dev_subject.lua:149`, `dev_console.py:250`), so the row count prints
   `nil`. — `LineCount`.
-- [ ] `probe_camera.lua:40-42` — "The horse's own right vector … Taken from
+- [x] `probe_camera.lua:40-42` — "The horse's own right vector … Taken from
   the head direction"; the code takes the camera's direction
   (`GetViewCameraDir`). — "The camera's right vector".
-- [ ] `probe_bark.lua:21` — "The speaker.s voice". — "speaker's".
-- [ ] `probe_bark.lua:103-107`, `:164-165` — "the rider" as the person
+- [x] `probe_bark.lua:21` — "The speaker.s voice". — "speaker's".
+- [x] `probe_bark.lua:103-107`, `:164-165` — "the rider" as the person
   running the probe. — "you".
 - [x] `probe_fall_landing.lua:5`, `probe_recovery_states.lua:16-17` — `--`
   as dashes. — Rephrase.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `probe_api.lua:18-20` — "The counts this found on a 1.9.7 build". —
+- [x] `probe_api.lua:18-20` — "The counts this found on a 1.9.7 build". —
   Cut.
-- [ ] `probe_bark.lua:3-26` — "The project had recorded this as
+- [x] `probe_bark.lua:3-26` — "The project had recorded this as
   impossible … Two faults put it there … Corrected, it works … By ear, Henry
   speaks…", and "a six candidate run asks the rider to hold six
   observations … four lines were lost that way". — Keep `:18-20` (audio is
   the gate, not holding) and "one per run".
-- [ ] `probe_bark.lua:52-53` — "which is how the first attempt at this was
+- [x] `probe_bark.lua:52-53` — "which is how the first attempt at this was
   wasted". — Cut.
-- [ ] `probe_bark.lua:112-113`, `:34-35` — "of the 1626 souls … 234 are
+- [x] `probe_bark.lua:112-113`, `:34-35` — "of the 1626 souls … 234 are
   horses", "zero of the 5025 souls". — Keep the class filter's reason; cut
   the tallies.
-- [ ] `probe_camera.lua:12-14` — "what made a smooth animation look jerky
+- [x] `probe_camera.lua:12-14` — "what made a smooth animation look jerky
   earlier in this project". — "Per-sample logging costs frames."
-- [ ] `probe_health.lua:10-12` — "This lived in the mod as
+- [x] `probe_health.lua:10-12` — "This lived in the mod as
   HorseCollisionMod:WatchHealth until 4.9.3". — Cut.
 
 ### Development helpers (`tools/dev_*.lua`, `testworlds.ini`)
@@ -3852,25 +3856,25 @@ their header, and three answer questions that are closed (see the ruling).
 - [x] `dev_target.lua:10`, `:41-43` — skips Henry's dog by name, behind a
   class filter that already excludes dogs (the `ProtectMutt` ruling). —
   Delete the name check.
-- [ ] `dev_survival.lua:14` — "established by reading them back rather than
+- [x] `dev_survival.lua:14` — "established by reading them back rather than
   assumed" (a `STYLE.md` rejected form). — Cut the clause.
-- [ ] `dev_horse.lua:3-5` — "the earliest save on hand is already level
+- [x] `dev_horse.lua:3-5` — "the earliest save on hand is already level
   5". — "Tests at low Horsemanship need a horse before the prologue grants
   one."
 
 **History and people to cut:**
 
-- [ ] `dev_peace.lua:21-26` — "It was described as the lever that mattered
+- [x] `dev_peace.lua:21-26` — "It was described as the lever that mattered
   … set on every run for several sessions while the rider went on being
   attacked". — Keep "not included: no test has shown it changes anything".
-- [ ] `dev_time.lua:5-7` — "A question needing several in-game days was
+- [x] `dev_time.lua:5-7` — "A question needing several in-game days was
   therefore abandoned rather than answered." — Cut.
-- [ ] `dev_time.lua:14-16` — "the rider reported that 'everything broke'".
+- [x] `dev_time.lua:14-16` — "the rider reported that 'everything broke'".
   — "A jump can leave the session inconsistent; reload if it does."
-- [ ] `dev_fasthorse.lua:3` — "Every measurement this project has ever
+- [x] `dev_fasthorse.lua:3` — "Every measurement this project has ever
   taken was ridden on Pebbles". — "The gait thresholds were measured on one
   horse."
-- [ ] `testworlds.ini:16` — "interrupts the rider mid-test". — "interrupts
+- [x] `testworlds.ini:16` — "interrupts the rider mid-test". — "interrupts
   a test".
 
 ### tools/legacy/

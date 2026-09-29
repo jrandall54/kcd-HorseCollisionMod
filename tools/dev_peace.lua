@@ -18,12 +18,9 @@
 --                            keeps someone hostile after the wanted level is
 --                            gone.
 --
--- `ai_IgnorePlayer` is deliberately absent. It was described as the lever that
--- mattered, and that was never true and never tested: it was set on every run
--- for several sessions while the rider went on being attacked, and reading it
--- back as 1 only ever confirmed the cvar had taken a value, not that it did
--- anything. Do not add it without a test that shows a difference with it on
--- and off.
+-- `ai_IgnorePlayer` is not included: no test has shown it changes anything,
+-- and reading it back as 1 confirms only that the cvar took a value. Do not add
+-- it without a test that shows a difference with it on and off.
 --
 -- None of this is a loop, and none of it survives a save load, so run this
 -- file again after every load.

@@ -1,8 +1,7 @@
 --- Gives the player a horse, for testing early-game saves.
 --
--- The horsemanship tuning has to be judged at a low skill level, and the
--- earliest save on hand is already level 5. Starting a new game reaches level
--- 1 but not a horse: the prologue hands one over hours in.
+-- Tests at low Horsemanship need a horse before the prologue grants one,
+-- which it does hours in.
 --
 -- Nothing is spawned. Every horse in the level is already an entity, so this
 -- finds the nearest one and makes it the player's, which is the same pair of
