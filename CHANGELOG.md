@@ -30,6 +30,17 @@ number.
 
 ## [Unreleased]
 
+### Removed
+
+- A knocked-down victim no longer groans at intervals while on the ground. The
+  settings `DynamicRecovery`, `RecoveryDelayByTier`,
+  `RecoveryArmorScaleArmored`, `RecoveryArmorScaleUnarmored`,
+  `RecoveryMinSec`, `RecoveryMaxSec`, `RecoveryGroundBarks` and
+  `RecoveryBarkIntervalMs` are gone; the get-up time was never affected by
+  them.
+- `ProtectMutt`. Henry's dog, like every dog, is never a victim.
+- `RiderBarks` and `LeanMinFlipMs`, which had no effect.
+
 ## [5.31.4] - 2026-09-27
 
 ### Changed

@@ -142,10 +142,6 @@
 	<td class="summary">Marks a handover as in flight, and clears it when the body ragdolls.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:TraceFallLanding">HorseCollisionMod:TraceFallLanding (npc, tierName)</a></td>
-	<td class="summary">Records how long a requested ragdoll took to actually take.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:WhenVictimIsUp">HorseCollisionMod:WhenVictimIsUp (npc, fn)</a></td>
 	<td class="summary">Runs something once a victim has finished getting up.</td>
 	</tr>
@@ -162,10 +158,6 @@
 	<td class="summary">Records every animation state a victim passes through while recovering.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:WatchTurn">HorseCollisionMod:WatchTurn (npc, action)</a></td>
-	<td class="summary">Measures how far a victim has turned once the whole recovery is over.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ReplanIfStranded">HorseCollisionMod:ReplanIfStranded (npc)</a></td>
 	<td class="summary">Replans a victim only when the game has not recovered them itself.</td>
 	</tr>
@@ -180,14 +172,6 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ImpactIsNewContact">HorseCollisionMod:ImpactIsNewContact (npcId, now)</a></td>
 	<td class="summary">Whether enough time has passed since this victim was last scored.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:CalculateRecoveryDuration">HorseCollisionMod:CalculateRecoveryDuration (tierName[, armorScale])</a></td>
-	<td class="summary">Calculates the dynamic recovery get-up delay for a fallen victim.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ApplyDynamicRecovery">HorseCollisionMod:ApplyDynamicRecovery (npc, tierName[, armorScale])</a></td>
-	<td class="summary">Applies dynamic recovery groans and telemetry to an impacted victim.</td>
 	</tr>
 </table>
 
@@ -441,46 +425,6 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:TraceFallLanding"></a>
-    <strong>HorseCollisionMod:TraceFallLanding (npc, tierName)</strong>
-    </dt>
-    <dd>
-    Records how long a requested ragdoll took to actually take. </p>
-
-<p> Instrumentation, and it answers a question the mod could not previously be
- asked. <code>actor:Fall</code> requests a ragdoll; it does not perform one, and nothing
- reports back. So a fall that takes on the next frame and one the engine
- holds for two and a half seconds look identical in the log, and the rider
- has been describing the second for hours with no way to show it: a victim
- takes the impact, walks a few steps, and falls over long afterwards.</p>
-
-<p> The diary measured the mechanism once, firing <code>actor:Fall</code> every 33ms from
- the first frame of a get-up: seventy-six calls did nothing and the
- seventy-seventh landed at the instant the animation released, and two
- unrelated sequences both landed at 2532ms to the millisecond. What is not
- known is how often it happens in ordinary play, which this counts.</p>
-
-<p> Costs one line per impact and nothing per frame.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">tierName</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the tier that struck them
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
     <a name = "HorseCollisionMod:WhenVictimIsUp"></a>
     <strong>HorseCollisionMod:WhenVictimIsUp (npc, fn)</strong>
     </dt>
@@ -530,8 +474,8 @@
     <dd>
     Runs something the moment a victim's body stops moving. </p>
 
-<p> Rest is the same thing <code>ImpactThrow</code> already means by it: the body has moved
- less than <code>RestStillMeters</code> since the last poll. Read from position rather
+<p> Rest means the body has moved less than <code>RestStillMeters</code> since the last
+ poll. Read from position rather
  than from <code>GetVelocity</code>, and rather than from the animation state, because
  <code>BlendRagdoll</code> never appears on a victim the impact killed.</p>
 
@@ -619,44 +563,6 @@
 
 <p> Diagnostic, and off unless <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:TraceRecovery">TraceRecovery</a> is set, because it polls at the
  reaction poll rate for the length of a recovery.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">action</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the reaction that played
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:WatchTurn"></a>
-    <strong>HorseCollisionMod:WatchTurn (npc, action)</strong>
-    </dt>
-    <dd>
-    Measures how far a victim has turned once the whole recovery is over. </p>
-
-<p> A guard carrying a polearm was reported finishing his get-up facing roughly
- the opposite way, where other victims do not. The get-up options carry no
- weapon tag at all, four per direction and nothing else, so whatever is
- happening is not a different clip being chosen. That leaves the victim's
- orientation, which is what this measures.</p>
-
-<p> Sampled at the impact and again well after the stand-up has finished, so it
- covers the whole sequence rather than a phase of it. The item in hand is
- recorded alongside, because the whole question is whether what a victim is
- carrying changes the result.</p>
-
-<p> Diagnostic, and off unless <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:TraceRecovery">TraceRecovery</a> is set.
 
 
     <h3>Parameters:</h3>
@@ -859,75 +765,6 @@
 
 
 </dd>
-    <dt>
-    <a name = "HorseCollisionMod:CalculateRecoveryDuration"></a>
-    <strong>HorseCollisionMod:CalculateRecoveryDuration (tierName[, armorScale])</strong>
-    </dt>
-    <dd>
-    Calculates the dynamic recovery get-up delay for a fallen victim. </p>
-
-<p> Armored victims (low armorScale) shake off the impact and recover quickly.
- Unarmored peasants (high armorScale) absorb the concussive force and stay
- stunned on the ground longer.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">tierName</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Trot", "Gallop", "Charge", "Rear"
-        </li>
-        <li><span class="parameter">armorScale</span>
-            <span class="types"><span class="type">number</span></span>
-         victim's armor scale (~0.35 armored, ~1.26 unarmored)
-         (<em>optional</em>)
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">number</span></span>
-        duration in seconds
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:ApplyDynamicRecovery"></a>
-    <strong>HorseCollisionMod:ApplyDynamicRecovery (npc, tierName[, armorScale])</strong>
-    </dt>
-    <dd>
-    Applies dynamic recovery groans and telemetry to an impacted victim. </p>
-
-<p> Armored victims shake off the impact quickly, while unarmored peasants
- stay stunned and emit periodic groans of pain while on the ground.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">tierName</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         impact tier
-        </li>
-        <li><span class="parameter">armorScale</span>
-            <span class="types"><span class="type">number</span></span>
-         victim's armor scale
-         (<em>optional</em>)
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
 </dl>
 
 
@@ -935,7 +772,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-29 12:22:33 </i>
+<i style="float:right;">Last updated 2026-09-29 13:51:33 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

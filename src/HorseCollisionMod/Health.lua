@@ -172,10 +172,6 @@ end
 -- also lost after a ragdoll resolves, in discrete amounts that look like a
 -- fall rather than like bleeding.
 --
--- Height is sampled alongside health for the same reason. The impulse throws
--- the target, and a change in z across the recovery separates a fall from
--- anything the collision itself did.
---
 -- @tparam table npc victim entity
 -- @tparam string tierName the tier the impact scored
 -- @tparam number strength the `HitReactionStrength` sent with the hit
@@ -194,29 +190,6 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 	end
 
 	local name = self:NameOf(npc)
-
-	local function height()
-		local okPos, pos = pcall(function()
-			return npc:GetWorldPos()
-		end)
-
-		if okPos and type(pos) == "table" and type(pos.z) == "number" then
-			return pos.z
-		end
-
-		return nil
-	end
-
-	local baseZ = height()
-
-	-- Where the victim stood when the impact landed. A reaction should leave
-	-- them near it; traveling on while animation-controlled is how a victim
-	-- reaches somewhere the collision never put them.
-	local origin = nil
-
-	pcall(function()
-		origin = npc:GetWorldPos()
-	end)
 
 	local exhaust = -1
 
@@ -241,7 +214,6 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 			.. " state=" .. state
 			.. " strength=" .. tostring(strength)
 			.. " health=" .. string.format("%.4f", before)
-			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?")
 			.. " exhaust=" .. string.format("%.1f", exhaust)
 			.. " " .. self:DescribeArmor(armor or self:ArmorOf(npc)))
 
@@ -254,26 +226,6 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 			return
 		end
 
-		local z = height()
-		local dz = "?"
-		local travel = "?"
-
-		pcall(function()
-			if origin then
-				local q = npc:GetWorldPos()
-
-				if q then
-					travel = string.format("%.2f",
-							math.sqrt((q.x - origin.x) ^ 2
-									+ (q.y - origin.y) ^ 2))
-				end
-			end
-		end)
-
-		if z and baseZ then
-			dz = string.format("%+.2f", z - baseZ)
-		end
-
 		-- The starting health is repeated on every sample. Samples now run
 		-- past the cooldown, so a second impact on the same target can
 		-- interleave its lines with the first one's, and the name alone no
@@ -281,9 +233,7 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 		self:Log("ImpactCost " .. name .. " " .. label
 				.. " from=" .. string.format("%.4f", before)
 				.. " health=" .. string.format("%.4f", after)
-				.. " delta=" .. string.format("%+.4f", after - before)
-				.. " dz=" .. dz
-				.. " travel=" .. travel)
+				.. " delta=" .. string.format("%+.4f", after - before))
 	end
 
 	for _, at in ipairs(self.ImpactProbeSamples) do
@@ -291,60 +241,6 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 			sample("t+" .. at .. "ms")
 		end)
 	end
-
-	-- The throw distance, sampled when the throw is actually over rather than
-	-- at a fixed time. A clock sample catches the body mid-flight on one impact
-	-- and long after it stopped on another, and worse, while the horse is still
-	-- pushing it along, so the figure mixes the throw with how long the horse
-	-- kept shoving.
-	--
-	-- Rest is read from the body's own position rather than from its animation
-	-- state. `BlendRagdoll` never appears on a victim the impact killed, so a
-	-- state test reports `neverDown` on exactly the impacts that threw someone
-	-- hardest and waits out its ceiling instead of measuring them.
-	local restPoll = self.RestPollMs
-	local restStill = self.RestStillMeters
-	local restCeiling = 8000
-	local restStart = self:TimeMs()
-	local restLast = nil
-
-	local function atRest()
-		local here = nil
-
-		pcall(function()
-			here = npc:GetWorldPos()
-		end)
-
-		local elapsed = self:TimeMs() - restStart
-
-		if here and restLast then
-			local moved = math.sqrt((here.x - restLast.x) ^ 2
-					+ (here.y - restLast.y) ^ 2
-					+ (here.z - restLast.z) ^ 2)
-
-			if moved < restStill or elapsed >= restCeiling then
-				local thrown = "?"
-
-				if origin then
-					thrown = string.format("%.2f",
-							math.sqrt((here.x - origin.x) ^ 2
-									+ (here.y - origin.y) ^ 2))
-				end
-
-				self:Log("ImpactThrow " .. name
-						.. " why=" .. (moved < restStill and "still" or "ceiling")
-						.. " atMs=" .. string.format("%.0f", elapsed)
-						.. " thrown=" .. thrown)
-
-				return
-			end
-		end
-
-		restLast = here
-		Script.SetTimer(restPoll, atRest)
-	end
-
-	Script.SetTimer(restPoll, atRest)
 end
 
 
@@ -829,11 +725,6 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 				self:SendCombatHit(npc, playerEnt, strength)
 				npc.hcm_combat_injected = true
 			end
-
-			-- The moment the mod's own damage killed somebody, which is the
-			-- only place the death is attributable to the mod rather than to
-			-- anything else that might have finished them.
-			self:BarkDeath(npc)
 
 			local state = "?"
 

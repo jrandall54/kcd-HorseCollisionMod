@@ -163,134 +163,25 @@ HorseCollisionMod.BarkSets = {
 	-- worth driving are the ones that are *only* a line.
 }
 
--- Henry's own sets.
+--- Lines Henry says on an impact, addressed by dialog `alias`, drawn as one
+-- weighted pool (`{ name, weight }`, read by `PickFromPool`) whatever the tier.
 --
--- Kept separate because the player is a different speaker with a different
--- voice, and because a line Henry has no recording for is silent however valid
--- the request. These two are confirmed on him.
-HorseCollisionMod.RiderBarkSets = {
-	-- **Henry is deliberately silent, and this table is deliberately empty.**
-	--
-	-- `soul:GetRoles()` returns 32 role ids for Henry, and that is his entire
-	-- palette. It cannot be widened: `C_ScriptBindSoul` exposes `GetRoles`,
-	-- `HasRoleByName`, `GetMetaRoles` and `HasMetaRoleByName`, but no setter
-	-- for a role. (`AddMetaRoleByName` exists, returns true and changes
-	-- nothing, which is consistent with the metarole not being what is
-	-- consulted.)
-	--
-	-- Of those 32 roles: most carry no recorded lines at all; several are
-	-- gated on a state he is never in while riding: hunger, tiredness,
-	-- combat, deep water, being too far from the map; two are conversation
-	-- roles under the generic `NPC` and `PLAYER` metaroles, which open a
-	-- dialogue scene instead of speaking and must never be requested; and
-	-- exactly one speaks freely. That one is `JINDRICH_NARAZIL_NA_MRTVOLY`,
-	-- whose nine lines are the Skalitz massacre monologs. They name Bianca,
-	-- the Bailiff, Deutsch and Henry's parents, and the longest runs 139
-	-- characters. The rider rejected it: a story monolog in a bark slot reads
-	-- as a bug however well the theme fits.
-	--
-	-- Ten further candidates were auditioned directly on Henry, through this
-	-- same code path, and every one was silent.
-	--
-	-- The trap that made several of them look like they had worked: `Bark`
-	-- writes its log line immediately after the `pcall` that sends the
-	-- request, so `Bark Killed=... to Dude` appears whether or not a sound
-	-- follows. A mod-written log line is evidence the mod asked, never
-	-- evidence the game answered.
-	--
-	-- **Two assumptions above are untested and must not be treated as facts.**
-	-- Whether the "state gate" is real has never been checked by *inducing* a
-	-- state and then asking, and whether role membership gates anything rests
-	-- on five observations that it does not fully explain. Henry holds
-	-- `JINDRICH___UNAVA` and that set was still silent. Both are written up in
-	-- `docs/TESTING_DIARY.md` as work for a later branch. If either turns out
-	-- differently, Henry's palette may be much larger than this comment says.
-}
-
---- Lines Henry can be made to say on an impact, addressed by `alias`.
+-- Empty on purpose. An impact gets `PlayRiderVocal`'s wordless grunt; the lines
+-- Henry can speak are sentences, and sentences belong to kills
+-- (`RiderBarkKillAliases`). The pool and `RiderBark`, which defaults to false,
+-- are kept so a line can be added without restructuring.
 --
--- This is the answer to the table above, and it works because the addressing
--- scheme is different rather than because anything about Henry changed.
+-- An entry must pass four filters, which `tools/henry_impact_lines.py` applies:
 --
--- `RiderBarkSets` is empty because a **metarole** names a whole bark set and
--- lets the dialog system choose the member, and the only set Henry speaks
--- freely is the Skalitz monologs. An **alias** names one topic, so the wording
--- is nearly pinned: a topic holding a single short line is effectively a line
--- the mod chose.
+-- 1. `topic2sequence.entry_condition` is `'1'`, always-true. A quest condition
+--    refuses silently.
+-- 2. `sequence.timeout` is not `-1`, which allows one use per playthrough.
+-- 3. The shipped audio carries exactly one actor, Henry's. Two actors is a
+--    conversation; no audio is a line that cannot be heard.
+-- 4. Every member of the topic fits, since the dialog system picks the member.
 --
--- ### Where these came from
---
--- The alias namespace was recorded as unrecoverable, on the grounds that a
--- label is only visible where vanilla's AI files happen to reference one. It is
--- a shipped column: `label` in `Libs/Tables/text/topic.xml`, 1656 of them
--- against the 861 those files mention. `tools/bark_alias.py` reads it and
--- `tools/legacy/henry_quips.py` cross-references it with who recorded each line,
--- having the audio is the gate.
---
--- That produced 1076 lines Henry can be asked for, of which the rider chose
--- these. **Theirs to judge, not a filter applied here** -- the survey they picked
--- from was narrowed only by what is mechanically possible.
---
--- ### One flat pool, by instruction
---
--- Every impact draws from the whole list regardless of tier. Per-tier pools were
--- offered and declined:
---
--- > "Just wire them as a random pool that every impact calls from."
---
--- Weights are all 1 for now. `PickFromPool` reads the same
--- `{ name, weight }` shape as the victim pools, so any line can be made rarer
--- without restructuring anything.
---
--- Note that `NPC` and `PLAYER` are absent for a reason given at length above:
--- they are conversation roles, they open a dialogue scene rather than speaking,
--- and 58 further lines the rider liked are reachable by nothing else and so are
--- not reachable at all.
---
--- ### Empty on purpose: an impact is breath, not words
---
--- Every spoken line the mod has belongs to `RiderBarkKillAliases` and fires only
--- when the collision killed somebody. An ordinary impact gets `PlayRiderVocal`'s
--- wordless grunt instead, which is also what the engine itself does for the
--- player: Henry holds the `COMBAT_VICTIM_SCREAM_RECEIVED_HIT` and
--- `COMBAT_ACTOR_SCREAM_ATTACK` metaroles, but neither carries any audio recorded
--- by his actor -- only NPCs' -- so vanilla reaches for an audio trigger for the
--- player's own impact vocals, exactly as this mod does.
---
--- The reason is the length of what is available. Of 1,656 aliases, 173 hold a
--- Henry line on an always-true sequence and 124 survive every usability filter,
--- and the ones that actually speak are sentences. A sentence is right over a
--- body and wrong for a shove, and the short exclamations that would have suited
--- a shove are the ones that do not play.
---
--- The pool and its switch are kept rather than deleted so a line can be put back
--- here without restructuring anything. `RiderBark` defaults to false to match.
---
--- ### What makes a line usable, and why listening was not optional
---
--- Four filters, applied by `tools/henry_impact_lines.py`:
---
--- 1. **`topic2sequence.entry_condition` must be `'1'`**, always-true. A quest
---    condition refuses silently while the mod still logs `sent=true`.
--- 2. **`sequence.timeout` must not be `-1`**, which means usable once per
---    playthrough and then never again.
--- 3. **The shipped audio must exist and carry exactly one actor, Henry's.** The
---    localization paks name every file
---    `<actor>_t<topic>_s<sequence>_<n>_<slug>_<hash>.ogg`, so this is a matter of
---    record. Two actors means a conversation, which is refused or opens a
---    cutscene; no audio at all means a line that has text and no recording.
--- 4. **Every member of the topic must fit**, since the dialog system picks which
---    member plays. A label reading "Oh, shit!" fronted "Shit, where's that
---    damned ring?".
---
--- Passing all four is still not proof a line is audible, so every alias below
--- was fired individually in game and kept only on the rider's word that they
--- heard it. `tools/legacy/make_audition.py` fires one by number for that purpose.
---
--- One caution for anyone auditioning more: a silence observed during that
--- audition turned out not to be reliable, and several lines recorded silent
--- played perfectly when fired again. The cause was never established. So fire a
--- candidate again and hear it before adding it here.
+-- Passing the filters does not prove a line is audible. Fire a candidate in
+-- game and hear it, more than once, before adding it.
 --
 -- @table RiderBarkAliases
 HorseCollisionMod.RiderBarkAliases = {}
@@ -742,20 +633,18 @@ end
 -- simply says nothing, with no error and no glitch, exactly as in vanilla.
 --
 -- @tparam table entity who should speak
--- @tparam string set a key of `BarkSets` or `RiderBarkSets`
--- @tparam ?boolean rider true to read from the rider's table instead
+-- @tparam string set a key of `BarkSets`
 -- @tparam ?boolean ignoreCooldown true to speak even inside the speaker's
 --   cooldown, used only for the recovery line that follows a cry of pain
 -- @treturn boolean true when a request was sent
-function HorseCollisionMod:Bark(entity, set, rider, ignoreCooldown,
+function HorseCollisionMod:Bark(entity, set, ignoreCooldown,
 		priority, overrideSuppress)
 	if not entity then
 		return false
 	end
 
 
-	local table_ = rider and self.RiderBarkSets or self.BarkSets
-	local metarole = self:PickFromPool(table_[set])
+	local metarole = self:PickFromPool(self.BarkSets[set])
 
 	if not metarole then
 		return false
@@ -1005,7 +894,7 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 			return
 		end
 
-		self:Bark(npc, "Ridden", false, true)
+		self:Bark(npc, "Ridden", true)
 	end)
 end
 
@@ -1023,31 +912,6 @@ function HorseCollisionMod:BarkRear(npc, struck)
 	end
 
 	self:Bark(npc, struck and "Panic" or "Startle")
-end
-
---- Speaks when the mod's own actions have killed somebody.
---
--- Henry only. The bystander raising the alarm used to fire from here and has
--- been removed: vanilla couples that line to a whole flee-and-fetch-a-guard
--- reaction that the mod cannot reproduce, and it already fires it correctly on
--- its own when a body is found.
---
--- Henry speaks from `RiderBarkKillAliases` here, chosen in `BarkRiderOnImpact`.
--- logs the death and says nothing.
---
--- @tparam table npc the victim who died
-function HorseCollisionMod:BarkDeath(npc)
-	if not self:BarksEnabled("Collision") then
-		return
-	end
-
-	if self.Config.RiderBarks == false then
-		return
-	end
-
-	if not self:Bark(player, "Killed", true) and self.Config.LogTelemetry then
-		self:Log("BarkDeath " .. self:NameOf(npc) .. " no rider set wired")
-	end
 end
 
 --- Makes a victim briefly immortal so the engine's collision damage lands on

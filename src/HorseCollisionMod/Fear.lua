@@ -103,7 +103,7 @@ function HorseCollisionMod:FrightenBystander(npc, playerWuid, priority,
 		return false
 	end
 
-	self:Bark(npc, "Panic", false, true, priority, overrideSuppress)
+	self:Bark(npc, "Panic", true, priority, overrideSuppress)
 
 	return true
 end

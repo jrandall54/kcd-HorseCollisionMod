@@ -47,40 +47,8 @@ HorseCollisionModSettings = {
 	RagdollDampCeilingMs     = 6000,  -- damp regardless by this point
 
 	-- =========================================================================
-	-- Dynamic Ragdoll Recovery & Ground Stun
+	-- Getting back up
 	-- =========================================================================
-	-- Whether to scale the ragdoll get-up delay based on impact tier and armor.
-	-- When enabled, heavy armored targets recover quickly to defend themselves,
-	-- while unarmored villagers or severe high-speed collisions leave the victim
-	-- stunned on the ground longer.
-	DynamicRecovery           = true,
-
-	-- Base get-up stillness delay (in seconds) by impact tier.
-	-- Trot knocks down lightly; Gallop and Charge deliver heavy concussive force.
-	RecoveryDelayByTier       = {
-		Trot   = 0.5,   -- light knock, quick shake-off
-		Gallop = 2.0,   -- solid hit, concussive knockdown
-		Rear   = 1.0,   -- reared and bowled over
-		Charge = 3.5,   -- devastating direct charge
-	},
-
-	-- How armor modifies the recovery delay.
-	-- Unarmored victims (high armor scale, ~1.15-1.26) take more of the shock
-	-- and stay down longer. Fully armored guards (~0.35-0.42) absorb the impact
-	-- across their plate and recover faster.
-	-- Multipliers applied to RecoveryDelayByTier:
-	RecoveryArmorScaleArmored   = 0.6,   -- armored knight recovers 40% faster
-	RecoveryArmorScaleUnarmored = 1.5,   -- unarmored peasant stays down 50% longer
-
-	-- Bounds on total get-up stillness duration (in seconds):
-	RecoveryMinSec            = 0.3,   -- fastest recovery (near immediate)
-	RecoveryMaxSec            = 5.0,   -- maximum groggy stun duration
-
-	-- Ground hurt barks: while recovering on the ground, weaker/dazed victims
-	-- periodically emit groans of pain (RANENY_NA_ZEMI) before standing up.
-	RecoveryGroundBarks       = true,
-	RecoveryBarkIntervalMs    = 1400,  -- ms between pain moans while down
-
 	-- Waiting for a victim to be back on their feet.
 	RisePollMs                = 160,   -- how often to look
 	RiseCeilingMs             = 15000, -- how long before the wait is given up
@@ -286,7 +254,6 @@ HorseCollisionModSettings = {
 	LeanHoldAmplitude        = 3.0,   -- lower holds steadier once out
 	LeanPollMs               = 30,
 	LeanDeadband             = 0.06,
-	LeanMinFlipMs            = 200,
 	LeanRunawayFactor        = 2.0,
 	LeanMaxAngleDeg          = 45,    -- refuse a lean past this far off the horse's line
 	LeanMaxPitchDeg          = 55,    -- and past this far up or down
@@ -802,9 +769,9 @@ HorseCollisionModSettings = {
 	-- `c_special_bone_crack1` both ignore position entirely, so the only
 	-- control over those is `chance`, which is how often the layer appears.
 	--
-	-- Two trigger names are tokens, replaced with the sample matching what the
-	-- victim is wearing: `body` is the blunt impact against that material and
-	-- `foley` is the movement rustle it makes.
+	-- A trigger name that is a key of `ImpactTokens` (`body`, `body_armed`,
+	-- `face_armed`, `blunt`) is replaced with the sample matching the victim's
+	-- armor.
 
 	-- A shove disturbs someone's clothing rather than striking them, so the
 	-- walk tier is cloth foley over a body settling, with a single hoofstep
@@ -828,9 +795,9 @@ HorseCollisionModSettings = {
 	-- milliseconds apart thickens and lifts it, which is the only way up once
 	-- a layer is already at zero distance.
 	--
-	-- Two trigger names are tokens, replaced with the sample matching what the
-	-- victim is wearing: `body` is the blunt impact against that material and
-	-- `foley` is the movement rustle it makes.
+	-- A trigger name that is a key of `ImpactTokens` (`body`, `body_armed`,
+	-- `face_armed`, `blunt`) is replaced with the sample matching the victim's
+	-- armor.
 
 	-- The master level control, in meters, added to every layer of every
 	-- tier. Higher is quieter. The per-layer distances below set the balance
@@ -1014,7 +981,6 @@ HorseCollisionModSettings = {
 	Barks                    = true,  -- the feature as a whole
 	CollisionBarks           = true,  -- victims and bystanders of an impact
 	RearBarks                = true,  -- whoever a rear is aimed at
-	RiderBarks               = true,  -- Henry's own remark over a body
 	BarkCooldownMs           = 3000,  -- per speaker, so a crowd is not a choir.
 	                                  -- Keep at or below HitCooldownMs: a
 	                                  -- longer value silences whole impacts,
@@ -1037,7 +1003,6 @@ HorseCollisionModSettings = {
 	ShieldWindowMs           = 6000,  -- crash backstop only; the damage call lifts it
 
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
-	ProtectMutt              = true,  -- whether your dog is immune
 	                                  -- around on his back
 
 	-- Characters the game will not let you attack -- Captain Bernard, the Lord

@@ -384,8 +384,6 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	local elapsed = 0
 	local finishedFor = 0
 	local sawFight = false
-	local sawYield = false
-	local caught = false
 
 	local function sample()
 		if generation ~= self.TimerTick then
@@ -403,25 +401,8 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		if self:IsStillFighting(state) then
 			sawFight = true
 			finishedFor = 0
-
-			if state ~= nil and string.find(state, "^Surrender") ~= nil then
-				sawYield = true
-			end
 		else
 			finishedFor = finishedFor + 1
-
-			-- Off by default. See `CatchYieldImmediately`.
-			if self.CatchYieldImmediately and sawYield and not caught then
-				caught = true
-
-				local stoodDown = self:SendStandDown(npc)
-
-				if self.Config.LogTelemetry then
-					self:Log("YieldCaught " .. self:NameOf(npc)
-							.. " state=" .. tostring(state)
-							.. " stoodDown=" .. tostring(stoodDown))
-				end
-			end
 		end
 
 		if sawFight and finishedFor >= self.RetaliationSettledSamples then
@@ -440,39 +421,6 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	end
 
 	Script.SetTimer(interval, sample)
-end
-
---- Tells a victim the incident is over and they may stand down.
---
--- `combat:stimulus:standDownRequest` sets `t_state = standDown` in
--- `sb_combat.xml`, and it is one of only two stimulus kinds exempt from the
--- acceptance rule that rejects a stimulus outright while the receiver is
--- already fighting or fleeing. That exemption is the whole reason it works
--- here: every other message this mod could send is discarded by someone
--- mid-flight, which is exactly who needs it.
---
--- The payload is empty. `TypeDefinitions.xml` declares a single member `_`,
--- which is a placeholder rather than a field: passing it is rejected with
--- "override table does not match the type", and vanilla's own sends carry
--- `values=""`.
---
--- @tparam table npc victim entity
--- @treturn boolean true when the call was accepted
-function HorseCollisionMod:SendStandDown(npc)
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
-
-	local ok = pcall(function()
-		local message = Utils.makeTable("combat:stimulus:standDownRequest", {})
-
-		XGenAIModule.SendMessageToEntityData(target,
-				"combat:stimulus:standDownRequest", message)
-	end)
-
-	return ok
 end
 
 --- Puts a victim right once the fight is over.
@@ -1118,11 +1066,6 @@ function HorseCollisionMod:PullRiderDown(npc)
 	local startedAt = self:TimeMs()
 	local polls = 0
 	local bestCan = 0
-	local bestCanHorse = 0
-	local bestAngle = 999
-	local widestAngle = -1
-	local angleWhenEnabled = -1
-	local pullTarget = "player"
 
 	local function attempt()
 		if generation ~= self.TimerTick then
@@ -1161,10 +1104,6 @@ function HorseCollisionMod:PullRiderDown(npc)
 						.. " atMs=" .. string.format("%.0f", elapsed)
 						.. " polls=" .. tostring(polls)
 						.. " bestCan=" .. tostring(bestCan)
-						.. " bestCanHorse=" .. tostring(bestCanHorse)
-						.. " angles=" .. string.format("%.0f", bestAngle)
-						.. "-" .. string.format("%.0f", widestAngle)
-						.. " enabledAt=" .. string.format("%.0f", angleWhenEnabled)
 						.. " state=" .. state
 						.. " dist=" .. string.format("%.2f", dist)
 						.. " hostile=" .. hostile)
@@ -1180,77 +1119,15 @@ function HorseCollisionMod:PullRiderDown(npc)
 		end
 
 		local can = 0
-		local canHorse = 0
 
 		pcall(function()
 			can = npc.actor:CanHorsePullDown(player.id) or 0
 		end)
 
-		-- The rider is pulled off a horse, so the id the action wants may be
-		-- the horse rather than the person. Both are asked until one of them
-		-- is shown to be the right one.
-		pcall(function()
-			local h = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
-
-			if h then
-				canHorse = npc.actor:CanHorsePullDown(h.id) or 0
-			end
-		end)
-
 		polls = polls + 1
-
-		-- The angle between where the horse is pointing and where the victim
-		-- is standing. `wh_cs_HorsePullDownAngle` is 55 degrees, so a victim
-		-- who only ever approaches from the flank may never qualify.
-		pcall(function()
-			local h = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
-			local hp = h and h:GetWorldPos()
-			local np = npc:GetWorldPos()
-			local dir = h and h:GetDirectionVector(1)
-
-			if hp and np and dir then
-				local dx, dy = np.x - hp.x, np.y - hp.y
-				local len = math.sqrt(dx * dx + dy * dy)
-
-				if len > 0 then
-					local dot = ((dx / len) * dir.x) + ((dy / len) * dir.y)
-
-					if dot > 1 then
-						dot = 1
-					end
-
-					if dot < -1 then
-						dot = -1
-					end
-
-					local deg = math.acos(dot) * 180 / math.pi
-
-					if deg < bestAngle then
-						bestAngle = deg
-					end
-
-					if deg > widestAngle then
-						widestAngle = deg
-					end
-
-					if can ~= 0 and angleWhenEnabled < 0 then
-						angleWhenEnabled = deg
-					end
-				end
-			end
-		end)
 
 		if can > bestCan then
 			bestCan = can
-		end
-
-		if canHorse > bestCanHorse then
-			bestCanHorse = canHorse
-		end
-
-		if can == 0 and canHorse ~= 0 then
-			can = canHorse
-			pullTarget = "horse"
 		end
 
 		-- Asked regardless of what the check says when `PullDownForce` is on.
@@ -1263,15 +1140,7 @@ function HorseCollisionMod:PullRiderDown(npc)
 		-- check advertises it.
 		if can ~= 0 or self.Config.PullDownForce then
 			local ok = pcall(function()
-				local id = player.id
-
-				if pullTarget == "horse" then
-					local h = XGenAIModule.GetEntityByWUID(
-							player.player:GetPlayerHorse())
-					id = h and h.id or player.id
-				end
-
-				npc.actor:RequestHorsePullDown(id)
+				npc.actor:RequestHorsePullDown(player.id)
 			end)
 
 			if self.Config.LogTelemetry then

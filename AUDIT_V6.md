@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 and 1 done.
+**Phase:** 2 in progress. Batches 0 to 2 done.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,7 +30,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 2, following **Phase 2 plan** below. Read
+**Next step:** phase 2, batch 3, following **Phase 2 plan** below. Read
 that section in full before starting; it gives the order, the procedure
 for every batch and how each is verified.
 
@@ -197,6 +197,12 @@ In this order, each its own commit and ride:
 5. The retaliation deletions from batch 2, if the sweep did not reach them.
    Ride: provoke a guard into pulling you off. Works: the pull-down happens
    and a `PullDown … done` row is logged.
+6. `PullRiderDown` returns `true` once it has started polling, so
+   `ProvokeIfAnnoyed` (`Retaliation.lua:1011`) stops releasing the offense
+   at once. It has ended with `attempt()` and no return since `ec6fc1f`, so
+   the deferral it documents has never happened. Asked of the rider before
+   applying. Ride together with item 5: the victim pulls the rider down
+   before throwing a punch.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -280,6 +286,25 @@ One line per batch: batch, commit, what was verified.
   edits are local and absent from the commit. `docs/api` regenerated with `ldoc .`;
   the orphan `docs/api/modules/Retaliation.html` (unlinked, last written
   2 September, still showing `Release: 4.6.1`) deleted.
+- **Batch 2.** Every batch-2 ruling applied. A stale settings key was
+  confirmed live to be logged and skipped (`AuditStaleKey`, 33 others
+  applied). Mutt read live as `player_dogCompanion_vorech class=Dog`, so
+  `ProtectMutt` went last as ruled. `DynamicRecovery` was live, not dead: it
+  played a `HurtDown` groan every 1.4 s on a downed victim, so its removal is
+  player-visible and has a `CHANGELOG.md` entry with `ProtectMutt`,
+  `RiderBarks` and `LeanMinFlipMs` (version check: 5.32.0). The impact-pool
+  doc was reduced to its ruled form here, because deleting `RiderBarkSets`
+  left it describing a table that no longer exists. Get-up options
+  regenerated out of both databases and the tags file; `verify_additive.py`
+  35 of 35. Removed-name grep clean outside the diary, this ledger and
+  `BALANCE_AUDIT.md` (deleted in batch 6). Sweep ride: all five tiers
+  reacted, kill line fired on gallop and charge, one `HurtDown` per downed
+  victim, `ImpactCost` rows without `travel=`, `dz=` or `z=`, cooldown
+  refusals correct, no Lua errors. **Open:** on two save reloads in a row
+  only rear and charge registered; a third reload after a script reload
+  registered every tier. Not reproduced and not attributed; recorded in the
+  diary with the procedure for a recurrence. `YieldCaught` result recorded
+  in the diary.
 
 ## Standard
 
@@ -3069,6 +3094,16 @@ comments.
   test values." — Cut.
 - [ ] `:480-481` — "The rider had to ask for this three times before it was
   automated". — Cut.
+
+- [ ] Every `flow test` builds at the manifest version with
+  `-Development`, so `releases/HorseCollisionMod_v<version>.zip` is
+  overwritten by each deploy and is not the released artifact; the
+  original v5.31.4 zip was lost this way and only the tag can rebuild it. —
+  Deploy builds use a `-dev` version, leaving the release zip alone.
+  Batch 5.
+- [ ] Every deploy reports every file `updated` and warns that
+  `hcm_actionmaps.xml` changed while the game runs, whether or not anything
+  changed. — Copy and report only files whose bytes differ. Batch 5.
 
 ### tools/verify_additive.py
 

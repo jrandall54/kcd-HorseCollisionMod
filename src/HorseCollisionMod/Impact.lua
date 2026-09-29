@@ -132,7 +132,6 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	if not staggerRefused then
 		self:PlayTierReaction(npc, tierName, velocity, speed,
 				armorImpulse, ctx.horsePos, horseEnt)
-		self:ApplyDynamicRecovery(npc, tierName, armorImpulse)
 	end
 
 	if cfg.LogTelemetry then
@@ -202,10 +201,6 @@ function HorseCollisionMod:ResolveImpact(npc, tierName, ctx)
 	-- gallop throws them several meters and dust that follows a body reads as
 	-- smoke.
 	self:ImpactDust(npc, tierName)
-
-	-- How long the ragdoll this impact asked for actually took to take.
-	-- Instrumentation only; it changes nothing.
-	self:TraceFallLanding(npc, tierName)
 
 	-- Marks, the native hit reaction, and the combat hit. `MarkVictim` gates
 	-- itself on having dirt and blood figures for the tier, and a tier that

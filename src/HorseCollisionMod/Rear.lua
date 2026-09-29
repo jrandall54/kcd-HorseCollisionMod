@@ -373,23 +373,14 @@ function HorseCollisionMod:RearRequested(fragTag)
 		return refuse("rear in progress")
 	end
 
-	-- The rear and the charge each keep their own cooldown clock. They used to
-	-- share `RearNextAt`, so the charge was rationed by the rear's cooldown.
-	-- Both start on the move's first contact, in `RearStrike` and
-	-- `ChargeStrike`, so a move that reaches nobody costs no cooldown.
+	-- The rear and the charge each keep their own cooldown clock, started on
+	-- the move's first contact in `RearStrike` and `ChargeStrike`, so a move
+	-- that reaches nobody costs no cooldown. A save load clears both clocks.
 	local isCharge = (fragTag == cfg.RearFragTag)
-	local clock = isCharge and "ChargeNextAt" or "RearNextAt"
-	local cooldown = isCharge and cfg.ChargeCooldownMs or cfg.RearCooldownMs
-	local nextAt = self[clock]
+	local nextAt = self[isCharge and "ChargeNextAt" or "RearNextAt"]
 
 	if nextAt and now < nextAt then
-		-- If the clock wound back (e.g. save load), now will be much smaller than nextAt.
-		-- Any difference larger than the cooldown itself means a reload happened.
-		if (nextAt - now) > cooldown + 1000 then
-			self:Log(clock .. " wound back, ignoring cooldown")
-		else
-			return refuse("cooldown " .. string.format("%.1fs", (nextAt - now) / 1000))
-		end
+		return refuse("cooldown " .. string.format("%.1fs", (nextAt - now) / 1000))
 	end
 
 	if not isCharge then
@@ -853,17 +844,6 @@ function HorseCollisionMod:RearHorse(horseEnt, fragTag)
 
 	local animSpeed = self.Config.RearAnimSpeed
 
-	-- Fix for broken save games caused by previous tests getting stuck at 0.
-	-- This only needs to run once to rescue the physics proxy.
-	if not self.HasRescuedPhysicsProxy then
-		self.HasRescuedPhysicsProxy = true
-		pcall(function()
-			if horseEnt.SetAnimationDrivenMotion then
-				horseEnt:SetAnimationDrivenMotion(0, 1)
-			end
-		end)
-	end
-
 	local ok = true
 
 	if tag == (self.Config.RearOnlyFragTag) then
@@ -1085,9 +1065,8 @@ end
 -- sphere returns crates, doors and dropped weapons as readily as people;
 -- humans are named by class, because a faction test gave dogs a human
 -- fragment on a dog skeleton and reached women only by a fallback. Corpses are
--- already ragdolls and reacting to them twitches bodies around. And Henry's
--- dog follows close enough to be caught constantly, so he is excluded by name,
--- dogs sharing the generic NPC class.
+-- already ragdolls and reacting to them twitches bodies around. Dogs, Henry's
+-- included, are class `Dog` and fail the class test.
 --
 -- @tparam table npc the candidate
 -- @treturn boolean true when the hooves may land on them
@@ -1101,22 +1080,6 @@ function HorseCollisionMod:RearCanHit(npc)
 
 	if not isHuman then
 		return false
-	end
-
-	if self.Config.ProtectMutt then
-		local isMutt = false
-
-		pcall(function()
-			local name = npc:GetName()
-
-			if name and string.find(name, "dogCompanion") then
-				isMutt = true
-			end
-		end)
-
-		if isMutt then
-			return false
-		end
 	end
 
 	local isDead = false

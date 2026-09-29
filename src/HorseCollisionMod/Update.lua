@@ -270,107 +270,82 @@ function HorseCollisionMod:SafeUpdate()
 				and ent.id ~= horseEnt.id)
 
 		if isCandidate then
-			local isMutt = false
+			local isHuman = false
 
-			-- Henry's dog follows close enough to be caught constantly, and
-			-- trampling him on every ride is nobody's idea of immersion. He
-			-- is identified by entity name because dogs share the generic
-			-- NPC class.
+			-- The sphere returns everything nearby: crates, doors, loose
+			-- items, animals. Humans are named by class, and there are
+			-- three: men spawn as NPC, women as NPC_Female, and the rider
+			-- as Player. Naming them is what keeps this a human filter.
+			--
+			-- A faction fallback stood here and was wrong in both
+			-- directions. Dogs carry `esFaction`, so a guard dog was
+			-- given a human knockdown fragment on a dog skeleton, which
+			-- is a fragment that cannot resolve. And women passed only
+			-- through that fallback rather than by class, which is a
+			-- fragile way to reach half the population and sits behind a
+			-- long run of female-specific faults in this mod.
 			pcall(function()
-				local entName = ent:GetName()
-
-				if entName and string.find(entName, "dogCompanion") then
-					isMutt = true
-				end
+				isHuman = (ent.class == 'NPC'
+						or ent.class == 'NPC_Female'
+						or ent.class == 'Player')
 			end)
 
-			-- The dog is already found here, so the collision filtering that
-			-- stops him carrying the horse rides along with the check that
-			-- keeps him from being trampled. It runs once per dog per
-			-- generation and does nothing on any later pass.
-			if isMutt then
+			if not isHuman then
+				-- Deliberately silent. The diagnostic exists to find
+				-- people the mod failed to react to, and an item is never
+				-- one. The player's own holster and any dropped weapon
+				-- ride along inside the search radius permanently, so
+				-- logging these buried the human misses entirely and a
+				-- distance gate did not help: the holster is on the
+				-- player.
+			elseif not ent.actor and self.Config.DiagnoseMisses then
+				self:LogRejection(ent, "no-actor",
+						"class=" .. tostring(ent.class))
 			end
 
-			local isProtected = (self.Config.ProtectMutt and isMutt)
+			if isHuman and ent.actor then
+				-- Ahead of contact, while they are still in front of the
+				-- horse, so vanilla's collision bark is already closed off
+				-- by the time bodies touch.
+				self:HushVanillaBark(ent)
 
-			if not isProtected then
-				local isHuman = false
+				local isDead = false
 
-				-- The sphere returns everything nearby: crates, doors, loose
-				-- items, animals. Humans are named by class, and there are
-				-- three: men spawn as NPC, women as NPC_Female, and the rider
-				-- as Player. Naming them is what keeps this a human filter.
-				--
-				-- A faction fallback stood here and was wrong in both
-				-- directions. Dogs carry `esFaction`, so a guard dog was
-				-- given a human knockdown fragment on a dog skeleton, which
-				-- is a fragment that cannot resolve. And women passed only
-				-- through that fallback rather than by class, which is a
-				-- fragile way to reach half the population and sits behind a
-				-- long run of female-specific faults in this mod.
-				pcall(function()
-					isHuman = (ent.class == 'NPC'
-							or ent.class == 'NPC_Female'
-							or ent.class == 'Player')
-				end)
-
-				if not isHuman then
-					-- Deliberately silent. The diagnostic exists to find
-					-- people the mod failed to react to, and an item is never
-					-- one. The player's own holster and any dropped weapon
-					-- ride along inside the search radius permanently, so
-					-- logging these buried the human misses entirely and a
-					-- distance gate did not help: the holster is on the
-					-- player.
-				elseif not ent.actor and self.Config.DiagnoseMisses then
-					self:LogRejection(ent, "no-actor",
-							"class=" .. tostring(ent.class))
+				-- Corpses are already ragdolls. Reacting to them would
+				-- twitch bodies around and re-trigger every tick.
+				if ent.IsDead then
+					pcall(function()
+						isDead = ent:IsDead()
+					end)
 				end
 
-				if isHuman and ent.actor then
-					-- Ahead of contact, while they are still in front of the
-					-- horse, so vanilla's collision bark is already closed off
-					-- by the time bodies touch.
-					self:HushVanillaBark(ent)
+				local inFootprint = self:IsInHorseFootprint(ent, horsePos,
+						horseForward, speed)
 
-					local isDead = false
-
-					-- Corpses are already ragdolls. Reacting to them would
-					-- twitch bodies around and re-trigger every tick.
-					if ent.IsDead then
-						pcall(function()
-							isDead = ent:IsDead()
-						end)
-					end
-
-					local inFootprint = self:IsInHorseFootprint(ent, horsePos,
-							horseForward, speed)
-
-					-- The diagnostic branches are guarded rather than relying
-					-- on `LogRejection` returning early, because their
-					-- arguments are built before the call: the footprint
-					-- detail re-runs the whole geometry a second time, and
-					-- this loop sees every nearby entity thirty times a
-					-- second.
-					if isDead or not inFootprint
-							or impactSpeed < self.Config.SpeedWalk then
-						if self.Config.DiagnoseMisses then
-							if isDead then
-								self:LogRejection(ent, "dead", "")
-							elseif not inFootprint then
-								self:LogRejection(ent, "outside-footprint",
-										self:FootprintDetail(ent, horsePos,
-												horseForward, speed))
-							else
-								self:LogRejection(ent, "below-walk-speed",
-										string.format("impact=%.2f sampled=%.2f",
-												impactSpeed, speed))
-							end
+				-- The diagnostic branches are guarded rather than relying
+				-- on `LogRejection` returning early, because their
+				-- arguments are built before the call: the footprint
+				-- detail re-runs the whole geometry a second time, and
+				-- this loop sees every nearby entity thirty times a
+				-- second.
+				if isDead or not inFootprint
+						or impactSpeed < self.Config.SpeedWalk then
+					if self.Config.DiagnoseMisses then
+						if isDead then
+							self:LogRejection(ent, "dead", "")
+						elseif not inFootprint then
+							self:LogRejection(ent, "outside-footprint",
+									self:FootprintDetail(ent, horsePos,
+											horseForward, speed))
+						else
+							self:LogRejection(ent, "below-walk-speed",
+									string.format("impact=%.2f sampled=%.2f",
+											impactSpeed, speed))
 						end
-					else
-						self:TriggerCollision(ent, velocity, impactSpeed, horseEnt,
-								player, horseWuid, speed)
 					end
+				else
+					self:TriggerCollision(ent, velocity, impactSpeed, horseEnt,
+							player, horseWuid, speed)
 				end
 			end
 		end

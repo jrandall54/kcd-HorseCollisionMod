@@ -22628,3 +22628,51 @@ Recovery is withdrawn from the balance pass. The get-up is the global cvar
 
 No code changed, so there was nothing to ride.
 
+
+# v6 audit, batch 2: dead code out, one sweep ride
+
+The audit's second phase removed the systems the rulings retired:
+`DynamicRecovery` and its ground groans, the dead Henry set path, the yield
+catch, the pull-down's horse query and angle tracking, the physics-proxy
+rescue, the cooldown wind-back branch, `WatchTurn`, `TraceFallLanding`, the
+throw and height fields of the impact probe, the `face` and `foley` sound
+tokens, the lean throttle, two unused tutorial cells, the four get-up options
+and `ProtectMutt`.
+
+Three things were measured on the way that are worth keeping.
+
+**A stale settings key is harmless.** With `AuditStaleKey = true` in the test
+world, `ApplySettings` logged `Setting 'AuditStaleKey' is not a setting,
+ignored` and applied the other 33. So a player whose settings file still
+carries a removed key loses nothing but a dead line.
+
+**Mutt is class `Dog`.** Read live: `player_dogCompanion_vorech class=Dog`,
+alongside `Dog11` and `rat_guardDog16`, both `Dog`. The detection loop's human
+filter admits only `NPC`, `NPC_Female` and `Player`, so every dog, Henry's
+included, was already excluded before the name test that `ProtectMutt` guarded.
+
+**The yield catch, for the record.** `CatchYieldImmediately` shipped off. When
+it was on, the stand-down went out on the first read after a surrender ended
+and the victim never started to run: logged as
+`YieldCaught state=MotionIdle stoodDown=true` with no run after it. It stayed
+off because the run ends by itself, and the stand-down hands the victim to
+`state_standDown` for about twenty-five seconds of standing still.
+
+The sweep ride took one impact at each tier and every one reacted: walk
+stagger, trot and rear knockdowns, gallop and charge throws with the kill line
+firing on both. Each downed victim gave one `HurtDown` cry and no more.
+
+Then two save reloads in a row felt vanilla. Only the rear and the charge
+registered; the rider reported every other collision as the game's own. The
+loop was alive (generation 6, then 7), tracking the horse, finding entities in
+the sphere, and scoring nothing, and with `DiagnoseMisses` off it gave no
+reason. After a script reload and a third save reload everything registered
+again, with ordinary `outside-footprint` misses beside the hits. The same code
+had scored all three speed tiers before the first reload and after the third,
+so the batch is not established as the cause. Open: if it recurs, turn
+`DiagnoseMisses` on through the test world before reloading anything, and note
+whether the script reload that switch performs is itself the cure.
+
+Found and not fixed: `PullRiderDown` has never returned `true` (it ends with
+`attempt()` since `ec6fc1f`), so `ProvokeIfAnnoyed` releases the offense at once
+and a provoked victim may swing before the pull-down rather than after it.

@@ -227,7 +227,7 @@ end
 -- @tparam number sign the direction wanted, used only for the first call
 -- @tparam number seconds how long this shake lives before it expires and
 --   returns the camera home
-function HorseCollisionMod:FlipLean(amplitude, sign, seconds, force)
+function HorseCollisionMod:FlipLean(amplitude, sign, seconds)
 	local cfg = self.Config
 	local playerEnt = rawget(_G, "player")
 
@@ -235,32 +235,9 @@ function HorseCollisionMod:FlipLean(amplitude, sign, seconds, force)
 		return
 	end
 
-	-- **Every shake is an entry in the rider's animation queue, and the queue
-	-- holds sixteen.** A shake lives for its whole duration, so the cost of a
-	-- correction is not paid when it is made but for however long the shake
-	-- was given.
-	--
-	-- Unrated, this floods. The controller corrects on every crossing of a
-	-- three centimeter deadband, which at the hold speed is two or three a
-	-- second, and at the twenty second lifetime those were still occupying the
-	-- queue long after the lean that made them had ended. Measured, 176
-	-- `Animation-queue overflow` errors against one instance, `male.chr`,
-	-- which is the rider, with no collision anywhere near them: the burst
-	-- began after a release and ran until the scripts were reloaded.
-	--
-	-- An overflowed queue **rejects** further animations rather than merely
-	-- warning, so this is not only noise.
-	-- The limit is on **corrections only**. Applied to the press it would drop
-	-- a lean that followed another too closely; applied to the release it
-	-- swallows the call that ends the lean, and the camera then travels on at
-	-- the full 2.75 m/s until the shakes expire. That is a sticky hold, a
-	-- return measured in seconds, and a runaway of ten meters on fast taps.
+	-- Each correction is a shake entry in the rider's sixteen-entry animation
+	-- queue for its whole lifetime; the deadband keeps the rate down.
 	local now = self:TimeMs()
-
-	if not force and self.LeanLastFlip
-			and (now - self.LeanLastFlip) < (cfg.LeanMinFlipMs) then
-		return
-	end
 
 	self.LeanLastFlip = now
 	self.LeanFlips = (self.LeanFlips or 0) + 1
@@ -365,7 +342,7 @@ function HorseCollisionMod:StartLean(sign)
 	local lastAngle = nil
 	local lastAngleAt = nil
 
-	self:FlipLean(cfg.LeanTravelAmplitude, sign, cfg.LeanShakeSec, true)
+	self:FlipLean(cfg.LeanTravelAmplitude, sign, cfg.LeanShakeSec)
 
 	local function watch()
 		if generation ~= self.LeanGeneration or timerTick ~= self.TimerTick then
@@ -484,7 +461,7 @@ function HorseCollisionMod:StartLean(sign)
 
 			if turns < 2 and (gap * moving) < 0 and math.abs(moving) > 0.001 then
 				turns = turns + 1
-				self:FlipLean(cfg.LeanTravelAmplitude, sign, live, true)
+				self:FlipLean(cfg.LeanTravelAmplitude, sign, live)
 			end
 		end
 
@@ -493,7 +470,7 @@ function HorseCollisionMod:StartLean(sign)
 			-- the hold speed and delaying it means sailing past the target
 			-- at the full travel speed.
 			reached = true
-			self:FlipLean(hold, sign, live, true)
+			self:FlipLean(hold, sign, live)
 		elseif reached and last then
 			-- **Direction is measured, never remembered.**
 			--
@@ -523,7 +500,7 @@ function HorseCollisionMod:StartLean(sign)
 			local turning = math.abs(gap) > band and (gap * moving) < 0
 
 			if turning or expired then
-				self:FlipLean(hold, sign, live, true)
+				self:FlipLean(hold, sign, live)
 			end
 		end
 
@@ -563,7 +540,7 @@ function HorseCollisionMod:StopLean()
 	-- and nothing may re-base until it has.
 	self.LeanHomeUntil = self:TimeMs() + (cfg.LeanHomeMs)
 
-	self:FlipLean(cfg.LeanHoldAmplitude, sign or 1, cfg.LeanReleaseSec, true)
+	self:FlipLean(cfg.LeanHoldAmplitude, sign or 1, cfg.LeanReleaseSec)
 
 	if cfg.LogTelemetry then
 		local offset = self:LeanOffset()

@@ -64,59 +64,16 @@ end
 -- A tier names a token rather than a trigger, and the material the victim is
 -- wearing is substituted at the moment of impact. Every family here is
 -- authored for all three materials, so a mailed guard and a peasant in cloth
--- are told apart by ear on every layer rather than only on one.
---
--- `foley` is the odd one out: it is movement rustle rather than impact, and
--- the game authors it for four materials under different short names, so it
--- carries its own table.
+-- are told apart by ear on every layer rather than only on one. Four tokens:
+-- `body`, `body_armed`, `face_armed` and `blunt`.
 --
 -- @table ImpactTokens
 HorseCollisionMod.ImpactTokens = {
 	body = "blunt_unarmed_body_%s",
 	body_armed = "blunt_armed_body_%s",
-	face = "blunt_unarmed_face_%s",
 	face_armed = "blunt_armed_face_%s",
 	blunt = "c_mfx_%s_sword_blunt_stopped"
 }
-
---- Movement foley, keyed by what the victim is wearing.
---
--- The third-person material foley the game plays when an NPC moves: cloth
--- swishes, leather creaks, mail rings, plate clanks. Right for a shove at
--- walking pace, which disturbs somebody's clothing rather than striking them.
---
--- @table BodyFoleySounds
-HorseCollisionMod.BodyFoleySounds = {
-	cloth = "f_n_mat_move_cl",
-	leather = "f_n_mat_move_le",
-	chainmail = "f_n_mat_move_ch",
-	plate = "f_n_mat_move_pl"
-}
-
---- Resolves the `foley` token to the movement foley for a victim's armor.
---
--- Leather has its own rustle here, unlike the impact families, so this reads
--- the armor type directly rather than going through `ArmorMaterial`.
---
--- @tparam table armor the total from `ArmorOf`, or nil
--- @treturn string a trigger name
-function HorseCollisionMod:BodyFoleySound(armor)
-	local heaviest = armor and armor.heaviestType or 0
-
-	if heaviest == 5 then
-		return self.BodyFoleySounds.plate
-	end
-
-	if heaviest == 4 then
-		return self.BodyFoleySounds.chainmail
-	end
-
-	if heaviest == 2 or heaviest == 3 then
-		return self.BodyFoleySounds.leather
-	end
-
-	return self.BodyFoleySounds.cloth
-end
 
 --- Resolves a layer's trigger, substituting the victim's armor into a token.
 --
@@ -127,10 +84,6 @@ end
 -- @tparam[opt] table armor the victim's armor total
 -- @treturn string the trigger to play
 function HorseCollisionMod:ResolveTrigger(trigger, armor)
-	if trigger == "foley" then
-		return self:BodyFoleySound(armor)
-	end
-
 	local pattern = self.ImpactTokens[trigger]
 
 	if pattern then
@@ -168,9 +121,9 @@ end
 -- control and chance is how often the layer appears at all, which is the only
 -- lever on a sample whose level cannot be changed.
 --
--- Two literal trigger names are tokens, both replaced with the sample matching
--- the victim's armor: `body` is the blunt impact against that material, and
--- `foley` is the movement rustle it makes.
+-- A trigger name that is a key of `ImpactTokens` (`body`, `body_armed`,
+-- `face_armed`, `blunt`) is replaced with the sample matching the victim's
+-- armor.
 --
 -- ### Balancing layers without a volume control
 --

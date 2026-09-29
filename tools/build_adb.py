@@ -274,26 +274,17 @@ REACTIONS = [
     ("hcm_fall_left", "relaxed_death_walk_left_01", BOTH),
     ("hcm_fall_right", "relaxed_death_walk_right_01", BOTH),
 
-    # The recovery half of the knockdown. Without one the fall clip ends and
-    # the victim snaps upright, which reads as a break rather than a get-up.
-    # Both character sets carry all four.
     # Nothing to play, for taking a victim out of a ragdoll without imposing a
     # pose or a facing on them.
     #
     # An actor has to be animation driven or it holds its bind pose, which is
     # the T-pose seen when a ragdolled victim is returned to the alive profile
-    # with no fragment running. Every real option carries a pose of its own,
-    # and the get-up options carry a measured rotation with it: +53 forward,
-    # +90 back, -176 left and 0 right. This one carries neither.
+    # with no fragment running. Every real option carries a pose of its own;
+    # this one carries none.
     #
     # See `render_option` for the shape, which is the terminal clip found for
     # the charge.
     ("hcm_settle", (), BOTH),
-
-    ("hcm_getup_forward", "getup_ground_front", BOTH),
-    ("hcm_getup_back", "getup_ground_back", BOTH),
-    ("hcm_getup_left", "getup_ground_left", BOTH),
-    ("hcm_getup_right", "getup_ground_right", BOTH),
 
     # collision_stand_{front,back,left,right}_heavy are named for exactly this
     # case and are not here. They exist as assets under

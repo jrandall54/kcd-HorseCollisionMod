@@ -1077,11 +1077,9 @@ body for as long as it is being thrown, so the shield has to span exactly that
 and no more, and the mod's damage has to land the instant it ends. Two
 mechanisms watching two different signals is what produced every defect below.
 
-**Rest is read from position, not velocity, and shares one definition.**
-`RestStillMeters` (0.05) and `RestPollMs` (200) are used by both `ImpactThrow`
-and `WhenBodyStops`, so the mod cannot hold two disagreeing opinions about
-whether a body has stopped. Measured after unifying them, the two readings
-agree to the millisecond: 1424/1424, 1440/1440, 1408/1408, 1472/1472.
+**Rest is read from position, not velocity.** `WhenBodyStops` treats a body
+as stopped once it moves less than `RestStillMeters` (0.05) between two polls
+`RestPollMs` (200) apart.
 
 Four other signals are wrong for this, each for a reason worth keeping:
 
@@ -1533,8 +1531,8 @@ the death is already detected there, and a victim who died while still in
 left alone, since the game's own handling works and forcing a ragdoll would
 override it.
 
-**The recovery is attached to the fall prefix.** `WatchTurn`, `RebuildVictim`
-and `ReplanIfStranded` run only for `hcm_fall_`, so a victim of a knockdown or
+**The recovery is attached to the fall prefix.** `RebuildVictim` and
+`ReplanIfStranded` run only for `hcm_fall_`, so a victim of a knockdown or
 a stagger stands up facing wherever the clip left them with no activity to
 return to. Both tiers that can knock someone down therefore default to
 `"fall"`. Extending the recovery to the other prefixes needs a different

@@ -114,7 +114,6 @@ breaking the mod. Deleting a line restores its default.
 | `ReplanAfterReaction` | true | Whether a victim walks back to whatever they were using, which is what puts them straight with it again. |
 | `SuppressStaggerInCombat` | true | Whether to skip the stagger during a fight. |
 | `WalkStagger` | true | False gives vanilla behavior at walking pace, leaving knockdowns intact. |
-| `ProtectMutt` | true | Whether your dog is immune. |
 | `Horsemanship` | true | Whether the rider's `horse_riding` skill changes what a collision costs. A novice is thrown by a single gallop impact; a master rides through four or five guards. |
 | `HorsemanshipStaminaWorst` | 5.0 | The horse's stamina cost multiplier at skill 0. |
 | `HorsemanshipStaminaBest` | 1.0 | And at skill 20. |

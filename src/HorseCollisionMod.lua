@@ -123,19 +123,10 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   surcharge on the way to its maximum
 -- @field MaxArmorStaminaAdd the largest share of the horse's pool a victim's
 --   armor can add, reached at ArmorReferenceWeight
--- @field DynamicRecovery scale ragdoll recovery get-up delay based on tier and armor
--- @field RecoveryDelayByTier base get-up stillness delay by impact tier
--- @field RecoveryArmorScaleArmored recovery delay multiplier for armored targets
--- @field RecoveryArmorScaleUnarmored recovery delay multiplier for unarmored targets
--- @field RecoveryMinSec minimum bound on recovery stillness duration
--- @field RecoveryMaxSec maximum bound on recovery stillness duration
--- @field RecoveryGroundBarks emit periodic pain barks while downed on the ground
--- @field RecoveryBarkIntervalMs interval between ground hurt barks in milliseconds
 -- @field RisePollMs how often to look for a victim being back on their feet
 -- @field RiseCeilingMs how long to wait for that before giving up
 -- @field RagdollStillDuration seconds of stillness before a ragdoll stands up
 -- @field RagdollStillSpeedThreshold speed threshold under which a ragdoll is still
--- @field ProtectMutt when true, Henry's dog is never a valid victim
 -- @field ProtectStoryCharacters when true, characters the game marks as
 --   protected take no damage from an impact
 -- @field StaminaShareByTier what each kind of impact costs the horse, as a
@@ -147,7 +138,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 -- @field Barks whether the mod gives its moments spoken vanilla lines at all
 -- @field CollisionBarks whether victims of an impact speak
 -- @field RearBarks whether whoever a rear is aimed at speaks
--- @field RiderBarks whether Henry remarks over a body
 -- @field BarkCooldownMs least time between two lines from one speaker; keep at
 --   or below HitCooldownMs or whole impacts fall silent
 -- @field BarkSuppressMs how long vanilla's own collision bark is held off
@@ -268,10 +258,6 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   the rider's animation queue and the queue holds sixteen**, so a long life
 --   is paid for long after the lean that made it ended. An overflowed queue
 --   rejects further animations rather than merely warning
--- @field LeanMinFlipMs the least time between two corrections, which bounds
---   how fast queue entries can be spent. It applies to corrections only: the
---   press, the arrival at the target and the release are never throttled,
---   because dropping any of those leaves the camera traveling
 -- @field LeanMaxPitchDeg how far up or down the rider may be looking and
 --   still lean, in degrees. The yaw limit is flattened so looking up or down
 --   is not treated as looking away, which stops meaning anything once the
@@ -624,7 +610,6 @@ HorseCollisionMod.Config = {
 	Barks                    = true,
 	CollisionBarks           = true,
 	RearBarks                = true,
-	RiderBarks               = true,
 	-- Per speaker, so a crowd reacting to one impact is not a choir, and a
 	-- victim struck twice does not talk over their own first line.
 	--
@@ -743,7 +728,6 @@ HorseCollisionMod.Config = {
 	LeanHoldAmplitude        = 3.0,
 	LeanPollMs               = 30,
 	LeanDeadband             = 0.06,
-	LeanMinFlipMs            = 200,
 	LeanRunawayFactor        = 2.0,
 	LeanMaxAngleDeg          = 45,
 	LeanMaxPitchDeg          = 55,
@@ -1010,9 +994,9 @@ HorseCollisionMod.Config = {
 	-- `c_special_bone_crack1` both ignore position entirely, so the only
 	-- control over those is `chance`, which is how often the layer appears.
 	--
-	-- Two trigger names are tokens, replaced with the sample matching what the
-	-- victim is wearing: `body` is the blunt impact against that material and
-	-- `foley` is the movement rustle it makes.
+	-- A trigger name that is a key of `ImpactTokens` (`body`, `body_armed`,
+	-- `face_armed`, `blunt`) is replaced with the sample matching the victim's
+	-- armor.
 
 	-- A shove disturbs someone's clothing rather than striking them, so the
 	-- walk tier is cloth foley over a body settling, with a single hoofstep
@@ -1036,9 +1020,9 @@ HorseCollisionMod.Config = {
 	-- milliseconds apart thickens and lifts it, which is the only way up once
 	-- a layer is already at zero distance.
 	--
-	-- Two trigger names are tokens, replaced with the sample matching what the
-	-- victim is wearing: `body` is the blunt impact against that material and
-	-- `foley` is the movement rustle it makes.
+	-- A trigger name that is a key of `ImpactTokens` (`body`, `body_armed`,
+	-- `face_armed`, `blunt`) is replaced with the sample matching the victim's
+	-- armor.
 
 	-- The master level control, in meters, added to every layer of every
 	-- tier. Higher is quieter. The per-layer distances set the balance
@@ -1165,7 +1149,6 @@ HorseCollisionMod.Config = {
 	VictimMarks              = true,
 
 	-- Switches.
-	ProtectMutt              = true,
 	ProtectStoryCharacters   = true,
 	WalkStagger              = true,
 	SendHitReaction          = true,
@@ -1240,21 +1223,6 @@ HorseCollisionMod.Config = {
 	RagdollDampRampSamples   = 8,
 	RagdollDampFloorMs       = 200,
 	RagdollDampCeilingMs     = 6000,
-
-	-- Dynamic Ragdoll Recovery
-	DynamicRecovery           = true,
-	RecoveryDelayByTier       = {
-		Trot   = 0.5,
-		Gallop = 2.0,
-		Rear   = 1.0,
-		Charge = 3.5,
-	},
-	RecoveryArmorScaleArmored   = 0.6,
-	RecoveryArmorScaleUnarmored = 1.5,
-	RecoveryMinSec            = 0.3,
-	RecoveryMaxSec            = 5.0,
-	RecoveryGroundBarks       = true,
-	RecoveryBarkIntervalMs    = 1400,
 
 	-- How `WhenVictimStands` waits for a victim to be back on their feet: how
 	-- often it looks, and how long it looks before giving up and reporting the
@@ -1532,19 +1500,6 @@ HorseCollisionMod.RepairStepValue = 0.1389
 -- 0.35 takes three. It bounds a victim whose relationship cannot be read.
 HorseCollisionMod.RepairMaxSteps = 5
 
---- Whether a yielding victim is stopped the instant the yield ends.
---
--- Off, and kept deliberately rather than because it is used. On the first
--- read after a surrender ends, the earliest the run can be caught at all, the
--- stand-down goes out and he never gets going: measured as
--- `YieldCaught state=MotionIdle stoodDown=true` with no run after it.
---
--- It is off because the run it prevents ends by itself, and stopping it hands
--- him to `state_standDown` and about twenty five seconds of standing still.
--- Turn it on only if a victim is ever seen running who should not be, and
--- expect that pause to come with it.
-HorseCollisionMod.CatchYieldImmediately = false
-
 --- How long after stopping him his standing is checked a second time.
 HorseCollisionMod.AftermathSettleMs = 8000
 
@@ -1648,8 +1603,7 @@ HorseCollisionMod.GetUpCeilingMs = 15000
 HorseCollisionMod.RagdollLandCeilingMs = 3000
 
 -- What counts as a body having stopped, in meters moved between two polls, and
--- how often that is read. Shared by `ImpactThrow` and `WhenBodyStops` so the
--- mod has one definition of rest rather than two that disagree.
+-- how often that is read, by `WhenBodyStops`.
 HorseCollisionMod.RestStillMeters = 0.05
 HorseCollisionMod.RestPollMs = 200
 
