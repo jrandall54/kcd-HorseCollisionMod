@@ -28,8 +28,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
-DynamicRecovery, the charge's bark set, the charge's impact cry. Next: the
-one-time physics-proxy rescue. Phase 2 then applies the
+DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
+rescue. Next: `RearAnimSpeed` and the standing rear. Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
@@ -103,11 +103,10 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `build.ps1` refuses a settings tier table that differs from `Tiers.lua`.
   Decided together with the charge's impact cry below.
 
-- [ ] **The one-time physics-proxy rescue.** `Rear.lua:856-865` calls
-  `SetAnimationDrivenMotion(0, 1)` on the horse once per session, to repair
-  saves left broken by development tests (`597e613`). Players' saves never
-  reached that state, and the comment beside it (`:876`) says the call is
-  left alone. Proposal: delete the rescue and `HasRescuedPhysicsProxy`.
+- [x] **The one-time physics-proxy rescue.** Ruled as proposed: delete the
+  rescue (`Rear.lua:856-865`) and `HasRescuedPhysicsProxy`. Players' saves
+  never reached the state it repairs, and `:876` states the mod leaves
+  `SetAnimationDrivenMotion` to the engine.
 
 - [ ] **`RearAnimSpeed` and the standing rear.** `RearAnimMs` divides the
   rear's length by `RearAnimSpeed`, but the standing rear plays through
