@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`, `land`'s build retry, `verify_additive.py`.
-Next: probes for closed questions. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`, `land`'s build retry, `verify_additive.py`, the closed-question probes.
+Next: `tools/legacy/`. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -371,7 +371,7 @@ Items that change behavior or delete a feature. Not applied without a decision.
   **Ruled as proposed.** Passes 35 of 35 against `v5.31.4`. The manual step
   leaves `.claude/RELEASING.md:37`.
 
-- [ ] **Probes for closed questions.** Three probes exist to answer a
+- [x] **Probes for closed questions.** Three probes exist to answer a
   question the project has settled:
   `probe_fall_landing.lua` measures head-stop landing to set
   `FALL_SETTLE_AT`, and `bcd2c31` ruled head-stop the wrong criterion;
@@ -382,6 +382,7 @@ Items that change behavior or delete a feature. Not applied without a decision.
   them to `tools/legacy/`; the findings live in the diary.
   `restore_alive.lua` belongs with them: it repairs actors left in the
   `unragdoll` profile, which nothing in `src/` sets any more.
+  **Ruled: delete all four**, with their README rows; git keeps them.
 
 - [ ] **`tools/legacy/`.** Tracked, unmaintained, and by construction a
   record of how investigations went, which the standard says belongs in the
