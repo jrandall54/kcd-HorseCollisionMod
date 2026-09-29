@@ -135,10 +135,11 @@ function HorseCollisionMod:PlayImpactSound(npc, tierName, armor)
 	-- of the tier so the mix comes down as a whole and the balance between
 	-- the layers is left alone.
 	--
-	-- Only the two loop tiers that ride into someone, trot and gallop, take it. Walk is movement
-	-- foley rather than an impact, its samples are the quietest in use and are
-	-- already doubled to be audible at all, so there is no headroom in them to
-	-- give away. The rear and the charge are tuned as their own moves.
+	-- Only the two loop tiers that ride into someone, trot and gallop, take
+	-- it. Walk is movement foley rather than an impact, its samples are the
+	-- quietest in use and are already doubled to be audible at all, so there
+	-- is no headroom in them to give away. The rear and the charge are tuned
+	-- as their own moves.
 	local master = 0
 
 	if tierName == "Trot" or tierName == "Gallop" then

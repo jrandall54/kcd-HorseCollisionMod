@@ -1215,9 +1215,9 @@ HorseCollisionMod.Baseline = {}
 -- meters, and the footprint's far corner is about 1.57 out (`HorseFrontReach`
 -- plus `MaxSweepExtra` ahead, `HorseHalfWidth` across). Anyone outside the
 -- sphere is at least 0.93 meters from the footprint, so they cannot be hit
--- until something closes that gap. Re-querying when the horse has moved most of it, rather
--- than on a tick count, makes the saving independent of speed: a gallop
--- refreshes often and a trot rarely, which is the right way round.
+-- until something closes that gap. Re-querying when the horse has moved most
+-- of it, rather than on a tick count, makes the saving independent of speed:
+-- a gallop refreshes often and a trot rarely, which is the right way round.
 --
 -- @table SphereCache
 HorseCollisionMod.SphereCache = { pos = nil, ents = nil, at = 0 }

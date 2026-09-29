@@ -528,6 +528,12 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Enums.lua`.** L1 `same`.
 - **Batch 4, `Tutorial.lua`.** L1 `same`. Code rework recorded for item 7.
 - **Batch 4, `Detection.lua`.** L1 `same` for it and the entry point. The broad-phase cache margin corrected; a small gap recorded as batch 3, item 8.
+- **Batch 4, complete.** L1 `same` for all 22 Lua files against the
+  batch's base `5a6a7ed`; build passes with the tier tables agreeing;
+  `audit_code.py` unchanged (the two dead functions are batch 3, item 7).
+  Narrative warnings outside this ledger 507 to 334, the rest largely the
+  "the rider" false positive; 0 errors. Histories the diary lacked were
+  moved into it. Code findings are batch 3, items 7 and 8.
 
 ## Standard
 
