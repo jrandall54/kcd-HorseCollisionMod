@@ -29,8 +29,10 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`. Next: the pull-down target
-probe. Phase 2 then applies the
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe.
+Next: the dead Henry set path. Present each ruling with the code checked
+first; several phase-1 premises turned out wrong on inspection (the cooldown
+icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
@@ -129,13 +131,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   (`Retaliation.lua:414-425`), `sawYield`, `caught` and `SendStandDown`.
   Record the measured `YieldCaught` result in the diary if absent.
 
-- [ ] **The pull-down target probe.** `PullRiderDown` asks
-  `CanHorsePullDown` for both the player and the horse "until one of them is
-  shown to be the right one" (`Retaliation.lua:1190-1192`), and computes
-  horse-to-victim angles every poll for the log line alone, whether or not
-  telemetry is on (`:1203-1242`). Proposal: settle the target from the
-  diary's pull-down rides, keep that one, and delete the second query and
-  the angle tracking.
+- [x] **The pull-down target probe.** Ruled: the target is the player. In
+  nine backed-up game logs `bestCan` (player id) read enabled 23 times and
+  `bestCanHorse` never read anything but 0, and vanilla passes the rider
+  (`BasicAIActions.lua:59`). Keep the player query; delete the horse query
+  and its fallback (`Retaliation.lua:1184`, `:1190-1199`, `:1248-1255`, the
+  `pullTarget == "horse"` branch), the per-poll angle tracking
+  (`:1203-1242`), and the matching fields of the `PullDown … done` line.
 
 - [ ] **The dead Henry set path.** `RiderBarkSets` is empty, so
   `BarkDeath`'s `Bark(player, "Killed", true)` (`Bark.lua:1049`) always
