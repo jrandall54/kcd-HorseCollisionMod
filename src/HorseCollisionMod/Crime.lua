@@ -1,6 +1,6 @@
 --- Crime: making the game charge the player for riding someone down.
 --
--- Vanilla does not treat a mounted collision as an offence at all. What makes
+-- Vanilla does not treat a mounted collision as an offense at all. What makes
 -- it one is a real combat hit attributed to the player, which is delivered as
 -- `combat:hit` rather than `hitReaction`: the latter is consumed by a passive
 -- observer that cannot drive a body or raise a crime, while the former feeds
@@ -8,15 +8,14 @@
 --
 -- `CollisionIsCrime` gates the whole thing, and the payload shape is vanilla's
 -- own, taken from the branch that turns a player-ridden collision into a real
--- hit. The strength sent is the same `HitReactionStrength` the tier chose, so
--- a harder impact is charged as a worse offence without this file deciding
--- anything about severity.
+-- hit.
 --
 -- Attached to the `HorseCollisionMod` table created by the entry point, which
 -- pulls this file in with `Script.ReloadScript`.
 --
 -- @module HorseCollisionMod.Crime
 -- @author jrandall54
+
 -- The engine's `combatAttackKind`, transcribed from
 -- `Libs/AI/TypeDefinitions.xml`. Sequential, and the type definition's own
 -- comment says the melee entries are ordered by increasing violence.
@@ -24,12 +23,9 @@
 -- `Unarmed` is what a shove from horseback is charged as: the mildest melee
 -- kind, so a provoked scuffle is a scuffle rather than an armed assault.
 --
--- It lives here rather than in `Enums.lua` beside the other engine enums for
--- a blunt reason: a third annotated table in that module makes LDoc fail
--- outright with "'class' cannot have multiple values", whatever the tags on
--- it say. Here it sits beside its only consumer, which is the better place
--- for it anyway. Documented as an ordinary comment for the same reason the
--- entry point does that for the tables LDoc misreads.
+-- Kept here, beside its only consumer, rather than in `Enums.lua`, because a
+-- third annotated table in that module makes LDoc fail with "'class' cannot
+-- have multiple values"; for the same reason it is an ordinary comment.
 --
 -- The full set is kept rather than only the value used, so the contract
 -- stays verifiable against the engine.
@@ -46,9 +42,7 @@ HorseCollisionMod.CombatAttackKind = {
 --
 -- `hitReaction` is a physical event, consumed by `sb_switch_hitreactions.xml`,
 -- which is a passive observer that cannot drive a body. `combat:hit` feeds the
--- combat subbrain, which owns it. That difference is why this is worth trying
--- at all, and why the mod's reaction animations have always had to be played
--- by seizing the actor instead.
+-- combat subbrain, which owns it.
 --
 -- The shape is vanilla's own, from the branch in that switch tree that turns a
 -- player-ridden collision into a real hit:
@@ -58,15 +52,20 @@ HorseCollisionMod.CombatAttackKind = {
 --
 -- A collision is rewritten as `Melee` there rather than kept as `Collision`,
 -- the player is named rather than the horse, and `real` marks it as a genuine
--- strike rather than a near miss.
+-- strike rather than a near miss. The crime system prosecutes `Melee`,
+-- `MeleeStealth` and `Bullet` and ignores `Collision` and `Fall`, so
+-- vanilla rewrites a ridden collision to `Melee`.
 --
 -- The payload has to be a typed table. As a `key(value)` string this message
--- is accepted and discarded, producing no reaction and no hostility, which is
--- the same fault that made `daycycle:restartRequest` look inert.
+-- is accepted and discarded, producing no reaction and no hostility.
 --
 -- `CollisionIsCrime` governs it. A real hit attributed to the player is how the
--- game decides a crime happened, so this is what turns a village against the
--- rider.
+-- game decides a crime happened.
+--
+-- `strength` is passed through and changes nothing about the charge: a
+-- `Tickle`, which costs no health, is prosecuted exactly as a `Fatal` is. The
+-- fine scales with the victim's social class, and murder arrives on its own
+-- when a victim dies.
 --
 -- @tparam table npc victim entity
 -- @tparam table playerEnt the player entity
@@ -93,21 +92,7 @@ function HorseCollisionMod:SendCombatHit(npc, playerEnt, strength)
 		return false
 	end
 
-	-- Both overridable, so a single impact can be run at a chosen setting
-	-- without a rebuild. The charge the game brings is the thing being
-	-- measured, and it can only be read by surrendering to a guard, which
-	-- means one impact per save load.
-	-- Melee, not Collision, and that is not a mistake. Measured across nine
-	-- runs, the crime system prosecutes `Melee`, `MeleeStealth` and `Bullet`
-	-- and is blind to `Collision` and `Fall` at every strength. Vanilla makes
-	-- the same substitution in `sb_switch_hitreactions.xml`, rewriting a
-	-- player-ridden collision into `Melee` before re-sending it, because the
-	-- crime system has no concept of being ridden down.
-	--
-	-- `strength` is passed through and changes nothing about the charge: a
-	-- `Tickle`, which costs no health, is prosecuted exactly as a `Fatal` is.
-	-- The fine scales with the victim's social class instead, and murder
-	-- arrives on its own when a victim actually dies.
+	-- Melee, not Collision; see the doc above.
 	local ok, err = pcall(function()
 		local message = Utils.makeTable("combat:hit", {
 			attacker = playerWuid,
@@ -140,8 +125,7 @@ end
 --   `SpawnExpiringPerceptibleVolume` one meter across at the victim, labeled
 --   `assault`, for six seconds, at full conspicuousness and visibility, then
 --   blinds the attacker and the victim to it and leaves everyone else able to
---   see it. That volume is how a bystander learns an assault happened, and it
---   is what charged the rider with brawling before a punch had been thrown.
+--   see it. That volume is how a bystander learns an assault happened.
 --
 -- `combat:stimulus:hit` is the message that switch ultimately sends onward to
 -- the victim's own combat subbrain. Sending it directly reaches the same
@@ -208,8 +192,7 @@ end
 -- A civilian the player provokes enters the fight carrying
 -- `startInDefenseOnly`, which `sb_combat_fight.xml` turns into
 -- `$offense = false`. Such a fighter squares up, holds his guard and never
--- strikes, which is what a provoked victim was observed doing for twenty-two
--- seconds before the rider swung first.
+-- strikes.
 --
 -- Exactly one node in that subtree sets the flag true. It reads the
 -- `hitReaction` inbox and requires a strength above `Zero` and a type of
@@ -223,19 +206,19 @@ end
 -- horse impact is, is not one of the two types the condition accepts, so the
 -- horse's own contact can never release a fighter however hard it lands.
 --
--- ### The attacker named is the horse, and that is the whole trick
+-- ### The attacker named is the horse
 --
 -- `sb_switch_hitreactions.xml` reads the `hitReaction` inbox as well, so this
 -- message reaches the assault broadcast described above `SendProvocationHit`,
--- which is **not** gated on `real` and which charges the rider with brawling
--- before he has thrown a punch. There is no message that reaches one consumer
+-- which is **not** gated on `real` and would charge the player with brawling
+-- before a punch is thrown. There is no message that reaches one consumer
 -- and not the other: they share the inbox, so the trick that keeps the
 -- provocation quiet, sending the onward message directly, has no equivalent
 -- here.
 --
 -- What the broadcast does key on is `hit.attacker`. Naming anyone but the
 -- player leaves an assault attributed to nobody the crime system prosecutes,
--- and measured against a null control it costs exactly nothing:
+-- and costs nothing:
 --
 --     attacker = player   victim -0.31, every bystander -0.030
 --     attacker = victim   victim  0.00, every bystander  0.000
@@ -243,7 +226,8 @@ end
 -- The horse is named rather than the victim, because the node that reads this
 -- also registers the attacker as an opponent, and a victim made his own
 -- opponent has himself to cool down from before `state_standDown` releases
--- him. The horse is what struck him in the first place.
+-- him. Where there is no horse the victim is named, which is still crime
+-- free.
 --
 -- The flag is still set, because the condition that guards it tests only the
 -- strength and the type and never looks at who threw the blow. The opponent
@@ -251,7 +235,7 @@ end
 -- was set to the player when the provocation was answered, and this message
 -- only adds one alongside it.
 --
--- @tparam table npc victim entity, who is also named as the attacker
+-- @tparam table npc victim entity
 -- @treturn boolean true when the message was sent
 function HorseCollisionMod:SendOffenseRelease(npc)
 	local target = npc.id
@@ -260,11 +244,7 @@ function HorseCollisionMod:SendOffenseRelease(npc)
 		target = npc.this.id
 	end
 
-	-- The horse, which is what actually hit him. It is not the player, so the
-	-- assault broadcast has nobody to charge, and it is not the victim either,
-	-- so he is not left registered as his own opponent with himself to cool
-	-- down from afterwards. Falls back to the victim where there is no horse,
-	-- which keeps the send crime free either way.
+	-- The horse, falling back to the victim; see the doc above.
 	local attacker = nil
 
 	pcall(function()

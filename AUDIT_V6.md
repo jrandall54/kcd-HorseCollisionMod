@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`, `Update.lua`, `Marks.lua`, `Fear.lua`. Next: `Crime.lua`. Read **Phase 2 plan**
+order below. Done: every file in the pass order through `Crime.lua`. Next: `Impact.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -296,6 +296,10 @@ In this order, each its own commit and ride:
      the scream never overrides suppression; behavior unchanged. Use
      `player` rather than the `playerEnt` alias; the target id and player
      WUID go through the helpers recorded under `Crime.lua`.
+   - `Crime.lua`: `SendCombatHit`, `SendProvocationHit` and
+     `SendOffenseRelease` return nothing, since no caller reads them; two
+     helpers, one for a message target id (`npc.this.id` or `npc.id`) and
+     one for the player's WUID, used by this file and `Fear.lua`.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -494,6 +498,8 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Fear.lua`.** L1 `same`. The flee-state measurement reduced
   to its constraint; people-neutral wording; `ChargeFearBand`'s return
   documented. Two undeclared settings found, recorded for item 7.
+- **Batch 4, `Crime.lua`.** L1 `same`. Duplicated explanations collapsed,
+  the stale test-hook comment deleted, "offense".
 
 ## Standard
 
@@ -2462,44 +2468,51 @@ item 7. Code findings went there too.
 
 ### src/HorseCollisionMod/Crime.lua
 
-- [ ] `:3`, `:12` — "offence". — "offense".
-- [ ] `:9-13` header — "a harder impact is charged as a worse offence";
+Batch 4: applied. The header no longer claims strength grades the offense;
+`SendCombatHit`'s doc now says strength changes nothing and the fine follows
+social class. The `Melee` substitution is explained once, in the doc. The
+dead "Both overridable" test-hook comment is deleted. The measurements were
+already in the diary; the defense-only observation moved there. Code
+findings went to batch 3, item 7.
+
+- [x] `:3`, `:12` — "offence". — "offense".
+- [x] `:9-13` header — "a harder impact is charged as a worse offence";
   `:108-111` says strength changes nothing about the charge and the fine
   follows the victim's social class. — Take `:108-111` as the fact; cut the
   header sentence.
-- [ ] `:20-21` — `@release` runs straight into the `CombatAttackKind`
+- [x] `:20-21` — `@release` runs straight into the `CombatAttackKind`
   comment, so LDoc folds it into the module doc. — Separate.
-- [ ] `:28-33` — "for a blunt reason", "which is the better place for it
+- [x] `:28-33` — "for a blunt reason", "which is the better place for it
   anyway". — One line: kept here because LDoc rejects a third annotated
   table in `Enums.lua`.
-- [ ] `:50-52` `SendCombatHit` — "why this is worth trying at all", "have
+- [x] `:50-52` `SendCombatHit` — "why this is worth trying at all", "have
   always had to be played by seizing the actor". — Cut; `:48-50` stands.
-- [ ] `:60-62`, `:101-106` — the `Melee` substitution explained twice;
+- [x] `:60-62`, `:101-106` — the `Melee` substitution explained twice;
   "Measured across nine runs". — Once: the crime system prosecutes `Melee`,
   `MeleeStealth` and `Bullet` and ignores `Collision` and `Fall`, and
   vanilla rewrites a ridden collision to `Melee` for that reason.
-- [ ] `:66` — "the same fault that made `daycycle:restartRequest` look
+- [x] `:66` — "the same fault that made `daycycle:restartRequest` look
   inert". — Cut.
-- [ ] `:97-100` — "Both overridable, so a single impact can be run at a
+- [x] `:97-100` — "Both overridable, so a single impact can be run at a
   chosen setting without a rebuild… one impact per save load": nothing in
   the function is overridable; residue of a removed test hook, and it runs
   into the next comment. — Delete.
-- [ ] `:75`, `:165`, `:256` `@treturn` — no caller reads the result of
+- [x] `:75`, `:165`, `:256` `@treturn` — no caller reads the result of
   `SendCombatHit` (`Impact.lua:233`, `Health.lua:830`),
   `SendProvocationHit` (`Retaliation.lua:1014`, `:1036`) or
   `SendOffenseRelease` (`Retaliation.lua:301`). — Return nothing.
-- [ ] `:81-95`, `:171-185`, `:258-262` — the target id and the player WUID
+- [x] `:81-95`, `:171-185`, `:258-262` — the target id and the player WUID
   are resolved inline in each sender, and again in `Fear.lua:48-52`,
   `:151-155`. — Two helpers, used by both files.
-- [ ] `:211-213` `SendOffenseRelease` — "observed doing for twenty-two
+- [x] `:211-213` `SendOffenseRelease` — "observed doing for twenty-two
   seconds before the rider swung first". — Cut; "never strikes" stands.
-- [ ] `:227` — "and that is the whole trick". — "The attacker named is the
+- [x] `:227` — "and that is the whole trick". — "The attacker named is the
   horse".
-- [ ] `:239` — "measured against a null control". — Keep the two sample
+- [x] `:239` — "measured against a null control". — Keep the two sample
   rows alone.
-- [ ] `:244-247`, `:264-268` — why the horse and not the victim, twice. —
+- [x] `:244-247`, `:264-268` — why the horse and not the victim, twice. —
   Once, in the doc.
-- [ ] `:255` `@tparam npc` — "who is also named as the attacker"; the horse
+- [x] `:255` `@tparam npc` — "who is also named as the attacker"; the horse
   is, and the victim only when there is no horse. — "victim entity".
 
 ### src/HorseCollisionMod/Impact.lua

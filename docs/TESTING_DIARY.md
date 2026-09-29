@@ -22751,3 +22751,9 @@ the offset further out on every release and re-press (the "pumping" bug), which
 `LeanHomeMs` now refuses; and `StartLean` once read `now` from a global that did
 not exist, so every press after the first threw inside the action hook's pcall
 and the lean died silently until the scripts were reloaded.
+
+## Moved from `Crime.lua` comments
+
+Before `SendOffenseRelease` existed, a provoked victim entering the fight with
+`startInDefenseOnly` was observed holding a guard for twenty-two seconds until
+the player swung first.
