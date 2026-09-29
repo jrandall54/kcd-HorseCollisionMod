@@ -13,7 +13,8 @@ end of every pass, so it always says where the audit stands.
 **Phase:** 1, recording findings. No source file has been edited.
 
 **Current status:** every source file and every document except the diary
-audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py` done.
+audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
+`dev_console.py` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -25,8 +26,8 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
-`verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
+**Next pass:** `tools/`, largest first: `publish_nexus.ps1`,
+`pre_release_check.py`, `flow.ps1`, `verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
 
 **Pass order** (dependencies first, then largest):
@@ -293,6 +294,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
   (`build_adb.py:293-296`) ship on both databases and nothing in `src/`
   requests them; the knockdown chains its get-up inside its own option.
   Proposal: delete the four.
+
+- [ ] **The interactive `:reload`.** `dev_console.py` interactive mode's
+  `:reload` (`reload_mod`, `:417-418`) re-executes only the entry point.
+  `RELOAD_COMMANDS` (`:170-200`) documents why that leaves the settings
+  stale and the detection loop stopped. Proposal: `:reload` queues
+  `RELOAD_COMMANDS`; delete `reload_mod`.
 
 ## Findings
 
@@ -2549,6 +2556,69 @@ comments contradict the values beside them.
   through `Data/patch/` so the same mistake raises.
 - [ ] `:907-910` — "This sweep did exactly that to the horse database". —
   Keep "hand-authored files here are not in git".
+
+### tools/dev_console.py
+
+The protocol notes are the value of this file and are sound; history is woven
+through them, and two comment blocks sit above the wrong constants.
+
+**Wrong or stale:**
+
+- [ ] `:31-38` usage — omits `--file`, `--ride`, `--anim-reload`,
+  `--commands`, `--diagnose`, `--noisy`, `--verbose`, `--quiet`, `--wait`. —
+  Rewrite from the parser, or point at `--help`.
+- [ ] `:40-42`, `:589-592` — "Setup, once, in the game's system.cfg";
+  `dev_deploy.ps1 -SetDevEnvironment` writes it. — Name the command.
+- [ ] `:134-144` — two orphaned blocks above `MAX_CHUNK_BYTES`: one
+  describes `RELOAD_COMMANDS` and says "Both are listed" (only
+  `lua_reload_script` is), the other describes `RIDE_SCRIPTS`. — Move each
+  above its constant; drop "Both are listed".
+- [ ] `:159-163` `GAME_ROOT` — read from `KCD_ROOT`; `dev_deploy.ps1` and
+  `build_adb.py` use `KCD_PATH` and resolve Steam libraries. A machine with
+  `KCD_PATH` set gets scratch files written into the wrong folder. — Use
+  `KCD_PATH`, and share the resolution order.
+- [ ] `:517-518` — the echo filter names `log_SpamDelay`, which the setup
+  never sends. — Drop it; derive the list from `setup_commands`.
+- [ ] `:777` — advises `dev_deploy.ps1 -NoBuild -Launch`; the tooling's
+  relaunch is `flow.ps1 test -Launch`, and the advice fires when the game is
+  running, where a full deploy hits the running-game ruling. — Name
+  `flow.ps1 test -Launch`.
+- [ ] `:71`, `:123`, `:253`, `:281` — one blank line between top-level
+  definitions; `:415-416` two inside the class. — PEP 8.
+- [ ] `:194` — `--` as a dash. — Rephrase.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:5-15` — "Confirmed against the running game: `MemInfo` executed…",
+  "Two limits found the same way", and `sys_DevMode` "is inert: querying it
+  answers Unknown command" (the `STYLE.md` rejected example). — State the
+  two limits.
+- [ ] `:27` — "which is exactly what the first run produced". — Cut.
+- [ ] `:67-68` — "That cost one wrong conclusion already." — Cut.
+- [ ] `:98-100` — "read off a live session and confirmed". — Cut.
+- [ ] `:147-156` — "Found the same way as the two limits above". — Keep the
+  measured edge (4200 accepted, 4250 dropped) as the derivation.
+- [ ] `:178-181` — "Without this a world change needed a restart, which is
+  the opposite of what it exists for". — Cut.
+- [ ] `:204-207` — "is the reason mn_reload appeared to do nothing". —
+  "`mn_reload` needs it; it resets with the game."
+- [ ] `:226-228` — "Verified rather than assumed: … went from 0 to 182". —
+  Cut.
+- [ ] `:258-262` — "a run that relied on a previous session having set it
+  looked like the command had vanished". — Cut.
+- [ ] `:282-286` — "Why no log line ever came back on the first working
+  session." — "Turns on console output and reads it back."
+- [ ] `:329-331` — "that ambiguity has cost several rounds of guessing". —
+  Cut.
+- [ ] `:412-413` — "An earlier comment credited sys_DevMode". — Cut.
+- [ ] `:427-430` — "replying only to requests got a single autocomplete
+  entry and then silence … rules out the reply's content". — "The server
+  alternates strictly: one reply per packet received."
+- [ ] `:471-473` — "That is 4545 entries here". — Cut the count.
+- [ ] `:762-764` — "a session was spent probing an unresponsive game". —
+  Cut.
+- [ ] `:773-776` — "which failed the deploy's reload step". — Keep "stderr
+  output fails a PowerShell caller".
 
 ### Dead code (`tools/audit_code.py`)
 
