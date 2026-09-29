@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`. Next: `Bark.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`. Next: `Recovery.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -239,6 +239,9 @@ In this order, each its own commit and ride:
      `SurrenderHint left to the game` log lines on `LogTelemetry`; rename
      the inner `mounted` in `PullRiderDown`'s `attempt`, which shadows the
      outer one.
+   - `Bark.lua`: move `ShieldFromEngineDamage` and `LiftCollisionShield` to
+     `Health.lua`, beside `ApplyImpactDamage`, which lifts the shield; drop
+     the redundant parentheses around single `cfg` reads.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -411,6 +414,9 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Retaliation.lua`.** L1 `same`. Measurements and history cut;
   the doc that LDoc attached to the wrong function moved; the morale survey
   moved to the diary.
+- **Batch 4, `Bark.lua`.** L1 `same`. Duplicate `KOLIZE_*` paragraphs,
+  audition history and quoted rides cut; `Bark`'s parameters documented;
+  the shield's duration and the hush rate corrected.
 
 ## Standard
 
@@ -1596,105 +1602,114 @@ victim is accurate (only men reach the fight branch) and stays.
 
 ### src/HorseCollisionMod/Bark.lua
 
-- [ ] `:27`, `:45-50`, `:72-77` — "each of which has already cost a wrong
+Batch 4: applied. Superseded by batch 2: `RiderBarkSets`, `BarkDeath` and the
+impact-pool doc (reduced in batch 2 to its ruled form). The charge-set
+finding follows the batch-3 ruling: `BarkRecovered` now says only the rear
+has its own voice. Histories cut here and absent from the diary were moved
+to it ("Moved from `Bark.lua` comments"): the three failed hush approaches
+and the recovery-line timings. `HushVanillaBark`'s rate corrected to about
+thirty ticks a second. The shield's move to `Health.lua` and the redundant
+parentheses are code and went to batch 3, item 7.
+
+- [x] `:27`, `:45-50`, `:72-77` — "each of which has already cost a wrong
   choice"; the `KOLIZE_*` paragraph appears twice, both with "reverses an
   earlier decision", "now", "no longer". — Keep one sentence in the header:
   the `KOLIZE_*` sets are pooled because `HushVanillaBark` keeps vanilla from
   playing them itself.
-- [ ] `:58-59`, `:306-307` — "for the same reason as `ImpactProbeSamples` in
+- [x] `:58-59`, `:306-307` — "for the same reason as `ImpactProbeSamples` in
   the entry point" / "above"; it lives in `Health.lua:27`. `:62-63` a doubled
   empty `--`. — Fix the pointer; one blank comment line.
-- [ ] `:82-104` `Shove` — "the mod's own find", the removed
+- [x] `:82-104` `Shove` — "the mod's own find", the removed
   `KOLIZE_S_HRACEM_LEHKA` story, "The rider heard", "The lesson
   generalises". Header test 3 already states the rule. — Keep the two
   sets' sample lines; cut the rest.
-- [ ] `:111-113`, `:1211` — "the rider having just trampled them", "an NPC
+- [x] `:111-113`, `:1211` — "the rider having just trampled them", "an NPC
   the rider passes". — "the player".
-- [ ] `:136-148` hurt grades — "what the victim makes at the moment of
+- [x] `:136-148` hurt grades — "what the victim makes at the moment of
   impact, in three grades"; only `HurtDown` is audible (`:596-609`), and the
   two comments contradict each other. — One comment: `HurtDown` is the
   impact cry; `HurtLight` and `HurtHard` name where the graded recordings
   live and cannot be requested.
-- [ ] `:150-164` bystander sets — removal history. Header test 4 states the
+- [x] `:150-164` bystander sets — removal history. Header test 4 states the
   rule. — Cut, or one line naming the three sets as excluded by test 4.
-- [ ] `:169-208` `RiderBarkSets` — "These two are confirmed on him" above an
+- [x] `:169-208` `RiderBarkSets` — "These two are confirmed on him" above an
   empty table; the role survey, "The rider rejected it", the audition trap
   and the untested assumptions. — Follows the dead-set-path ruling; if the
   table stays, one line.
-- [ ] `:211-297` `RiderBarkAliases` — "was recorded as unrecoverable", "the
+- [x] `:211-297` `RiderBarkAliases` — "was recorded as unrecoverable", "the
   rider chose these", the quoted instruction, "for now", "turned out". —
   Follows the empty-pool ruling.
-- [ ] `:299-314` `RiderBarkKillAliases` — the gender column is explained
+- [x] `:299-314` `RiderBarkKillAliases` — the gender column is explained
   here and again in `PoolForVictim` (`:346-349`); "the two filters described
   above" (there are four). — Keep the explanation in `PoolForVictim`; "the
   four filters".
-- [ ] `:397-398`, `:446-447` — "two at once is a defect rather than a richer
+- [x] `:397-398`, `:446-447` — "two at once is a defect rather than a richer
   moment" twice; "the same man". — Once, in `RiderVoiceReady`.
-- [ ] `:400-403` — the rewind sentence is hard to parse. — "A hold further
+- [x] `:400-403` — the rewind sentence is hard to parse. — "A hold further
   out than the longest cooldown means the save clock was wound back; it is
   ignored."
-- [ ] `:406-410` — "A grunt is `RiderVoiceGrunt`" (it is
+- [x] `:406-410` — "A grunt is `RiderVoiceGrunt`" (it is
   `RiderVoiceRanks.Grunt`); "four gallop kills… produced one death line and
   three silences". — Correct the name; cut the measurement.
-- [ ] `:419`, `:474`, `:527`, `:701`, `:709`, `:999` — redundant parentheses
+- [x] `:419`, `:474`, `:527`, `:701`, `:709`, `:999` — redundant parentheses
   around single `cfg` reads. — Remove.
-- [ ] `:484` "every spoken line the rider has" means Henry's. — "Henry".
-- [ ] `:592-609` `PainByTier` — "Both tiers" over three entries; test
+- [x] `:484` "every spoken line the rider has" means Henry's. — "Henry".
+- [x] `:592-609` `PainByTier` — "Both tiers" over three entries; test
   history ("Both were tested rather than assumed… fourteen requests"). —
   Keep: those sets are combat shouts dispatched outside
   `dialog:monologRequest` and gated on the engine's `hitStrength`. See the
   charge-cry ruling.
-- [ ] `:646-648` `PickFromPool` — "once the rider reports which lines they
+- [x] `:646-648` `PickFromPool` — "once the rider reports which lines they
   actually hear". — Cut.
-- [ ] `:689-692` `BarkOnCooldown` — "which is the point of having a
+- [x] `:689-692` `BarkOnCooldown` — "which is the point of having a
   bystander set at all"; there are none. `:702-705` history. — Keep: per
   speaker, so two victims can both speak; a refusal is logged.
-- [ ] `:723-724` `Bark` — "the whole finding of the investigation behind
+- [x] `:723-724` `Bark` — "the whole finding of the investigation behind
   this file". `:756` double blank line. `priority` and `overrideSuppress`
   undocumented; `ignoreCooldown` is "used only for the recovery line", but
   `Fear.lua:106` and the recovery groans (`Recovery.lua:1178`) pass it too. —
   Cut; add the two params; describe `ignoreCooldown` without a caller list.
-- [ ] `:783-809` — the `HushVanillaBark` note and the message-fields note run
+- [x] `:783-809` — the `HushVanillaBark` note and the message-fields note run
   together with no break; "Three approaches failed… none should be
   retried", "this used to send two of them". — Split; keep: the branch is
   closed ahead of contact by `HushVanillaBark`, and a request below the top
   priority waits or is discarded.
-- [ ] `:814-823`, `:892-895` — "a man" for the speaker. — "they".
-- [ ] `:850-861` `BarkForTier` — "Mirrors `GetSpeedTier`" (it is a table
+- [x] `:814-823`, `:892-895` — "a man" for the speaker. — "they".
+- [x] `:850-861` `BarkForTier` — "Mirrors `GetSpeedTier`" (it is a table
   lookup); "graded by how hard they were hit" (trot and gallop both use
   `HurtDown`); `@tparam` lists Walk, Trot, Gallop, and the charge also
   arrives here. — Correct.
-- [ ] `:886-895` `BarkCollision` — "which the mod had no counterpart for",
+- [x] `:886-895` `BarkCollision` — "which the mod had no counterpart for",
   "The rider heard the gap". — Keep the vanilla condition and its source
   line.
-- [ ] `:918-934`, `:965-971` `BarkRecovered` — the three failed timings are
+- [x] `:918-934`, `:965-971` `BarkRecovered` — the three failed timings are
   told twice, with the quoted ride. "about 0.15 of its standing height to
   1.59" mixes a fraction and meters. — Keep: the line fires when the body
   leaves flat, read by `WhenVictimRises`; check the figures in the
   `Recovery.lua` pass.
-- [ ] `:947-950` — "the rear and the charge have a voice of their own"; the
+- [x] `:947-950` — "the rear and the charge have a voice of their own"; the
   charge ships `"collision"` and reaches this function. — Follows the
   charge's bark set ruling.
-- [ ] `:983-984` — "is how the death barks ended up firing over silence". —
+- [x] `:983-984` — "is how the death barks ended up firing over silence". —
   Keep: a dead victim does not rise.
-- [ ] `:1031-1037` `BarkDeath` — removal history, and "logs the death and
+- [x] `:1031-1037` `BarkDeath` — removal history, and "logs the death and
   says nothing." is a fragment. — Follows the dead-set-path ruling.
-- [ ] `:1054-1196` `ShieldFromEngineDamage`, `LiftCollisionShield` — damage
+- [x] `:1054-1196` `ShieldFromEngineDamage`, `LiftCollisionShield` — damage
   code in the bark module; the caller is `Impact.lua:73` and the lifter is
   `ApplyImpactDamage` in `Health.lua`. — Move to `Health.lua`.
-- [ ] `:1057-1062` — "Five separate levers leave it unchanged" names two. —
+- [x] `:1057-1062` — "Five separate levers leave it unchanged" names two. —
   Keep: the engine's collision damage cannot be stopped without a global
   that also governs arrows, so the victim is made immortal through the
   window.
-- [ ] `:1071-1072` — "for a few hundred milliseconds"; the shield lasts until
+- [x] `:1071-1072` — "for a few hundred milliseconds"; the shield lasts until
   `ApplyImpactDamage`, after the ragdoll resolves, with a 6000 ms backstop. —
   Correct.
-- [ ] `:1083-1088` — "Testing the entry alone was wrong… one was killed". —
+- [x] `:1083-1088` — "Testing the entry alone was wrong… one was killed". —
   Keep: only a live shield blocks a second.
-- [ ] `:1134-1138` — "Every other timer in this mod returns early" on a
+- [x] `:1134-1138` — "Every other timer in this mod returns early" on a
   reload; `HushVanillaBark`'s timer does not either. — "Unlike the mod's
   polling timers".
-- [ ] `:1200-1209` `HushVanillaBark` — "about ten times a second" and
+- [x] `:1200-1209` `HushVanillaBark` — "about ten times a second" and
   "twenty times a second"; `TickSeconds` is 0.033, about thirty. "The rider
   heard the result". — Correct the rate; cut the quote.
 

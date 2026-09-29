@@ -24,7 +24,7 @@
 --
 -- ## What a set has to pass to be used here
 --
--- Four tests, each of which has already cost a wrong choice:
+-- Four tests:
 --
 -- 1. **It must be able to play.** Anything named `COMBAT_` speaks only from
 --    combat, and a trampled townsman is not in combat. More generally, a
@@ -42,23 +42,17 @@
 -- `tools/bark_lines.py` answers 2 and 3 offline. Only an audition answers 1,
 -- and only watching vanilla answers 4.
 --
--- The vanilla `KOLIZE_*` collision sets **are** used, which reverses an earlier
--- decision. They were excluded while vanilla still fired its own collision bark
--- on every contact, because driving them would have duplicated what the player
--- already heard. `HushVanillaBark` now closes that branch, so they no longer
--- play on their own and excluding them would simply delete the game's most
--- directly descriptive writing for this exact situation.
+-- The vanilla `KOLIZE_*` collision sets are pooled with the mod's own finds,
+-- because `HushVanillaBark` keeps vanilla from playing them itself.
 --
 -- @module HorseCollisionMod.Bark
 -- @author jrandall54
 
 -- The bark sets, by the moment that causes them.
 --
--- Documented as an ordinary comment rather than an LDoc block, for the same
--- reason as `ImpactProbeSamples` in the entry point: LDoc reads an annotated
--- table as a set of named fields and refuses one carrying array entries, which
--- every weighted pool below is.
---
+-- An ordinary comment rather than an LDoc block: LDoc reads an annotated table
+-- as a set of named fields and refuses one carrying array entries, which every
+-- weighted pool below is.
 --
 -- An entry is either one metarole name or a **weighted pool** written as a
 -- list of `{ metarole, weight }` pairs, from which one is drawn per firing.
@@ -67,40 +61,17 @@
 -- chooses the set. One set per moment means one bad member poisons every
 -- firing of that moment, and it means the same voice every time. Drawing from
 -- a pool spreads the risk and widens the palette without needing new audio.
---
--- The vanilla `KOLIZE_*` collision sets are deliberately **in** these pools.
--- They were excluded while vanilla still fired its own collision bark, because
--- driving them from the mod would have duplicated what the player already
--- heard. `HushVanillaBark` now closes that branch, so those lines no longer
--- play on their own, and they are the most directly descriptive writing the
--- game has for exactly this situation. Excluding them now would delete them.
 HorseCollisionMod.BarkSets = {
 	-- What a victim says about being shoved aside, at a walk and again once
 	-- they have picked themselves up from a harder hit.
 	--
-	-- ZASAH_ZBRANI_IGNOROVANY is the mod's own find and escalates across
-	-- repeated provocation, which is the shape of a rider shoving somebody
-	-- more than once:
+	-- ZASAH_ZBRANI_IGNOROVANY escalates across repeated provocation, which is
+	-- the shape of a rider shoving somebody more than once:
 	--   "What the fuck are you doing!?"  "Have you lost your mind?"
 	--   "Right, try that one more time and see what happens..."
 	-- KOLIZE_S_HRACEM is vanilla's on-foot collision set, every line short:
 	--   "Be a bit more careful!"  "Hey! Watch it!"  "Jesus! Look where you're going!"
 	--   and a set of monk variants: "Slow down, brother!"  "In a rush to pray?"
-	--
-	-- `KOLIZE_S_HRACEM_LEHKA` was in this pool and has been removed. It is
-	-- vanilla's *lightest* bump set, and its job there is to be barely
-	-- audible: of its 36 entries, 23 carry no word at all, being either the
-	-- wordless marker `<...>` or a Hungarian interjection recorded for Cuman
-	-- speakers. The rider heard the result as barks that "were just mmm" and
-	-- made no sense for being hit by a horse. Measured rather than guessed:
-	--
-	--     KOLIZE_S_HRACEM_LEHKA     36 entries, 23 with no real word (64%)
-	--     KOLIZE_S_HRACEM           35 entries,  1 with no real word (3%)
-	--     ZASAH_ZBRANI_IGNOROVANY   14 entries,  0 with no real word
-	--
-	-- The lesson generalises: read a set's whole contents and count what
-	-- carries meaning before pooling it, because the dialog system picks the
-	-- line and a set that is mostly grunts will mostly grunt.
 	Shove = {
 		{ "ZASAH_ZBRANI_IGNOROVANY", 3 },
 		{ "KOLIZE_S_HRACEM",         3 }
@@ -108,7 +79,7 @@ HorseCollisionMod.BarkSets = {
 
 	-- What a victim says once they are back on their feet after being ridden
 	-- down. Weighted towards the mounted set, because it is the only writing
-	-- in the game that names the horse, and the rider having just trampled
+	-- in the game that names the horse, and the player having just trampled
 	-- them is the whole point of the line:
 	--   "Learn how to ride a horse, idiot!"
 	--   "Watch where you're going, you lout! You nearly killed me!"
@@ -132,13 +103,10 @@ HorseCollisionMod.BarkSets = {
 	--   "What in the -?"  "Who's there?"  "Jesus!"
 	Startle = "KDO_TAM_CITOSLOVCE",
 
-	-- Wordless pain, no subtitle, in three grades. These are what the victim
-	-- makes at the moment of impact; the words come later, once they are up.
-	--
-	-- The grades are real sets and not a volume control: each was written for
-	-- a different severity of blow and the recordings differ in kind, not just
-	-- in loudness. Several of their members are the literal marker `<...>`,
-	-- a grunt the subtitle file cannot render.
+	-- Wordless pain, no subtitle. `HurtDown` is the cry at the moment of
+	-- impact; the words come later, once the victim is up. `HurtLight` and
+	-- `HurtHard` name where vanilla's graded recordings live, and a bark
+	-- request cannot reach them (see `PainByTier`).
 	--   HurtLight  "Uhh!"  "Ech!"  "Ow!"
 	--   HurtHard   "Aaaaah!"  "Yow!"  "Enhhhh!"
 	--   HurtDown   "Aaaah... dear God..."  "Christ!"
@@ -146,21 +114,8 @@ HorseCollisionMod.BarkSets = {
 	HurtHard  = "ZASAH_ZBRANI_SILNY",
 	HurtDown  = "RANENY_NA_ZEMI",
 
-	-- **Deliberately absent: the bystander sets.**
-	--
-	-- `UVIDI_MRTVOLU` ("Jesus Christ! Murder! Help!"),
-	-- `VOLANI_STRAZE_MRTVOLA`, a bystander calling the guards to a body, and
-	-- `REAKCE_NA_VRAZDU` were wired here and have been removed.
-	--
-	-- They played correctly and were still wrong. In vanilla each of those
-	-- lines is the audible part of a whole reaction. The NPC notices a body,
-	-- panics, runs and fetches a guard, and `dialog:monologRequest` reaches only
-	-- the audio. The result was a bystander announcing a corpse and then
-	-- strolling on, which reads as a bug rather than a reaction.
-	--
-	-- Vanilla already fires these at the right moment with the behavior
-	-- attached, so the mod has nothing to add and something to break. The sets
-	-- worth driving are the ones that are *only* a line.
+	-- The corpse sets `UVIDI_MRTVOLU`, `VOLANI_STRAZE_MRTVOLA` and
+	-- `REAKCE_NA_VRAZDU` are excluded by test 4 in the module header.
 }
 
 --- Lines Henry says on an impact, addressed by dialog `alias`, drawn as one
@@ -188,20 +143,14 @@ HorseCollisionMod.RiderBarkAliases = {}
 
 -- Henry's lines for an impact that killed, drawn on instead of the impact pool.
 --
--- A third column restricts a line to one gender of victim, `"m"` or `"f"`, and
--- is absent on a line that fits either. Some of these name the body: "he was
--- only a boy", "shameless hussy". Played over the wrong victim they read as the
--- mod talking about someone who is not there.
---
--- An ordinary comment rather than an LDoc block, for the same reason as
--- ImpactProbeSamples above: LDoc reads an annotated table as a set of named
--- fields and refuses an array of entries.
+-- An ordinary comment rather than an LDoc block: LDoc reads an annotated table
+-- as a set of named fields and refuses an array of entries.
 --
 -- A death is the one moment in the mod worth a distinct reaction, so it gets a
--- distinct pool rather than a weight inside the ordinary one. Every member is an
--- ungated single-line topic whose full text is printed beside it -- see the two
--- filters described above the impact pool, which apply here identically.
---
+-- distinct pool rather than a weight inside the ordinary one. Every member
+-- passes the four filters described above the impact pool, and its full text
+-- is printed beside it. A third column restricts a line to one gender of
+-- victim; see `PoolForVictim`.
 HorseCollisionMod.RiderBarkKillAliases = {
 	{ "revelation_murderer_ohfuck", 1 },                   -- "Oh fuck!"
 	{ "q_rides_traitor_henry_trail_skirt", 1, "f" },       -- "Shameless hussy!"
@@ -234,9 +183,9 @@ HorseCollisionMod.RiderBarkKillAliases = {
 --- The subset of a pool whose lines suit this victim.
 --
 -- A pool entry may carry a third field naming the only gender of victim the line
--- fits, `"m"` or `"f"`. Lines that name the body -- "he was only a boy",
--- "shameless hussy" -- read as the mod describing someone who is not there when
--- they land on the wrong victim, which is what this removes.
+-- fits, `"m"` or `"f"`, and none on a line that fits either. Lines that name the
+-- body, such as "he was only a boy" or "shameless hussy", read as the mod
+-- describing someone who is not there when they land on the wrong victim.
 --
 -- Returns the pool unchanged when the victim's gender cannot be read, because a
 -- line is better than silence and an unreadable soul is not evidence of anything.
@@ -284,19 +233,15 @@ end
 
 --- Whether Henry is free to speak, or still inside a hold from his last sound.
 --
--- One gate for words and breath alike, because both come out of the same man
--- and two at once is a defect rather than a richer moment.
+-- One gate for words and breath alike, because both come out of Henry and two
+-- at once is a defect rather than a richer moment.
 --
--- A hold further out than any cooldown that can be written was not written
--- against this clock: `System.GetCurrTime` is persisted in the save, so loading
--- an earlier one moves it backwards, and without this the rewind would mute
--- Henry until it had been ridden back through.
+-- A hold further out than the longest cooldown means the save clock was wound
+-- back by a load; it is ignored.
 --
 -- Ranked, so that the more important sound wins a contest rather than whichever
--- was asked first. A grunt is `RiderVoiceGrunt`, an impact line outranks it, and
--- a line about a death outranks both: four gallop kills in quick succession
--- produced one death line and three silences when the gate was rank-blind,
--- because the grunt at each contact had already taken it.
+-- was asked first: `RiderVoiceRanks.Grunt`, then an impact line, then a line
+-- about a death, so a grunt at the contact cannot silence a kill line.
 --
 -- Equal rank still loses, so two death lines do not talk over each other.
 --
@@ -333,9 +278,9 @@ HorseCollisionMod.RiderVoiceRanks = { Grunt = 3, Impact = 4, Killed = 5 }
 --
 -- ### Why this cannot run alongside the grunt
 --
--- `PlayRiderVocal` already puts a wordless grunt on every impact, and two Henry
--- voices at once is a defect rather than a richer moment. So the two share one
--- gate: a line that goes out stamps the rider's voice clock at the top rank,
+-- `PlayRiderVocal` already puts a wordless grunt on every impact, and the two
+-- share one gate (`RiderVoiceReady`): a line that goes out stamps Henry's
+-- voice clock at a rank above the grunt,
 -- which suppresses the grunt for the length of `RiderBarkCooldownMs`. The two
 -- are therefore alternatives on any given impact, and `RiderBarkChance` decides
 -- how often Henry uses words instead of breath.
@@ -371,7 +316,7 @@ end
 
 --- Sends one line from a pool as Henry, and takes the voice gate on success.
 --
--- The dispatch shared by every spoken line the rider has: the impact pool and
+-- The dispatch shared by every spoken line Henry has: the impact pool and
 -- the kill pool differ only in which pool they draw from and what the telemetry
 -- calls the moment. Both stamp the same clock, because there is one Henry.
 --
@@ -479,24 +424,19 @@ function HorseCollisionMod:BarkRiderOnImpact(playerEnt, tierName, fatal, npc)
 			self.RiderVoiceRanks.Killed)
 end
 
--- The wordless pain grade an impact at this tier should make.
+-- The wordless pain set an impact at each tier makes.
 --
--- Walk is absent on purpose. A shove at walking pace does not hurt, and the
--- victim goes straight to words.
--- Every tier here uses the one pain set that is **proven to speak**, and the graded
--- ladder above it can never be wired in. `HurtLight` and `HurtHard` name
--- `ZASAH_ZBRANI_SLABY` and `ZASAH_ZBRANI_SILNY`, whose metaroles are two of the
--- fifteen registered in `Libs/Tables/rpg/combat_shout_type.xml`: those are
--- dispatched by the combat shout system rather than by `dialog:monologRequest`,
--- so a bark request for one reaches the wrong subsystem entirely. Their entry
--- conditions also read `var('hitStrength')`, which the engine hangs on its own
+-- Walk and the rear are absent: a shove does not hurt, and the victim goes
+-- straight to words.
+--
+-- Every tier here uses `HurtDown`, the one pain set a bark request can reach.
+-- `HurtLight` and `HurtHard` name `ZASAH_ZBRANI_SLABY` and
+-- `ZASAH_ZBRANI_SILNY`, two of the metaroles registered in
+-- `Libs/Tables/rpg/combat_shout_type.xml`: those are dispatched by the combat
+-- shout system rather than by `dialog:monologRequest`, and their entry
+-- conditions read `var('hitStrength')`, which the engine hangs on its own
 -- `CombatShout_*` request rather than on the character, so no state a mod can
--- set will satisfy them.
---
--- Both were tested rather than assumed: relaxing the entry condition to `1` and
--- raising `speech_coef` from 0 to 1, through additive table patches the engine
--- confirmed it had applied, left fourteen requests in one ride silent. The two
--- names are kept above because they document where the right recordings live.
+-- set satisfies them.
 HorseCollisionMod.PainByTier = {
 	Trot   = "HurtDown",
 	Gallop = "HurtDown",
@@ -534,8 +474,7 @@ end
 -- as often as `b`.
 --
 -- Kept separate from `Bark` so that a pool can be drawn from and inspected
--- without sending anything, and because the weighting is the part most likely
--- to be tuned once the rider reports which lines they actually hear.
+-- without sending anything.
 --
 -- @tparam ?string|table entry a metarole name, a weighted pool, or nil
 -- @treturn ?string the metarole to speak, or nil when the entry is empty
@@ -578,8 +517,7 @@ end
 --
 -- Without this a rider working through a crowd produces a chorus, and a single
 -- victim struck twice talks over their own first line. Tracked per entity
--- rather than globally so two different people can react to the same event,
--- which is the point of having a bystander set at all.
+-- rather than globally so two different people can react to the same event.
 --
 -- @tparam table entity the prospective speaker
 -- @treturn boolean true when they are still inside their cooldown
@@ -589,10 +527,7 @@ function HorseCollisionMod:BarkOnCooldown(entity)
 	local last = self.RecentBarks[id]
 
 	if last and (now - last) < (self.Config.BarkCooldownMs) then
-		-- Said out loud. This refused silently, so a victim shoved twice in
-		-- three seconds simply did not speak the second time and nothing in
-		-- the log accounted for it. A line nobody hears and nobody can explain
-		-- reads as the mod having missed the impact entirely.
+		-- Logged, so a silent second shove can be told from a missed impact.
 		if self.Config.LogTelemetry then
 			self:Log("BarkCooldown " .. self:NameOf(entity)
 					.. " silent for another "
@@ -609,9 +544,6 @@ function HorseCollisionMod:BarkOnCooldown(entity)
 end
 
 --- Asks a character to speak one of a named bark set.
---
--- The shape of this call is the whole finding of the investigation behind this
--- file, so it is worth stating precisely why each part is here.
 --
 -- `Utils.makeTable` builds the message from its declared type, filling every
 -- member. A hand-built table leaves the receiving node with nothing to match
@@ -630,12 +562,16 @@ end
 -- look different from the game's own.
 --
 -- Failure is silent by design: a character whose voice never recorded the set
--- simply says nothing, with no error and no glitch, exactly as in vanilla.
+-- says nothing, with no error and no glitch, exactly as in vanilla.
 --
 -- @tparam table entity who should speak
 -- @tparam string set a key of `BarkSets`
 -- @tparam ?boolean ignoreCooldown true to speak even inside the speaker's
---   cooldown, used only for the recovery line that follows a cry of pain
+--   cooldown, for a line deliberately sequenced after another; it still
+--   stamps the clock
+-- @tparam ?number priority the rank to send at, in place of `BarkPriority`
+-- @tparam ?boolean overrideSuppress true to ignore a `suppressMonologs`
+--   context whatever `BarkOverrideSuppress` says
 -- @treturn boolean true when a request was sent
 function HorseCollisionMod:Bark(entity, set, ignoreCooldown,
 		priority, overrideSuppress)
@@ -643,17 +579,15 @@ function HorseCollisionMod:Bark(entity, set, ignoreCooldown,
 		return false
 	end
 
-
 	local metarole = self:PickFromPool(self.BarkSets[set])
 
 	if not metarole then
 		return false
 	end
 
-	-- The recovery line is deliberately sequenced after the victim's cry of
-	-- pain, several seconds later, so it must not be refused by the cooldown
-	-- that the cry itself started. It still stamps the clock, so a second
-	-- impact is governed normally.
+	-- A line sequenced after another, such as the recovery line after the
+	-- cry of pain, must not be refused by the cooldown the first started. It
+	-- still stamps the clock, so a second impact is governed normally.
 	if ignoreCooldown then
 		self.RecentBarks[tostring(entity.id or "?")] = self:TimeMs()
 	elseif self:BarkOnCooldown(entity) then
@@ -676,19 +610,9 @@ function HorseCollisionMod:Bark(entity, set, ignoreCooldown,
 	-- Doing it here as well would also mean two writers sharing one context
 	-- handle, where whichever timer expired first would hand vanilla's bark back
 	-- while the other still believed it was suppressed.
-	--
-	-- Three approaches failed before the pre-emptive one and none should be
-	-- retried. Delaying the mod's line by a second made it worse, because vanilla
-	-- keeps firing. Setting `suppressMonologs` silenced every line including the
-	-- mod's own,
-	-- because the gate does not exempt `overrideContextSuppress` the way its
-	-- condition reads at a glance. Removing the victim's `KOLIZE_*` metaroles
-	-- succeeded, logged as `tookVanilla=3`, and vanilla barked anyway, which is
-	-- one more confirmation that holding a metarole is not what decides what is
-	-- spoken.
-	-- The message carries thirteen fields and this used to send two of them,
-	-- one of which vanilla itself uses exactly once. The rest are read from
-	-- settings so they can be changed in a running game and compared by ear.
+
+	-- The message fields that matter are read from settings, so they can be
+	-- changed in a running game.
 	--
 	-- `priority` is the one that matters most. Requests register their
 	-- priority in a shared array which `monologRequestProcess` sorts
@@ -701,12 +625,12 @@ function HorseCollisionMod:Bark(entity, set, ignoreCooldown,
 		forceOnMuted = true,
 		-- A caller may outbid the shipped rank for a line that has to be
 		-- heard over whatever the speaker's own brain is saying at the time.
-		-- The fear scream is the case: it is spoken by a man in the middle of
-		-- running away, and running away has lines of its own.
+		-- The fear scream is the case: it is spoken by someone in the middle
+		-- of running away, and running away has lines of its own.
 		priority = priority or cfg.BarkPriority,
 		canBeDelayed = cfg.BarkCanBeDelayed == true,
-		-- Likewise overridable per call. A man running for his life is inside
-		-- a brain that raises `suppressMonologs` on itself, and a request
+		-- Likewise overridable per call. Someone running for their life is
+		-- inside a brain that raises `suppressMonologs` on itself, and a request
 		-- that does not say it outranks that context is discarded with no
 		-- error, exactly as a losing bid is.
 		overrideContextSuppress = overrideSuppress == true
@@ -735,17 +659,14 @@ function HorseCollisionMod:Bark(entity, set, ignoreCooldown,
 	return ok
 end
 
---- The bark set an impact at this speed should raise.
---
--- Mirrors `GetSpeedTier` rather than inventing a second set of thresholds, so
--- that what is said always agrees with what the body does.
+--- The bark set an impact at this tier should raise at the moment of contact.
 --
 -- A walk shoves, which does not hurt, so the victim goes straight to words.
--- Anything harder knocks them down, and what comes out at the moment of
--- impact is a wordless cry graded by how hard they were hit. Their words come
--- later, from `BarkRecovered`, once they are back on their feet.
+-- A tier in `PainByTier` knocks them down, and what comes out at the moment
+-- of impact is a wordless cry. Their words come later, from `BarkRecovered`,
+-- once they are back on their feet.
 --
--- @tparam string tier "Walk", "Trot" or "Gallop"
+-- @tparam string tier "Walk", "Trot", "Gallop" or "Charge"
 -- @treturn ?string a key of `BarkSets`, or nil when nothing should be said
 function HorseCollisionMod:BarkForTier(tier)
 	if tier == "Walk" then
@@ -775,12 +696,7 @@ function HorseCollisionMod:BarkCollision(npc, tier, inCombat)
 	-- `!$b_inCombat & !$b_context['suppressCollisionsBark']`, at
 	-- `sb_switch_hitreactions.xml:293`. `HushVanillaBark` supplies the second
 	-- half, which is how the mod takes the line over outside a fight; this is
-	-- the first half, which the mod had no counterpart for.
-	--
-	-- The rider heard the gap: a guard already fighting them still stopped to
-	-- complain about being ridden into. Vanilla's judgment is that a man in a
-	-- fight does not remark on being bumped, and it is followed here rather
-	-- than second-guessed.
+	-- the first: someone in a fight does not remark on being bumped.
 	if inCombat and self.Config.BarkInCombat ~= true then
 		if self.Config.LogTelemetry then
 			self:Log("BarkCollision " .. self:NameOf(npc) .. " skipped, in combat")
@@ -803,23 +719,13 @@ end
 
 --- Speaks for a victim who is getting back to their feet.
 --
--- The gap this closes: a trot or gallop victim cried out on impact, lay there,
--- stood up and walked off without ever saying a word about what had happened,
--- which reads as the game forgetting rather than as a person recovering.
+-- Without it a knocked-down victim cries out on impact, stands up and walks
+-- off without a word about what happened.
 --
--- **Fired when the body begins to rise.** Three earlier attempts missed the
--- moment. Waiting for the readiness watcher could not report until two seconds
--- after the victim was upright; waiting for the animation state to leave
--- `BlendRagdoll` fires once the get-up has already finished; and a delay tuned
--- from the impact is one figure for a get-up that is not one length, so it
--- landed mid-ragdoll for some victims and after others had walked off. The
--- rider heard the last as "a large gap between when they actually stand up and
--- then the 2nd line plays".
---
--- The target is a moment inside the get-up rather than at either end of it,
--- and the body marks it even though no animation state does: the head climbs
--- from about 0.15 of its standing height to 1.59 across the rise, so leaving
--- flat is the instant wanted. `WhenVictimRises` reads it.
+-- **Fired when the body begins to rise**, a moment inside the get-up rather
+-- than at either end of it. No animation state marks it, and a delay from
+-- the impact cannot, because a get-up is not one length. `WhenVictimRises`
+-- reads it: the head height for a fall, the ragdoll state for a throw.
 --
 -- @tparam table npc the victim
 -- @tparam string tier the speed tier the impact was scored at
@@ -834,8 +740,7 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 
 	-- Only the tiers that answer with the collision voice and put somebody on
 	-- the ground. A shove has no knockdown to recover from and already spoke
-	-- at the moment of contact, and the rear and the charge have a voice of
-	-- their own rather than this one.
+	-- at the moment of contact, and the rear has a voice of its own.
 	if self:TierValue("VictimBarkByTier", tier) ~= "collision" then
 		return
 	end
@@ -850,13 +755,8 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 
 	local generation = self.TimerTick
 
-	-- Fired when the body begins to rise rather than after a tuned wait.
-	--
-	-- The delay that stood here was 3200ms for every victim, and a get-up is
-	-- not one length: measured, a body is flat from about 1.8s and starts
-	-- rising anywhere from there to past 7s depending on the fall and the
-	-- character set. One figure lands mid-ragdoll for some and after they are
-	-- already walking for others, which is the gap the rider reported.
+	-- A body is flat from about 1.8 s and starts rising anywhere from there
+	-- to past 7 s, depending on the fall and the character set.
 	self:WhenVictimRises(npc, function(why, waited)
 		if generation ~= self.TimerTick then
 			return
@@ -868,8 +768,7 @@ function HorseCollisionMod:BarkRecovered(npc, tier)
 					.. " waited=" .. tostring(waited) .. "ms")
 		end
 
-		-- A victim the impact killed is not getting up, and asking a corpse to
-		-- speak is how the death barks ended up firing over silence.
+		-- A victim the impact killed is not getting up and does not speak.
 		local ok, health = pcall(function()
 			return npc.soul:GetState("health")
 		end)
@@ -918,11 +817,10 @@ end
 -- nothing.
 --
 -- The engine charges a victim health for being struck by a moving physical
--- body and the mod cannot stop it. Five separate levers leave it unchanged.
--- `BasicActor`'s collision multipliers belong to CryEngine's legacy damage
--- path rather than to the RPG layer that charges `soul` health, and the
--- one parameter that does work, `CollisionVelocityDeltaToDmgR`, is global and
--- also governs arrows.
+-- body and the mod cannot stop it. `BasicActor`'s collision multipliers belong
+-- to CryEngine's legacy damage path rather than to the RPG layer that charges
+-- `soul` health, and the one parameter that does work,
+-- `CollisionVelocityDeltaToDmgR`, is global and also governs arrows.
 --
 -- So rather than stop the damage, this stops it **landing**. `imm=1` is the
 -- parameter behind the game's own `immortality` and `death_protection` buffs,
@@ -931,8 +829,9 @@ end
 -- victim is untouchable for exactly the window the trample occupies, and the
 -- mod's own damage lands afterwards on a mortal target.
 --
--- **This is deliberately narrow.** It is one buff, on one victim, for a few
--- hundred milliseconds, and it is removed by GUID so nothing of it persists.
+-- **This is deliberately narrow.** It is one buff instance, on one victim,
+-- until `ApplyImpactDamage` lifts it after the body comes to rest, with
+-- `ShieldWindowMs` as the backstop.
 --
 -- @tparam table npc somebody in front of the horse
 function HorseCollisionMod:ShieldFromEngineDamage(npc)
@@ -943,12 +842,9 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 	local id = tostring(npc.id or "?")
 	local existing = self.ShieldedVictims[id]
 
-	-- Only a **live** shield blocks a second one. Testing the entry alone was
-	-- wrong: a record whose buff has already been removed still reads truthy,
-	-- and every later impact on that victim then skipped the shield silently,
-	-- with no log line to say so. A victim left at low health by an earlier
-	-- impact is exactly who cannot afford that, and one was killed by the
-	-- engine on a second gallop having never been shielded for it.
+	-- Only a **live** shield blocks a second one: a record whose buff has
+	-- already been removed still reads truthy, and must not leave a later
+	-- impact unshielded.
 	if existing and not existing.removed then
 		return
 	end
@@ -986,19 +882,17 @@ function HorseCollisionMod:ShieldFromEngineDamage(npc)
 	end
 
 	-- Nothing here decides when the shield ends. `ApplyImpactDamage` lifts it as
-	-- the first thing it does, and that call is itself fired by the victim's
-	-- ragdoll resolving, so the shield covers exactly the window the engine can
-	-- charge the body for and not a millisecond that has to be guessed at.
+	-- the first thing it does, and that call waits for the victim's body to
+	-- come to rest, so the shield covers the window the engine can charge the
+	-- body for.
 	--
 	-- This timer is a crash backstop and nothing else: if the damage call never
 	-- happens, nobody is left permanently unkillable. Reaching it means
-	-- something else went wrong, which is why it says so.
+	-- something else went wrong, so it logs.
 	--
-	-- **Deliberately not generation guarded.** Every other timer in this mod
-	-- returns early when a script reload has bumped the generation, so a stale
-	-- loop stops doing work. This one must not: the work it does is removing
-	-- immortality, and skipping it would leave a victim unkillable for the rest
-	-- of the session. A reload happens on every deploy, so that is not remote.
+	-- **Deliberately not generation guarded**, unlike the mod's polling timers:
+	-- the work it does is removing immortality, and skipping it on a script
+	-- reload would leave a victim unkillable for the rest of the session.
 	Script.SetTimer(self.Config.ShieldWindowMs, function()
 		if state.removed then
 			return
@@ -1061,17 +955,16 @@ end
 --- Switches off vanilla's collision bark on somebody the horse is approaching.
 --
 -- Per impact suppression loses a race it cannot win. The mod's detection loop
--- runs about ten times a second, while the engine raises its own hit reaction
--- the instant bodies touch, so vanilla's line can already be playing before the
--- tick that would have silenced it. The rider heard the result as "a vanilla
--- interrupted by the mod's".
+-- runs about thirty times a second, while the engine raises its own hit
+-- reaction the instant bodies touch, so vanilla's line can already be playing
+-- before the tick that would have silenced it.
 --
 -- Setting the option while the victim is still in front of the horse removes
 -- the race: by the time contact happens the branch is already closed. It is
--- refreshed rather than set every tick, because a context write twenty times a
--- second per nearby person is not free.
+-- refreshed every half `BarkSuppressMs` rather than set every tick, because a
+-- context write every tick per nearby person is not free.
 --
--- Cleared on a timer well after the impact, so an NPC the rider passes without
+-- Cleared on a timer well after the impact, so an NPC the player passes without
 -- touching gets their own bark back a moment later and nothing is permanently
 -- changed. Non-persistent, so a save cannot carry it.
 --

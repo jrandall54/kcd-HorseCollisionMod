@@ -22698,3 +22698,23 @@ Rattay, women read morale 0.15 to 0.22, male civilians 0.16 to 0.52 and guards
 0.54 to 0.79. The morale comparison in `sb_combat.xml` tells a guard from a
 townsman and says nothing about sex, so the mod routes a provoked victim on the
 gender the combat tree itself tests.
+
+## Moved from `Bark.lua` comments
+
+Two histories cut from the bark module's comments during the audit, kept here.
+
+**Vanilla's collision bark.** Three approaches failed before `HushVanillaBark`
+closed the branch ahead of contact. Delaying the mod's line by a second made it
+worse, because vanilla keeps firing. Setting `suppressMonologs` silenced every
+line including the mod's own, because the gate does not exempt
+`overrideContextSuppress` the way its condition reads at a glance. Removing the
+victim's `KOLIZE_*` metaroles succeeded, logged as `tookVanilla=3`, and vanilla
+barked anyway: holding a metarole is not what decides what is spoken.
+
+**The recovery line's timing.** Three earlier triggers missed the moment the
+victim gets up. Waiting for the readiness watcher could not report until two
+seconds after the victim was upright; waiting for the animation state to leave
+`BlendRagdoll` fires once the get-up has finished; and a fixed 3200 ms from the
+impact landed mid-ragdoll for some victims and after others had walked off,
+heard as "a large gap between when they actually stand up and then the 2nd line
+plays". The line now fires from `WhenVictimRises`.
