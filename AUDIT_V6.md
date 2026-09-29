@@ -30,9 +30,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 5, tooling, from the fourth bullet
-(`publish_nexus.ps1` runs `verify_additive.py`); the front door, `:reload`
-and `land`'s retry are done (see **Phase 2 log**). Read **Phase 2 plan** below in
+**Next step:** phase 2, batch 5, tooling, from the fifth bullet (the stale
+armor-table sweep in `build.ps1`); the front door, `:reload`, `land`'s retry
+and `publish_nexus.ps1` are done (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -594,6 +594,13 @@ One line per batch: batch, commit, what was verified.
   source, so it was dropped; the other three are named. Left for batch 6:
   README layout rows for the three horse files, `check_tiers.lua` and
   `game_root.ps1`.
+- **Batch 5, `publish_nexus.ps1`.** Runs `verify_additive.py` on the zip
+  unless `-Force`, dry run included, before any Nexus call; the game root
+  comes from `game_root.ps1`; every file finding applied, the `-ChangelogOnly`
+  path restored to `releases\notes-…`. `-DryRun` on the 5.31.4 zip: 35 of 35,
+  then the read-only page lookups and the dry-run stop. The same zip with
+  `Enums.lua` removed from its pak: two checks failed and the script threw
+  before resolving the mod page.
 
 ## Standard
 
@@ -3430,7 +3437,7 @@ comment that contradicts `build.ps1`, and release history in the comments.
 
 **Wrong or stale:**
 
-- [ ] `:516-517` — `releases\notes-$Version.md` was written through an
+- [x] `:516-517` — `releases\notes-$Version.md` was written through an
   escaping tool: `\n` became a line break, so the `-ChangelogOnly` error
   reads "Write releases" / "otes-…". `build.ps1`'s control-character check
   (`:257-278`) excludes LF, so it cannot catch this. — Restore the
@@ -3438,30 +3445,30 @@ comment that contradicts `build.ps1`, and release history in the comments.
   next line starts a path fragment is not detectable in general, so add
   `releases\n`, `tools\n`, `src\n` and similar known-path breaks to the
   linter's patterns instead.
-- [ ] `:461-466` — "Compress-Archive stores Windows separators, so the
+- [x] `:461-466` — "Compress-Archive stores Windows separators, so the
   release zip does does hold `Data\HorseCollisionMod.pak`. Harmless for the
   outer zip". `build.ps1:555-591` builds the outer zip entry by entry because
   a backslash entry breaks the install, and refuses one. The replace at
   `:467` is then a no-op. — Cut the comment; keep the replace only if an
   older zip must still validate, otherwise delete it.
-- [ ] `:454-457` — "its <version> is maintained by hand and can drift";
+- [x] `:454-457` — "its <version> is maintained by hand and can drift";
   `set_version.py` writes it and `build.ps1:298-301` refuses a mismatch. —
   "Checked again against the zip, since `-Zip` can name any file."
-- [ ] `:359-363` — game root is `KCD_PATH` or one hardcoded path; the other
+- [x] `:359-363` — game root is `KCD_PATH` or one hardcoded path; the other
   tools also search Steam libraries. — Share the resolution.
-- [ ] `:620-621` — "around 190 KB"; the current zip is 239 KB. — Cut the
+- [x] `:620-621` — "around 190 KB"; the current zip is 239 KB. — Cut the
   figure.
-- [ ] `:663` — "Finalising" in output. — "Finalizing" (the endpoint keeps
+- [x] `:663` — "Finalising" in output. — "Finalizing" (the endpoint keeps
   its own spelling).
-- [ ] `:533-534` — two blank lines. — One.
+- [x] `:533-534` — two blank lines. — One.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `:144-145` — "4.2.2 went out with none". — Cut.
-- [ ] `:354` — "Version 4.0.0 was published without this check." — Cut.
-- [ ] `:418-420` — "which is what happened to 4.2.2". — Keep "found without
+- [x] `:144-145` — "4.2.2 went out with none". — Cut.
+- [x] `:354` — "Version 4.0.0 was published without this check." — Cut.
+- [x] `:418-420` — "which is what happened to 4.2.2". — Keep "found without
   being asked, because the field is optional".
-- [ ] `:724-731` — "A changelog posted for 4.2.2 … That was concluded twice
+- [x] `:724-731` — "A changelog posted for 4.2.2 … That was concluded twice
   from the page alone … both were wrong." — Keep "the public changelog page
   lags; its absence is not evidence the call failed".
 
