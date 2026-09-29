@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan.
-Next: README repository layout. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout.
+Next: the stale armor-table sweep. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -287,9 +287,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
   settled fear notes from `HANDOFF.md:128-145` and the reference in
   `probe_gait_speed.lua:3`; the diary's references stay as history.
 
-- [ ] **README repository layout.** A player-facing README carries 120 lines
+- [x] **README repository layout.** A player-facing README carries 120 lines
   of developer tooling. Proposal: keep the top-level layout in the README and
   move the `tools/` catalog to `DEV_LOOP.md`.
+  **Ruled as proposed.** The README keeps the top level, `src/` and
+  `docs/`; `tools/` becomes one line pointing at `docs/DEV_LOOP.md`, which
+  takes the catalog.
 
 - [ ] **The stale armor-table sweep.** `build.ps1:431-440` deletes
   `mod_assets/Scripts/Startup/HorseCollisionMod_ItemData.lua`, a file no
