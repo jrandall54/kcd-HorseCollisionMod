@@ -1,29 +1,26 @@
 --- Armor: what a collision victim is wearing, and what it changes.
 --
--- Weight is read from the entity's inventory and turned into two multipliers,
--- one for the impulse an impact carries and one for the stamina it costs the
--- horse. Both run through a single curve so the two settings that shape them
--- behave the same way.
+-- What a victim wears changes an impact three ways. Its armor **weight**
+-- sets the impulse multiplier, through `ArmorCurve`, and the stamina
+-- surcharge, off its own full-set anchor. Its summed **`smash_def`** sets the
+-- damage multiplier. The horse's own barding, also read from `smash_def`,
+-- adds force, damage and stamina relief.
 --
 -- Attached to the `HorseCollisionMod` table created by the entry point, which
--- pulls this file in with `Script.ReloadScript`. The curve reads `Config`, so
--- the settings it depends on live in the entry point and exist before this
+-- pulls this file in with `Script.ReloadScript`. The curves read `Config`, so
+-- the settings they depend on live in the entry point and exist before this
 -- file runs.
 --
 -- @module HorseCollisionMod.Armor
 -- @author jrandall54
--- The `armor_type_id` values worn by a horse rather than a person.
+
+--- The `armor_type_id` values that are a horse's tack rather than armor:
+-- the saddle and the horseshoes.
 --
--- A sum over a person has to exclude them and a sum over a horse has to be
--- only them, because a saddle sits in the horse's inventory and a rider's
--- armor does not.
--- Only the saddle and the horseshoes. `armor_type_id` 12 is named
--- `horse_bridle` in `armor_type.xml` and looks like tack, but the game files
--- every `horse_armor_head_neck_*` piece under it, and those carry a
--- `smash_def` of 0.80 to 1.40 against the trappings' 0.06. Excluding the id
--- threw away all the real barding and left only cloth, which is why the
--- barding multiplier had to be cranked before it did anything. Genuine
--- bridles share the id and carry 0.00, so counting it costs nothing.
+-- `armor_type_id` 12 is named `horse_bridle` in `armor_type.xml` but is not
+-- excluded: the game files every `horse_armor_head_neck_*` piece under it,
+-- with a `smash_def` of 0.80 to 1.40, and genuine bridles share the id at
+-- 0.00, so counting it costs nothing.
 HorseCollisionMod.TackTypes = {
 	[10] = true,
 	[11] = true
@@ -56,11 +53,6 @@ HorseCollisionMod.ArmorTypeNames = {
 -- Membership of `armor` is what makes a carried item count. `pickable_item`
 -- holds food, tools and coin as well, and summing all of it would weigh a
 -- target by their shopping rather than their protection.
---
--- This replaces a 50 KB table generated from the game's paks at build time and
--- shipped with the mod. The join is the same one that generator performed, done
--- against the live tables instead, so nothing about the resulting weights
--- changed and the download no longer carries them.
 --
 -- Built once and cached. The tables do not change while the game runs, and the
 -- join walks a few thousand rows.
@@ -150,12 +142,12 @@ end
 -- The player is the exception, carrying whatever has been picked up, but the
 -- player is never the victim of an impact.
 --
--- Saddles, bridles, horseshoes and spurs are filed as armor. `tack` selects
--- between the two: false for what a person is wearing, true for a horse's own
--- gear, which is what Phase 3 barding needs from the same call.
+-- Saddles and horseshoes are filed as armor; `TackTypes` names them. `tack`
+-- true sums only those, false sums everything else, which is both a
+-- person's armor and a horse's barding.
 --
 -- @tparam table entity any entity with an inventory
--- @tparam[opt] boolean tack true to sum horse gear instead of worn armor
+-- @tparam[opt] boolean tack true to sum tack instead of armor
 -- @treturn table weight, smashDef, pieces, heaviest and heaviestType
 function HorseCollisionMod:ArmorOf(entity, tack)
 	local total = {
@@ -216,7 +208,6 @@ function HorseCollisionMod:ArmorOf(entity, tack)
 	return total
 end
 
-
 --- An armor total as a log fragment.
 --
 -- @tparam table total a table from `ArmorOf`
@@ -230,24 +221,22 @@ function HorseCollisionMod:DescribeArmor(total)
 			.. " heaviest=" .. kind
 end
 
-
---- How much a target's armor changes the impact it takes.
+--- How much a target's armor weight changes the impulse it takes.
 --
--- One curve serves both halves. `weight` is the target's armor weight and
--- `reference` the weight that changes nothing, so the ratio between them is
--- the whole signal; `exponent` sets how sharply it bites and 0 switches the
--- scaling off entirely.
+-- `weight` is the target's armor weight and `reference` the weight that
+-- changes nothing, so the ratio between them is the whole signal; `exponent`
+-- sets how sharply it bites and 0 switches the scaling off entirely. Armor
+-- makes a target harder to throw, so the impulse takes the reciprocal of the
+-- ratio (`invert`, which `ArmorImpulseScale`, the only caller, always sets).
 --
--- Armor makes a target harder to throw and more tiring to hit, so the impulse
--- takes the reciprocal of the ratio and the stamina cost takes it directly.
--- Both are clamped, because the curve has no natural floor or ceiling and an
--- unclamped extreme reads in game as a target that cannot be moved at all, or
--- one that flies out of sight.
+-- Clamped, because the curve has no natural floor or ceiling and an unclamped
+-- extreme reads in game as a target that cannot be moved at all, or one that
+-- flies out of sight.
 --
 -- @tparam number weight the target's armor weight
 -- @tparam number reference the weight that produces 1.0
 -- @tparam number exponent how strongly weight matters, 0 to disable
--- @tparam boolean invert true for the impulse, false for the stamina cost
+-- @tparam boolean invert true to take the reciprocal of the ratio
 -- @tparam number low the smallest multiplier allowed
 -- @tparam number high the largest
 -- @treturn number the multiplier
@@ -284,7 +273,6 @@ function HorseCollisionMod:ArmorCurve(weight, reference, exponent, invert, low, 
 	return scale
 end
 
-
 --- The impulse multiplier for a target's armor.
 --
 -- @tparam table armor a table from `ArmorOf`
@@ -297,24 +285,18 @@ function HorseCollisionMod:ArmorImpulseScale(armor)
 			cfg.MinArmorImpulse, cfg.MaxArmorImpulse)
 end
 
-
 --- Where a target sits between "fully armored" and "unarmored", 0 to 1.
 --
--- `ArmorImpulseScale` answers a multiplier, and four separate things then want
--- a *position* rather than a multiplier: the brake, the ragdoll speed cap, the
--- air damping and the recovery delay each interpolate their own pair of
--- figures across the same span. All four derived that position themselves,
--- from the same two settings, in four copies of the same seven lines.
+-- `ArmorImpulseScale` answers a multiplier; the throw wants a position, and
+-- the gallop's brake, cap and drag and the charge's lunge transfer each
+-- interpolate their own pair of figures across it.
 --
 -- The span is `RagdollBrakeArmorScaleArmored` to
--- `RagdollBrakeArmorScaleUnarmored`, which are named for the brake because
--- that is what first needed them. They are not the same pair as
+-- `RagdollBrakeArmorScaleUnarmored`. They are not the same pair as
 -- `MinArmorImpulse` and `MaxArmorImpulse`, which bound the curve itself: the
--- unarmored endpoint here is 1.26 against a curve ceiling of 1.5, and it is
--- deliberately inside the curve's range. Measured, ordinary villagers score
--- about 1.15, so they land near but not at 1, which is why the log's `keep` is
--- rarely the figure a tier's `brakeKeepUnarmored` names. Reading the endpoints as
--- describing a bracket rather than a delivered value is the way round it.
+-- unarmored endpoint here is 1.26, inside the curve's 0.35 to 1.5. Ordinary
+-- villagers score about 1.15, so they land near but not at 1, and the endpoint
+-- figures in a throw profile describe a bracket rather than a delivered value.
 --
 -- @tparam[opt] number armorScale a value from `ArmorImpulseScale`
 -- @treturn number 0 at the armored endpoint, 1 at the unarmored one
@@ -339,7 +321,6 @@ function HorseCollisionMod:ArmorLerp(armorScale)
 	return t
 end
 
-
 --- One pair of figures interpolated across a target's armor.
 --
 -- The shape every consumer of `ArmorLerp` wanted. `armored` is what a victim
@@ -356,14 +337,11 @@ function HorseCollisionMod:ArmorBlend(armorScale, armored, unarmored)
 	return armored + ((unarmored - armored) * t)
 end
 
-
 --- The stamina surcharge for a target's armor.
 --
 -- A share of the horse's pool added to the tier's own share, rising from zero
--- on a victim in clothes to `MaxArmorStaminaAdd` on one in a full set. It used
--- to be a multiplier running 0.75 to 3.0, which is the factor that put a
--- gallop at seven times its tier figure on an armored guard; as a surcharge
--- the worst it can do is the figure it names.
+-- on a victim in clothes to `MaxArmorStaminaAdd` on one in a full set, so the
+-- worst it can do is the figure it names.
 --
 -- The weight of what the victim is wearing is the input, not their armor
 -- rating, for the same reason the impulse curve uses weight: what tires a
@@ -373,10 +351,9 @@ end
 -- and the two figures are far apart on purpose. The impulse curve's reference
 -- is the weight that multiplies an impulse by exactly one, a point inside the
 -- range; a surcharge needs the weight where a victim is *fully* armored, or
--- everybody pays the maximum. Measured on a run of 76 impacts by inverting
--- `ArmorImpulseScale` off the impact log, villagers came out at 5 to 7 and
--- mailed guards at 45 to 65, so 50 is where a full set sits and a villager
--- pays a tenth of the surcharge.
+-- everybody pays the maximum. Villagers weigh 5 to 7 and mailed guards 45 to
+-- 65, so 50 is where a full set sits and a villager pays a tenth of the
+-- surcharge.
 --
 -- @tparam table armor a table from `ArmorOf`
 -- @treturn number a share of the horse's maximum stamina, near 0 on a victim
@@ -402,50 +379,42 @@ function HorseCollisionMod:ArmorStaminaAdd(armor)
 	return cfg.MaxArmorStaminaAdd * math.pow(ratio, cfg.ArmorStaminaExponent)
 end
 
---- The damage multiplier for a target's armor.
---
--- The third of the three armor multipliers, beside `ArmorImpulseScale` and
--- `ArmorStaminaScale`, and it lives here for the same reason they do: what a
--- victim is wearing and what that changes is this file's subject.
---
--- It does not run through `ArmorCurve`, and that is deliberate rather than an
--- oversight. The other two are driven by the armor's **weight**, because being
--- heavy is what makes a target hard to shift and tiring to hit. Damage is
--- driven by **smash_def**, the armor's own rating against blunt force, because
--- what stops a hoof is the plate rather than the mass. Feeding one curve from
--- two different quantities would make the settings on it mean two things.
---
 --- How much of the tier's damage a target in this armor takes.
 --
--- One falling curve against the summed `smash_def` of what the victim is
--- wearing, past the part of it that is not armor:
--- `1 / (1 + max(0, smashDef - ImpactDamageIgnoredArmor) / ImpactDamageArmorScale)`.
--- It reaches 1.0 on anyone in ordinary clothes and never reaches 0, so plate
--- is a very bad day rather than immunity.
+-- Driven by the armor's **`smash_def`**, its rating against blunt force,
+-- rather than by weight through `ArmorCurve`, because what stops a hoof is the
+-- plate rather than the mass.
 --
--- The subtraction is what makes the curve work at all. Shoes, a shirt and a
--- hood are in the `armor` table and sum to 0.30 to 0.50 on a villager wearing
--- nothing anyone would call armor. Measured against the raw figure, a villager
--- was already taking 17 per cent off for being dressed, which meant the curve
--- could not be made steep enough to spare a knight without also sparing her.
+-- One falling curve against the summed `smash_def` of what the victim is
+-- wearing, past the part of it that is not armor, with a floor:
+--
+--     worn    = max(0, smashDef - ImpactDamageIgnoredArmor)
+--     falloff = 1 / (1 + (worn / ImpactDamageArmorScale) ^ ImpactDamageArmorCurve)
+--     result  = max(falloff, ImpactDamageArmorFloor)
+--
+-- It is 1.0 on anyone in ordinary clothes and never reaches 0, so plate is a
+-- bad day rather than immunity. The subtraction exists because shoes, a
+-- shirt and a hood are in the `armor` table and sum to 0.30 to 0.50 on a
+-- villager wearing nothing anyone would call armor.
 --
 -- `smash_def` is the game's own blunt resistance and is the right column for a
 -- horse: it is what the engine consults for a mace or a hammer, and a horse's
 -- chest is the same kind of problem for a breastplate. Weight is deliberately
 -- not used, though `ArmorOf` returns it, because a heavy mail hauberk and a
--- heavy padded gambeson weigh alike and stop a blunt impact very differently.
+-- heavy padded gambeson weigh alike and stop a blunt impact differently.
 --
 -- The scale is a half-life rather than a ceiling: at
 -- `ImpactDamageArmorScale` past the ignored figure the target takes half, at
 -- twice it a third. With the shipped 2.9 that reads across the range actually
--- worn in game as, in gallop impacts to put the victim down,
+-- worn in game as, in gallop impacts (111, rolled 0.85 to 1.15) to take a
+-- victim from 100 health,
 --
---     villager    smashDef 0.30   1.00   1
+--     villager    smashDef 0.30   1.00   1 to 2
 --     light       smashDef 1.50   0.74   2
---     guard       smashDef 3.22   0.52   2
---     mail        smashDef 4.99   0.39   2 to 3
---     heavy mail  smashDef 7.16   0.30   3
---     plate       smashDef 12.0   0.20   4 to 5
+--     guard       smashDef 3.22   0.52   2 to 3
+--     mail        smashDef 4.99   0.39   3
+--     heavy mail  smashDef 7.16   0.30   3 to 4
+--     plate       smashDef 12.0   0.20   4 to 6
 --
 -- @tparam table armor totals from `ArmorOf`
 -- @treturn number multiplier on the tier's damage, in (0, 1]
@@ -472,28 +441,18 @@ function HorseCollisionMod:ImpactDamageScale(armor)
 	-- The curve, and then a floor under it.
 	--
 	-- `1 / (1 + worn / scale)` alone is a hyperbola with no bottom, so heavy
-	-- armor drives the multiplier arbitrarily close to zero: measured on
-	-- ordinary town guards it lands between 0.08 and 0.19, which turns a
-	-- charge's 110 into 10 and makes the heaviest move in the mod unable to
-	-- hurt anyone wearing plate. That is the right shape and the wrong depth.
+	-- enough armor drives the multiplier arbitrarily close to zero.
 	--
 	-- `ImpactDamageArmorCurve` bends it. Above 1 armor bites harder and sooner,
-	-- below 1 it flattens, and 1 is the original hyperbola exactly, so the
-	-- default changes nothing.
+	-- below 1 it flattens, and 1 is the plain hyperbola.
 	--
-	-- `ImpactDamageArmorFloor` is the answer to "a horse is a horse". No armor
-	-- makes a man weigh less than the animal standing on him, so there is a
-	-- share of an impact that plate should not be able to refuse. It is the
-	-- lowest multiplier armor can reach, applied after the curve.
-	--
-	-- Its figure is not chosen. Before `ImpactDamageOwnsTheHit` handed the
-	-- engine's trample back, that trample was the floor: measured over five
-	-- armored gallop impacts it charged 7.5 to 28.3 regardless of what the
-	-- victim wore, a mean of 16 against a gallop now worth 111. 0.14 is that
-	-- ratio, so the mod delivers the floor it took away. At the shipped scale
-	-- the curve stays above it everywhere anyone in the game is dressed, so the
-	-- floor is a guarantee against armor heavier than plate rather than a clamp
-	-- inside the range.
+	-- `ImpactDamageArmorFloor` is the share of an impact armor cannot refuse:
+	-- no plate makes a body weigh less than the horse standing on it. 0.14 is
+	-- the engine trample's mean of 16 on an armored victim over the gallop's
+	-- 111, which `ImpactDamageOwnsTheHit` hands back, so the mod delivers the
+	-- floor the engine would have. At the shipped scale the curve stays above
+	-- it for everything worn in the game, so the floor guards against armor
+	-- heavier than plate rather than clamping inside the range.
 	local curve = self.Config.ImpactDamageArmorCurve
 	local falloff = 1.0 / (1.0 + ((worn / scale) ^ curve))
 	local floor = self.Config.ImpactDamageArmorFloor
@@ -504,7 +463,6 @@ function HorseCollisionMod:ImpactDamageScale(armor)
 
 	return falloff
 end
-
 
 --- How heavily barded the horse is, from nothing to a full set.
 --
@@ -518,11 +476,12 @@ end
 -- figure the victim's side of the collision is scored on.
 --
 -- Returned as a coverage fraction from 0 to 1 rather than as a multiplier,
--- because barding's three effects are flat additions and reductions rather
--- than a chain of multipliers. A multiplier on the impulse compounds with the
--- victim's own armor scale, so the same barding moves an unarmored villager
--- far more than an armored one, which is backwards for a property of the
--- horse. A flat addition contributes the same push whoever is hit.
+-- because each of barding's three effects scales it differently: the force
+-- is a flat addition and the stamina relief a flat reduction, while the damage
+-- is a multiplier on the victim's damage. The force is flat because a
+-- multiplier on the impulse would compound with the victim's own armor scale
+-- and move an unarmored villager far more than an armored one, which is
+-- backwards for a property of the horse.
 --
 -- Nothing about the rider enters this. Barding is what the horse is wearing,
 -- so it does not scale with Horsemanship and must not be made to.
@@ -596,8 +555,7 @@ end
 
 --- What barding adds to the damage an impact does.
 --
--- An armored horse hits harder. Damage is a number rather than a picture, so
--- a subtle change here is actually achievable, unlike knockback.
+-- An armored horse hits harder, by up to `BardingDamageBonus` on a full set.
 --
 -- @tparam table horseEnt the player's horse entity
 -- @treturn number a multiplier on impact damage, 1 on a bare horse
@@ -608,13 +566,10 @@ end
 
 --- What barding saves the horse in stamina.
 --
--- Barding is protection, so an impact tires the horse less. This is the half
--- of barding a player actually feels: one more guard ridden down before the
--- horse is spent and throws them.
---
--- A share of the horse's pool subtracted from the tier's own share, in the
--- same currency as the tier figure and the two surcharges, so a full set is
--- worth exactly the figure `BardingStaminaRelief` names.
+-- Barding is protection, so an impact tires the horse less. A share of the
+-- horse's pool subtracted from the tier's own share, in the same currency as
+-- the tier figure, the combat surcharge and the armor surcharge, so a full set
+-- is worth exactly the figure `BardingStaminaRelief` names.
 --
 -- @tparam table horseEnt the player's horse entity
 -- @treturn number a share of the horse's maximum stamina, 0 on a bare horse
