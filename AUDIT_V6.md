@@ -29,7 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon. Next: `CatchYieldImmediately`. Phase 2 then applies the
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`. Next: the pull-down target
+probe. Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
@@ -122,11 +123,11 @@ Items that change behavior or delete a feature. Not applied without a decision.
   icon buff is written into the save, so that a relaunch and load of a save
   taken with the icon up leaves it raised with `CooldownIconShown` empty.
 
-- [ ] **`CatchYieldImmediately`.** A module constant fixed at `false`
-  (`HorseCollisionMod.lua:1547`) with no setting, so the yield branch in
-  `WatchRetaliation` (`Retaliation.lua:414-425`), `sawYield`, `caught` and
-  `SendStandDown`, whose only caller is that branch, never run. Proposal:
-  delete them.
+- [x] **`CatchYieldImmediately`.** Ruled: delete. A vestigial alternative for
+  the post-yield flee, which does not need handling. Remove the constant
+  (`HorseCollisionMod.lua:1536-1547`), the yield branch in `WatchRetaliation`
+  (`Retaliation.lua:414-425`), `sawYield`, `caught` and `SendStandDown`.
+  Record the measured `YieldCaught` result in the diary if absent.
 
 - [ ] **The pull-down target probe.** `PullRiderDown` asks
   `CanHorsePullDown` for both the player and the horse "until one of them is
