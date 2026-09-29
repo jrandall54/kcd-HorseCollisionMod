@@ -31,8 +31,8 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 5, tooling, the last bullet: the remaining
-tool **Findings**, file by file, from `tools/dev_console.py`; every bullet
-before it, and `build_adb.py`, are done (see **Phase 2 log**). Read **Phase 2 plan** below in
+tool **Findings**, file by file, from `tools/verify_additive.py`; every
+bullet before it, `build_adb.py` and `dev_console.py` are done (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -645,6 +645,13 @@ One line per batch: batch, commit, what was verified.
   clip length times 0.68 (male) or 0.50 (female). `GENDERS` loses `ctrl`, and
   `hcm_pb_` goes from both prefix tests. Regenerated: the two parent
   databases and the tag file byte-identical to the files before the change.
+- **Batch 5, `dev_console.py`.** Every finding applied. The game folder for
+  an oversized script comes from `build_adb.GAME_ROOT`, imported only on that
+  path, so `KCD_PATH` and the Steam libraries resolve it as they do for the
+  build; `KCD_ROOT` is gone. The setup echo filter is derived from
+  `setup_commands`. Tests: `--help`; `--lua` against the running game
+  answered; a 6 KB `--file` went to disk under the resolved install and ran
+  (`hcm oversized ok 499`), and the scratch file was removed after.
 
 ## Standard
 
@@ -3419,60 +3426,60 @@ through them, and two comment blocks sit above the wrong constants.
 
 **Wrong or stale:**
 
-- [ ] `:31-38` usage — omits `--file`, `--ride`, `--anim-reload`,
+- [x] `:31-38` usage — omits `--file`, `--ride`, `--anim-reload`,
   `--commands`, `--diagnose`, `--noisy`, `--verbose`, `--quiet`, `--wait`. —
   Rewrite from the parser, or point at `--help`.
-- [ ] `:40-42`, `:589-592` — "Setup, once, in the game's system.cfg";
+- [x] `:40-42`, `:589-592` — "Setup, once, in the game's system.cfg";
   `dev_deploy.ps1 -SetDevEnvironment` writes it. — Name the command.
-- [ ] `:134-144` — two orphaned blocks above `MAX_CHUNK_BYTES`: one
+- [x] `:134-144` — two orphaned blocks above `MAX_CHUNK_BYTES`: one
   describes `RELOAD_COMMANDS` and says "Both are listed" (only
   `lua_reload_script` is), the other describes `RIDE_SCRIPTS`. — Move each
   above its constant; drop "Both are listed".
-- [ ] `:159-163` `GAME_ROOT` — read from `KCD_ROOT`; `dev_deploy.ps1` and
+- [x] `:159-163` `GAME_ROOT` — read from `KCD_ROOT`; `dev_deploy.ps1` and
   `build_adb.py` use `KCD_PATH` and resolve Steam libraries. A machine with
   `KCD_PATH` set gets scratch files written into the wrong folder. — Use
   `KCD_PATH`, and share the resolution order.
-- [ ] `:517-518` — the echo filter names `log_SpamDelay`, which the setup
+- [x] `:517-518` — the echo filter names `log_SpamDelay`, which the setup
   never sends. — Drop it; derive the list from `setup_commands`.
-- [ ] `:777` — advises `dev_deploy.ps1 -NoBuild -Launch`; the tooling's
+- [x] `:777` — advises `dev_deploy.ps1 -NoBuild -Launch`; the tooling's
   relaunch is `flow.ps1 test -Launch`, and the advice fires when the game is
   running, where a full deploy hits the running-game ruling. — Name
   `flow.ps1 test -Launch`.
-- [ ] `:71`, `:123`, `:253`, `:281` — one blank line between top-level
+- [x] `:71`, `:123`, `:253`, `:281` — one blank line between top-level
   definitions; `:415-416` two inside the class. — PEP 8.
-- [ ] `:194` — `--` as a dash. — Rephrase.
+- [x] `:194` — `--` as a dash. — Rephrase.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `:5-15` — "Confirmed against the running game: `MemInfo` executed…",
+- [x] `:5-15` — "Confirmed against the running game: `MemInfo` executed…",
   "Two limits found the same way", and `sys_DevMode` "is inert: querying it
   answers Unknown command" (the `STYLE.md` rejected example). — State the
   two limits.
-- [ ] `:27` — "which is exactly what the first run produced". — Cut.
-- [ ] `:67-68` — "That cost one wrong conclusion already." — Cut.
-- [ ] `:98-100` — "read off a live session and confirmed". — Cut.
-- [ ] `:147-156` — "Found the same way as the two limits above". — Keep the
+- [x] `:27` — "which is exactly what the first run produced". — Cut.
+- [x] `:67-68` — "That cost one wrong conclusion already." — Cut.
+- [x] `:98-100` — "read off a live session and confirmed". — Cut.
+- [x] `:147-156` — "Found the same way as the two limits above". — Keep the
   measured edge (4200 accepted, 4250 dropped) as the derivation.
-- [ ] `:178-181` — "Without this a world change needed a restart, which is
+- [x] `:178-181` — "Without this a world change needed a restart, which is
   the opposite of what it exists for". — Cut.
-- [ ] `:204-207` — "is the reason mn_reload appeared to do nothing". —
+- [x] `:204-207` — "is the reason mn_reload appeared to do nothing". —
   "`mn_reload` needs it; it resets with the game."
-- [ ] `:226-228` — "Verified rather than assumed: … went from 0 to 182". —
+- [x] `:226-228` — "Verified rather than assumed: … went from 0 to 182". —
   Cut.
-- [ ] `:258-262` — "a run that relied on a previous session having set it
+- [x] `:258-262` — "a run that relied on a previous session having set it
   looked like the command had vanished". — Cut.
-- [ ] `:282-286` — "Why no log line ever came back on the first working
+- [x] `:282-286` — "Why no log line ever came back on the first working
   session." — "Turns on console output and reads it back."
-- [ ] `:329-331` — "that ambiguity has cost several rounds of guessing". —
+- [x] `:329-331` — "that ambiguity has cost several rounds of guessing". —
   Cut.
-- [ ] `:412-413` — "An earlier comment credited sys_DevMode". — Cut.
-- [ ] `:427-430` — "replying only to requests got a single autocomplete
+- [x] `:412-413` — "An earlier comment credited sys_DevMode". — Cut.
+- [x] `:427-430` — "replying only to requests got a single autocomplete
   entry and then silence … rules out the reply's content". — "The server
   alternates strictly: one reply per packet received."
-- [ ] `:471-473` — "That is 4545 entries here". — Cut the count.
-- [ ] `:762-764` — "a session was spent probing an unresponsive game". —
+- [x] `:471-473` — "That is 4545 entries here". — Cut the count.
+- [x] `:762-764` — "a session was spent probing an unresponsive game". —
   Cut.
-- [ ] `:773-776` — "which failed the deploy's reload step". — Keep "stderr
+- [x] `:773-776` — "which failed the deploy's reload step". — Keep "stderr
   output fails a PowerShell caller".
 
 ### tools/publish_nexus.ps1
