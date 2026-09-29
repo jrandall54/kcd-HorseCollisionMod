@@ -31,8 +31,8 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`. Next: `Armor.lua`.lua`. Read **Phase 2 plan** below in full
-before starting; it gives the procedure for every batch and how each is
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`. Next: `Armor.lua`. Read **Phase 2 plan**
+below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
 
