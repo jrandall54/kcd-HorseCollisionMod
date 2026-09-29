@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep.
-Next: a full deploy into a running game. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door).
+Next: the horse animation files are not in git. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -302,7 +302,7 @@ Items that change behavior or delete a feature. Not applied without a decision.
   **Ruled as proposed.** The only working copy's `Scripts/Startup/` is
   already empty.
 
-- [ ] **A full deploy into a running game.** `dev_deploy.ps1` warns and
+- [x] **A full deploy into a running game.** `dev_deploy.ps1` warns and
   continues when the game is running (`:935-940`), then deletes
   `Mods\HorseCollisionMod_dev` (`:971-973`), whose pak the engine holds
   open; under `$ErrorActionPreference = "Stop"` that aborts the deploy
@@ -310,6 +310,15 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `-AnimOnly` when the game is up (`flow.ps1:260-266`), so only a direct
   call reaches it. Proposal: with the game running, a full deploy syncs the
   loose files as `-Reload` does and says the pak was left alone.
+  **Ruled, revised:** `flow.ps1` is the only front door. `dev_deploy.ps1`
+  becomes an internal helper that only `flow` calls: its header says so,
+  and the direct-call pointers (`AGENTS.md`, `publish_nexus.ps1:392`,
+  `dev_console.py:777`, `DEV_LOOP.md`, `.claude/RELEASING.md`) name the
+  `flow` command instead. A full deploy with the game running refuses
+  before touching anything, since `flow` owns that case; the misleading
+  "refusal is kept" comment is corrected. Any `dev_deploy` switch `flow`
+  cannot reach (`-Reload` alone among them) becomes a `flow` option if
+  still needed, or is deleted.
 
 - [ ] **The horse animation files are not in git.** `hcm_horse_database.adb`,
   `kcd_horse_fragmentids.xml` and `kcd_horse_controllerdefs.xml` are hand
