@@ -22757,3 +22757,26 @@ and the lean died silently until the scripts were reloaded.
 Before `SendOffenseRelease` existed, a provoked victim entering the fight with
 `startInDefenseOnly` was observed holding a guard for twenty-two seconds until
 the player swung first.
+
+## Moved from `docs/BALANCE_AUDIT.md`
+
+The balance plan was deleted during the v6 audit once every stage had run.
+Rulings 2 and 3, the per-tier damage and the stamina share, are recorded above
+under 5.28.0 and 5.29.1. The other two were decided at the desk before stage 2
+and had no entry of their own.
+
+**Ruling 1, damage stays flat per tier.** A damage law continuous in speed was
+rejected for three reasons. The tier also picks the reaction, the bark set, hit
+strength, throw, stamina, retaliation, dust, dirt and blood, so a speed law
+would change one tier-keyed table while `GetSpeedTier` still ran the rest. The
+gallop band, `SpeedGallop` 8.5 to the then `MaxImpactSpeed` cap of 11.0, spans
+only 1.29x, which `ImpactDamageVariance`'s 15 percent roll already drowns. And
+the rear and the charge are scored at declared speeds rather than measured
+ones, so a speed law would have placed them by accident.
+
+**Ruling 4, `Knockback` and `Uplift` stay as a player's knob.** They date from
+version 1 and nothing depends on them. They were kept because raising them
+works: the gallop's brake keeps a fraction of the body's own velocity rather
+than cancelling it, about 0.94 for an unarmored villager and 0.35 for an
+armored guard, so a tenfold `Knockback` delivers roughly tenfold the push. At
+the shipped values they are a 0.73 m/s nudge against the engine's collision.
