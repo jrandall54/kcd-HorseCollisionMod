@@ -14,7 +14,7 @@ end of every pass, so it always says where the audit stands.
 
 **Current status:** every source file and every document except the diary
 audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
-`dev_console.py`, `publish_nexus.ps1` done.
+`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -26,8 +26,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first:
-`pre_release_check.py`, `flow.ps1`, `verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
+**Next pass:** `tools/`, largest first: `flow.ps1`, `verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
 
 **Pass order** (dependencies first, then largest):
@@ -2661,6 +2660,41 @@ comment that contradicts `build.ps1`, and release history in the comments.
 - [ ] `:724-731` — "A changelog posted for 4.2.2 … That was concluded twice
   from the page alone … both were wrong." — Keep "the public changelog page
   lags; its absence is not evidence the call failed".
+
+### tools/pre_release_check.py
+
+The checks are sound. One docstring contradicts its own function, three
+regular expressions carry literal tab characters, and release history sits in
+the docstrings.
+
+**Wrong or stale:**
+
+- [ ] `:487-488` `check_generated_docs` — "This regenerates into a temporary
+  directory and compares"; `:522-531` runs LDoc in place in `docs/api`,
+  because `ldoc -d <dir>` fails on this project. — Keep the second; cut the
+  first.
+- [ ] `:241`, `:250`, `:255` — literal tab characters inside the patterns
+  (`[ <TAB>]`, `"<TAB>-- ====="`, `"^<TAB>(\w+)"`), invisible in an editor;
+  the shape an escaping tool leaves when it writes `\t`. — Write `\t`.
+- [ ] `:16` — `import tempfile`, unused. — Delete.
+- [ ] `:88-91` — exempts `2.0.0`, `1.9.7`, `1.1.0`, `3.0.3` as "Semantic
+  Versioning itself, and the game's own version" without saying which is
+  which. — One named constant per exemption.
+- [ ] `:26` — "Each of these has been wrong in this repository." — Cut.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:195-197` — "The Files tab entry has always been checked; the
+  changelog never was … 4.2.2 published with an empty one". — Keep "the
+  field is optional on the upload, so nothing else asks for it".
+- [ ] `:238-240` — "Matching from column zero collected every heading …
+  twenty-nine keys". — Cut.
+- [ ] `:361-363` — "That happened: the manifest named 1.9.7 exactly, the
+  game shipped 1.9.8". — Cut; `:356-359` states the constraint.
+- [ ] `:490-501` — "Commit times were the previous approach …". — Cut.
+- [ ] `:514-516` — "raised OSError on the machine that has it installed and
+  the check quietly passed. A check that never fires is worse than the one
+  it replaced." — Keep "subprocess does not apply `PATHEXT` to a bare name".
 
 ### Dead code (`tools/audit_code.py`)
 
