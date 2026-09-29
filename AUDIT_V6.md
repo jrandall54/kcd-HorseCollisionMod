@@ -10,16 +10,11 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 1, recording findings. No source file has been edited.
+**Phase:** 1 complete. No source file has been edited.
 
-**Current status:** every source file and every document except the diary
-audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
-`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
-`verify_additive.py`, `version_check.py`, `set_version.py`,
-`audit_code.py`, `testworld.py`, `dev_subject.lua`,
-`nexus_settings_block.py`, the bark scripts, the probes, the
-`dev_` helpers, `restore_alive.lua`, `testworlds.ini` done. `tools/legacy/`
-recorded as a ruling. `tools/` is complete.
+**Current status:** every source file, every document except the diary, and
+all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
+`.claude/` hooks, linter and notes) audited. `.claude/` was the last pass.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -31,8 +26,9 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** the `.claude/` hooks and linter (untracked), which closes
-phase 1.
+**Next step:** the rulings, decided together one at a time
+in the order listed under **Rulings needed**. Phase 2 then applies the
+findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
 
@@ -59,7 +55,7 @@ phase 1.
 - [x] `Detection.lua`
 - [x] `Enums.lua`
 - [x] Documentation: `README`, `docs/*.md` except the diary
-- [ ] Tooling: `build.ps1`, `tools/`, `.claude/` hooks and linter
+- [x] Tooling: `build.ps1`, `tools/`, `.claude/` hooks and linter
 
 **Carried forward:** findings in one file that point into a file not yet
 audited are listed here, so its pass picks them up. None open.
@@ -3029,6 +3025,76 @@ they are kept unmaintained. Not audited line by line; see the ruling.
 - [ ] Nine files say "the rider" and several open with the investigation's
   account ("The question this answers is the rider's", "Everything so far
   inferred this…"). — Falls under the ruling.
+
+### .claude/ (local, untracked)
+
+Hooks, linter and workflow notes. None of it reaches the remote, and none of
+it is checked by anything: `.git/info/exclude` excludes `/.claude/`, so
+`git ls-files --others --exclude-standard` never lists these files for
+`lint_docs.py` or `build.ps1`'s control-character check.
+
+**Wrong or stale:**
+
+- [ ] `RELEASING.md:76` — `releases\file-description` holds a form feed
+  (0x0C) where `\f` was; `:116-117` — `HorseCollisionMod\nexus.cred` holds a
+  line break where `\n` was. The same escaping defect as
+  `publish_nexus.ps1:516`. — Restore both backslashes.
+- [ ] `lint_docs.py`, `build.ps1:259` — both enumerate files through git, so
+  `.claude/` is never checked. — Have the linter and the control-character
+  check also walk `.claude/`.
+- [ ] `hooks/diary-check.sh:5`, `:86`; `hooks/pre-commit:21`;
+  `hooks/pre-push:8` — cite `.agent_instructions.md`, which no longer
+  exists; `AGENTS.md` is the instructions file. — Name `AGENTS.md`, or drop
+  the citation.
+- [ ] `hooks/diary-check.sh:35-36` — watches `src/HorseCollisionMod.lua`
+  and four tools; the twenty part files, the settings file and `flow.ps1`
+  are not watched, so almost every mod change never raises the reminder. —
+  Watch `src/` and `tools/` as `flow.ps1 land` does (`:338`).
+- [ ] `hooks/pre-push:15-31`, `HOOKS.md:72-75` — "Four levels" over three,
+  and a "Releases" level that adds the mod page on a release version; the
+  hook runs `pre_release_check.py --merge` only (`:145-150`), and `release`
+  (`:94-100`) is computed and never read. `:22` "not older than the source";
+  the check regenerates and compares. — Describe what runs; delete
+  `release`.
+- [ ] `hooks/pre-merge-commit` — a copy of `pre-commit` without the main
+  check, printing "pre-commit:". — `exec` `pre-commit`, which already exempts
+  a merge through `MERGE_HEAD`.
+- [ ] `hooks/pre-commit:56-60` — parses Lua with `luac` or `luac5.1` only;
+  `build.ps1` uses `luajit`. On a machine with only LuaJIT the parse check
+  silently does nothing. — Fall back to `luajit -bl`, as
+  `dev_console.py:350` does. `:37-38` `python` is set and unused.
+- [ ] `RELEASING.md:8-19` — step 1 bumps the version by hand;
+  `set_version.py` and `flow.ps1 land` do it. `:40-42` "Thirty-one checks",
+  "the two intended declaration files" (three). `:56-63`, `:103-111` —
+  shipping test via `-SetPlayEnvironment` and back via
+  `-SetDevEnvironment`; the tooling is `flow.ps1 shipping` and
+  `flow.ps1 test`, which also park and restore the loose files. — Rewrite
+  against `flow.ps1`, and add `verify_additive.py` per its ruling.
+- [ ] `RESEARCH_BRIEF.md:3-4`, `:16-21` — "Written after a previous run of
+  it lost almost everything"; `:40` points at the flat
+  `references/WHGame_Decompiled.c`, where `AGENTS.md` sends engine
+  questions to `references/decomp/RESEARCH_GUIDE.md`. — Point at the guide;
+  cut the history.
+
+**History to cut** (the existing finding at the top of this section
+covers the hooks' tone; these are the specific lines):
+
+- [ ] `hooks/diary-check.sh:5-8`, `:26-30`; `hooks/pre-commit:10-11`,
+  `:20-23`; `hooks/pre-merge-commit:10-11`; `hooks/pre-push:6-9`, `:76-83`,
+  `:119-122`, `:146` ("now"); `hooks/style-check.sh:4-5`; `HOOKS.md:56-57`,
+  `:79-83`; `lint_docs.py:30-31`.
+- [ ] British spelling: `hooks/pre-commit:78` "recognised";
+  `hooks/pre-push:24-26` "Behaviour", "behaviour"; `hooks/commit-msg:9`
+  "acknowledgement".
+
+**Linter rules to add** (extends the `lint_docs.py` finding above):
+
+- [ ] ` -- ` used as a dash inside a comment or paragraph.
+- [ ] An escape-corrupted path: a control character, or a line ending in a
+  known directory name (`releases`, `tools`, `src`) whose next line starts a
+  path fragment.
+- [ ] `the rider`, `no longer`, `used to <verb>`, `now` in the timeless
+  sense, and quoted speech (`> "` or `"…" the rider`).
 
 ### Dead code (`tools/audit_code.py`)
 
