@@ -14,7 +14,8 @@ end of every pass, so it always says where the audit stands.
 
 **Current status:** every source file and every document except the diary
 audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
-`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1` done.
+`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
+`verify_additive.py` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -26,7 +27,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `verify_additive.py`, `version_check.py`,
+**Next pass:** `tools/`, largest first: `version_check.py`,
 `audit_code.py`, `testworld.py`, `dev_subject.lua`, `set_version.py`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
 
@@ -60,8 +61,6 @@ hooks and linter. The carried-forward items belong to it.
 **Carried forward:** findings in one file that point into a file not yet
 audited are listed here, so its pass picks them up.
 
-- `tools/verify_additive.py:10` docstring — "the two small declaration
-  files"; `intended_vanilla` holds three. (From `HOW_IT_WORKS.md`.)
 - `tools/set_version.py:3-5` docstring — "fourteen places", "eleven part
   files"; it lists the directory, which holds twenty. (From `DEV_LOOP.md`.)
 
@@ -308,6 +307,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   LDoc output, and `docs/api` holds no version string. The retry also
   masks any other first-build failure. Proposal: delete the retry; if a
   real second-build cause exists, name it in the comment instead.
+
+- [ ] **`verify_additive.py` runs only by hand.** Its docstring says "Run
+  it before publishing"; nothing calls it. `build.ps1`, `flow.ps1 land` and
+  `publish_nexus.ps1` all skip it, and `.claude/RELEASING.md` lists it as a
+  manual step. It needs the game install, so it cannot gate a clone's
+  build. Proposal: `publish_nexus.ps1` runs it against the zip it is about
+  to upload, unless `-Force`.
 
 ## Findings
 
@@ -2748,6 +2754,42 @@ comments.
   test values." — Cut.
 - [ ] `:480-481` — "The rider had to ask for this three times before it was
   automated". — Cut.
+
+### tools/verify_additive.py
+
+The checks are right; the wording around claim 1 predates the horse files,
+and the section comments number the claims differently from the docstring.
+
+**Wrong or stale:**
+
+- [ ] `:9-10` — "the two small declaration files"; `intended_vanilla`
+  (`:111-115`) holds three. (Carried forward from `HOW_IT_WORKS.md`.) —
+  "the three declaration files".
+- [ ] `:97` heading — "The release overrides no vanilla file"; it claims
+  three by design. `README.md:305` repeats it ("proves the release
+  overrides no vanilla file"). — "The release claims only the intended
+  vanilla names", in both.
+- [ ] `:96`, `:188`, `:277`, `:294`, `:302` — section comments number tags
+  6, pak hygiene 7 and the redirect 8; the docstring numbers pak hygiene 6
+  and the redirect 7, and `TECHNICAL_DETAILS.md` cites "claim 7" for the
+  redirect. Tags are not a docstring claim. — Number by the docstring; fold
+  the tag check into claim 3.
+- [ ] `:309` — `Scripts.pak` is a hardcoded path, not
+  `build_adb.GAME_ROOT`. When it is absent, `exposed` is empty and the
+  redirect check passes on zero classes. — Use `GAME_ROOT`; fail when the
+  pak is missing.
+- [ ] `:276-277` — no blank line before the next section comment. — Add one.
+
+**History to cut** (keep the constraint each one supports):
+
+- [ ] `:68-72` — "This script used to read `Animations-part1.pak` directly,
+  and so verified the mod against the game as it was in February 2018". —
+  "Resolved through the patches, as the game serves it."
+- [ ] `:106-110` — "`wh_female_fragmentids.xml` was on this list and failed
+  both tests … deleted 103 fragment ids". — Keep the two tests.
+- [ ] `:214-218` — "The table it reads was called STAGGERS … this check
+  went unrun for long enough that the rename was not noticed." — Keep the
+  first sentence.
 
 ### Dead code (`tools/audit_code.py`)
 
