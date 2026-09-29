@@ -13,8 +13,8 @@ end of every pass, so it always says where the audit stands.
 **Phase:** 1, recording findings. No source file has been edited.
 
 **Current status:** every source file audited; README.md,
-`docs/HOW_IT_WORKS.md`, `docs/DEV_LOOP.md` and `docs/ARCHITECTURE_NOTES.md`
-audited.
+`docs/HOW_IT_WORKS.md`, `docs/DEV_LOOP.md`, `docs/ARCHITECTURE_NOTES.md` and
+`docs/BALANCE_AUDIT.md` audited.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -26,8 +26,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `docs/BALANCE_AUDIT.md`, then `ENGINE_BINDS.md`, `TECHNICAL_DETAILS.md`, one file per
-pass.
+**Next pass:** `docs/ENGINE_BINDS.md`, then `docs/TECHNICAL_DETAILS.md`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -249,6 +248,14 @@ Items that change behavior or delete a feature. Not applied without a decision.
   pre-push hook whose script lives in the ignored `.claude/hooks/`, so a clone
   can never follow it. Proposal: cut the section; the hooks are local
   workflow and `STYLE.md` keeps those off the remote.
+
+- [ ] **The balance plan.** `docs/BALANCE_AUDIT.md` is a tracked session
+  plan whose stages have run. Its figures and derivations already live in the
+  settings file and `Tiers.lua`, as its own last rule requires; what remains
+  is superseded tables and the account of the rulings. `HANDOFF.md:134-141`
+  and `tools/probe_gait_speed.lua:3` cite it. Proposal: move the account of
+  the four rulings to the diary, confirm each derivation is in the code, and
+  delete the file.
 
 - [ ] **README repository layout.** A player-facing README carries 120 lines
   of developer tooling. Proposal: keep the top-level layout in the README and
@@ -2142,6 +2149,35 @@ to the same standard because it is not the diary.
 - [ ] `:278-284` `ImpulseDelayMs` — "an impulse and a set velocity produce the
   same distribution across three rides". — Cut the measurement; keep "the
   engine's collision does the throwing".
+
+### docs/BALANCE_AUDIT.md
+
+Tracked. `lint_docs.py`: 0 errors; nine warnings and eight repeated
+sequences. A plan "written before any value is touched" whose stages have
+since run; most of it now describes superseded state. See the balance-plan
+ruling. If it is kept, these stand:
+
+- [ ] `:7-8`, `:14`, `:53-104`, `:112-148`, `:275-280` — "read out of `src/`
+  at 5.26.0", "252 `Config` keys", and the defect tables, each marked
+  "Fixed in Stage 0". — Record as done or cut.
+- [ ] `:23-28` — system table names `StaminaDrainByTier`,
+  `CombatStaminaMultiplier`, `RagdollSpeedCap*`, `RagdollAirDamping*`,
+  `RagdollBrakeKeep*`; none exists in `src/`. — Current names.
+- [ ] `:159-211` — damage figures 60, 95, 110 and the stamina and blood rows
+  predate Rulings 2 and 3 (shipped 75, 111, 118; shares 0.13, 0.20; trot
+  blood 0.07). — Current figures or cut.
+- [ ] `:34`, `:248`, `:315`, `:359-364`, `:373`, `:408-411`, `:429` — "the
+  rider", quoted rulings. — Cut the quotes; state the ruling.
+- [ ] `:377-385`, `:494-500` — derivations told as discovery ("The first
+  version of this derivation", "stage 2 step 2 proved it in the log"). —
+  State the condition; move the account to the diary.
+- [ ] `:439` Rear share 0.10; shipped 0.20. `:460` `RearCooldownMs` 2500;
+  shipped 7500, with a separate `ChargeCooldownMs` 12500, which `:461-463`
+  still proposes. — Correct.
+- [ ] `:505-507` Stage 2 step 4 — "the charge's throw distance, reported as
+  too far"; the charge has its own throw (`RearChargeThrow`). — Update or cut.
+- [ ] `:515-519` Stage 3 — "Give `Fear.lua` the tier-table shape"; `:225-232`
+  resolved against it. `ROADMAP.md` item 2 is already corrected. — Cut.
 
 ### Dead code (`tools/audit_code.py`)
 
