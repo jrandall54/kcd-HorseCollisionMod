@@ -118,9 +118,9 @@ end
 -- The sphere reaches `HitRadius`, 2.5 m. The footprint's far corner is
 -- `HorseFrontReach` plus `MaxSweepExtra` ahead and `HorseHalfWidth` across,
 -- about 1.57 m out, so anyone the query did not return is at least 0.93 m
--- from being hit. `SphereCacheTravel` spends 0.8 m of that, leaving 0.13 m
--- for the victim's own movement, less than a walking victim covers in
--- `SphereCacheMaxAgeMs`; such a victim can be picked up one refresh late.
+-- from being hit. `SphereCacheTravel` spends 0.7 m of that, leaving 0.23 m
+-- for the victim's own movement, more than the 0.22 m a walking victim
+-- covers in `SphereCacheMaxAgeMs`.
 -- The margin is horizontal: the sphere does not contain the whole
 -- `HorseMaxVerticalDiff` allowance. Keying the refresh on distance traveled
 -- rather than on elapsed ticks keeps the margin independent of the horse's

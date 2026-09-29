@@ -354,13 +354,13 @@ one entity inside a one meter sphere and 0.43 ms for eight inside the shipped
 resolution of the clock. At thirty ticks a second that single call is the only
 part of this mod with a budget worth managing.
 
-It does not have to run every tick. The sphere reaches `HitRadius` and the
-footprint can never reach past `HorseFrontReach` plus `MaxSweepExtra`, so
-anyone the query did not return is at least the difference between those, 1.1
-meters, from being hit. `EntitiesNearHorse` reuses the last result until the
-horse has traveled `SphereCacheTravel`, 0.8 of that margin, or the result has
-aged past `SphereCacheMaxAgeMs`. The remaining 0.3 meters covers a victim
-walking toward a horse that is barely moving.
+It does not have to run every tick. The sphere reaches `HitRadius`, 2.5 m,
+and the footprint's far corner is about 1.57 m out (`HorseFrontReach` plus
+`MaxSweepExtra` ahead, `HorseHalfWidth` across), so anyone the query did not
+return is at least 0.93 m from being hit. `EntitiesNearHorse` reuses the last
+result until the horse has traveled `SphereCacheTravel`, 0.7 m of that margin,
+or the result has aged past `SphereCacheMaxAgeMs`. The remaining 0.23 m covers
+a victim walking toward a horse that is barely moving.
 
 Keying the refresh on distance traveled rather than on a tick count is what
 makes the guarantee independent of speed: a gallop re-queries every second or

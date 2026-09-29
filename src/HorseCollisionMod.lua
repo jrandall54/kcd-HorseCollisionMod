@@ -1223,16 +1223,15 @@ HorseCollisionMod.SphereCache = { pos = nil, ents = nil, at = 0 }
 
 --- How much of that margin the horse may use before the broad phase is redone.
 --
--- The remaining 0.13 meters of the 0.93 is what covers the victim walking
+-- The remaining 0.23 meters of the 0.93 is what covers the victim walking
 -- toward the horse while the cache stands; see `EntitiesNearHorse`.
-HorseCollisionMod.SphereCacheTravel = 0.8
+HorseCollisionMod.SphereCacheTravel = 0.7
 
 --- The longest a broad phase result is trusted, in milliseconds.
 --
 -- A horse barely moving still lets people walk up to it. At a walking pace of
--- 1.5 meters a second a victim covers 0.22 meters in this time, more than the
--- allowance above at the footprint's corner, so such a victim can be picked
--- up one refresh late.
+-- 1.5 meters a second a victim covers 0.22 meters in this time, inside the
+-- allowance above at the footprint's corner.
 HorseCollisionMod.SphereCacheMaxAgeMs = 150
 
 --- Last time each entity was reported as a miss, keyed by entity id.

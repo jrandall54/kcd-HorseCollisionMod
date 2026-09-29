@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 4 done except batch 3, item 8.
+**Phase:** 2 in progress. Batches 0 to 4 done.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,8 +30,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 3, item 8 (`SphereCacheTravel` 0.8 to 0.7),
-then batch 5. Read **Phase 2 plan** below in full before starting; it gives
+**Next step:** phase 2, batch 5, tooling. Read **Phase 2 plan** below in full before starting; it gives
 the procedure for every batch and how each is verified.
 
 **Pass order** (dependencies first, then largest):
@@ -549,6 +548,12 @@ One line per batch: batch, commit, what was verified.
   Lua error from the reload on, loop running, and `PlayerHorse`,
   `PlayerWuid`, `RiderVoiceReady` and `Maneuvers` answer live. No
   player-visible change, so no changelog entry.
+- **Batch 3, item 8.** `SphereCacheTravel` 0.7, leaving 0.23 m against the
+  0.22 m a walking victim covers in `SphereCacheMaxAgeMs`. The entry point,
+  `Detection.lua` and `TECHNICAL_DETAILS.md` state the new margin; the last
+  still gave the old 1.1 m and 0.3 m figures. L0: build passes, no new lint
+  warnings. L2: reloaded into the running game, the value reads 0.7 live, no
+  Lua error. **Batch 3 complete.**
 
 ## Standard
 
