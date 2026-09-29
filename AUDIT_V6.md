@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe.
-Next: the dead Henry set path. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path.
+Next: the empty impact pool. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -139,13 +139,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `pullTarget == "horse"` branch), the per-poll angle tracking
   (`:1203-1242`), and the matching fields of the `PullDown … done` line.
 
-- [ ] **The dead Henry set path.** `RiderBarkSets` is empty, so
-  `BarkDeath`'s `Bark(player, "Killed", true)` (`Bark.lua:1049`) always
-  returns false and, with telemetry on, logs "no rider set wired" on every
-  death. The `RiderBarks` setting gates only that call; the kill line is
-  gated by `RiderBarkKill`. Proposal: delete `BarkDeath` and its call
-  (`Health.lua:837`), `RiderBarkSets`, `RiderBarks`, and `Bark`'s `rider`
-  parameter. Resolves the settings file's `RiderBark`/`RiderBarks` finding.
+- [x] **The dead Henry set path.** Ruled as proposed: delete `BarkDeath`
+  and its call (`Health.lua:837`), `RiderBarkSets`, `RiderBarks` (entry
+  point and settings file), and `Bark`'s `rider` parameter; the calls at
+  `Bark.lua:1009`, `Fear.lua:106` and `Recovery.lua:1178` drop the `false`
+  they pass in that slot. The kill line (`RiderBarkKill`,
+  `RiderBarkKillAliases`) is unaffected. Resolves the settings file's
+  `RiderBark`/`RiderBarks` finding.
 
 - [ ] **The empty impact pool.** `RiderBarkAliases` is empty and `RiderBark`
   ships false, so `BarkRiderImpact` never sends. Its doc (`Bark.lua:211-297`)
