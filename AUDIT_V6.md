@@ -29,7 +29,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue. Next: `RearAnimSpeed` and the standing rear. Phase 2 then applies the
+rescue, `RearAnimSpeed`. Next: the cooldown icon after a save load. Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
@@ -108,11 +108,10 @@ Items that change behavior or delete a feature. Not applied without a decision.
   never reached the state it repairs, and `:876` states the mod leaves
   `SetAnimationDrivenMotion` to the engine.
 
-- [ ] **`RearAnimSpeed` and the standing rear.** `RearAnimMs` divides the
-  rear's length by `RearAnimSpeed`, but the standing rear plays through
-  `StartAnimation`, which is not given the speed; only the charge is. Harmless
-  at the shipped 1.0. Proposal: document `RearAnimSpeed` as the charge's
-  speed and stop dividing the standing rear's length by it.
+- [x] **`RearAnimSpeed` and the standing rear.** Ruled as proposed: document
+  `RearAnimSpeed` as the charge's playback speed (entry point `:235`,
+  settings file `:1108`), and `RearAnimMs` (`Rear.lua:420`), used only for
+  the standing rear, stops dividing by it.
 
 - [ ] **The cooldown icon after a save load.** A load winds the clock back
   with the deadline in place. `RearRequested` treats a gap larger than the
