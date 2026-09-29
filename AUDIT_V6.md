@@ -29,8 +29,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`, `land`'s build retry, `verify_additive.py`, the closed-question probes, `tools/legacy/`.
-Next: two test-subject tools. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`, `VictimFlatFraction`, `WhenBodyStops`, the investigation diagnostics, the impact-throw probe, unused sound tokens, the lean throttle, `ProtectMutt`, the tutorial text, the README settings table, DEV_LOOP's hook section, the balance plan, the README layout, the armor-table sweep, the full deploy (flow as the only front door)., the horse animation files, the get-up options, the interactive `:reload`, `land`'s build retry, `verify_additive.py`, the closed-question probes, `tools/legacy/`, the test-subject tools.
+Every ruling is decided. Next: phase 2, starting with moving the horse
+animation files into `src/`. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -395,10 +396,12 @@ Items that change behavior or delete a feature. Not applied without a decision.
   keeps "fire it in game and hear it before adding" without naming
   `make_audition.py`, which git restores if a line is ever added.
 
-- [ ] **Two test-subject tools.** `dev_target.lua` moves an existing NPC
+- [x] **Two test-subject tools.** `dev_target.lua` moves an existing NPC
   and pins it with `AI.SetIgnorant`; `dev_subject.lua` spawns a guard soul
   and says moving an existing NPC does not work. Each header contradicts
   the other. Proposal: keep `dev_subject.lua`, delete `dev_target.lua`.
+  **Ruled: delete both**, with their README rows; neither is used.
+
 
 ## Findings
 
