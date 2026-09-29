@@ -26,12 +26,6 @@ USER_FACING = ("src/",)
 
 BREAKING = "**BREAKING**"
 
-# Kept as a way to say on the record that a removal breaks nothing, for a
-# reader of the changelog rather than for the check. Dropping a setting no
-# longer forces a major on its own, so this marker no longer excuses anything;
-# it is documentation.
-NOT_BREAKING = "**NOT BREAKING**"
-
 
 def git(*args):
     return subprocess.run(["git"] + list(args), cwd=REPO_ROOT,
@@ -115,17 +109,15 @@ def dropped_settings(last_tag):
 def implied_bump(body, dropped=None):
     """Which part of the version the entries in one block call for.
 
-    An entry marked BREAKING is a major. A new capability is a minor. Anything
-    else is a patch.
+    An entry marked BREAKING is a major. A dropped setting or a new capability
+    is a minor. Anything else is a patch.
 
     Dropping a setting is **not** a major on its own. A key disappearing from
     the settings file does not break an installed mod: an unknown key is
     ignored and the default takes over, so the cost to a player is a line in
-    their file that no longer does anything. Judging that as severe as a change
-    that forces everyone to redo their configuration overstates it, and made
-    ordinary cleanup expensive. `dropped` is still reported, so a removal is
-    visible in the check's output and can be called BREAKING deliberately when
-    it really does break something.
+    their file that no longer does anything. `dropped` is still reported, so a
+    removal is visible in the check's output and can be called BREAKING
+    deliberately when it really does break something.
     """
     parts = sections(body)
 
@@ -200,11 +192,7 @@ def documented_since(blocks, last_version):
             described.append((name, body))
             continue
 
-        # A prerelease suffix has to be accepted here. Under this project's
-        # workflow a version is assigned when a branch merges, so the entries
-        # move out of Unreleased and under a heading like `4.0.0-dev.1` long
-        # before anything is published. Matching only a bare `x.y.z` reported
-        # a correctly described release as undescribed.
+        # A prerelease heading counts as the release it precedes.
         m = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$", name)
 
         if m and tuple(int(g) for g in m.groups()) > last_version:
@@ -217,7 +205,13 @@ def main():
     release = None
 
     if "--release" in sys.argv:
-        release = sys.argv[sys.argv.index("--release") + 1]
+        index = sys.argv.index("--release") + 1
+
+        if index >= len(sys.argv):
+            print("[VERSION] --release needs a version, such as --release 5.32.0")
+            return 2
+
+        release = sys.argv[index]
 
     if not os.path.exists(CHANGELOG):
         print("[VERSION] CHANGELOG.md is missing")
@@ -230,14 +224,8 @@ def main():
 
     if release:
         # The version being built is compared against the newest tag *older
-        # than it*, not against the newest tag outright.
-        #
-        # Those are the same thing while a version is being prepared, and
-        # different the moment it is tagged. Comparing against the newest tag
-        # made a build of the version that had just been tagged fail against
-        # itself: 4.6.0 tagged, expected 4.7.0, "version and changelog
-        # disagree". Every deploy after a merge hit that until the next bump,
-        # and the workaround was to skip the build entirely.
+        # than it*, not against the newest tag outright, so a build of the
+        # version just tagged is not measured against itself.
         #
         # Rebuilding a tagged version is an ordinary thing to do. It is what
         # installing the current build into the game does.

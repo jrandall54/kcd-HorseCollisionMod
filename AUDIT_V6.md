@@ -3663,20 +3663,20 @@ and the section comments number the claims differently from the docstring.
 
 ### tools/version_check.py
 
-- [ ] `:29-33` `NOT_BREAKING` — nothing reads it; the comment says so
+- [x] `:29-33` `NOT_BREAKING` — nothing reads it; the comment says so
   ("no longer excuses anything; it is documentation"). — Delete the
   constant; the changelog marker needs no code.
-- [ ] `:115-119` `implied_bump` docstring — lists major, minor, patch and
+- [x] `:115-119` `implied_bump` docstring — lists major, minor, patch and
   omits the rule at `:135-139` that a dropped setting is a minor. — Add it.
-- [ ] `:121-128` — "and made ordinary cleanup expensive". — Cut.
-- [ ] `:203-207` — prerelease headings "under this project's workflow"
+- [x] `:121-128` — "and made ordinary cleanup expensive". — Cut.
+- [x] `:203-207` — prerelease headings "under this project's workflow"
   (`4.0.0-dev.1`); `set_version.py` writes plain versions and the changelog
   holds no prerelease heading. "Matching only a bare x.y.z reported…" is
   history. — "A prerelease heading counts as the release it precedes."
-- [ ] `:235-243` — "Comparing against the newest tag made a build of the
+- [x] `:235-243` — "Comparing against the newest tag made a build of the
   version that had just been tagged fail against itself: 4.6.0 tagged …". —
   Keep `:232-233` and `:242-243`.
-- [ ] `:220` — `--release` with no value raises `IndexError`. — Report it.
+- [x] `:220` — `--release` with no value raises `IndexError`. — Report it.
 
 ### tools/set_version.py
 
