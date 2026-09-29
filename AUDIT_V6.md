@@ -28,7 +28,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
-DynamicRecovery. Next: the charge's bark set. Phase 2 then applies the
+DynamicRecovery, the charge's bark set, the charge's impact cry. Next: the
+one-time physics-proxy rescue. Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
@@ -97,14 +98,10 @@ Items that change behavior or delete a feature. Not applied without a decision.
   publish test runs call for it. The comment keeps "1.0 throws like a gallop"
   as the scale, with no claim about which tier throws further.
 
-- [ ] **The charge's bark set.** `Tiers.lua:422` says `VictimBarkByTier.Charge`
-  is `"rear"`; the settings file (`:381`, changed later in `cbe54cb`) ships
-  `"collision"`, and because it carries the whole table, `"collision"` is what
-  runs. The same risk applies to every tier table: the settings file ships a
-  full literal copy of all nine, so `Tiers.lua` is unreachable unless a player
-  deletes one. Proposal: make `Tiers.lua` match what ships (`"collision"`),
-  and have `build.ps1` refuse a settings tier table that differs from
-  `Tiers.lua`.
+- [x] **The charge's bark set.** Ruled as proposed: `Tiers.lua:422` becomes
+  `Charge = "collision"`, matching the settings file (`:381`), and
+  `build.ps1` refuses a settings tier table that differs from `Tiers.lua`.
+  Decided together with the charge's impact cry below.
 
 - [ ] **The one-time physics-proxy rescue.** `Rear.lua:856-865` calls
   `SetAnimationDrivenMotion(0, 1)` on the horse once per session, to repair
@@ -153,12 +150,9 @@ Items that change behavior or delete a feature. Not applied without a decision.
   reduce the doc to what an entry must satisfy (the four filters) and move the
   survey and audition history to the diary if absent there.
 
-- [ ] **The charge's impact cry is silent.** `VictimBarkByTier.Charge` ships
-  `"collision"`, so the charge reaches `BarkForTier`, and `PainByTier.Charge`
-  is `HurtHard` (`ZASAH_ZBRANI_SILNY`), which the comment directly above
-  (`Bark.lua:596-609`) says is a combat-shout set that a bark request cannot
-  reach. Proposal: `HurtDown`, as trot and gallop use; decide together with
-  the charge's bark set ruling.
+- [x] **The charge's impact cry is silent.** Ruled: `PainByTier.Charge`
+  (`Bark.lua:613`) becomes `HurtDown`, as trot and gallop use; `HurtHard`
+  (`ZASAH_ZBRANI_SILNY`) is a combat-shout set a bark request cannot reach.
 
 - [ ] **`HushVanillaBark` clears its own refresh.** Each call arms a timer
   that clears the option after `BarkSuppressMs`, and a refresh comes at half
