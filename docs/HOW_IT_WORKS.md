@@ -7,65 +7,49 @@ level needed to change it.
 ## What the mod does
 
 Vanilla horse collisions produce a shout and nothing else. This mod reads the
-horse's speed at the moment of contact and picks a reaction to match:
-
-| Speed | Reaction |
-| --- | --- |
-| Walking | The NPC staggers, stays upright, takes no damage |
-| Trot | The NPC is knocked down, and hurt |
-| Gallop | The NPC is knocked down harder, and hurt badly |
+horse's speed at the moment of contact and picks a reaction to match: a stagger
+at a walk, an animated knockdown at a trot, and a physics throw at a gallop.
+Two commanded moves, the rear and the charge, are tiers of their own. The
+README's table gives all five.
 
 The horse pays for it in stamina, more so during combat and more against an
 armored target, and an exhausted horse throws its rider.
 
 Armor is felt in the collision as well as in the stamina. A man in mail is
-harder for a horse to move than a villager in cloth, and lands about half as
-far away. A peasant is thrown clear; a guard mostly goes down where he stood.
+harder for a horse to move than a villager in cloth. A peasant is thrown clear;
+a guard mostly goes down where he stood.
 
-Being ridden down hurts, and enough of it kills. That damage is the game's own
-rather than the mod's: knocking someone down makes them a physical object, and
-the game charges for a horse striking one at speed. A bump costs nothing and a
-full gallop costs a great deal. Because the game attributes a rider's collision
-to the rider, it is a crime like any other, and guards respond to it.
+Being ridden down hurts, and enough of it kills. The mod applies that damage
+itself, from the tier and the victim's armor. A bump costs nothing and a full
+gallop usually kills an unarmored man. With `CollisionIsCrime` on, which is the
+default, a collision that wounds is a crime, and guards respond to it.
 
-Which is only true if the mod is the one that kills them. The game applies
-trample damage of its own for a collision, and guards blame whoever lands the
-killing blow, so a victim the trample happened to finish was charged to the
-player as murder whatever `CollisionIsCrime` was set to. The same collision was
-ignored on one villager and an instant hanging offence on the next.
+That only holds if the mod is the one that kills. The game applies trample
+damage of its own for a collision, and guards blame whoever lands the killing
+blow, so a victim the trample finished would be charged to the player as murder
+whatever `CollisionIsCrime` was set to.
 
-So the mod stops the trample from being able to kill at all. Anyone the horse
-strikes is made briefly immortal at the moment of contact, and the immortality
-is lifted the instant the mod applies its own damage. The trample still hurts,
-and hurts exactly as much as before, but it can no longer take the last point
-of health from anybody. Across roughly two hundred test impacts the mod landed
-every kill and none was attributed to the player.
+So the trample cannot kill at all. Anyone the horse strikes is made briefly
+immortal at the moment of contact, and the mod hands back whatever the engine
+charged for the collision. The immortality lasts until the victim's body has
+stopped moving, and the mod charges them at that same moment. The game bills a
+thrown body for as long as it is moving, so waiting for the body to come to rest
+is what makes the protection cover the whole collision and the mod's own blow
+land last.
 
-The immortality lasts until the victim's body has stopped moving, and the mod
-charges them at that same moment. The game bills a thrown body for as long as
-it is moving, which at a gallop is a little over a second, so waiting for the
-body to come to rest is what makes the protection cover the whole collision and
-the mod's own blow land last.
-
-The mod waits a moment before charging a victim, so the trample resolves first
-and the two are not competing. It no longer tries to work out in advance
-whether an impact will be fatal, or kill a victim early to keep the death its
-own: there is nothing to race any more, so the damage is simply what the speed
-and the armor say it is.
-
-The same reasoning covers the mod's own damage roll. Impacts vary a little so
-that two identical collisions are not identical, but a roll that turns a fatal
-blow non-fatal hands the kill back to the game. When the intended damage would
-have killed, the roll is overruled.
+Impacts vary a little, so that two identical collisions are not identical. The
+outcome is left to that arithmetic: a villager dies at a gallop because the
+damage usually exceeds their health, and a knight survives because it usually
+does not come close.
 
 Characters the game will not let you attack are charged nothing at all. The mod
 damages a victim by writing to their health, which is not the path vanilla
 refuses when it declines to let the player swing at Captain Bernard, and which
-ignores the game's own immortality flag, so such a character could be worn down
-and killed. They are recognized by the protection flags the game marks them
-with rather than by name, so a character protected only for the span of one
-quest is covered too. They are still knocked down, since that is the collision
-itself, and whatever the game charges them for it is given straight back.
+ignores the game's own immortality flag. They are recognized by the protection
+flags the game marks them with rather than by name, so a character protected
+only for the span of one quest is covered too. They are still knocked down,
+since that is the collision itself, and whatever the game charges them for it
+is given straight back.
 
 A badly hurt NPC left in the street would otherwise be taken over by the game's
 own behavior for the wounded, which stands them still until they slowly heal.
@@ -73,46 +57,40 @@ The mod exempts anyone it knocks down from that, using the same mechanism the
 game uses for its own characters, so a victim gets up and carries on.
 
 A victim who hits the ground shows it afterwards. Their clothes pick up dirt,
-and a gallop draws blood on whichever side of them the horse struck. Both
-accumulate, so a man ridden down repeatedly gets steadily filthier. Neither is
-permanent: a man ridden down and left alone was found clean again after a night
-had passed, without the mod doing anything to clean him. Nothing is marked at walking
-pace, where nobody goes down.
+and a harder blow draws more blood on whichever side of them the horse struck.
+Both accumulate, so a man ridden down repeatedly gets steadily filthier. The
+marks wear off once the victim's own routine takes them home. Nothing is marked
+at walking pace, where nobody goes down.
 
-A collision also makes a noise, which vanilla never did. There is no single
-sound in the game for a horse hitting a person, so each speed builds one from
-layers a few milliseconds apart: a shove at walking pace is cloth and a body
-settling, a trot leads with a blunt impact, and a gallop stacks that impact
-four times over a dull heavy thud. What the impact sounds like depends on what
-the victim is wearing, from the same armor the collision already weighs.
+A collision also makes a noise. There is no single sound in the game for a
+horse hitting a person, so each tier builds one from layers. A shove at walking
+pace is cloth and a body settling, a trot leads with a blunt impact, and a
+gallop stacks several impacts over a dull heavy thud. What the impact sounds
+like depends on what the victim is wearing, from the same armor the collision
+already weighs.
 
 Henry makes a noise too. The game records him taking a hit at three severities
-and each speed uses one, so a shove at walking pace draws a small grunt and a
-body taken at a gallop knocks the wind out of him. He stays quiet for a moment
-and a half afterwards, because riding into a crowd lands several collisions in a
-second and a grunt for each reads as broken audio rather than as a man being
-jolted. A heavier impact still gets through that silence, so a gallop is never
-swallowed by the shove that happened just before it.
+and each tier uses one, so a shove at walking pace draws a small grunt and a
+body taken at a gallop knocks the wind out of him. He stays quiet for a second
+and a half afterwards, so riding into a crowd does not produce a grunt per
+person. A heavier impact still gets through that silence.
 
 When a collision kills somebody, he says something. "Oh fuck!", "Good God, what
 a bloody mess.", "Jesus Christ, he was only a boy.", "He's still breathing but
-he probably won't wake up again." Fifteen lines, all the game's own, recorded by
-Henry's voice actor for quests you may never have played. A death always gets
-one, and never a grunt as well, because two voices out of one man is a mistake
-rather than a richer moment.
+he probably won't wake up again." Every line is the game's own, recorded by
+Henry's voice actor for quests you may never have played. A death gets a line
+and never a grunt as well.
 
 An ordinary impact stays wordless. The lines Henry has are sentences, which suit
 standing over a body and not a shove at walking pace, and the short exclamations
-that would have suited a shove are the ones the game will not play on request.
-The game itself works the same way round: for Henry's own reaction to being
-jolted it reaches for a recorded grunt, not for dialogue.
+that would suit a shove are the ones the game will not play on request.
 
 ### What people say about it
 
 Vanilla's answer to a horse walking into someone is one shout. The mod gives
 the moment words, and every one of them is already in the game, spoken by that
-character's own voice actor. No new audio ships and nothing is recorded: a
-vanilla bark set is named and the game chooses a line from it.
+character's own voice actor. No new audio ships: a vanilla bark set is named
+and the game chooses a line from it.
 
 A shove at walking pace draws a complaint: "Be a bit more careful!", "Hey!
 Watch it!", "Jesus! Look where you're going!". Or a set that gets angrier the
@@ -120,209 +98,179 @@ more often the same person is shoved, which turns repeatedly barging somebody
 into an argument rather than a repeated noise.
 
 A knockdown speaks twice. The victim cries out at the moment of impact,
-wordlessly, and then says something a few seconds later while getting back to
-their feet, so they no longer stand up and walk off as though nothing had
-happened. What they say then leans on the only lines the game has that mention
-a horse: "Learn how to ride a horse, idiot!", "Watch where you're going, you
-lout! You nearly killed me!", "That horse of yours nearly trampled me to
-death!"
+wordlessly, and then says something while getting back to their feet. What
+they say then leans on the only lines the game has that mention a horse: "Learn
+how to ride a horse, idiot!", "Watch where you're going, you lout! You nearly
+killed me!", "That horse of yours nearly trampled me to death!"
 
 Each moment draws from a pool rather than a single set, so the same collision
 does not produce the same sentence twice running, and vanilla's own collision
-bark is held off for a moment so the two do not talk over each other.
+bark is held off so the two do not talk over each other.
 
-**With `CollisionIsCrime` on, which is the default, this is a walking-pace
+**With `CollisionIsCrime` on, the spoken reactions are mostly a walking-pace
 feature.** A trot or gallop impact is a crime, and a victim of a crime is taken
 over by the game's own crime and combat reactions: they call for the guards,
-immediately, and that is what you hear instead. The mod cannot reach that, because it
-suppresses the collision bark, which is a different branch of the game's
-dialogue than the call for help. A stagger is deliberately not a crime, so the
-walking-pace reactions are unaffected and work in every configuration. Turning
-`CollisionIsCrime` off gives the spoken reactions at every speed.
+and that is what you hear instead. The mod suppresses the collision bark, which
+is a different branch of the game's dialogue from the call for help. A stagger
+is not a crime, so the walking-pace reactions work in every configuration.
+Turning `CollisionIsCrime` off gives the spoken reactions at every speed.
 
-A character whose voice never recorded a set simply says nothing, with no error
-and no glitch, exactly as in vanilla. So some individuals are quieter than
-others, and that is the game's own casting rather than a fault.
-
-Henry himself says nothing. His own vocabulary is fixed by the game and every
-line in it that would suit having just ridden somebody down is either unusable
-or far too long, so he is deliberately silent rather than saying something
-wrong.
+A character whose voice never recorded a set says nothing, with no error, as in
+vanilla, so some individuals are quieter than others.
 
 ### Losing patience
 
-Barging the same man at walking pace costs nobody anything: no damage, no
-stamina, no crime. Ridden into repeatedly he now runs out of patience. The
-first shove is free, and every one after that rolls against a chance that
-grows with the count, until he turns and fights.
+Barging the same person at walking pace costs nobody anything: no damage, no
+stamina, no crime. Ridden into repeatedly, they run out of patience. The first
+shove is free, and every one after that rolls against a chance that grows with
+the count, until they turn and fight.
 
-That fight is deliberately not a crime. No fine is levied and no guard is
-summoned for the provocation itself, because the message the mod sends is one
-the game's own data marks as costing no reputation. A charge appears only if
-**you** swing, and only if somebody sees it. Guards who witness the brawl wade
-in, which is them reacting to what they saw.
+They try to drag you out of the saddle first, and the fight starts once you are
+on the ground. During it, the mod shows the game's surrender prompt, so you can yield
+rather than fight on.
 
-A guard shoved the same way arrests rather than brawls. That is the game's
-own rule for soldiers and it is left alone: the crime-free scuffle is for the
-people who have no authority to arrest anyone.
+That fight is not a crime. No fine is levied and no guard is summoned for the
+provocation itself, because the message the mod sends is one the game's own
+data marks as costing no reputation. A charge appears only if **you** swing,
+and only if somebody sees it. Guards who witness the brawl wade in.
 
-Women do not fight back. The game refuses them the fight branch outright, and
-nothing the mod sets changes it.
+A guard shoved the same way arrests rather than brawls. That is the game's own
+rule for soldiers and it is left alone.
+
+Women do not fight back. The game refuses them the fight branch, so a woman
+runs and fetches a guard instead, on the same count and the same roll.
 
 The brawl ends when the victim's own state says it has ended, not on a timer.
-Usually the game resolves the encounter itself and the mod does nothing at
-all; only a victim who leaves the fight and keeps running with the rider well
-clear is left to run, because that flee ends by itself in ten to fifteen
-seconds unless the rider follows him.
+Usually the game resolves the encounter itself; a victim who leaves the fight
+and keeps running with you well clear is left to run, because that flee ends
+by itself unless you follow.
 
 ### Rearing on command
 
-Everything else the mod does needs speed. A rear is what a rider has at a
-standstill, and it is on the mod's own keys: R rears and drives forward, Q
-rears on the spot. Both are the horse's own animations and you stay in the
-saddle throughout.
+A rear is what a rider has at a standstill, and it is on the mod's own keys:
+`F` rears on the spot and `R` rears and drives forward. Both are the horse's own
+animations and you stay in the saddle throughout.
 
-A rear is its own kind of blow rather than a slow collision. It hurts more than
-being shoved at a trot, sounds like hooves rather than a body, and leaves its
-victim to get up and go back to what they were doing. Rearing again on someone
-already down hits them again without restarting their fall.
+The rear is its own tier. It hurts more than being knocked down at a trot,
+sounds like hooves rather than a body, and plays the same fall as a trot.
+Rearing again on someone already down hits them again without restarting their
+fall. It brings the hooves down on whoever is directly in front, inside an arc
+rather than on everyone nearby, and hits everybody standing in that arc.
 
-The rear on the spot brings the hooves down on whoever is directly in front,
-inside an arc rather than on everyone nearby, and it hits everybody standing in
-that arc rather than a capped number. It is scored as a trot, because a horse
-coming down from a standstill is a real blow but it is not a charge.
+The charge is its own tier too. The horse rears on the spot and is then driven
+forward physically, so it collides with the world like any moving horse. It is
+stopped by walls and fences instead of riding through them, and you can steer
+it slightly on the way in. Everyone in a corridor in front of the horse goes
+down, with no limit. Its damage, stamina cost, throw and the time it holds a
+victim out of the next impact are all its own figures.
 
-The charge is a tier of its own rather than a gallop by another name. The horse
-rears and then covers several meters, and what that costs the victim, what it
-costs the horse in stamina, how far it throws someone and how long it holds
-them out of the next impact are all its own figures. It used to borrow a
-gallop's, which meant tuning one silently moved the other.
+Bystanders a rear or a charge misses are frightened, and each decides for
+themselves whether to run or turn on you.
 
-The charge is a special move rather than a fast collision. The horse rears on
-the spot and is then driven forward physically, so it collides with the world
-like any moving horse: it is stopped by walls and fences instead of riding
-through them, and you can steer it slightly on the way in.
+Both moves refuse from anything faster than a standstill. The animation owns
+the horse's position while it plays, so speed the horse already had fights it
+and drags the horse visibly sideways.
 
-What it reaches is its own. Everyone in a corridor in front of the horse goes
-down, with no limit, so a crowd cannot shield each other by standing close. It
-hits harder than a gallop, sounds different, and every part of it is tuned
-separately from an ordinary collision.
-
-Both refuse from anything faster than a standstill. The animation owns the
-horse's position while it plays, so speed the horse already had fights it and
-drags the horse visibly sideways.
-
-The keys are chosen in the settings file, from R, Q, Y, U, O and H. That list
-is fixed, and it is short for a reason: the mod cannot rebind a key while the
-game is running, so it declares every key it might be asked for in advance and
-the settings pick which of them it listens to. A key outside the list, or both
-moves put on one key, is reported in the log rather than quietly doing nothing.
+The keys are chosen in the settings file from a fixed list, given in the README.
+The mod cannot rebind a key while the game is running, so it declares every key
+it might be asked for in advance and the settings pick which of them it listens
+to. A key outside the list, or both moves put on one key, is reported in the
+log rather than quietly doing nothing.
 
 ## The approach
 
-The first version was a physics hack: every impact applied a raw impulse and
-threw a ragdoll, at any speed. This version tries to make collisions behave
-like part of the game.
-
 - Reactions are the game's own animations. The stagger, the knockdown and the
-  rear-and-throw all exist in vanilla already.
+  rear all exist in vanilla already.
 - Speed thresholds come from measured in-game gaits, not round numbers. KCD
   horses have three speed plateaus, so the tiers sit in the gaps between them.
-- The detection area is shaped like a horse, and was narrowed after logging
-  where impacts were landing.
+- The detection area is shaped like a horse.
 - Stamina limits how much is possible in one run, and costs more in combat, so
   charging into a fight is a decision rather than a default.
-- Nothing is hardcoded. Every threshold, force and cost is a value in one
-  settings table, and players edit a separate file rather than the mod source.
+- Every threshold, force and cost is a named setting, and players edit a
+  separate file rather than the mod source.
 
-## The three parts
+## The parts
 
-**A timer loop, in Lua.** Roughly twenty times a second the mod asks the game
-for everything near the player's horse, works out which of those are actually
-underneath or in front of it, and decides what should happen to them.
+**A timer loop, in Lua.** Every `TickSeconds`, about thirty times a second, the
+mod asks the game for everything near the player's horse, works out which of
+those are actually underneath or in front of it, and decides what should happen
+to them.
 
-**A reaction, per speed tier.** The walking-pace stagger plays one of the game's
-own standing hit-reaction animations, so the NPC keeps their feet and their
-dignity. A trot plays an animated fall and then hands the body to the game's
-physics partway through, so the victim lands as the animation intended and is
-picked up afterwards the way the game picks up anyone who has fallen. A gallop
-is physics from the moment of impact: the NPC is given an impulse and the
-ragdoll takes over.
+**A reaction, per tier.** The walking-pace stagger plays one of the game's own
+standing hit-reaction animations, so the NPC keeps their feet. A trot plays an
+animated fall and then hands the body to the game's physics partway through,
+so the victim lands as the animation intended and is picked up afterwards the
+way the game picks up anyone who has fallen. A gallop is physics from the
+moment of impact: the victim is ragdolled and the engine's own collision throws
+the body, with the mod's impulse as a small trim on top.
 
-**Animation data.** The stagger is the part that needs new data, and it is the
-reason this mod ships anything besides a script.
+**Animation data.** The reactions need named animation options the game does
+not declare, and they are the reason this mod ships anything besides a script.
 
 **Handing the victim back.** Playing an animation on someone takes their body
 away from them, and the game does not tell them so. Left alone they stand where
 they fell, thinking they are somewhere else, until something makes the game
-rebuild them, which is why a victim could stand motionless and then appear to
-jump across the street. The mod watches for the animation finishing and rebuilds
-them itself, so they get up and carry on.
+rebuild them. The mod watches for the animation finishing and rebuilds them
+itself, so they get up and carry on.
 
-## Why the stagger needs new data
+## Why the reactions need new data
 
 The game will play a chosen animation on an NPC on request, but only through a
 narrow door. One Mannequin fragment, `AnimationControlled`, holds a list of
 named options, and a request has to match one of those names. Vanilla's list is
-30 object interactions: opening doors, cabinets, wardrobes, ringing an alarm
-bell. Nothing that looks like being knocked into by a horse.
+object interactions: opening doors, cabinets, wardrobes, ringing an alarm bell.
+Nothing that looks like being knocked into by a horse.
 
-So the mod adds four options to that list, one per direction, each pointing at
-a standing hit-reaction animation the game already contains. No new animation is
-authored; the clips are the game's own.
+So the mod adds its own options to that list: a stagger, a knockdown and a fall
+for each of four directions, and a settle. Each points at an animation the game
+already contains. No new animation is authored. The horse gets its own options
+the same way, for the rear and the charge.
 
 ## Why that is harder than it sounds
 
-That list lives inside `kcd_male_database.adb`, a single 5.5 MB file. Mannequin
+That list lives inside `kcd_male_database.adb`, a single large file. Mannequin
 databases cannot be merged and no tool in the KCD ecosystem merges them.
 
-The obvious approach is to ship a modified copy of the whole file. Before 3.0.0
-this mod did exactly that, and it has a serious consequence: **two mods cannot
-both do it.** Whichever loads later in `mod_order.txt` wins, the other's changes
-vanish, and nothing is logged. Neither author finds out, and neither does the
-player.
+Shipping a modified copy of the whole file has a serious consequence: **two
+mods cannot both do it.** Whichever loads later in `mod_order.txt` wins, the
+other's changes vanish, and nothing is logged.
 
-## What 3.0.0 does instead
+## How the mod adds to it
 
 Mannequin can assemble one database out of several. A database may say "also
 load this other one", which means the vanilla file can be *pointed at* where it
 already sits rather than copied.
 
-So the mod ships its own small database. That file holds the option list, both
-vanilla's 30 and the mod's 4, and refers to the untouched vanilla database for
+So the mod ships its own small database. That file holds the option list,
+vanilla's and the mod's, and refers to the untouched vanilla database for
 everything else a person animates with. At startup the mod tells the human
 character types to use it.
 
 ```
-hcm_male_database.adb          the mod's file: 30 vanilla options + 4 new
+hcm_male_database.adb          the mod's file: vanilla's options and the mod's
   refers to kcd_male_database.adb    vanilla, untouched, inside its own pak
 ```
 
-The 5.5 MB database is never copied and never replaced. The mod's own file is
-72 KB, and the whole download is about 24 KB compressed against 195 KB before.
+The same holds for the female database. The vanilla databases are never copied
+and never replaced.
 
-## What the mod does still replace
+## What the mod does replace
 
-One small declaration file:
+Three small declaration files:
 
-| File | Size | Why |
-| --- | --- | --- |
-| `kcd_animationControlledTags.xml` | 1 KB | Lists the names an option may use, and the new names have to be declared where the game looks. |
+| File | Why |
+| --- | --- |
+| `kcd_animationControlledTags.xml` | Lists the names an option may use, and the new names have to be declared where the game looks. |
+| `kcd_horse_fragmentids.xml` | Declares `AnimationControlled` for the horse, which vanilla declares only for people. |
+| `kcd_horse_controllerdefs.xml` | Gives that fragment a scope, without which it can never play. |
 
-If another mod replaces it, whichever loads later wins, as with any file
-conflict in KCD. The loss is 1 KB of declarations rather than a whole animation
-set, and it can be reconciled by hand.
-
-`wh_female_fragmentids.xml` was in this list and is not any more. It was a 14 KB
-copy of the game's female animation index, and unlike the tag file above, the
-game rewrites that index with every patch. The copy that shipped came from the
-game as released in February 2018, so installing the mod removed 103 animations
-from every female character. The game has declared what the mod wanted from that
-file since patch 1.9, so the mod no longer ships it at all. The size is the
-signal worth remembering: a file small enough to own is a list of names, and a
-file this large is the game's own data.
+If another mod replaces one of them, whichever loads later wins, as with any
+file conflict in KCD. Each is a short list of declarations that can be
+reconciled by hand. A file is safe to own only if it is a list of names that no
+game patch rewrites; a copy of the game's own data overrides every later patch
+to it.
 
 ## Verifying it
 
-`python tools/verify_additive.py` checks every claim on this page against the
-game's own data files and the packaged release.
+`python tools/verify_additive.py` checks the release's animation layout and
+packaged file set against the game's own data files.
