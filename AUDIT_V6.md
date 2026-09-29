@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Tutorial.lua findings recorded and committed.
+**Current status:** Detection.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Detection.lua`.
+**Next pass:** `Enums.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -48,7 +48,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Impact.lua`
 - [x] `Log.lua`
 - [x] `Tutorial.lua`
-- [ ] `Detection.lua`
+- [x] `Detection.lua`
 - [ ] `Enums.lua`
 - [ ] Documentation: `README`, `docs/*.md` except the diary
 - [ ] Tooling: `build.ps1`, `tools/`, `.claude/` hooks and linter
@@ -1874,6 +1874,36 @@ victim is accurate (only men reach the fight branch) and stays.
 - [ ] Whole file — no blank line after local declarations or before
   `return` and control blocks (`:18-19`, `:76-77`, `:95-96`, `:100-101`,
   `:141-148`, `:156-158`), unlike every other module. — Match the mod.
+
+### src/HorseCollisionMod/Detection.lua
+
+- [ ] `:15-16` — `@release` runs straight into `IsInHorseFootprint`'s doc;
+  the function is missing from the generated Detection page. — Separate.
+- [ ] `:18-21` — "under a meter wide"; `HorseHalfWidth` is 0.70, a 1.4 m
+  footprint. "what makes collisions feel like they reach too far". — Cut
+  the figures; the sphere catches people beside and behind the horse.
+- [ ] `:29-32`, `:118-119` — the diagnostic string is "the most expensive
+  thing in the loop", and `GetEntitiesInSphere` is "the most expensive call
+  the mod makes". — Keep the second; the first says only that the string
+  is built on request.
+- [ ] `:81-84` — "gating it on `LogTelemetry` instead wrote a line for every
+  tick". — Keep the first sentence.
+- [ ] `:101-102` — two blank lines. — One.
+- [ ] `:103-109` `FootprintDetail` — no `@tparam`s. — Add, or refer to
+  `IsInHorseFootprint`.
+- [ ] `:123-128` `EntitiesNearHorse` — the margin is argued from
+  `HorseFrontReach` plus `MaxSweepExtra` (1.40 m); the footprint's far
+  corner is 1.57 m out with `HorseHalfWidth`, leaving 0.93 m against the
+  0.8 m `SphereCacheTravel`, and the argument ignores the victim's own
+  movement over the 150 ms cache life and the 2.35 m vertical allowance,
+  which the sphere does not contain. — State the corner, the margin and
+  what it assumes.
+- [ ] `:137` `@treturn boolean` — the caller (`Update.lua:260`) reads one
+  value. — Return the list only.
+- [ ] `:200-204` `GetImpactDir` — divides the velocity by `speed`, which is
+  the capped impact speed rather than the velocity's own length; the
+  comparisons are scale-free, so the division does nothing. — Drop it and
+  the `speed` parameter (callers `MarkVictim`, the reaction).
 
 ### Dead code (`tools/audit_code.py`)
 
