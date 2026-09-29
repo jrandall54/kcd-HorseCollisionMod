@@ -1,6 +1,6 @@
 --- Update: the loop that finds collisions, and what it does with one.
 --
--- The detection loop runs ten times a second while the player is mounted. It
+-- The detection loop runs every `TickSeconds` while the player is mounted. It
 -- reads the horse's velocity, sweeps a footprint forward proportional to
 -- speed, and for every human inside it decides a tier and dispatches the
 -- reaction. Everything else in this mod is called from here.
@@ -8,31 +8,29 @@
 -- `UpdateTimer` is what keeps it running, and it carries the generation guard.
 -- Re-executing the entry point builds a fresh `HorseCollisionMod` table, and
 -- without that guard every reload would leave another loop sweeping for
--- collisions ten times a second, all of them writing to the same cooldown
--- table.
+-- collisions, all of them writing to the same tables.
 --
--- `SafeUpdate` is wrapped in `pcall` by its caller for a reason worth keeping:
--- an error thrown inside a timer callback kills the loop silently, and the mod
--- would simply stop working with nothing in the log to say so.
---
--- This file was moved last, because it calls into every other part and a
--- mistake here would have been indistinguishable from a mistake in whichever
--- part it called.
+-- `SafeUpdate` is wrapped in `pcall` by its caller: an error thrown inside a
+-- timer callback kills the loop silently, and the mod would stop working with
+-- nothing in the log to say so.
 --
 -- Attached to the `HorseCollisionMod` table created by the entry point, which
 -- pulls this file in with `Script.ReloadScript`.
 --
 -- @module HorseCollisionMod.Update
 -- @author jrandall54
+
 --- Applies the appropriate reaction for one collision.
 --
--- Enforces the per-victim cooldown, then dispatches on gait.
+-- Stands out of a charge, scores the tier from the speed, refuses a contact
+-- the horse has already been charged for, and hands the rest to
+-- `ResolveImpact`.
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed speed to score the impact at, in meters per second
 -- @tparam table horseEnt the player's horse entity
--- @tparam table playerEnt the player entity
+-- @tparam table playerEnt the player entity, `player`
 -- @tparam userdata horseWuid WUID of the horse
 -- @tparam number sampledSpeed speed read on this tick, recorded in the log so
 --   the correction for collision deceleration stays visible
@@ -50,58 +48,31 @@ function HorseCollisionMod:TriggerCollision(npc, velocity, speed, horseEnt, play
 		horsePos = horseEnt:GetPos()
 	end)
 
-	-- There is no readiness wait any more, and nothing here counts time.
-	--
-	-- What stood here stamped a deadline per victim and refused every impact
-	-- until it passed, with five settings behind it and a watcher polling the
-	-- animation state to clear it early. It was wrong in both directions.
-	-- It let an impact through mid-fall, because it declared a victim
-	-- recovered after 250ms of being in neither reaction state and there is a
-	-- 608ms stretch of exactly that while the body is face down between the
-	-- fall clip ending and the ragdoll taking hold. And it refused impacts
-	-- through the whole of a get-up, which reads as the mod having stopped
-	-- working.
-	--
-	-- Whether a body can take an animation is now `IsVictimFlat`, read from
-	-- the victim's own posture at the moment of the impact, and it lives with
-	-- the reaction rather than in front of the whole collision. The impact
-	-- always lands: a second hit on a downed victim registers and costs them
-	-- health, so refusing it only ever lost damage the engine charged anyway.
+	-- Every contact lands; whether the body can take an animation is decided
+	-- in the reaction, by `IsVictimFlat`.
 
 	-- A lunge belongs to the charge, and this loop stays out of it.
-	--
 	-- `ChargeStrike` sweeps a corridor ahead of the horse and raises the
-	-- impact itself, because a charge has to be able to catch several people
-	-- at once and to catch them without the horse's collider physically
-	-- reaching each one. Scoring the lunge here instead makes the move
-	-- useless: a charge can then only land where a real collision happened,
-	-- which whiffs on a walking man three times running.
+	-- charge's impacts itself, because a charge has to catch several people
+	-- at once without the horse's collider physically reaching each one.
 	--
-	-- Scoring alongside the sweep is not an option either. Two paths on one
-	-- collision is what the old double hit was, and the contact gate
-	-- suppresses the second rather than preventing it.
-	--
-	-- The window is `ChargeScoringUntil` rather than `RearCharging`.
-	-- `RearCharging` is cleared by `ChargeForward` the moment the horse stops
-	-- accelerating, measured at 144 to 256 ms after the push, while the sweep
-	-- runs for `RearChargeStrikeMs`. Standing out for the shorter of the two
-	-- let this loop score a contact the sweep was about to score as well, as a
-	-- `Walk` stagger, which is what a charge landing on nobody looked like.
+	-- The window is `ChargeScoringUntil`, stamped at the key press for
+	-- `RearChargeStrikeMs`, so it covers the rear and the start of the lunge.
+	-- `RearCharging`, which `WatchLunge` clears when the lunge is spent, would
+	-- end it sooner. Once the window closes, `ImpactIsNewContact` keeps this
+	-- loop and the sweep from scoring one contact twice.
 	if self.ChargeScoringUntil and now < self.ChargeScoringUntil then
 		return
 	end
 
 	local tierName = self:GetSpeedTier(speed)
 
-	-- One contact, one impact. A horse mid-pass is still inside the same
-	-- collision it has already been charged for, and this is the only thing
-	-- that debounces it. It measures the gap between two contacts rather than
-	-- a victim's recovery, which is why it outlived the readiness wait.
+	-- One pass is one impact: a horse mid-pass is still inside the collision
+	-- it has already been charged for, debounced by the gap between contacts.
 	if not self:ImpactIsNewContact(npcId, now) then
 		return
 	end
 
-	-- What makes one pass one impact, read by `ImpactIsNewContact` above.
 	self.LastScoredHit[npcId] = now
 
 	-- When the last impact of any kind landed, so the airborne probe can say
@@ -193,16 +164,9 @@ function HorseCollisionMod:SafeUpdate()
 
 	local speed = self:VectorLength(velocity)
 
-	-- The horse leaving the ground, reported when it happens and never
-	-- otherwise.
-	--
-	-- The rider watched the horse thrown about five meters up and away off an
-	-- impact, and nothing in the log had anything to say about it, because the
-	-- mod records the victim's body in detail and the horse's own motion not
-	-- at all. There is no cost to this: the detection loop already reads the
-	-- horse's velocity every hundred milliseconds for the speed history, and
-	-- this only decides whether to write a line about a reading it already
-	-- has.
+	-- The horse leaving the ground, logged when its upward speed crosses
+	-- `HorseAirborneVz`, at most once a second. It costs nothing: the loop
+	-- already reads the horse's velocity every tick for the speed history.
 	--
 	-- Vertical speed rather than height, because height off a slope is
 	-- ordinary and a horse moving upward at several meters a second is not. A
@@ -226,7 +190,6 @@ function HorseCollisionMod:SafeUpdate()
 	self:TrackSpeed(speed)
 
 	local impactSpeed = self:ImpactSpeed()
-
 
 	-- Below walking pace nothing can happen, so the loop normally stops here
 	-- before looking at a single entity. While diagnosing it keeps going, or
@@ -274,16 +237,8 @@ function HorseCollisionMod:SafeUpdate()
 
 			-- The sphere returns everything nearby: crates, doors, loose
 			-- items, animals. Humans are named by class, and there are
-			-- three: men spawn as NPC, women as NPC_Female, and the rider
-			-- as Player. Naming them is what keeps this a human filter.
-			--
-			-- A faction fallback stood here and was wrong in both
-			-- directions. Dogs carry `esFaction`, so a guard dog was
-			-- given a human knockdown fragment on a dog skeleton, which
-			-- is a fragment that cannot resolve. And women passed only
-			-- through that fallback rather than by class, which is a
-			-- fragile way to reach half the population and sits behind a
-			-- long run of female-specific faults in this mod.
+			-- three: men spawn as NPC, women as NPC_Female, and the player
+			-- as Player. Dogs are class `Dog` and fail it.
 			pcall(function()
 				isHuman = (ent.class == 'NPC'
 						or ent.class == 'NPC_Female'
@@ -295,18 +250,16 @@ function HorseCollisionMod:SafeUpdate()
 				-- people the mod failed to react to, and an item is never
 				-- one. The player's own holster and any dropped weapon
 				-- ride along inside the search radius permanently, so
-				-- logging these buried the human misses entirely and a
-				-- distance gate did not help: the holster is on the
-				-- player.
+				-- logging these would bury the human misses.
 			elseif not ent.actor and self.Config.DiagnoseMisses then
 				self:LogRejection(ent, "no-actor",
 						"class=" .. tostring(ent.class))
 			end
 
 			if isHuman and ent.actor then
-				-- Ahead of contact, while they are still in front of the
-				-- horse, so vanilla's collision bark is already closed off
-				-- by the time bodies touch.
+				-- For every human within `HitRadius`, ahead of contact, so
+				-- vanilla's collision bark is already closed off by the
+				-- time bodies touch.
 				self:HushVanillaBark(ent)
 
 				local isDead = false
@@ -352,11 +305,12 @@ function HorseCollisionMod:SafeUpdate()
 	end
 end
 
---- Reschedules itself every 100 ms and runs one detection tick.
+--- Reschedules itself every `TickSeconds` and runs one detection tick.
 --
--- The tick number guards against duplicate loops. Each load screen starts a
--- new loop, and any loop whose number no longer matches the current one stops
--- on its next iteration, so reloading a save leaves no stale timers running.
+-- The tick number guards against duplicate loops. The entry point's load
+-- screen handler starts a new loop, and any loop whose number does not match
+-- the current one stops on its next iteration, so reloading a save leaves no
+-- stale timers running.
 --
 -- @tparam number assignedTick the loop generation this timer belongs to
 function HorseCollisionMod:UpdateTimer(assignedTick)
@@ -369,9 +323,7 @@ function HorseCollisionMod:UpdateTimer(assignedTick)
 	-- afterwards would end the mod for the rest of the session.
 	--
 	-- The interval comes from `TickSeconds`, which the forward sweep is also
-	-- computed from. Those were separate figures until the impact sound made
-	-- the difference audible: the timer was a hardcoded 100 and the sweep
-	-- assumed whatever `TickSeconds` said, so the two agreed only by accident.
+	-- computed from.
 	Script.SetTimer(self:TickMs(), function()
 		HorseCollisionMod:UpdateTimer(assignedTick)
 	end)

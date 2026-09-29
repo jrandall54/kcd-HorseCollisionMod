@@ -952,7 +952,7 @@ function HorseCollisionMod:LiftCollisionShield(npc)
 	return ok
 end
 
---- Switches off vanilla's collision bark on somebody the horse is approaching.
+--- Switches off vanilla's collision bark on somebody near the horse.
 --
 -- Per impact suppression loses a race it cannot win. The mod's detection loop
 -- runs about thirty times a second, while the engine raises its own hit
@@ -968,7 +968,7 @@ end
 -- touching gets their own bark back a moment later and nothing is permanently
 -- changed. Non-persistent, so a save cannot carry it.
 --
--- @tparam table npc somebody inside the horse's footprint
+-- @tparam table npc a human within `HitRadius` of the horse
 function HorseCollisionMod:HushVanillaBark(npc)
 	if not self:BarksEnabled("Collision") then
 		return

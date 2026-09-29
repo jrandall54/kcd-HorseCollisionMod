@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`. Next: `Update.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`, `Rider.lua`, `Sound.lua`, `Lean.lua`, `Update.lua`. Next: `Marks.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -279,6 +279,11 @@ In this order, each its own commit and ride:
      the stray parentheses around settings; `StopLean` uses `sign` rather
      than `sign or 1`, and logs `none` for an unreadable offset or angle
      instead of `-9` and `-1`.
+   - `Update.lua`: `SafeUpdate`'s player test is
+     `not player or not player.human or not player.player`; the clock is
+     read once per tick; the airborne log's 1000 ms repeat gap is named,
+     and `sinceImpactMs` logs `none` rather than `-1`; the loop's error row
+     is `UpdateError err=` rather than capitals.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -469,6 +474,9 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Lean.lua`.** L1 `same` for it, the entry point and the
   settings file. Measurements and bug history moved to the diary; the
   unfinished expiry sentence completed.
+- **Batch 4, `Update.lua`.** L1 `same` for it and `Bark.lua`. Rates named
+  as `TickSeconds`; the removed readiness wait's history cut; the charge
+  stand-aside described as it works.
 
 ## Standard
 
@@ -2284,21 +2292,30 @@ batch 3, item 7.
 
 ### src/HorseCollisionMod/Update.lua
 
-- [ ] `:3`, `:11`, `:204`, `:381` — "ten times a second", "every hundred
+Batch 4: applied. Superseded by batch 2: the `ProtectMutt` block and its
+"dogs share the generic NPC class" comment. The charge stand-aside comment
+now matches the `Rear.lua` pass: `ChargeScoringUntil` is stamped at the
+press and `WatchLunge` clears `RearCharging`. `HushVanillaBark` runs for
+every human within `HitRadius`; its doc in `Bark.lua` was corrected in this
+commit, and its rate was corrected in the `Bark.lua` pass. The horse lookup
+goes to the shared helper recorded under `Lean.lua`. Code findings went to
+batch 3, item 7.
+
+- [x] `:3`, `:11`, `:204`, `:381` — "ten times a second", "every hundred
   milliseconds", "every 100 ms"; the interval is `TickSeconds`, 0.033
   (`:354` says thirty, which is right). — Name `TickSeconds`, not a rate.
-- [ ] `:18-20` header — "This file was moved last…". — Cut.
-- [ ] `:27-28` — `@release` runs straight into `TriggerCollision`'s doc
+- [x] `:18-20` header — "This file was moved last…". — Cut.
+- [x] `:27-28` — `@release` runs straight into `TriggerCollision`'s doc
   with no break, so LDoc merges the two. — Separate.
-- [ ] `:28-39` `TriggerCollision` doc — "Enforces the per-victim cooldown,
+- [x] `:28-39` `TriggerCollision` doc — "Enforces the per-victim cooldown,
   then dispatches on gait"; it stands out of a charge, scores the tier from
   speed, refuses a repeat contact and hands off to `ResolveImpact`.
   `@tparam table playerEnt` receives `player`. — Correct the summary.
-- [ ] `:54-70` — the removed readiness wait, "There is no readiness wait
+- [x] `:54-70` — the removed readiness wait, "There is no readiness wait
   any more", "What stood here…", the 608 ms stretch. — Cut; if anything,
   one line: every contact lands, and `IsVictimFlat` decides in the
   reaction whether the body can take an animation.
-- [ ] `:72-90` — "which whiffs on a walking man three times running", "the
+- [x] `:72-90` — "which whiffs on a walking man three times running", "the
   old double hit", "measured at 144 to 256 ms", "which is what a charge
   landing on nobody looked like". `:86-87` says `ChargeForward` clears
   `RearCharging` "the moment the horse stops accelerating"; it clears it
@@ -2307,43 +2324,43 @@ batch 3, item 7.
   raises the charge's impacts, so the loop scores nothing until
   `ChargeScoringUntil`, which spans the sweep's `RearChargeStrikeMs`;
   `RearCharging` ends sooner.
-- [ ] `:97-106` — "which is why it outlived the readiness wait"; `:105`
+- [x] `:97-106` — "which is why it outlived the readiness wait"; `:105`
   repeats `:97-100`. — One comment: one pass is one impact, debounced by
   the gap between contacts.
-- [ ] `:136-139` — `type(player) == "nil" or (not player)` tests the same
+- [x] `:136-139` — `type(player) == "nil" or (not player)` tests the same
   thing twice. — `not player or not player.human or not player.player`.
-- [ ] `:145`, `:215`, `:260` — the clock is read three times per tick. —
+- [x] `:145`, `:215`, `:260` — the clock is read three times per tick. —
   Read once at the top.
-- [ ] `:163-181`, `:407-409` — the horse lookup, twice in this file. — The
+- [x] `:163-181`, `:407-409` — the horse lookup, twice in this file. — The
   shared horse lookup from the Lean findings.
-- [ ] `:197-210` — "The rider watched the horse thrown about five meters
+- [x] `:197-210` — "The rider watched the horse thrown about five meters
   up… nothing in the log had anything to say about it". `:217` `1000`
   unnamed; `:223` `-1` stands in for no impact yet. — Keep: logged when the
   upward speed crosses `HorseAirborneVz`, speed rather than height because
   height off a slope is ordinary. Name the 1000 ms repeat gap; log `none`.
-- [ ] `:230-231` — two blank lines. — One.
-- [ ] `:276-279` — "trampling him on every ride is nobody's idea of
+- [x] `:230-231` — two blank lines. — One.
+- [x] `:276-279` — "trampling him on every ride is nobody's idea of
   immersion"; "dogs share the generic NPC class" is false. See the
   `ProtectMutt` ruling.
-- [ ] `:305-311` — the faction fallback that "stood here", "a long run of
+- [x] `:305-311` — the faction fallback that "stood here", "a long run of
   female-specific faults in this mod". — Cut; `:300-303` stands alone.
-- [ ] `:319-325` — "buried the human misses entirely and a distance gate
+- [x] `:319-325` — "buried the human misses entirely and a distance gate
   did not help". — Keep: non-humans are not logged, because the player's
   holster and dropped weapons sit permanently inside the sphere.
-- [ ] `:332-335` — "while they are still in front of the horse"; the call
+- [x] `:332-335` — "while they are still in front of the horse"; the call
   runs for every human the broad phase returns, all round the horse within
   `HitRadius`, before the dead and footprint tests. `HushVanillaBark`'s doc
   (`Bark.lua:1233`) says "somebody inside the horse's footprint", and
   `:1201`, `:1210` give the loop as "ten" and "twenty" times a second. —
   Correct both files: anyone within `HitRadius`, ahead of contact.
-- [ ] `:381-385` `UpdateTimer` — "Each load screen starts a new loop": the
+- [x] `:381-385` `UpdateTimer` — "Each load screen starts a new loop": the
   entry point's load handler (`HorseCollisionMod.lua:1867`) does. — Name it.
-- [ ] `:397-400` — "Those were separate figures until the impact sound made
+- [x] `:397-400` — "Those were separate figures until the impact sound made
   the difference audible… agreed only by accident". — Keep: the interval
   is `TickSeconds`, which the forward sweep also uses.
-- [ ] `:419` — "CRITICAL ERROR IN UPDATE TIMER" in capitals, unlike every
+- [x] `:419` — "CRITICAL ERROR IN UPDATE TIMER" in capitals, unlike every
   other log row. — `UpdateError err=`.
-- [ ] `:84-89` — "`RearCharging` is cleared by `ChargeForward`… measured
+- [x] `:84-89` — "`RearCharging` is cleared by `ChargeForward`… measured
   at 144 to 256 ms"; `WatchLunge` clears it. `ChargeScoringUntil` is
   stamped at the key press, so it covers the rear and about 150 ms of the
   lunge, not the sweep's whole run. — Correct. (Found in the `Rear.lua`
