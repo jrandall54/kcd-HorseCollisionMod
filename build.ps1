@@ -5,17 +5,14 @@ param (
     #
     # The release checks below are about what a release claims: that the
     # version follows from the changelog, that the version strings agree with
-    # it, and that no documentation describes an older build. None of that is
-    # true of a build that only goes into the local install, and gating one on
-    # it means the dev loop stops dead the moment work is written into
-    # [Unreleased] and the manifest has not been bumped to match. That cost a
-    # working session, and the fix belongs here rather than in a habit of
-    # bumping the version by hand mid-branch.
-    #
-    # The version is still carried, because the installed files and the zip
-    # name have to agree with the manifest.
+    # it, and that no documentation describes an older build. A development
+    # deploy is not a release, and gating one on them stops the dev loop the
+    # moment work is written into [Unreleased] before the manifest is bumped.
     [switch]$Development
 )
+
+# A failed step stops the build rather than printing success over a broken zip.
+$ErrorActionPreference = "Stop"
 
 Write-Host "Building HorseCollisionMod version $Version..."
 
@@ -156,11 +153,6 @@ if ($scopeErrors.Count -gt 0) {
 
 # The part file layout, enforced rather than remembered.
 #
-# The mod's Lua was one 2,558-line file and was split across ten part files by
-# concern. Nothing stops the next change putting a new method back in the entry
-# point, and that is how the split would be undone: not in one commit anybody
-# would question, but a method at a time, each one defensible on its own.
-#
 # The entry point owns the table, Config, the state tables, the timing
 # constants, the settings merge, the animation database redirect, the load
 # screen listener and the bootstrap. Behavior belongs in a part file. This list
@@ -246,14 +238,12 @@ if ($layoutErrors.Count -gt 0) {
     Write-Host "Build failed: the part file layout was not respected." -ForegroundColor Red
     exit 1
 }
+
 # Stray control characters in any tracked text file.
 #
 # A scripted edit that writes a path like ".\build.ps1" through a tool that
 # interprets escapes turns the \b into a literal backspace, and \v into a
-# vertical tab. The result is invisible in an editor, survives review, and has
-# reached this repository four times: it broke dev_deploy.ps1's build path and
-# corrupted two documented commands. Cheaper to fail the build than to keep
-# noticing it by hand.
+# vertical tab. The result is invisible in an editor and survives review.
 $controlChars = @()
 
 foreach ($tracked in (git ls-files)) {
@@ -281,7 +271,7 @@ Write-Host "Code Style Check Passed ($luaLineCount lines, $($luaScripts.Count) f
 
 # Release gate. A release version is anything without a prerelease suffix, so
 # -dev and -diag builds skip every check below and stay free to carry
-# diagnostics and a mismatched version.
+# diagnostics and a mismatched version; so does -Development at any version.
 $isRelease = (-not $Development) -and ($Version -match '^\d+\.\d+\.\d+$')
 
 if ($isRelease) {
@@ -407,20 +397,9 @@ if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\hcm_male_dat
     Write-Host "Animation data missing - generating..."
     python (Join-Path $toolsDir "build_adb.py")
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[BUILD ERROR] build_adb.py failed. Check the game path at the top of it." -ForegroundColor Red
+        Write-Host "[BUILD ERROR] build_adb.py failed. Check that the game install resolves." -ForegroundColor Red
         exit 1
     }
-}
-
-# A stale armor table from before the mod read the game's tables directly. It
-# is a Startup script, so leaving one in mod_assets would ship it and define a
-# global nothing reads. Removed rather than ignored, because mod_assets is
-# generated and not committed, so a working copy can still be carrying one.
-$staleItemData = Join-Path $assetsDir "Scripts\Startup\HorseCollisionMod_ItemData.lua"
-
-if (Test-Path $staleItemData) {
-    Remove-Item -Force $staleItemData
-    Write-Host "Removed the superseded armor table from mod_assets."
 }
 
 Write-Host "Including data overrides from mod_assets ..."
@@ -437,25 +416,22 @@ foreach ($srcDataName in @("Libs", "Animations")) {
 # The animation chain needs every one of these present or the stagger silently
 # no-ops in game, which is expensive to diagnose. Fail the build instead.
 #
-# These are the additive layout, which claims no vanilla filename: a parent
-# database per gender referencing the untouched vanilla file in its own pak,
-# the mod's own fragments, and the declarations those fragments need.
-# Any file under a vanilla name is a bug, not an alternative layout: it would
-# override the file the parent database references, silently defeating the
-# whole arrangement without changing anything this build prints.
+# These are the additive layout: a parent database per gender referencing the
+# untouched vanilla file in its own pak, the mod's own fragments, and the
+# declarations those fragments need. No vanilla filename beyond the three
+# declaration files below: another would override the file the parent database
+# references, silently defeating the arrangement without changing anything
+# this build prints.
 $adb = "$buildDir\pak\Animations\Mannequin\ADB"
 
 # The exact file set the mod ships. Three of these carry vanilla names on
 # purpose: they are small declaration files, and owning them is far cheaper
-# than the alternative of restating 123 KB of fragment and controller
-# definitions under mod names, which put this mod in the resolution path of
-# every human animation and broke unrelated ones. See TECHNICAL_DETAILS.md.
+# than restating 123 KB of fragment and controller definitions under mod
+# names, which would put this mod in the resolution path of every human
+# animation. See TECHNICAL_DETAILS.md.
 #
-# `wh_female_fragmentids.xml` was in this list and must never come back. It is
-# not a small declaration file: it is a 20 KB copy of a file the patches rewrite,
-# and the copy that shipped was the launch one, so it deleted 103 fragment ids
-# from every female character, `PickingHerbs` among them. Patch 1.9 declares
-# what the mod wanted from it anyway. See the note in tools/build_adb.py.
+# Never ship `wh_female_fragmentids.xml`. The patches rewrite it, so a copy
+# overrides the patched file and drops its fragment ids.
 $required = @(
     "$adb\hcm_male_database.adb",
     "$adb\hcm_female_database.adb",
@@ -486,13 +462,14 @@ foreach ($f in $required) {
         exit 1
     }
 }
+
 # 2. Create the PAK (zip file)
 # Compress-Archive writes Windows path separators into the zip entry names
 # (Libs\AI\final\x.xml). CryEngine looks pak entries up by exact path with
 # forward slashes, so a backslash pak silently fails to override anything.
 # Startup Lua still works because that folder is enumerated rather than looked
-# up by path, which is what made this bug so slow to spot. Build the pak entry
-# by entry so the names match the vanilla paks (Libs/AI/final/x.xml).
+# up by path. Build the pak entry by entry so the names match the vanilla paks
+# (Libs/AI/final/x.xml).
 Add-Type -AssemblyName System.IO.Compression | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem | Out-Null
 
@@ -538,14 +515,10 @@ if (-not (Test-Path $releasesDir)) { New-Item -ItemType Directory -Force -Path $
 $outZip = "$releasesDir\HorseCollisionMod_v$Version.zip"
 if (Test-Path $outZip) { Remove-Item -Force $outZip }
 
-# Same defect as the pak above, and it reached players. Compress-Archive writes
-# Windows separators into the entry names, so the archive carries one entry
-# literally named "Data\HorseCollisionMod.pak" rather than a Data folder holding
-# the pak. File Explorer hides it by treating the backslash as a separator, which
-# is why manual testing never caught it, but the ZIP specification requires
-# forward slashes and every tool that follows it, 7-Zip and Vortex included,
-# extracts a single oddly named file into the mod root. The mod then does not
-# load at all. Build the archive entry by entry, as the pak is built.
+# Built entry by entry for the same reason as the pak. A backslash entry
+# extracts as one oddly named file in 7-Zip and Vortex, and the mod does not
+# load; File Explorer hides the defect by treating the backslash as a
+# separator.
 $modRoot = (Resolve-Path $modDir).Path
 $outArchive = [System.IO.Compression.ZipFile]::Open($outZip, "Create")
 try {
@@ -559,9 +532,9 @@ finally {
     $outArchive.Dispose()
 }
 
-# A backslash here ships a broken install, and it did once. The archive is read
-# back and refused rather than trusted, because the failure is invisible in File
-# Explorer and only appears on a player's machine.
+# A backslash here ships a broken install. The archive is read back and refused
+# rather than trusted, because the failure is invisible in File Explorer and only
+# appears on a player's machine.
 $verify = [System.IO.Compression.ZipFile]::OpenRead($outZip)
 try {
     $bad = @($verify.Entries | Where-Object { $_.FullName.Contains("\") })
@@ -581,17 +554,13 @@ Remove-Item -Recurse -Force $buildDir
 
 # Superseded builds move into releases\archive.
 #
-# Every build of every branch lands here, and a session of small slices leaves
-# dozens. That is not merely untidy: publish_nexus.ps1 and pre_release_check.py
-# resolve a zip by name, and the one thing worse than a full directory is
-# picking the wrong file out of it.
+# Every build of every branch lands here, and publish_nexus.ps1 and
+# pre_release_check.py resolve a zip by name.
 #
-# Nothing is deleted, only moved, which matters more than it first appears: a
-# tagged release cannot be rebuilt. Asked for its own version number this
-# script refuses twice, once because the manifest has moved on and once because
-# version_check.py sees that version already tagged and demands the next one.
-# The zip in this directory is therefore the only copy of what was released,
-# and archiving is the whole safety net rather than a convenience.
+# Moved, never deleted, because a tagged release cannot be rebuilt: asked for
+# its own version number this script refuses, once because the manifest has
+# moved on and once because version_check.py demands the next version. The zip
+# here is the only copy of what was released.
 #
 # So two names stay at the top level. The build just made, and the version the
 # manifest currently names, so that a prerelease built while testing does not
@@ -615,5 +584,3 @@ if ($stale.Count -gt 0) {
 }
 
 Write-Host "Successfully built $outZip"
-
-
