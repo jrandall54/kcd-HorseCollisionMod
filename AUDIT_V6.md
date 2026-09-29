@@ -12,8 +12,8 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** every source file audited; README.md and
-`docs/HOW_IT_WORKS.md` audited.
+**Current status:** every source file audited; README.md,
+`docs/HOW_IT_WORKS.md` and `docs/DEV_LOOP.md` audited.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -25,7 +25,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `docs/DEV_LOOP.md`, then `ARCHITECTURE_NOTES.md`,
+**Next pass:** `docs/ARCHITECTURE_NOTES.md`, then
 `BALANCE_AUDIT.md`, `ENGINE_BINDS.md`, `TECHNICAL_DETAILS.md`, one file per
 pass.
 
@@ -244,6 +244,11 @@ Items that change behavior or delete a feature. Not applied without a decision.
   mod page's block from the file. Proposal: generate the README table the
   same way, checked by `--check`, or cut it to a short list of headline
   toggles that points at the file.
+
+- [ ] **DEV_LOOP's hook section.** `DEV_LOOP.md` is tracked and describes a
+  pre-push hook whose script lives in the ignored `.claude/hooks/`, so a clone
+  can never follow it. Proposal: cut the section; the hooks are local
+  workflow and `STYLE.md` keeps those off the remote.
 
 - [ ] **README repository layout.** A player-facing README carries 120 lines
   of developer tooling. Proposal: keep the top-level layout in the README and
@@ -2053,6 +2058,55 @@ the present tense against the findings below.
   says none. — List all three here; README points at this section.
 - [ ] `:327-328` — "checks every claim on this page"; it checks the
   animation layout and the packaged file set. — Say that.
+
+### docs/DEV_LOOP.md
+
+`lint_docs.py`: 0 errors; two sentences over 40 words (`:124-128`, and the
+landing block read as prose).
+
+- [ ] Whole file — the page never mentions `flow.ps1 test`, `status`,
+  `branch` or `shipping`, which the project uses to reach every state it
+  describes; the loop is given as bare `dev_deploy.ps1` calls. — Lead with
+  the `flow.ps1` verbs; keep `dev_deploy.ps1` switches as reference beneath.
+- [ ] `:33-67` pre-push hook — `git config core.hooksPath .githooks`; there
+  is no `.githooks`. The hooks live in `.claude/hooks/`, which is ignored,
+  and `core.hooksPath` points there. `STYLE.md` keeps local workflow off
+  the remote. — See the hook-section ruling.
+- [ ] `:56-60` — the justification for keeping mod-page checks out of the
+  build. — One sentence: `publish_nexus.ps1` also checks the page copy.
+- [ ] `:72-79` — omits `-NoDevMode`, `-NoLooseScript`, `-ReleaseSettings`,
+  `-Force`; `-Force` appears only in prose at `:30`. — Complete the table.
+- [ ] `:90-92` — "rewrites all four animation databases"; the build writes
+  three `.adb` files. — Drop the count.
+- [ ] `:98-105` — the loose-file list omits `Libs\Config\hcm_actionmaps.xml`,
+  which `-Reload` deploys (`dev_deploy.ps1:781`). — Add it, with the note
+  that it needs a restart.
+- [ ] `:111` — "A file one level higher is never read" with no referent. —
+  Name the path, or cut.
+- [ ] `:124-128` — 58-word sentence; the `dev` world also switches off the
+  bolt and `WomenRaiseAlarm`. — List what `[dev]` sets, or point at
+  `testworlds.ini`.
+- [ ] `:156-160` — "which a regex over the settings file could not do once
+  everything per-tier moved into tables". — Cut the clause.
+- [ ] `:168-169` — "A world nobody could see is how a setting stays on through
+  the next three tests." — Cut.
+- [ ] `:190` — omits `--diagnose`, `--file`, `--raw`, `--ride`, `--wait`. —
+  Complete the table; `--file` is used at `:235`.
+- [ ] `:222` — sample log line says `v3.0.0`. — Use `v<version>`.
+- [ ] `:227-235` — "None of that is necessary. It is not necessary."; the
+  command block has a broken line (`python tools/dev_survival.lua-style
+  setup, then`). — One sentence; two `--file` commands.
+- [ ] `:238` — "verified moving day 38 to day 39 instantly". — Cut.
+- [ ] `:249-251` — "fourteen places", "thirteen part files"; there are twenty
+  part files, and `set_version.py` lists the directory. Same stale count in
+  README `:318` and `set_version.py:3-5` ("eleven"). — Drop the counts.
+- [ ] `:266-282` — the manual landing sequence restates `flow.ps1 land` and
+  argues that `--merged` is safe. — "`flow.ps1 land` does this:" and a
+  one-line list of its steps.
+- [ ] `:289-297` "Two things that used to bite" — history. — Cut.
+- [ ] `:299-310` — the packaged-build checklist never names `flow.ps1
+  shipping`, which sets up exactly that state. — Name it; keep the list as
+  what it establishes.
 
 ### Dead code (`tools/audit_code.py`)
 
