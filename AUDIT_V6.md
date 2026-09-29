@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** every source file audited; Enums.lua was the last.
+**Current status:** every source file audited; README.md audited.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,8 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** documentation — `README`, then `docs/*.md` except the diary.
+**Next pass:** `docs/HOW_IT_WORKS.md`, then the rest of `docs/*.md` except
+the diary, one file per pass.
 
 **Pass order** (dependencies first, then largest):
 
@@ -231,6 +232,19 @@ Items that change behavior or delete a feature. Not applied without a decision.
   table carries `ui_tutorial_hcm_rear` and `ui_tutorial_hcm_charge`, which
   nothing reads, with different text and no lean entry. Proposal: delete
   the two unused cells, since only the Lua text can name a rebound key.
+
+- [ ] **README settings table.** It lists 97 settings as "the ones worth
+  changing" while the player section of the settings file holds about 120
+  more (`ShowTutorials`, `ImpactDamage`, `Barks`, `RiderBark`, `RearFear`,
+  `ProtectStoryCharacters` among them), and every row repeats a fact the
+  file's own comments own. `nexus_settings_block.py` already generates the
+  mod page's block from the file. Proposal: generate the README table the
+  same way, checked by `--check`, or cut it to a short list of headline
+  toggles that points at the file.
+
+- [ ] **README repository layout.** A player-facing README carries 120 lines
+  of developer tooling. Proposal: keep the top-level layout in the README and
+  move the `tools/` catalog to `DEV_LOOP.md`.
 
 ## Findings
 
@@ -1915,6 +1929,61 @@ match.
   messages the mod sends".
 - [ ] `:29` — "`Tickle` and `Unpleasant` cost the victim no health"; the
   type definition gives `Exhausting` as no health loss too. — Add it.
+
+### README.md
+
+`lint_docs.py` reports nothing. Every default in the settings table matches
+the file except `ThrowByTier`.
+
+- [ ] `:14-16` table — Rear "Higher cost", Charge "Highest cost"; gallop, rear
+  and charge all ship 0.20 (`Settings:108-114`). — "Same as a gallop", and
+  "Same, once per charge".
+- [ ] `:18-20` — "Two moves on two keys" names only `F`; the charge's `R` is
+  never given. — Name both keys.
+- [ ] `:25-27` — "genuinely is not charged to you". — Cut "genuinely".
+- [ ] `:43` — "every stamina cost is multiplied"; `CombatStaminaAdd` adds
+  0.13 to the share. — "raised".
+- [ ] `:55-61` — "no longer recognizes", "now", "no longer describe", "moved
+  to `F`": upgrade history from 4.x. — Keep the first paragraph's
+  instruction; move the 4.x note to the changelog if it is not there.
+- [ ] `:65-68` — "The ones worth changing are listed below"; see the
+  settings-table ruling.
+- [ ] `:77-80` — the hard-link explanation for editing the Vortex staging
+  copy. — "Edit this copy, not the deployed one under `Mods\`."
+- [ ] `:100-101` `Knockback`, `Uplift` — "trot and gallop only"; they reach
+  only ragdoll tiers (`Reaction.lua:311-338`), gallop and charge as shipped.
+  Same error at `Settings:32`. — "ragdoll tiers only".
+- [ ] `:102`, `:118`, `:124`, `:142`, `:145`, `:146`, `:148`, `:161`, `:183`,
+  `:188` — rationale in the player's table (why a delay decides murder, why
+  the rear dust differs, "a master rides through four or five guards", "the
+  half of barding you actually feel", "exists for future investigation"). —
+  One sentence each: what the setting does and its unit.
+- [ ] `:111` `ThrowByTier` — "Charge 0.7"; the file ships 1.0, and the charge's
+  throw is `RearChargeThrow` with `ThrowByTier` as trim. — Correct the figure
+  and say it is trim.
+- [ ] `:113` `ReleaseAnimationMovement` — "restores the behavior before
+  4.0.0". — Say what false does.
+- [ ] `:117` `ProtectMutt` — follows the `ProtectMutt` ruling.
+- [ ] `:159`, `:167` — the rear keys are "r, q, e, f, y, u, o, h", correct; the
+  lean list gives `g` where the action map has `f` (`hcm_lean_*_f`, no `g`). —
+  One key list, stated once.
+- [ ] `:180-182` — "he" for the victim. — "the victim".
+- [ ] `:184` `RetaliationSurrenderHint` — "Surrendering already worked;
+  nothing told you so." — Cut.
+- [ ] `:190` — "A few detection internals are omitted"; about 120 settings
+  above the file's internals line are omitted. — Follows the settings-table
+  ruling.
+- [ ] `:194-195` — "RPG tables are untouched"; the mod ships perk rows under
+  `src/Libs/Tables/rpg/`. — "RPG tables are extended, never replaced."
+- [ ] `:200-205` Planned — "a rear frightens people the hooves never reach"
+  shipped in 5.25.0 (`Fear.lua`). — Keep the line and the polearm; add fear
+  to **What happens**.
+- [ ] `:207-332` layout — `docs/` omits `ARCHITECTURE_NOTES.md` and
+  `BALANCE_AUDIT.md`; the tool descriptions carry purpose clauses ("so a ride
+  is not also a search for someone standing usefully") and `legacy/` a
+  paragraph of justification. — See the layout ruling; one line per entry.
+- [ ] `:342` — `-Version "3.0.0"`; `-Version` defaults to `dev`, and releases
+  are versioned by `flow.ps1 land`. — Show the default build.
 
 ### Dead code (`tools/audit_code.py`)
 
