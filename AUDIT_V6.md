@@ -2848,6 +2848,23 @@ and the section comments number the claims differently from the docstring.
 - [ ] `:278-279` — "how a setting stays on through the next three tests". —
   "Printed after any change, so the live world is always visible."
 
+### tools/dev_subject.lua
+
+Accurate; the rationale sections run long.
+
+- [ ] `:23-27` — "seventy-five of the hundred-odd NPCs around a village
+  already read 0/0/0". — "`AIMovementAbility` is descriptive; setting it
+  does not stop an NPC's routine."
+- [ ] `:37-38` — "looks deliberate rather than arbitrary". — Cut.
+
+### tools/nexus_settings_block.py
+
+- [ ] `:5` — "There were 150 missing at the 5.10.0 audit." — Cut.
+- [ ] `:92-93` — "which is what the page showed before". — Cut.
+- [ ] `:10-11` — `--` as dashes. — Rephrase.
+- [ ] `:28-29` — paths relative to the working directory. — Resolve from
+  `__file__`.
+
 ### Dead code (`tools/audit_code.py`)
 
 - [ ] `Recovery.lua:177` `WatchRecoveryForRearm` — nothing calls it. — Delete.
