@@ -15,7 +15,8 @@ end of every pass, so it always says where the audit stands.
 **Current status:** every source file and every document except the diary
 audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
 `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
-`verify_additive.py`, `version_check.py`, `set_version.py` done.
+`verify_additive.py`, `version_check.py`, `set_version.py`,
+`audit_code.py`, `testworld.py` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -27,8 +28,9 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `audit_code.py`,
-`testworld.py`, `dev_subject.lua`, then the rest; `tools/legacy/` last. Then `.claude/`
+**Next pass:** `tools/`, largest first: `dev_subject.lua`,
+`nexus_settings_block.py`, the bark scripts, the `probe_` and `dev_` Lua,
+`testworlds.ini`; `tools/legacy/` last. Then `.claude/`
 hooks and linter.
 
 **Pass order** (dependencies first, then largest):
@@ -330,6 +332,10 @@ Format: `file:line` — problem — planned edit.
 - [ ] `tools/audit_code.py` — reports `RearCooldownBuff` and
   `ChargeCooldownBuff` as unread; `Rear.lua:431` reads them by string. —
   Recognize string references, or record the exemption.
+- [ ] `tools/*.py` — seven files are tab-indented (`audit_code`,
+  `bark_alias`, `bark_lines`, `henry_impact_lines`, `nexus_settings_block`,
+  `npc_pain_sets`, `testworld`); the rest use four spaces. — Four spaces
+  (PEP 8) throughout.
 
 ### src/HorseCollisionMod.lua
 
@@ -2818,6 +2824,29 @@ and the section comments number the claims differently from the docstring.
   which was never the cause." — Keep the LDoc failure it prevents.
 - [ ] `:164-165` — "That failure was silent and therefore the worst kind". —
   Cut.
+
+### tools/audit_code.py
+
+- [ ] `:14-15`, `:143-146`, `:173-175` — "Each found real drift at 5.26.0",
+  "Seventeen of them disagreed … at 5.26.0, among them
+  `CameraShakeFrequency or 12`", "`ShieldVictimFromEngineDamage` read
+  `false`…". — Keep each check's reason; cut the tallies and examples.
+- [ ] `:98` — "reports all eight"; `Tiers.lua` declares nine. — Drop the
+  count.
+- [ ] `:39-42`, `:272` — `src` and `tools` are relative to the working
+  directory, so the script only works from the repository root. — Resolve
+  from `__file__`, as the other tools do.
+- [ ] `:3` — "judgement". — "judgment".
+
+### tools/testworld.py
+
+- [ ] `:3-16` — "The problem this replaces", the three PowerShell switches
+  it replaced, and a quoted, profane remark from the rider. History, a
+  person, and a quote, in a tracked file. — Cut entirely; `:18-34` is the
+  docstring.
+- [ ] `:18` — "How it works now." — Cut the lead-in.
+- [ ] `:278-279` — "how a setting stays on through the next three tests". —
+  "Printed after any change, so the live world is always visible."
 
 ### Dead code (`tools/audit_code.py`)
 
