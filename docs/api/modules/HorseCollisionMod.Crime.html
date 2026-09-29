@@ -68,7 +68,7 @@
 
 <h1>Module <code>HorseCollisionMod.Crime</code></h1>
 <p>Crime: making the game charge the player for riding someone down.</p>
-<p> Vanilla does not treat a mounted collision as an offence at all. What makes
+<p> Vanilla does not treat a mounted collision as an offense at all. What makes
  it one is a real combat hit attributed to the player, which is delivered as
  <code>combat:hit</code> rather than <code>hitReaction</code>: the latter is consumed by a passive
  observer that cannot drive a body or raise a crime, while the former feeds
@@ -76,36 +76,26 @@
 
 <p> <code>CollisionIsCrime</code> gates the whole thing, and the payload shape is vanilla's
  own, taken from the branch that turns a player-ridden collision into a real
- hit. The strength sent is the same <code>HitReactionStrength</code> the tier chose, so
- a harder impact is charged as a worse offence without this file deciding
- anything about severity.</p>
+ hit.</p>
 
 <p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Author</strong>:  jrandall54
- The engine's <code>combatAttackKind</code>, transcribed from
- <code>Libs/AI/TypeDefinitions.xml</code>. Sequential, and the type definition's own
- comment says the melee entries are ordered by increasing violence.</p>
-
-<p> <code>Unarmed</code> is what a shove from horseback is charged as: the mildest melee
- kind, so a provoked scuffle is a scuffle rather than an armed assault.</p>
-
-<p> It lives here rather than in <code>Enums.lua</code> beside the other engine enums for
- a blunt reason: a third annotated table in that module makes LDoc fail
- outright with "'class' cannot have multiple values", whatever the tags on
- it say. Here it sits beside its only consumer, which is the better place
- for it anyway. Documented as an ordinary comment for the same reason the
- entry point does that for the tables LDoc misreads.</p>
-
-<p> The full set is kept rather than only the value used, so the contract
- stays verifiable against the engine.</li>
+        <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
 
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:MessageTarget">HorseCollisionMod:MessageTarget (npc)</a></td>
+	<td class="summary">The id a message to this character is addressed to.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayerWuid">HorseCollisionMod:PlayerWuid ()</a></td>
+	<td class="summary">The player's WUID.</td>
+	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:SendCombatHit">HorseCollisionMod:SendCombatHit (npc, playerEnt, strength)</a></td>
 	<td class="summary">Sends the victim a real combat hit, attributed to the player.</td>
@@ -128,6 +118,52 @@
 
     <dl class="function">
     <dt>
+    <a name = "HorseCollisionMod:MessageTarget"></a>
+    <strong>HorseCollisionMod:MessageTarget (npc)</strong>
+    </dt>
+    <dd>
+    The id a message to this character is addressed to.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the character
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>npc.this.id</code> where the entity carries one, its own id otherwise
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:PlayerWuid"></a>
+    <strong>HorseCollisionMod:PlayerWuid ()</strong>
+    </dt>
+    <dd>
+    The player's WUID.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types">optional <span class="type">userdata</span></span>
+        the WUID, or nil when it cannot be read
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:SendCombatHit"></a>
     <strong>HorseCollisionMod:SendCombatHit (npc, playerEnt, strength)</strong>
     </dt>
@@ -136,9 +172,7 @@
 
 <p> <code>hitReaction</code> is a physical event, consumed by <code>sb_switch_hitreactions.xml</code>,
  which is a passive observer that cannot drive a body. <code>combat:hit</code> feeds the
- combat subbrain, which owns it. That difference is why this is worth trying
- at all, and why the mod's reaction animations have always had to be played
- by seizing the actor instead.</p>
+ combat subbrain, which owns it.</p>
 
 <p> The shape is vanilla's own, from the branch in that switch tree that turns a
  player-ridden collision into a real hit:</p>
@@ -149,15 +183,20 @@
 
 <p> A collision is rewritten as <code>Melee</code> there rather than kept as <code>Collision</code>,
  the player is named rather than the horse, and <code>real</code> marks it as a genuine
- strike rather than a near miss.</p>
+ strike rather than a near miss. The crime system prosecutes <code>Melee</code>,
+ <code>MeleeStealth</code> and <code>Bullet</code> and ignores <code>Collision</code> and <code>Fall</code>, so
+ vanilla rewrites a ridden collision to <code>Melee</code>.</p>
 
 <p> The payload has to be a typed table. As a <code>key(value)</code> string this message
- is accepted and discarded, producing no reaction and no hostility, which is
- the same fault that made <code>daycycle:restartRequest</code> look inert.</p>
+ is accepted and discarded, producing no reaction and no hostility.</p>
 
 <p> <code>CollisionIsCrime</code> governs it. A real hit attributed to the player is how the
- game decides a crime happened, so this is what turns a village against the
- rider.
+ game decides a crime happened.</p>
+
+<p> <code>strength</code> is passed through and changes nothing about the charge: a
+ <code>Tickle</code>, which costs no health, is prosecuted exactly as a <code>Fatal</code> is. The
+ fine scales with the victim's social class, and murder arrives on its own
+ when a victim dies.
 
 
     <h3>Parameters:</h3>
@@ -176,12 +215,6 @@
         </li>
     </ul>
 
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when the call was accepted
-    </ol>
 
 
 
@@ -205,8 +238,7 @@
     <code>SpawnExpiringPerceptibleVolume</code> one meter across at the victim, labeled
     <code>assault</code>, for six seconds, at full conspicuousness and visibility, then
     blinds the attacker and the victim to it and leaves everyone else able to
-    see it. That volume is how a bystander learns an assault happened, and it
-    is what charged the rider with brawling before a punch had been thrown.</li>
+    see it. That volume is how a bystander learns an assault happened.</li>
 </ul>
 
 <p> <code>combat:stimulus:hit</code> is the message that switch ultimately sends onward to
@@ -238,12 +270,6 @@
         </li>
     </ul>
 
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when the call was accepted
-    </ol>
 
 
 
@@ -259,8 +285,7 @@
 <p> A civilian the player provokes enters the fight carrying
  <code>startInDefenseOnly</code>, which <code>sb_combat_fight.xml</code> turns into
  <code>$offense = false</code>. Such a fighter squares up, holds his guard and never
- strikes, which is what a provoked victim was observed doing for twenty-two
- seconds before the rider swung first.</p>
+ strikes.</p>
 
 <p> Exactly one node in that subtree sets the flag true. It reads the
  <code>hitReaction</code> inbox and requires a strength above <code>Zero</code> and a type of
@@ -274,19 +299,19 @@
  horse impact is, is not one of the two types the condition accepts, so the
  horse's own contact can never release a fighter however hard it lands.</p>
 
-<p> ### The attacker named is the horse, and that is the whole trick</p>
+<p> ### The attacker named is the horse</p>
 
 <p> <code>sb_switch_hitreactions.xml</code> reads the <code>hitReaction</code> inbox as well, so this
  message reaches the assault broadcast described above <a href="../modules/HorseCollisionMod.Crime.html#HorseCollisionMod:SendProvocationHit">SendProvocationHit</a>,
- which is <strong>not</strong> gated on <code>real</code> and which charges the rider with brawling
- before he has thrown a punch. There is no message that reaches one consumer
+ which is <strong>not</strong> gated on <code>real</code> and would charge the player with brawling
+ before a punch is thrown. There is no message that reaches one consumer
  and not the other: they share the inbox, so the trick that keeps the
  provocation quiet, sending the onward message directly, has no equivalent
  here.</p>
 
 <p> What the broadcast does key on is <code>hit.attacker</code>. Naming anyone but the
  player leaves an assault attributed to nobody the crime system prosecutes,
- and measured against a null control it costs exactly nothing:</p>
+ and costs nothing:</p>
 
 <pre><code> attacker = player   victim -0.31, every bystander -0.030
  attacker = victim   victim  0.00, every bystander  0.000
@@ -295,7 +320,8 @@
 <p> The horse is named rather than the victim, because the node that reads this
  also registers the attacker as an opponent, and a victim made his own
  opponent has himself to cool down from before <code>state_standDown</code> releases
- him. The horse is what struck him in the first place.</p>
+ him. Where there is no horse the victim is named, which is still crime
+ free.</p>
 
 <p> The flag is still set, because the condition that guards it tests only the
  strength and the type and never looks at who threw the blow. The opponent
@@ -308,16 +334,10 @@
     <ul>
         <li><span class="parameter">npc</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity, who is also named as the attacker
+         victim entity
         </li>
     </ul>
 
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when the message was sent
-    </ol>
 
 
 
@@ -330,7 +350,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-29 13:51:33 </i>
+<i style="float:right;">Last updated 2026-09-29 16:12:06 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

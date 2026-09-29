@@ -69,9 +69,8 @@
 
 <h1>Module <code>HorseCollisionMod.Sound</code></h1>
 <p>Sound: the noise a collision makes.</p>
-<p> A collision is silent. The victim's bark and the horse's own foley are all
- there is, and nothing in the moment says that eighty kilograms of person was
- struck by half a ton of horse.</p>
+<p> Vanilla plays nothing for a collision beyond the victim's bark and the
+ horse's own foley.</p>
 
 <p> Vanilla's audio triggers are reachable from Lua through a global helper in
  <code>Scripts/Utils/SoundUtils.lua</code>:</p>
@@ -84,23 +83,15 @@
 <span class="keyword">end</span>
 </pre>
 
-<p> The trigger names come from the game's own <code>.animevents</code> files, which carry
- 242 distinct <code>audio_trigger</code> parameters between them. That is the authored
- vocabulary, and a name outside it does not resolve.</p>
+<p> The trigger names are the game's audio triggers, listed with their events in
+ <code>references/audio_triggers.tsv</code>. A name that does not exist plays nothing.</p>
 
 <p> ### Why this is not in the animation data</p>
 
-<p> The animation databases this mod generates can carry a <code>PlaySound</code>
- procedural layer, and that route works: a trigger fired that way is audible,
- and the stock male database ships twenty four of them. It was built, tested
- in game, and abandoned, because a fragment cannot make a sound before it
- starts. Even at <code>ExitTime=&quot;0.0&quot;</code> the noise arrives after the horse has
- already hit, since the reaction animation begins a detection tick and an
- interactive-action call later than the contact that caused it. The rider's
- verdict on that build was that the timing was "way off".</p>
-
-<p> Firing from here instead puts the sound on the same line as the impact that
- detected it, and leaves the animation data unchanged.</p>
+<p> A fragment's <code>PlaySound</code> procedural layer starts with the reaction, which
+ begins a detection tick and an interactive-action call after the contact,
+ so even at <code>ExitTime=&quot;0.0&quot;</code> the sound lands late. Firing from here puts the
+ sound on the same line as the impact that detected it.</p>
 
 <p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
  pulls this file in with <code>Script.ReloadScript</code>.</p>
@@ -125,12 +116,20 @@
 	<td class="summary">Plays the impact sound for one collision.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayTriggerAfter">HorseCollisionMod:PlayTriggerAfter (entity, trigger, delay, distance)</a></td>
+	<td class="summary">Plays a trigger on an entity now, or after a delay.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:PlayRiderVocal">HorseCollisionMod:PlayRiderVocal (playerEnt, tierName)</a></td>
 	<td class="summary">Henry's own grunt as the collision goes through him.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:PlayHorseVocal">HorseCollisionMod:PlayHorseVocal (horseEnt, tierName)</a></td>
 	<td class="summary">Plays a horse vocalization on the horse entity at each impact tier.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayGatedVocal">HorseCollisionMod:PlayGatedVocal (entity, tierName, layer, rank, gate)</a></td>
+	<td class="summary">Plays one vocal layer through a ranked voice gate.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:PlayAtDistance">HorseCollisionMod:PlayAtDistance (entity, trigger, distance)</a></td>
@@ -164,8 +163,8 @@
     <dd>
     The material a victim's armor sounds like, by engine armor type. </p>
 
-<p> <code>Armor.lua</code> reports the heaviest type a victim is wearing, transcribed in
- <code>ArmorTypeNames</code>: 4 is chain and 5 is plate. Everything lighter, leather
+<p> <code>ArmorOf</code> reports the type of the heaviest piece a victim is wearing,
+ transcribed in <code>ArmorTypeNames</code>: 4 is chain and 5 is plate. Everything lighter, leather
  included, sounds like cloth, because the blunt impact families are only
  authored for three materials.
 
@@ -234,51 +233,34 @@
 <p> Called from <code>OnImpact</code> before the reaction is chosen, so the request goes
  out ahead of the animation rather than behind it.</p>
 
-<p> Firing it earlier than the collision does not work. A footprint reaching
- sixty milliseconds of travel further forward sounds near misses, and sounds
- the same victim twice, which is worse than a sound that is slightly late.</p>
+<p> Firing it earlier than the collision does not work: sounding ahead of
+ contact plays near misses, and sounds the same victim twice.</p>
 
 <p> ### Layers</p>
 
-<p> A tier names a list of <code>{ trigger, delayMs }</code> pairs rather than one sound,
- because no single sound in the game is a horse striking a person. Vanilla
- never makes that noise, so its library does not contain it: of twenty three
- candidates, every one reads as a weapon, a footstep or a dropped object.</p>
-
-<p> What works is the horse's own weight underneath a body impact:
- <code>a_o_jump_landing</code> is the sound of the horse landing from a jump, and it is
- the only sample in the game carrying that mass. A blunt body impact ten
- milliseconds later reads as the thing it struck.</p>
-
-<p> The offsets are small on purpose. Far enough apart to thicken the hit,
- close enough that the ear takes them as one event rather than as a stack.</p>
-
-<p> A layer is <code>{ trigger, delay, distance, chance }</code>. Distance is the volume
- control and chance is how often the layer appears at all, which is the only
- lever on a sample whose level cannot be changed.</p>
-
-<p> A trigger name that is a key of <a href="../modules/HorseCollisionMod.Sound.html#ImpactTokens">ImpactTokens</a> (<code>body</code>, <code>body_armed</code>,
- <code>face_armed</code>, <code>blunt</code>) is replaced with the sample matching the victim's
- armor.</p>
+<p> A tier names a list of layers rather than one sound, because no single
+ sound in the game is a horse striking a person. A layer is
+ <code>{ trigger, delay, distance, chance }</code>. The offsets are small, so the ear
+ takes the layers as one event. Distance is the volume control and chance is
+ how often the layer appears at all, which is the only lever on a sample
+ whose level cannot be changed. A trigger name that is a key of
+ <a href="../modules/HorseCollisionMod.Sound.html#ImpactTokens">ImpactTokens</a> is replaced with the sample matching the victim's armor.</p>
 
 <p> ### Balancing layers without a volume control</p>
 
 <p> There is no gain on a trigger. Distance is the substitute, and it only
- reaches events authored in 3D; <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayAtDistance">PlayAtDistance</a> documents what was measured.
- Loudness upward comes from repetition instead, which is why a tier names the
- same sample two or four times a few milliseconds apart.</p>
+ reaches events authored in 3D; see <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayAtDistance">PlayAtDistance</a>. Loudness upward comes
+ from repetition instead: a tier names the same sample more
+ than once a few milliseconds apart.</p>
 
 <p> Levels can only be judged from the saddle. Every sample here is clearly
  audible standing still and most of them disappear under the horse's own
  hoofbeats at speed, so a mix that sounds correct while parked is not the
  mix that will be heard.</p>
 
-<p> And they can only be judged from the camera the player uses.
- <code>ImpactSoundDistance</code> is added to every layer for exactly that reason: the
- listener follows the camera, so a third-person view starts several meters
- further from the victim than a first-person one and hears the whole mix
- quieter. The per-layer distances set the balance between the layers; the
- master sets where that balance sits.
+<p> And they can only be judged from the camera the player uses: the listener
+ follows the camera, so a third-person view starts several meters further
+ from the victim than a first-person one and hears the whole mix quieter.
 
 
     <h3>Parameters:</h3>
@@ -289,7 +271,7 @@
         </li>
         <li><span class="parameter">tierName</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Walk", "Trot" or "Gallop"
+         an impact tier name
         </li>
         <li><span class="parameter">armor</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
@@ -298,12 +280,40 @@
         </li>
     </ul>
 
-    <h3>Returns:</h3>
-    <ol>
 
-           <span class="types"><span class="type">boolean</span></span>
-        true when at least one layer was played
-    </ol>
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:PlayTriggerAfter"></a>
+    <strong>HorseCollisionMod:PlayTriggerAfter (entity, trigger, delay, distance)</strong>
+    </dt>
+    <dd>
+    Plays a trigger on an entity now, or after a delay.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the entity the sound belongs to
+        </li>
+        <li><span class="parameter">trigger</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the audio trigger name
+        </li>
+        <li><span class="parameter">delay</span>
+            <span class="types"><span class="type">number</span></span>
+         milliseconds to wait, 0 or less to play at once
+        </li>
+        <li><span class="parameter">distance</span>
+            <span class="types"><span class="type">number</span></span>
+         meters to push the sound back by through
+   <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayAtDistance">PlayAtDistance</a>, 0 or less to play it where it is
+        </li>
+    </ul>
+
 
 
 
@@ -316,30 +326,24 @@
     <dd>
     Henry's own grunt as the collision goes through him. </p>
 
-<p> The victim makes a noise and the camera kicks, and until now the rider was
- silent through both. The game authors him three severities of taking a hit:</p>
+<p> The game authors him three severities of taking a hit:</p>
 
 <pre><code> v_henry_hit_soft     event:/voice/henry_hit_soft
  v_henry_hit_medium   event:/voice/henry_hit_medium
  v_henry_hit_heavy    event:/voice/henry_hit_heavy
 </code></pre>
 
-<p> which is the same shape as the tiers, so each tier names one.</p>
+<p> and <code>RiderVocalByTier</code> names one per tier; the shipped tiers use <code>soft</code> and
+ <code>heavy</code>.</p>
 
 <p> ### Why this is not a bark</p>
 
-<p> Every earlier attempt at giving Henry something to say went through
- <code>dialog:monologRequest</code>, and the sets available to him answered with full
- Skalitz monologs rather than a grunt, because the mod chooses a set and the
- dialog system chooses the line out of it. <code>Bark.lua</code> still carries that
- constraint and it is real.</p>
-
-<p> These are not dialogue. They are FMOD events fired straight at the entity's
- audio proxy, the same call the impact foley above uses, so the mod names the
- exact event and the dialog system is not consulted. A named event cannot
- answer with a monolog, which removes the only thing that made Henry's half
- unusable. It also means no priority auction and no cooldown: this cannot be
- taken by a crime reaction the way a collision bark is.</p>
+<p> A bark names a set and the dialog system chooses the line, and the sets
+ available to Henry answer with full monologs. These are FMOD events fired
+ straight at the entity's audio proxy, the same call the impact foley above
+ uses, so the mod names the exact event and the dialog system is not
+ consulted: no monolog, no priority auction, and nothing a crime reaction can
+ take.</p>
 
 <p> What it does not give is a choice of sample. An FMOD event may hold several
  takes and randomize inside them, and that is internal to FMOD. The severity
@@ -360,24 +364,13 @@
 <p> ### Why there is a cooldown</p>
 
 <p> Riding into a group lands several collisions inside a second, and one grunt
- per collision does not read as a man being jolted repeatedly, it reads as
- broken audio. The rider's verdict on the first build:</p>
+ per collision reads as broken audio rather than a rider being jolted. So
+ <code>RiderVocalCooldownMs</code> holds the next one off. One exception: a <strong>harder</strong>
+ impact, by <code>RiderVocalRankByTier</code>, is still allowed through, because a
+ gallop silenced by the walk shove just before it is the worse fault.</p>
 
-<p> > "Henry only needs to grunt or make sound once within a short period as
- > with multiple impacts happening within a short interval sounds weird."</p>
-
-<p> So <code>RiderVocalCooldownMs</code> holds the next one off. One exception: a <strong>harder</strong>
- impact is still allowed through, because a gallop silenced by the walk shove
- that happened just before it is a worse fault than the one being fixed. Ranks
- are the mod's own reading of severity rather than config, so changing a
- trigger cannot scramble them.</p>
-
-<p> The worst case is therefore three grunts in one window, soft then medium then
- heavy, which needs three impacts of rising tier inside the cooldown. Riding
- through a crowd is all one tier and gets one grunt.</p>
-
-<p> The stamp is taken when the grunt is <em>scheduled</em> rather than when it plays,
- so collisions arriving inside the tier's own delay are still caught.
+<p> With the shipped ranks the worst case is two grunts in one window, rank 2
+ then rank 3. Riding through a crowd is all one tier and gets one grunt.
 
 
     <h3>Parameters:</h3>
@@ -388,16 +381,10 @@
         </li>
         <li><span class="parameter">tierName</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Walk", "Trot", "Gallop", "Charge" or "Rear"
+         an impact tier name
         </li>
     </ul>
 
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when a trigger resolved and was played
-    </ol>
 
 
 
@@ -410,20 +397,10 @@
     <dd>
     Plays a horse vocalization on the horse entity at each impact tier. </p>
 
-<p> Mirrors <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayRiderVocal">PlayRiderVocal</a> but targets the horse rather than the rider.
- Playing a horse trigger on a human entity corrupts CryEngine's audio
- proxy because the triggers carry <code>path=&quot;horse&quot;</code> metadata that the engine
- applies structurally, not just as routing. Every call here goes to
- <code>horseEnt</code> only.</p>
-
-<p> The horse gets its own independent voice gate (<code>HorseVoiceUntil</code> /
- <code>HorseVoiceRank</code>) so a rapid series of collisions does not produce a
- chorus. The gate mirrors the rider-vocal logic: a harder impact is still
- let through, but equal or lighter ones are held off.</p>
-
-<p> Config: <code>HorseVocal</code> boolean master switch, <code>HorseVocalByTier</code> for per-tier
- <code>{ trigger, delayMs, distance, chance }</code>, <code>HorseVocalRankByTier</code> for
- severity ordering.
+<p> Mirrors <a href="../modules/HorseCollisionMod.Sound.html#HorseCollisionMod:PlayRiderVocal">PlayRiderVocal</a>, played on the horse. The horse has its own voice
+ gate (<code>HorseVoiceUntil</code> and <code>HorseVoiceRank</code>), so a rapid series of
+ collisions does not produce a chorus: a harder impact is still let through,
+ and equal or lighter ones are held off.
 
 
     <h3>Parameters:</h3>
@@ -434,16 +411,53 @@
         </li>
         <li><span class="parameter">tierName</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Walk", "Trot", "Gallop", "Charge" or "Rear"
+         an impact tier name
         </li>
     </ul>
 
-    <h3>Returns:</h3>
-    <ol>
 
-           <span class="types"><span class="type">boolean</span></span>
-        true when a trigger resolved and was played
-    </ol>
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:PlayGatedVocal"></a>
+    <strong>HorseCollisionMod:PlayGatedVocal (entity, tierName, layer, rank, gate)</strong>
+    </dt>
+    <dd>
+    Plays one vocal layer through a ranked voice gate. </p>
+
+<p> The hold is stamped when the sound is <em>scheduled</em> rather than when it
+ plays, so collisions arriving inside the layer's own delay are still
+ caught.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">entity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         who the sound comes out of
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         an impact tier name, for the log line
+        </li>
+        <li><span class="parameter">layer</span>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         <code>{ trigger, delayMs, distance, chance }</code>; a missing
+   layer or a <code>&quot;&quot;</code> trigger is silent
+        </li>
+        <li><span class="parameter">rank</span>
+            <span class="types"><span class="type">number</span></span>
+         this sound's weight against the hold
+        </li>
+        <li><span class="parameter">gate</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         a gate as <code>VoiceGateOpen</code> reads it, plus <code>name</code> for the
+   log line and <code>cooldown</code>, the hold this sound stamps
+        </li>
+    </ul>
+
 
 
 
@@ -466,15 +480,13 @@
  level changes. Offsetting along an arbitrary axis instead moves the sound
  across the stereo field, which is audible as panning rather than as volume.</p>
 
-<p> <code>SetAudioProxyOffset</code> takes an entity-local vector, which is why the world
+<p> <code>SetAudioProxyOffset</code> takes an entity-local vector, so the world
  direction is converted through the entity's own axes. <code>Lightning.lua</code> uses
  the same call for distant thunder.</p>
 
-<p> It only works on events authored in 3D. Measured through speakers placed at
- verified distances of 2 and 25 meters, <code>blunt_unarmed_body_fabric</code> was
- inaudible at the far one and <code>a_o_jump_landing</code> was identical at both: the
- landing lives under <code>hoofsteps_player</code> and ignores position entirely, so its
- level is fixed and no distance will lower it.
+<p> It only works on events authored in 3D. <code>a_o_jump_landing</code> lives under
+ <code>hoofsteps_player</code>, which ignores position, so its level is fixed and no
+ distance lowers it.
 
 
     <h3>Parameters:</h3>
@@ -511,11 +523,13 @@
     <dd>
     An entity-local offset that pushes a sound directly away from the listener. </p>
 
-<p> The world vector from the player to the entity, normalized and scaled, then
+<p> The player's position stands in for the listener, which follows the camera.
+ The world vector from the player to the entity, normalized and scaled, is
  expressed in the entity's own frame, because that is the space
  <code>SetAudioProxyOffset</code> reads. Falls back to straight up when the listener is
- on top of the entity, which happens while mounted and would otherwise push
- the sound into the ground.
+ within half a meter of the entity, as it is while mounted, where there is
+ no direction to push along and a guess could push the sound into the
+ ground.
 
 
     <h3>Parameters:</h3>
@@ -595,7 +609,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-29 13:51:33 </i>
+<i style="float:right;">Last updated 2026-09-29 16:12:06 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

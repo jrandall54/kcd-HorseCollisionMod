@@ -34,6 +34,7 @@
 <h2>Contents</h2>
 <ul>
 <li><a href="#Functions">Functions</a></li>
+<li><a href="#Tables">Tables</a></li>
 </ul>
 
 
@@ -67,16 +68,17 @@
 <div id="content">
 
 <h1>Module <code>HorseCollisionMod.Rider</code></h1>
-<p>Rider: what a collision costs the player and the horse.</p>
+<p>Rider: what a collision does to the player and the horse.</p>
 <p> The anti-bulldozing budget. Riding through a crowd has to end with Henry on
  the ground rather than being a free way to scatter a dozen people, so every
- impact at trot or gallop draws horse stamina, and a spent horse throws its
- rider.</p>
+ impact but a walk draws horse stamina, and a spent horse throws its rider
+ and sometimes bolts. The file also holds the rider's camera shake and blur,
+ the Horsemanship scale, <a href="../modules/HorseCollisionMod.Rider.html#HorseCollisionMod:GrantPerks">GrantPerks</a>, and <a href="../modules/HorseCollisionMod.Rider.html#HorseCollisionMod:PlayerHorse">PlayerHorse</a>.</p>
 
-<p> <code>IsCombatCollision</code> lives here despite its name. It decides how hard an
- impact counts, not whether it is an offence, and the stamina multiplier is
- its only consumer: charging into a fight costs the horse more than riding
- through a market. Whether a collision is a crime is <code>Crime.lua</code>.</p>
+<p> <a href="../modules/HorseCollisionMod.Rider.html#HorseCollisionMod:IsCombatCollision">IsCombatCollision</a> lives here despite its name. It decides how hard an
+ impact counts, not whether it is an offense: charging into a fight costs
+ the horse more than riding through a market. Whether a collision is a crime
+ is <code>Crime.lua</code>.</p>
 
 <p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
  pulls this file in with <code>Script.ReloadScript</code>. Every threshold and
@@ -89,6 +91,14 @@
 
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayerHorse">HorseCollisionMod:PlayerHorse ()</a></td>
+	<td class="summary">The player's horse entity.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsCombatCollision">HorseCollisionMod:IsCombatCollision (npc)</a></td>
+	<td class="summary">Whether an impact happens in a fight, for the combat stamina surcharge.</td>
+	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ThrowRider">HorseCollisionMod:ThrowRider (horseEnt, playerEnt)</a></td>
 	<td class="summary">Throws the rider from the horse.</td>
@@ -107,7 +117,7 @@
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ShakeRiderCamera">HorseCollisionMod:ShakeRiderCamera (playerEnt, tierName)</a></td>
-	<td class="summary">Shakes the rider's camera on a gallop impact.</td>
+	<td class="summary">Shakes the rider's camera on an impact.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BlurRiderView">HorseCollisionMod:BlurRiderView (playerEnt, tierName)</a></td>
@@ -130,6 +140,13 @@
 	<td class="summary">Grants the mod's Horsemanship perks directly to the player soul.</td>
 	</tr>
 </table>
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#Maneuvers">Maneuvers</a></td>
+	<td class="summary">The mod's Horsemanship maneuvers, in the order their banners are shown.</td>
+	</tr>
+</table>
 
 <br/>
 <br/>
@@ -139,6 +156,57 @@
 
     <dl class="function">
     <dt>
+    <a name = "HorseCollisionMod:PlayerHorse"></a>
+    <strong>HorseCollisionMod:PlayerHorse ()</strong>
+    </dt>
+    <dd>
+    The player's horse entity.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        the horse, or nil when the player has none or it cannot be
+   read
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:IsCombatCollision"></a>
+    <strong>HorseCollisionMod:IsCombatCollision (npc)</strong>
+    </dt>
+    <dd>
+    Whether an impact happens in a fight, for the combat stamina surcharge.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the victim, whose drawn weapon is logged only
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><span class="type">boolean</span></span>
+        true when the player is in combat danger</li>
+        <li>
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the readings, for the log</li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:ThrowRider"></a>
     <strong>HorseCollisionMod:ThrowRider (horseEnt, playerEnt)</strong>
     </dt>
@@ -147,8 +215,7 @@
 
 <p> Prefers the horse's own <code>RearAndThrowDown</code>, which plays the animation of
  the animal rearing and unseating its rider. Falls back to ragdolling the
- player, which is what earlier builds did and which reads as the player
- collapsing rather than being thrown.</p>
+ player, which reads as the player collapsing rather than being thrown.</p>
 
 <p> <code>RearAndThrowDown</code> is undocumented. It sits on the horse entity's <code>horse</code>
  extension, alongside <code>HasRider</code> and <code>IsMountable</code>.
@@ -180,10 +247,7 @@
 
 <p> The single place the stamina figure is worked out. Every tier goes through
  it, so the rider's Horsemanship, the horse's barding and the combat
- surcharge reach a rear and a charge exactly as they reach a gallop. They did
- not before: the rear and the charge each drained a flat setting at their own
- call site and none of the three modifiers touched them, which meant levelling
- Horsemanship made every impact cheaper except the two heaviest.</p>
+ surcharge reach a rear and a charge exactly as they reach a gallop.</p>
 
 <p> The cost is a share of the horse's own maximum stamina, and the three
  situational factors are surcharges on that share rather than multipliers on
@@ -194,14 +258,10 @@
       * horsemanship
 </code></pre>
 
-<p> A chain five multipliers deep and unbounded puts a gallop anywhere between
- 14.85 and 1452 points against a pool of about 210. The tier
- separation the rider tunes, a factor of 1.6, was invisible beside a modifier
- stack spanning nearly a hundredfold, and the answer to that is not a clamp
- on the product but a shape where every term is readable on its own. Adding
- the surcharges makes the worst case the sum of the named maxima rather than
- an emergent product: 0.38 of the pool before Horsemanship, which the log
- prints term by term.</p>
+<p> Adding the surcharges makes every term readable on its own and the worst
+ case the sum of the named maxima rather than an emergent product: 0.20 +
+ 0.13 + 0.05 = 0.38 of the pool before Horsemanship, which the log prints
+ term by term.</p>
 
 <p> Horsemanship stays a multiplier, because it is the one factor meant to
  dominate. The progressive drain at low Horsemanship is settled design: at
@@ -220,7 +280,7 @@
         </li>
         <li><span class="parameter">tierName</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Walk", "Trot", "Gallop", "Rear" or "Charge"
+         an impact tier name
         </li>
         <li><span class="parameter">armor</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
@@ -274,10 +334,10 @@
     <dd>
     Charges the horse for an impact and dismounts Henry when it is spent. </p>
 
-<p> Stamina is written with <code>soul:SetState</code>, never <code>soul:DealDamage</code>. That
- call takes <code>(stamina, health, attacker, ...)</code>  -  stamina first  -  even though
- vanilla's own debug helper names the parameters health-first, so using it
- here silently injures the horse instead.
+<p> Stamina is written with <code>soul:SetState</code>, never <code>soul:DealDamage</code>.
+ <code>C_ScriptBindSoul</code> declares that call <code>DealDamage(float stamina, float
+ health)</code>, stamina first, while vanilla's own debug helper names the
+ parameters health-first, so it is easy to injure the horse by mistake.
 
 
     <h3>Parameters:</h3>
@@ -306,19 +366,15 @@
     <strong>HorseCollisionMod:ShakeRiderCamera (playerEnt, tierName)</strong>
     </dt>
     <dd>
-    Shakes the rider's camera on a gallop impact. </p>
+    Shakes the rider's camera on an impact. </p>
 
 <p> A collision costs the rider stamina and costs the victim health, and neither
  is visible from the saddle: hardcore mode hides the bars, and the horse's
- own gait does not change. Half a ton of horse hitting a person should be
- felt by the person riding it, and this is the only part of an impact that
- reaches the player directly.</p>
+ own gait does not change. This is the part of an impact that reaches the
+ player directly.</p>
 
-<p> A trot gets a fraction of it through <code>CameraShakeTrotScale</code>, which scales
- the angle, the shift and the duration together. A trot knockdown should
- still read as a shove that happens to put someone down rather than as half a
- ton of horse at speed, so the difference between the tiers is kept as a
- difference of degree.</p>
+<p> <code>CameraShakeByTier</code> scales the angle, the shift and the duration together,
+ so the tiers differ by degree; a tier with no entry does not shake.</p>
 
 <p> ### The call</p>
 
@@ -349,7 +405,7 @@
         </li>
         <li><span class="parameter">tierName</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Walk", "Trot" or "Gallop"; a walk never pulses
+         an impact tier name
         </li>
     </ul>
 
@@ -372,7 +428,7 @@
     Blurs the rider's view for a moment on an impact. </p>
 
 <p> The dust the collision throws up is on the ground behind the horse's neck,
- and from the saddle in first person it is very nearly never seen: the impact
+ and from the saddle in first person it is almost never seen: the impact
  happens below the field of view at ten meters a second. Third person gets
  the whole thing and first person gets none of it, so first person needs
  something of its own, and it has to be on the camera rather than in the
@@ -383,8 +439,7 @@
 <p> <code>System.SetScreenFx(param, value)</code> is the only Lua surface onto the
  renderer's post effects. No script bind exposes the material effect or HUD
  systems at all, so the flowgraphs the game drives its own screen effects
- through are out of reach. What was confirmed working in game, by setting
- each and looking:</p>
+ through are out of reach. In game:</p>
 
 <pre><code> ScreenFrost_Amount          frosts the screen
  WaterDroplets_Amount        droplets on the lens
@@ -407,23 +462,18 @@
 
 <p> ### Telling the views apart</p>
 
-<p> <code>System.GetViewCameraPos</code> sits on the player in first person and meters away
- in third: measured at 7.7 m behind and 4.6 m above with a third-person
- camera mod running. Comparing it against the player's own position separates
- them, which is what <code>RiderBlurFirstPersonOnly</code> uses, so a third-person
- player does not get their screen blurred over an impact they can already
- see.</p>
+<p> <a href="../modules/HorseCollisionMod.Rider.html#HorseCollisionMod:CameraIsFirstPerson">CameraIsFirstPerson</a> tells the views apart, which is what
+ <code>RiderBlurFirstPersonOnly</code> uses, so a third-person player does not get
+ their screen blurred over an impact they can already see.</p>
 
-<p> <strong>The blur amount is clamped.</strong> Raising it from 0.9 to 1.3 to 2.0 produced
- the same picture three times, so anything past about 1.0 is thrown away and
- weight has to come from how long it is held and from what is layered under
- it. <code>RiderBlurChroma</code> adds a chromatic shift on the same envelope, which is
- a different distortion rather than more of the same one.</p>
+<p> <strong>The blur amount has no effect past about 1.0</strong>, so weight comes from how
+ long it is held and from what is layered under it. <code>RiderBlurChroma</code> adds a
+ chromatic shift on the same envelope, a different distortion rather than
+ more of the same one.</p>
 
 <p> The blur is held at full for <code>RiderBlurHoldMs</code> before the decay starts. A
  pulse that begins decaying on its first step never reaches the eye during a
- gallop: it is competing with the camera shake and with the horse's own
- motion, and raising the amount alone stopped helping well before it read.</p>
+ gallop, competing with the camera shake and the horse's own motion.</p>
 
 <p> The pulse always ends by writing zero. This parameter is global renderer
  state rather than anything owned by the mod, so a decay that stopped partway
@@ -438,7 +488,8 @@
         </li>
         <li><span class="parameter">tierName</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Walk", "Trot" or "Gallop"; a walk never pulses
+         an impact tier name; a tier with no entry never
+   pulses
         </li>
     </ul>
 
@@ -493,17 +544,8 @@
     Sends the horse off after it has thrown its rider. </p>
 
 <p> A horse that has just dumped its rider because it was ridden into people
- until it was spent should sometimes want nothing more to do with them. Not
- every time: a horse that always bolts is a punishment, and one that
- sometimes bolts is a horse.</p>
-
-<p> ### Why this is a chance and not a health system</p>
-
-<p> The horse taking health damage from impacts was built and removed. It worked
- and it was legible in the log, but from the saddle it was a second invisible
- stat racing the first to the same outcome, and the rider could not tell what
- it was contributing. What was actually wanted from it was this one moment,
- so this is the moment on its own.</p>
+ until it was spent sometimes wants nothing more to do with them, on
+ <code>HorseBoltChance</code>.</p>
 
 <p> ### How, and why not by message</p>
 
@@ -514,16 +556,11 @@
  <code>sb_combat_playerHorse.xml</code> is a bare <code>Wait</code> with no behavior in it, so the
  player's horse has no combat brain to receive anything.</p>
 
-<p> What is used instead is the behavior already observed in game. Emptying the
- horse's health throws the rider and sends the horse off, which is how the
- 2.0.0-dev1 bug behaved when it charged 25 health an impact by mistake, and
- how this reads when a horse is attacked. So the roll takes the health rather
- than asking the AI for anything.</p>
-
-<p> The health is restored a moment later, once the horse has already left. The
- point is the bolt, not a crippled horse the rider has to nurse: nothing here
- is a fight they chose, and a permanent cost for running out of stamina is
- not what was wanted.
+<p> Emptying the horse's health throws the rider and sends the horse off, as it
+ does when a horse is attacked, so the roll takes the health rather than
+ asking the AI for anything. The health is restored after
+ <code>HorseBoltRestoreMs</code>, once the horse has left, so the cost is the bolt and
+ not a crippled horse.
 
 
     <h3>Parameters:</h3>
@@ -601,10 +638,50 @@
     <dd>
     Grants the mod's Horsemanship perks directly to the player soul. </p>
 
-<p> Called on startup or settings apply when <code>AutoGrantPerks</code> is enabled in
- the configuration.
+<p> Called from <code>ApplySettings</code> on every load screen when <code>AutoGrantPerks</code> is
+ on.
 
 
+
+
+
+
+
+</dd>
+</dl>
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "Maneuvers"></a>
+    <strong>Maneuvers</strong>
+    </dt>
+    <dd>
+    The mod's Horsemanship maneuvers, in the order their banners are shown. </p>
+
+<p> <code>perk</code> is the perk in <code>perk__horsecollisionmod.xml</code> that grants the
+ maneuver, <code>ability</code> the ability that perk unlocks, and <code>banner</code> the name
+ <code>ShowTutorial</code> knows it by.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">{</span>
+
+
+
+        </li>
+        <li><span class="parameter">ability</span>
+
+
+
+        </li>
+        <li><span class="parameter">perk</span>
+
+
+
+        </li>
+    </ul>
 
 
 
@@ -618,7 +695,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-29 13:51:33 </i>
+<i style="float:right;">Last updated 2026-09-29 16:12:06 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

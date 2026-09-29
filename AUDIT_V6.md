@@ -30,8 +30,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 5, tooling, from the third bullet (`land`'s
-retry); the front door and `:reload` are done (see **Phase 2 log**). Read **Phase 2 plan** below in
+**Next step:** phase 2, batch 5, tooling, from the fourth bullet
+(`publish_nexus.ps1` runs `verify_additive.py`); the front door, `:reload`
+and `land`'s retry are done (see **Phase 2 log**). Read **Phase 2 plan** below in
 full before starting; it gives the procedure for every batch and how each is
 verified.
 
@@ -580,6 +581,19 @@ One line per batch: batch, commit, what was verified.
 - **Batch 5, `:reload`.** `reload_mod`, the `:reload` command and its help
   line deleted; `flow test` is the reload path. `--help` runs; interactive
   mode connects and passes `:reload` to the game as an ordinary command.
+- **Batch 5, `land` and `pre_release_check.py`.** The retry deleted; a
+  refused build fails the landing. Every `pre_release_check.py` finding
+  applied. Beyond them: the API staleness check had never fired, because
+  `.gitattributes` marks `docs/api` `-diff`, so `git diff` printed "Binary
+  files differ" with no lines to read, and the check then reverted the
+  regenerated pages. It runs `git diff --text` now, and at once reported the
+  22 pages the batch 4 comment passes left stale; they are regenerated in
+  this commit. Orphans are found by modification time, since LDoc rewrites
+  every page it produces: a planted page was reported. Of the version
+  exemptions, `3.0.3` appears in no scanned file and nothing records its
+  source, so it was dropped; the other three are named. Left for batch 6:
+  README layout rows for the three horse files, `check_tiers.lua` and
+  `game_root.ps1`.
 
 ## Standard
 
@@ -3459,34 +3473,34 @@ the docstrings.
 
 **Wrong or stale:**
 
-- [ ] `:487-488` `check_generated_docs` — "This regenerates into a temporary
+- [x] `:487-488` `check_generated_docs` — "This regenerates into a temporary
   directory and compares"; `:522-531` runs LDoc in place in `docs/api`,
   because `ldoc -d <dir>` fails on this project. — Keep the second; cut the
   first.
-- [ ] `:241`, `:250`, `:255` — literal tab characters inside the patterns
+- [x] `:241`, `:250`, `:255` — literal tab characters inside the patterns
   (`[ <TAB>]`, `"<TAB>-- ====="`, `"^<TAB>(\w+)"`), invisible in an editor;
   the shape an escaping tool leaves when it writes `\t`. — Write `\t`.
-- [ ] `:16` — `import tempfile`, unused. — Delete.
-- [ ] `:88-91` — exempts `2.0.0`, `1.9.7`, `1.1.0`, `3.0.3` as "Semantic
+- [x] `:16` — `import tempfile`, unused. — Delete.
+- [x] `:88-91` — exempts `2.0.0`, `1.9.7`, `1.1.0`, `3.0.3` as "Semantic
   Versioning itself, and the game's own version" without saying which is
   which. — One named constant per exemption.
-- [ ] `:26` — "Each of these has been wrong in this repository." — Cut.
+- [x] `:26` — "Each of these has been wrong in this repository." — Cut.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `:195-197` — "The Files tab entry has always been checked; the
+- [x] `:195-197` — "The Files tab entry has always been checked; the
   changelog never was … 4.2.2 published with an empty one". — Keep "the
   field is optional on the upload, so nothing else asks for it".
-- [ ] `:238-240` — "Matching from column zero collected every heading …
+- [x] `:238-240` — "Matching from column zero collected every heading …
   twenty-nine keys". — Cut.
-- [ ] `:361-363` — "That happened: the manifest named 1.9.7 exactly, the
+- [x] `:361-363` — "That happened: the manifest named 1.9.7 exactly, the
   game shipped 1.9.8". — Cut; `:356-359` states the constraint.
-- [ ] `:490-501` — "Commit times were the previous approach …". — Cut.
-- [ ] `:514-516` — "raised OSError on the machine that has it installed and
+- [x] `:490-501` — "Commit times were the previous approach …". — Cut.
+- [x] `:514-516` — "raised OSError on the machine that has it installed and
   the check quietly passed. A check that never fires is worse than the one
   it replaced." — Keep "subprocess does not apply `PATHEXT` to a bare name".
 
-- [ ] LDoc never deletes a page whose module it no longer produces, and the
+- [x] LDoc never deletes a page whose module it no longer produces, and the
   staleness check compares only the pages it regenerates, so an orphan in
   `docs/api/modules/` passes. — Report files present in `docs/api` that the
   regeneration does not write. Batch 5.

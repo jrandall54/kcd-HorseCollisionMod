@@ -373,22 +373,8 @@ function Land {
 	Say "building"
 	& (Join-Path $repo "build.ps1") -Version $version | Out-String | Write-Host
 
-	# One retry, for the staleness the version bump itself creates.
-	#
-	# Setting the version rewrites the `@release` line in every source file,
-	# which makes the generated API reference stale a second time, after the
-	# check above has already passed. The build regenerates it and refuses, and
-	# the only thing needed is to stage what it wrote and build again. Failing
-	# here and handing that back is the tool creating work rather than doing it.
 	if ($LASTEXITCODE -ne 0) {
-		Say "build refused, staging what it regenerated and retrying"
-		Invoke-Git add -A | Out-Null
-
-		& (Join-Path $repo "build.ps1") -Version $version | Out-String | Write-Host
-
-		if ($LASTEXITCODE -ne 0) {
-			Fail "the build failed. Nothing has been committed."
-		}
+		Fail "the build failed. Nothing has been committed."
 	}
 
 	Invoke-Git add -A | Out-Null

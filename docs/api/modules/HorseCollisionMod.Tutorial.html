@@ -67,11 +67,10 @@
 <div id="content">
 
 <h1>Module <code>HorseCollisionMod.Tutorial</code></h1>
-<p>In-game tutorial guidance for horseback maneuvers.</p>
-<p> Explains how to execute the Rear, Rear Charge, and Saddle Lean maneuvers,
- detailing key controls, standstill requirements, stamina drain, and crime
- consequences. Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the
- entry point, which pulls this file in with <code>Script.ReloadScript</code>.</p>
+<p>In-game tutorial banners for the horseback maneuvers.</p>
+<p> Shows each maneuver's banner once, when it is first available: the rear,
+ the charge and the lean. Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created
+ by the entry point, which pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
         <li><strong>Author</strong>: jrandall54</li>
@@ -89,24 +88,16 @@
 	<td class="summary">Formats the tutorial text for a given maneuver, resolving configured keys.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ShowTutorial">HorseCollisionMod:ShowTutorial (name[, force])</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ShowTutorial">HorseCollisionMod:ShowTutorial (name)</a></td>
 	<td class="summary">Displays an on-screen tutorial banner for a maneuver.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:QueueNextTutorial">HorseCollisionMod:QueueNextTutorial ()</a></td>
-	<td class="summary">Displays newly acquired maneuver tutorials in order, scheduling subsequent banners.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:CheckMountTutorials">HorseCollisionMod:CheckMountTutorials (playerEnt)</a></td>
-	<td class="summary">Checks whether newly acquired maneuver tutorials should be shown on mount.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:CheckMenuTutorials">HorseCollisionMod:CheckMenuTutorials ()</a></td>
-	<td class="summary">Checks whether newly acquired maneuver tutorials should be shown when leaving menus.</td>
+	<td class="summary">Shows the banners for newly available maneuvers, one after another.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:SyncTutorialsOnLoad">HorseCollisionMod:SyncTutorialsOnLoad ()</a></td>
-	<td class="summary">Synchronizes tutorial state against the player's actual abilities in the loaded save.</td>
+	<td class="summary">Matches the shown banners to the abilities in the loaded save.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ResetTutorials">HorseCollisionMod:ResetTutorials ()</a></td>
@@ -156,7 +147,7 @@
     <ul>
         <li><span class="parameter">name</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         tutorial identifier ("rear", "charge", "lean", etc.)
+         "rear", "charge" or "lean"
         </li>
     </ul>
 
@@ -173,7 +164,7 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:ShowTutorial"></a>
-    <strong>HorseCollisionMod:ShowTutorial (name[, force])</strong>
+    <strong>HorseCollisionMod:ShowTutorial (name)</strong>
     </dt>
     <dd>
     Displays an on-screen tutorial banner for a maneuver.
@@ -183,12 +174,7 @@
     <ul>
         <li><span class="parameter">name</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         tutorial identifier ("rear", "charge", "lean", etc.)
-        </li>
-        <li><span class="parameter">force</span>
-            <span class="types"><span class="type">boolean</span></span>
-         true to bypass settings and CVar checks
-         (<em>optional</em>)
+         "rear", "charge" or "lean"
         </li>
     </ul>
 
@@ -208,47 +194,16 @@
     <strong>HorseCollisionMod:QueueNextTutorial ()</strong>
     </dt>
     <dd>
-    Displays newly acquired maneuver tutorials in order, scheduling subsequent banners. </p>
+    Shows the banners for newly available maneuvers, one after another. </p>
 
-<p> When multiple perks are acquired at once (e.g. in the perk menu), this shows
- the first banner immediately and schedules subsequent banners to appear after
- the preceding banner's 10-second display duration expires, ensuring every
- tutorial plays in full in sequence.
+<p> When several perks are acquired at once, in the perk menu, this shows the
+ first banner at once and schedules the next for when the first banner has
+ left the screen, so every banner plays in full.</p>
 
+<p> Without <code>RequirePerks</code> only the rear's banner is shown here; the charge's
+ and the lean's appear on their first use.</p>
 
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:CheckMountTutorials"></a>
-    <strong>HorseCollisionMod:CheckMountTutorials (playerEnt)</strong>
-    </dt>
-    <dd>
-    Checks whether newly acquired maneuver tutorials should be shown on mount.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">playerEnt</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the player entity table
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:CheckMenuTutorials"></a>
-    <strong>HorseCollisionMod:CheckMenuTutorials ()</strong>
-    </dt>
-    <dd>
-    Checks whether newly acquired maneuver tutorials should be shown when leaving menus.
+<p> Called on mounting and on leaving the inventory.
 
 
 
@@ -262,12 +217,11 @@
     <strong>HorseCollisionMod:SyncTutorialsOnLoad ()</strong>
     </dt>
     <dd>
-    Synchronizes tutorial state against the player's actual abilities in the loaded save. </p>
+    Matches the shown banners to the abilities in the loaded save. </p>
 
-<p> Called on save load (sys_loadingimagescreen OnEnd). If a loaded character
- already has an ability, mark its tutorial as already shown so the player is
- not spammed. If the loaded character does NOT have the ability in this save,
- clear the flag so unlocking it later in this save cleanly displays the banner.
+<p> Called from the load screen handler. An ability the loaded character
+ already has marks its banner as shown, so it is not repeated; one they lack
+ clears the mark, so unlocking it later in this save shows the banner.
 
 
 
@@ -297,7 +251,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-29 13:51:33 </i>
+<i style="float:right;">Last updated 2026-09-29 16:12:06 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

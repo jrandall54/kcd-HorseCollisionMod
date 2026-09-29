@@ -84,9 +84,8 @@
  anything invented here.</p>
 
 <p> <code>alwaysFightWhenHit</code> is a context option from the shipped catalog in
- <code>Scripts/Script/ContextData.lua</code>. Vanilla quests set options exactly this
- way: <code>q_ledecko</code> gives four bandits <code>fightAllHostilePerceptibles</code>, and
- <code>q_hareHunt</code> applies the <code>berserk</code> preset. In <code>sb_combat.xml</code> the option
+ <code>Scripts/Script/ContextData.lua</code>, set the way vanilla quests set their own
+ context options. In <code>sb_combat.xml</code> the option
  sits in front of the morale comparison that otherwise decides whether a
  civilian fights or flees, and skipping that comparison is all it does.</p>
 
@@ -110,12 +109,8 @@
  opening with an attack. Guards who witness the brawl join it, because the
  game models what a bystander perceived. Neither is arranged here.</p>
 
-<p> ### Guards are included, and behave differently on purpose</p>
-
-<p> A provoked guard arrests the rider rather than brawling with him, because
- the soldier branch of the hit handler raises assault information whenever
- the attacker is the player. That is a guard using the authority a guard
- has, and the crime-free brawl here is for the people who lack it.</p>
+<p> Guards are included, and behave differently on purpose; see
+ <a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:CanRetaliate">CanRetaliate</a>.</p>
 
 <p> ### Women raise the alarm instead of fighting</p>
 
@@ -134,19 +129,11 @@
  to push a victim through a fight subtree she cannot enter, so setting them
  would only leave an option to clear afterwards for no effect.</p>
 
-<p> Morale is not what separates her from a man, and it was measured rather
- than assumed. Across twenty one NPCs in Rattay the women read 0.15 to 0.22
- and the male civilians read 0.16 to 0.52 against guards at 0.54 to 0.79, so
- the morale comparison tells a guard from a townsman and says nothing about
- sex. Routing on the gender the combat tree itself tests is therefore the
- honest implementation, not a shortcut around a stat that would have done it.</p>
+<p> The combat tree tests gender, not morale, so the mod routes on gender.
+ Morale separates guards from townsmen and does not separate women from men.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Author</strong>:  jrandall54
- The context option that makes a victim answer a hit with a fight.</p>
-
-<p> From the game's own catalog. Named here rather than written inline at each
- use so a search for it finds one definition.</li>
+        <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
 
@@ -189,8 +176,8 @@
 	<td class="summary">Puts a victim right once the fight is over.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ShowSurrenderHint">HorseCollisionMod:ShowSurrenderHint (npc, why)</a></td>
-	<td class="summary">Closes the incident out and puts the victim back the way he was found.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ShowSurrenderHint">HorseCollisionMod:ShowSurrenderHint (npc)</a></td>
+	<td class="summary">Shows the on-screen prompt telling the player they can surrender.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:SurrenderIsTheGames">HorseCollisionMod:SurrenderIsTheGames (npc)</a></td>
@@ -199,6 +186,10 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:HideSurrenderHint">HorseCollisionMod:HideSurrenderHint ([all])</a></td>
 	<td class="summary">Takes the surrender prompt down when the last provoked fight ends.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:EndRetaliation">HorseCollisionMod:EndRetaliation (npc, why)</a></td>
+	<td class="summary">Closes the incident out and puts the victim back the way he was found.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:WatchAftermath">HorseCollisionMod:WatchAftermath (npc)</a></td>
@@ -210,11 +201,15 @@
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:PullRiderDown">HorseCollisionMod:PullRiderDown (npc)</a></td>
-	<td class="summary">Has a provoked victim drag the rider out of the saddle.</td>
+	<td class="summary">Has a provoked victim drag the player out of the saddle.</td>
 	</tr>
 </table>
 <h2><a href="#Fields">Fields</a></h2>
 <table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.RetaliationOption">HorseCollisionMod.RetaliationOption</a></td>
+	<td class="summary">The context option that makes a victim answer a hit with a fight.</td>
+	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod.RetaliationHandle">HorseCollisionMod.RetaliationHandle</a></td>
 	<td class="summary">The handle every context option this mod sets is carried on.</td>
@@ -268,10 +263,7 @@
     How this victim answers a shove too many. </p>
 
 <p> <strong>Gender</strong> decides which of two answers is available, and it is the game's
- decision rather than this mod's. <code>sb_combat.xml</code> tests
- <code>b_soul.gender == male</code> after the context option is consulted and fails
- everyone else outright, so a man reaches the fight branch and a woman falls
- through to the report or flee branches of the same handler.</p>
+ decision rather than this mod's; see the module header.</p>
 
 <p> Both are answers, so both are offered: <code>&quot;fight&quot;</code> for a man and <code>&quot;alarm&quot;</code>
  for a woman, with <code>&quot;none&quot;</code> for anyone the game would let do neither. The
@@ -284,13 +276,11 @@
  with no <code>real</code> check and no context option in front of it, so provoking one
  is a crime and ends in an arrest. That is a guard exercising the authority
  a guard has, and the crime-free brawl this file builds is for the people
- who lack it. An earlier revision gated soldiers out; the gate was wrong and
- has been removed.</p>
+ who lack it.</p>
 
-<p> <code>soul:GetSocialClass()</code> carries <code>SoulCrimeRoleId</code> and a class <code>Name</code> if the
- distinction is ever wanted: a village guard reports <code>soldier</code> and 2 against
- a townsman's <code>civilian</code> and 1. It is read here only for the telemetry, so a
- log can be read afterwards for who was provoked.
+<p> <code>soul:GetSocialClass()</code> carries a class <code>Name</code>: a village guard reports
+ <code>soldier</code> against a townsman's <code>civilian</code>. It is read here for the log
+ only, so a session can be read afterwards for who was provoked.
 
 
     <h3>Parameters:</h3>
@@ -323,8 +313,7 @@
     Counts a shove against a victim and returns how many they have taken. </p>
 
 <p> A count older than <code>RetaliationMemorySec</code> is discarded rather than aged
- down. Someone barged twice this morning does not start today's ride one
- shove from a fight.
+ down.
 
 
     <h3>Parameters:</h3>
@@ -355,8 +344,7 @@
 
 <p> Zero until the victim has taken more than <code>RetaliationFreeBumps</code>, then
  <code>RetaliationChanceStep</code> per shove beyond that, capped at
- <code>RetaliationMaxChance</code>. The first contact is always free, so brushing past
- someone once never starts anything.
+ <code>RetaliationMaxChance</code>. Contacts up to <code>RetaliationFreeBumps</code> are free.
 
 
     <h3>Parameters:</h3>
@@ -436,7 +424,7 @@
 
 <p> Giving up is logged rather than silent, because a victim who never reaches
  the fight is the interesting case: it means the provocation itself was
- refused, which the <a href="../modules/HorseCollisionMod.Retaliation.html">Retaliation</a> line above would not have shown.
+ refused, which the <a href="../modules/HorseCollisionMod.Retaliation.html">Retaliation</a> telemetry line would not have shown.
 
 
     <h3>Parameters:</h3>
@@ -463,8 +451,7 @@
  recovery polls. Two prefixes mean the incident is live:</p>
 
 <ul>
-    <li><code>Combat</code> is the obvious one, and <code>CombatMovement</code> was observed on a guard
-    closing to two meters.</li>
+    <li><code>Combat</code>, which covers <code>CombatMovement</code> and <code>CombatIdle</code>.</li>
     <li><code>Surrender</code> is the one that is easy to miss, and missing it is a real
     fault: a victim who yields stands in <code>SurrenderIn</code>, which is perfectly
     still, so it reads as finished and the incident closes in the middle of
@@ -474,12 +461,8 @@
 </ul>
 
 <p> Anything else is finished, and that deliberately includes a victim running
- away. Running is not a state this has to handle specially: a man sprinting
- from the rider has left the fight, so the incident should close and the
- aftermath should take him, which is exactly what treating it as finished
- does. An earlier design classified running separately and only counted it
- once the rider was 25 m clear, which never happens while the rider is
- following him; it fired in none of six incidents.
+ away: a man sprinting from the player has left the fight, so the incident
+ closes and the aftermath takes him.
 
 
     <h3>Parameters:</h3>
@@ -516,18 +499,18 @@
  sample, because a fighter between exchanges reads as finished for an
  instant and closing there would cut a live fight short.</p>
 
-<p> The fight is waited for rather than assumed, but it always arrives:
- <code>alwaysFightWhenHit</code> skips the morale comparison that would otherwise let a
- timid victim decline, so courage decides how the fight goes and not whether
- there is one. A victim who yields to the first punch has still fought.</p>
+<p> The fight is waited for rather than assumed. <code>alwaysFightWhenHit</code> skips the
+ morale comparison that would otherwise let a timid victim decline, so
+ courage decides how the fight goes and not whether there is one; a victim
+ who yields to the first punch has still fought.</p>
 
 <p> <code>RetaliationCeilingSec</code> bounds the poll so a victim who never resolves
  cannot leave it running for the session. It is a failsafe rather than a
- mechanism, and in six measured incidents it was never reached.</p>
+ mechanism.</p>
 
 <p> The poll is generation-guarded: a load screen moves <code>TimerTick</code>, and a
- sample scheduled before it would otherwise fire into a world that no longer
- contains the entity it was about.
+ sample scheduled before it would otherwise fire into a world that does not
+ contain the entity it was about.
 
 
     <h3>Parameters:</h3>
@@ -550,28 +533,14 @@
     <dd>
     Puts a victim right once the fight is over. </p>
 
-<p> A man the rider fought is left at a relationship of 0.0 against the 0.50 an
+<p> A man the player fought is left at a relationship of 0.0 against the 0.50 an
  untouched townsman reads, and below vanilla's 0.2 threshold he decides to
- run every time he perceives the rider. Riding past him a week later still
+ run every time he perceives the player. Riding past him a week later still
  sends him sprinting, which reads as a permanently ruined NPC rather than a
  man who lost a fight.</p>
 
-<p> <strong>Two things are needed and neither works alone</strong>, which is what made this
- hard to see. Measured on a victim who had been fleeing on sight across a
- save reload and an in game wait:</p>
-
-<ul>
-    <li><code>combat:stimulus:standDownRequest</code> cancels the flee that is running. Sent
-    by itself it bought five seconds, and then the next time he perceived the
-    rider he decided to flee again.</li>
-    <li>Raising the relationship changes the decision but not the behavior
-    already executing, so sent by itself while he is mid-flight it does
-    nothing visible. That is why an earlier reading of this called reputation
-    irrelevant; the measurement could not have shown an effect either way.</li>
-</ul>
-
-<p> Together they hold. The same victim stopped, stood at a meter and a half
- for twelve seconds, and afterwards would talk and trade.</p>
+<p> Raising the relationship changes his next decision, not a flee already
+ running; that flee ends on its own (see <a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:WatchAftermath">WatchAftermath</a>).</p>
 
 <p> ### It marks him down, it does not reward him</p>
 
@@ -580,16 +549,14 @@
  is right, and he is never left under the threshold that ruins him, which is
  the bug. The count is worked from his own figure rather than fixed, because
  a count calibrated for a victim at 0.0 carries one to 0.84 against the 0.50
- his untouched neighbors read, and a beating would pay the rider a bonus.</p>
+ his untouched neighbors read, and a beating would pay the player a bonus.</p>
 
 <p> ### The step is a fixed quantum, so the count is arithmetic</p>
 
 <p> <code>surrender_step</code> moves the relationship by <code>RepairStepValue</code> every time it
- is applied, whatever second argument it is given: 0.1, 0.2 and no argument
- at all each moved exactly 0.1389 in a measured sweep. The magnitude cannot
- be tuned, so the number of applications is what decides where a victim
- lands, and that is worked out once from the gap rather than approached by
- trial. They apply in one pass, because a change does not read back in the
+ is applied, whatever second argument it is given, so the number of
+ applications decides where a victim lands, worked out once from the gap.
+ They apply in one pass, because a change does not read back in the
  frame it is applied and re-reading between them would report stale values.</p>
 
 <p> The quantum is also the precision: a victim lands within one step above his
@@ -618,50 +585,14 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:ShowSurrenderHint"></a>
-    <strong>HorseCollisionMod:ShowSurrenderHint (npc, why)</strong>
+    <strong>HorseCollisionMod:ShowSurrenderHint (npc)</strong>
     </dt>
     <dd>
+    Shows the on-screen prompt telling the player they can surrender. </p>
 
-<p>Closes the incident out and puts the victim back the way he was found. </p>
-
-<p> <code>why</code> names which ending applied and goes into the telemetry, so a session
- can be read afterwards for how often a fight resolved itself against how
- often the failsafe had to close it.</p>
-
-<p> Three things happen, and every one of them happens on every ending. None of
- them is conditional on how the fight finished, because a settled victim is
- not a safe victim: a man released through the yield menu settles first and
- only then walks away for good.</p>
-
-<ul>
-    <li>The context option comes back. Left set, every NPC the rider had ever
-    shoved would answer any hit from anyone with a fight for the rest of the
-    session, which is a different mod.</li>
-    <li>His standing is repaired, because below vanilla's threshold he decides to
-    run from the rider on sight, for good. See <a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:RepairVictim">RepairVictim</a>.</li>
-    <li><a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:WatchAftermath">WatchAftermath</a> takes him from here, because the fight can end with a
-    flee already running that his standing does not explain and that nothing
-    else stops.</li>
-</ul>
-
-
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">why</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         either <code>settled</code> or <code>ceiling</code>
- Shows the on-screen prompt telling the player they can surrender.</p>
-
-<p> Surrendering already works during a provoked brawl and resolves it cleanly.
- Nothing told the player so: the hint that appears when guards attack is
- raised from the AI's own behavior tree and a mod-provoked fight never
- triggers it, so the option existed and was invisible.</p>
+<p> Surrendering works during a provoked brawl and resolves it cleanly, but the
+ hint that appears when guards attack is raised from the AI's own behavior
+ tree and a mod-provoked fight never triggers it, so the mod raises it.</p>
 
 <p> The HUD element declares <code>ShowActionHint(ActionId, Control, Text, Type,
  Name)</code> in <code>Libs/UI/UIElements/HUD.xml</code>, reachable through
@@ -676,6 +607,13 @@
 <p> One hint for any number of provoked victims, counted rather than shown per
  fight, so a brawl with three of them does not stack three copies and does
  not disappear when the first one yields.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the provoked victim the prompt is raised for
         </li>
     </ul>
 
@@ -695,8 +633,7 @@
  own prompt. Raising one alongside it puts two on screen offering the same
  key, which is reproducible by provoking a guard in sight of another guard.</p>
 
-<p> Read from the victim's social class, the same source the retaliation answer
- uses, so the two cannot disagree about who is a soldier.
+<p> Read from the victim's social class.
 
 
     <h3>Parameters:</h3>
@@ -741,6 +678,52 @@
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:EndRetaliation"></a>
+    <strong>HorseCollisionMod:EndRetaliation (npc, why)</strong>
+    </dt>
+    <dd>
+
+<p>Closes the incident out and puts the victim back the way he was found. </p>
+
+<p> <code>why</code> names which ending applied and goes into the telemetry, so a session
+ can be read afterwards for how often a fight resolved itself against how
+ often the failsafe had to close it.</p>
+
+<p> Three things happen, and every one of them happens on every ending. None of
+ them is conditional on how the fight finished, because a settled victim is
+ not a safe victim: a man released through the yield menu settles first and
+ only then walks away for good.</p>
+
+<ul>
+    <li>The context option comes back. Left set, every NPC the player had ever
+    shoved would answer any hit from anyone with a fight for the rest of the
+    session.</li>
+    <li>His standing is repaired, because below vanilla's threshold he decides to
+    run from the player on sight, for good. See <a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:RepairVictim">RepairVictim</a>.</li>
+    <li><a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod:WatchAftermath">WatchAftermath</a> takes him from here.</li>
+</ul>
+
+
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">why</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         either <code>settled</code> or <code>ceiling</code>
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:WatchAftermath"></a>
     <strong>HorseCollisionMod:WatchAftermath (npc)</strong>
     </dt>
@@ -749,18 +732,13 @@
 
 <p> He is replanned so he has somewhere to be, and his standing is checked
  again a little later, because the repair at the close of the incident runs
- before the rider is necessarily finished with him: a victim knocked down
- again, or beaten while he stands up, loses more afterwards. One measured
- victim was repaired at the close, dropped back to 0.0 by what followed, and
- was restored here.</p>
+ before the player is necessarily finished with him: a victim knocked down
+ again, or beaten while he stands up, loses more afterwards.</p>
 
-<p> Nothing is done about a victim who runs, because a flee ends by itself.
- Measured on one beggar, one build, the only difference being what the rider
- did: left alone he stopped after fourteen seconds, and chased he was still
- at full speed forty seconds later. <code>fleeFromNPCParams</code> gives the reason,
- with a <code>distance</code> of 150 and <code>t_fleeParams.entityToFleeFrom</code> set to the
- player, so the run ends when he is that far from the man he is running
- from and following him means he never gets there.</p>
+<p> Nothing is done about a victim who runs, because a flee ends by itself:
+ <code>fleeFromNPCParams</code> has a <code>distance</code> of 150 with the player as
+ <code>t_fleeParams.entityToFleeFrom</code>, so the run ends when he is that far from
+ the player, and following him means he never gets there.</p>
 
 <p> <code>combat:stimulus:standDownRequest</code> does stop that run, and is not sent.
  It hands him to <code>state_standDown</code>, which holds him through a hot entity
@@ -820,7 +798,7 @@
     <strong>HorseCollisionMod:PullRiderDown (npc)</strong>
     </dt>
     <dd>
-    Has a provoked victim drag the rider out of the saddle. </p>
+    Has a provoked victim drag the player out of the saddle. </p>
 
 <p> A man who has run out of patience with someone riding into him goes for the
  rider, not the animal. Left to itself the AI gets there eventually, but it
@@ -830,20 +808,19 @@
 <p> <code>RequestHorsePullDown</code> is the vanilla action, the same one guards use when
  they unhorse the player, and it takes the victim's entity id, meaning the
  person being pulled down. It is offered by the AI's own behavior tree as
- <code>HorsePullDownAction</code>, governed by <code>wh_cs_HorsePullDownAngle</code> at 55 degrees
- with a Z angle and a zero angle alongside it, so it is not available until
- the NPC has the geometry. <code>CanHorsePullDown</code> returns 0 until then.</p>
+ <code>HorsePullDownAction</code>, governed by <code>wh_cs_HorsePullDownAngle</code> (55 degrees)
+ and its sibling angle cvars, so it is not available until the NPC has the
+ geometry.</p>
 
 <p> So this asks repeatedly rather than once, from the moment the fight starts,
- until the rider is down. Nothing is forced: if the geometry never
- comes the request is simply never made and the brawl proceeds as it did
- before.</p>
+ until the player is down. Nothing is forced: if the geometry never comes
+ the request is never made and the brawl proceeds without the pull.</p>
 
 <p> A rider already on the ground is the other reason to stop, and it is the
  common one, since the whole point is that this happens early.</p>
 
 <p> Returns whether it has taken responsibility for starting the fight. When it
- has, the caller must not release the offense: this does it once the rider is
+ has, the caller must not release the offense: this does it once the player is
  down, or on the ceiling if the pull never comes.
 
 
@@ -871,6 +848,23 @@
 
     <dl class="function">
     <dt>
+    <a name = "HorseCollisionMod.RetaliationOption"></a>
+    <strong>HorseCollisionMod.RetaliationOption</strong>
+    </dt>
+    <dd>
+    The context option that makes a victim answer a hit with a fight. </p>
+
+<p> From the game's own catalog. Named here rather than written inline at each
+ use so a search for it finds one definition.
+
+
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod.RetaliationHandle"></a>
     <strong>HorseCollisionMod.RetaliationHandle</strong>
     </dt>
@@ -896,7 +890,7 @@
     <dd>
     The soul gender that <code>sb_combat.xml</code> lets through to the fight branch. </p>
 
-<p> Confirmed against telemetry rather than assumed: logged reactions report
+<p> The value <code>GetGender</code> returns for a man; logged reactions report
  <code>gender=1</code> for men and <code>gender=2</code> for women.
 
 
@@ -913,7 +907,7 @@
     <dd>
     The soul gender that falls through to the report and flee branches. </p>
 
-<p> Same source as <a href="../modules/HorseCollisionMod.Retaliation.html#HorseCollisionMod.GenderMale">GenderMale</a>: logged reactions report <code>gender=2</code> for women.
+<p> The value <code>GetGender</code> returns for a woman.
 
 
 
@@ -929,7 +923,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-29 13:51:33 </i>
+<i style="float:right;">Last updated 2026-09-29 16:12:06 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
