@@ -27,7 +27,8 @@ needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
 **Next step:** the rulings, decided together one at a time
-in the order listed under **Rulings needed**. Phase 2 then applies the
+in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
+DynamicRecovery. Next: the charge's bark set. Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
 
 **Pass order** (dependencies first, then largest):
@@ -83,12 +84,14 @@ Measured against `.claude/STYLE.md`, plus these rules from the research pass:
 
 Items that change behavior or delete a feature. Not applied without a decision.
 
-- [ ] **DynamicRecovery.** `Recovery.lua:1097-1185` computes a per-tier get-up
-  duration that nothing applies (the get-up is the global
-  `wh_rd_StillDuration`). The duration only times the ground groans and a log
-  line. Proposal: keep the groans, stop them when the victim is observed
-  standing, delete `DynamicRecovery`, `RecoveryDelayByTier`,
-  `RecoveryArmorScale*`, `RecoveryMinSec`, `RecoveryMaxSec`.
+- [x] **DynamicRecovery.** Ruled: remove entirely. The per-tier ground time
+  and the ground groans it timed are one abandoned system; the get-up stays
+  the global `wh_rd_StillDuration`. Delete `CalculateRecoveryDuration`,
+  `ApplyDynamicRecovery` and its call (`Impact.lua:136`), `DynamicRecovery`,
+  `RecoveryDelayByTier`, `RecoveryArmorScale*`, `RecoveryMinSec`,
+  `RecoveryMaxSec`, `RecoveryGroundBarks`, `RecoveryBarkIntervalMs`, from the
+  entry point and the settings file. Recovery barks (`WhenVictimRises`) are
+  unaffected. Findings that follow this ruling delete rather than rewrite.
 
 - [x] **RearChargeThrow ships at 0.6.** Ruled correct; revisit only if the
   publish test runs call for it. The comment keeps "1.0 throws like a gallop"
