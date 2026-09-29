@@ -12,7 +12,7 @@ end of every pass, so it always says where the audit stands.
 
 **Phase:** 1, recording findings. No source file has been edited.
 
-**Current status:** Lean.lua findings recorded and committed.
+**Current status:** Update.lua findings recorded and committed.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -24,7 +24,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `Update.lua`.
+**Next pass:** `Marks.lua`.
 
 **Pass order** (dependencies first, then largest):
 
@@ -41,7 +41,7 @@ passes continue. Rulings are made together once phase 1 is complete.
 - [x] `Rider.lua`
 - [x] `Sound.lua`
 - [x] `Lean.lua`
-- [ ] `Update.lua`
+- [x] `Update.lua`
 - [ ] `Marks.lua`
 - [ ] `Fear.lua`
 - [ ] `Crime.lua`
@@ -57,10 +57,6 @@ passes continue. Rulings are made together once phase 1 is complete.
 audited are listed here, so its pass picks them up.
 
 - `Marks.lua` — check the dust comments against the vertical-speed test.
-- `Update.lua:85-90` — says `RearCharging` is cleared by `ChargeForward`
-  "the moment the horse stops accelerating"; `WatchLunge` clears it when
-  speed decays to a fraction of the peak. "the old double hit" is history.
-- `Update.lua` — receives `ImpactIsNewContact` from `Recovery.lua`.
 - `Rear.lua`, `Retaliation.lua`, `Update.lua` — adopt the shared horse
   lookup from the Lean findings.
 - `Impact.lua:218-223` — the comment on deferring `SendCombatHit` ("it
@@ -229,6 +225,15 @@ Items that change behavior or delete a feature. Not applied without a decision.
   unforced for a `turning` correction and forced only for the expiry
   refresh; or, if the hold is judged fine as it ships, delete
   `LeanMinFlipMs`, the `force` parameter and the throttle.
+
+- [ ] **`ProtectMutt` has no effect.** `Update.lua:276-279` says dogs
+  share the generic NPC class and are found by name; the human filter at
+  `:312-316` admits only `NPC`, `NPC_Female` and `Player`, and dogs are class
+  `Dog` (live scan in the diary, "The human filter was not one"). Henry's
+  dog never reaches the `isProtected` test's consequences, and `:288-293` is
+  an empty `if isMutt then end` left from removed collision filtering.
+  Proposal: delete `ProtectMutt`, the name check and the empty block; the
+  class filter protects every dog.
 
 ## Findings
 
@@ -1589,6 +1594,71 @@ victim is accurate (only men reach the fight branch) and stays.
   often the hold is corrected" (it is the wait after a release); `LeanShakeSec`
   "long enough to outlast a held lean" (a hold renews it before expiry).
   Part of the settings lean rewrite.
+
+### src/HorseCollisionMod/Update.lua
+
+- [ ] `:3`, `:11`, `:204`, `:381` — "ten times a second", "every hundred
+  milliseconds", "every 100 ms"; the interval is `TickSeconds`, 0.033
+  (`:354` says thirty, which is right). — Name `TickSeconds`, not a rate.
+- [ ] `:18-20` header — "This file was moved last…". — Cut.
+- [ ] `:27-28` — `@release` runs straight into `TriggerCollision`'s doc
+  with no break, so LDoc merges the two. — Separate.
+- [ ] `:28-39` `TriggerCollision` doc — "Enforces the per-victim cooldown,
+  then dispatches on gait"; it stands out of a charge, scores the tier from
+  speed, refuses a repeat contact and hands off to `ResolveImpact`.
+  `@tparam table playerEnt` receives `player`. — Correct the summary.
+- [ ] `:54-70` — the removed readiness wait, "There is no readiness wait
+  any more", "What stood here…", the 608 ms stretch. — Cut; if anything,
+  one line: every contact lands, and `IsVictimFlat` decides in the
+  reaction whether the body can take an animation.
+- [ ] `:72-90` — "which whiffs on a walking man three times running", "the
+  old double hit", "measured at 144 to 256 ms", "which is what a charge
+  landing on nobody looked like". `:86-87` says `ChargeForward` clears
+  `RearCharging` "the moment the horse stops accelerating"; it clears it
+  when speed falls to `RearChargeLungeSpentAt` of the peak
+  (`Rear.lua:681-683`). Resolves the carried item. — Keep: `ChargeStrike`
+  raises the charge's impacts, so the loop scores nothing until
+  `ChargeScoringUntil`, which spans the sweep's `RearChargeStrikeMs`;
+  `RearCharging` ends sooner.
+- [ ] `:97-106` — "which is why it outlived the readiness wait"; `:105`
+  repeats `:97-100`. — One comment: one pass is one impact, debounced by
+  the gap between contacts.
+- [ ] `:136-139` — `type(player) == "nil" or (not player)` tests the same
+  thing twice. — `not player or not player.human or not player.player`.
+- [ ] `:145`, `:215`, `:260` — the clock is read three times per tick. —
+  Read once at the top.
+- [ ] `:163-181`, `:407-409` — the horse lookup, twice in this file. — The
+  shared horse lookup from the Lean findings.
+- [ ] `:197-210` — "The rider watched the horse thrown about five meters
+  up… nothing in the log had anything to say about it". `:217` `1000`
+  unnamed; `:223` `-1` stands in for no impact yet. — Keep: logged when the
+  upward speed crosses `HorseAirborneVz`, speed rather than height because
+  height off a slope is ordinary. Name the 1000 ms repeat gap; log `none`.
+- [ ] `:230-231` — two blank lines. — One.
+- [ ] `:276-279` — "trampling him on every ride is nobody's idea of
+  immersion"; "dogs share the generic NPC class" is false. See the
+  `ProtectMutt` ruling.
+- [ ] `:305-311` — the faction fallback that "stood here", "a long run of
+  female-specific faults in this mod". — Cut; `:300-303` stands alone.
+- [ ] `:319-325` — "buried the human misses entirely and a distance gate
+  did not help". — Keep: non-humans are not logged, because the player's
+  holster and dropped weapons sit permanently inside the sphere.
+- [ ] `:332-335` — "while they are still in front of the horse"; the call
+  runs for every human the broad phase returns, all round the horse within
+  `HitRadius`, before the dead and footprint tests. `HushVanillaBark`'s doc
+  (`Bark.lua:1233`) says "somebody inside the horse's footprint", and
+  `:1201`, `:1210` give the loop as "ten" and "twenty" times a second. —
+  Correct both files: anyone within `HitRadius`, ahead of contact.
+- [ ] `:381-385` `UpdateTimer` — "Each load screen starts a new loop": the
+  entry point's load handler (`HorseCollisionMod.lua:1867`) does. — Name it.
+- [ ] `:397-400` — "Those were separate figures until the impact sound made
+  the difference audible… agreed only by accident". — Keep: the interval
+  is `TickSeconds`, which the forward sweep also uses.
+- [ ] `:405-406` — `TrackHorseSpeed` exists "because the rear's standstill
+  gate cannot trust `GetVelocity`"; correct, but the reading is also this
+  file's only horse-speed source outside `SafeUpdate`. — Keep as is.
+- [ ] `:419` — "CRITICAL ERROR IN UPDATE TIMER" in capitals, unlike every
+  other log row. — `UpdateError err=`.
 
 ### Dead code (`tools/audit_code.py`)
 
