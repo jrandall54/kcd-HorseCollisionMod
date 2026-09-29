@@ -483,7 +483,7 @@ end
 --
 -- Walk is absent on purpose. A shove at walking pace does not hurt, and the
 -- victim goes straight to words.
--- Both tiers use the one pain set that is **proven to speak**, and the graded
+-- Every tier here uses the one pain set that is **proven to speak**, and the graded
 -- ladder above it can never be wired in. `HurtLight` and `HurtHard` name
 -- `ZASAH_ZBRANI_SLABY` and `ZASAH_ZBRANI_SILNY`, whose metaroles are two of the
 -- fifteen registered in `Libs/Tables/rpg/combat_shout_type.xml`: those are
@@ -500,7 +500,7 @@ end
 HorseCollisionMod.PainByTier = {
 	Trot   = "HurtDown",
 	Gallop = "HurtDown",
-	Charge = "HurtHard"
+	Charge = "HurtDown"
 }
 
 --- Whether a bark may be raised at all right now.

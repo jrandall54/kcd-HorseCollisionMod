@@ -316,6 +316,19 @@ One line per batch: batch, commit, what was verified.
   by ear and the engine does not log vanilla's, and the change can only
   hold the mute longer. Walk contact after lingering: stagger, the mod's
   `Shove` line sent, no errors.
+- **Batch 3, item 3.** `VictimBarkByTier.Charge = "collision"` in
+  `Tiers.lua`; `PainByTier.Charge = "HurtDown"`; `tools/check_tiers.lua`
+  loads both files in LuaJIT and the build refuses any differing tier row
+  (it refused the old `Charge` row, then passed 9 of 9). Ride: the charge
+  cry is heard on unarmored villagers and not, per the rider, on armored
+  guards. The mod sent `HurtDown` to all of them (`villageGuard`,
+  `rat_guard22`, `sent=true`), and the set is the one trot and gallop use,
+  so the guards' silence is not specific to this change. **Open, bark
+  research:** whether guards can speak `HurtDown`; `HasMetaRoleByName`
+  does not decide it (a villager who spoke also reads false). **Open, bark
+  window:** the rider heard vanilla's collision bark after the mod's `Shove`
+  line on a walk stagger, so item 2 does not close every path by which
+  vanilla speaks inside the mod's window.
 
 ## Standard
 

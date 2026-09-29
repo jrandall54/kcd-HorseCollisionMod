@@ -362,6 +362,17 @@ if ($luajit) {
         }
     }
     Write-Host "Lua Syntax Check Passed."
+
+    # The settings file restates each tier table and overrides it at load, so
+    # a row that differs from Tiers.lua silently replaces the declared value.
+    Push-Location $repoRoot
+    & $luajit.Source (Join-Path $toolsDir "check_tiers.lua")
+    $tierCheck = $LASTEXITCODE
+    Pop-Location
+    if ($tierCheck -ne 0) {
+        Write-Host "Build failed: settings file tier tables differ from Tiers.lua." -ForegroundColor Red
+        exit 1
+    }
 }
 else {
     Write-Host "Lua Syntax Check Skipped (luajit not installed)." -ForegroundColor Yellow

@@ -418,7 +418,7 @@ HorseCollisionMod.VictimBarkByTier = {
 	Trot = "collision",
 	Gallop = "collision",
 	Rear = "rear",
-	Charge = "rear",
+	Charge = "collision",
 }
 
 --- Which tiers can make a victim lose patience and fight back.

@@ -30,6 +30,10 @@ number.
 
 ## [Unreleased]
 
+### Fixed
+
+- A charge victim cries out on impact, as a trot or gallop victim does.
+
 ### Removed
 
 - A knocked-down victim no longer groans at intervals while on the ground. The
