@@ -14,7 +14,7 @@ end of every pass, so it always says where the audit stands.
 
 **Current status:** every source file and every document except the diary
 audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
-`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py` done.
+`dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1` done.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -26,7 +26,8 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, largest first: `flow.ps1`, `verify_additive.py`, then the rest; `tools/legacy/` last. Then `.claude/`
+**Next pass:** `tools/`, largest first: `verify_additive.py`, `version_check.py`,
+`audit_code.py`, `testworld.py`, `dev_subject.lua`, `set_version.py`, then the rest; `tools/legacy/` last. Then `.claude/`
 hooks and linter. The carried-forward items belong to it.
 
 **Pass order** (dependencies first, then largest):
@@ -299,6 +300,14 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `RELOAD_COMMANDS` (`:170-200`) documents why that leaves the settings
   stale and the detection loop stopped. Proposal: `:reload` queues
   `RELOAD_COMMANDS`; delete `reload_mod`.
+
+- [ ] **`land`'s build retry.** `flow.ps1:382-398` retries a refused build
+  after staging, because "setting the version rewrites the `@release` line
+  … which makes the generated API reference stale a second time".
+  `pre_release_check.py:493-495` says the version does not appear in the
+  LDoc output, and `docs/api` holds no version string. The retry also
+  masks any other first-build failure. Proposal: delete the retry; if a
+  real second-build cause exists, name it in the comment instead.
 
 ## Findings
 
@@ -2695,6 +2704,50 @@ the docstrings.
 - [ ] `:514-516` — "raised OSError on the machine that has it installed and
   the check quietly passed. A check that never fires is worse than the one
   it replaced." — Keep "subprocess does not apply `PATHEXT` to a bare name".
+
+### tools/flow.ps1
+
+The verbs work as documented. Defects: a hardcoded game path the deploy it
+calls does not share, a vestigial splat, and people and history in the
+comments.
+
+**Wrong or stale:**
+
+- [ ] `:70` — `$gameRoot` is hardcoded; `dev_deploy.ps1` resolves
+  `-GameRoot`, `KCD_PATH` and Steam libraries. `Dev-Configured`, `Parked`
+  and `Enter-Shipping` read the hardcoded path while the deploy writes to the
+  resolved one. — Resolve the same way; one shared resolver for the
+  PowerShell tools.
+- [ ] `:9-13` usage — omits `world`, `test -Launch` and the world switches'
+  pointer. — Add `world`; point at the `param` block for the switches.
+- [ ] `:255-258`, `:265-269`, `:277` — "The deploy carries no world switches
+  any more … nothing to splat"; `$deployArgs` is always empty and every call
+  splats it. — Delete `$deployArgs`; pass `-NoBuild -Launch` directly.
+- [ ] `:142-157` — an empty `status` section header, then the world helpers,
+  then `Show-Status` after a double blank line. — Put `Show-Status` under
+  its header; one blank line.
+- [ ] `:338-339` — `$src_changed`, `$diary_changed`; the file is camelCase.
+  — Rename.
+- [ ] `:192` — "the world is its own file now". — Cut "now".
+
+**History and people to cut** (keep the constraint each one supports):
+
+- [ ] `:5-7` — "every one of them was previously a list of steps". — Cut.
+- [ ] `:194-195` — "and the rider has paid for that more than once". — Cut.
+- [ ] `:231-232` — "a rider mid-test suddenly has a horse that tires". —
+  Keep "a switch persists until `land`".
+- [ ] `:263` — "and has cost rides". — Cut.
+- [ ] `:272-276` — "Passed as a bare switch in front of a splat it was
+  accepted and did nothing … Same family as the splatting defect above";
+  the defect above no longer exists. — Cut with the splat.
+- [ ] `:454-466` — two comments run together, "a rider wondering why their
+  horse never tired", "So the next branch started with crime". — One
+  comment: the deploy writes an empty world, then `--reset` removes the
+  file, because no file and an empty file mean different things.
+- [ ] `:471-473` — "Re-entering here is what left main carrying a branch's
+  test values." — Cut.
+- [ ] `:480-481` — "The rider had to ask for this three times before it was
+  automated". — Cut.
 
 ### Dead code (`tools/audit_code.py`)
 
