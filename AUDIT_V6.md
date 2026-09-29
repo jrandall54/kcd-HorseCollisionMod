@@ -17,7 +17,9 @@ audited; tooling pass started, `build.ps1`, `dev_deploy.ps1`, `build_adb.py`,
 `dev_console.py`, `publish_nexus.ps1`, `pre_release_check.py`, `flow.ps1`,
 `verify_additive.py`, `version_check.py`, `set_version.py`,
 `audit_code.py`, `testworld.py`, `dev_subject.lua`,
-`nexus_settings_block.py`, the bark scripts, the probes done.
+`nexus_settings_block.py`, the bark scripts, the probes, the
+`dev_` helpers, `restore_alive.lua`, `testworlds.ini` done. `tools/` is
+complete except `tools/legacy/`.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -29,9 +31,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `tools/`, the `dev_` Lua,
-`restore_alive.lua`, `testworlds.ini`; `tools/legacy/` last. Then `.claude/`
-hooks and linter.
+**Next pass:** `tools/legacy/`, then the `.claude/` hooks and linter.
 
 **Pass order** (dependencies first, then largest):
 
@@ -324,6 +324,13 @@ Items that change behavior or delete a feature. Not applied without a decision.
   `probe_recovery_states.lua` searched for a flat-versus-rising signal,
   which `IsVictimFlat` now implements. Proposal: delete the three, or move
   them to `tools/legacy/`; the findings live in the diary.
+  `restore_alive.lua` belongs with them: it repairs actors left in the
+  `unragdoll` profile, which nothing in `src/` sets any more.
+
+- [ ] **Two test-subject tools.** `dev_target.lua` moves an existing NPC
+  and pins it with `AI.SetIgnorant`; `dev_subject.lua` spawns a guard soul
+  and says moving an existing NPC does not work. Each header contradicts
+  the other. Proposal: keep `dev_subject.lua`, delete `dev_target.lua`.
 
 ## Findings
 
@@ -2966,6 +2973,41 @@ their header, and three answer questions that are closed (see the ruling).
   earlier in this project". — "Per-sample logging costs frames."
 - [ ] `probe_health.lua:10-12` — "This lived in the mod as
   HorseCollisionMod:WatchHealth until 4.9.3". — Cut.
+
+### Development helpers (`tools/dev_*.lua`, `testworlds.ini`)
+
+**Wrong or stale:**
+
+- [ ] `dev_target.lua:107`, `:116-118` — sets `ai_IgnorePlayer 1` and says
+  it "keeps the rest of the town from reacting"; `dev_peace.lua:21-27`
+  records that this was never shown to do anything and forbids adding it
+  without a test. — Delete the cvar and the claim (or see the ruling).
+- [ ] `dev_target.lua:5-7` — "a spawned entity has no soul, armour or AI";
+  `dev_subject.lua` spawns with a guard soul and is the tool the rest of the
+  project uses. "armour" twice. — See the ruling; "armor" if kept.
+- [ ] `dev_target.lua:10`, `:41-43` — skips Henry's dog by name, behind a
+  class filter that already excludes dogs (the `ProtectMutt` ruling). —
+  Delete the name check.
+- [ ] `dev_survival.lua:14` — "established by reading them back rather than
+  assumed" (a `STYLE.md` rejected form). — Cut the clause.
+- [ ] `dev_horse.lua:3-5` — "the earliest save on hand is already level
+  5". — "Tests at low Horsemanship need a horse before the prologue grants
+  one."
+
+**History and people to cut:**
+
+- [ ] `dev_peace.lua:21-26` — "It was described as the lever that mattered
+  … set on every run for several sessions while the rider went on being
+  attacked". — Keep "not included: no test has shown it changes anything".
+- [ ] `dev_time.lua:5-7` — "A question needing several in-game days was
+  therefore abandoned rather than answered." — Cut.
+- [ ] `dev_time.lua:14-16` — "the rider reported that 'everything broke'".
+  — "A jump can leave the session inconsistent; reload if it does."
+- [ ] `dev_fasthorse.lua:3` — "Every measurement this project has ever
+  taken was ridden on Pebbles". — "The gait thresholds were measured on one
+  horse."
+- [ ] `testworlds.ini:16` — "interrupts the rider mid-test". — "interrupts
+  a test".
 
 ### Dead code (`tools/audit_code.py`)
 
