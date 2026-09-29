@@ -13,7 +13,8 @@ end of every pass, so it always says where the audit stands.
 **Phase:** 1, recording findings. No source file has been edited.
 
 **Current status:** every source file audited; README.md,
-`docs/HOW_IT_WORKS.md` and `docs/DEV_LOOP.md` audited.
+`docs/HOW_IT_WORKS.md`, `docs/DEV_LOOP.md` and `docs/ARCHITECTURE_NOTES.md`
+audited.
 
 **Method for one pass:** read the whole file; check every factual claim in a
 comment against the code it describes; record each problem under the file's
@@ -25,8 +26,7 @@ update this section; commit as `docs(audit): record findings for <file>`.
 needing one is recorded under **Rulings needed** with a proposal, and the
 passes continue. Rulings are made together once phase 1 is complete.
 
-**Next pass:** `docs/ARCHITECTURE_NOTES.md`, then
-`BALANCE_AUDIT.md`, `ENGINE_BINDS.md`, `TECHNICAL_DETAILS.md`, one file per
+**Next pass:** `docs/BALANCE_AUDIT.md`, then `ENGINE_BINDS.md`, `TECHNICAL_DETAILS.md`, one file per
 pass.
 
 **Pass order** (dependencies first, then largest):
@@ -2107,6 +2107,41 @@ landing block read as prose).
 - [ ] `:299-310` — the packaged-build checklist never names `flow.ps1
   shipping`, which sets up exactly that state. — Name it; keep the list as
   what it establishes.
+
+### docs/ARCHITECTURE_NOTES.md
+
+Local: excluded through `.git/info/exclude`, so the linter never sees it. Held
+to the same standard because it is not the diary.
+
+- [ ] `:14`, `:72`, `:114`, `:123`, `:133`, `:176`, `:266-272`, `:318` — em
+  dashes. — Replace.
+- [ ] `:47`, `:85-88`, `:152-153`, `:206-213`, `:238-241`, `:302-305` —
+  anecdotes: "four hundred log lines", "cost hours", the manifest gate, the
+  readiness watcher's 608 ms, how the watcher was caught. — Move to the
+  diary; keep each constraint.
+- [ ] `:327-361` "Look for the mechanism this project already has" —
+  narrative of one fix, with "the rider" at `:358`. — Move to the diary;
+  keep the rule (read the neighboring working mechanism before the engine
+  API) as one paragraph, and the empty-terminal-clip fragment as a fact.
+- [ ] `:63`, `:171`, `:177` — "sixteen files", "roughly a hundred and fifty
+  methods"; there are twenty part files and 169 methods. — Drop the counts.
+- [ ] `:99-125` "What has moved since this was written" — a changelog inside
+  the assessment. — Fold into **Assessment** as current state.
+- [ ] `:109-110` — `RetaliationByTier` is "the worked example from this
+  document, implemented as written"; it ships as booleans
+  (`Settings:386-392`), not the `{ policy, escalates }` rows at `:187-193`,
+  and `NoteImpact` (`:196`) does not exist. — Say the table exists as
+  booleans and the policy rows are still the target.
+- [ ] `:215-253` — "every remaining duration was enumerated"; the lists omit
+  `ChargeCooldownMs`, `HorseVocalCooldownMs`, `PhysicsReadyMs`,
+  `RagdollDampFloorMs`, `RearChargeWindowMs`, `RecoveryBarkIntervalMs`,
+  `RecoveryMinSec`, `RecoveryMaxSec`, `ReleaseMovementGapMs`,
+  `RiseCeilingMs`, `RisePollMs`, `TickMs`. — Classify them.
+- [ ] `:264`, `:273`, `:307` — "now have been", "now governs", "from now". —
+  Timeless.
+- [ ] `:278-284` `ImpulseDelayMs` — "an impulse and a set velocity produce the
+  same distribution across three rides". — Cut the measurement; keep "the
+  engine's collision does the throwing".
 
 ### Dead code (`tools/audit_code.py`)
 
