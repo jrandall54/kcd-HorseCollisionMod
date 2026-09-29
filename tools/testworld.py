@@ -1,21 +1,6 @@
 """The testing world: what this branch changes about the installed settings.
 
-The problem this replaces. The test world used to be three PowerShell switches
-with their values hard-coded in `dev_deploy.ps1`, applied by regex over the
-installed settings file. Every new thing anybody wanted to change for a test
-meant editing PowerShell, and the rider said so plainly after watching a
-two-minute detour to flip two booleans:
-
-    We built the fucking tool so you can easily switch testing environments
-    that persist past save reloads. We built it. it works and I have fucking
-    clue why you don't use it.
-
-It also could not reach most of the mod any more. After the per-tier tables
-landed, a setting like the gallop's stamina cost lives at
-`StaminaShareByTier.Gallop`, and a regex looking for `^\\tKey = value` cannot
-see inside a table.
-
-How it works now. Startup scripts are loaded in name order, so a file named
+Startup scripts are loaded in name order, so a file named
 `HorseCollisionMod_TestWorld.lua` runs after `HorseCollisionMod_Settings.lua`
 and can simply assign into the same global the settings file defines. The mod
 then applies it through `ApplySettings` like anything else, with the same type
@@ -275,8 +260,7 @@ def main():
     if args.preset or args.set or args.unset or args.clear:
         write_world(world)
 
-    # Printed after any change, because a switch whose effect you cannot see is
-    # how a setting stays on through the next three tests.
+    # Printed after any change, so the live world is always visible.
     if args.list or not args.write:
         if world:
             for key, value in world:

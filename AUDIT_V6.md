@@ -3713,12 +3713,12 @@ and the section comments number the claims differently from the docstring.
 
 ### tools/testworld.py
 
-- [ ] `:3-16` — "The problem this replaces", the three PowerShell switches
+- [x] `:3-16` — "The problem this replaces", the three PowerShell switches
   it replaced, and a quoted, profane remark from the rider. History, a
   person, and a quote, in a tracked file. — Cut entirely; `:18-34` is the
   docstring.
-- [ ] `:18` — "How it works now." — Cut the lead-in.
-- [ ] `:278-279` — "how a setting stays on through the next three tests". —
+- [x] `:18` — "How it works now." — Cut the lead-in.
+- [x] `:278-279` — "how a setting stays on through the next three tests". —
   "Printed after any change, so the live world is always visible."
 
 ### tools/dev_subject.lua
