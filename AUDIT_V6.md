@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool.
-Next: `HushVanillaBark` clears its own refresh. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh.
+Next: `WhenVictimRises` fires at once on a ragdoll tier. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -159,13 +159,11 @@ Items that change behavior or delete a feature. Not applied without a decision.
   (`Bark.lua:613`) becomes `HurtDown`, as trot and gallop use; `HurtHard`
   (`ZASAH_ZBRANI_SILNY`) is a combat-shout set a bark request cannot reach.
 
-- [ ] **`HushVanillaBark` clears its own refresh.** Each call arms a timer
-  that clears the option after `BarkSuppressMs`, and a refresh comes at half
-  that window, so the first timer clears an option the second call set and
-  expects to hold. The option can be down while the victim is still in front
-  of the horse. This is the two-writers failure the comment in `Bark`
-  (`:788-790`) warns against. Proposal: the timer clears only when
-  `RecentHushes[id]` still holds its own stamp.
+- [x] **`HushVanillaBark` clears its own refresh.** Ruled as proposed: the
+  timer (`Bark.lua:1237-1243`) captures the stamp it was armed with and
+  clears the option only when `RecentHushes[id]` still holds that stamp, so
+  a timer superseded by a refresh does nothing. Closes a gap of up to half
+  of `BarkSuppressMs` with the victim still in front of the horse.
 
 - [ ] **`WhenVictimRises` fires at once on a ragdoll tier.** `8809c66` added
   an early return on any ragdoll state (`Recovery.lua:332-338`, "the most
