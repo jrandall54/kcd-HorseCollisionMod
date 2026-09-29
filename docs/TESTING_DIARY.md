@@ -22689,3 +22689,12 @@ The fraction was not what decided it. Every second hit logged
 the head height reads as full standing height, so `IsVictimFlat` returns false
 at any fraction below 0.88 and the reaction always starts. The same blindness
 as `GetWorldPos` on a thrown body, found from the other side.
+
+## Morale does not separate women from men
+
+Moved here from the `Retaliation.lua` header during the audit's comment pass,
+where it had been kept as justification. Across twenty one NPCs sampled in
+Rattay, women read morale 0.15 to 0.22, male civilians 0.16 to 0.52 and guards
+0.54 to 0.79. The morale comparison in `sb_combat.xml` tells a guard from a
+townsman and says nothing about sex, so the mod routes a provoked victim on the
+gender the combat tree itself tests.
