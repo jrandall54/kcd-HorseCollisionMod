@@ -864,7 +864,7 @@ HorseCollisionMod.Config = {
 
 	VictimLockMsByTier       = { Charge = 2600 },
 
-	VictimFlatFraction       = 0.45,
+	VictimFlatFraction       = 0.15,
 
 	ImpactDamageOwnsTheHit   = true,
 	ImpactDamageReclaimCeiling = 60,

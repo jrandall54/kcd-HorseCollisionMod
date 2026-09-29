@@ -22676,3 +22676,16 @@ whether the script reload that switch performs is itself the cure.
 Found and not fixed: `PullRiderDown` has never returned `true` (it ends with
 `attempt()` since `ec6fc1f`), so `ProvokeIfAnnoyed` releases the offense at once
 and a provoked victim may swing before the pull-down rather than after it.
+
+## Batch 3, ride 1: the flat test cannot see a ragdoll
+
+`VictimFlatFraction` went back to 0.15, its measured value, from the 0.45 an
+unrelated commit had left. The ride hit a downed villager a second time at a
+trot, and she popped upright into a new reaction. The rider does not mind: a
+reaction reads better than none.
+
+The fraction was not what decided it. Every second hit logged
+`state=BlendRagdoll headUp=0.88 standing=0.88`: while the body is a ragdoll
+the head height reads as full standing height, so `IsVictimFlat` returns false
+at any fraction below 0.88 and the reaction always starts. The same blindness
+as `GetWorldPos` on a thrown body, found from the other side.

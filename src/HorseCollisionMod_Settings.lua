@@ -385,7 +385,7 @@ HorseCollisionModSettings = {
 	-- Raise it and a victim is refused further into their get-up; lower it and
 	-- a reaction can start on a body still on the ground, which snaps them
 	-- upright into it.
-	VictimFlatFraction       = 0.45,
+	VictimFlatFraction       = 0.15,
 
 	-- What a tier does to the victim's body.
 	--

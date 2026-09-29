@@ -251,8 +251,6 @@ rider asks.
 
 - A gallop or charge victim's recovery line or retaliation must not start
   while they are still on the ground (the rise shortcut).
-- A second hit on a victim who is down must not snap them upright
-  (`VictimFlatFraction`).
 - Mutt taking damage and fleeing is the rider's to raise if it recurs.
 
 ### Phase 2 log
@@ -305,6 +303,13 @@ One line per batch: batch, commit, what was verified.
   registered every tier. Not reproduced and not attributed; recorded in the
   diary with the procedure for a recurrence. `YieldCaught` result recorded
   in the diary.
+- **Batch 3, item 1.** `VictimFlatFraction` 0.15 in both files. Ride: a
+  second trot hit on a downed victim popped them upright, which the rider
+  prefers to no reaction. The fraction did not decide it: every second hit
+  read `state=BlendRagdoll headUp=0.88 standing=0.88`, so the head-height
+  test does not see a ragdolled body lie down and returns `flat=false` at
+  any fraction. The derivation stands; the snap check is dropped from the
+  publish test.
 
 ## Standard
 
