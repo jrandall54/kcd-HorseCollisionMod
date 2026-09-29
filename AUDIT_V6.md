@@ -29,8 +29,8 @@ passes continue. Rulings are made together once phase 1 is complete.
 **Next step:** the rulings, decided together one at a time
 in the order listed under **Rulings needed**. Decided so far: RearChargeThrow,
 DynamicRecovery, the charge's bark set, the charge's impact cry, the physics-proxy
-rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh.
-Next: `WhenVictimRises` fires at once on a ragdoll tier. Present each ruling with the code checked
+rescue, `RearAnimSpeed`, the cooldown icon, `CatchYieldImmediately`, the pull-down target probe, the dead Henry set path, the empty impact pool, `HushVanillaBark`'s refresh, `WhenVictimRises`.
+Next: `VictimFlatFraction`. Present each ruling with the code checked
 first; several phase-1 premises turned out wrong on inspection (the cooldown
 icon) or needed log evidence (the pull-down target). Phase 2 then applies the
 findings in small batches, each checked off here with its commit.
@@ -165,15 +165,17 @@ Items that change behavior or delete a feature. Not applied without a decision.
   a timer superseded by a refresh does nothing. Closes a gap of up to half
   of `BarkSuppressMs` with the victim still in front of the horse.
 
-- [ ] **`WhenVictimRises` fires at once on a ragdoll tier.** `8809c66` added
-  an early return on any ragdoll state (`Recovery.lua:332-338`, "the most
-  reliable indicator that they have started rising"). `IsVictimFlat`
-  (`:262-270`) records that a gallop or charge victim sits in `BlendRagdoll`
-  for the whole time they are down, so on those tiers the recovery line
-  fires on the first poll, while the victim is still on the ground. The
-  doc above the function describes the height test that the early return
-  bypasses. Proposal: take the shortcut only on a tier whose reaction is
-  `fall`, or remove it and rely on the height test.
+- [x] **`WhenVictimRises` and the ragdoll-state shortcut.** Ruled not a
+  bug. The phase-1 premise was wrong: backed-up logs show gallop and charge
+  victims take the shortcut (`on=ragdoll`) 1.7 to 2.0 s after impact, not
+  on the first poll, and without it the same tiers ran the 15 s ceiling
+  (`on=neverFlat`) because the height test never reads them flat. It also
+  times the crime deferral (`Impact.lua:224`), not only the recovery line.
+  No change of behavior; the comment at `Recovery.lua:332-334` and the doc
+  above the function are corrected to say the height test serves the fall
+  tiers and the ragdoll state serves the ragdoll tiers. Publish-test check:
+  on a gallop or charge hit, the recovery line or retaliation must not
+  start while the victim is still down; if it does, this reopens.
 
 - [ ] **`VictimFlatFraction` ships at 0.45 against a derivation for about
   0.13.** The comment (`Recovery.lua:275-287`) says flat reads 0.04 to 0.10
