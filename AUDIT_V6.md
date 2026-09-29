@@ -31,7 +31,7 @@ ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
 **Next step:** phase 2, batch 4, one source file per commit in the pass
-order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`. Next: `Health.lua`. Read **Phase 2 plan**
+order below. Done: `src/HorseCollisionMod.lua`, the settings file, `Tiers.lua`, `Armor.lua`, `Reaction.lua`, `Rear.lua`, `Retaliation.lua`, `Bark.lua`, `Recovery.lua`, `Health.lua`. Next: `Rider.lua`. Read **Phase 2 plan**
 below in full before starting; it gives the procedure for every batch and how each is
 verified. Code changes found on the way go to batch 3, item 7, applied
 after the comment passes.
@@ -247,6 +247,14 @@ In this order, each its own commit and ride:
      `RiseCeilingMs` stay for `FallToBlend`); `IsVictimFlat` returns four
      values on a nil victim as it does elsewhere; move `ImpactIsNewContact`
      to `Update.lua`, beside its callers' concern.
+   - `Health.lua`, `ApplyImpactDamage`: delete `attacker` and the
+     `attributed=` field it feeds (`DealDamage` takes no attacker); return
+     nothing, since `Impact.lua` ignores the figure; the crime hit's
+     strength falls back as `Impact.lua`'s does rather than through a
+     `"Tickle"` literal; the `fatal=` log field reads `fatal`; the
+     immediate-deal branch keys on the tier's `ReactionByTier` being
+     `stagger` rather than on the name `"Walk"`, which gives the same
+     result for the shipped tables.
 
 **Batch 4. Comment passes, one source file per commit.** *(L0, L1)*
 All remaining **Findings** under `src/`, in the pass order. L1 must report
@@ -425,6 +433,9 @@ One line per batch: batch, commit, what was verified.
 - **Batch 4, `Recovery.lua`.** L1 `same`. Docs follow the rise-shortcut
   and `WhenBodyStops` rulings; misplaced and missing docs fixed; history
   cut; the `hcm_combat_injected` skip explained from `7508a1a`.
+- **Batch 4, `Health.lua`.** L1 `same` for it and the entry point. Header
+  lists the file's five parts; the orphaned damage doc moved to its
+  function; the prediction doc matches the code.
 
 ## Standard
 
@@ -1818,81 +1829,92 @@ mix is now meters in both files. Code findings went to batch 3, item 7.
 
 ### src/HorseCollisionMod/Health.lua
 
-- [ ] `:1-10` header — names `SuppressAutoCure` and the probe but not the
+Batch 4: applied. Superseded by batch 2: the throw fields and the rest
+watcher. The `ApplyImpactDamage` doc moved onto its function and rewritten
+for `ImpactDamageOwnsTheHit`; the three spliced crime-fix blocks collapsed
+into one section of that doc. `PredictImpactFatal` now describes the center
+of the roll, which the code uses. `lastHitByPlayer` is real
+(`sb_switch_hitreactions.xml:584`) and cited. The entry point's
+`ImpactDamageDelayMs` field corrected in the same commit. The test-subject
+path's missing shield lift is superseded by batch 5, which deletes that
+path. Two measurements the diary lacked moved to it. Code findings went to
+batch 3, item 7.
+
+- [x] `:1-10` header — names `SuppressAutoCure` and the probe but not the
   damage path, which is most of the file. — One line per part: the probe,
   the auto-cure exemption, the mod's damage and its reclaim, story-character
   protection.
-- [ ] `:17-27` — no break between `@release` and the `ImpactProbeSamples`
+- [x] `:17-27` — no break between `@release` and the `ImpactProbeSamples`
   comment, so it folds into the module doc (the `Armor.lua` pattern). The
   last two lines explain why it is not an LDoc block. — Separate; cut the
   LDoc aside.
-- [ ] `:29-47` `SuppressAutoCure` — "cleared on a timer"; the option is held
+- [x] `:29-47` `SuppressAutoCure` — "cleared on a timer"; the option is held
   until health is back over `AutoCureHealthLimit`, rechecked every
   `SuppressAutoCureSec`. — Correct.
-- [ ] `:65-69` — "reads as the tidier option… sent to a guard in combat, the
+- [x] `:65-69` — "reads as the tidier option… sent to a guard in combat, the
   option read back false immediately". — Keep: the brain message can be
   dropped by a busy brain; the direct call writes the table.
-- [ ] `:101-103` — "doubles as the repair path for a save carrying stuck
+- [x] `:101-103` — "doubles as the repair path for a save carrying stuck
   NPCs". The exemption is non-persistent and the cure patch is vanilla's, so
   this is true, but it is release history. — Cut to "reports false on a
   victim who was never held".
-- [ ] `:160-161`, `:350-351` — two blank lines between functions. — One.
-- [ ] `:176-178` — "The impulse throws the target, and a change in z…
+- [x] `:160-161`, `:350-351` — two blank lines between functions. — One.
+- [x] `:176-178` — "The impulse throws the target, and a change in z…
   separates a fall from anything the collision itself did." — Follows the
   impact-throw probe ruling.
-- [ ] `:228-234` — "a long investigation turned on being unable to tell them
+- [x] `:228-234` — "a long investigation turned on being unable to tell them
   apart". — Keep: an impact on someone already down plays nothing and
   costs nothing, and the state separates that from a failed impact.
-- [ ] `:278-281` — "Samples now run past the cooldown… no longer". — Keep:
+- [x] `:278-281` — "Samples now run past the cooldown… no longer". — Keep:
   `from=` ties each sample to its impact when two interleave.
-- [ ] `:296-348` — the rest watcher. Follows the impact-throw probe ruling;
+- [x] `:296-348` — the rest watcher. Follows the impact-throw probe ruling;
   if kept, `restCeiling = 8000` is an unnamed literal.
-- [ ] `:352-403` — the `ApplyImpactDamage` doc sits above
+- [x] `:352-403` — the `ApplyImpactDamage` doc sits above
   `PredictImpactFatal`'s (`:404`) with no function between, and the
   function is at `:527`; LDoc gives `ApplyImpactDamage` no doc. — Move it
   to `:527`.
-- [ ] `:352-369` — "on top of what the engine charged" and "the mod adds its
+- [x] `:352-369` — "on top of what the engine charged" and "the mod adds its
   own charge": with `ImpactDamageOwnsTheHit` (shipped true) the engine's
   charge is given back and the mod's figure is the whole cost. "87 per
   cent… with an error bar" is measurement narrative. — Say: the engine's
   charge is nearly flat against armor, so the mod reclaims it and deals an
   armor-scaled figure of its own; keep the variance paragraph.
-- [ ] `:383-389` — "A victim the mod kills therefore dies silently, and that
+- [x] `:383-389` — "A victim the mod kills therefore dies silently, and that
   is a property of this call rather than of the bark system." — Keep the
   constraint; the `BarkDeath` call at `:837` follows the dead-set-path
   ruling.
-- [ ] `:391-396` — "by the `combat:hit` that `Crime.lua` sends": the hit is
+- [x] `:391-396` — "by the `combat:hit` that `Crime.lua` sends": the hit is
   sent from `Impact.lua:233` when the victim rises, and from `:830` here on
   a death. — Correct.
-- [ ] `:401` `@tparam playerEnt` — "named as the attacker"; the attacker
+- [x] `:401` `@tparam playerEnt` — "named as the attacker"; the attacker
   WUID (`:561-567`) feeds only the `attributed=` log field, and `DealDamage`
   takes no attacker (`:377-381`). — Delete `attacker`; describe
   `playerEnt` as the player the death is attributed to when crime is on.
-- [ ] `:403` `@treturn` — "the damage dealt, or 0"; the function returns the
+- [x] `:403` `@treturn` — "the damage dealt, or 0"; the function returns the
   rolled figure before the deferred path runs, whether or not it is dealt,
   and `Impact.lua:251` ignores it. — Return nothing.
-- [ ] `:406-412` `PredictImpactFatal` — "produced words a second and a half
+- [x] `:406-412` `PredictImpactFatal` — "produced words a second and a half
   after… never got a line whatsoever". — Keep: the damage is deferred until
   the body stops, so a line chosen from it arrives late.
-- [ ] `:414-427` — says the prediction is taken at the **top** of the
+- [x] `:414-427` — says the prediction is taken at the **top** of the
   variance roll; the code (`:465-468`) uses the intended figure, the
   center. `4a36c11` chose the center deliberately and its message says so;
   the comment was rewritten the other way in the same commit. "Three of
   seven kills in one ride". — Rewrite for the center: a death line over a
   survivor is the worse error, so the prediction is the average outcome and
   misses some kills near the margin.
-- [ ] `:429-431` — "The mod reclaims it" holds only with
+- [x] `:429-431` — "The mod reclaims it" holds only with
   `ImpactDamageOwnsTheHit`. — Say so.
-- [ ] `:473-499` `IsProtectedFromHarm` — "measured taking Bernard from 100
+- [x] `:473-499` `IsProtectedFromHarm` — "measured taking Bernard from 100
   down to 66", "reading it here reported every victim… six gallops", "has
   not been seen". — Keep: `DealDamage` ignores immortality; `apr` comes from
   `vip_attackprot` and the mod never writes it; `imm` is set on every victim
   by the shield, so it cannot identify anyone; the known gap is an immortal
   character without `apr`. Keep the `rat_bernard`/`villageGuard` sample.
-- [ ] `:533-536` — "The settings file wins… belong where a player or a test
+- [x] `:533-536` — "The settings file wins… belong where a player or a test
   can reach them rather than compiled in." This is how `TierValue` works
   for every table. — Cut.
-- [ ] `:569-599` — "this is the whole of the crime fix", "until now a coin
+- [x] `:569-599` — "this is the whole of the crime fix", "until now a coin
   toss", "hanging offence" (British), and "A fixed wait, not a poll, and
   deliberately so", which contradicts the `WhenBodyStops` wait at `:888`.
   `:600-612` "the mod's design has always been… What it never did". —
@@ -1901,47 +1923,47 @@ mix is now meters in both files. Code findings went to batch 3, item 7.
   raises `murder` only from an attributed hit; so the victim is shielded
   from contact until the body stops, the engine's charge is reclaimed, and
   the mod's blow is the one that kills. Cite the setting, not 22.7 or 95.
-- [ ] `:619-631` — "The Cheat mod's immortality works because…". — Keep
+- [x] `:619-631` — "The Cheat mod's immortality works because…". — Keep
   the constraint: an NPC's health cannot be raised past 100 from Lua, so the
   exemption lives here and holds only `tools/dev_subject.lua` spawns.
-- [ ] `:642-648` — "about 18 a pass", "still died after a handful of runs…
+- [x] `:642-648` — "about 18 a pass", "still died after a handful of runs…
   the rider was charged with murder". — Keep: the engine charges a
   collision too, so health is restored to its value at impact.
-- [ ] `:642-673` — the test-subject path returns before `deal`, so it never
+- [x] `:642-673` — the test-subject path returns before `deal`, so it never
   calls `LiftCollisionShield`; the shield comes off only at its 6000 ms
   backstop. — Lift it in this path as well.
-- [ ] `:675-680` — "Nothing is timed here any more, and the local that used
+- [x] `:675-680` — "Nothing is timed here any more, and the local that used
   to hold a delay". `:677-679` says the test subject has "no body to watch";
   the subject is thrown like any victim, and the restore uses a timer only
   because nothing is dealt. — Cut; one line on why the restore is timed.
-- [ ] `:687-692` — "Nothing here tries to work out whether this impact will
+- [x] `:687-692` — "Nothing here tries to work out whether this impact will
   be lethal any more", beside a function (`PredictImpactFatal`) that does,
   for the bark. — Cut with the collapse above.
-- [ ] `:710-723` — keep; trim to: restored without the reclaim ceiling,
+- [x] `:710-723` — keep; trim to: restored without the reclaim ceiling,
   because this character is not to be harmed; done after the shield lifts
   and the body stops, when the engine has finished charging.
-- [ ] `:796-811` — "Observed on a beggar… mourned him", "It has been latent
+- [x] `:796-811` — "Observed on a beggar… mourned him", "It has been latent
   all along… Raising the rear's damage made it common". — Keep: a victim
   killed inside an interactive action is left standing in it, so the death
   is handed to a ragdoll, and only then.
-- [ ] `:816-823` — prose in another register ("don't", unquoted
+- [x] `:816-823` — prose in another register ("don't", unquoted
   identifiers, `'lastHitByPlayer'` in quotes). `lastHitByPlayer` appears
   nowhere else in the repository or the references cited. — Rewrite in the
   file's register; name the link only if a source is found in
   `vanilla_scripts/` or the decompilation, otherwise describe it as the hit
   that attributes the death.
-- [ ] `:825-829` — `"Tickle"` literal as the strength fallback, repeated
+- [x] `:825-829` — `"Tickle"` literal as the strength fallback, repeated
   from the reaction path. — Use the same fallback `Impact.lua` uses, or
   pass `hitStrength` always and drop the chain.
-- [ ] `:866-867` — `fatal=` recomputes `fatal` (`:812`). `:869` is
+- [x] `:866-867` — `fatal=` recomputes `fatal` (`:812`). `:869` is
   misindented. — Use `fatal`; fix the indent.
-- [ ] `:874-884` — "measured… victims lost between 6 and 32 health, and six
+- [x] `:874-884` — "measured… victims lost between 6 and 32 health, and six
   of ten were driven onto the clamp". — Keep: the shield has to span the
   whole throw, since the engine charges the body while it moves.
-- [ ] `:885` — the tier name `"Walk"` as a literal decides whether to wait.
+- [x] `:885` — the tier name `"Walk"` as a literal decides whether to wait.
   `WhenBodyStops` already reads a still body on its first poll. — Drop the
   branch, or key it on the tier's reaction rather than its name and say why.
-- [ ] `HorseCollisionMod.lua:421-424` `@field ImpactDamageDelayMs` —
+- [x] `HorseCollisionMod.lua:421-424` `@field ImpactDamageDelayMs` —
   describes the wait before charging; the setting only times the test
   subject's restore (the settings file, `:663-665`, says so). — Correct.
 

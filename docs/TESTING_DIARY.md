@@ -22718,3 +22718,13 @@ seconds after the victim was upright; waiting for the animation state to leave
 impact landed mid-ragdoll for some victims and after others had walked off,
 heard as "a large gap between when they actually stand up and then the 2nd line
 plays". The line now fires from `WhenVictimRises`.
+
+## Moved from `Health.lua` comments
+
+Two measurements cut from the health module's comments during the audit.
+`soul:DealDamage` took Captain Bernard from 100 to 66 over three gallops before
+`IsProtectedFromHarm` existed, which is why protected characters are read from
+the `apr` flag. Between the impact and the body coming to rest, victims lost 6
+to 32 health to the engine, and six of ten were driven onto the clamp, which is
+why the collision shield spans the whole throw rather than the moment of
+contact.

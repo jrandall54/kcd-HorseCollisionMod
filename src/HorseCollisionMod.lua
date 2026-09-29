@@ -400,10 +400,9 @@ HorseCollisionModGeneration = HorseCollisionModGeneration or 0
 --   no plate makes a body weigh less than the horse standing on it
 -- @field ImpactDamageVariance how far either side of the tier figure a single
 --   impact can land, as a fraction
--- @field ImpactDamageDelayMs how long to wait before charging the victim, so
---   that the engine's own trample damage lands first and this mod delivers
---   the killing blow; 0 charges immediately, which lets the engine decide
---   whether a collision death is attributed to the rider
+-- @field ImpactDamageDelayMs how long after an impact a development test
+--   subject's health is put back; a real impact's damage waits for the body
+--   to stop instead
 -- @field ImpactDust whether an impact throws dust off the ground
 -- @field ImpactDustEffect the particle library node to spawn
 -- @field ImpactDustHeight meters above the victim's origin to spawn it
