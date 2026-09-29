@@ -274,6 +274,20 @@ Write-Host "Code Style Check Passed ($luaLineCount lines, $($luaScripts.Count) f
 # diagnostics and a mismatched version; so does -Development at any version.
 $isRelease = (-not $Development) -and ($Version -match '^\d+\.\d+\.\d+$')
 
+# The README's settings table is generated from the settings file, and the
+# README ships in the zip. A release refuses a stale table; a development build
+# only reports it, so a comment edit does not block a deploy.
+python (Join-Path $toolsDir "nexus_settings_block.py") --check-readme
+
+if ($LASTEXITCODE -ne 0) {
+    if ($isRelease) {
+        Write-Host "Build failed: README.md's settings table is stale." -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "README.md's settings table is stale; a release build will refuse it." -ForegroundColor Yellow
+}
+
 if ($isRelease) {
     # The version lives in three places and a release needs all three to agree.
     # publish_nexus.ps1 catches a manifest mismatch, but only once the zip is

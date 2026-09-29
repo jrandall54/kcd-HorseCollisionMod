@@ -411,13 +411,13 @@ HorseCollisionModSettings = {
 	-- Every pair is blended across the victim's armor, so armor decides
 	-- distance within a tier.
 	--
-	--   1. throw   -- the gallop brakes, keeping a fraction of the speed the
-	--                 engine gave the body; the charge launches, at
-	--                 RearChargeImpactSpeed * lungeTransfer * RearChargeThrow
-	--   2. cap     -- the speed the body may not exceed in the air, held by
-	--                 the drag. The charge's cap is its own launch speed
-	--   3. settle  -- damping on the ground, the `RagdollDamp*` figures above,
-	--                 which are the same for every tier
+	--   1. throw: the gallop brakes, keeping a fraction of the speed the
+	--      engine gave the body; the charge launches, at
+	--      RearChargeImpactSpeed * lungeTransfer * RearChargeThrow.
+	--   2. cap: the speed the body may not exceed in the air, held by the
+	--      drag. The charge's cap is its own launch speed.
+	--   3. settle: damping on the ground, the `RagdollDamp*` figures above,
+	--      which are the same for every tier.
 	ThrowProfileByTier       = {
 		Gallop = {
 			brakeKeepArmored   = 0.45,  -- fraction of its speed a victim in
