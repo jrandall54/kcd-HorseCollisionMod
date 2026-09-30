@@ -22912,3 +22912,13 @@ already-provoked victim does not re-roll on subsequent contacts) brought back
 the immediate reaction (`rat_refugee_tonda_rumpal`, `rat_ruch`,
 `rat_refugee_vojcek`).
 
+## Release 6.0.0
+
+Prepared the mod page description (`nexus_description.txt`), the Files tab entry
+(`releases/file-description-6.0.0.txt`), the release notes
+(`releases/notes-6.0.0.md`) and `README.md` for publishing `v6.0.0` as the first
+published release since `v4.2.2`. Verified with `pre_release_check.py --version
+6.0.0` (0 stale references across repository and mod page),
+`nexus_settings_block.py --check` (196 of 196 player-facing settings on the
+page), and `.claude/lint_docs.py` (0 errors).
+
