@@ -22877,3 +22877,38 @@ every press showed 56 consecutive presses refused at the cooldown gate and the
 **The merchant's marks.** A merchant ridden down twice, dirty with blood on both
 arms, was clean after a night spent away from his booth; forty-eight in-game
 hours standing at the booth changed nothing.
+
+## Batch 7, final sweep ride: the save-reload lockout and the pull-down deferral
+
+Two things surfaced on the final sweep ride at shipped settings, both resolved
+before closing the branch.
+
+**`ChargeScoringUntil` across a save load.** Reloading a save after a rear
+charge left walk, trot and gallop contacts with no reaction at all until the
+next charge, reproducing the batch 2 save-reload failure. When a charge starts,
+it stamps `ChargeScoringUntil = now + 1.6` against `System.GetCurrTime()` so the
+detection loop stands aside while the charge's own sweep scores the corridor.
+Loading an earlier save winds level time back while leaving `ChargeScoringUntil`
+in the future, so the detection loop keeps standing aside on every walk, trot
+and gallop contact until the restored clock catches up or a new charge
+overwrites the deadline. Clearing `self.ChargeScoringUntil = nil` in
+`uiActionListener` beside `RearNextAt`, `ChargeNextAt` and `RearBusyUntil`
+closed it. Verified across post-charge save reloads: walk (`rat_guard8`,
+`rat_guard18`, `rat_woman35`), trot (`rat_woman35`) and gallop
+(`rat_guard_pazdera`, `villageGuard`) reacted on the first contact after loading,
+alongside standing rear (`rat_guard22`) and rear charge (`rat_guard18`,
+`rat_guard_pazdera`, `rat_refugee_tonka`).
+
+**The pull-down offense deferral reverted.** Commit `5a6a7ed` had made
+`PullRiderDown` return `true` so `ProvokeIfAnnoyed` withheld
+`ReleaseWhenFighting` until the pull-down completed or its 8000 ms ceiling
+expired. Because a provoked civilian enters the combat tree with
+`startInDefenseOnly` (`$offense = false`), withholding `ReleaseWhenFighting`
+left the victim holding their guard and fidgeting in place for several seconds
+instead of closing the distance to unhorse the player. Restoring
+`PullRiderDown` and `ReleaseWhenFighting` to run together at the moment of
+provocation (while keeping `self.Annoyance[tostring(npc.id)] = nil` so an
+already-provoked victim does not re-roll on subsequent contacts) brought back
+the immediate reaction (`rat_refugee_tonda_rumpal`, `rat_ruch`,
+`rat_refugee_vojcek`).
+

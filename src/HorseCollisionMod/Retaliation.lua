@@ -936,16 +936,9 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 
 	-- The provocation decides that he fights; releasing the offense decides
 	-- that he attacks. Without it he enters the fight in defense only and
-	-- holds a guard.
-	--
-	-- Against a mounted player the release is held back until the player is
-	-- on the ground: told to attack, he attacks the thing in front of him,
-	-- the horse, and the pull-down request then queues behind the swing. So
-	-- the order is pull, then fight, and `PullRiderDown` releases the offense
-	-- itself when it takes the victim on.
-	if not self:PullRiderDown(npc) then
-		self:ReleaseWhenFighting(npc)
-	end
+	-- holds a guard, unable to close the distance for the pull-down.
+	self:PullRiderDown(npc)
+	self:ReleaseWhenFighting(npc)
 
 	return true
 end
@@ -953,9 +946,7 @@ end
 --- Has a provoked victim drag the player out of the saddle.
 --
 -- A man who has run out of patience with someone riding into him goes for the
--- rider, not the animal. Left to itself the AI gets there eventually, but it
--- fights the horse first while it works into position, and a person throwing
--- punches at a horse does not read as anything a person would do.
+-- rider, not the animal.
 --
 -- `RequestHorsePullDown` is the vanilla action, the same one guards use when
 -- they unhorse the player, and it takes the victim's entity id, meaning the
@@ -965,18 +956,15 @@ end
 -- geometry.
 --
 -- So this asks repeatedly rather than once, from the moment the fight starts,
--- until the player is down. Nothing is forced: if the geometry never comes
--- the request is never made and the brawl proceeds without the pull.
+-- until the player is down, while `ReleaseWhenFighting` releases the offense
+-- so the victim closes the distance instead of standing in defense only.
+-- Nothing is forced: if the geometry never comes the request is never made and
+-- the brawl proceeds without the pull.
 --
 -- A rider already on the ground is the other reason to stop, and it is the
 -- common one, since the whole point is that this happens early.
 --
--- Returns whether it has taken responsibility for starting the fight. When it
--- has, the caller must not release the offense: this does it once the player is
--- down, or on the ceiling if the pull never comes.
---
 -- @tparam table npc the provoked victim
--- @treturn boolean true when the offense release has been deferred to this
 function HorseCollisionMod:PullRiderDown(npc)
 	local mounted = false
 
@@ -985,7 +973,7 @@ function HorseCollisionMod:PullRiderDown(npc)
 	end)
 
 	if not self.Config.RetaliationPullsRiderDown or not mounted then
-		return false
+		return
 	end
 
 	local pollMs = self.Config.PullDownPollMs
@@ -1035,12 +1023,6 @@ function HorseCollisionMod:PullRiderDown(npc)
 						.. " hostile=" .. hostile)
 			end
 
-			-- Now he may swing. Held until here so the pull is the opening
-			-- move rather than something queued behind a punch, and released
-			-- on the ceiling too so a victim who never gets the geometry is
-			-- not left standing with his guard up forever.
-			self:ReleaseWhenFighting(npc)
-
 			return
 		end
 
@@ -1072,10 +1054,9 @@ function HorseCollisionMod:PullRiderDown(npc)
 			end
 
 			-- Asked again on a slow cadence until the player is actually
-			-- down. The request is accepted immediately but the brain runs
-			-- it when it is ready, and without the offense released there is
-			-- little for it to be busy with, so this is a safety net rather
-			-- than the mechanism.
+			-- down. The request is accepted immediately and the brain runs
+			-- it when it is ready, so this is a safety net rather than the
+			-- mechanism.
 			Script.SetTimer(self.Config.PullDownRepeatMs, attempt)
 
 			return
@@ -1085,6 +1066,4 @@ function HorseCollisionMod:PullRiderDown(npc)
 	end
 
 	attempt()
-
-	return true
 end
