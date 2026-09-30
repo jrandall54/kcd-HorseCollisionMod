@@ -15,13 +15,20 @@ of your own.
 | Rear | Struck by the horse coming down. | Same as a gallop, once per rear |
 | Charge | Everyone in a corridor ahead is knocked down. | Same as a gallop, once per charge |
 
-- **Two moves on two keys.** `F` rears the horse on the spot and brings its hooves
-  down on anyone in front. `R` is the charge, a rearing lunge that knocks down
-  everyone ahead of the horse. The horse must be standing still for either.
-- **`Q` and `E` lean you out of the saddle** in first person, so the horse's head
-  stops hiding what you are about to ride into.
+- **Two moves on two keys.** `F` (`L-Stick` on controller) rears the horse on the
+  spot and brings its hooves down on anyone in front. `R` (`LT` on controller) is
+  the charge, a rearing lunge that knocks down everyone ahead of the horse. The
+  horse must be standing still for either, and a `Rear Spent` or `Charge Spent`
+  status icon shows while the move is on cooldown.
+- **`Q` and `E` (`LB` and `RB` on controller) lean you out of the saddle** in
+  first person, so the horse's head stops hiding what you are about to ride into.
+- **Three Horsemanship perks grant the moves.** `Hello There` (level 4) grants
+  leaning, `Rear in Headlights` (level 7) grants rearing, and `Move Roach, Get
+  Out the Way` (level 10) grants the charge, each with an on-screen tutorial
+  banner. `RequirePerks` and `AutoGrantPerks` govern whether the perks are needed.
 - **Damage follows what the victim wears.** An unarmored villager rarely survives a
-  full gallop. A man in plate mostly walks away.
+  full gallop. A man in plate mostly walks away. Quest-protected characters take
+  no collision damage.
 - **Collision kills are yours or not, as you choose.** Trampling someone to death is
   a crime and guards respond, unless you turn that off, in which case it is not
   charged to you.
@@ -30,9 +37,11 @@ of your own.
   damage and eases the stamina cost.
 - **If a collision empties your horse's stamina it rears and throws you off**, and
   may wander off rather than wait to be remounted.
-- **Victims speak.** A shove gets a complaint. A knockdown gets a cry of pain and
-  then words while they get back up. Henry grunts when the collision goes through
-  him, and has something to say when one kills somebody.
+- **Victims, Henry and the horse all make a sound.** A shove gets a complaint. A
+  knockdown gets a cry of pain and then words while they get back up. Henry
+  calls out on a rear or charge, grunts when a collision goes through him, and
+  has something to say when one kills somebody. The horse snorts and whinnies on
+  impact.
 - **Shove the same person too often and they fight back.** They drag you out of the
   saddle first, and you can yield instead of killing them. The brawl itself is not a
   crime. Women raise the alarm rather than fighting.
@@ -40,8 +49,8 @@ of your own.
   miss decide for themselves whether to run or turn on you.
 - **They carry the marks.** Dirt and blood on the side the horse struck, which build
   up and wear off once their own routine takes them home.
-- **The impact lands on you too.** Camera kick at a gallop, a brief blur in first
-  person, and dust off the ground where a body lands.
+- **The impact lands on you too.** Camera kick, a brief blur in first person, and
+  dust off the ground where a body lands.
 - **In combat every stamina cost is raised**, and the walk stagger is skipped.
   Knockdowns are not.
 - Your dog is never affected.

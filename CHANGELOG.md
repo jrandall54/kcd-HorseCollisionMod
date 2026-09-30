@@ -30,6 +30,20 @@ number.
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-09-29
+
+### Changed
+
+- **BREAKING**: First published release since 4.2.2. Per-tier settings are
+  grouped into tables (`StaminaShareByTier`, `ReactionByTier`,
+  `ImpactDamageByTier`, `ImpactSoundByTier`, `RiderVocalByTier`,
+  `CameraShakeByTier`, `RiderBlurByTier`, `VictimDirtByTier`,
+  `VictimBloodByTier`) instead of separate keys per speed, and horseback
+  maneuvers (`Lean`, `Rear`, `Charge`) require their Horsemanship perks by
+  default (`RequirePerks`). Existing settings files load without error and
+  ignore removed key names, while any custom per-tier values must move into
+  the new tables.
+
 ## [5.32.0] - 2026-09-29
 
 ### Fixed
