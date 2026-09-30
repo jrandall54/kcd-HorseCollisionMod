@@ -33,6 +33,8 @@ number.
 ### Fixed
 
 - A charge victim cries out on impact, as a trot or gallop victim does.
+- Loading a save after a rear charge left walk, trot and gallop impacts with
+  no reaction until the next charge.
 - A provoked victim pulls the rider down before throwing a punch, rather than
   swinging at a mounted rider while the pull-down is pending.
 

@@ -1637,6 +1637,11 @@ function HorseCollisionMod:uiActionListener(actionName, eventName, argTable)
 		self.RearBusyUntil = nil
 		self.RearCharging = false
 
+		-- The charge's stand-aside window is a deadline on the same clock.
+		-- Left in place, it holds the detection loop off every walk, trot and
+		-- gallop impact until the restored clock passes it.
+		self.ChargeScoringUntil = nil
+
 		-- The lean's re-base guard, `LeanHomeUntil`, is a deadline on the same
 		-- clock. `LeanHeld` is dropped too, since a save written mid-lean would
 		-- otherwise come back holding a sign that nothing can release,
