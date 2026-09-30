@@ -518,9 +518,9 @@ def check_generated_docs():
     # tidier form cannot be trusted to answer the question.
     #
     # The working tree is therefore touched, and deliberately: if the pages
-    # were out of date they are now correct and only need committing, which is
-    # what the instruction would have been anyway. If they were already correct
-    # nothing changes, because LDoc is deterministic.
+    # were out of date the run has corrected them and they only need
+    # committing, which is what the instruction would have been anyway. If
+    # they were already correct nothing changes, because LDoc is deterministic.
     #
     # LDoc rewrites every page it produces, so a file older than the run is
     # one it no longer produces. The margin allows for file systems that

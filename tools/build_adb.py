@@ -794,7 +794,7 @@ def write_additive():
     # A stale file here is still an override, and would quietly change which
     # chain entities resolve through.
     #
-    # `wh_female_fragmentids.xml` is deliberately absent: it is no longer
+    # `wh_female_fragmentids.xml` is deliberately absent: it is not
     # generated, so leaving it in this set would keep an already-installed copy
     # alive forever. It stays in `generated` below, which is what licenses the
     # sweep to delete it.

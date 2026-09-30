@@ -30,9 +30,10 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 7, close. Read **Phase 2 plan** below in full
-before starting; it gives the procedure for every batch and how each is
-verified.
+**Next step:** phase 2, batch 7, the final sweep ride on shipped values
+(`flow.ps1 test -Shipped`), every tier once, plus the publish-test checks.
+The static half of batch 7 is done (see **Phase 2 log**). Then delete this
+ledger.
 
 **Pass order** (dependencies first, then largest):
 
@@ -734,6 +735,18 @@ One line per batch: batch, commit, what was verified.
   not added to the roadmap. L0: development build passes; `lint_docs.py` no
   error outside this ledger, warnings 487 to 387; `pre_release_check.py
   --merge` reports only this ledger; `audit_code.py` unchanged.
+- **Batch 7, static.** Base `7982bf0`. Before promotion the narrative rules
+  were narrowed against their false positives: `the rider` matches only the
+  tester reporting or ruling (said, asked, prefers, the rider's position and
+  the like), since in game it is Henry; `before this` only before a change,
+  fix, release or version; `no longer` passes before ships, matches,
+  produces or contains, the runtime and withdrawn-file sense. The narrative
+  rules and the escape-damage check are errors. Four real hits rewritten
+  (two in `ROADMAP.md`, one each in `build_adb.py` and
+  `pre_release_check.py`, comments only by `git diff -w`). `lint_docs.py`:
+  0 errors outside this ledger, 182 warnings (style only). Full development
+  build passes, tier tables agree; `verify_additive.py` 35 of 35 on it;
+  `audit_code.py` reports nothing uncalled or unindexed.
 
 ## Standard
 
