@@ -22780,3 +22780,38 @@ works: the gallop's brake keeps a fraction of the body's own velocity rather
 than cancelling it, about 0.94 for an unarmored villager and 0.35 for an
 armored guard, so a tenfold `Knockback` delivers roughly tenfold the push. At
 the shipped values they are a 0.73 m/s nudge against the engine's collision.
+
+## Moved from `docs/ARCHITECTURE_NOTES.md`
+
+Accounts cut from the architecture notes during the v6 audit.
+
+**Timers standing in for a state.** The readiness watcher declared a victim
+recovered after 250 ms of not being in two animation states, and a body lying
+face down spends 608 ms in exactly that condition, so impacts landed mid-fall
+and snapped victims upright. It was caught by its ceiling telemetry, which
+showed it releasing victims still in `BlendRagdoll`. The recovery line was timed
+3200 ms from the impact against a get-up that starts anywhere from 1.8 to past
+7 seconds, so it arrived mid-ragdoll for some victims and after others had
+walked away. Both were tuned by ear and both looked right. `BarkRecoveryDelayMs`
+carried a comment saying a timer was correct because no readable state marked
+the moment; that was true of every state examined and false of the body itself.
+
+**Comments stated as fact.** A note claiming that freeing `XyMove` and `Rotate`
+"makes it worse" conflated two parameters and cost hours. The recovery-loop
+comment called its output a handful of log lines against a measured 404.
+
+**The manifest gate.** An exact `supports` version disabled the mod for anyone
+past 1.9.7, the case that feature detection over version detection exists for.
+
+**A gallop on a victim already down.** It produced no reaction, and an hour went
+into engine calls: `RagDollize` with and without its fall-and-play flag, cycling
+the physicalization profile out to `alive` and back, `PostPhysicalize` once and
+then across the whole get-up, `StandUp`, and a get-up fragment whose imparted
+rotation had already been measured as the reason those fragments left the
+reaction path. Each drove physics from Lua and then handed the body back, and an
+alive actor is an upright capsule, so returning to that profile stands a lying
+victim up in one frame. The fall tier already had the answer: its fragments
+carry a `Ragdoll` ProcLayer, so Mannequin owns the ragdoll and the game recovers
+the actor its own way. The fix was that shape with an empty terminal animation
+and the `Ragdoll` ProcLayer at `ExitTime 0`; the six settings added while
+guessing were deleted. The empty-terminal fragment was the rider's suggestion.
