@@ -30,6 +30,8 @@ number.
 
 ## [Unreleased]
 
+## [5.32.0] - 2026-09-29
+
 ### Fixed
 
 - A charge victim cries out on impact, as a trot or gallop victim does.
