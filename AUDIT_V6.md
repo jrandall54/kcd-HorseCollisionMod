@@ -10,7 +10,7 @@ checked off here with its commit.
 Read this section first in a new session. It is updated and committed at the
 end of every pass, so it always says where the audit stands.
 
-**Phase:** 2 in progress. Batches 0 to 5 done.
+**Phase:** 2 in progress. Batches 0 to 6 done.
 
 **Current status:** every source file, every document except the diary, and
 all tooling (`build.ps1`, `tools/`, `tools/legacy/`, the untracked
@@ -30,9 +30,9 @@ passes continue. Rulings are made together once phase 1 is complete.
 ruling. Several set phase-2 checks for the publish test runs (the rise
 shortcut, `VictimFlatFraction`, the companion dog's class).
 
-**Next step:** phase 2, batch 6, documentation. Read **Phase 2 plan** below
-in full before starting; it gives the procedure for every batch and how each
-is verified.
+**Next step:** phase 2, batch 7, close. Read **Phase 2 plan** below in full
+before starting; it gives the procedure for every batch and how each is
+verified.
 
 **Pass order** (dependencies first, then largest):
 
@@ -713,6 +713,27 @@ One line per batch: batch, commit, what was verified.
   `game_root.ps1`), which batch 6's README layout work absorbs. The game was
   restarted once, announced, to test the closed-game deploy, and every
   reload since has loaded clean. No test-world override was left changed.
+- **Batch 6.** Base `6869de9`. Every document finding applied or ticked as
+  superseded, one commit per document. README: the `tools/` catalog moves to
+  `DEV_LOOP.md`, and `pre_release_check.py` checks each layout block for its
+  own tree (README for `src/`, DEV_LOOP's **Tools** for `tools/`); the
+  settings-table row findings were superseded by batch 5's generated table.
+  DEV_LOOP leads with the `flow` verbs; its hook section is cut and its
+  switch-table finding was superseded by batch 5. `BALANCE_AUDIT.md` deleted
+  after confirming the damage and stamina derivations in `Tiers.lua` and the
+  settings file; rulings 1 and 4, absent from the diary, were added to it. The
+  settled fear notes are out of `HANDOFF.md`. `ENGINE_BINDS.md`'s daggers are
+  regenerated from the calls in `src/`, by receiver per section (26 changed).
+  `HOW_IT_WORKS.md`, the local `ARCHITECTURE_NOTES.md` and
+  `TECHNICAL_DETAILS.md` rewritten against their findings; histories the diary
+  lacked were moved into it. Found beyond the list: `IsVictimFlat` reads the
+  center of mass against `VictimFlatFraction`, not the head against half;
+  requirement 3 of the additive layout named mod fragment ids the build does
+  not ship; the `BarkCooldownMs` versus hit-interval rule no longer held and
+  was cut. The two unused Henry events and death sounds are stated as facts,
+  not added to the roadmap. L0: development build passes; `lint_docs.py` no
+  error outside this ledger, warnings 487 to 387; `pre_release_check.py
+  --merge` reports only this ledger; `audit_code.py` unchanged.
 
 ## Standard
 
@@ -2908,55 +2929,55 @@ match.
 `lint_docs.py` reports nothing. Every default in the settings table matches
 the file except `ThrowByTier`.
 
-- [ ] `:14-16` table — Rear "Higher cost", Charge "Highest cost"; gallop, rear
+- [x] `:14-16` table — Rear "Higher cost", Charge "Highest cost"; gallop, rear
   and charge all ship 0.20 (`Settings:108-114`). — "Same as a gallop", and
   "Same, once per charge".
-- [ ] `:18-20` — "Two moves on two keys" names only `F`; the charge's `R` is
+- [x] `:18-20` — "Two moves on two keys" names only `F`; the charge's `R` is
   never given. — Name both keys.
-- [ ] `:25-27` — "genuinely is not charged to you". — Cut "genuinely".
-- [ ] `:43` — "every stamina cost is multiplied"; `CombatStaminaAdd` adds
+- [x] `:25-27` — "genuinely is not charged to you". — Cut "genuinely".
+- [x] `:43` — "every stamina cost is multiplied"; `CombatStaminaAdd` adds
   0.13 to the share. — "raised".
-- [ ] `:55-61` — "no longer recognizes", "now", "no longer describe", "moved
+- [x] `:55-61` — "no longer recognizes", "now", "no longer describe", "moved
   to `F`": upgrade history from 4.x. — Keep the first paragraph's
   instruction; move the 4.x note to the changelog if it is not there.
-- [ ] `:65-68` — "The ones worth changing are listed below"; see the
+- [x] `:65-68` — "The ones worth changing are listed below"; see the
   settings-table ruling.
-- [ ] `:77-80` — the hard-link explanation for editing the Vortex staging
+- [x] `:77-80` — the hard-link explanation for editing the Vortex staging
   copy. — "Edit this copy, not the deployed one under `Mods\`."
-- [ ] `:100-101` `Knockback`, `Uplift` — "trot and gallop only"; they reach
+- [x] `:100-101` `Knockback`, `Uplift` — "trot and gallop only"; they reach
   only ragdoll tiers (`Reaction.lua:311-338`), gallop and charge as shipped.
   Same error at `Settings:32`. — "ragdoll tiers only".
-- [ ] `:102`, `:118`, `:124`, `:142`, `:145`, `:146`, `:148`, `:161`, `:183`,
+- [x] `:102`, `:118`, `:124`, `:142`, `:145`, `:146`, `:148`, `:161`, `:183`,
   `:188` — rationale in the player's table (why a delay decides murder, why
   the rear dust differs, "a master rides through four or five guards", "the
   half of barding you actually feel", "exists for future investigation"). —
   One sentence each: what the setting does and its unit.
-- [ ] `:111` `ThrowByTier` — "Charge 0.7"; the file ships 1.0, and the charge's
+- [x] `:111` `ThrowByTier` — "Charge 0.7"; the file ships 1.0, and the charge's
   throw is `RearChargeThrow` with `ThrowByTier` as trim. — Correct the figure
   and say it is trim.
-- [ ] `:113` `ReleaseAnimationMovement` — "restores the behavior before
+- [x] `:113` `ReleaseAnimationMovement` — "restores the behavior before
   4.0.0". — Say what false does.
-- [ ] `:117` `ProtectMutt` — follows the `ProtectMutt` ruling.
-- [ ] `:159`, `:167` — the rear keys are "r, q, e, f, y, u, o, h", correct; the
+- [x] `:117` `ProtectMutt` — follows the `ProtectMutt` ruling.
+- [x] `:159`, `:167` — the rear keys are "r, q, e, f, y, u, o, h", correct; the
   lean list gives `g` where the action map has `f` (`hcm_lean_*_f`, no `g`). —
   One key list, stated once.
-- [ ] `:180-182` — "he" for the victim. — "the victim".
-- [ ] `:184` `RetaliationSurrenderHint` — "Surrendering already worked;
+- [x] `:180-182` — "he" for the victim. — "the victim".
+- [x] `:184` `RetaliationSurrenderHint` — "Surrendering already worked;
   nothing told you so." — Cut.
-- [ ] `:190` — "A few detection internals are omitted"; about 120 settings
+- [x] `:190` — "A few detection internals are omitted"; about 120 settings
   above the file's internals line are omitted. — Follows the settings-table
   ruling.
-- [ ] `:194-195` — "No vanilla file is replaced"; three declaration files
+- [x] `:194-195` — "No vanilla file is replaced"; three declaration files
   are (see `HOW_IT_WORKS.md` `:304-314`). "RPG tables are untouched"; the mod
   ships perk rows under `src/Libs/Tables/rpg/`. — Correct both.
-- [ ] `:200-205` Planned — "a rear frightens people the hooves never reach"
+- [x] `:200-205` Planned — "a rear frightens people the hooves never reach"
   shipped in 5.25.0 (`Fear.lua`). — Keep the line and the polearm; add fear
   to **What happens**.
-- [ ] `:207-332` layout — `docs/` omits `ARCHITECTURE_NOTES.md` and
+- [x] `:207-332` layout — `docs/` omits `ARCHITECTURE_NOTES.md` and
   `BALANCE_AUDIT.md`; the tool descriptions carry purpose clauses ("so a ride
   is not also a search for someone standing usefully") and `legacy/` a
   paragraph of justification. — See the layout ruling; one line per entry.
-- [ ] `:342` — `-Version "3.0.0"`; `-Version` defaults to `dev`, and releases
+- [x] `:342` — `-Version "3.0.0"`; `-Version` defaults to `dev`, and releases
   are versioned by `flow.ps1 land`. — Show the default build.
 
 ### docs/HOW_IT_WORKS.md
@@ -2966,14 +2987,14 @@ sentences over 40 words) and 27 eight-word sequences repeated from the
 changelog and README. Most of the page is history; the edit is a rewrite in
 the present tense against the findings below.
 
-- [ ] `:12-16` — three tiers; the rear and the charge are missing, and the
+- [x] `:12-16` — three tiers; the rear and the charge are missing, and the
   gallop is "knocked down harder" where it is a physics throw. — Five rows;
   point at README's table rather than restating it.
-- [ ] `:21-23` — "lands about half as far away"; throw distance is not
+- [x] `:21-23` — "lands about half as far away"; throw distance is not
   measured. — Cut the figure.
-- [ ] `:25-29` — "That damage is the game's own rather than the mod's";
+- [x] `:25-29` — "That damage is the game's own rather than the mod's";
   `:37-59` describe the mod's own damage. — State the mod applies it.
-- [ ] `:31-35`, `:41-42`, `:51-54`, `:124`, `:155`, `:198-199`, `:223-225`,
+- [x] `:31-35`, `:41-42`, `:51-54`, `:124`, `:155`, `:198-199`, `:223-225`,
   `:231-232`, `:279-302`, `:316-323` — history: what the trample "was
   charged", "two hundred test impacts", "no longer tries", "no longer stand
   up", "now runs out of patience", "It used to borrow a gallop's", "The first
@@ -2981,47 +3002,47 @@ the present tense against the findings below.
   instead", the pre-3.0 download size, the `wh_female_fragmentids.xml`
   account. — Cut; the constraint alone stays (shipping a whole database
   breaks another mod's copy).
-- [ ] `:44-50` — the charge waits for the body to stop, then "The mod waits a
+- [x] `:44-50` — the charge waits for the body to stop, then "The mod waits a
   moment before charging"; `ImpactDamageDelayMs` is only for a test
   subject (`Settings:663-665`). — Keep the first; cut the second. Same
   error at README `:142`.
-- [ ] `:75-80` — "was found clean again after a night had passed"; README
+- [x] `:75-80` — "was found clean again after a night had passed"; README
   says the marks wear off once the victim's routine takes them home. — One
   statement, and only what is known.
-- [ ] `:76` — "a gallop draws blood"; every knockdown tier does, trot at
+- [x] `:76` — "a gallop draws blood"; every knockdown tier does, trot at
   0.07. — "a harder blow draws more blood".
-- [ ] `:89-95` — "a moment and a half" for `RiderVocalCooldownMs` 1500. —
+- [x] `:89-95` — "a moment and a half" for `RiderVocalCooldownMs` 1500. —
   "a second and a half".
-- [ ] `:147-150` — "Henry himself says nothing"; `:97-102` gives his kill
+- [x] `:147-150` — "Henry himself says nothing"; `:97-102` gives his kill
   lines, and `RiderBarkKill` ships on. — "Henry speaks only over a body."
-- [ ] `:152-176` Losing patience — omits the pull-down and the surrender
+- [x] `:152-176` Losing patience — omits the pull-down and the surrender
   prompt, which README lists. — Add one sentence each.
-- [ ] `:181-182` — "R rears and drives forward, Q rears on the spot"; the rear
+- [x] `:181-182` — "R rears and drives forward, Q rears on the spot"; the rear
   on the spot is `F` (`RearOnlyKey`). — Correct.
-- [ ] `:185`, `:192` — the rear is "its own kind of blow" and then "scored as
+- [x] `:185`, `:192` — the rear is "its own kind of blow" and then "scored as
   a trot"; it is its own tier with its own figures and shares only the
   `"fall"` reaction. — "plays the same fall as a trot".
-- [ ] `:215` — keys "R, Q, Y, U, O and H"; the list is r, q, e, f, y, u, o,
+- [x] `:215` — keys "R, Q, Y, U, O and H"; the list is r, q, e, f, y, u, o,
   h. — Point at README's single key list.
-- [ ] `:235-236` — "Nothing is hardcoded"; the source findings list unnamed
+- [x] `:235-236` — "Nothing is hardcoded"; the source findings list unnamed
   literals (`Log.lua:197`, `:250`, `Tutorial.lua:103-119`). — Cut, or state
   it once the no-magic-numbers findings are applied.
-- [ ] `:238` "The three parts" — four follow. — "The parts".
-- [ ] `:240` — "Roughly twenty times a second"; `TickSeconds` is 0.033,
+- [x] `:238` "The three parts" — four follow. — "The parts".
+- [x] `:240` — "Roughly twenty times a second"; `TickSeconds` is 0.033,
   about thirty. — Cite the setting.
-- [ ] `:249-250` — the gallop "is given an impulse and the ragdoll takes
+- [x] `:249-250` — the gallop "is given an impulse and the ragdoll takes
   over"; the engine's collision throws the body and the impulse is trim
   (`Reaction.lua:1030-1033`). — Correct.
-- [ ] `:252-272`, `:297` — "the stagger is the part that needs new data",
+- [x] `:252-272`, `:297` — "the stagger is the part that needs new data",
   "four options, one per direction", "30 vanilla options + 4 new"; the mod
   declares 19 tags (stagger, knockdown, fall, get-up, rear, charge, settle). —
   Describe the option set without a count, or with the current one.
-- [ ] `:301-302` — database and download sizes. — Cut.
-- [ ] `:304-314` — "One small declaration file"; the mod replaces three:
+- [x] `:301-302` — database and download sizes. — Cut.
+- [x] `:304-314` — "One small declaration file"; the mod replaces three:
   `kcd_animationControlledTags.xml`, `kcd_horse_fragmentids.xml`,
   `kcd_horse_controllerdefs.xml` (`verify_additive.py:110-114`). README `:194`
   says none. — List all three here; README points at this section.
-- [ ] `:327-328` — "checks every claim on this page"; it checks the
+- [x] `:327-328` — "checks every claim on this page"; it checks the
   animation layout and the packaged file set. — Say that.
 
 ### docs/DEV_LOOP.md
@@ -3029,47 +3050,47 @@ the present tense against the findings below.
 `lint_docs.py`: 0 errors; two sentences over 40 words (`:124-128`, and the
 landing block read as prose).
 
-- [ ] Whole file — the page never mentions `flow.ps1 test`, `status`,
+- [x] Whole file — the page never mentions `flow.ps1 test`, `status`,
   `branch` or `shipping`, which the project uses to reach every state it
   describes; the loop is given as bare `dev_deploy.ps1` calls. — Lead with
   the `flow.ps1` verbs; keep `dev_deploy.ps1` switches as reference beneath.
-- [ ] `:33-67` pre-push hook — `git config core.hooksPath .githooks`; there
+- [x] `:33-67` pre-push hook — `git config core.hooksPath .githooks`; there
   is no `.githooks`. The hooks live in `.claude/hooks/`, which is ignored,
   and `core.hooksPath` points there. `STYLE.md` keeps local workflow off
   the remote. — See the hook-section ruling.
-- [ ] `:56-60` — the justification for keeping mod-page checks out of the
+- [x] `:56-60` — the justification for keeping mod-page checks out of the
   build. — One sentence: `publish_nexus.ps1` also checks the page copy.
-- [ ] `:72-79` — omits `-NoDevMode`, `-NoLooseScript`, `-ReleaseSettings`,
+- [x] `:72-79` — omits `-NoDevMode`, `-NoLooseScript`, `-ReleaseSettings`,
   `-Force`; `-Force` appears only in prose at `:30`. — Complete the table.
-- [ ] `:90-92` — "rewrites all four animation databases"; the build writes
+- [x] `:90-92` — "rewrites all four animation databases"; the build writes
   three `.adb` files. — Drop the count.
-- [ ] `:98-105` — the loose-file list omits `Libs\Config\hcm_actionmaps.xml`,
+- [x] `:98-105` — the loose-file list omits `Libs\Config\hcm_actionmaps.xml`,
   which `-Reload` deploys (`dev_deploy.ps1:781`). — Add it, with the note
   that it needs a restart.
-- [ ] `:111` — "A file one level higher is never read" with no referent. —
+- [x] `:111` — "A file one level higher is never read" with no referent. —
   Name the path, or cut.
-- [ ] `:124-128` — 58-word sentence; the `dev` world also switches off the
+- [x] `:124-128` — 58-word sentence; the `dev` world also switches off the
   bolt and `WomenRaiseAlarm`. — List what `[dev]` sets, or point at
   `testworlds.ini`.
-- [ ] `:156-160` — "which a regex over the settings file could not do once
+- [x] `:156-160` — "which a regex over the settings file could not do once
   everything per-tier moved into tables". — Cut the clause.
-- [ ] `:168-169` — "A world nobody could see is how a setting stays on through
+- [x] `:168-169` — "A world nobody could see is how a setting stays on through
   the next three tests." — Cut.
-- [ ] `:190` — omits `--diagnose`, `--file`, `--raw`, `--ride`, `--wait`. —
+- [x] `:190` — omits `--diagnose`, `--file`, `--raw`, `--ride`, `--wait`. —
   Complete the table; `--file` is used at `:235`.
-- [ ] `:222` — sample log line says `v3.0.0`. — Use `v<version>`.
-- [ ] `:227-235` — "None of that is necessary. It is not necessary."; the
+- [x] `:222` — sample log line says `v3.0.0`. — Use `v<version>`.
+- [x] `:227-235` — "None of that is necessary. It is not necessary."; the
   command block has a broken line (`python tools/dev_survival.lua-style
   setup, then`). — One sentence; two `--file` commands.
-- [ ] `:238` — "verified moving day 38 to day 39 instantly". — Cut.
-- [ ] `:249-251` — "fourteen places", "thirteen part files"; there are twenty
+- [x] `:238` — "verified moving day 38 to day 39 instantly". — Cut.
+- [x] `:249-251` — "fourteen places", "thirteen part files"; there are twenty
   part files, and `set_version.py` lists the directory. Same stale count in
   README `:318` and `set_version.py:3-5` ("eleven"). — Drop the counts.
-- [ ] `:266-282` — the manual landing sequence restates `flow.ps1 land` and
+- [x] `:266-282` — the manual landing sequence restates `flow.ps1 land` and
   argues that `--merged` is safe. — "`flow.ps1 land` does this:" and a
   one-line list of its steps.
-- [ ] `:289-297` "Two things that used to bite" — history. — Cut.
-- [ ] `:299-310` — the packaged-build checklist never names `flow.ps1
+- [x] `:289-297` "Two things that used to bite" — history. — Cut.
+- [x] `:299-310` — the packaged-build checklist never names `flow.ps1
   shipping`, which sets up exactly that state. — Name it; keep the list as
   what it establishes.
 
@@ -3078,33 +3099,33 @@ landing block read as prose).
 Local: excluded through `.git/info/exclude`, so the linter never sees it. Held
 to the same standard because it is not the diary.
 
-- [ ] `:14`, `:72`, `:114`, `:123`, `:133`, `:176`, `:266-272`, `:318` — em
+- [x] `:14`, `:72`, `:114`, `:123`, `:133`, `:176`, `:266-272`, `:318` — em
   dashes. — Replace.
-- [ ] `:47`, `:85-88`, `:152-153`, `:206-213`, `:238-241`, `:302-305` —
+- [x] `:47`, `:85-88`, `:152-153`, `:206-213`, `:238-241`, `:302-305` —
   anecdotes: "four hundred log lines", "cost hours", the manifest gate, the
   readiness watcher's 608 ms, how the watcher was caught. — Move to the
   diary; keep each constraint.
-- [ ] `:327-361` "Look for the mechanism this project already has" —
+- [x] `:327-361` "Look for the mechanism this project already has" —
   narrative of one fix, with "the rider" at `:358`. — Move to the diary;
   keep the rule (read the neighboring working mechanism before the engine
   API) as one paragraph, and the empty-terminal-clip fragment as a fact.
-- [ ] `:63`, `:171`, `:177` — "sixteen files", "roughly a hundred and fifty
+- [x] `:63`, `:171`, `:177` — "sixteen files", "roughly a hundred and fifty
   methods"; there are twenty part files and 169 methods. — Drop the counts.
-- [ ] `:99-125` "What has moved since this was written" — a changelog inside
+- [x] `:99-125` "What has moved since this was written" — a changelog inside
   the assessment. — Fold into **Assessment** as current state.
-- [ ] `:109-110` — `RetaliationByTier` is "the worked example from this
+- [x] `:109-110` — `RetaliationByTier` is "the worked example from this
   document, implemented as written"; it ships as booleans
   (`Settings:386-392`), not the `{ policy, escalates }` rows at `:187-193`,
   and `NoteImpact` (`:196`) does not exist. — Say the table exists as
   booleans and the policy rows are still the target.
-- [ ] `:215-253` — "every remaining duration was enumerated"; the lists omit
+- [x] `:215-253` — "every remaining duration was enumerated"; the lists omit
   `ChargeCooldownMs`, `HorseVocalCooldownMs`, `PhysicsReadyMs`,
   `RagdollDampFloorMs`, `RearChargeWindowMs`, `RecoveryBarkIntervalMs`,
   `RecoveryMinSec`, `RecoveryMaxSec`, `ReleaseMovementGapMs`,
   `RiseCeilingMs`, `RisePollMs`, `TickMs`. — Classify them.
-- [ ] `:264`, `:273`, `:307` — "now have been", "now governs", "from now". —
+- [x] `:264`, `:273`, `:307` — "now have been", "now governs", "from now". —
   Timeless.
-- [ ] `:278-284` `ImpulseDelayMs` — "an impulse and a set velocity produce the
+- [x] `:278-284` `ImpulseDelayMs` — "an impulse and a set velocity produce the
   same distribution across three rides". — Cut the measurement; keep "the
   engine's collision does the throwing".
 
@@ -3115,26 +3136,26 @@ sequences. A plan "written before any value is touched" whose stages have
 since run; most of it now describes superseded state. See the balance-plan
 ruling. If it is kept, these stand:
 
-- [ ] `:7-8`, `:14`, `:53-104`, `:112-148`, `:275-280` — "read out of `src/`
+- [x] `:7-8`, `:14`, `:53-104`, `:112-148`, `:275-280` — "read out of `src/`
   at 5.26.0", "252 `Config` keys", and the defect tables, each marked
   "Fixed in Stage 0". — Record as done or cut.
-- [ ] `:23-28` — system table names `StaminaDrainByTier`,
+- [x] `:23-28` — system table names `StaminaDrainByTier`,
   `CombatStaminaMultiplier`, `RagdollSpeedCap*`, `RagdollAirDamping*`,
   `RagdollBrakeKeep*`; none exists in `src/`. — Current names.
-- [ ] `:159-211` — damage figures 60, 95, 110 and the stamina and blood rows
+- [x] `:159-211` — damage figures 60, 95, 110 and the stamina and blood rows
   predate Rulings 2 and 3 (shipped 75, 111, 118; shares 0.13, 0.20; trot
   blood 0.07). — Current figures or cut.
-- [ ] `:34`, `:248`, `:315`, `:359-364`, `:373`, `:408-411`, `:429` — "the
+- [x] `:34`, `:248`, `:315`, `:359-364`, `:373`, `:408-411`, `:429` — "the
   rider", quoted rulings. — Cut the quotes; state the ruling.
-- [ ] `:377-385`, `:494-500` — derivations told as discovery ("The first
+- [x] `:377-385`, `:494-500` — derivations told as discovery ("The first
   version of this derivation", "stage 2 step 2 proved it in the log"). —
   State the condition; move the account to the diary.
-- [ ] `:439` Rear share 0.10; shipped 0.20. `:460` `RearCooldownMs` 2500;
+- [x] `:439` Rear share 0.10; shipped 0.20. `:460` `RearCooldownMs` 2500;
   shipped 7500, with a separate `ChargeCooldownMs` 12500, which `:461-463`
   still proposes. — Correct.
-- [ ] `:505-507` Stage 2 step 4 — "the charge's throw distance, reported as
+- [x] `:505-507` Stage 2 step 4 — "the charge's throw distance, reported as
   too far"; the charge has its own throw (`RearChargeThrow`). — Update or cut.
-- [ ] `:515-519` Stage 3 — "Give `Fear.lua` the tier-table shape"; `:225-232`
+- [x] `:515-519` Stage 3 — "Give `Fear.lua` the tier-table shape"; `:225-232`
   resolved against it. `ROADMAP.md` item 2 is already corrected. — Cut.
 
 ### docs/ENGINE_BINDS.md
@@ -3142,39 +3163,39 @@ ruling. If it is kept, these stand:
 `lint_docs.py`: 0 errors; five warnings. The tables are extracted
 reference; the findings are in the prose and the markers.
 
-- [ ] `:5-7` — "A name here has not been called unless it is marked", and
+- [x] `:5-7` — "A name here has not been called unless it is marked", and
   the dagger marks "Entries this mod calls". The daggers are wrong both
   ways: `CanHuntAttack`, `CanStealthKill`, `CanStealthKnockout` carry one
   and nothing in `src/` calls them; `RequestHorsePullDown`, `AddBlood`,
   `AddDirt`, `SetViewShake`, `RagDollize`, `HolsterWeapon`, `IsWeaponDrawn`
   and `GetCenterOfMassPos` are called and carry none. — Regenerate the marks
   from a grep of `src/`; one meaning for the dagger.
-- [ ] `:744-785` "Actor and human methods vanilla uses" — "Already used by
+- [x] `:744-785` "Actor and human methods vanilla uses" — "Already used by
   this mod" names `SetPhysicalizationProfile`, `SetHealth`, `ForceDismount`,
   none called in `src/`; "Untried" names `AddBlood`, `AddDirt`,
   `SetViewShake`, `CanHorsePullDown`, `RequestHorsePullDown`,
   `IsWeaponDrawn`, all shipped; "the cosmetic roadmap item" and "never
   considered" have shipped. — Fold into the dagger; delete the section's
   status claims.
-- [ ] `:787-804` pull-down — "Whether an NPC can be the `user` … is
+- [x] `:787-804` pull-down — "Whether an NPC can be the `user` … is
   untested"; the retaliation pull-down ships on it. — State that it works
   and what gates it.
-- [ ] `:806-820` — "The roadmap item about striking a heavy target rearing
+- [x] `:806-820` — "The roadmap item about striking a heavy target rearing
   the horse" has no roadmap entry. — Cut the sentence.
-- [ ] `:822-827`, `:855-860` — "The lists above were gathered by reading
+- [x] `:822-827`, `:855-860` — "The lists above were gathered by reading
   vanilla scripts…", and `SetVelocity` "matters most": `Knockback` "has
   never meant anything", "50 was measured as indistinguishable", "600 threw
   a villager 27 meters". Narrative, and it contradicts the settled design
   (the engine's collision throws; `Knockback` is trim). — Cut; list
   `SetVelocity` without advocacy.
-- [ ] `:860-861` — "the opposite of what this project recorded". — Cut.
-- [ ] `:895-896` — "`human:HolsterWeapon()` is the clean answer to forcing
+- [x] `:860-861` — "the opposite of what this project recorded". — Cut.
+- [x] `:895-896` — "`human:HolsterWeapon()` is the clean answer to forcing
   an unarmed brawl"; the mod calls it. — Mark it used; cut the claim.
-- [ ] `:617`, `:737` — "which is why". `:694` 42 words. — Rephrase.
-- [ ] `:614-623` — "43 entry points out of 43 tried" and the Cheat mod's
+- [x] `:617`, `:737` — "which is why". `:694` 42 words. — Rephrase.
+- [x] `:614-623` — "43 entry points out of 43 tried" and the Cheat mod's
   author credited as the source. — Keep the source as a citation; cut the
   tally.
-- [ ] `:630` — `3,319,760 read at day 38`. — Cut the sample.
+- [x] `:630` — `3,319,760 read at day 38`. — Cut the sample.
 
 ### docs/TECHNICAL_DETAILS.md
 
@@ -3184,7 +3205,7 @@ defects are history mixed into it and sections describing removed code.
 
 **History to cut** (keep the constraint each one supports):
 
-- [ ] `:80-82`, `:110-114`, `:138-156`, `:331-334`, `:405-413`, `:438-452`,
+- [x] `:80-82`, `:110-114`, `:138-156`, `:331-334`, `:405-413`, `:438-452`,
   `:465-475`, `:500-504`, `:528-532`, `:573-576`, `:634`, `:644-650`,
   `:713-723`, `:753-754`, `:814-821`, `:830-832`, `:857-858`, `:906-908`,
   `:970-973`, `:979-980`, `:986`, `:1047-1069`, `:1083-1084`, `:1088-1095`,
@@ -3198,72 +3219,72 @@ defects are history mixed into it and sections describing removed code.
 
 **Wrong or stale:**
 
-- [ ] `:117-118`, `:1195` — "the one vanilla file the mod still replaces",
+- [x] `:117-118`, `:1195` — "the one vanilla file the mod still replaces",
   "without replacing a vanilla file"; three are replaced
   (`verify_additive.py:110-114`). — Name all three.
-- [ ] `:119-120`, `:1231`, `:1235` — the mod's options are "standing hit
+- [x] `:119-120`, `:1231`, `:1235` — the mod's options are "standing hit
   reactions", "vanilla's 30 options + this mod's 4", "vanilla's 16 FragTags +
   this mod's 4"; the mod declares 19 tags across stagger, knockdown, fall,
   get-up, rear, charge and settle. — Describe the set.
-- [ ] `:182-216` — "thirteen part files", a load list of thirteen and a table
+- [x] `:182-216` — "thirteen part files", a load list of thirteen and a table
   of thirteen; the entry point loads twenty (`Tiers`, `Bark`, `Lean`,
   `Rear`, `Fear`, `Impact`, `Tutorial` missing). `Rider.lua` holds "the combat
   multiplier"; it is an additive surcharge. — Drop the count and the copied
   load list; complete the table.
-- [ ] `:255` — ` - ` used as a dash; `:924`, `:970` `--`. — Rephrase.
-- [ ] `:261-262` — "reloads only `Scripts/Startup/HorseCollisionMod.lua`";
+- [x] `:255` — ` - ` used as a dash; `:924`, `:970` `--`. — Rephrase.
+- [x] `:261-262` — "reloads only `Scripts/Startup/HorseCollisionMod.lua`";
   `--reload` runs the settings file first (`DEV_LOOP.md:210`). — Correct.
-- [ ] `:376-383` — plateaus give a trot at 6.38 to 7.03 and a gallop from
+- [x] `:376-383` — plateaus give a trot at 6.38 to 7.03 and a gallop from
   9.18, then "the gap between 8.03 and 8.84 m/s is empty". The two
   measurements disagree. — One set of plateaus, as `probe_gait_speed.lua`
   last reported.
-- [ ] `:357-363` — the cache margin is `HorseFrontReach` plus `MaxSweepExtra`
+- [x] `:357-363` — the cache margin is `HorseFrontReach` plus `MaxSweepExtra`
   and omits the footprint's corner; same defect as `Detection.lua`
   `:123-128`. — Apply that finding here.
-- [ ] `:428` — "tested ten times a second"; `TickSeconds` is 0.033. — "every
+- [x] `:428` — "tested ten times a second"; `TickSeconds` is 0.033. — "every
   tick".
-- [ ] `:494` `RagdollSpeedSoftCap` — no such setting; the cap is per tier in
+- [x] `:494` `RagdollSpeedSoftCap` — no such setting; the cap is per tier in
   `ThrowProfileByTier`. — Name it.
-- [ ] `:556-557` — "by the rider's ruling". — Cut.
-- [ ] `:679-683` against `:1544-1548` — refused "only while the victim is
+- [x] `:556-557` — "by the rider's ruling". — Cut.
+- [x] `:679-683` against `:1544-1548` — refused "only while the victim is
   flat" (`IsVictimFlat`), and later "a victim already in
   `AnimationControlled` or `BlendRagdoll` is not given a second action". —
   Keep the first; correct the second.
-- [ ] `:830` and `Settings:1019-1020` — `HitCooldownMs` does not exist; the
+- [x] `:830` and `Settings:1019-1020` — `HitCooldownMs` does not exist; the
   per-victim interval is `HitMinIntervalMs`. — Correct both.
-- [ ] `:916-920` — two events "may be worth adding". `:947-949` — death
+- [x] `:916-920` — two events "may be worth adding". `:947-949` — death
   sounds "Not yet implemented; the mechanism is proven". — Roadmap
   material; move to `ROADMAP.md` if still wanted.
-- [ ] `:871` — "line 3610277 of the decompilation". — Name the function.
-- [ ] `:1100` `WhenRagdollResolves` — no such function. — Cut the bullet or
+- [x] `:871` — "line 3610277 of the decompilation". — Name the function.
+- [x] `:1100` `WhenRagdollResolves` — no such function. — Cut the bullet or
   name the current one.
-- [ ] `:1139-1144` — a gallop "deals `95 * …`" and survives seven times in
+- [x] `:1139-1144` — a gallop "deals `95 * …`" and survives seven times in
   ten; shipped figure is 111. — Cut with the section.
-- [ ] `:1227-1236` layout — "Seven files, all named `hcm_*`", including
+- [x] `:1227-1236` layout — "Seven files, all named `hcm_*`", including
   `hcm_<set>_fragmentids.xml`, `hcm_<set>_controllerdefs.xml` and
   `hcm_animationControlledTags.xml`. The build ships
   `kcd_animationControlledTags.xml` under vanilla's name, no human fragment
   ids or controller defs, and a horse database with `kcd_horse_*`
   declarations. — Rewrite from the build's file list.
-- [ ] `:1263-1267` requirement 4 — "`ActionController` must be redirected as
+- [x] `:1263-1267` requirement 4 — "`ActionController` must be redirected as
   well"; `:1309-1312`, the entry point (`HorseCollisionMod.lua:1777`) and
   `verify_additive.py` claim 7 all say it stays on vanilla. — Delete
   requirement 4; "The four requirements" becomes three.
-- [ ] `:1387-1402` — the watcher polls "once a second" and ends as
+- [x] `:1387-1402` — the watcher polls "once a second" and ends as
   `natural`, `runaway` or `ceiling` on `RetaliationFleeSpeed`,
   `RetaliationFleeIgnoreRange` and `RetaliationFleeSamples`; none of the
   three settings exists, and the endings in `Retaliation.lua` are
   `settled` and `ceiling`. — Rewrite from `WatchRetaliation`.
-- [ ] `:1468-1477` against `:1499-1511` — the charge is `relaxed_rearing` cut
+- [x] `:1468-1477` against `:1499-1511` — the charge is `relaxed_rearing` cut
   at 0.8 s into `relaxed_gallop_jump`, then the fragment "rears in place",
   cut at 1.0 s into `relaxed_idle_jump_land`, with travel from an impulse. —
   Keep the second; cut the first.
-- [ ] `:1479-1480` — "`RearCharging` forces it to a gallop"; the loop stands
+- [x] `:1479-1480` — "`RearCharging` forces it to a gallop"; the loop stands
   out for `ChargeScoringUntil` and scores nothing during a charge
   (`Update.lua:85-92`). — Correct.
-- [ ] `:1574-1575` — `RearChargeVictimLockMs` is `VictimLockMsByTier.Charge`;
+- [x] `:1574-1575` — `RearChargeVictimLockMs` is `VictimLockMsByTier.Charge`;
   the charge's throw is `RearChargeThrow`, not "throw scalar". — Correct.
-- [ ] `:1688` — "the same mechanism third-party perk mods use"; the mod's own
+- [x] `:1688` — "the same mechanism third-party perk mods use"; the mod's own
   four `rpg/*__horsecollisionmod.xml` tables use it. — Say so; README
   `:194` depends on it.
 
