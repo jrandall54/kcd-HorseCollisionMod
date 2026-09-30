@@ -30,6 +30,26 @@ number.
 
 ## [Unreleased]
 
+## [5.32.0] - 2026-09-29
+
+### Fixed
+
+- A charge victim cries out on impact, as a trot or gallop victim does.
+- Loading a save after a rear charge left walk, trot and gallop impacts with
+  no reaction until the next charge.
+
+### Removed
+
+- A knocked-down victim no longer groans at intervals while on the ground. The
+  settings `DynamicRecovery`, `RecoveryDelayByTier`,
+  `RecoveryArmorScaleArmored`, `RecoveryArmorScaleUnarmored`,
+  `RecoveryMinSec`, `RecoveryMaxSec`, `RecoveryGroundBarks` and
+  `RecoveryBarkIntervalMs` are gone; the get-up time was never affected by
+  them.
+- `ProtectMutt`. Henry's dog, like every dog, is never a victim.
+- `RiderBarks` and `LeanMinFlipMs`, which had no effect.
+- `ImpactDamageDelayMs`, which only the development test subject read.
+
 ## [5.31.4] - 2026-09-27
 
 ### Changed

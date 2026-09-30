@@ -1,29 +1,29 @@
---- Health: what an impact cost, and keeping the game from undoing it.
+--- Health: what an impact costs a victim.
 --
--- Nothing in the ScriptBind surface reports damage, so what a collision cost
--- is established by reading health before and after and sampling it again as
--- the victim recovers. `tools/probe_health.lua` watches one entity from the
--- console, for the case where health moves with no impact to account for it.
---
--- `SuppressAutoCure` is here because it protects the measurement: vanilla's
--- daycycle clears a victim's buffs and restores health on its own schedule,
--- which would erase the loss before the later samples are taken.
+-- * `ApplyImpactDamage` deals the mod's own damage once the body stops,
+--   reclaiming what the engine charged, so the mod's figure is the whole cost
+--   and the mod's blow is the one that kills.
+-- * `PredictImpactFatal` answers at the moment of contact whether that damage
+--   will kill, for Henry's line.
+-- * `ShieldFromEngineDamage` makes a victim immortal across contact so the
+--   engine's collision damage lands on nothing; `LiftCollisionShield` ends it.
+-- * `IsProtectedFromHarm` exempts the characters the game protects.
+-- * `SuppressAutoCure` keeps a hurt victim out of vanilla's auto-cure daycycle.
+-- * `ProbeImpactCost` logs health across an impact, since nothing in the
+--   ScriptBind surface reports damage.
 --
 -- Attached to the `HorseCollisionMod` table created by the entry point, which
 -- pulls this file in with `Script.ReloadScript`.
 --
 -- @module HorseCollisionMod.Health
 -- @author jrandall54
--- @release 5.31.4
+
 -- When the impact probe samples, in milliseconds after the hit.
 --
 -- 500 catches what the impact cost, since the engine applies damage after the
 -- message is handled. 3000 catches anything continuing. 6000 and 10000 reach
 -- past the get-up, which a ragdoll does not finish before the earlier samples
 -- have already been taken.
---
--- Documented as an ordinary comment rather than an LDoc block: LDoc reads an
--- annotated table as a set of named fields and refuses one holding an array.
 HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
 
 --- Exempts a collision victim from vanilla's auto-cure daycycle.
@@ -39,7 +39,8 @@ HorseCollisionMod.ImpactProbeSamples = { 500, 3000, 6000, 10000 }
 --
 -- Vanilla exempts its own characters from the daycycle through a context
 -- option, used for duellists and for scripted wanderers among others. The
--- same option is set here, and cleared on a timer.
+-- same option is set here and held until the victim's health is back over
+-- `AutoCureHealthLimit`, rechecked every `SuppressAutoCureSec`.
 --
 -- The gate admitting the cure is read only on entry, so the option has to be
 -- in place before health crosses the threshold. It is set at the moment of
@@ -62,11 +63,9 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 		return
 	end
 
-	-- The message form, `context:timedOptionRequest`, carries its own
-	-- expiration and reads as the tidier option, but it is a request to the
-	-- brain and a busy brain drops it: sent to a guard in combat, the option
-	-- read back false immediately. The direct call writes the Contexts table
-	-- and does not depend on the brain accepting anything.
+	-- The message form, `context:timedOptionRequest`, is a request to the
+	-- brain, and a busy brain drops it. The direct call writes the Contexts
+	-- table and does not depend on the brain accepting anything.
 	--
 	-- Non-persistent is deliberate. The option does not survive a save, so an
 	-- exemption this code fails to clear cannot become permanent in a player's
@@ -98,9 +97,7 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 	-- is still bleeding under the threshold and not yet exempt lets the cure
 	-- start again immediately.
 	--
-	-- On a victim that was never stuck this reports false and costs nothing,
-	-- so it doubles as the repair path for a save carrying stuck NPCs: any
-	-- victim ridden into again is released.
+	-- On a victim that was never held this reports false and costs nothing.
 	pcall(function()
 		local wuid = XGenAIModule.GetMyWUID(npc)
 
@@ -158,7 +155,6 @@ function HorseCollisionMod:SuppressAutoCure(npc)
 	Script.SetTimer(seconds * 1000, watch)
 end
 
-
 --- Samples the victim's health across an impact.
 --
 -- Vanilla converts a collision hit whose rider is the player into a real
@@ -172,10 +168,6 @@ end
 -- the impact itself cost. The rest reach past the get-up, because health is
 -- also lost after a ragdoll resolves, in discrete amounts that look like a
 -- fall rather than like bleeding.
---
--- Height is sampled alongside health for the same reason. The impulse throws
--- the target, and a change in z across the recovery separates a fall from
--- anything the collision itself did.
 --
 -- @tparam table npc victim entity
 -- @tparam string tierName the tier the impact scored
@@ -196,29 +188,6 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 
 	local name = self:NameOf(npc)
 
-	local function height()
-		local okPos, pos = pcall(function()
-			return npc:GetWorldPos()
-		end)
-
-		if okPos and type(pos) == "table" and type(pos.z) == "number" then
-			return pos.z
-		end
-
-		return nil
-	end
-
-	local baseZ = height()
-
-	-- Where the victim stood when the impact landed. A reaction should leave
-	-- them near it; traveling on while animation-controlled is how a victim
-	-- reaches somewhere the collision never put them.
-	local origin = nil
-
-	pcall(function()
-		origin = npc:GetWorldPos()
-	end)
-
 	local exhaust = -1
 
 	pcall(function()
@@ -227,11 +196,8 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 
 	-- What the victim was doing when the horse reached them.
 	--
-	-- Every reaction is a standing animation, so an impact landing on someone
-	-- already down plays nothing and usually costs them no health. Without
-	-- this, an impact that cost nothing by design reads exactly like one that
-	-- failed, and a long investigation turned on being unable to tell them
-	-- apart.
+	-- An impact landing on someone already down plays nothing, and the state
+	-- separates that from an impact that failed.
 	local state = "?"
 
 	pcall(function()
@@ -242,7 +208,6 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 			.. " state=" .. state
 			.. " strength=" .. tostring(strength)
 			.. " health=" .. string.format("%.4f", before)
-			.. " z=" .. (baseZ and string.format("%.2f", baseZ) or "?")
 			.. " exhaust=" .. string.format("%.1f", exhaust)
 			.. " " .. self:DescribeArmor(armor or self:ArmorOf(npc)))
 
@@ -255,36 +220,13 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 			return
 		end
 
-		local z = height()
-		local dz = "?"
-		local travel = "?"
-
-		pcall(function()
-			if origin then
-				local q = npc:GetWorldPos()
-
-				if q then
-					travel = string.format("%.2f",
-							math.sqrt((q.x - origin.x) ^ 2
-									+ (q.y - origin.y) ^ 2))
-				end
-			end
-		end)
-
-		if z and baseZ then
-			dz = string.format("%+.2f", z - baseZ)
-		end
-
-		-- The starting health is repeated on every sample. Samples now run
-		-- past the cooldown, so a second impact on the same target can
-		-- interleave its lines with the first one's, and the name alone no
-		-- longer identifies which impact a sample belongs to.
+		-- The starting health is repeated on every sample as `from=`, so the
+		-- samples of two impacts on one target can be told apart when they
+		-- interleave.
 		self:Log("ImpactCost " .. name .. " " .. label
 				.. " from=" .. string.format("%.4f", before)
 				.. " health=" .. string.format("%.4f", after)
-				.. " delta=" .. string.format("%+.4f", after - before)
-				.. " dz=" .. dz
-				.. " travel=" .. travel)
+				.. " delta=" .. string.format("%+.4f", after - before))
 	end
 
 	for _, at in ipairs(self.ImpactProbeSamples) do
@@ -292,143 +234,22 @@ function HorseCollisionMod:ProbeImpactCost(npc, tierName, strength, armor)
 			sample("t+" .. at .. "ms")
 		end)
 	end
-
-	-- The throw distance, sampled when the throw is actually over rather than
-	-- at a fixed time. A clock sample catches the body mid-flight on one impact
-	-- and long after it stopped on another, and worse, while the horse is still
-	-- pushing it along, so the figure mixes the throw with how long the horse
-	-- kept shoving.
-	--
-	-- Rest is read from the body's own position rather than from its animation
-	-- state. `BlendRagdoll` never appears on a victim the impact killed, so a
-	-- state test reports `neverDown` on exactly the impacts that threw someone
-	-- hardest and waits out its ceiling instead of measuring them.
-	local restPoll = self.RestPollMs
-	local restStill = self.RestStillMeters
-	local restCeiling = 8000
-	local restStart = self:TimeMs()
-	local restLast = nil
-
-	local function atRest()
-		local here = nil
-
-		pcall(function()
-			here = npc:GetWorldPos()
-		end)
-
-		local elapsed = self:TimeMs() - restStart
-
-		if here and restLast then
-			local moved = math.sqrt((here.x - restLast.x) ^ 2
-					+ (here.y - restLast.y) ^ 2
-					+ (here.z - restLast.z) ^ 2)
-
-			if moved < restStill or elapsed >= restCeiling then
-				local thrown = "?"
-
-				if origin then
-					thrown = string.format("%.2f",
-							math.sqrt((here.x - origin.x) ^ 2
-									+ (here.y - origin.y) ^ 2))
-				end
-
-				self:Log("ImpactThrow " .. name
-						.. " why=" .. (moved < restStill and "still" or "ceiling")
-						.. " atMs=" .. string.format("%.0f", elapsed)
-						.. " thrown=" .. thrown)
-
-				return
-			end
-		end
-
-		restLast = here
-		Script.SetTimer(restPoll, atRest)
-	end
-
-	Script.SetTimer(restPoll, atRest)
 end
 
-
---- Charges a victim for being ridden down, on top of what the engine charged.
---
--- The engine already takes something. A ragdoll under a moving horse is a
--- physics object and the velocity delta is charged at
--- `CollisionVelocityDeltaToDmgR`, which is a global this mod will not
--- override. That cost is real but it is nearly flat against armor: measured
--- across matched impacts an armored target took 87 per cent of what an
--- unarmored one did, with an error bar that includes no difference at all.
--- Being ridden down at a gallop in a shirt and being ridden down in plate
--- therefore cost about the same, which is the thing this function exists to
--- fix.
---
--- So the mod adds its own charge, scaled by `ImpactDamageScale`, and the
--- outcome is left to arithmetic rather than decided by a kill roll. A villager
--- dies at a gallop because the damage usually exceeds what a villager has, and
--- occasionally does not; a knight survives because it usually does not come
--- close. `ImpactDamageVariance` is what makes "usually" mean anything, and a
--- roll that decides death directly would be a different and much cruder thing.
---
--- Applied through `soul:DealDamage`, which is vanilla's own call:
--- `deadBody.xml` and `questUtils.xml` use it to kill an entity outright and
--- `npc_roebuck.xml` to wound one. Stamina is left at zero because the horse's
--- side of the impact already debits the rider and the victim's stamina is not
--- what this models.
---
--- **It takes two arguments and no more.** `C_ScriptBindSoul` declares
--- `DealDamage(float stamina, float health)`, so an attacker passed as a third
--- argument is accepted by Lua and discarded by the engine. This call is a raw
--- subtraction on the soul: no attacker, no hit type, no hit data, and nothing
--- the victim's behavior tree ever sees.
---
--- That has a consequence beyond tidiness. Vanilla's death cry is raised inside
--- `IsDeadCheck -> Then` in `sb_switch_hitreactions.xml`, while a hit is being
--- processed, because the engine applies damage as part of resolving that hit.
--- Here the only hit the victim's brain receives is the one sent at the moment
--- of impact, when they are still alive, so the check finds them alive and
--- nothing looks again. A victim the mod kills therefore dies silently, and
--- that is a property of this call rather than of the bark system.
---
--- Attribution is handled separately, by the `combat:hit` that `Crime.lua`
--- sends, and by the ordering that makes this damage land last. With the crime
--- switch off the damage lands unattributed, so a collision test is not
--- interrupted by guards. This does not make a trampling death crime free on
--- its own: the engine attributes the trample itself, and that is not reachable
--- from here.
---
--- @tparam table npc victim entity
--- @tparam string tierName the tier the impact scored
--- @tparam table armor totals from `ArmorOf`
--- @tparam[opt] table playerEnt the player, named as the attacker when crime is on
--- @tparam[opt] table horseEnt the player's horse, for the barding bonus
--- @treturn number the damage dealt, or 0 when nothing was
 --- Whether this impact is about to kill, worked out at the moment of contact.
 --
--- Exists so Henry can react on time. `ApplyImpactDamage` cannot answer this: it
--- defers its damage until the thrown body comes to rest, up to a second after
--- contact, deliberately, so that the mod's blow lands last and owns the kill.
--- Choosing the rider's line from that resolved state produced words a second
--- and a half after the collision, detached from it, and a walk stagger -- whose
--- tier is worth no damage at all and so returns before dealing any -- never got
--- a line whatsoever.
+-- Exists so Henry can react on time. `ApplyImpactDamage` defers its damage
+-- until the thrown body comes to rest, so a line chosen from the resolved
+-- death would arrive long after the collision.
 --
--- The arithmetic is `ApplyImpactDamage`'s own, taken at the **top** of the
--- variance roll rather than at its center. Predicting from the center reads the
--- average outcome as the whole outcome and misses the most ordinary kill in the
--- game: a gallop into a healthy villager intends 95 * 1.00 * 1.02 = 96.9 against
--- 100 health, which is survivable on average and fatal on most rolls once the
--- spread is applied. Three of seven kills in one ride got no line for exactly
--- that reason, and the error was invisible in an earlier check because those
--- victims were already hurt.
+-- The arithmetic is `ApplyImpactDamage`'s own, taken at the intended figure,
+-- the center of the variance roll. A death line over a survivor is the worse
+-- error, so the prediction is the average outcome and misses some kills near
+-- the margin.
 --
--- So the question asked here is "can this impact kill", not "will it on
--- average". The cost of being wrong in this direction is a death line on a
--- victim who survives, which reads as Henry misjudging a blow; the cost in the
--- other direction is silence on a kill, which reads as the feature being
--- broken.
---
--- The engine's own trample damage is not added in. The mod reclaims it and
--- restores the health the victim had at impact, so the mod's own figure is what
--- decides the death.
+-- The engine's own trample damage is not added in: with
+-- `ImpactDamageOwnsTheHit` the mod reclaims it, so the mod's own figure is
+-- what decides the death.
 --
 -- @tparam table npc the victim
 -- @tparam string tierName the impact tier
@@ -472,35 +293,23 @@ end
 --
 -- Vanilla never offers the option of swinging at Captain Bernard or the Lord of
 -- Leipa: the refusal lives in the attack path, and this mod does not use that
--- path. `soul:DealDamage` charges health directly, and was measured taking
--- Bernard from 100 down to 66 over three gallops. It ignores the game's own
--- immortality flag while doing it, so nothing downstream was going to catch
--- this either.
+-- path. `soul:DealDamage` charges health directly and ignores the game's own
+-- immortality flag.
 --
--- The marker is readable, and it is a flag rather than a name. Such characters
--- carry the VIP protection derived stats; an ordinary guard carries none of
--- them. Measured on the pair, side by side:
+-- The marker is a flag rather than a name. Such characters carry the VIP
+-- protection derived stats and an ordinary guard carries none of them:
 --
 --     rat_bernard  apr=1 imm=1 upr=1 ppr=1
 --     villageGuard apr=0 imm=0 upr=0 ppr=0
 --
--- `apr` is the one read, and the distinction from `imm` matters.
+-- `apr` is the one read. It is attack protection, granted by the
+-- `vip_attackprot` buff, and nothing in this mod writes it. `imm` is generic
+-- immortality, which `ShieldFromEngineDamage` grants **every** victim at the
+-- moment of contact, so it cannot identify anybody. The known gap is a
+-- character a quest makes immortal without attack protection.
 --
--- `apr` is attack protection, granted by the `vip_attackprot` buff. It is the
--- flag the game marks a story character with, and nothing in this mod writes
--- it. `imm` is generic immortality, and it is the same flag
--- `ShieldFromEngineDamage` grants **every** victim at the moment of contact, so
--- it cannot be used to recognize anybody: reading it here reported every victim
--- as protected, and a villager survived six gallops logging `protected=true`
--- while reading `apr=0 imm=0` at rest.
---
--- The cost of reading `apr` alone is a character a quest has made immortal
--- without also granting attack protection. That combination has not been seen,
--- and covering it would mean reintroducing the flag this mod contaminates.
---
--- Reading the flag rather than keeping a list of names is what makes this
--- cover every character the game protects, including the ones protected only
--- for the span of one quest, without the mod having to know who they are.
+-- Reading the flag rather than keeping a list of names covers every character
+-- the game protects, including the ones protected only for one quest.
 --
 -- @tparam table npc the victim
 -- @treturn boolean true when the game marks this character as protected
@@ -524,20 +333,199 @@ function HorseCollisionMod:IsProtectedFromHarm(npc)
 	return protected
 end
 
+--- Makes a victim briefly immortal so the engine's collision damage lands on
+-- nothing.
+--
+-- The engine charges a victim health for being struck by a moving physical
+-- body and the mod cannot stop it. `BasicActor`'s collision multipliers belong
+-- to CryEngine's legacy damage path rather than to the RPG layer that charges
+-- `soul` health, and the one parameter that does work,
+-- `CollisionVelocityDeltaToDmgR`, is global and also governs arrows.
+--
+-- So rather than stop the damage, this stops it **landing**. `imm=1` is the
+-- parameter behind the game's own `immortality` and `death_protection` buffs,
+-- and `immortality_nonpersistent` carries it without being able to survive a
+-- save. Applied ahead of contact and removed once the engine has settled, the
+-- victim is untouchable for exactly the window the trample occupies, and the
+-- mod's own damage lands afterwards on a mortal target.
+--
+-- **This is deliberately narrow.** It is one buff instance, on one victim,
+-- until `ApplyImpactDamage` lifts it after the body comes to rest, with
+-- `ShieldWindowMs` as the backstop.
+--
+-- @tparam table npc somebody in front of the horse
+function HorseCollisionMod:ShieldFromEngineDamage(npc)
+	if not self.Config.ShieldVictimFromEngineDamage or not npc or not npc.soul then
+		return
+	end
+
+	local id = tostring(npc.id or "?")
+	local existing = self.ShieldedVictims[id]
+
+	-- Only a **live** shield blocks a second one: a record whose buff has
+	-- already been removed still reads truthy, and must not leave a later
+	-- impact unshielded.
+	if existing and not existing.removed then
+		return
+	end
+
+	-- The instance handle, not the GUID, is what gets handed back later.
+	--
+	-- `RemoveAllBuffsByGuid` would strip **every** instance of this buff from
+	-- the victim, and immortality is exactly what a quest uses to keep a story
+	-- character alive. Shielding such a character and then clearing by GUID
+	-- would quietly remove protection this mod never granted. Removing the
+	-- single instance that was added cannot.
+	local ok, instance = pcall(function()
+		return npc.soul:AddBuff(self.ImmortalityBuffGuid)
+	end)
+
+	if not ok or instance == nil then
+		self.ShieldedVictims[id] = nil
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield failed on " .. self:NameOf(npc))
+		end
+
+		return
+	end
+
+	-- Held in a record rather than bare, so the backstop timer can close over
+	-- it. A script reload replaces the whole `HorseCollisionMod` table and with
+	-- it this map, and the one thing that must survive a reload is the removal.
+	-- A closure survives; a table lookup does not.
+	local state = { instance = instance, removed = false }
+	self.ShieldedVictims[id] = state
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield on " .. self:NameOf(npc) .. " ok=true")
+	end
+
+	-- Nothing here decides when the shield ends. `ApplyImpactDamage` lifts it as
+	-- the first thing it does, and that call waits for the victim's body to
+	-- come to rest, so the shield covers the window the engine can charge the
+	-- body for.
+	--
+	-- This timer is a crash backstop and nothing else: if the damage call never
+	-- happens, nobody is left permanently unkillable. Reaching it means
+	-- something else went wrong, so it logs.
+	--
+	-- **Deliberately not generation guarded**, unlike the mod's polling timers:
+	-- the work it does is removing immortality, and skipping it on a script
+	-- reload would leave a victim unkillable for the rest of the session.
+	Script.SetTimer(self.Config.ShieldWindowMs, function()
+		if state.removed then
+			return
+		end
+
+		state.removed = true
+
+		if self.ShieldedVictims[id] == state then
+			self.ShieldedVictims[id] = nil
+		end
+
+		local lifted = pcall(function()
+			npc.soul:RemoveBuff(state.instance)
+		end)
+
+		if self.Config.LogTelemetry then
+			self:Log("Shield backstop fired on " .. self:NameOf(npc)
+					.. " ok=" .. tostring(lifted)
+					.. " (the damage call never lifted it)")
+		end
+	end)
+end
+
+--- Takes the collision shield off a victim, now.
+--
+-- Called from `ApplyImpactDamage` immediately before it charges the victim, so
+-- the immortality that swallowed the engine's trample cannot also swallow the
+-- mod's own damage. Safe to call on somebody who was never shielded.
+--
+-- @tparam table npc the victim
+-- @treturn boolean true when a removal was attempted
+function HorseCollisionMod:LiftCollisionShield(npc)
+	if not npc or not npc.soul then
+		return false
+	end
+
+	local id = tostring(npc.id or "?")
+	local state = self.ShieldedVictims[id]
+
+	if state == nil or state.removed then
+		return false
+	end
+
+	state.removed = true
+	self.ShieldedVictims[id] = nil
+
+	-- The instance this mod added, never every instance by GUID, so a quest's
+	-- own immortality on the same victim is untouched.
+	local ok = pcall(function()
+		npc.soul:RemoveBuff(state.instance)
+	end)
+
+	if self.Config.LogTelemetry then
+		self:Log("Shield lifted on " .. self:NameOf(npc) .. " ok=" .. tostring(ok))
+	end
+
+	return ok
+end
+
+--- Charges a victim for being ridden down.
+--
+-- The engine charges a collision itself, at `CollisionVelocityDeltaToDmgR`, a
+-- global this mod will not override, and that charge is nearly flat against
+-- armor. With `ImpactDamageOwnsTheHit` the mod reclaims it and deals its own
+-- figure, scaled by `ImpactDamageScale`, so the mod's figure is the whole cost.
+-- The outcome is left to arithmetic rather than decided by a kill roll: a
+-- villager dies at a gallop because the damage usually exceeds what a villager
+-- has, and a knight survives because it usually does not come close.
+-- `ImpactDamageVariance` is what makes "usually" mean anything.
+--
+-- Applied through `soul:DealDamage`, vanilla's own call: `deadBody.xml` and
+-- `questUtils.xml` use it to kill an entity outright and `npc_roebuck.xml` to
+-- wound one. Stamina is left at zero; the horse's side of the impact already
+-- debits the rider.
+--
+-- **It takes two arguments and no more.** `C_ScriptBindSoul` declares
+-- `DealDamage(float stamina, float health)`: a raw subtraction on the soul,
+-- with no attacker, no hit type and nothing the victim's behavior tree sees.
+-- Vanilla's death cry is raised inside `IsDeadCheck -> Then` in
+-- `sb_switch_hitreactions.xml` while a hit is processed, so a victim this call
+-- kills dies silently.
+--
+-- ### Why the damage waits for the body to stop
+--
+-- The engine attributes its own trample to the rider and cannot be gated, and
+-- `sb_switch_awareness.xml` raises `murder` only from a hit that names an
+-- attacker and finds the target dead; a death with no attributed hit is found
+-- later as a `corpse`, which `Scripts/Script/Crime.lua` marks
+-- `isCrime = false`. So the killing blow decides whether guards know who did
+-- it. The victim is shielded from the moment of contact
+-- (`ShieldFromEngineDamage`) until the body stops, the engine's charge is
+-- reclaimed, and the mod's blow is the one that kills, which lets
+-- `CollisionIsCrime` govern the death. The crime hit is sent from `Impact.lua`
+-- when a victim rises, and from here on a death.
+--
+-- @tparam table npc victim entity
+-- @tparam string tierName the tier the impact scored
+-- @tparam table armor totals from `ArmorOf`
+-- @tparam[opt] table playerEnt the player, to whom a death is attributed when
+--   `CollisionIsCrime` is on
+-- @tparam[opt] table horseEnt the player's horse, for the barding bonus
+-- @tparam[opt] number hitStrength the `HitReactionStrength` the crime hit
+--   carries on a death
 function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 		playerEnt, horseEnt, hitStrength)
 	if not self.Config.ImpactDamage or not npc or not npc.soul then
-		return 0
+		return
 	end
 
-	-- The settings file wins, and the table on the module is the fallback.
-	-- These figures are the mod's account of what each kind of collision is
-	-- worth, so they belong where a player or a test can reach them rather
-	-- than compiled in.
 	local base = self:TierValue("ImpactDamageByTier", tierName)
 
 	if type(base) ~= "number" or base <= 0 then
-		return 0
+		return
 	end
 
 	local scale = self:ImpactDamageScale(armor)
@@ -558,79 +546,14 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 	local intended = base * scale * bardingDamage
 	local damage = intended * spread
 
-	local attacker = nil
-
-	if self.Config.CollisionIsCrime and playerEnt then
-		pcall(function()
-			attacker = XGenAIModule.GetMyWUID(playerEnt)
-		end)
-	end
-
-	-- Deferred rather than dealt here, and this is the whole of the crime fix.
-	--
-	-- The engine applies its own trample damage for a horse collision. The mod
-	-- neither sees it nor can gate it, and the engine attributes it to the
-	-- rider. Measured on a full-health guard with `CollisionIsCrime` off, so
-	-- the mod had sent no hit of its own, it was 22.7.
-	--
-	-- That much cannot kill a healthy villager on its own. It only ever gets
-	-- the kill because this damage lands first and leaves a sliver: the tier
-	-- figure is 95 against a villager's 100, so it falls a little short about
-	-- two times in three, and the trample finishes what is left.
-	--
-	-- It matters who finishes them. `sb_switch_awareness.xml` raises the
-	-- `murder` stimulus from a hit event that names an attacker and finds the
-	-- target dead. A death with no attributed hit behind it is discovered
-	-- later as a `corpse`, which `Scripts/Script/Crime.lua` marks
-	-- `isCrime = false`. So the killing blow decides whether guards know who
-	-- did it, and until now a coin toss decided the killing blow. That is why
-	-- riding someone down was sometimes ignored and sometimes an instant
-	-- hanging offence, with `CollisionIsCrime` powerless over either.
-	--
-	-- Waiting puts this damage last. The trample lands on a victim at full
-	-- health and cannot kill them, and whatever it leaves is finished here,
-	-- under this mod's attribution. `CollisionIsCrime` then decides the
-	-- outcome in both directions rather than in neither.
-	--
-	-- A fixed wait, not a poll, and deliberately so: what is being waited for
-	-- is damage that frequently never arrives at all, so there is no state
-	-- that says "the trample has resolved" to read. The figure comes from the
-	-- impact probe, whose first sample at 500 ms already shows the trample
-	-- settled.
 	-- The victim's health at the moment of the impact, before anything has had
-	-- a chance to charge them for it.
-	--
-	-- This is what makes the damage the mod's own. The engine charges a
-	-- collision itself, at `CollisionVelocityDeltaToDmgR`, and that figure is
-	-- neither readable nor overridable from here; the mod's design has always
-	-- been to wait it out and land the last blow, so that `CollisionIsCrime`
-	-- governs the death. What it never did was account for what the engine
-	-- took, so the mod's tier figure was padding on top of an unknown, and a
-	-- collision hard enough to kill inside the delay window took the death
-	-- out of the mod's hands entirely.
-	--
-	-- Sampling here and again after the wait gives that unknown a number.
+	-- a chance to charge them for it. Sampled again when the damage is dealt,
+	-- the difference is what the engine took, which the reclaim gives back.
 	local atImpact = nil
 
 	pcall(function()
 		atImpact = npc.soul:GetState("health")
 	end)
-
-	-- Subjects the development tooling created take no damage.
-	--
-	-- An NPC cannot be made unkillable through the engine. There is no
-	-- writable path to its health cap: `SetMaxHealth`, `SetStatLevel` and
-	-- `SetDerivedStat` are all absent from a soul, and `SetState("health", n)`
-	-- clamps at 100. The Cheat mod's immortality works because it is applied
-	-- to the player, who is not capped that way.
-	--
-	-- So the exemption lives here instead, and it is narrow on purpose: only
-	-- entities `tools/dev_subject.lua` spawned are in this table, nothing in
-	-- normal play ever puts anything in it, and it is not a setting. Damage is
-	-- the only thing skipped. The reaction, the impulse, the sound and every
-	-- log line still run, which is what a test of collision feedback needs.
-	local exempt = self.ImmortalSubjects and npc.id
-			and self.ImmortalSubjects[tostring(npc.id)]
 
 	-- Story characters the game protects are handled further down instead of
 	-- here, inside `deal`. Returning early would skip the shield lift and the
@@ -639,63 +562,8 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 	-- in a position to give it back.
 	local protected = self:IsProtectedFromHarm(npc)
 
-	if exempt then
-		-- Skipping the mod's own damage is not enough on its own. The engine
-		-- charges a collision too, at about 18 a pass, and that accumulates
-		-- unopposed: a subject exempted this way still died after a handful of
-		-- runs, and because the engine landed the killing blow the rider was
-		-- charged with murder.
-		--
-		-- So the health is put back to what it was at the impact, which undoes
-		-- the engine's charge as well as declining to add one.
-		local was = nil
-
-		pcall(function()
-			was = npc.soul:GetState("health")
-		end)
-
-		Script.SetTimer(self.Config.ImpactDamageDelayMs, function()
-			pcall(function()
-				if was then
-					npc.soul:SetState("health", was)
-				end
-			end)
-		end)
-
-		if self.Config.LogTelemetry then
-			self:Log("ImpactDamage " .. self:NameOf(npc)
-					.. " tier=" .. tostring(tierName)
-					.. " testSubject=true restoredTo="
-					.. string.format("%.1f", was or -1))
-		end
-
-		return 0
-	end
-
-	-- Nothing is timed here any more, and the local that used to hold a delay
-	-- was read into and never used: the wait below is `WhenBodyStops`, which
-	-- watches the body rather than counting. `ImpactDamageDelayMs` survives for
-	-- the immortal-subject restore above, which has no body to watch because
-	-- the whole point of that path is that nothing about the victim changed.
-	--
-	-- Waiting is right only while the engine cannot land the killing blow.
-	--
-	-- The delay exists so the engine's collision resolves first and the mod
-	-- lands last, which puts the death under the mod's attribution and lets
-	-- `CollisionIsCrime` govern it.
-	--
-	-- Nothing here tries to work out whether this impact will be lethal any
-	-- more. That prediction, and the rushing and rounding-up it drove, existed
-	-- because the engine could take a victim during the wait and the crime went
-	-- to whoever landed the last blow. It could not be made reliable: it had to
-	-- be right about a number it does not control, and when it was wrong the
-	-- rider was charged with murder at random.
-	--
-	-- The shield settles it instead of predicting it. A victim the horse strikes
-	-- is immortal from the moment of contact until this call lifts it, so the
-	-- engine cannot reach them during the wait however hurt they are, and the
-	-- blow below is always the one that kills.
-
+	-- The shield keeps the engine from killing the victim during the wait,
+	-- however hurt they are, so the blow below is always the one that kills.
 	local function deal()
 		-- The shield goes on at the top of this call and comes off here, so
 		-- the victim is mortal by the time the line below charges them.
@@ -708,19 +576,10 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 		end)
 
 		-- A protected character is put straight back to the health they had at
-		-- the impact and charged nothing, so the collision leaves no mark on
-		-- them at all.
-		--
-		-- Restored without the ceiling the ordinary reclaim below applies. That
-		-- ceiling exists so a horse walking past cannot heal somebody an archer
-		-- shot in the meantime, and it is a sensible bound on handing back an
-		-- unknown. Here there is nothing to bound: this character is not to be
-		-- harmed, and a large loss during the window is far more likely to be
-		-- this collision than a coincidence.
-		--
-		-- Done here rather than at the top of the call so that the shield has
-		-- already come off and the body has already stopped moving, which is
-		-- the point after which the engine has finished charging them.
+		-- the impact and charged nothing, without the reclaim ceiling below,
+		-- because this character is not to be harmed. Done here, after the
+		-- shield lifts and the body stops, when the engine has finished
+		-- charging them.
 		if protected then
 			local restored = false
 
@@ -794,16 +653,9 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 		end)
 
 		-- A victim killed while an animated reaction is still playing is left
-		-- standing in it. The game marks them dead, so other NPCs treat them
-		-- as a corpse and the world reacts accordingly, but the interactive
-		-- action still owns the body: it holds an idle pose, has no collision,
-		-- and walks through walls. Observed on a beggar reared twice, standing
-		-- in front of the rider while everyone around him mourned him.
-		--
-		-- It has been latent all along. The gallop tier ragdolls its victims,
-		-- so a death there lands on a body physics already owns, and the tiers
-		-- that play animated reactions did too little damage to kill. Raising
-		-- the rear's damage made it common.
+		-- standing in it. The game marks them dead, but the interactive action
+		-- still owns the body: it holds an idle pose, has no collision, and
+		-- walks through walls.
 		--
 		-- So a death during an interactive action is handed to a ragdoll,
 		-- which is where the engine's own death handling would have put them.
@@ -813,28 +665,19 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 				and type(after) == "number" and after <= 0
 
 		if fatal then
-			-- If the hit was fatal and CollisionIsCrime is enabled, attribute the
-			-- hit to the player immediately. When the victim survives, SendCombatHit
-			-- is deferred until WhenVictimRises so living NPCs don't yell crime barks
-			-- while ragdolling. But a corpse never rises, and without SendCombatHit,
-			-- the engine graph link 'lastHitByPlayer' is never created, causing guards
-			-- to classify the death as an unattributed corpse (isCrime = false) rather
-			-- than a murder. Dead victims in sb_switch_hitreactions skip stimulus_hit
-			-- (no mid-air barks) while properly linking lastHitByPlayer and alerting guards.
+			-- A death is attributed to the player at once. A survivor's crime
+			-- hit waits for `WhenVictimRises`, so a victim on the ground does not
+			-- shout crime barks, but a corpse never rises. Without the hit the
+			-- `lastHitByPlayer` link (`sb_switch_hitreactions.xml:584`) is never
+			-- made and guards find an unattributed corpse rather than a murder.
+			-- A dead victim's hit skips the reaction stimulus, so nothing is
+			-- shouted.
 			if self.Config.CollisionIsCrime and playerEnt then
-				local strength = hitStrength
-						or (self.HitReactionStrength
-							and self.HitReactionStrength[
-								self:TierValue("HitStrengthByTier", tierName) or "Tickle"])
-						or 0
+				local strength = hitStrength or self.HitReactionStrength[
+						self:TierValue("HitStrengthByTier", tierName)]
 				self:SendCombatHit(npc, playerEnt, strength)
 				npc.hcm_combat_injected = true
 			end
-
-			-- The moment the mod's own damage killed somebody, which is the
-			-- only place the death is attributable to the mod rather than to
-			-- anything else that might have finished them.
-			self:BarkDeath(npc)
 
 			local state = "?"
 
@@ -863,26 +706,18 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 					.. " engineTook=" .. string.format("%.1f", reclaimed)
 					.. " health=" .. string.format("%.1f", before or -1)
 					.. " after=" .. string.format("%.1f", after or -1)
-					.. " fatal=" .. tostring(after ~= nil and after <= 0
-							and (before == nil or before > 0))
-					.. " attributed=" .. tostring(attacker ~= nil)
-										.. " ok=" .. tostring(ok)
+					.. " fatal=" .. tostring(fatal)
+					.. " ok=" .. tostring(ok)
 					.. " err=" .. tostring(err))
 		end
 	end
 
-	-- Fired by the victim's own state, not by a clock.
+	-- Fired by the victim's own state, not by a clock: lift the shield and deal
+	-- the damage the moment the body stops moving. The shield has to span the
+	-- whole throw, because the engine charges the body while it moves.
 	--
-	-- Shield, then lift and damage the moment the body stops moving.
-	--
-	-- The shield goes on at the impact and has to span everything the engine
-	-- charges the victim for, which is the whole time the body is being thrown:
-	-- measured between the impact and the body coming to rest, victims lost
-	-- between 6 and 32 health, and six of ten were driven onto the clamp. Lift
-	-- it before that is over and those are engine kills, charged to the rider.
-	--
-	-- A walk stagger never moves the body, so it deals immediately.
-	if tierName == "Walk" then
+	-- A stagger never moves the body, so it deals immediately.
+	if self:TierValue("ReactionByTier", tierName) == "stagger" then
 		deal()
 	else
 		self:WhenBodyStops(npc, function(why, waited)
@@ -895,6 +730,4 @@ function HorseCollisionMod:ApplyImpactDamage(npc, tierName, armor,
 			deal()
 		end)
 	end
-
-	return damage
 end

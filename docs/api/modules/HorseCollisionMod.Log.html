@@ -41,6 +41,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><strong>HorseCollisionMod.Log</strong></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -55,6 +57,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -63,25 +67,18 @@
 <div id="content">
 
 <h1>Module <code>HorseCollisionMod.Log</code></h1>
-<p>Logging, speed history and the speed tier.</p>
+<p>Logging, the clock and the speed history.</p>
 <p> What every other part of the mod reads before it decides anything: the
- engine clock, vector length, the rolling speed history an impact is judged
- against, and the two log calls. Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table
- created by the entry point, which pulls this file in with
- <code>Script.ReloadScript</code>.</p>
+ engine clock, vector length, the detection interval, the rolling speed
+ history an impact is scored from, entity names for the log, and the log
+ calls. Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry
+ point, which pulls this file in with <code>Script.ReloadScript</code>.</p>
 
-<p> <code>TimeMs</code> and <a href="../modules/HorseCollisionMod.Log.html#HorseCollisionMod:VectorLength">VectorLength</a> are methods rather than file-locals. A local is
- visible only inside the chunk that declares it, and these are called from
- part files that are separate chunks.</p>
+<p> These are methods rather than file-locals: a local is visible only inside
+ the chunk that declares it, and they are called from part files that are
+ separate chunks.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  5.11.3
- The engine clock in milliseconds.</p>
-
-<p> <code>System.GetCurrTime</code> returns seconds as a float and <a href="https://www.lua.org/manual/5.1/manual.html#pdf-os.clock">os.clock</a> returns nil
- in this engine, so this is the only clock available. A method rather than a
- file-local because the mod is split across files and a local is visible only
- inside the one that declares it.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -89,10 +86,8 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#returns...">returns... ()</a></td>
-	<td class="summary">
-
-</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:TimeMs">HorseCollisionMod:TimeMs ()</a></td>
+	<td class="summary">The engine clock in milliseconds.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:VectorLength">HorseCollisionMod:VectorLength (v)</a></td>
@@ -116,19 +111,15 @@
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:LogRejection">HorseCollisionMod:LogRejection (npc, reason, detail)</a></td>
-	<td class="summary">Logs why a candidate was passed over, at most once per second per entity.</td>
+	<td class="summary">Logs why a candidate was passed over, rate limited per entity.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:NameOf">HorseCollisionMod:NameOf (npc)</a></td>
-	<td class="summary">Current time in milliseconds.</td>
+	<td class="summary">An entity's name, or "?" when it cannot be read.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:Log">HorseCollisionMod:Log (message)</a></td>
 	<td class="summary">Writes a prefixed line to kcd.log when telemetry is enabled.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:GetSpeedTier">HorseCollisionMod:GetSpeedTier (speed)</a></td>
-	<td class="summary">Resolves a speed to its gait name.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:TickMs">HorseCollisionMod:TickMs ()</a></td>
@@ -144,13 +135,14 @@
 
     <dl class="function">
     <dt>
-    <a name = "returns..."></a>
-    <strong>returns... ()</strong>
+    <a name = "HorseCollisionMod:TimeMs"></a>
+    <strong>HorseCollisionMod:TimeMs ()</strong>
     </dt>
     <dd>
+    The engine clock in milliseconds. </p>
 
-
-
+<p> <code>System.GetCurrTime</code> returns seconds as a float and <a href="https://www.lua.org/manual/5.1/manual.html#pdf-os.clock">os.clock</a> returns nil
+ in this engine, so this is the only clock available.
 
 
 
@@ -170,10 +162,7 @@
     <strong>HorseCollisionMod:VectorLength (v)</strong>
     </dt>
     <dd>
-    Magnitude of a CryEngine vector. </p>
-
-<p> A method for the same reason as <code>TimeMs</code>: callers are spread across the
- mod's part files, which do not share locals.
+    Magnitude of a CryEngine vector.
 
 
     <h3>Parameters:</h3>
@@ -227,34 +216,16 @@
  horse, so the speed on the tick of impact under-rates the blow. A collision
  should be scored by the speed the horse carried <strong>into</strong> it.</p>
 
-<p> The flaw that fixes is real and the hold must stay. What it could not do is
- tell speed carried into a collision from speed produced by one. Walking a
- horse into someone repeatedly kicks it off the body, the kick lands in this
- history, and the hold then scores the next impact by it. Measured over one
- run of walking shoves, the score climbed while the horse never left walking
- pace:</p>
+<p> The hold alone cannot tell speed carried into a collision from speed
+ produced by one: walking a horse into someone kicks it off the body, and a
+ kick in the history would score a walking shove as a trot.</p>
 
-<pre><code> score 3.06  sampled 3.05    agreeing
- score 2.90  sampled 2.89    agreeing
- score 3.79  sampled 2.24    diverging
- score 6.23  sampled 2.05    scored a trot at 2 m/s
-</code></pre>
-
-<p> The victim took a knockdown, 16 damage and a camera shake from what the
- rider experienced as walking into her, and the walk tier's whole contract is
- that it shoves and does not knock anyone down.</p>
-
-<p> <strong>A single sample cannot set the peak.</strong> The peak is the larger of each
- neighbouring pair, so a figure has to be reached on two consecutive samples
- before it counts. Real speed is sustained: a horse at a gallop reads 8.5
- across many samples and is scored at 8.5, and one decelerating on contact
- still has the samples before the contact to be rated by. A kick is one tick
- wide and its neighbour is an ordinary reading, so it never wins.</p>
-
-<p> This is the same rule <code>WatchLunge</code> already applies for the same reason,
- where one-sample readings of 21.2, 25.5 and 25.8 m/s against 13.0 on the
- same move were closing the charge window inside 200 ms. Both are the engine
- reporting a speed the horse did not travel at.
+<p> <strong>A single sample cannot set the peak.</strong> The peak is the largest of each
+ neighboring pair's smaller reading, so a figure has to be reached on two
+ consecutive samples before it counts. Real speed is sustained, and a horse
+ decelerating on contact still has the samples before the contact to be
+ rated by; a kick is one tick wide and its neighbor is an ordinary reading,
+ so it never wins. <code>WatchLunge</code> applies the same rule to the charge.
 
 
     <h3>Parameters:</h3>
@@ -325,8 +296,10 @@
  someone.</p>
 
 <p> Capped because the physics system reports occasional speeds above anything a
- horse holds, and this value scales knockback force as well as selecting the
- tier.
+ horse holds. This value selects the tier and gives <code>GetImpactDir</code> its
+ direction; nothing downstream scales force by it. Every force figure is
+ flat per tier, the brake reads the body's own velocity, and the impulse is
+ <code>Knockback</code> and <code>Uplift</code>.
 
 
 
@@ -346,14 +319,15 @@
     <strong>HorseCollisionMod:LogRejection (npc, reason, detail)</strong>
     </dt>
     <dd>
-    Logs why a candidate was passed over, at most once per second per entity. </p>
+    Logs why a candidate was passed over, rate limited per entity. </p>
 
 <p> Every rejection in the detection loop is silent, so an impact that produces
  no reaction is indistinguishable from one that was never detected. This
  names the reason.</p>
 
-<p> Rate limited because the loop runs about twenty times a second and the
- detection sphere returns everything nearby, including crates and doors.
+<p> Rate limited, to once per <code>RejectionLogGapMs</code> per entity, because the loop
+ runs every <code>TickSeconds</code> and the detection sphere returns everything
+ nearby, including crates and doors.
 
 
     <h3>Parameters:</h3>
@@ -382,7 +356,13 @@
     <strong>HorseCollisionMod:NameOf (npc)</strong>
     </dt>
     <dd>
-    Current time in milliseconds.
+    An entity's name, or "?" when it cannot be read. </p>
+
+<p> Reading a name is not safe. An entity can be unstreamed between the moment
+ something is scheduled and the moment it runs, and <code>GetName</code> throws on one
+ that has gone. Almost every use of a name here is for a log line, and most
+ of those sit inside timer callbacks, so an unprotected lookup could kill the
+ callback and silently stop a watcher for the sake of a diagnostic.
 
 
     <h3>Parameters:</h3>
@@ -395,19 +375,9 @@
 
     <h3>Returns:</h3>
     <ol>
-        <li>
-           <span class="types"><span class="type">number</span></span>
-         milliseconds since the game session started
- An entity's name, or "?" when it cannot be read.</p>
 
-<p> Reading a name is not safe. An entity can be unstreamed between the moment
- something is scheduled and the moment it runs, and <code>GetName</code> throws on one
- that has gone. Almost every use of a name here is for a log line, and most
- of those sit inside timer callbacks, so an unprotected lookup could kill the
- callback and silently stop a watcher for the sake of a diagnostic.</li>
-        <li>
            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-        the entity's name, or "?"</li>
+        the entity's name, or "?"
     </ol>
 
 
@@ -436,33 +406,6 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:GetSpeedTier"></a>
-    <strong>HorseCollisionMod:GetSpeedTier (speed)</strong>
-    </dt>
-    <dd>
-    Resolves a speed to its gait name.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         speed in meters per second
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-        one of "Gallop", "Trot", "Walk" or "Idle"
-    </ol>
-
-
-
-
-</dd>
-    <dt>
     <a name = "HorseCollisionMod:TickMs"></a>
     <strong>HorseCollisionMod:TickMs ()</strong>
     </dt>
@@ -470,8 +413,8 @@
     The detection interval in milliseconds. </p>
 
 <p> <code>TickSeconds</code> is the one figure the loop rate and the forward sweep are both
- derived from, so a change to it moves them together. Clamped at the bottom
- because a zero would book a timer that never rests.
+ derived from, so a change to it moves them together. Clamped at
+ <code>MinTickSeconds</code>, because a zero would book a timer that never rests.
 
 
 
@@ -493,7 +436,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

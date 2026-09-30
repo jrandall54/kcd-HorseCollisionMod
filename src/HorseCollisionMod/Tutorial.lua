@@ -1,21 +1,26 @@
---- In-game tutorial guidance for horseback maneuvers.
+--- In-game tutorial banners for the horseback maneuvers.
 --
--- Explains how to execute the Rear, Rear Charge, and Saddle Lean maneuvers,
--- detailing key controls, standstill requirements, stamina drain, and crime
--- consequences. Attached to the `HorseCollisionMod` table created by the
--- entry point, which pulls this file in with `Script.ReloadScript`.
+-- Shows each maneuver's banner once, when it is first available: the rear,
+-- the charge and the lean. Attached to the `HorseCollisionMod` table created
+-- by the entry point, which pulls this file in with `Script.ReloadScript`.
 --
 -- @module HorseCollisionMod.Tutorial
 -- @author jrandall54
--- @release 5.31.4
 
 HorseCollisionMod.TutorialsShown = HorseCollisionMod.TutorialsShown or {}
+
+-- How long a banner stays on screen, in seconds.
+HorseCollisionMod.TutorialBannerSec = 10
+
+-- The pause after one banner leaves the screen before the next is shown.
+HorseCollisionMod.TutorialBannerGapMs = 500
 
 --- Checks whether the player is currently using a game controller.
 --
 -- @treturn boolean true if a gamepad is active, false if keyboard/mouse
 function HorseCollisionMod:IsController()
 	local ctrl = Game.GetActionControl and Game.GetActionControl("player", "use")
+
 	return type(ctrl) == "string" and string.sub(ctrl, 1, 3) == "xi_"
 end
 
@@ -24,7 +29,7 @@ end
 -- Dynamically adapts button prompts based on whether the player is currently
 -- using a gamepad or keyboard.
 --
--- @tparam string name tutorial identifier ("rear", "charge", "lean", etc.)
+-- @tparam string name "rear", "charge" or "lean"
 -- @treturn string formatted tutorial message
 function HorseCollisionMod:FormatTutorialText(name)
 	local cfg = self.Config
@@ -33,6 +38,7 @@ function HorseCollisionMod:FormatTutorialText(name)
 	if name == "rear" then
 		local btn = pad and "[L-Stick]"
 				or ("[" .. string.upper(cfg.RearOnlyKey) .. "]")
+
 		return "Horsemanship: Rear Maneuver\n\n"
 				.. "Bring your horse to a stop and press " .. btn
 				.. " to rear up and strike anyone ahead.\n\n"
@@ -41,6 +47,7 @@ function HorseCollisionMod:FormatTutorialText(name)
 	elseif name == "charge" then
 		local btn = pad and "[LT]"
 				or ("[" .. string.upper(cfg.RearChargeKey) .. "]")
+
 		return "Horsemanship: Rear Charge\n\n"
 				.. "Bring your horse to a stop and press " .. btn
 				.. " to lunge forward, trampling anyone in your path.\n\n"
@@ -51,6 +58,7 @@ function HorseCollisionMod:FormatTutorialText(name)
 				or ("[" .. string.upper(cfg.LeanLeftKey) .. "]")
 		local right = pad and "[RB]"
 				or ("[" .. string.upper(cfg.LeanRightKey) .. "]")
+
 		return "Horsemanship: Saddle Lean\n\n"
 				.. "While mounted, hold " .. left .. " or " .. right
 				.. " to lean out and look past your horse's head."
@@ -61,30 +69,28 @@ end
 
 --- Displays an on-screen tutorial banner for a maneuver.
 --
--- @tparam string name tutorial identifier ("rear", "charge", "lean", etc.)
--- @tparam[opt] boolean force true to bypass settings and CVar checks
+-- @tparam string name "rear", "charge" or "lean"
 -- @treturn boolean true if the tutorial was displayed
-function HorseCollisionMod:ShowTutorial(name, force)
+function HorseCollisionMod:ShowTutorial(name)
 	if not name or name == "" then
 		return false
 	end
 
-	if not self.Config.ShowTutorials and not force then
+	if not self.Config.ShowTutorials then
 		return false
 	end
 
 	local uiEnabled = true
+
 	pcall(function()
 		if System.GetCVar("wh_ui_TutorialsEnabled") == 0 then
 			uiEnabled = false
 		end
 	end)
 
-	if not uiEnabled and not force then
+	if not uiEnabled then
 		return false
 	end
-
-	self.TutorialsShown = self.TutorialsShown or {}
 
 	if self.TutorialsShown[name] then
 		return false
@@ -93,14 +99,16 @@ function HorseCollisionMod:ShowTutorial(name, force)
 	self.TutorialsShown[name] = true
 
 	local text = self:FormatTutorialText(name)
+
 	if text == "" then
 		return false
 	end
 
 	local ok = false
+
 	pcall(function()
 		if Game and Game.ShowTutorial then
-			Game.ShowTutorial(text, 10, false, true)
+			Game.ShowTutorial(text, self.TutorialBannerSec, false, true)
 			ok = true
 		end
 	end)
@@ -112,50 +120,51 @@ function HorseCollisionMod:ShowTutorial(name, force)
 	return ok
 end
 
---- Displays newly acquired maneuver tutorials in order, scheduling subsequent banners.
+--- Shows the banners for newly available maneuvers, one after another.
 --
--- When multiple perks are acquired at once (e.g. in the perk menu), this shows
--- the first banner immediately and schedules subsequent banners to appear after
--- the preceding banner's 10-second display duration expires, ensuring every
--- tutorial plays in full in sequence.
+-- When several perks are acquired at once, in the perk menu, this shows the
+-- first banner at once and schedules the next for when the first banner has
+-- left the screen, so every banner plays in full.
+--
+-- Without `RequirePerks` only the rear's banner is shown here; the charge's
+-- and the lean's appear on their first use.
+--
+-- Called on mounting and on leaving the inventory.
 function HorseCollisionMod:QueueNextTutorial()
 	if not self.Config.ShowTutorials then
 		return
 	end
 
-	local playerEnt = rawget(_G, "player")
-	if not playerEnt or not playerEnt.soul then
+	if not player or not player.soul then
 		return
 	end
 
-	self.TutorialsShown = self.TutorialsShown or {}
-
 	if self.Config.RequirePerks then
-		local perks = {
-			{ id = "lean", ability = "hcm_lean" },
-			{ id = "rear", ability = "hcm_rear" },
-			{ id = "charge", ability = "hcm_charge" },
-		}
-
 		local pending = {}
-		for _, p in ipairs(perks) do
+
+		for _, maneuver in ipairs(self.Maneuvers) do
 			local has = false
+
 			pcall(function()
-				has = playerEnt.soul:HasAbility(p.ability)
+				has = player.soul:HasAbility(maneuver.ability)
 			end)
-			if has and not self.TutorialsShown[p.id] then
-				table.insert(pending, p.id)
+
+			if has and not self.TutorialsShown[maneuver.banner] then
+				table.insert(pending, maneuver.banner)
 			end
 		end
 
 		if #pending > 0 then
-			local nextId = pending[1]
-			self:ShowTutorial(nextId)
+			self:ShowTutorial(pending[1])
 
 			if #pending > 1 and not self.TutorialTimerPending then
 				self.TutorialTimerPending = true
+
 				local tick = self.TimerTick
-				Script.SetTimer(10500, function()
+				local after = (self.TutorialBannerSec * 1000)
+						+ self.TutorialBannerGapMs
+
+				Script.SetTimer(after, function()
 					self.TutorialTimerPending = false
 					if self.TimerTick == tick and not self.InventoryOpen then
 						self:QueueNextTutorial()
@@ -170,50 +179,30 @@ function HorseCollisionMod:QueueNextTutorial()
 	end
 end
 
---- Checks whether newly acquired maneuver tutorials should be shown on mount.
+--- Matches the shown banners to the abilities in the loaded save.
 --
--- @tparam table playerEnt the player entity table
-function HorseCollisionMod:CheckMountTutorials(playerEnt)
-	self:QueueNextTutorial()
-end
-
---- Checks whether newly acquired maneuver tutorials should be shown when leaving menus.
-function HorseCollisionMod:CheckMenuTutorials()
-	self:QueueNextTutorial()
-end
-
---- Synchronizes tutorial state against the player's actual abilities in the loaded save.
---
--- Called on save load (sys_loadingimagescreen OnEnd). If a loaded character
--- already has an ability, mark its tutorial as already shown so the player is
--- not spammed. If the loaded character does NOT have the ability in this save,
--- clear the flag so unlocking it later in this save cleanly displays the banner.
+-- Called from the load screen handler. An ability the loaded character
+-- already has marks its banner as shown, so it is not repeated; one they lack
+-- clears the mark, so unlocking it later in this save shows the banner.
 function HorseCollisionMod:SyncTutorialsOnLoad()
-	self.TutorialsShown = self.TutorialsShown or {}
 	self.TutorialTimerPending = false
 
-	local playerEnt = rawget(_G, "player")
-	if not playerEnt or not playerEnt.soul then
+	if not player or not player.soul then
 		return
 	end
 
 	if self.Config.RequirePerks then
-		local abilities = {
-			rear = "hcm_rear",
-			charge = "hcm_charge",
-			lean = "hcm_lean",
-		}
-
-		for bannerName, abilityName in pairs(abilities) do
+		for _, maneuver in ipairs(self.Maneuvers) do
 			local hasAbility = false
+
 			pcall(function()
-				hasAbility = playerEnt.soul:HasAbility(abilityName)
+				hasAbility = player.soul:HasAbility(maneuver.ability)
 			end)
 
 			if hasAbility then
-				self.TutorialsShown[bannerName] = true
+				self.TutorialsShown[maneuver.banner] = true
 			else
-				self.TutorialsShown[bannerName] = nil
+				self.TutorialsShown[maneuver.banner] = nil
 			end
 		end
 	end
@@ -223,11 +212,4 @@ function HorseCollisionMod:SyncTutorialsOnLoad()
 				.. " charge=" .. tostring(self.TutorialsShown["charge"])
 				.. " lean=" .. tostring(self.TutorialsShown["lean"]))
 	end
-end
-
---- Clears the history of displayed tutorials.
-function HorseCollisionMod:ResetTutorials()
-	self.TutorialsShown = {}
-	self.TutorialTimerPending = false
-	self:Log("Tutorials reset")
 end

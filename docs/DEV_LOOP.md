@@ -2,6 +2,24 @@
 
 Change the mod and see the change in a running game, without restarting it.
 
+## The workflow
+
+`tools\flow.ps1` is the only entry point. Each verb puts the repository and the
+install into one state, and running a verb again in that state re-syncs rather
+than failing.
+
+```
+.\tools\flow.ps1 status          where the branch, version, install and game stand
+.\tools\flow.ps1 branch NAME     start a topic branch and seed its testing world
+.\tools\flow.ps1 test            deploy, and reload into a running game
+.\tools\flow.ps1 test -Launch    the same, and start the game if it is closed
+.\tools\flow.ps1 world           print the testing world
+.\tools\flow.ps1 shipping        park the mod to test a release build
+.\tools\flow.ps1 land "msg"      finish the branch
+```
+
+`tools\dev_deploy.ps1` is `flow`'s internal helper and is not run directly.
+
 ## Requirements
 
 `system.cfg`, in the game root:
@@ -16,84 +34,31 @@ mn_allowEditableDatabasesInPureGame = 1  allow Mannequin reloads
 At its shipping value of `2` the engine reads only paks, and every loose file
 below is ignored.
 
-Verifying a release requires the shipping values, so an install used for a
-release is left configured for play. `dev_deploy.ps1` switches between the two
-and refuses to deploy into an install configured for play, because at
-`sys_PakPriority = 2` a deploy, a reload and a console command all report
-success while the game keeps running the packed build.
-
-```
-.\tools\dev_deploy.ps1 -SetDevEnvironment     development values
-.\tools\dev_deploy.ps1 -SetPlayEnvironment    shipping values
-```
-
-Restart the game after either. `-Force` deploys into an install that will
-ignore what it is given.
-
-### The pre-push hook
-
-Enable it once per clone:
-
-```
-git config core.hooksPath .githooks
-```
-
-Git does not carry hook configuration through a clone, so a fresh checkout has
-no hooks until this is set.
-
-Pushing `main` then runs the version and changelog check, the documentation
-style check, and the staleness sweep, and refuses the push if any of them
-reports a problem. Pushing a topic branch runs nothing, because a branch in
-progress is allowed to be inconsistent.
-
-The staleness sweep has two scopes, chosen by what is happening rather than by
-what the version looks like.
-
-`build.ps1` and the pre-push hook check the repository's own accuracy: version
-numbers, documented claims, config keys against their documentation, and quoted
-download sizes against the built zip.
-
-`publish_nexus.ps1` also checks the mod page copy and the Files tab entry.
-Those are written once per release, and publishing is the only act that puts
-them in front of anyone. Every merge to `main` takes a plain version and builds
-at it while almost none are published, so gating a build on the page copy would
-stop ordinary work on a document nobody is about to read.
-
-Both scopes can be run by hand:
-
-```
-python tools\pre_release_check.py --merge    repository only
-python tools\pre_release_check.py            repository and mod page
-```
+`flow.ps1 shipping` switches the install to the shipping values and parks every
+loose file; `flow.ps1 test` switches it back. The deploy refuses an install
+configured for play, because at `sys_PakPriority = 2` a deploy, a reload and a
+console command all report success while the game keeps running the packed
+build. Restart the game after either switch.
 
 ## Deploying
 
-```
-.\tools\dev_deploy.ps1 -Reload             push what changed and reload it
-.\tools\dev_deploy.ps1 -Launch             build, install, start the game
-.\tools\dev_deploy.ps1 -NoBuild -Launch    install what was built last
-.\tools\dev_deploy.ps1 -ScriptOnly         push the Lua whether or not it changed
-.\tools\dev_deploy.ps1 -AnimOnly           push the animation data, same
-.\tools\dev_deploy.ps1 -ParkVortexMod      move the Vortex-installed copy to mods_old\
-.\tools\dev_deploy.ps1 -GameRoot "D:\..."  use an install somewhere else
-```
+The game install is found through `KCD_PATH`, then the usual Steam and GOG
+locations, then every Steam library in `libraryfolders.vdf`. A wrong `KCD_PATH`
+stops the run instead of falling through to another install. `build_adb.py`
+resolves the same way.
 
-It installs to `Mods\HorseCollisionMod_dev`, overwriting the last build, and
-launches with `-devmode`. It refuses to run while the game holds its paks open.
-`-Reload`, `-ScriptOnly` and `-AnimOnly` skip that guard, because loose files
-are not locked and can be replaced under a running game.
+With the game closed, `test` builds, installs to `Mods\HorseCollisionMod_dev`,
+overwriting the last build, and copies the loose files; `-Launch` then starts
+the game with `-devmode`. The build is named `<version>-dev`, so it never
+overwrites a release zip.
 
-`-Reload` compares every loose file against its source, copies the ones whose
-contents differ, and runs the console reload for whichever halves moved. It
-reports `nothing changed since the last deploy` when they all match, and says so
-rather than reloading when the game is not running. The comparison is on
-contents rather than timestamps, because `build.ps1` rewrites all four animation
-databases on every run and a Mannequin reload is a visible hitch in the running
-game.
-
-`-ScriptOnly` and `-AnimOnly` name one half and skip the comparison. Use them
-for a file that has been reverted to a state matching the installed copy, or
-when only one subsystem should be disturbed.
+With the game running, the engine holds the installed pak open, so `test`
+copies only the loose files whose contents differ from the repository and runs
+the console reload for whichever halves moved. A change to the testing world
+counts as a script change. It reports `nothing changed since the last deploy`
+when everything matches. The comparison is on contents rather than timestamps,
+because a regeneration rewrites the animation databases and a Mannequin reload
+is a visible hitch in the running game.
 
 Loose files go under `<game>\Data`, mirroring the pak layout:
 
@@ -102,34 +67,30 @@ Data\Scripts\Startup\HorseCollisionMod.lua
 Data\Scripts\Startup\HorseCollisionMod_Settings.lua
 Data\Scripts\HorseCollisionMod\*.lua
 Data\Animations\Mannequin\ADB\*.adb
+Data\Libs\Config\hcm_actionmaps.xml
+Data\Libs\Tables\rpg\*__horsecollisionmod.xml
 ```
 
 The settings file is a Startup script in its own right. Left out, the running
 game reads the packed values while the edited file sits on disk looking
 applied.
 
-A file one level higher is never read, and nothing is logged when that happens.
-
-The game folder is resolved, not hardcoded: `-GameRoot`, then `KCD_PATH`, then
-the usual Steam and GOG locations, then every Steam library in
-`libraryfolders.vdf`. A wrong explicit path stops the run instead of falling
-through to another install. `build_adb.py` resolves the same way, with
-`--game-root`.
+The action map and the tables are read once per session, so a change to either
+takes effect at the next game start.
 
 Releases go through `build.ps1`. The dev folder never ships.
 
 ## The testing world
 
-What a branch changes about the installed settings so a test is not fighting
-the mod's shipping behavior. Riding someone down is legal, a spent horse keeps
-its rider, nobody is pulled down or calls for guards, and a rear or a charge
-frightens nobody; almost every collision test is about the collision, and a
-guard summoned mid-run, or a crowd that scatters before the horse reaches it,
-ends a test that was measuring something else.
+What a branch changes about the installed settings, so a test is not
+interrupted by the mod's shipping behavior. The default, `[dev]` in
+`tools/testworlds.ini`, switches off the crime, the throw from the saddle and
+the bolt on an emptied horse, retaliation and its pull-down and surrender prompt, women
+raising the alarm, and both fear bands.
 
 It is branch state. `flow.ps1 branch` seeds the default, every `test`
 re-applies it, anything asked for on a later `test` is added to it, and `land`
-clears it. A value given once does not evaporate on the next deploy.
+clears it.
 
 ```
 tools/flow.ps1 world                              what is live
@@ -140,10 +101,8 @@ tools/flow.ps1 test -Unset CollisionIsCrime       drop one
 tools/flow.ps1 test -Shipped                      carry nothing
 ```
 
-Anything in the settings file can be set, including a member of a table, so a
-new kind of test never needs a new switch. Named worlds live in
-`tools/testworlds.ini` as data: adding one is an edit to that file and nothing
-else.
+Anything in the settings file can be set, including a member of a table. Named
+worlds live in `tools/testworlds.ini` as data.
 
 ### How it reaches the game
 
@@ -153,32 +112,33 @@ order, so it runs after `HorseCollisionMod_Settings.lua` and assigns into the
 same global; the mod then applies it through `ApplySettings` with the same type
 checking and without knowing it exists.
 
-Three things follow from that shape. Nothing can ship it, because `build.ps1`
-packs from `src/`, which never holds it. Table members work, which a regex over
-the settings file could not do once everything per-tier moved into tables. And
-the installed settings stay byte-identical to the repository, so the deploy's
-own verification is exact rather than having to forgive the values it patched.
+Nothing can ship it, because `build.ps1` packs from `src/`, which never holds
+it. The installed settings stay byte-identical to the repository, so the
+deploy's own verification is exact.
 
-The world announces itself in `kcd.log` at load:
+The world is written to `kcd.log` at load, as the record of what a run was
+measured against:
 
 ```
 [HorseCollisionMod] test world: CollisionIsCrime=false, Retaliation=false
 ```
-
-That line is the record of what a run was measured against. A world nobody
-could see is how a setting stays on through the next three tests.
 
 ## The remote console
 
 CryEngine listens on port 4600 and streams console output back.
 
 ```
-python tools\dev_console.py --listen           watch the log stream live
-python tools\dev_console.py --reload           reload the mod's Lua
-python tools\dev_console.py --anim-reload      reload the Mannequin databases
-python tools\dev_console.py --commands         dump every command and CVar
-python tools\dev_console.py "MemInfo"          run one command
-python tools\dev_console.py --lua "CODE"       evaluate Lua in the running game
+python tools\dev_console.py --listen          watch the log stream live
+python tools\dev_console.py --reload          reload the mod's Lua
+python tools\dev_console.py --anim-reload     reload the Mannequin databases
+python tools\dev_console.py --commands        dump every command and CVar
+python tools\dev_console.py "MemInfo"         run one command
+python tools\dev_console.py --lua "CODE"      evaluate Lua in the running game
+python tools\dev_console.py --file PATH       evaluate a Lua file as one chunk
+python tools\dev_console.py --ride            start the survival loop for a ride
+python tools\dev_console.py --wait SECONDS    keep reading after the command
+python tools\dev_console.py --diagnose        turn on console output, read it back
+python tools\dev_console.py --raw             dump every byte received
 ```
 
 `--lua` reads and writes the mod's live state:
@@ -192,22 +152,22 @@ Verbosity is raised on connect, since it resets on every game restart;
 `--verbose` raises it further for engine-level messages.
 
 Cheat-marked commands, `lua_reload_script` among them, need `-devmode`, which
-`dev_deploy.ps1` passes.
+`flow.ps1 test -Launch` passes.
 
 ## The loop
 
 ```
-.\tools\dev_deploy.ps1 -Launch      once, at the start of a session
+.\tools\flow.ps1 test -Launch    once, at the start of a session
 
                               edit src/, or regenerate the databases
-.\tools\dev_deploy.ps1 -Reload      push what moved, reload it live
+.\tools\flow.ps1 test            push what moved, reload it live
 ```
 
 Both halves can change in one pass, and Mannequin is reloaded before the Lua, so
 the detection loop restarts against databases that are already current. Nothing
 here restarts the game.
 
-`--reload` re-executes the settings file and the mod script, then calls the
+The Lua reload re-executes the settings file and the mod script, then calls the
 mod's entry point:
 
 ```
@@ -219,89 +179,71 @@ listener, so a bare re-execution leaves the mod silent until a save is loaded. A
 successful reload ends with:
 
 ```
-[log] [HorseCollisionMod] Load screen ended. v3.0.0 initializing physics timer loop 1
+[log] [HorseCollisionMod] Load screen ended. v<version> initializing physics timer loop 1
 ```
 
 ## Tests that need game time
 
-The in-game wait dialog caps at 24 hours, runs at about four real minutes a
-day, and in hardcore it also demands food and a bed. None of that is
-necessary.
+`Calendar` is a Lua global and world time is directly settable, so the in-game
+wait dialog is not needed:
 
-It is not necessary. `Calendar` is a Lua global and world time is directly
-settable:
-
-    python tools/dev_survival.lua-style setup, then
-    python tools/dev_console.py --file tools/dev_time.lua
+```
+python tools\dev_console.py --file tools\dev_survival.lua
+python tools\dev_console.py --file tools\dev_time.lua
+```
 
 `dev_time.lua` carries an `HOURS` value at the top; 24 moves a full day in one
-call, verified moving day 38 to day 39 instantly. Setting `RATIO` instead
-leaves ordinary time running fast rather than jumping, for a measurement that
-needs the world to tick rather than to arrive. The shipped ratio is 15.
+call. Setting `RATIO` instead leaves ordinary time running fast rather than
+jumping. The shipped ratio is 15.
 
-Run `tools/dev_survival.lua` alongside it, which holds nourishment and energy
-at 100, so a multi-day skip does not turn into an errand.
-
-Neither survives a save load. Re-run both after one.
+`dev_survival.lua` holds nourishment and energy at 100, so a multi-day skip in
+hardcore needs no food or bed. Neither survives a save load; re-run both after
+one.
 
 ## Landing a branch
 
-The version lives in fourteen places: `src/mod.manifest`, the
-`HorseCollisionMod.Version` assignment, and an `@release` tag in the entry
-point and each of the thirteen part files. `build.ps1` refuses a release if any
-of them disagrees.
+```
+.\tools\flow.ps1 land "msg"
+```
 
-One command writes all of them, and dates the changelog section at the same
-time:
+It checks the documentation style and the testing diary, and runs
+`pre_release_check.py`, which regenerates a stale API reference. It then sets
+the version from `CHANGELOG.md` with `set_version.py`, builds, commits, merges
+into `main`, tags and pushes. Last, it deletes every local branch already
+merged into `main` and clears the testing world. `-NoPush` stops before the push.
 
-    python tools/set_version.py            derive the next version and apply it
-    python tools/set_version.py X.Y.Z      apply one explicitly
-    python tools/set_version.py --check    report without writing
+The version lives in `src/mod.manifest` and the `HorseCollisionMod.Version`
+assignment, and `build.ps1` refuses a release if either disagrees.
+`set_version.py` writes both and dates the changelog section:
 
-Deriving uses the same rule the build enforces: the newest tag, bumped by what
-the entries under `## [Unreleased]` call for. Applying it also moves those
-entries under a dated heading for the new version, which is the step the
-workflow requires when a branch merges.
+```
+python tools\set_version.py            derive the next version and apply it
+python tools\set_version.py X.Y.Z      apply one explicitly
+python tools\set_version.py --check    report without writing
+```
 
-So a branch lands like this:
+Deriving uses the rule the build enforces: the newest tag older than the build
+target, bumped by what the entries under `## [Unreleased]` call for.
 
-    python tools/set_version.py
-    ldoc .
-    .\build.ps1 -Version <the version it printed>
-    git add -A && git commit
-    git checkout main && git merge --no-ff <branch>
-    git tag -a v<version> -m "..."
-    git push origin main --follow-tags
-    git branch -d <branch> && git branch --merged main | prune the rest
+### Staleness checks
 
-`tools/flow.ps1 land` does all of that, including the last line: after a
-successful push it deletes the branch it landed and every other local branch
-already merged into `main`. `git branch --merged main` is safe by construction,
-because a branch appears there only once `main` contains all of its commits, and
-`-d` refuses anything that is not truly merged. Pruning is part of landing rather
-than a separate tidy-up, so merged branches never accumulate.
+`build.ps1` checks the repository's own accuracy: version numbers, documented
+claims, config keys against their documentation, the layout blocks, and quoted
+download sizes against the built zip. `publish_nexus.ps1` also checks the mod
+page copy and the Files tab entry, which only publishing puts in front of
+anyone.
 
-`ldoc .` belongs in that order because the staleness check compares **commit**
-times rather than file times, so the regenerated pages have to be committed
-alongside the sources they describe. Regenerating after the commit leaves the
-check failing on the next build.
-
-### Two things that used to bite
-
-Rebuilding a version that is already tagged works. The version check compares
-against the newest tag *older than* the build target, so `dev_deploy.ps1` runs
-normally after a merge; it used to fail against the tag it had just created
-and needed `-NoBuild` to get past.
-
-A version mismatch reports every file at once. It used to fail on the first,
-which turned a bump into a build-fix-build cycle repeated once per file.
+```
+python tools\pre_release_check.py --merge    repository only
+python tools\pre_release_check.py            repository and mod page
+```
 
 ## Testing a packaged build
 
 The loop above runs on loose files. A player runs on paks only, where a pak with
 wrong entry names or reference paths overrides nothing and logs nothing.
 
-Before publishing, test the zip as one:
+`flow.ps1 shipping` sets up that state before publishing:
 
 - `sys_PakPriority = 2` and `mn_allowEditableDatabasesInPureGame = 0`, both
   shipping defaults
@@ -324,3 +266,55 @@ luarocks install ldoc
 ```
 
 The compiler is only needed for that install.
+
+## Tools
+
+Every tool resolves paths from the repository root and runs from any directory.
+
+```
+tools/
+  flow.ps1                the workflow's verbs: status, branch, test, world,
+                          shipping, land
+  dev_deploy.ps1          flow's internal deploy helper
+  game_root.ps1           resolves the game install for the PowerShell tools
+  build_adb.py            generates the human animation databases from the
+                          game install
+  check_tiers.lua         refuses a tier table in the settings file that
+                          differs from the one in Tiers.lua
+  testworld.py            writes the testing world into the development install
+  testworlds.ini          named testing worlds
+  dev_console.py          talks to the running game over its remote console
+  pre_release_check.py    finds claims the repository makes that are not true
+  version_check.py        derives the next version from CHANGELOG.md
+  set_version.py          writes the version and dates the changelog section
+  audit_code.py           reports unread settings, uncalled functions and
+                          unused tables
+  verify_additive.py      checks the release's animation layout and file set
+  nexus_settings_block.py generates the mod page's settings block and the
+                          README settings table from the settings file
+  publish_nexus.ps1       uploads a built release to the Nexus Mods page
+  bark_chain.py           walks a bark set from metarole to role to topic to
+                          sequences, with each line's cooldown
+  bark_lines.py           prints the English text of a vanilla bark set, or
+                          finds the set holding a remembered line
+  bark_alias.py           prints any topic addressable by alias, with its
+                          lines, speakers and word counts
+  henry_impact_lines.py   every line Henry can be made to say
+  npc_pain_sets.py        every NPC bark set whose sequences are all
+                          unconditional
+  probe_api.lua           lists the methods an object exposes in the running
+                          game
+  probe_bark.lua          tests whether a vanilla line can be triggered from Lua
+  probe_camera.lua        polls the first-person camera through a view shake
+  probe_gait_speed.lua    reports the mounted horse's speed plateau per gait
+  probe_health.lua        logs one entity's health whenever it changes
+  probe_inventory.lua     lists what a named entity carries
+  probe_tables.lua        dumps a game table through the Database bind
+  dev_peace.lua           stops the world reacting to the player
+  dev_survival.lua        holds the player's nourishment and energy at 100
+  dev_time.lua            moves game time forward through the Calendar global
+  dev_horse.lua           gives the player a rideable horse
+  dev_fasthorse.lua       gives the player the fastest horse in the level
+  dev_barding.lua         puts a set of barding on the player's horse
+  dev_watchfight.lua      samples everyone near the player once a second
+```

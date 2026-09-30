@@ -13,8 +13,8 @@ import os
 import re
 import shutil
 import subprocess
-import tempfile
 import sys
+import time
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -22,8 +22,15 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # there. The changelog is a history of releases for the same reason.
 VERSION_EXEMPT = {"docs/TESTING_DIARY.md", "CHANGELOG.md"}
 
+# Version numbers that are not this project's: the specifications the
+# changelog follows, and the game release the manifest once named.
+SEMVER_SPEC = "2.0.0"
+KEEP_A_CHANGELOG_SPEC = "1.1.0"
+GAME_1_9_7 = "1.9.7"
+FOREIGN_VERSIONS = {SEMVER_SPEC, KEEP_A_CHANGELOG_SPEC, GAME_1_9_7}
+
 # Prose that claims something the reader can check, and that goes stale when
-# the design moves. Each of these has been wrong in this repository.
+# the design moves.
 STALE_CLAIMS = [
     (r"\bships? (?:a )?full replacements?\b|\breplaces the (?:vanilla )?"
      r"animation databases\b",
@@ -39,7 +46,9 @@ def tracked_files():
         ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
         cwd=REPO_ROOT, capture_output=True, text=True).stdout
 
-    return sorted(p for p in out.splitlines() if p)
+    # A file deleted but not yet staged is still listed; it has nothing to check.
+    return sorted(p for p in out.splitlines()
+                  if p and os.path.exists(os.path.join(REPO_ROOT, p)))
 
 
 def read(path):
@@ -85,9 +94,7 @@ def check_versions(paths, version):
             for m in re.finditer(r"\b(\d+\.\d+\.\d+)(?![\w.-])", line):
                 other = m.group(1)
 
-                # Semantic Versioning itself, and the game's own version, are
-                # not this project's version.
-                if other in (version, "2.0.0", "1.9.7", "1.1.0", "3.0.3"):
+                if other == version or other in FOREIGN_VERSIONS:
                     continue
 
                 # The version under development, with its prerelease suffix
@@ -192,9 +199,7 @@ def check_config_docs():
 def check_release_notes(version):
     """The changelog text a release publishes with.
 
-    The Files tab entry has always been checked; the changelog never was,
-    because the field is optional on the upload. 4.2.2 published with an empty
-    one for exactly that reason.
+    The field is optional on the upload, so nothing else asks for it.
     """
     path = os.path.join("releases", "notes-%s.md" % version)
 
@@ -235,10 +240,8 @@ def check_nexus_page(version):
         return found
 
     # Settings are indented inside the block and its section headings are not,
-    # so an unindented word is "Force" or "Behavior" rather than a key. Matching
-    # from column zero collected every heading and no setting, which reported
-    # the page as missing all twenty-nine keys it actually documents.
-    listed = set(re.findall(r"^[ 	]{2,}(\w+)\s{2,}", block.group(1), re.M))
+    # so an unindented word is "Force" or "Behavior" rather than a key.
+    listed = set(re.findall(r"^[ \t]{2,}(\w+)\s{2,}", block.group(1), re.M))
 
     # Only the player-facing half of the settings file is the page's business.
     # Everything after the banner is exposed for completeness: internals, tuning
@@ -247,12 +250,12 @@ def check_nexus_page(version):
     # downloading would bury the settings that actually matter, so the
     # comparison stops at the banner.
     settings = read(os.path.join("src", "HorseCollisionMod_Settings.lua"))
-    banner = settings.find("	-- =====")
+    banner = settings.find("\t-- =====")
 
     if banner != -1:
         settings = settings[:banner]
 
-    shipped = set(re.findall(r"^	(\w+)\s*=", settings, re.M))
+    shipped = set(re.findall(r"^\t(\w+)\s*=", settings, re.M))
 
     for key in sorted(listed - shipped):
         found.append((page_path, 0, key, "page documents a setting that does "
@@ -308,16 +311,17 @@ def check_download_size(paths, version):
     return found
 
 
-def readme_layout():
-    """The paths listed in the README's repository layout block.
+def layout_block(path, heading):
+    """The paths listed in a document's layout block.
 
-    The block is indented by directory: a line at the left margin ending in a
-    slash opens a directory, indented lines under it are its members, and a
-    line at the left margin without a slash is a file in the root.
+    The block is the first fenced block under `heading`. It is indented by
+    directory: a line at the left margin ending in a slash opens a directory,
+    indented lines under it are its members, and a line at the left margin
+    without a slash is a file in the root.
     """
-    text = read("README.md")
-    m = re.search(r"^## Repository layout\s*\n+```\n(.*?)^```", text,
-                  re.S | re.M)
+    text = read(path)
+    m = re.search(r"^## " + re.escape(heading) + r"\s*\n[^#]*?^```\n(.*?)^```",
+                  text, re.S | re.M)
 
     if not m:
         return None
@@ -358,10 +362,6 @@ def check_supported_game_version():
     version the manifest does not name gets a mod that never loads, with
     nothing in game to say why.
 
-    That happened: the manifest named 1.9.7 exactly, the game shipped 1.9.8,
-    and the mod simply did not run for anyone who had patched. A minor patch
-    that touches nothing this mod uses should not do that.
-
     The loader offers three ways to be enabled, all present in WHGame.dll:
     no `supports` block at all, an exact match, or a wildcard. Only the last
     two are a claim, and only a wildcard survives a patch.
@@ -392,47 +392,53 @@ def check_supported_game_version():
              " supports block")]
 
 
-def check_readme_layout():
-    """The README's repository layout against what the repository holds.
+# Each layout block and the tree it must list completely: the README's
+# repository layout covers src/, and the development loop's catalog covers
+# tools/. Those are where files are added, so a missing entry there means the
+# description is wrong rather than merely brief.
+LAYOUTS = (
+    ("README.md", "Repository layout", "src/"),
+    ("docs/DEV_LOOP.md", "Tools", "tools/"),
+)
 
-    A layout block is the first thing a reader trusts and the first thing to
-    rot, because adding a file is not a moment anyone thinks about the README.
-    Only src and tools are required to be complete: they are where files are
-    added, and a missing entry there means the description is wrong rather
-    than merely brief.
+
+def check_layouts():
+    """Each layout block against what the repository holds.
 
     A listed directory covers what is inside it. The mod's Lua is split across
-    a directory of part files that grows one file at a time, and a layout block
-    that named every one would say less than a line describing the directory.
+    a directory of part files, and a line describing the directory says more
+    than a list of every file in it.
     """
-    listed = readme_layout()
-
-    if listed is None:
-        return [("README.md", 0, "layout", "no repository layout block")]
-
     found = []
-    directories = sorted(n for n in listed if n.endswith("/"))
-
-    for name in sorted(listed):
-        if not os.path.exists(os.path.join(REPO_ROOT, name)):
-            found.append(("README.md", 0, name,
-                          "the layout lists a %s that does not exist"
-                          % ("directory" if name.endswith("/") else "file")))
-
     tracked = set(tracked_files())
 
-    for path in sorted(tracked):
-        if not path.startswith(("src/", "tools/")):
+    for doc, heading, tree in LAYOUTS:
+        listed = layout_block(doc, heading)
+
+        if listed is None:
+            found.append((doc, 0, heading, "no layout block"))
             continue
 
-        if os.path.basename(path).startswith("__"):
-            continue
+        directories = sorted(n for n in listed if n.endswith("/"))
 
-        if path in listed or any(path.startswith(d) for d in directories):
-            continue
+        for name in sorted(listed):
+            if not os.path.exists(os.path.join(REPO_ROOT, name)):
+                found.append((doc, 0, name,
+                              "the layout lists a %s that does not exist"
+                              % ("directory" if name.endswith("/")
+                                 else "file")))
 
-        found.append(("README.md", 0, path,
-                      "tracked but missing from the layout"))
+        for path in sorted(tracked):
+            if not path.startswith(tree):
+                continue
+
+            if os.path.basename(path).startswith("__"):
+                continue
+
+            if path in listed or any(path.startswith(d) for d in directories):
+                continue
+
+            found.append((doc, 0, path, "tracked but missing from the layout"))
 
     return found
 
@@ -484,21 +490,9 @@ def check_generated_docs():
     silently: the source grows new functions and fields and the published
     reference keeps describing the old surface.
 
-    This regenerates into a temporary directory and compares. Nothing is
-    inferred from timestamps.
-
-    Commit times were the previous approach and they do not work here. LDoc
-    writes a page per module and git records a commit only for the ones whose
-    bytes changed, so a page that is already correct keeps whatever commit last
-    altered it. A version bump rewrites an `@release` tag in every source file
-    and changes no generated page at all, since the version does not appear in
-    the output; the sources then carry a newer commit than every page and the
-    check fired on a repository whose reference was perfectly current, with no
-    way to satisfy it except touching files to no purpose.
-
-    That is the state this report's own closing line warns against. Comparing
-    the artifact against what would be generated answers the real question and
-    cannot produce that false positive.
+    It regenerates the pages and compares them with what is committed, and
+    reports any page in docs/api that LDoc no longer writes, since LDoc never
+    deletes one.
 
     When LDoc is not installed the check reports nothing rather than guessing.
     It is a documentation generator, not a build dependency, and a developer
@@ -511,9 +505,7 @@ def check_generated_docs():
 
     # Resolved through shutil.which rather than named directly. On Windows
     # LDoc installs as ldoc.bat, and subprocess does not apply PATHEXT to a
-    # bare name, so running "ldoc" raised OSError on the machine that has it
-    # installed and the check quietly passed. A check that never fires is
-    # worse than the one it replaced.
+    # bare name.
     ldoc = shutil.which("ldoc")
 
     if not ldoc:
@@ -526,9 +518,14 @@ def check_generated_docs():
     # tidier form cannot be trusted to answer the question.
     #
     # The working tree is therefore touched, and deliberately: if the pages
-    # were out of date they are now correct and only need committing, which is
-    # what the instruction would have been anyway. If they were already correct
-    # nothing changes, because LDoc is deterministic.
+    # were out of date the run has corrected them and they only need
+    # committing, which is what the instruction would have been anyway. If
+    # they were already correct nothing changes, because LDoc is deterministic.
+    #
+    # LDoc rewrites every page it produces, so a file older than the run is
+    # one it no longer produces. The margin allows for file systems that
+    # store modification times at a coarse resolution.
+    started = time.time() - 2
     run = subprocess.run([ldoc, "."], cwd=REPO_ROOT, capture_output=True,
                          text=True)
 
@@ -537,10 +534,26 @@ def check_generated_docs():
         return [("docs/api", 0, "ldoc failed",
                  tail[-1] if tail else "ldoc exited non-zero")]
 
+    orphans = []
+
+    for folder, _dirs, names in os.walk(api):
+        for name in names:
+            full = os.path.join(folder, name)
+
+            if os.path.getmtime(full) < started:
+                orphans.append((os.path.relpath(full, REPO_ROOT)
+                                .replace(os.sep, "/"), 0, "orphan",
+                                "LDoc no longer generates this page; "
+                                "delete it"))
+
     # LDoc stamps "Last updated <timestamp>" into every page, so a byte
     # comparison says every page changed on every run and the check would fire
     # forever. Only differences other than that line mean anything.
-    diff = subprocess.run(["git", "diff", "--no-color", "--", "docs/api"],
+    #
+    # --text, because .gitattributes marks docs/api -diff, and without it git
+    # reports each changed page as a binary difference with no lines to read.
+    diff = subprocess.run(["git", "diff", "--text", "--no-color", "--",
+                           "docs/api"],
                           cwd=REPO_ROOT, capture_output=True,
                           text=True).stdout
 
@@ -565,9 +578,9 @@ def check_generated_docs():
         subprocess.run(["git", "checkout", "--", "docs/api"], cwd=REPO_ROOT,
                        capture_output=True, text=True)
 
-        return []
+        return orphans
 
-    return [(real[0], 0, "stale",
+    return orphans + [(real[0], 0, "stale",
              "%d generated page(s) were out of date and have been "
              "regenerated; commit docs/api" % len(real))]
 
@@ -639,7 +652,7 @@ def main():
                 + check_links(paths)
                 + check_config_docs()
                 + check_supported_game_version()
-                + check_readme_layout()
+                + check_layouts()
                 + check_readme_settings()
                 + check_generated_docs()
                 + ([] if merge_only else check_release_notes(version))

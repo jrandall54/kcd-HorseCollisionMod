@@ -41,6 +41,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -55,6 +57,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -69,14 +73,13 @@
  and something has to wait for that moment and then put the game back in
  charge of them.</p>
 
-<p> The two waits poll <code>actor:GetCurrentAnimationState</code>, which is the only
- signal the engine offers for either transition: <code>AnimationControlled</code> while
- one of this mod's clips is playing, <code>BlendRagdoll</code> while physics owns the
- body. Both carry a ceiling, because neither state is guaranteed to be
- observed at all, and a wait that never ends would strand the victim
- permanently.</p>
+<p> The waits here poll either <code>actor:GetCurrentAnimationState</code> or the body
+ itself. <code>AnimationControlled</code> means one of this mod's clips is playing;
+ <code>BlendRagdoll</code> is the get-up on a fall tier and the whole time down on a
+ ragdoll tier. Every wait carries a ceiling, because no state is guaranteed
+ to be observed at all, and a wait that never ends would strand the victim.</p>
 
-<p> <code>ReleaseActorMovement</code> is here rather than with the reaction that needs it
+<p> <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:ReleaseActorMovement">ReleaseActorMovement</a> is here rather than with the reaction that needs it
  because its ordering belongs to the recovery: it must run on the tick after
  the action starts, never before, or the fragment's own movement control
  overwrites it and the call does nothing.</p>
@@ -85,23 +88,6 @@
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  5.11.3
- Stops the animation driving an actor's own movement.</p>
-
-<p> <code>actor:SetMovementControlledByAnimation</code> is the runtime equivalent of a
- fragment's <code>MovementControlMethod</code> layer, and it is the only lever that
- applies to one actor rather than to every option in the database. Turning
- it off leaves the actor on entity-driven movement, which is the state
- vanilla's own hit reactions play in and the reason they respect geometry an
- interactive action passes through.</p>
-
-<p> Called on the tick after the action starts, never before it. An interactive
- action applies the fragment's own movement control as it begins, so a call
- made ahead of it is overwritten and does nothing at all: victims clipped
- into walls exactly as they did without it.</p>
-
-<p> Written for victims and used by the rear charge as well, where the actor is
- the horse. The two want it at different moments, so the caller decides when.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -109,14 +95,44 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#returns...">returns... (ent[, what])</a></td>
-	<td class="summary">
-
-</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ReleaseActorMovement">HorseCollisionMod:ReleaseActorMovement (ent[, what])</a></td>
+	<td class="summary">Stops the animation driving an actor's own movement.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:WhenRagdollResolves">HorseCollisionMod:WhenRagdollResolves (npc, fn)</a></td>
-	<td class="summary">Runs something once a victim is no longer a settling ragdoll.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RecordStandingHeight">HorseCollisionMod:RecordStandingHeight (npc)</a></td>
+	<td class="summary">How high a victim carries their body when they are on their feet.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:DisarmVictim">HorseCollisionMod:DisarmVictim (npc)</a></td>
+	<td class="summary">Holsters a victim's drawn weapon before a fall, and marks it for redrawing.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearmVictim">HorseCollisionMod:RearmVictim (npc)</a></td>
+	<td class="summary">Draws a victim's weapon again if <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:DisarmVictim">DisarmVictim</a> holstered it.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsVictimFlat">HorseCollisionMod:IsVictimFlat (npc)</a></td>
+	<td class="summary">Whether a victim is lying flat rather than upright or getting up.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:WhenVictimRises">HorseCollisionMod:WhenVictimRises (npc, fn)</a></td>
+	<td class="summary">Runs something the moment a victim stops lying flat and starts to rise.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsRagdollState">HorseCollisionMod:IsRagdollState (state)</a></td>
+	<td class="summary">Whether an animation state means the body is in a ragdoll.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:HasFallPending">HorseCollisionMod:HasFallPending (npc)</a></td>
+	<td class="summary">Whether a victim's last fall clip has yet handed them to physics.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:WatchFallHandover">HorseCollisionMod:WatchFallHandover (npc)</a></td>
+	<td class="summary">Marks a handover as in flight, and clears it when the body ragdolls.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:WhenVictimIsUp">HorseCollisionMod:WhenVictimIsUp (npc, fn)</a></td>
+	<td class="summary">Runs something once a victim has finished getting up.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:WhenBodyStops">HorseCollisionMod:WhenBodyStops (npc, fn)</a></td>
@@ -131,10 +147,6 @@
 	<td class="summary">Records every animation state a victim passes through while recovering.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:WatchTurn">HorseCollisionMod:WatchTurn (npc, action)</a></td>
-	<td class="summary">Measures how far a victim has turned once the whole recovery is over.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ReplanIfStranded">HorseCollisionMod:ReplanIfStranded (npc)</a></td>
 	<td class="summary">Replans a victim only when the game has not recovered them itself.</td>
 	</tr>
@@ -146,18 +158,6 @@
 	<td class="name" nowrap><a href="#HorseCollisionMod:RebuildVictim">HorseCollisionMod:RebuildVictim (npc)</a></td>
 	<td class="summary">Rebuilds a victim so their own behavior reattaches to their body.</td>
 	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ImpactIsNewContact">HorseCollisionMod:ImpactIsNewContact (npcId, now)</a></td>
-	<td class="summary">Whether enough time has passed since this victim was last scored.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:HitReadyApplies">HorseCollisionMod:HitReadyApplies (tierName)</a></td>
-	<td class="summary">Whether a tier waits for a victim to be ready before it will land.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:WatchHitReady">HorseCollisionMod:WatchHitReady (npc, npcId, tierName)</a></td>
-	<td class="summary">Clears a victim's hit cooldown when they are back on their feet.</td>
-	</tr>
 </table>
 
 <br/>
@@ -168,13 +168,25 @@
 
     <dl class="function">
     <dt>
-    <a name = "returns..."></a>
-    <strong>returns... (ent[, what])</strong>
+    <a name = "HorseCollisionMod:ReleaseActorMovement"></a>
+    <strong>HorseCollisionMod:ReleaseActorMovement (ent[, what])</strong>
     </dt>
     <dd>
+    Stops the animation driving an actor's own movement. </p>
 
+<p> <code>actor:SetMovementControlledByAnimation</code> is the runtime equivalent of a
+ fragment's <code>MovementControlMethod</code> layer, and it is the only lever that
+ applies to one actor rather than to every option in the database. Turning
+ it off leaves the actor on entity-driven movement, which is the state
+ vanilla's own hit reactions play in and the reason they respect geometry an
+ interactive action passes through.</p>
 
+<p> Called on the tick after the action starts, never before it. An interactive
+ action applies the fragment's own movement control as it begins, so a call
+ made ahead of it is overwritten and does nothing.</p>
 
+<p> Written for victims and used by the rear charge as well, where the actor is
+ the horse. The two want it at different moments, so the caller decides when.
 
 
     <h3>Parameters:</h3>
@@ -202,20 +214,264 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:WhenRagdollResolves"></a>
-    <strong>HorseCollisionMod:WhenRagdollResolves (npc, fn)</strong>
+    <a name = "HorseCollisionMod:RecordStandingHeight"></a>
+    <strong>HorseCollisionMod:RecordStandingHeight (npc)</strong>
     </dt>
     <dd>
-    Runs something once a victim is no longer a settling ragdoll. </p>
+    How high a victim carries their body when they are on their feet. </p>
 
-<p> <code>GetPhysicalizationProfile</code> is not usable for this: measured through a whole
- ragdoll sequence it read <code>alive</code> from start to finish. The animation state
- does report <code>BlendRagdoll</code> while the body is being blended back, so that is
- what is watched instead.</p>
+<p> The reading is the physics body's center-of-mass height above the entity
+ origin, which tracks posture. The tallest reading ever seen is kept, taken
+ at every impact, so a first reading off a body already down corrects itself
+ the first time the victim stands. It is the reference every later check is
+ read against, so nothing here is a number anybody chose.
 
-<p> The state has to be seen before its absence counts, for the same reason the
- reaction wait requires it: a poll landing before the ragdoll takes hold
- would otherwise report a recovery that has not started as already over.
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:DisarmVictim"></a>
+    <strong>HorseCollisionMod:DisarmVictim (npc)</strong>
+    </dt>
+    <dd>
+    Holsters a victim's drawn weapon before a fall, and marks it for redrawing. </p>
+
+<p> A drawn weapon on a body on the ground glitches its IK.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:RearmVictim"></a>
+    <strong>HorseCollisionMod:RearmVictim (npc)</strong>
+    </dt>
+    <dd>
+    Draws a victim's weapon again if <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:DisarmVictim">DisarmVictim</a> holstered it.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:IsVictimFlat"></a>
+    <strong>HorseCollisionMod:IsVictimFlat (npc)</strong>
+    </dt>
+    <dd>
+    Whether a victim is lying flat rather than upright or getting up. </p>
+
+<p> The single answer to "can this body take an animation right now", read from
+ the body rather than a clock. <code>headUp</code> is the height <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:RecordStandingHeight">RecordStandingHeight</a>
+ reads. Traced through a trot knockdown:</p>
+
+<pre><code> t+0000ms  AnimationControlled  headUp 1.55   upright, the impact lands
+ t+0624ms  AnimationControlled  headUp 0.94   falling
+ t+1840ms  AnimationControlled  headUp 0.15   flat
+ t+2448ms  MotionIdle           headUp 0.15   flat
+ t+3072ms  MotionIdle           headUp 0.15   flat
+ t+3664ms  BlendRagdoll         headUp 0.27   rising
+ t+4880ms  BlendRagdoll         headUp 1.21   rising
+ t+5472ms  BlendRagdoll         headUp 1.59   standing
+</code></pre>
+
+<p> On a fall tier <code>BlendRagdoll</code> is the get-up, and the flat stretch includes
+ <code>MotionIdle</code>, which no state test can tell from a person standing idle. On
+ a ragdoll tier the victim is in <code>BlendRagdoll</code> the whole time they are down
+ and the height reads as standing, so this test cannot see them flat;
+ <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:WhenVictimRises">WhenVictimRises</a> uses the ragdoll state for those tiers.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+        <li>
+           <span class="types"><span class="type">boolean</span></span>
+        true while they are flat on the ground</li>
+        <li>
+           <span class="types"><span class="type">number</span></span>
+        the current height, or -1 when unreadable</li>
+        <li>
+           <span class="types"><span class="type">number</span></span>
+        the recorded standing height, or -1 when none is recorded</li>
+        <li>
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the animation state, <code>&quot;unrecorded&quot;</code> or <code>&quot;?&quot;</code></li>
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:WhenVictimRises"></a>
+    <strong>HorseCollisionMod:WhenVictimRises (npc, fn)</strong>
+    </dt>
+    <dd>
+    Runs something the moment a victim stops lying flat and starts to rise. </p>
+
+<p> The middle of a get-up, which a recovery line and the deferred crime want
+ to land on. Waiting for the reaction to end fires while the victim is still
+ on the ground, and waiting for <code>BlendRagdoll</code> to end fires once they are
+ already walking.</p>
+
+<p> Two signals, one per kind of tier. On a fall tier the height test serves:
+ the body reads about 0.15 m flat and 1.59 m standing, so leaving flat is
+ the instant wanted, and flat has to be seen before its absence counts, or
+ a poll before the body reaches the ground would report a rise already
+ over. On a ragdoll tier the height test cannot see the victim flat, and the
+ ragdoll state serves instead: it fires the first time the victim is seen in
+ it, 1.7 to 2.0 s after impact.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">fn</span>
+            <span class="types"><span class="type">function</span></span>
+         called with the reason and the wait in milliseconds
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:IsRagdollState"></a>
+    <strong>HorseCollisionMod:IsRagdollState (state)</strong>
+    </dt>
+    <dd>
+    Whether an animation state means the body is in a ragdoll.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">state</span>
+            <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         an animation state name
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when the body is ragdolling
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:HasFallPending"></a>
+    <strong>HorseCollisionMod:HasFallPending (npc)</strong>
+    </dt>
+    <dd>
+    Whether a victim's last fall clip has yet handed them to physics. </p>
+
+<p> True from the moment a <code>hcm_fall_</code> clip starts until the body is seen in a
+ ragdoll state, or until the wait gives up on it. A second clip started in
+ that window cancels the handover the first one was carrying, and the
+ canceled handover lands later against whatever the victim is doing then.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true while a handover is in flight
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:WatchFallHandover"></a>
+    <strong>HorseCollisionMod:WatchFallHandover (npc)</strong>
+    </dt>
+    <dd>
+    Marks a handover as in flight, and clears it when the body ragdolls.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:WhenVictimIsUp"></a>
+    <strong>HorseCollisionMod:WhenVictimIsUp (npc, fn)</strong>
+    </dt>
+    <dd>
+    Runs something once a victim has finished getting up. </p>
+
+<p> It watches for the ragdoll state and fires when that state ends, which is
+ the victim standing, on either kind of tier. <code>GetPhysicalizationProfile</code> is
+ no use here: it reads <code>alive</code> from the impact to standing.</p>
+
+<p> The state has to be seen before its absence counts. A poll landing before
+ the get-up begins would otherwise report a recovery that has not started as
+ already finished.
 
 
     <h3>Parameters:</h3>
@@ -242,17 +498,15 @@
     <dd>
     Runs something the moment a victim's body stops moving. </p>
 
-<p> Rest is the same thing <code>ImpactThrow</code> already means by it: the body has moved
- less than <code>RestStillMeters</code> since the last poll. Read from position rather
- than from <code>GetVelocity</code>, and rather than from the animation state, because
- <code>BlendRagdoll</code> never appears on a victim the impact killed.</p>
+<p> Rest means the entity has moved less than <code>RestStillMeters</code> since the last
+ poll. Read from position rather than from the animation state, because
+ <code>BlendRagdoll</code> never appears on a victim the impact killed. The entity
+ position does not track how far a ragdoll travels, but it moves until the
+ body settles, which is what timing the rest needs.</p>
 
-<p> Exact position equality is the stricter test and is the wrong one. A body
- only returns identical coordinates once the physics has fully slept, and a
- settled body keeps micro-jittering well past the point it has visibly
- stopped: measured against the throw's own reading, equality fired between
- 400ms and 1150ms late, which the rider saw as the damage landing long after
- the body came to rest.</p>
+<p> Exact position equality would be the wrong test: a body only returns
+ identical coordinates once the physics has fully slept, and a settled body
+ keeps micro-jittering well past the point it has visibly stopped.</p>
 
 <p> The body has to be seen moving before stillness counts, or a victim struck
  while standing still is reported at rest on the first poll, before the
@@ -285,7 +539,11 @@
     <strong>HorseCollisionMod:FinishRecovery (npc, action, why, waited)</strong>
     </dt>
     <dd>
-    Rebuilds a victim and sends them back to their activity.
+    Rebuilds a victim and sends them back to their activity. </p>
+
+<p> The rebuild is skipped for a victim marked <code>hcm_combat_injected</code>, whom the
+ crime hit or a provocation has put into combat, because a rebuild would
+ wipe that combat state.
 
 
     <h3>Parameters:</h3>
@@ -323,52 +581,13 @@
 <p> The recovery is not one phase. A victim is animation-driven while the fall
  clip plays, limp while physics holds the body, and animation-driven again
  while the game stands them up. A single duration covering all of it cannot
- say which phase is long, and the complaint is about one of them: the pause
- between the ragdoll taking hold and the victim beginning to rise.</p>
+ show which phase is long.</p>
 
 <p> So each distinct state is timed and the sequence is logged as one line. Any
  state occupying seconds is where the time is going, and it is named.</p>
 
 <p> Diagnostic, and off unless <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:TraceRecovery">TraceRecovery</a> is set, because it polls at the
  reaction poll rate for the length of a recovery.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">action</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the reaction that played
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:WatchTurn"></a>
-    <strong>HorseCollisionMod:WatchTurn (npc, action)</strong>
-    </dt>
-    <dd>
-    Measures how far a victim has turned once the whole recovery is over. </p>
-
-<p> A guard carrying a polearm was reported finishing his get-up facing roughly
- the opposite way, where other victims do not. The get-up options carry no
- weapon tag at all, four per direction and nothing else, so whatever is
- happening is not a different clip being chosen. That leaves the victim's
- orientation, which is what this measures.</p>
-
-<p> Sampled at the impact and again well after the stand-up has finished, so it
- covers the whole sequence rather than a phase of it. The item in hand is
- recorded alongside, because the whole question is whether what a victim is
- carrying changes the result.</p>
-
-<p> Diagnostic, and off unless <a href="../modules/HorseCollisionMod.Recovery.html#HorseCollisionMod:TraceRecovery">TraceRecovery</a> is set.
 
 
     <h3>Parameters:</h3>
@@ -399,17 +618,12 @@
  an innkeeper regains their loop: they are bound to a smart object they
  cannot re-approach on their own, and without it they stand where they got
  up. Everyone else recovers unaided, and for them the restart interrupts
- correct behavior visibly. A woman carrying a bucket drops it, because
- restarting the daycycle tears down the activity holding the prop.</p>
+ correct behavior visibly: restarting the daycycle tears down the activity
+ holding any prop they carry, and they drop it.</p>
 
-<p> The two cases are told apart by one reading. A stranded victim sits in
- <code>MotionIdle</code>; a recovered one is already in <code>MotionMovement</code>, <code>IdleToMove</code>
- or a turn. Measured across nine recoveries, that held without exception.</p>
-
-<p> Taken immediately rather than after a wait. Nothing about the reading
- improves by being taken later, and everything a victim needs is owed to them
- the moment they are on their feet: the wait was only ever the cost of a
- weaker signal.</p>
+<p> The two cases are told apart by one reading, taken as soon as the victim is
+ up. A stranded victim sits in <code>MotionIdle</code>; a recovered one is already in
+ <code>MotionMovement</code>, <code>IdleToMove</code> or a turn.</p>
 
 <p> A victim whose own activity is standing still is not stranded, so a state
  matching what they were hit in counts as recovered whatever it is.
@@ -454,9 +668,8 @@
  after teleporting an NPC, both being cases where a body has been moved
  without its behavior being told.</p>
 
-<p> Entity links are not involved. Probing a victim before a reaction, after it
- and after the rebuild showed an unchanged list of persistent assignments, a
- home and a workplace, with no <code>usedSO</code> link visible at any point.
+<p> Entity links are not involved: a victim's persistent assignments are
+ unchanged by a reaction and the rebuild, and no <code>usedSO</code> link appears.
 
 
     <h3>Parameters:</h3>
@@ -519,169 +732,6 @@
 
 
 </dd>
-    <dt>
-    <a name = "HorseCollisionMod:ImpactIsNewContact"></a>
-    <strong>HorseCollisionMod:ImpactIsNewContact (npcId, now)</strong>
-    </dt>
-    <dd>
-    Whether enough time has passed since this victim was last scored. </p>
-
-<p> One contact should be one impact. The detection loop runs every 33 ms and a
- galloping horse takes about 150 ms to clear a person, so a single pass
- crosses four or five ticks and every one of them is a collision by the
- loop's reckoning.</p>
-
-<p> Repeats were suppressed by accident before this existed. The readiness
- wait blocked a second
- impact for seconds afterward, which suppressed the repeats as a side effect
- of suppressing everything. Taking a gallop out of that wait, so it can land
- at any stage of a victim's recovery, removed the accident with it and the
- repeats came straight back.</p>
-
-<p> So they are separate rules now, because they are separate questions.
- Readiness asks whether an animation has anything to blend from. This asks
- whether the horse has already been charged for the contact it is still in.
- A gallop needs the second and not the first.</p>
-
-<p> The interval only has to outlast one pass. It must not approach the time a
- rider needs to turn around and come back, because a deliberate second run is
- a second impact and should be scored as one.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npcId</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the victim's id, as the table is keyed
-        </li>
-        <li><span class="parameter">now</span>
-            <span class="types"><span class="type">number</span></span>
-         the current time in milliseconds
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when this impact should be scored
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:HitReadyApplies"></a>
-    <strong>HorseCollisionMod:HitReadyApplies (tierName)</strong>
-    </dt>
-    <dd>
-    Whether a tier waits for a victim to be ready before it will land. </p>
-
-<p> The wait exists for one reason: a knockdown clip starts from standing, so
- playing it at a victim already flat on the ground has nothing to blend from
- and looks wrong. That reason applies to the tiers that play an animation and
- to no others.</p>
-
-<p> A gallop ragdolls. There is no clip and no pose to start from, so no stage of
- a victim's recovery makes it impossible, and the rider's position is that it
- should always be available:</p>
-
-<p> A gallop is pure physics, so it belongs on the table of possibilities at
- any stage of a victim's recovery.</p>
-
-<p> Leaving a gallop gated is also what produced the worst of the feedback
- problem. The mod declined the impact, the engine's own collision happened
- regardless, and what the rider got was the vanilla result: the horse wedged
- in the victim, no reaction, and a bark. Nothing this mod does should ever
- hand an impact back to that.</p>
-
-<p> A charge is here for the same reason a gallop is. It is a physical ride-down
- that ends in a ragdoll, and it is already scored as a gallop.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">tierName</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the tier the impact scored as
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when this tier waits
-    </ol>
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:WatchHitReady"></a>
-    <strong>HorseCollisionMod:WatchHitReady (npc, npcId, tierName)</strong>
-    </dt>
-    <dd>
-    Clears a victim's hit cooldown when they are back on their feet. </p>
-
-<p> <code>HitCooldownMs</code> and <code>KnockdownRecoveryMs</code> are fixed durations standing in
- for a question the mod can now ask directly: is this victim in a state where
- another impact would do anything. A knockdown at 6000 ms was short. Measured
- on a <code>villageGuard</code> sampled every 250 ms, the whole arc runs about seven
- seconds at both tiers:</p>
-
-<pre><code> gallop   MotionIdle 0-1.8   BlendRagdoll 2.0-4.3   MotionIdle 4.6-5.3
-          IdleToMove 5.6-6.8   MotionMovement 7.1+
- trot     AnimationControlled 0.2-3.0   MotionIdle 3.3-3.8
-          BlendRagdoll 4.0-6.4          MotionMovement 6.6+
-</code></pre>
-
-<p> An impact landing inside that arc plays no reaction, because every reaction
- is a standing animation, and usually costs no health either.</p>
-
-<p> ### Two traps the trace exposes</p>
-
-<p> **<code>MotionIdle</code> appears in the middle of both arcs**, so leaving the busy
- state is not the same as being recovered. A trot victim is idle for three
- quarters of a second between the fall clip ending and the ragdoll taking the
- body, and a gate that fired there would be worse than the timer. The wait
- therefore requires the settle window to pass with no busy state in it, and
- any busy state seen restarts it.</p>
-
-<p> <strong>A gallop victim is not busy for the first two seconds.</strong> The impulse takes
- that long to physicalize, and until it does they read <code>MotionIdle</code>, which is
- indistinguishable from having recovered. So the settle window does not begin
- counting until a busy state has actually been seen. Without that the
- cooldown would clear before the victim had even fallen over.</p>
-
-<p> The ceiling is what makes it safe. A victim who is never seen busy, because
- the reaction was suppressed or they were already dead, is released on the
- ceiling rather than left permanently immune.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         victim entity
-        </li>
-        <li><span class="parameter">npcId</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the key this victim's deadline is stored under
-        </li>
-        <li><span class="parameter">tierName</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the tier that hit them, for the telemetry line
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
 </dl>
 
 
@@ -689,7 +739,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

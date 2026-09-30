@@ -22628,3 +22628,287 @@ Recovery is withdrawn from the balance pass. The get-up is the global cvar
 
 No code changed, so there was nothing to ride.
 
+
+# v6 audit, batch 2: dead code out, one sweep ride
+
+The audit's second phase removed the systems the rulings retired:
+`DynamicRecovery` and its ground groans, the dead Henry set path, the yield
+catch, the pull-down's horse query and angle tracking, the physics-proxy
+rescue, the cooldown wind-back branch, `WatchTurn`, `TraceFallLanding`, the
+throw and height fields of the impact probe, the `face` and `foley` sound
+tokens, the lean throttle, two unused tutorial cells, the four get-up options
+and `ProtectMutt`.
+
+Three things were measured on the way that are worth keeping.
+
+**A stale settings key is harmless.** With `AuditStaleKey = true` in the test
+world, `ApplySettings` logged `Setting 'AuditStaleKey' is not a setting,
+ignored` and applied the other 33. So a player whose settings file still
+carries a removed key loses nothing but a dead line.
+
+**Mutt is class `Dog`.** Read live: `player_dogCompanion_vorech class=Dog`,
+alongside `Dog11` and `rat_guardDog16`, both `Dog`. The detection loop's human
+filter admits only `NPC`, `NPC_Female` and `Player`, so every dog, Henry's
+included, was already excluded before the name test that `ProtectMutt` guarded.
+
+**The yield catch, for the record.** `CatchYieldImmediately` shipped off. When
+it was on, the stand-down went out on the first read after a surrender ended
+and the victim never started to run: logged as
+`YieldCaught state=MotionIdle stoodDown=true` with no run after it. It stayed
+off because the run ends by itself, and the stand-down hands the victim to
+`state_standDown` for about twenty-five seconds of standing still.
+
+The sweep ride took one impact at each tier and every one reacted: walk
+stagger, trot and rear knockdowns, gallop and charge throws with the kill line
+firing on both. Each downed victim gave one `HurtDown` cry and no more.
+
+Then two save reloads in a row felt vanilla. Only the rear and the charge
+registered; the rider reported every other collision as the game's own. The
+loop was alive (generation 6, then 7), tracking the horse, finding entities in
+the sphere, and scoring nothing, and with `DiagnoseMisses` off it gave no
+reason. After a script reload and a third save reload everything registered
+again, with ordinary `outside-footprint` misses beside the hits. The same code
+had scored all three speed tiers before the first reload and after the third,
+so the batch is not established as the cause. Open: if it recurs, turn
+`DiagnoseMisses` on through the test world before reloading anything, and note
+whether the script reload that switch performs is itself the cure.
+
+Found and not fixed: `PullRiderDown` has never returned `true` (it ends with
+`attempt()` since `ec6fc1f`), so `ProvokeIfAnnoyed` releases the offense at once
+and a provoked victim may swing before the pull-down rather than after it.
+
+## Batch 3, ride 1: the flat test cannot see a ragdoll
+
+`VictimFlatFraction` went back to 0.15, its measured value, from the 0.45 an
+unrelated commit had left. The ride hit a downed villager a second time at a
+trot, and she popped upright into a new reaction. The rider does not mind: a
+reaction reads better than none.
+
+The fraction was not what decided it. Every second hit logged
+`state=BlendRagdoll headUp=0.88 standing=0.88`: while the body is a ragdoll
+the head height reads as full standing height, so `IsVictimFlat` returns false
+at any fraction below 0.88 and the reaction always starts. The same blindness
+as `GetWorldPos` on a thrown body, found from the other side.
+
+## Morale does not separate women from men
+
+Moved here from the `Retaliation.lua` header during the audit's comment pass,
+where it had been kept as justification. Across twenty one NPCs sampled in
+Rattay, women read morale 0.15 to 0.22, male civilians 0.16 to 0.52 and guards
+0.54 to 0.79. The morale comparison in `sb_combat.xml` tells a guard from a
+townsman and says nothing about sex, so the mod routes a provoked victim on the
+gender the combat tree itself tests.
+
+## Moved from `Bark.lua` comments
+
+Two histories cut from the bark module's comments during the audit, kept here.
+
+**Vanilla's collision bark.** Three approaches failed before `HushVanillaBark`
+closed the branch ahead of contact. Delaying the mod's line by a second made it
+worse, because vanilla keeps firing. Setting `suppressMonologs` silenced every
+line including the mod's own, because the gate does not exempt
+`overrideContextSuppress` the way its condition reads at a glance. Removing the
+victim's `KOLIZE_*` metaroles succeeded, logged as `tookVanilla=3`, and vanilla
+barked anyway: holding a metarole is not what decides what is spoken.
+
+**The recovery line's timing.** Three earlier triggers missed the moment the
+victim gets up. Waiting for the readiness watcher could not report until two
+seconds after the victim was upright; waiting for the animation state to leave
+`BlendRagdoll` fires once the get-up has finished; and a fixed 3200 ms from the
+impact landed mid-ragdoll for some victims and after others had walked off,
+heard as "a large gap between when they actually stand up and then the 2nd line
+plays". The line now fires from `WhenVictimRises`.
+
+## Moved from `Health.lua` comments
+
+Two measurements cut from the health module's comments during the audit.
+`soul:DealDamage` took Captain Bernard from 100 to 66 over three gallops before
+`IsProtectedFromHarm` existed, which is why protected characters are read from
+the `apr` flag. Between the impact and the body coming to rest, victims lost 6
+to 32 health to the engine, and six of ten were driven onto the clamp, which is
+why the collision shield spans the whole throw rather than the moment of
+contact.
+
+## Moved from `Rider.lua` comments
+
+The Horsemanship stamina scale is linear because two curved shapes were
+measured in game and rejected: one spent the benefit in the first few levels,
+leaving a rider at 13 riding like one at 20, and one withheld it until the last
+quarter, making every level below 16 feel identical.
+
+## Moved from `Lean.lua` comments
+
+The shake's curve, polled from `System.GetViewCameraPos` every 100 ms across a
+full cycle at amplitude 2.0 and period 8.0, reached 1.264 m at 8.0 s and fell
+away again (0.41 at 2 s, 0.78 at 4 s, 1.02 at 6 s, 0.485 at 12 s): the peak is
+about 0.63 of the amplitude and arrives at t = period. Over its first eighth
+the curve is indistinguishable from a straight line, and reading a velocity off
+that window gave an amplitude twenty times too large. Four identical calls two
+seconds apart drove the camera out, back through center, out again and back.
+
+Two lean bugs, both fixed: re-basing against a still-displaced camera ratcheted
+the offset further out on every release and re-press (the "pumping" bug), which
+`LeanHomeMs` now refuses; and `StartLean` once read `now` from a global that did
+not exist, so every press after the first threw inside the action hook's pcall
+and the lean died silently until the scripts were reloaded.
+
+## Moved from `Crime.lua` comments
+
+Before `SendOffenseRelease` existed, a provoked victim entering the fight with
+`startInDefenseOnly` was observed holding a guard for twenty-two seconds until
+the player swung first.
+
+## Moved from `docs/BALANCE_AUDIT.md`
+
+The balance plan was deleted during the v6 audit once every stage had run.
+Rulings 2 and 3, the per-tier damage and the stamina share, are recorded above
+under 5.28.0 and 5.29.1. The other two were decided at the desk before stage 2
+and had no entry of their own.
+
+**Ruling 1, damage stays flat per tier.** A damage law continuous in speed was
+rejected for three reasons. The tier also picks the reaction, the bark set, hit
+strength, throw, stamina, retaliation, dust, dirt and blood, so a speed law
+would change one tier-keyed table while `GetSpeedTier` still ran the rest. The
+gallop band, `SpeedGallop` 8.5 to the then `MaxImpactSpeed` cap of 11.0, spans
+only 1.29x, which `ImpactDamageVariance`'s 15 percent roll already drowns. And
+the rear and the charge are scored at declared speeds rather than measured
+ones, so a speed law would have placed them by accident.
+
+**Ruling 4, `Knockback` and `Uplift` stay as a player's knob.** They date from
+version 1 and nothing depends on them. They were kept because raising them
+works: the gallop's brake keeps a fraction of the body's own velocity rather
+than cancelling it, about 0.94 for an unarmored villager and 0.35 for an
+armored guard, so a tenfold `Knockback` delivers roughly tenfold the push. At
+the shipped values they are a 0.73 m/s nudge against the engine's collision.
+
+## Moved from `docs/ARCHITECTURE_NOTES.md`
+
+Accounts cut from the architecture notes during the v6 audit.
+
+**Timers standing in for a state.** The readiness watcher declared a victim
+recovered after 250 ms of not being in two animation states, and a body lying
+face down spends 608 ms in exactly that condition, so impacts landed mid-fall
+and snapped victims upright. It was caught by its ceiling telemetry, which
+showed it releasing victims still in `BlendRagdoll`. The recovery line was timed
+3200 ms from the impact against a get-up that starts anywhere from 1.8 to past
+7 seconds, so it arrived mid-ragdoll for some victims and after others had
+walked away. Both were tuned by ear and both looked right. `BarkRecoveryDelayMs`
+carried a comment saying a timer was correct because no readable state marked
+the moment; that was true of every state examined and false of the body itself.
+
+**Comments stated as fact.** A note claiming that freeing `XyMove` and `Rotate`
+"makes it worse" conflated two parameters and cost hours. The recovery-loop
+comment called its output a handful of log lines against a measured 404.
+
+**The manifest gate.** An exact `supports` version disabled the mod for anyone
+past 1.9.7, the case that feature detection over version detection exists for.
+
+**A gallop on a victim already down.** It produced no reaction, and an hour went
+into engine calls: `RagDollize` with and without its fall-and-play flag, cycling
+the physicalization profile out to `alive` and back, `PostPhysicalize` once and
+then across the whole get-up, `StandUp`, and a get-up fragment whose imparted
+rotation had already been measured as the reason those fragments left the
+reaction path. Each drove physics from Lua and then handed the body back, and an
+alive actor is an upright capsule, so returning to that profile stands a lying
+victim up in one frame. The fall tier already had the answer: its fragments
+carry a `Ragdoll` ProcLayer, so Mannequin owns the ragdoll and the game recovers
+the actor its own way. The fix was that shape with an empty terminal animation
+and the `Ragdoll` ProcLayer at `ExitTime 0`; the six settings added while
+guessing were deleted. The empty-terminal fragment was the rider's suggestion.
+
+## Moved from `docs/TECHNICAL_DETAILS.md`
+
+Accounts cut from the technical reference during the v6 audit, where the diary
+had no entry of its own.
+
+**Skipping the physics wait.** Without `PhysicsReadyMs` the brake fired onto a
+body still carrying the collision's peak velocity; gallop throws fell from a
+mean of 1.81 m to 1.57 m over 18 impacts, and the rider described the victims
+as bricks. The mass rewrite doubled as the readiness probe on a six-rung ladder,
+and every impact answered on the second rung, so it was replaced by the
+constant.
+
+**The air brake's first cap.** It was set at 9.0 on the theory that far throws
+were victims launched into the air. It fired on nothing. Pairing the contact
+string against the speed trace showed a launch holding 8 to 9 m/s across its
+uncontacted samples while a short throw never passed 3.9.
+
+**The multiplied stamina chain.** `base x combat x victimArmor x barding x
+horsemanship` put a gallop anywhere between 14.85 and 1452 points against a pool
+of about 210, so the tier separation, a factor of 1.6, was invisible beside a
+stack spanning nearly a hundredfold.
+
+**The rear before it was a tier.** Until 4.19.2 it borrowed the trot's figures.
+`ImpactDamageByTier` carried a `Rear` entry nothing read, so the move did a
+trot's 18 rather than its 60; connecting it made the rear able to kill, which
+exposed the corpse left by a death inside an interactive action and the
+recovery attached only to the fall prefix. The rear and charge also drained a
+flat setting at their own call sites, missing Horsemanship, barding and the
+combat surcharge. The detection loop set `tierName = "Gallop"` during a charge,
+which gave the charge a gallop's stamina and, with the corridor sweep honoring
+no existing contact, scored each victim twice. The victim lockout sat
+unconditionally in a function both moves call, so an ordinary rear held its
+victim out of every impact for 2.6 seconds.
+
+**The lunge window.** Before `WatchLunge`, a `SpeedWalk` threshold, a floor of
+1200 ms and a ceiling of 2600 governed it, and the horse went on striking people
+after it was slowing. The first `WatchLunge` peaked on single samples, and a
+derived-speed spike closed every window inside 200 ms.
+
+**The damage prediction the shield replaced.** `ApplyImpactDamage` once decided
+before the wait who would land the killing blow: if the engine's trample could
+finish what the mod's damage left, the mod added overkill.
+`ImpactDamageEngineCeiling` held the largest trample seen per tier over 136
+impacts, and a variance roll that turned a fatal blow non-fatal was overruled.
+When it was wrong the rider was charged with murder at random. Removing it left
+a gallop at `95 * 1.00 * 1.02 = 96.9` against 100 health, surviving about seven
+times in ten, until the balance pass set 111. `ImpactDamageRushBelow`, an
+earlier version keyed on how hurt the victim already was, was removed in 5.0.0.
+Earlier shield timings: a 700 ms shield against an 1100 ms damage delay left
+victims clamped at 1 health, and a look-ahead that shielded anyone the horse
+would strike a tick later caught bystanders it then missed.
+
+**The cooldown across a save load.** `RearNextAt` survived a load while the
+clock went backwards, so the rear keys were dead for an unpredictable stretch.
+Seven attempts went at the action map, the listener and the hook before logging
+every press showed 56 consecutive presses refused at the cooldown gate and the
+57th accepted at +14256 ms.
+
+**The merchant's marks.** A merchant ridden down twice, dirty with blood on both
+arms, was clean after a night spent away from his booth; forty-eight in-game
+hours standing at the booth changed nothing.
+
+## Batch 7, final sweep ride: the save-reload lockout and the pull-down deferral
+
+Two things surfaced on the final sweep ride at shipped settings, both resolved
+before closing the branch.
+
+**`ChargeScoringUntil` across a save load.** Reloading a save after a rear
+charge left walk, trot and gallop contacts with no reaction at all until the
+next charge, reproducing the batch 2 save-reload failure. When a charge starts,
+it stamps `ChargeScoringUntil = now + 1.6` against `System.GetCurrTime()` so the
+detection loop stands aside while the charge's own sweep scores the corridor.
+Loading an earlier save winds level time back while leaving `ChargeScoringUntil`
+in the future, so the detection loop keeps standing aside on every walk, trot
+and gallop contact until the restored clock catches up or a new charge
+overwrites the deadline. Clearing `self.ChargeScoringUntil = nil` in
+`uiActionListener` beside `RearNextAt`, `ChargeNextAt` and `RearBusyUntil`
+closed it. Verified across post-charge save reloads: walk (`rat_guard8`,
+`rat_guard18`, `rat_woman35`), trot (`rat_woman35`) and gallop
+(`rat_guard_pazdera`, `villageGuard`) reacted on the first contact after loading,
+alongside standing rear (`rat_guard22`) and rear charge (`rat_guard18`,
+`rat_guard_pazdera`, `rat_refugee_tonka`).
+
+**The pull-down offense deferral reverted.** Commit `5a6a7ed` had made
+`PullRiderDown` return `true` so `ProvokeIfAnnoyed` withheld
+`ReleaseWhenFighting` until the pull-down completed or its 8000 ms ceiling
+expired. Because a provoked civilian enters the combat tree with
+`startInDefenseOnly` (`$offense = false`), withholding `ReleaseWhenFighting`
+left the victim holding their guard and fidgeting in place for several seconds
+instead of closing the distance to unhorse the player. Restoring
+`PullRiderDown` and `ReleaseWhenFighting` to run together at the moment of
+provocation (while keeping `self.Annoyance[tostring(npc.id)] = nil` so an
+already-provoked victim does not re-roll on subsequent contacts) brought back
+the immediate reaction (`rat_refugee_tonda_rumpal`, `rat_ruch`,
+`rat_refugee_vojcek`).
+

@@ -4,18 +4,15 @@ param (
     # A development deploy, which installs but never ships.
     #
     # The release checks below are about what a release claims: that the
-    # version follows from the changelog, that every @release line agrees with
-    # it, and that no documentation describes an older build. None of that is
-    # true of a build that only goes into the local install, and gating one on
-    # it means the dev loop stops dead the moment work is written into
-    # [Unreleased] and the manifest has not been bumped to match. That cost a
-    # working session, and the fix belongs here rather than in a habit of
-    # bumping the version by hand mid-branch.
-    #
-    # The version is still carried, because the installed files and the zip
-    # name have to agree with the manifest.
+    # version follows from the changelog, that the version strings agree with
+    # it, and that no documentation describes an older build. A development
+    # deploy is not a release, and gating one on them stops the dev loop the
+    # moment work is written into [Unreleased] before the manifest is bumped.
     [switch]$Development
 )
+
+# A failed step stops the build rather than printing success over a broken zip.
+$ErrorActionPreference = "Stop"
 
 Write-Host "Building HorseCollisionMod version $Version..."
 
@@ -156,11 +153,6 @@ if ($scopeErrors.Count -gt 0) {
 
 # The part file layout, enforced rather than remembered.
 #
-# The mod's Lua was one 2,558-line file and was split across ten part files by
-# concern. Nothing stops the next change putting a new method back in the entry
-# point, and that is how the split would be undone: not in one commit anybody
-# would question, but a method at a time, each one defensible on its own.
-#
 # The entry point owns the table, Config, the state tables, the timing
 # constants, the settings merge, the animation database redirect, the load
 # screen listener and the bootstrap. Behavior belongs in a part file. This list
@@ -246,17 +238,25 @@ if ($layoutErrors.Count -gt 0) {
     Write-Host "Build failed: the part file layout was not respected." -ForegroundColor Red
     exit 1
 }
+
 # Stray control characters in any tracked text file.
 #
 # A scripted edit that writes a path like ".\build.ps1" through a tool that
 # interprets escapes turns the \b into a literal backspace, and \v into a
-# vertical tab. The result is invisible in an editor, survives review, and has
-# reached this repository four times: it broke dev_deploy.ps1's build path and
-# corrupted two documented commands. Cheaper to fail the build than to keep
-# noticing it by hand.
+# vertical tab. The result is invisible in an editor and survives review.
 $controlChars = @()
 
-foreach ($tracked in (git ls-files)) {
+# `.claude/` is excluded from git on this machine, so it is walked separately.
+$localFiles = @()
+$claudeDir = Join-Path $repoRoot ".claude"
+
+if (Test-Path $claudeDir) {
+    $localFiles = @(Get-ChildItem $claudeDir -Recurse -File |
+        Where-Object { $_.FullName -notmatch '\\__pycache__\\' } |
+        ForEach-Object { $_.FullName.Substring($repoRoot.Length + 1).Replace("\", "/") })
+}
+
+foreach ($tracked in (@(git ls-files) + $localFiles)) {
     if ($tracked -notmatch '\.(md|ps1|py|lua|ld|json|manifest|css|html|xml)$') { continue }
 
     $full = Join-Path $repoRoot $tracked
@@ -281,8 +281,22 @@ Write-Host "Code Style Check Passed ($luaLineCount lines, $($luaScripts.Count) f
 
 # Release gate. A release version is anything without a prerelease suffix, so
 # -dev and -diag builds skip every check below and stay free to carry
-# diagnostics and a mismatched version.
+# diagnostics and a mismatched version; so does -Development at any version.
 $isRelease = (-not $Development) -and ($Version -match '^\d+\.\d+\.\d+$')
+
+# The README's settings table is generated from the settings file, and the
+# README ships in the zip. A release refuses a stale table; a development build
+# only reports it, so a comment edit does not block a deploy.
+python (Join-Path $toolsDir "nexus_settings_block.py") --check-readme
+
+if ($LASTEXITCODE -ne 0) {
+    if ($isRelease) {
+        Write-Host "Build failed: README.md's settings table is stale." -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "README.md's settings table is stale; a release build will refuse it." -ForegroundColor Yellow
+}
 
 if ($isRelease) {
     # The version lives in three places and a release needs all three to agree.
@@ -302,32 +316,6 @@ if ($isRelease) {
 
     if ($luaVersion -ne $Version) {
         Write-Host "Build failed: HorseCollisionMod.Version is $luaVersion, building $Version." -ForegroundColor Red
-        exit 1
-    }
-
-    # The LDoc header carries the version too, and it is the one that goes
-    # stale unnoticed because nothing reads it back. Checked in every part
-    # file that declares one, not just the entry point, since a part header is
-    # read even less often than the entry point's.
-    # Every mismatch is collected and reported together. Failing on the first
-    # one turns a version bump into a build, fix, build cycle repeated once per
-    # file, which is how twelve files were bumped one at a time. The remedy is
-    # named in the message, because `set_version.py` does all of them at once.
-    $staleReleases = @()
-
-    foreach ($script in (@($modScript) + $partScripts)) {
-        $raw = Get-Content $script -Raw
-        if ($raw -notmatch '@release\s+([^\s]+)') { continue }
-
-        if ($Matches[1] -ne $Version) {
-            $staleReleases += "  $(Split-Path -Leaf $script) says $($Matches[1])"
-        }
-    }
-
-    if ($staleReleases.Count -gt 0) {
-        Write-Host "Build failed: $($staleReleases.Count) @release tag(s) do not say $Version." -ForegroundColor Red
-        $staleReleases | ForEach-Object { Write-Host $_ -ForegroundColor Red }
-        Write-Host "         Fix them all at once:  python tools\set_version.py $Version"
         exit 1
     }
 
@@ -388,6 +376,17 @@ if ($luajit) {
         }
     }
     Write-Host "Lua Syntax Check Passed."
+
+    # The settings file restates each tier table and overrides it at load, so
+    # a row that differs from Tiers.lua silently replaces the declared value.
+    Push-Location $repoRoot
+    & $luajit.Source (Join-Path $toolsDir "check_tiers.lua")
+    $tierCheck = $LASTEXITCODE
+    Pop-Location
+    if ($tierCheck -ne 0) {
+        Write-Host "Build failed: settings file tier tables differ from Tiers.lua." -ForegroundColor Red
+        exit 1
+    }
 }
 else {
     Write-Host "Lua Syntax Check Skipped (luajit not installed)." -ForegroundColor Yellow
@@ -411,11 +410,10 @@ if ($partScripts.Count -gt 0) {
     }
 }
 
-# Data overrides live under mod_assets/ mirroring the game's own layout and
-# are copied in wholesale. They are derived from the game's paks, so they are
-# not committed; regenerate them from a local install instead. A fresh clone
-# therefore has no mod_assets/ and would silently build a Lua-only mod, so
-# generate it here rather than leaving that trap for the next person.
+# Generated data overrides live under mod_assets/, mirroring the game's own
+# layout, and are copied in wholesale. They are derived from the game's paks,
+# so they are not committed; a fresh clone has no mod_assets/ and generates it
+# here. Hand-authored data lives under src/ and is copied after it.
 # Tests for the generated file rather than the directory, because a failed or
 # interrupted run can leave mod_assets/ present but empty, which would
 # otherwise skip generation and fail later with a less obvious message.
@@ -423,53 +421,41 @@ if (-not (Test-Path (Join-Path $assetsDir "Animations\Mannequin\ADB\hcm_male_dat
     Write-Host "Animation data missing - generating..."
     python (Join-Path $toolsDir "build_adb.py")
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[BUILD ERROR] build_adb.py failed. Check the game path at the top of it." -ForegroundColor Red
+        Write-Host "[BUILD ERROR] build_adb.py failed. Check that the game install resolves." -ForegroundColor Red
         exit 1
     }
-}
-
-# A stale armor table from before the mod read the game's tables directly. It
-# is a Startup script, so leaving one in mod_assets would ship it and define a
-# global nothing reads. Removed rather than ignored, because mod_assets is
-# generated and not committed, so a working copy can still be carrying one.
-$staleItemData = Join-Path $assetsDir "Scripts\Startup\HorseCollisionMod_ItemData.lua"
-
-if (Test-Path $staleItemData) {
-    Remove-Item -Force $staleItemData
-    Write-Host "Removed the superseded armor table from mod_assets."
 }
 
 Write-Host "Including data overrides from mod_assets ..."
 Copy-Item "$assetsDir\*" -Destination "$buildDir\pak\" -Recurse -Force
 
-$srcLibs = Join-Path $srcDir "Libs"
-if (Test-Path $srcLibs) {
-    New-Item -ItemType Directory -Force -Path "$buildDir\pak\Libs" | Out-Null
-    Copy-Item "$srcLibs\*" -Destination "$buildDir\pak\Libs\" -Recurse -Force
+foreach ($srcDataName in @("Libs", "Animations")) {
+    $srcData = Join-Path $srcDir $srcDataName
+    if (Test-Path $srcData) {
+        New-Item -ItemType Directory -Force -Path "$buildDir\pak\$srcDataName" | Out-Null
+        Copy-Item "$srcData\*" -Destination "$buildDir\pak\$srcDataName\" -Recurse -Force
+    }
 }
 
 # The animation chain needs every one of these present or the stagger silently
 # no-ops in game, which is expensive to diagnose. Fail the build instead.
 #
-# These are the additive layout, which claims no vanilla filename: a parent
-# database per gender referencing the untouched vanilla file in its own pak,
-# the mod's own fragments, and the declarations those fragments need.
-# Any file under a vanilla name is a bug, not an alternative layout: it would
-# override the file the parent database references, silently defeating the
-# whole arrangement without changing anything this build prints.
+# These are the additive layout: a parent database per gender referencing the
+# untouched vanilla file in its own pak, the mod's own fragments, and the
+# declarations those fragments need. No vanilla filename beyond the three
+# declaration files below: another would override the file the parent database
+# references, silently defeating the arrangement without changing anything
+# this build prints.
 $adb = "$buildDir\pak\Animations\Mannequin\ADB"
 
 # The exact file set the mod ships. Three of these carry vanilla names on
 # purpose: they are small declaration files, and owning them is far cheaper
-# than the alternative of restating 123 KB of fragment and controller
-# definitions under mod names, which put this mod in the resolution path of
-# every human animation and broke unrelated ones. See TECHNICAL_DETAILS.md.
+# than restating 123 KB of fragment and controller definitions under mod
+# names, which would put this mod in the resolution path of every human
+# animation. See TECHNICAL_DETAILS.md.
 #
-# `wh_female_fragmentids.xml` was in this list and must never come back. It is
-# not a small declaration file: it is a 20 KB copy of a file the patches rewrite,
-# and the copy that shipped was the launch one, so it deleted 103 fragment ids
-# from every female character, `PickingHerbs` among them. Patch 1.9 declares
-# what the mod wanted from it anyway. See the note in tools/build_adb.py.
+# Never ship `wh_female_fragmentids.xml`. The patches rewrite it, so a copy
+# overrides the patched file and drops its fragment ids.
 $required = @(
     "$adb\hcm_male_database.adb",
     "$adb\hcm_female_database.adb",
@@ -500,13 +486,14 @@ foreach ($f in $required) {
         exit 1
     }
 }
+
 # 2. Create the PAK (zip file)
 # Compress-Archive writes Windows path separators into the zip entry names
 # (Libs\AI\final\x.xml). CryEngine looks pak entries up by exact path with
 # forward slashes, so a backslash pak silently fails to override anything.
 # Startup Lua still works because that folder is enumerated rather than looked
-# up by path, which is what made this bug so slow to spot. Build the pak entry
-# by entry so the names match the vanilla paks (Libs/AI/final/x.xml).
+# up by path. Build the pak entry by entry so the names match the vanilla paks
+# (Libs/AI/final/x.xml).
 Add-Type -AssemblyName System.IO.Compression | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem | Out-Null
 
@@ -552,14 +539,10 @@ if (-not (Test-Path $releasesDir)) { New-Item -ItemType Directory -Force -Path $
 $outZip = "$releasesDir\HorseCollisionMod_v$Version.zip"
 if (Test-Path $outZip) { Remove-Item -Force $outZip }
 
-# Same defect as the pak above, and it reached players. Compress-Archive writes
-# Windows separators into the entry names, so the archive carries one entry
-# literally named "Data\HorseCollisionMod.pak" rather than a Data folder holding
-# the pak. File Explorer hides it by treating the backslash as a separator, which
-# is why manual testing never caught it, but the ZIP specification requires
-# forward slashes and every tool that follows it, 7-Zip and Vortex included,
-# extracts a single oddly named file into the mod root. The mod then does not
-# load at all. Build the archive entry by entry, as the pak is built.
+# Built entry by entry for the same reason as the pak. A backslash entry
+# extracts as one oddly named file in 7-Zip and Vortex, and the mod does not
+# load; File Explorer hides the defect by treating the backslash as a
+# separator.
 $modRoot = (Resolve-Path $modDir).Path
 $outArchive = [System.IO.Compression.ZipFile]::Open($outZip, "Create")
 try {
@@ -573,9 +556,9 @@ finally {
     $outArchive.Dispose()
 }
 
-# A backslash here ships a broken install, and it did once. The archive is read
-# back and refused rather than trusted, because the failure is invisible in File
-# Explorer and only appears on a player's machine.
+# A backslash here ships a broken install. The archive is read back and refused
+# rather than trusted, because the failure is invisible in File Explorer and only
+# appears on a player's machine.
 $verify = [System.IO.Compression.ZipFile]::OpenRead($outZip)
 try {
     $bad = @($verify.Entries | Where-Object { $_.FullName.Contains("\") })
@@ -595,17 +578,13 @@ Remove-Item -Recurse -Force $buildDir
 
 # Superseded builds move into releases\archive.
 #
-# Every build of every branch lands here, and a session of small slices leaves
-# dozens. That is not merely untidy: publish_nexus.ps1 and pre_release_check.py
-# resolve a zip by name, and the one thing worse than a full directory is
-# picking the wrong file out of it.
+# Every build of every branch lands here, and publish_nexus.ps1 and
+# pre_release_check.py resolve a zip by name.
 #
-# Nothing is deleted, only moved, which matters more than it first appears: a
-# tagged release cannot be rebuilt. Asked for its own version number this
-# script refuses twice, once because the manifest has moved on and once because
-# version_check.py sees that version already tagged and demands the next one.
-# The zip in this directory is therefore the only copy of what was released,
-# and archiving is the whole safety net rather than a convenience.
+# Moved, never deleted, because a tagged release cannot be rebuilt: asked for
+# its own version number this script refuses, once because the manifest has
+# moved on and once because version_check.py demands the next version. The zip
+# here is the only copy of what was released.
 #
 # So two names stay at the top level. The build just made, and the version the
 # manifest currently names, so that a prerelease built while testing does not
@@ -629,5 +608,3 @@ if ($stale.Count -gt 0) {
 }
 
 Write-Host "Successfully built $outZip"
-
-

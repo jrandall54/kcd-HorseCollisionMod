@@ -15,9 +15,8 @@
 -- anything invented here.
 --
 -- `alwaysFightWhenHit` is a context option from the shipped catalog in
--- `Scripts/Script/ContextData.lua`. Vanilla quests set options exactly this
--- way: `q_ledecko` gives four bandits `fightAllHostilePerceptibles`, and
--- `q_hareHunt` applies the `berserk` preset. In `sb_combat.xml` the option
+-- `Scripts/Script/ContextData.lua`, set the way vanilla quests set their own
+-- context options. In `sb_combat.xml` the option
 -- sits in front of the morale comparison that otherwise decides whether a
 -- civilian fights or flees, and skipping that comparison is all it does.
 --
@@ -41,12 +40,8 @@
 -- opening with an attack. Guards who witness the brawl join it, because the
 -- game models what a bystander perceived. Neither is arranged here.
 --
--- ### Guards are included, and behave differently on purpose
---
--- A provoked guard arrests the rider rather than brawling with him, because
--- the soldier branch of the hit handler raises assault information whenever
--- the attacker is the player. That is a guard using the authority a guard
--- has, and the crime-free brawl here is for the people who lack it.
+-- Guards are included, and behave differently on purpose; see
+-- `CanRetaliate`.
 --
 -- ### Women raise the alarm instead of fighting
 --
@@ -65,16 +60,12 @@
 -- to push a victim through a fight subtree she cannot enter, so setting them
 -- would only leave an option to clear afterwards for no effect.
 --
--- Morale is not what separates her from a man, and it was measured rather
--- than assumed. Across twenty one NPCs in Rattay the women read 0.15 to 0.22
--- and the male civilians read 0.16 to 0.52 against guards at 0.54 to 0.79, so
--- the morale comparison tells a guard from a townsman and says nothing about
--- sex. Routing on the gender the combat tree itself tests is therefore the
--- honest implementation, not a shortcut around a stat that would have done it.
+-- The combat tree tests gender, not morale, so the mod routes on gender.
+-- Morale separates guards from townsmen and does not separate women from men.
 --
 -- @module HorseCollisionMod.Retaliation
 -- @author jrandall54
--- @release 5.31.4
+
 --- The context option that makes a victim answer a hit with a fight.
 --
 -- From the game's own catalog. Named here rather than written inline at each
@@ -91,13 +82,13 @@ HorseCollisionMod.RetaliationHandle = "horseCollisionMod"
 
 --- The soul gender that `sb_combat.xml` lets through to the fight branch.
 --
--- Confirmed against telemetry rather than assumed: logged reactions report
+-- The value `GetGender` returns for a man; logged reactions report
 -- `gender=1` for men and `gender=2` for women.
 HorseCollisionMod.GenderMale = 1
 
 --- The soul gender that falls through to the report and flee branches.
 --
--- Same source as `GenderMale`: logged reactions report `gender=2` for women.
+-- The value `GetGender` returns for a woman.
 HorseCollisionMod.GenderFemale = 2
 
 --- Whether the context system is available.
@@ -116,10 +107,7 @@ end
 --- How this victim answers a shove too many.
 --
 -- **Gender** decides which of two answers is available, and it is the game's
--- decision rather than this mod's. `sb_combat.xml` tests
--- `b_soul.gender == male` after the context option is consulted and fails
--- everyone else outright, so a man reaches the fight branch and a woman falls
--- through to the report or flee branches of the same handler.
+-- decision rather than this mod's; see the module header.
 --
 -- Both are answers, so both are offered: `"fight"` for a man and `"alarm"`
 -- for a woman, with `"none"` for anyone the game would let do neither. The
@@ -132,13 +120,11 @@ end
 -- with no `real` check and no context option in front of it, so provoking one
 -- is a crime and ends in an arrest. That is a guard exercising the authority
 -- a guard has, and the crime-free brawl this file builds is for the people
--- who lack it. An earlier revision gated soldiers out; the gate was wrong and
--- has been removed.
+-- who lack it.
 --
--- `soul:GetSocialClass()` carries `SoulCrimeRoleId` and a class `Name` if the
--- distinction is ever wanted: a village guard reports `soldier` and 2 against
--- a townsman's `civilian` and 1. It is read here only for the telemetry, so a
--- log can be read afterwards for who was provoked.
+-- `soul:GetSocialClass()` carries a class `Name`: a village guard reports
+-- `soldier` against a townsman's `civilian`. It is read here for the log
+-- only, so a session can be read afterwards for who was provoked.
 --
 -- @tparam table npc victim entity
 -- @treturn string `"fight"`, `"alarm"` or `"none"`
@@ -180,8 +166,7 @@ end
 --- Counts a shove against a victim and returns how many they have taken.
 --
 -- A count older than `RetaliationMemorySec` is discarded rather than aged
--- down. Someone barged twice this morning does not start today's ride one
--- shove from a fight.
+-- down.
 --
 -- @tparam table npc victim entity
 -- @treturn number the running count, this shove included
@@ -210,8 +195,7 @@ end
 --
 -- Zero until the victim has taken more than `RetaliationFreeBumps`, then
 -- `RetaliationChanceStep` per shove beyond that, capped at
--- `RetaliationMaxChance`. The first contact is always free, so brushing past
--- someone once never starts anything.
+-- `RetaliationMaxChance`. Contacts up to `RetaliationFreeBumps` are free.
 --
 -- @tparam number count how many shoves this victim has taken
 -- @treturn number a chance between 0 and 1
@@ -278,7 +262,7 @@ end
 --
 -- Giving up is logged rather than silent, because a victim who never reaches
 -- the fight is the interesting case: it means the provocation itself was
--- refused, which the `Retaliation` line above would not have shown.
+-- refused, which the `Retaliation` telemetry line would not have shown.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:ReleaseWhenFighting(npc)
@@ -325,8 +309,7 @@ end
 -- Reads `actor:GetCurrentAnimationState()`, the same call the reaction
 -- recovery polls. Two prefixes mean the incident is live:
 --
--- * `Combat` is the obvious one, and `CombatMovement` was observed on a guard
---   closing to two meters.
+-- * `Combat`, which covers `CombatMovement` and `CombatIdle`.
 -- * `Surrender` is the one that is easy to miss, and missing it is a real
 --   fault: a victim who yields stands in `SurrenderIn`, which is perfectly
 --   still, so it reads as finished and the incident closes in the middle of
@@ -335,12 +318,8 @@ end
 --   `SurrenderDialogToMove`, `SurrenderForcedWait` and `SurrenderToCombat`.
 --
 -- Anything else is finished, and that deliberately includes a victim running
--- away. Running is not a state this has to handle specially: a man sprinting
--- from the rider has left the fight, so the incident should close and the
--- aftermath should take him, which is exactly what treating it as finished
--- does. An earlier design classified running separately and only counted it
--- once the rider was 25 m clear, which never happens while the rider is
--- following him; it fired in none of six incidents.
+-- away: a man sprinting from the player has left the fight, so the incident
+-- closes and the aftermath takes him.
 --
 -- @tparam string state the animation state
 -- @treturn boolean true while the fight is still running
@@ -363,18 +342,18 @@ end
 -- sample, because a fighter between exchanges reads as finished for an
 -- instant and closing there would cut a live fight short.
 --
--- The fight is waited for rather than assumed, but it always arrives:
--- `alwaysFightWhenHit` skips the morale comparison that would otherwise let a
--- timid victim decline, so courage decides how the fight goes and not whether
--- there is one. A victim who yields to the first punch has still fought.
+-- The fight is waited for rather than assumed. `alwaysFightWhenHit` skips the
+-- morale comparison that would otherwise let a timid victim decline, so
+-- courage decides how the fight goes and not whether there is one; a victim
+-- who yields to the first punch has still fought.
 --
 -- `RetaliationCeilingSec` bounds the poll so a victim who never resolves
 -- cannot leave it running for the session. It is a failsafe rather than a
--- mechanism, and in six measured incidents it was never reached.
+-- mechanism.
 --
 -- The poll is generation-guarded: a load screen moves `TimerTick`, and a
--- sample scheduled before it would otherwise fire into a world that no longer
--- contains the entity it was about.
+-- sample scheduled before it would otherwise fire into a world that does not
+-- contain the entity it was about.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:WatchRetaliation(npc)
@@ -385,8 +364,6 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	local elapsed = 0
 	local finishedFor = 0
 	local sawFight = false
-	local sawYield = false
-	local caught = false
 
 	local function sample()
 		if generation ~= self.TimerTick then
@@ -404,25 +381,8 @@ function HorseCollisionMod:WatchRetaliation(npc)
 		if self:IsStillFighting(state) then
 			sawFight = true
 			finishedFor = 0
-
-			if state ~= nil and string.find(state, "^Surrender") ~= nil then
-				sawYield = true
-			end
 		else
 			finishedFor = finishedFor + 1
-
-			-- Off by default. See `CatchYieldImmediately`.
-			if self.CatchYieldImmediately and sawYield and not caught then
-				caught = true
-
-				local stoodDown = self:SendStandDown(npc)
-
-				if self.Config.LogTelemetry then
-					self:Log("YieldCaught " .. self:NameOf(npc)
-							.. " state=" .. tostring(state)
-							.. " stoodDown=" .. tostring(stoodDown))
-				end
-			end
 		end
 
 		if sawFight and finishedFor >= self.RetaliationSettledSamples then
@@ -443,61 +403,16 @@ function HorseCollisionMod:WatchRetaliation(npc)
 	Script.SetTimer(interval, sample)
 end
 
---- Tells a victim the incident is over and they may stand down.
---
--- `combat:stimulus:standDownRequest` sets `t_state = standDown` in
--- `sb_combat.xml`, and it is one of only two stimulus kinds exempt from the
--- acceptance rule that rejects a stimulus outright while the receiver is
--- already fighting or fleeing. That exemption is the whole reason it works
--- here: every other message this mod could send is discarded by someone
--- mid-flight, which is exactly who needs it.
---
--- The payload is empty. `TypeDefinitions.xml` declares a single member `_`,
--- which is a placeholder rather than a field: passing it is rejected with
--- "override table does not match the type", and vanilla's own sends carry
--- `values=""`.
---
--- @tparam table npc victim entity
--- @treturn boolean true when the call was accepted
-function HorseCollisionMod:SendStandDown(npc)
-	local target = npc.id
-
-	if npc.this and npc.this.id then
-		target = npc.this.id
-	end
-
-	local ok = pcall(function()
-		local message = Utils.makeTable("combat:stimulus:standDownRequest", {})
-
-		XGenAIModule.SendMessageToEntityData(target,
-				"combat:stimulus:standDownRequest", message)
-	end)
-
-	return ok
-end
-
 --- Puts a victim right once the fight is over.
 --
--- A man the rider fought is left at a relationship of 0.0 against the 0.50 an
+-- A man the player fought is left at a relationship of 0.0 against the 0.50 an
 -- untouched townsman reads, and below vanilla's 0.2 threshold he decides to
--- run every time he perceives the rider. Riding past him a week later still
+-- run every time he perceives the player. Riding past him a week later still
 -- sends him sprinting, which reads as a permanently ruined NPC rather than a
 -- man who lost a fight.
 --
--- **Two things are needed and neither works alone**, which is what made this
--- hard to see. Measured on a victim who had been fleeing on sight across a
--- save reload and an in game wait:
---
--- * `combat:stimulus:standDownRequest` cancels the flee that is running. Sent
---   by itself it bought five seconds, and then the next time he perceived the
---   rider he decided to flee again.
--- * Raising the relationship changes the decision but not the behavior
---   already executing, so sent by itself while he is mid-flight it does
---   nothing visible. That is why an earlier reading of this called reputation
---   irrelevant; the measurement could not have shown an effect either way.
---
--- Together they hold. The same victim stopped, stood at a meter and a half
--- for twelve seconds, and afterwards would talk and trade.
+-- Raising the relationship changes his next decision, not a flee already
+-- running; that flee ends on its own (see `WatchAftermath`).
 --
 -- ### It marks him down, it does not reward him
 --
@@ -506,16 +421,14 @@ end
 -- is right, and he is never left under the threshold that ruins him, which is
 -- the bug. The count is worked from his own figure rather than fixed, because
 -- a count calibrated for a victim at 0.0 carries one to 0.84 against the 0.50
--- his untouched neighbors read, and a beating would pay the rider a bonus.
+-- his untouched neighbors read, and a beating would pay the player a bonus.
 --
 -- ### The step is a fixed quantum, so the count is arithmetic
 --
 -- `surrender_step` moves the relationship by `RepairStepValue` every time it
--- is applied, whatever second argument it is given: 0.1, 0.2 and no argument
--- at all each moved exactly 0.1389 in a measured sweep. The magnitude cannot
--- be tuned, so the number of applications is what decides where a victim
--- lands, and that is worked out once from the gap rather than approached by
--- trial. They apply in one pass, because a change does not read back in the
+-- is applied, whatever second argument it is given, so the number of
+-- applications decides where a victim lands, worked out once from the gap.
+-- They apply in one pass, because a change does not read back in the
 -- frame it is applied and re-reading between them would report stale values.
 --
 -- The quantum is also the precision: a victim lands within one step above his
@@ -565,34 +478,11 @@ function HorseCollisionMod:RepairVictim(npc)
 	return true
 end
 
---- Closes the incident out and puts the victim back the way he was found.
---
--- `why` names which ending applied and goes into the telemetry, so a session
--- can be read afterwards for how often a fight resolved itself against how
--- often the failsafe had to close it.
---
--- Three things happen, and every one of them happens on every ending. None of
--- them is conditional on how the fight finished, because a settled victim is
--- not a safe victim: a man released through the yield menu settles first and
--- only then walks away for good.
---
--- * The context option comes back. Left set, every NPC the rider had ever
---   shoved would answer any hit from anyone with a fight for the rest of the
---   session, which is a different mod.
--- * His standing is repaired, because below vanilla's threshold he decides to
---   run from the rider on sight, for good. See `RepairVictim`.
--- * `WatchAftermath` takes him from here, because the fight can end with a
---   flee already running that his standing does not explain and that nothing
---   else stops.
---
--- @tparam table npc victim entity
--- @tparam string why either `settled` or `ceiling`
 --- Shows the on-screen prompt telling the player they can surrender.
 --
--- Surrendering already works during a provoked brawl and resolves it cleanly.
--- Nothing told the player so: the hint that appears when guards attack is
--- raised from the AI's own behavior tree and a mod-provoked fight never
--- triggers it, so the option existed and was invisible.
+-- Surrendering works during a provoked brawl and resolves it cleanly, but the
+-- hint that appears when guards attack is raised from the AI's own behavior
+-- tree and a mod-provoked fight never triggers it, so the mod raises it.
 --
 -- The HUD element declares `ShowActionHint(ActionId, Control, Text, Type,
 -- Name)` in `Libs/UI/UIElements/HUD.xml`, reachable through
@@ -607,6 +497,8 @@ end
 -- One hint for any number of provoked victims, counted rather than shown per
 -- fight, so a brawl with three of them does not stack three copies and does
 -- not disappear when the first one yields.
+--
+-- @tparam table npc the provoked victim the prompt is raised for
 function HorseCollisionMod:ShowSurrenderHint(npc)
 	if not self.Config.RetaliationSurrenderHint then
 		return
@@ -651,9 +543,7 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 	-- Put back on an interval for as long as a fight is running, because the
 	-- HUD drops it on its own. Being pulled off the horse swaps the action map
 	-- from `horse` to `player`, the hints are rebuilt for the new map, and a
-	-- hint this mod raised is not among them: measured as the prompt appearing
-	-- correctly, then disappearing at the moment of the unhorsing and staying
-	-- gone for the rest of the brawl.
+	-- hint this mod raised is not among them.
 	--
 	-- The control is resolved again on each pass rather than reused, since the
 	-- map it belongs to is exactly what changed.
@@ -683,16 +573,11 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 			return
 		end
 
-		-- The prompt lives as long as a surrender is actually possible, which
-		-- is not the same as the mod's own idea of when the brawl ended.
-		-- `EndRetaliation` fires the moment the rider is pulled off the horse,
-		-- because the victim stops reading as fighting during the pull, and
-		-- the fight then carries on for another half minute. Hanging the
-		-- prompt on that took it down a second after it appeared.
-		--
+		-- The prompt lives as long as a surrender is possible, which is not
+		-- the same as the mod's own idea of when the brawl ended.
 		-- `IsInCombatDanger` is the same read the collision code uses for
-		-- whether the player is in a fight, and it is the honest condition
-		-- here: while it holds, pressing the key does something.
+		-- whether the player is in a fight: while it holds, pressing the key
+		-- does something.
 		local danger = false
 
 		pcall(function()
@@ -705,13 +590,6 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 		-- removed as they die and as their fights end, so an empty table means
 		-- there is nobody who could accept a surrender, whatever the engine
 		-- still reports about danger.
-		--
-		-- The prompt is held by the danger reading alone, which lingers after
-		-- a fight ends and needs six quiet passes to clear, so killing the
-		-- last person offering to fight left the prompt up for five or six
-		-- seconds with nobody to accept it. Measured after a beggar was
-		-- reared to death, and newly reachable because the rear can now kill
-		-- the victims it provokes.
 		--
 		-- Checked before the danger reading rather than after, because this is
 		-- the stronger condition: a live opponent may briefly read as no
@@ -733,7 +611,10 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 		end
 
 		if not anyoneLeft then
-			self:Log("SurrenderHint nobody left to surrender to")
+			if self.Config.LogTelemetry then
+				self:Log("SurrenderHint nobody left to surrender to")
+			end
+
 			self:HideSurrenderHint(true)
 
 			return
@@ -759,11 +640,9 @@ function HorseCollisionMod:ShowSurrenderHint(npc)
 			local again = Game.GetActionControl("player", "surrender")
 
 			if again then
-				-- Taken down and put back rather than simply shown again.
-				-- Re-showing an id the HUD still believes it is displaying
-				-- is a no-op, so after the action map change wiped the hint
-				-- from the screen the re-assert changed nothing and the
-				-- prompt stayed gone for the rest of the fight.
+				-- Taken down and put back rather than shown again: re-showing
+				-- an id the HUD still believes it is displaying does nothing,
+				-- even after the action map change has wiped it.
 				UIAction.CallFunction("hud", -1, "HideActionHint",
 						self.SurrenderHintId)
 				UIAction.CallFunction("hud", -1, "ShowActionHint",
@@ -783,8 +662,7 @@ end
 -- own prompt. Raising one alongside it puts two on screen offering the same
 -- key, which is reproducible by provoking a guard in sight of another guard.
 --
--- Read from the victim's social class, the same source the retaliation answer
--- uses, so the two cannot disagree about who is a soldier.
+-- Read from the victim's social class.
 --
 -- @tparam table npc the provoked victim
 -- @treturn boolean true when the prompt belongs to the game
@@ -831,16 +709,35 @@ function HorseCollisionMod:HideSurrenderHint(all)
 	end
 end
 
+--- Closes the incident out and puts the victim back the way he was found.
+--
+-- `why` names which ending applied and goes into the telemetry, so a session
+-- can be read afterwards for how often a fight resolved itself against how
+-- often the failsafe had to close it.
+--
+-- Three things happen, and every one of them happens on every ending. None of
+-- them is conditional on how the fight finished, because a settled victim is
+-- not a safe victim: a man released through the yield menu settles first and
+-- only then walks away for good.
+--
+-- * The context option comes back. Left set, every NPC the player had ever
+--   shoved would answer any hit from anyone with a fight for the rest of the
+--   session.
+-- * His standing is repaired, because below vanilla's threshold he decides to
+--   run from the player on sight, for good. See `RepairVictim`.
+-- * `WatchAftermath` takes him from here.
+--
+-- @tparam table npc victim entity
+-- @tparam string why either `settled` or `ceiling`
 function HorseCollisionMod:EndRetaliation(npc, why)
 	-- The prompt is for people who might accept a surrender, and this victim
-	-- no longer will: the fight is over however it ended. Removing him here
+	-- will not: the fight is over however it ended. Removing him here
 	-- is what takes the prompt down promptly, rather than waiting for the
 	-- danger reading to go quiet and stay quiet.
 	--
-	-- Safe to hang on this ending where it was not safe to hang the whole
-	-- prompt on it. The watcher requires having seen him fight before it
-	-- counts settled samples, so being pulled off the horse no longer reads
-	-- as the fight finishing a second after it started.
+	-- Safe to hang on this ending: the watcher requires having seen him fight
+	-- before it counts settled samples, so being pulled off the horse does
+	-- not read as the fight finishing.
 	if self.SurrenderHintFor and npc and npc.id then
 		self.SurrenderHintFor[tostring(npc.id)] = nil
 	end
@@ -859,16 +756,11 @@ function HorseCollisionMod:EndRetaliation(npc, why)
 	-- Every ending, not only the ones that need a stand-down. However the
 	-- fight finished, whether he yielded, ran, or was knocked out and got up
 	-- again, he is left below the threshold that decides he should run from
-	-- the rider on sight, and that is what has to be undone.
+	-- the player on sight, and that is what has to be undone.
 	local repaired = self:RepairVictim(npc)
 
-	-- Sent on every ending, not only the runaway and ceiling ones. A victim
-	-- released through the yield menu walks away in a flee
-	-- his own standing does not explain: measured at 0.737, well clear of the
-	-- threshold that decides a man should run, and running anyway. Reputation
-	-- cannot reach that and only the stand-down ends it.
 	-- The stand-down is deliberately not sent here. A victim who runs should
-	-- be allowed to get away first, and the rider is not necessarily finished
+	-- be allowed to get away first, and the player is not necessarily finished
 	-- with him either, so both are left to the aftermath.
 	self:WatchAftermath(npc)
 
@@ -885,18 +777,13 @@ end
 --
 -- He is replanned so he has somewhere to be, and his standing is checked
 -- again a little later, because the repair at the close of the incident runs
--- before the rider is necessarily finished with him: a victim knocked down
--- again, or beaten while he stands up, loses more afterwards. One measured
--- victim was repaired at the close, dropped back to 0.0 by what followed, and
--- was restored here.
+-- before the player is necessarily finished with him: a victim knocked down
+-- again, or beaten while he stands up, loses more afterwards.
 --
--- Nothing is done about a victim who runs, because a flee ends by itself.
--- Measured on one beggar, one build, the only difference being what the rider
--- did: left alone he stopped after fourteen seconds, and chased he was still
--- at full speed forty seconds later. `fleeFromNPCParams` gives the reason,
--- with a `distance` of 150 and `t_fleeParams.entityToFleeFrom` set to the
--- player, so the run ends when he is that far from the man he is running
--- from and following him means he never gets there.
+-- Nothing is done about a victim who runs, because a flee ends by itself:
+-- `fleeFromNPCParams` has a `distance` of 150 with the player as
+-- `t_fleeParams.entityToFleeFrom`, so the run ends when he is that far from
+-- the player, and following him means he never gets there.
 --
 -- `combat:stimulus:standDownRequest` does stop that run, and is not sent.
 -- It hands him to `state_standDown`, which holds him through a hot entity
@@ -936,18 +823,16 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 		return false
 	end
 
-	-- Nobody new is provoked while the rider is already in a fight.
+	-- Nobody new is provoked while the player is already in a fight.
 	--
 	-- Detection cannot tell a rider steering into someone from someone running
 	-- into a nearly stationary horse, because it reads the horse's speed and
 	-- who is close, not who closed the distance. During a brawl that is exactly
 	-- what happens: guards charge the horse, each contact scores as a walk
-	-- impact, and each one provokes another attacker. Measured at 1.93 m/s
-	-- against a threshold of 1.8, with `danger=true` on the same line, on a
-	-- rider who had shoved one merchant and touched no guard at all.
+	-- impact, and each one would provoke another attacker.
 	--
 	-- The impact still lands and still costs the victim. Only the provocation
-	-- is withheld, so a fight grows from what the rider did before it started
+	-- is withheld, so a fight grows from what the player did before it started
 	-- rather than from the fight itself.
 	if not self.Config.ProvokeDuringCombat then
 		local danger = false
@@ -1035,73 +920,51 @@ function HorseCollisionMod:ProvokeIfAnnoyed(npc, playerEnt)
 	-- way and the provocation is wasted.
 	self:SendProvocationHit(npc, playerEnt)
 
-	-- The provocation decides that he fights; releasing the offense decides
-	-- that he attacks. Without it he enters the fight in defense only and
-	-- holds a guard until something else closes the incident, which is the
-	-- whole of what a provoked victim did before it existed.
-	--
-	-- Against a mounted rider that release is held back until the rider is on
-	-- the ground. Handing him the offense first is what made him punch the
-	-- horse: told to attack, he attacks the thing in front of him, and the
-	-- pull-down request then queues behind the swing. A man who wants to
-	-- fight someone on a horse takes them off it first, so the order here is
-	-- pull, then fight.
-	-- Not for a soldier. The game raises its own surrender prompt when it
-	-- arrests you, and a guard provoked in front of a witness is an arrest, so
-	-- this one would sit beside it: two prompts on screen offering the same
-	-- thing. Reproducible every time by provoking a guard another guard can
-	-- see, and never with a villager, who cannot arrest anyone.
-	--
-	-- The mod's own documentation already records that a shoved guard arrests
-	-- rather than brawls, and that the game's rule for soldiers is left alone.
-	-- Its prompt should be left alone with it.
+	-- The surrender prompt, except for a soldier, whose arrest raises the
+	-- game's own; see `SurrenderIsTheGames`.
 	if self:SurrenderIsTheGames(npc) then
-		self:Log("SurrenderHint left to the game for " .. self:NameOf(npc))
+		if self.Config.LogTelemetry then
+			self:Log("SurrenderHint left to the game for " .. self:NameOf(npc))
+		end
 	else
 		self:ShowSurrenderHint(npc)
 	end
-
-	if self:PullRiderDown(npc) then
-		return true
-	end
-
-	self:ReleaseWhenFighting(npc)
 
 	-- The count is spent. Without this a victim already fighting keeps
 	-- rolling on every further contact during the brawl.
 	self.Annoyance[tostring(npc.id)] = nil
 
+	-- The provocation decides that he fights; releasing the offense decides
+	-- that he attacks. Without it he enters the fight in defense only and
+	-- holds a guard, unable to close the distance for the pull-down.
+	self:PullRiderDown(npc)
+	self:ReleaseWhenFighting(npc)
+
 	return true
 end
 
---- Has a provoked victim drag the rider out of the saddle.
+--- Has a provoked victim drag the player out of the saddle.
 --
 -- A man who has run out of patience with someone riding into him goes for the
--- rider, not the animal. Left to itself the AI gets there eventually, but it
--- fights the horse first while it works into position, and a person throwing
--- punches at a horse does not read as anything a person would do.
+-- rider, not the animal.
 --
 -- `RequestHorsePullDown` is the vanilla action, the same one guards use when
 -- they unhorse the player, and it takes the victim's entity id, meaning the
 -- person being pulled down. It is offered by the AI's own behavior tree as
--- `HorsePullDownAction`, governed by `wh_cs_HorsePullDownAngle` at 55 degrees
--- with a Z angle and a zero angle alongside it, so it is not available until
--- the NPC has the geometry. `CanHorsePullDown` returns 0 until then.
+-- `HorsePullDownAction`, governed by `wh_cs_HorsePullDownAngle` (55 degrees)
+-- and its sibling angle cvars, so it is not available until the NPC has the
+-- geometry.
 --
 -- So this asks repeatedly rather than once, from the moment the fight starts,
--- until the rider is down. Nothing is forced: if the geometry never
--- comes the request is simply never made and the brawl proceeds as it did
--- before.
+-- until the player is down, while `ReleaseWhenFighting` releases the offense
+-- so the victim closes the distance instead of standing in defense only.
+-- Nothing is forced: if the geometry never comes the request is never made and
+-- the brawl proceeds without the pull.
 --
 -- A rider already on the ground is the other reason to stop, and it is the
 -- common one, since the whole point is that this happens early.
 --
--- Returns whether it has taken responsibility for starting the fight. When it
--- has, the caller must not release the offense: this does it once the rider is
--- down, or on the ceiling if the pull never comes.
---
 -- @tparam table npc the provoked victim
--- @treturn boolean true when the offense release has been deferred to this
 function HorseCollisionMod:PullRiderDown(npc)
 	local mounted = false
 
@@ -1110,7 +973,7 @@ function HorseCollisionMod:PullRiderDown(npc)
 	end)
 
 	if not self.Config.RetaliationPullsRiderDown or not mounted then
-		return false
+		return
 	end
 
 	local pollMs = self.Config.PullDownPollMs
@@ -1119,30 +982,23 @@ function HorseCollisionMod:PullRiderDown(npc)
 	local startedAt = self:TimeMs()
 	local polls = 0
 	local bestCan = 0
-	local bestCanHorse = 0
-	local bestAngle = 999
-	local widestAngle = -1
-	local angleWhenEnabled = -1
-	local pullTarget = "player"
 
 	local function attempt()
 		if generation ~= self.TimerTick then
 			return
 		end
 
-		local mounted = false
+		local stillMounted = false
 
 		pcall(function()
-			mounted = player.human:IsMounted()
+			stillMounted = player.human:IsMounted()
 		end)
 
 		local elapsed = self:TimeMs() - startedAt
 
-		if not mounted or elapsed >= ceilingMs then
+		if not stillMounted or elapsed >= ceilingMs then
 			if self.Config.LogTelemetry then
-				-- What the victim looked like when it never became available,
-				-- since one merchant gets the pull within a second and
-				-- another never gets it at all across the whole ceiling.
+				-- What the victim looked like when the pull ended.
 				local state, dist, hostile = "?", -1, "?"
 
 				pcall(function()
@@ -1158,121 +1014,36 @@ function HorseCollisionMod:PullRiderDown(npc)
 				end)
 
 				self:Log("PullDown " .. self:NameOf(npc)
-						.. " done why=" .. (mounted and "ceiling" or "dismounted")
+						.. " done why=" .. (stillMounted and "ceiling" or "dismounted")
 						.. " atMs=" .. string.format("%.0f", elapsed)
 						.. " polls=" .. tostring(polls)
 						.. " bestCan=" .. tostring(bestCan)
-						.. " bestCanHorse=" .. tostring(bestCanHorse)
-						.. " angles=" .. string.format("%.0f", bestAngle)
-						.. "-" .. string.format("%.0f", widestAngle)
-						.. " enabledAt=" .. string.format("%.0f", angleWhenEnabled)
 						.. " state=" .. state
 						.. " dist=" .. string.format("%.2f", dist)
 						.. " hostile=" .. hostile)
 			end
 
-			-- Now he may swing. Held until here so the pull is the opening
-			-- move rather than something queued behind a punch, and released
-			-- on the ceiling too so a victim who never gets the geometry is
-			-- not left standing with his guard up forever.
-			self:ReleaseWhenFighting(npc)
-
 			return
 		end
 
 		local can = 0
-		local canHorse = 0
 
 		pcall(function()
 			can = npc.actor:CanHorsePullDown(player.id) or 0
 		end)
 
-		-- The rider is pulled off a horse, so the id the action wants may be
-		-- the horse rather than the person. Both are asked until one of them
-		-- is shown to be the right one.
-		pcall(function()
-			local h = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
-
-			if h then
-				canHorse = npc.actor:CanHorsePullDown(h.id) or 0
-			end
-		end)
-
 		polls = polls + 1
-
-		-- The angle between where the horse is pointing and where the victim
-		-- is standing. `wh_cs_HorsePullDownAngle` is 55 degrees, so a victim
-		-- who only ever approaches from the flank may never qualify.
-		pcall(function()
-			local h = XGenAIModule.GetEntityByWUID(player.player:GetPlayerHorse())
-			local hp = h and h:GetWorldPos()
-			local np = npc:GetWorldPos()
-			local dir = h and h:GetDirectionVector(1)
-
-			if hp and np and dir then
-				local dx, dy = np.x - hp.x, np.y - hp.y
-				local len = math.sqrt(dx * dx + dy * dy)
-
-				if len > 0 then
-					local dot = ((dx / len) * dir.x) + ((dy / len) * dir.y)
-
-					if dot > 1 then
-						dot = 1
-					end
-
-					if dot < -1 then
-						dot = -1
-					end
-
-					local deg = math.acos(dot) * 180 / math.pi
-
-					if deg < bestAngle then
-						bestAngle = deg
-					end
-
-					if deg > widestAngle then
-						widestAngle = deg
-					end
-
-					if can ~= 0 and angleWhenEnabled < 0 then
-						angleWhenEnabled = deg
-					end
-				end
-			end
-		end)
 
 		if can > bestCan then
 			bestCan = can
 		end
 
-		if canHorse > bestCanHorse then
-			bestCanHorse = canHorse
-		end
-
-		if can == 0 and canHorse ~= 0 then
-			can = canHorse
-			pullTarget = "horse"
-		end
-
-		-- Asked regardless of what the check says when `PullDownForce` is on.
-		-- `CanHorsePullDown` returns an HPS status, 2 enabled and 1 disabled,
-		-- and some victims answer 0, meaning the engine does not consider the
-		-- action applicable to them at all. Measured on one merchant across
-		-- 32 polls at every angle from 1 to 117 degrees and under two meters,
-		-- while another merchant answers 2 within a second. Whether the
-		-- request is honoured anyway is a separate question from whether the
-		-- check advertises it.
+		-- `CanHorsePullDown` returns an HPS status: 2 enabled, 1 disabled and
+		-- 0 not applicable, which some victims answer at every angle and
+		-- distance. `PullDownForce` requests regardless of the answer.
 		if can ~= 0 or self.Config.PullDownForce then
 			local ok = pcall(function()
-				local id = player.id
-
-				if pullTarget == "horse" then
-					local h = XGenAIModule.GetEntityByWUID(
-							player.player:GetPlayerHorse())
-					id = h and h.id or player.id
-				end
-
-				npc.actor:RequestHorsePullDown(id)
+				npc.actor:RequestHorsePullDown(player.id)
 			end)
 
 			if self.Config.LogTelemetry then
@@ -1282,11 +1053,10 @@ function HorseCollisionMod:PullRiderDown(npc)
 						.. " atMs=" .. string.format("%.0f", elapsed))
 			end
 
-			-- Asked again on a slow cadence until the rider is actually
-			-- down. The request is accepted immediately but the brain runs
-			-- it when it is ready, and without the offense released there is
-			-- little for it to be busy with, so this is a safety net rather
-			-- than the mechanism.
+			-- Asked again on a slow cadence until the player is actually
+			-- down. The request is accepted immediately and the brain runs
+			-- it when it is ready, so this is a safety net rather than the
+			-- mechanism.
 			Script.SetTimer(self.Config.PullDownRepeatMs, attempt)
 
 			return

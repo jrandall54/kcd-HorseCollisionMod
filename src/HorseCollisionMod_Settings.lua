@@ -13,7 +13,7 @@ HorseCollisionModSettings = {
 	-- Speed tiers. Below SpeedWalk nothing happens at all.
 	SpeedWalk                = 1.8,   -- staggers, no damage, no stamina cost
 	SpeedTrot                = 4.5,   -- knocked down
-	SpeedGallop              = 8.5,   -- knocked down harder
+	SpeedGallop              = 8.5,   -- thrown
 
 	-- Whether maneuvers (Lean, Rear, Charge) require Horsemanship perks.
 	RequirePerks             = true,
@@ -29,16 +29,13 @@ HorseCollisionModSettings = {
 	HorseHalfWidth           = 0.70,  -- meters to either side
 	HorseRearReach           = 0.20,  -- meters behind
 
-	-- Knockdown force, trot and gallop only.
+	-- The force a thrown victim is pushed with, at the gallop and the charge.
 	Knockback                = 50.0,  -- horizontal, higher throws further
 	Uplift                   = 30.0,  -- vertical, higher throws upward
 
-	-- The ceiling a thrown body is held under, the drag that holds it there and
-	-- the brake or launch it enters with all live in `ThrowProfileByTier`
-	-- below, one set per tier. They used to live here, as one set shared by
-	-- every tier that ragdolls, which is why the rear charge's throw distance
-	-- could only be changed by moving the gallop's.
-
+	-- How a thrown body settles once it is down. The ceiling it is held under
+	-- in the air, and the brake or launch it starts with, are per tier in
+	-- `ThrowProfileByTier` below.
 	RagdollDamping           = 5.0,   -- higher stops a thrown body sooner
 	RagdollMinEnergy         = 1.0,   -- higher puts it to rest sooner
 	RagdollDampPollMs        = 100,   -- how often to look at a thrown body
@@ -46,47 +43,15 @@ HorseCollisionModSettings = {
 	RagdollDampFloorMs       = 200,   -- never damp before this, mid-launch
 	RagdollDampCeilingMs     = 6000,  -- damp regardless by this point
 
-	-- =========================================================================
-	-- Dynamic Ragdoll Recovery & Ground Stun
-	-- =========================================================================
-	-- Whether to scale the ragdoll get-up delay based on impact tier and armor.
-	-- When enabled, heavy armored targets recover quickly to defend themselves,
-	-- while unarmored villagers or severe high-speed collisions leave the victim
-	-- stunned on the ground longer.
-	DynamicRecovery           = true,
-
-	-- Base get-up stillness delay (in seconds) by impact tier.
-	-- Trot knocks down lightly; Gallop and Charge deliver heavy concussive force.
-	RecoveryDelayByTier       = {
-		Trot   = 0.5,   -- light knock, quick shake-off
-		Gallop = 2.0,   -- solid hit, concussive knockdown
-		Rear   = 1.0,   -- reared and bowled over
-		Charge = 3.5,   -- devastating direct charge
-	},
-
-	-- How armor modifies the recovery delay.
-	-- Unarmored victims (high armor scale, ~1.15-1.26) take more of the shock
-	-- and stay down longer. Fully armored guards (~0.35-0.42) absorb the impact
-	-- across their plate and recover faster.
-	-- Multipliers applied to RecoveryDelayByTier:
-	RecoveryArmorScaleArmored   = 0.6,   -- armored knight recovers 40% faster
-	RecoveryArmorScaleUnarmored = 1.5,   -- unarmored peasant stays down 50% longer
-
-	-- Bounds on total get-up stillness duration (in seconds):
-	RecoveryMinSec            = 0.3,   -- fastest recovery (near immediate)
-	RecoveryMaxSec            = 5.0,   -- maximum groggy stun duration
-
-	-- Ground hurt barks: while recovering on the ground, weaker/dazed victims
-	-- periodically emit groans of pain (RANENY_NA_ZEMI) before standing up.
-	RecoveryGroundBarks       = true,
-	RecoveryBarkIntervalMs    = 1400,  -- ms between pain moans while down
-
 	-- Waiting for a victim to be back on their feet.
 	RisePollMs                = 160,   -- how often to look
 	RiseCeilingMs             = 15000, -- how long before the wait is given up
 
-	-- Native Engine Ragdoll Stillness CVars
-	-- Set the time and speed threshold required for ragdoll recovery.
+	-- When a ragdolled body gets up: it must lie still for RagdollStillDuration
+	-- seconds, moving slower than RagdollStillSpeedThreshold. These are the
+	-- engine's console variables `wh_rd_StillDuration` and
+	-- `wh_rd_StillSpeedThreshold`, written on every load over any value set
+	-- there.
 	RagdollStillDuration        = 0.8,
 	RagdollStillSpeedThreshold  = 0.4,
 
@@ -125,7 +90,7 @@ HorseCollisionModSettings = {
 	-- anchor: it reaches MaxArmorStaminaAdd at ArmorStaminaFullWeight, the
 	-- weight of a full set of armor, so a villager in clothes pays almost
 	-- nothing.
-	ArmorReferenceWeight     = 8.0,   -- the weight counted as a full set
+	ArmorReferenceWeight     = 8.0,   -- the weight whose multiplier is 1.0
 	ArmorImpulseExponent     = 0.5,   -- higher means armor plants them harder
 	MinArmorImpulse          = 0.35,  -- a knight is never immovable
 	MaxArmorImpulse          = 1.5,   -- nor is a naked peasant weightless
@@ -133,150 +98,60 @@ HorseCollisionModSettings = {
 	ArmorStaminaExponent     = 1.0,   -- higher means light armor costs less
 	MaxArmorStaminaAdd       = 0.05,  -- the most an armored victim can add
 
-	-- The floor a collision will not take a victim below. A collision puts
-	-- its victim into a wounded state whose exit is gated on health, and an
-	-- NPC never heals, so a victim left below that gate stays wounded for
-	-- good: rooted in place, unable to fight, permanently.
-	--
-	-- Damage still lands, and still accumulates, down to this figure. The
-	-- cost is that a collision can no longer kill: a victim cannot be
-	-- trampled past the floor, however many times they are ridden into.
-	-- Set it to 0 to restore the behavior 3.0.0 shipped with, lockup
-	-- included.
-	SuppressAutoCureSec      = 30,   -- exempt victims from the auto-cure daycycle
+	-- Keeps a victim out of vanilla's auto-cure daycycle after an impact,
+	-- until their health is back over AutoCureHealthLimit.
+	SuppressAutoCureSec      = 30,   -- how often it is rechecked; 0 turns it off
 	AutoCureHealthLimit      = 40.0,  -- exemption held until health is back over this
 
-	-- Losing patience. Barging the same person at a walk costs nobody
-	-- anything, so this lets them run out of patience and swing back. The
-	-- first shove is always free; each one after that rolls against a
-	-- chance that grows with the count.
-	--
-	-- The fight it starts is deliberately not a crime: no fine, no guard
-	-- summoned. Guards who actually witness the brawl still wade in.
-	--
-	-- Only men fight back. The game itself refuses the fight branch to
-	-- women, and nothing this mod sets changes that.
-	-- Which key does what. Only these eight are offered, because the mod
-	-- cannot rebind a key at runtime and its action map has to declare each
-	-- one in advance: r, q, e, f, y, u, o, h.
-	--
-	-- The lean takes q and e, the usual keys for it. The rears take r and f,
-	-- neither of which does anything in vanilla while mounted. Note that the
-	-- key a vanilla action answers to is not always visible in the game's own
-	-- files: surrender and draw resolve through the player profile rather
-	-- than a pak, so g and the number keys are spoken for without ever
-	-- appearing in a scan of the shipped action maps.
+	-- Which key does what. Any of r, q, e, f, y, u, o and h can be used; the
+	-- mod's action map declares these eight and no others. The lean takes q
+	-- and e and the rears take r and f, none of which does anything in vanilla
+	-- while mounted.
 	RearChargeKey            = "r",   -- rear, then drive forward
 	RearOnlyKey              = "f",   -- rear on the spot
 	Rear                     = true,
 	RearIdleOnly             = true,  -- also require the horse's idle state
 	RearMaxSpeed             = 0.15,  -- horizontal m/s; above this it slides
-	RearCooldownMs           = 7500,  -- after a rear lands, set by feel
-	ChargeCooldownMs         = 12500, -- after a charge lands, set by feel
+	RearCooldownMs           = 7500,  -- after a rear lands
+	ChargeCooldownMs         = 12500, -- after a charge lands
 	MoveCooldownIcons        = true,  -- show an icon while either runs
 	RearFragTag              = "hcm_rear_charge", -- rear, then drive forward
 	RearOnlyFragTag          = "hcm_rear",       -- the second key rears on the spot
-	-- The charge rears in place and is then pushed forward physically, so the
-	-- horse collides with the world like any moving horse.
-	-- The rear on the spot is its own tier too. Hooves coming down on someone
-	-- is not a horse riding into them, so it has its own sound, dust, shake,
-	-- blur and reaction rather than borrowing the trot's.
-	-- A rear is hooves coming down, so it leads with the horse's own landing
-	-- rather than a hoofstep. `a_o_jump_landing` is the front feet hitting the
-	-- ground after a jump, which is the same motion.
-	--
-	-- Its level is fixed: distance and obstruction do nothing to it. The fourth
-	-- number is the only control there is, a chance of playing at all, so that
-	-- it punctuates a rear rather than being welded to every one of them.
-	-- The two armor layers sit further back than they did, and the hoofstep
-	-- closer. `body` and `blunt` resolve by what the victim is wearing, and
-	-- the chainmail variants are much brighter than the fabric ones: on an
-	-- armored target they were masking the hoof entirely, while on an
-	-- unarmored one the balance was right. Both were confirmed playing in the
-	-- log, so this is a mix rather than a missing trigger.
-	ImpactDustEffectRear     = "collisions.destructibles.arrow_soil",
+	ImpactDustEffectRear     = "collisions.destructibles.arrow_soil", -- a rear's dust
 
-	-- The charge is its own tier, not a gallop. It has its own damage, sound,
-	-- dust, camera shake and view blur, so it can be tuned without touching
-	-- what an ordinary collision does. It knocks down everyone in a corridor in
-	-- front of the horse, with no cap: a crowd cannot shield each other by
-	-- standing close.
-	--
-	-- Its sound drops the log layer an ordinary gallop uses and adds hoofsteps,
-	-- so a charge sounds like a horse coming down on someone rather than like
-	-- riding into them. `hs_hp_soil` ignores position and plays at a fixed
-	-- level, so it is set back from the ear rather than sitting on top.
+	-- The charge rears in place and is then pushed forward physically. It is
+	-- its own tier, with its own damage, sound, dust, camera shake and view
+	-- blur. It knocks down everyone in a corridor in front of the horse, with
+	-- no cap: a crowd cannot shield each other by standing close.
 	RearChargeStrikes        = true,  -- whether the charge knocks people down
 	RearChargeStrikeReach    = 1.8,   -- how far ahead it reaches
 	RearChargeStrikeWidth    = 0.9,   -- how wide, either side
-	-- The speed a charge is resolved at, scoring and physics alike.
-	--
-	-- Declared rather than measured, because the horse cannot be measured
-	-- through a lunge: its speed is derived from its positions and the rear
-	-- holds it animation-controlled, so the readings are 0.02 and 0.07 with
-	-- occasional snaps of 25.9. Neither works, and each produces a charge
-	-- whose throw had nothing to do with what the player saw.
-	--
-	-- The figure is the charge's own push, which the mod applies itself: an
-	-- impulse is a change in momentum, so 6000 units on a horse the engine
-	-- masses at 480 kg buys 12.5 m/s, less the share the 0.2 lift takes out of
-	-- the horizontal. Change `RearChargeImpulse` and this should follow it.
-	--
-	-- It sits just under a gallop's own ceiling, so a charge hits like a horse
-	-- at full gallop. How far a charge throws is `RearChargeThrow` below, not
-	-- this figure.
+	-- The speed a charge is scored and thrown at. It is RearChargeImpulse over
+	-- the horse's mass, 6000 on about 480 kg, less the share the lift takes;
+	-- change it with RearChargeImpulse. How far a charge throws is
+	-- RearChargeThrow below, not this figure.
 	RearChargeImpactSpeed    = 12.3,  -- the speed a charge is resolved at
 
-	-- How far a charge throws, and the only dial for it.
-	--
-	-- The mod commands a charge's throw outright rather than subtracting from
-	-- the engine's, because there is nothing to subtract from: the lunge starts
-	-- from a stop, the horse moves only because of `RearChargeImpulse`, and
-	-- through the rear Mannequin holds it animation-controlled, so its own
-	-- velocity cannot be read at all. Measured with no mod throw in place,
-	-- charge victims moved 0.3 to 1.0 m.
-	--
-	-- The throw is the lunge speed above times the tier's transfer in
-	-- `ThrowProfileByTier`, and this multiplies the result. The transfers are
-	-- set so that 1.0 lands a charge where a gallop lands, which is the honest
-	-- place to start from.
-	--
-	-- Turn it up freely. A charge is an offensive attack the player commands,
-	-- not a consequence of riding into somebody, so this is allowed a much
-	-- wider range than anything on the gallop.
+	-- How far a charge throws, and the only dial for it. The throw is the lunge
+	-- speed above times the tier's transfer in `ThrowProfileByTier`, times this;
+	-- at 1.0 a charge lands where a gallop lands.
 	RearChargeThrow          = 0.6,   -- 1.0 throws like a gallop, 2.0 twice as far
-	-- The near miss, the charge's own. Same idea as the rear's band but a
-	-- wider one, because the margin the rear uses does not describe a charge.
-	-- A rear is a horse making a noise in one place and the fright is the
-	-- hooves coming down a stride away, so a stride past the strike is the
-	-- whole of it. A charge is a horse bearing down at speed, and a man does
-	-- not have to be within a stride of it to have something to run from: the
-	-- horse will be where he is standing in a moment.
-	--
-	-- So the margin is the ground the horse covers rather than the room a man
-	-- stands in. `RearChargeLungePeakMin` is the slowest a lunge may be and
-	-- still count as one, 3.0 m/s, and a second of that past the 1.8 m
-	-- corridor is 4.8 m. That is comfortably outside the rear's 3.5 and it is
-	-- derived from the lunge rather than chosen to be bigger.
+	-- Bystanders a charge passes without striking are frightened and run.
+	-- RearChargeFearReach is the 1.8 m strike reach plus one second of the
+	-- slowest lunge, RearChargeLungePeakMin.
 	RearChargeFear           = true,
 	RearChargeFearReach      = 4.8,   -- the corridor plus a second of lunge
-	-- The same rank as the rear's scream, and for the same reason: it is
-	-- spoken by a man already running, over whatever his own brain says while
-	-- he runs.
-	RearChargeFearScreamPriority = 50,
+	RearChargeFearScreamPriority = 50, -- the rank the scream is sent at
 	RearChargeImpulse        = 6000,  -- how hard the charge is pushed
 	RearChargeLift           = 0.2,   -- how much of that is upward
-	RearChargeWindowMs       = 2600,  -- how long a charge counts as a gallop
+	RearChargeWindowMs       = 2600,  -- ceiling on a charge that never decays
 	RearStrikes              = true,  -- the rear on the spot hits who is in front
 	RearStrikeMs             = 700,   -- when in the animation they land
-	-- Leaning out to see past the horse's head, in first person.
-	--
-	-- The camera slides to one side so you can look along the horse's neck
-	-- rather than into it. Amplitude is not the distance traveled: the push
-	-- is the opening part of one very slow swing, so at a period of 30 and a
-	-- duration of 2 the camera reaches roughly 40 per cent of the amplitude.
-	--
-	-- Lower LeanPeriod to lean faster, raise LeanAmplitude to lean further.
+	-- Leaning out to see past the horse's head, in first person. The camera
+	-- travels out fast on LeanTravelAmplitude, then holds at LeanDistance on
+	-- LeanHoldAmplitude, corrected every LeanPollMs when it drifts further than
+	-- LeanDeadband. A lean ends on its own if the rider looks too far off the
+	-- horse's line.
 	Lean                     = true,
 	LeanLeftKey              = "q",   -- q and e, the usual lean keys
 	LeanRightKey             = "e",
@@ -284,43 +159,40 @@ HorseCollisionModSettings = {
 	LeanForwardShare         = 0.35,  -- how much it also carries forward, 0 for none
 	LeanTravelAmplitude      = 110.0,   -- higher gets out there faster
 	LeanHoldAmplitude        = 3.0,   -- lower holds steadier once out
-	LeanPollMs               = 30,
-	LeanDeadband             = 0.06,
-	LeanMinFlipMs            = 200,
-	LeanRunawayFactor        = 2.0,
+	LeanPollMs               = 30,    -- how often the hold is checked
+	LeanDeadband             = 0.06,  -- meters off target before a correction
+	LeanRunawayFactor        = 2.0,   -- end the lean this many times past target
 	LeanMaxAngleDeg          = 45,    -- refuse a lean past this far off the horse's line
 	LeanMaxPitchDeg          = 55,    -- and past this far up or down
 	LeanSuppressShake        = true,  -- an impact does not shake the view mid lean
 	LeanTurnLeadMs           = 200,   -- cancel this far ahead of a fast turn
-	LeanHomeMs               = 220,    -- how often the hold is corrected
-	LeanShakePeriod          = 40.0,
-	LeanShakeSec             = 1.5,  -- long enough to outlast a held lean
+	LeanHomeMs               = 220,    -- wait before another lean, while the camera returns
+	LeanShakePeriod          = 40.0,  -- the camera shake period a lean is driven by
+	LeanShakeSec             = 1.5,  -- how long each shake lives; a hold renews it
 	LeanReleaseSec           = 0.05,  -- a short shake, so it expires and comes home
 
 	RearReach                = 2.5,   -- how far in front they reach
 	RearArc                  = 70,    -- the arc in front that counts
 
-	-- The near miss. A horse rearing is not in itself frightening and not a
-	-- crime; what frightens a man is the hooves coming down a stride away
-	-- from him. So the band is not a sweep of the area but a margin around
-	-- the strike, one meter of ground past where the hooves reach. It has no
-	-- arc, unlike the strike: a man the horse reared beside saw the same
-	-- thing as a man it reared in front of.
+	-- Bystanders near a rear who are not struck are frightened and run, in a
+	-- band one stride past where the hooves reach, all round the horse.
 	RearFear                 = true,
 	RearFearReach            = 3.5,   -- a stride past the hooves, all round
-	-- The scream is spoken by a man already running, over whatever his own
-	-- brain says while he runs, so it is submitted above the rank victim lines
-	-- ship at. 50 is the rank Henry's own lines were confirmed audible at and
-	-- is used here for the same reason.
-	RearFearScreamPriority   = 50,
+	RearFearScreamPriority   = 50,    -- the rank the scream is sent at
 
+	-- Losing patience. Barging the same person at a walk costs nobody
+	-- anything, so this lets them run out of patience and swing back. The
+	-- first shove is always free; each one after that rolls against a
+	-- chance that grows with the count.
+	--
+	-- The fight it starts is deliberately not a crime: no fine, no guard
+	-- summoned. Guards who actually witness the brawl still wade in. When the
+	-- fight is over the victim's regard for Henry is put back the way it was.
 	Retaliation              = true,
 	RetaliationFreeBumps     = 1,     -- shoves tolerated before any chance
 	RetaliationChanceStep    = 0.25,  -- added per shove beyond that
 	RetaliationMaxChance     = 0.85,  -- the chance never exceeds this
 	RetaliationMemorySec     = 45,    -- how long a victim stays annoyed
-	-- The brawl is not timed. The mod watches the victim's own state, and
-	-- when the fight is over it puts him back the way it found him.
 	RetaliationCeilingSec    = 120,   -- failsafe, stop watching after this
 	RetaliationPullsRiderDown = true, -- drag the rider down before fighting
 	RetaliationSurrenderHint = true,  -- show the surrender prompt during the brawl
@@ -334,31 +206,13 @@ HorseCollisionModSettings = {
 	PullDownRepeatMs         = 1500,  -- ask again this often until it happens
 	PullDownCeilingMs        = 8000,  -- stop looking after this
 
-	-- A woman answers the same shove differently, because the game's combat
-	-- tree lets only men into the fight branch. She runs and fetches a guard
-	-- instead, on the same count and the same roll.
+	-- The game lets only men into the fight branch. A woman runs and fetches a
+	-- guard instead, on the same count and the same roll.
 	WomenRaiseAlarm          = true,  -- women raise the alarm rather than fight
 
 	-- What being ridden down costs, over and above the engine's own charge for
-	-- the collision. The engine's charge barely notices armor, so this is what
-	-- makes a knight in plate different from a villager in a shirt.
-	--
-	-- Ordinary clothes are in the game's armor table and sum to about 0.4, so
-	-- that much is ignored before anything counts as armor. Past it a victim
-	-- takes half the tier's damage at ImpactDamageArmorScale, a third at twice
-	-- it, and so on down. Worn totals run about 0.3 in clothes, 5 in mail and
-	-- 12 or more in plate.
+	-- the collision. The damage model is described above ImpactDamageByTier.
 	ImpactDamage             = true,  -- charge the victim for the impact
-	-- The damage model, in one place, meant to be read and tuned together.
-	--
-	-- ImpactDamageByTier says what a collision is worth before armor.
-	-- ArmorScale and ArmorCurve say how much of that survives what the victim
-	-- is wearing. ArmorFloor says how little armor is allowed to refuse.
-	--
-	-- Worked example at the defaults: a town guard reads smash_def about 5, so
-	-- worn is 4.5, the falloff is 1/(1+4.5/2.9) = 0.39, and a gallop's 111
-	-- becomes 44, which is two impacts to put him down on good rolls and three
-	-- otherwise. Lower ArmorScale and armor refuses more of every blow.
 	-- How hard the engine is told each impact hit, by name. The names come
 	-- from the game's own hit reaction scale, ascending: Tickle, Unpleasant,
 	-- Exhausting, MinorInjury, MajorInjury, Fatal.
@@ -371,8 +225,7 @@ HorseCollisionModSettings = {
 	},
 
 	-- Which set of spoken lines a victim answers each impact with. The rear
-	-- and the charge have their own voice, separate from the collision sets
-	-- and with their own switch.
+	-- has its own set, with its own switch, RearBarks.
 	VictimBarkByTier         = {
 		Walk   = "collision",
 		Trot   = "collision",
@@ -382,7 +235,7 @@ HorseCollisionModSettings = {
 	},
 
 	-- Which impacts can make a victim lose patience and fight back. Only the
-	-- shove: being reared on is not a patience problem.
+	-- shove.
 	RetaliationByTier        = {
 		Walk   = true,
 		Trot   = false,
@@ -409,26 +262,20 @@ HorseCollisionModSettings = {
 
 	-- How low a victim's head must be, as a fraction of how high they carry it
 	-- standing, before the mod treats them as flat on the ground and refuses
-	-- to start an animation on them.
-	--
-	-- Measured, not chosen. Every reading taken of a body lying flat is 0.04
-	-- or 0.10 of its standing height; every reading of one that has begun to
-	-- get up is 0.17 or more. This sits between them.
-	--
-	-- Raise it and a victim is refused further into their get-up; lower it and
-	-- a reaction can start on a body still on the ground, which snaps them
-	-- upright into it.
-	VictimFlatFraction       = 0.45,
+	-- to start an animation on them. Raise it and a victim is refused further
+	-- into their get-up; lower it and a reaction can start on a body still on
+	-- the ground.
+	VictimFlatFraction       = 0.15,
 
-	-- What a tier does to the victim's body.
-	--
-	-- "stagger" and "knockdown" play an animation and nothing else. "fall"
-	-- plays an animation whose own timing hands the body to physics partway
-	-- through, and is the only one that restores a victim's facing and gives
-	-- them their activity back afterwards. "ragdoll" drops them at the moment
-	-- of contact and this mod drives the throw.
 	-- Impact audio, one layer list per tier. Each layer is
-	-- { event, delay in milliseconds, volume, optional pitch }.
+	-- { trigger, delay in milliseconds, distance in meters, chance }.
+	--
+	-- Distance is the volume control: a layer is played that much further
+	-- away, from the same direction, so higher is quieter. It does nothing to
+	-- `a_o_jump_landing` or `hs_hp_soil`, which ignore position; chance, from 0
+	-- to 1, is how often a layer plays at all. `body`, `body_armed`,
+	-- `face_armed` and `blunt` are replaced with the sample matching what the
+	-- victim is wearing.
 	ImpactSoundByTier        = {
 		-- Movement foley rather than an impact: a shove is a scuff and a
 		-- stumble, spread out so it does not read as one hit.
@@ -440,24 +287,14 @@ HorseCollisionModSettings = {
 		           { "f_n_mat_foleyam_cl", 13 },
 		           { "f_bodyfall1", 18 } },
 
-		-- A trot puts someone on the ground, so the blunt impact leads,
-		-- doubled with the second copy taken back a fraction to shade it
-		-- down. Both copies sit back from the ear: at zero distance the lead
-		-- impact is louder from the saddle than a trot deserves.
+		-- The blunt impact leads, doubled with the second copy set a little
+		-- further back.
 		Trot   = { { "body", 0, 1.3 },
 		           { "body", 0, 1.65 },
 		           { "f_bodyfall1", 0, 1.5 } },
 
-		-- A gallop stacks four different blunt impacts rather than repeats of
-		-- one, so it reads as a collision instead of a flam, with the body
-		-- settling underneath. Every impact layer is a token, so a mailed
-		-- guard and a peasant in cloth sound different on all four.
-		--
-		-- No hoofstep. `hs_hp_soil` is `hoofsteps_player`, the same family as
-		-- `a_o_jump_landing`, and those events ignore position: it played at a
-		-- fixed full level under every other layer and was the loudest thing
-		-- in the mix with no way down. The horse is already making that noise
-		-- at a gallop on its own.
+		-- Four different blunt impacts rather than repeats of one, with the body
+		-- settling underneath.
 		Gallop = { { "body", 0, 0.5 },
 		           { "n_lu_log_ground", 0, 1.0 },
 		           { "body_armed", 0, 0.85 },
@@ -465,14 +302,14 @@ HorseCollisionModSettings = {
 		           { "face_armed", 0, 0.9 },
 		           { "f_bodyfall1", 0, 0.7 } },
 
-		-- The rear leads with the horse's own landing, because that is what
-		-- the victim is hit by.
+		-- Leads with the horse's own landing, on 60% of rears.
 		Rear   = { { "a_o_jump_landing", 0, 0, 0.6 },
 		           { "hs_hp_soil", 2, 0.6 },
 		           { "body", 0, 1.6 },
 		           { "blunt", 0, 2.0 },
 		           { "f_bodyfall1", 0, 1.3 } },
 
+		-- The gallop's impacts without the log layer, with hoofsteps.
 		Charge = { { "body", 0, 0.6 },
 		           { "hs_hp_soil", 3, 0.8 },
 		           { "body_armed", 0, 0.9 },
@@ -482,11 +319,11 @@ HorseCollisionModSettings = {
 		           { "f_bodyfall1", 0, 0.7 } },
 	},
 
-	HorseVocal               = true,
-	HorseVocalCooldownMs     = 1500,
+	HorseVocal               = true,  -- whether the horse makes a noise on impact
+	HorseVocalCooldownMs     = 1500,  -- how long it stays quiet afterwards
 
-	-- Horse vocalization on impact. Triggered on the horse entity, not the
-	-- victim. Rear and Charge are already covered by animation-driven sounds.
+	-- The horse's noise on impact, as an impact layer. Rear and Charge are
+	-- empty because their animations carry their own.
 	HorseVocalByTier         = {
 		Walk   = { "a_o_horse_excited1", 0, 0, 1 },
 		Trot   = { "a_o_horse_excited1", 0, 0, 1 },
@@ -495,12 +332,15 @@ HorseCollisionModSettings = {
 		Charge = { "", 0, 0, 1 },
 	},
 
+	-- Where each tier's horse noise sits in its cooldown, so a heavier impact
+	-- is never silenced by a lighter one.
 	HorseVocalRankByTier     = {
 		Walk = 1, Trot = 2, Gallop = 3, Rear = 2, Charge = 3,
 	},
 
-	-- Henry's own grunt as the collision goes through him, as
-	-- { event, delay in milliseconds, pitch, volume }.
+	-- Henry's own grunt as the collision goes through him, as an impact layer.
+	-- The triggers available are `v_henry_hit_soft`, `v_henry_hit_medium` and
+	-- `v_henry_hit_heavy`; "" silences a tier.
 	RiderVocalByTier         = {
 		Walk   = { "", 140, 0, 1 },
 		Trot   = { "v_henry_hit_soft", 140, 0, 1 },
@@ -516,14 +356,13 @@ HorseCollisionModSettings = {
 	},
 
 	-- How hard each tier kicks the camera. A tier with no entry does not
-	-- shake it at all, which is why the walk is absent.
+	-- shake it at all; the walk has none.
 	CameraShakeByTier        = {
 		Trot = 0.6, Gallop = 1.0, Rear = 0.8, Charge = 1.2,
 	},
 
-	-- How much each tier blurs the view, and how long that lasts. They are
-	-- two tables rather than one pair per tier because they came apart in
-	-- tuning: a trot wanted the strength kept and the length cut.
+	-- How much each tier blurs the view, and how long that lasts, as a share
+	-- of RiderBlurAmount and RiderBlurMs.
 	RiderBlurByTier          = {
 		Trot = 0.7, Gallop = 1.0, Rear = 0.8, Charge = 1.1,
 	},
@@ -538,9 +377,8 @@ HorseCollisionModSettings = {
 	},
 
 	-- The marks left on the victim. Dirt is where they landed, so a fall
-	-- (trot, rear) leaves less than a throw (gallop, charge). Blood is what
-	-- the impact opened, so it scales with each tier's damage against the
-	-- gallop's.
+	-- (trot, rear) leaves less than a throw (gallop, charge). Blood scales with
+	-- each tier's damage against the gallop's.
 	VictimDirtByTier         = {
 		Trot = 0.35, Gallop = 0.60, Rear = 0.35, Charge = 0.60,
 	},
@@ -549,73 +387,37 @@ HorseCollisionModSettings = {
 		Trot = 0.07, Gallop = 0.45, Rear = 0.30, Charge = 0.48,
 	},
 
+	-- What a tier does to the victim's body. "stagger" plays an animation and
+	-- nothing else. "fall" plays an animation that hands the body to physics
+	-- partway through. "ragdoll" drops them at the moment of contact and this
+	-- mod drives the throw.
 	ReactionByTier           = {
 		Walk   = "stagger",
 		Trot   = "fall",
 		Gallop = "ragdoll",
-		Rear   = "fall",   -- a rear is a trot-class blow, not a gallop's
+		Rear   = "fall",
 		Charge = "ragdoll",
 	},
 
-	-- How hard each ragdoll tier throws. Only the tiers set to "ragdoll" above
-	-- appear: the others hand the body to physics through the animation and
-	-- this mod never pushes them, so a figure for them would do nothing.
-	--
-	-- This is trim: it scales Knockback and Uplift, together about one meter per
-	-- second on a body of 80 kg. What makes a charge throw further than a gallop
-	-- is the speed it is resolved at, not this.
+	-- A scale on Knockback and Uplift for each ragdoll tier. Only the tiers
+	-- set to "ragdoll" above appear. How far a charge throws is
+	-- RearChargeThrow, not this.
 	ThrowByTier              = {
 		Gallop = 1.0,
 		Charge = 1.0,
 	},
 
 	-- How each ragdoll tier throws a victim, and what holds the throw down.
+	-- Every pair is blended across the victim's armor, so armor decides
+	-- distance within a tier.
 	--
-	-- Every ragdoll tier runs the same three steps, and owns its own numbers
-	-- for them. Nothing here is shared between tiers.
-	--
-	--   1. throw   -- either a brake, which keeps a fraction of the speed the
-	--                 engine gave the body, or a launch, which commands a
-	--                 speed outright. A tier has one or the other
-	--   2. cap     -- the speed the body may not exceed in the air. For a
-	--                 braking tier it is a ceiling held by the drag; for a
-	--                 launching tier it is the commanded speed itself, held by
-	--                 a counter-impulse, so the throw is the same length every
-	--                 time
-	--   3. settle  -- damping on the ground, the `RagdollDamp*` figures above,
-	--                 which are the same for every tier
-	--
-	-- Both ends of every pair are blended across the victim's armour, so armour
-	-- is what decides distance within a tier.
-	--
-	-- The two tiers are opposite in kind under the hood and identical to the
-	-- player: both look like physical contact and both throw a body in ragdoll.
-	-- What differs is who owns the throw.
-	--
-	-- A gallop reacts to physics. The horse is really moving at 8 to 12 m/s
-	-- and carries through the victim, so the engine throws them and the mod
-	-- subtracts: a brake keeps a fraction, a ceiling holds what is left.
-	--
-	-- A charge sidesteps physics. The lunge starts and ends at a stop, the
-	-- horse moves only because of the impulse the mod gives it, and the engine
-	-- delivers nothing reliable -- victims moved 0.3 to 1.0 m with no mod throw
-	-- in place. So the mod commands the whole throw, derived 1:1 from that
-	-- lunge, and nothing downstream is allowed to take it back out.
-	--
-	--   throw = RearChargeImpactSpeed * lungeTransfer * RearChargeThrow
-	--
-	-- The transfers are the fraction of a striker's speed a struck body leaves
-	-- with, and they reproduce the gallop's accepted ceilings off a 12.3 m/s
-	-- lunge: 6.0/12.3 = 0.49 unarmored and 2.5/12.3 = 0.20 in full mail. So a
-	-- charge at `RearChargeThrow` of 1.0 lands where a gallop lands, and that
-	-- setting is the dial.
-	--
-	-- The charge's cap is not a ceiling. It is set to the commanded speed
-	-- itself, so it never shortens the throw the mod set and catches only what
-	-- the horse's collider adds on top afterwards.
-	--
-	-- The drag is the same in both tiers, because drag is not a distance axis.
-	-- It is what makes a ceiling true.
+	--   1. throw: the gallop brakes, keeping a fraction of the speed the
+	--      engine gave the body; the charge launches, at
+	--      RearChargeImpactSpeed * lungeTransfer * RearChargeThrow.
+	--   2. cap: the speed the body may not exceed in the air, held by the
+	--      drag. The charge's cap is its own launch speed.
+	--   3. settle: damping on the ground, the `RagdollDamp*` figures above,
+	--      which are the same for every tier.
 	ThrowProfileByTier       = {
 		Gallop = {
 			brakeKeepArmored   = 0.45,  -- fraction of its speed a victim in
@@ -628,8 +430,8 @@ HorseCollisionModSettings = {
 
 		Charge = {
 			-- The share of the lunge's speed the victim leaves with. These
-			-- reproduce the gallop's ceilings off a 12.3 m/s lunge, so a
-			-- charge at RearChargeThrow 1.0 throws like a gallop.
+			-- reproduce the gallop's caps off a 12.3 m/s lunge, so a charge at
+			-- RearChargeThrow 1.0 throws like a gallop.
 			lungeTransferArmored   = 0.20,  -- 2.5 / 12.3, a victim in mail
 			lungeTransferUnarmored = 0.49,  -- 6.0 / 12.3, an unarmored one
 			dragArmored            = 20.0,  -- the gallop's drag unchanged
@@ -637,20 +439,28 @@ HorseCollisionModSettings = {
 		},
 	},
 
+	-- What a collision is worth, before armor, against an NPC's 100 health.
+	--
+	-- Clothing is ignored: ImpactDamageIgnoredArmor of smash_def does not count
+	-- as armor. Past it a victim takes half the tier's damage at
+	-- ImpactDamageArmorScale, a third at twice it, and so on down, never below
+	-- ImpactDamageArmorFloor. Worn totals run about 0.3 in clothes, 5 in mail
+	-- and 12 or more in plate.
+	--
+	-- At the defaults a town guard reads smash_def about 5, so worn is 4.5, the
+	-- falloff is 1/(1+4.5/2.9) = 0.39, and a gallop's 111 becomes 44: two
+	-- impacts to put them down on good rolls and three otherwise.
 	ImpactDamageByTier       = {
 		Walk   = 0,     -- a walk staggers, it does not wound
 		Trot   = 18,
-		Gallop = 111,   -- kills about nine unarmored men in ten
-		Rear   = 75,    -- hooves coming down, standing still: badly wounds
-		                -- a healthy man, kills one already hurt
-		Charge = 118,   -- the heaviest thing the mod does, and the only
-		                -- impact that kills on every roll
+		Gallop = 111,   -- kills about four unarmored victims in five
+		Rear   = 75,    -- badly wounds a healthy victim, kills one already hurt
+		Charge = 118,   -- kills an unarmored victim on every roll
 	},
 
 	-- Hand back whatever the engine charged for the collision, so the figures
-	-- above are the entire cost of an impact rather than an addition to one
-	-- nobody can read. This is also what keeps a death the mod's to attribute,
-	-- which is what CollisionIsCrime depends on.
+	-- above are the entire cost of an impact. This is also what keeps a death
+	-- the mod's to attribute, which is what CollisionIsCrime depends on.
 	ImpactDamageOwnsTheHit   = true,
 
 	ImpactDamageReclaimCeiling = 60,   -- never give back more than this at once
@@ -660,19 +470,11 @@ HorseCollisionModSettings = {
 	ImpactDamageArmorFloor   = 0.14,  -- least armor can reduce an impact to
 	ImpactDamageIgnoredArmor = 0.5,   -- smash_def that is clothing, not armor
 	ImpactDamageVariance     = 0.15,  -- spread either side of the tier figure
-	ImpactDamageDelayMs      = 600,   -- only for a test subject's health being
-	                                  -- put back; a real impact waits for the
-	                                  -- body to stop moving instead
 
-	-- The rider's own half of a gallop impact. A collision costs stamina and
-	-- costs the victim health, and in hardcore mode neither is visible from
-	-- the saddle, so a kick to the camera is the only part of it the player
-	-- feels. Gallop only: a trot knockdown should stay a shove.
-	--
-	-- Angle is degrees of rotation and shift is meters of displacement, both
-	-- applied on all three axes. Frequency is the period vanilla's own shakes
-	-- pass, which is a small number: `SinglePlayer:ViewShake` uses 1/20 and
-	-- the CameraShake entity defaults to 0.5. Randomness varies each shake so
+	-- The rider's own half of an impact: a kick to the camera, scaled per tier
+	-- by CameraShakeByTier. Angle is degrees of rotation and shift is meters
+	-- of displacement, both on all three axes. Frequency is the shake's
+	-- period; vanilla's own shakes use 0.05. Randomness varies each shake so
 	-- repeated collisions do not feel canned.
 	CameraShake              = true,
 	CameraShakeAngle         = 4.0,
@@ -681,17 +483,12 @@ HorseCollisionModSettings = {
 	CameraShakeFrequency     = 0.05,
 	CameraShakeRandomness    = 0.5,
 
-	-- What a gallop impact does to the rider's own view in first person. The
-	-- dust the collision throws up is on the ground below the field of view at
-	-- speed, so a first person rider sees none of it; this is their share.
-	--
-	-- A blur pulse, because the engine has no dust or dirt lens overlay and
-	-- this is the same cue the game uses for taking a hit. Amount is how heavy
-	-- the blur starts, and it decays to nothing over RiderBlurMs.
-	--
-	-- Off in third person by default, where the real effect is already
-	-- visible. The views are told apart by how far the camera sits from the
-	-- player, which is under a meter in first person and several in third.
+	-- A blur pulse on the rider's view in first person, scaled per tier by
+	-- RiderBlurByTier. It starts at RiderBlurAmount, holds for RiderBlurHoldMs
+	-- and decays to nothing over RiderBlurMs in RiderBlurSteps steps, with a
+	-- chromatic shift of RiderBlurChroma on the same curve. Off in third
+	-- person by default, where the dust is visible; the views are told apart
+	-- by how far the camera sits from the player.
 	RiderBlur                = true,
 	RiderBlurAmount          = 1.0,
 	RiderBlurHoldMs          = 260,
@@ -702,19 +499,14 @@ HorseCollisionModSettings = {
 	RiderBlurFirstPersonRange = 1.5,
 
 	-- What the rider's own Horsemanship is worth. The game's `horse_riding`
-	-- skill runs 0 to 20; a rider at 0 is unaffected and the figures below are
-	-- what the skill is worth at the top of that scale.
+	-- skill runs 0 to 20, and it multiplies an impact's stamina cost, running
+	-- linearly from HorsemanshipStaminaWorst at level 0 to
+	-- HorsemanshipStaminaBest at the top. At 5.0 a gallop's 0.20 share is one
+	-- full pool, so a novice is thrown by a single impact; at 1.0 an expert
+	-- rides down five in a row, or three in a fight.
 	--
-	-- Horsemanship is the one factor that multiplies the cost rather than
-	-- adding to it, because it is the factor meant to dominate, and the range
-	-- is wide on purpose. At 5.0 a gallop's 0.20 share is one full pool, so a
-	-- novice is thrown by a single impact; at 1.0 the share is what it says
-	-- and an expert rides down five in a row, or three in a fight. It runs
-	-- linearly between the two, so every level is worth the same.
-	--
-	-- Seat is the chance of staying mounted when the horse is finally spent.
-	-- The horse still stops either way; a rider who can ride does not always
-	-- come off with it.
+	-- Seat is the chance of staying mounted when the horse is finally spent,
+	-- at the top of the skill. The horse stops either way.
 	Horsemanship             = true,
 	HorsemanshipSkill        = "horse_riding",
 	HorsemanshipMaxLevel     = 20,
@@ -722,21 +514,16 @@ HorseCollisionModSettings = {
 	HorsemanshipStaminaBest  = 1.0,   -- and at HorsemanshipMaxLevel
 	HorsemanshipSeatChance   = 0.6,   -- chance of keeping the saddle, at the top
 
-	-- What the horse's own barding is worth. Barding is the horse's armor and
-	-- is separate from its tack, so a saddle and shoes count for nothing here.
-	-- Read from the total smash_def of what the horse is wearing, which is what
-	-- separates a cloth caparison from a plated head and neck.
-	--
-	-- Three flat effects rather than one multiplier, each scaling from nothing
-	-- on a bare horse to its figure below on a full set. Nothing about the
-	-- rider enters this: barding does not scale with Horsemanship.
+	-- What the horse's own barding is worth, read from the total smash_def of
+	-- what the horse is wearing; tack counts for nothing. Three effects, each
+	-- scaling from nothing on a bare horse to its figure below on a full set:
+	-- a stamina relief, a damage multiplier and a flat added force. Barding
+	-- does not scale with Horsemanship.
 	Barding                  = true,
 	BardingFullSmashDef      = 1.45,  -- smash_def counted as a full set, measured
 	BardingStaminaRelief     = 0.03,  -- share of the pool a full set takes off
 	BardingDamageBonus       = 0.15,  -- how much harder a barded horse hits
-	-- What barding adds to the knockdown force, in five steps. No barding adds
-	-- nothing, a fifth of a full set adds a fifth of the bonus, up to a full
-	-- set adding all of it. Each row is
+	-- What barding adds to the knockdown force, in five steps. Each row is
 	--
 	--     { coverage at or above, added to Knockback, added to Uplift }
 	--
@@ -752,222 +539,60 @@ HorseCollisionModSettings = {
 		{ 1.0, 5.0, 3.0 }
 	},
 
-	-- What happens to the horse after it dumps a rider who rode it into people
-	-- until it was spent. Sometimes it wants nothing more to do with them and
-	-- leaves, using its own AI: its combat subbrain flees wherever, so it only
-	-- has to be given something to flee from.
-	--
-	-- A chance rather than a certainty. A horse that always bolts is a
-	-- punishment; one that sometimes bolts is a horse.
+	-- Whether a horse ridden until spent sometimes bolts after throwing its
+	-- rider, fleeing on its own AI.
 	HorseBoltsWhenSpent      = true,
 	HorseBoltChance          = 0.4,
 	HorseBoltRestoreMs       = 3000,  -- health is given back this long after
 
-	-- The noise a collision makes, played as the horse hits them.
-	--
-	-- No single sound in the game is a horse striking a person, because
-	-- vanilla never makes that noise. These are layered instead: the horse's
-	-- own landing carries the weight, and a blunt impact ten milliseconds
-	-- later is the body it hit.
-	--
-	-- Any of the game's 1803 audio trigger names may be used, listed in
+	-- The noise a collision makes, played on the victim at the moment of
+	-- impact. Any of the game's audio trigger names may be used, listed in
 	-- Libs/GameAudio/*.xml inside GameData.pak. A name that does not exist
-	-- plays nothing rather than breaking anything, and an empty list silences
-	-- that tier alone.
-	--
+	-- plays nothing, and an empty list silences that tier alone.
 	ImpactSound              = true,
 
-	-- Each tier is a list of { trigger, delay in milliseconds }. The trigger
-	-- name "body" is replaced with the blunt impact matching what the victim
-	-- is wearing: cloth, mail or plate.
-	-- A third entry is a distance in meters, and it is the volume control:
-	-- the layer is pushed that far back along the line from the listener, so
-	-- it arrives from the same direction and quieter. Higher is quieter, and
-	-- it does nothing to `a_o_jump_landing`, which is a 2D event whose level
-	-- is fixed.
-	--
-	-- Walk names the cloth impact outright rather than using the `body` token.
-	-- A shove at walking pace should not ring somebody's mail, which the token
-	-- would do for an armored victim.
-	-- A layer is { trigger, delay in ms, distance in meters, chance }.
-	--
-	-- Distance is the volume control. There is no gain anywhere in this
-	-- engine's audio, so a layer is quietened by being played from further
-	-- away: the offset is added along the line from the listener to the
-	-- victim, so it arrives from the same direction and only its level drops.
-	-- Because a victim is always a meter or two away at the moment of impact,
-	-- the number behaves as a volume knob rather than as a position.
-	--
-	-- It does nothing to a 2D event. `a_o_jump_landing` and
-	-- `c_special_bone_crack1` both ignore position entirely, so the only
-	-- control over those is `chance`, which is how often the layer appears.
-	--
-	-- Two trigger names are tokens, replaced with the sample matching what the
-	-- victim is wearing: `body` is the blunt impact against that material and
-	-- `foley` is the movement rustle it makes.
-
-	-- A shove disturbs someone's clothing rather than striking them, so the
-	-- walk tier is cloth foley over a body settling, with a single hoofstep
-	-- underneath for the horse. Quiet by being pushed back five meters.
-	-- A layer is { trigger, delay in milliseconds, distance in meters, chance }.
-	--
-	-- Distance is the volume control, because the engine has no gain: a layer
-	-- is quietened by being played from further away, offset along the line
-	-- from the listener to the victim so it arrives from the same direction.
-	-- A victim is always a meter or two away at impact, so the number behaves
-	-- as a volume knob rather than as a position. The curve is steep and short:
-	-- for the blunt impacts the usable range is about a meter, and past
-	-- roughly 1.5 the sound is gone entirely, so the fine adjustments are
-	-- fractional and are made to one copy of a layer rather than to all of it.
-	--
-	-- Distance does nothing to a 2D event. `a_o_jump_landing` and
-	-- `c_special_bone_crack1` ignore position completely, which is why neither
-	-- is used here.
-	--
-	-- Loudness otherwise comes from repetition. Naming a sample twice a few
-	-- milliseconds apart thickens and lifts it, which is the only way up once
-	-- a layer is already at zero distance.
-	--
-	-- Two trigger names are tokens, replaced with the sample matching what the
-	-- victim is wearing: `body` is the blunt impact against that material and
-	-- `foley` is the movement rustle it makes.
-
-	-- The master level control, in meters, added to every layer of every
-	-- tier. Higher is quieter. The per-layer distances below set the balance
-	-- between the layers; this sets how loud that balance is as a whole.
-	--
-	-- It exists because the listener follows the camera. In first person the
-	-- ear is on top of the victim and hears the mix at close to full level; a
-	-- third-person camera starts several meters further back and hears the
-	-- same mix much quieter, which is why a mix tuned in one view is wrong in
-	-- the other. The tuning here is done in first person, the loudest case.
+	-- The master level, in meters, added to every layer of the trot and gallop
+	-- tiers. Higher is quieter. The listener follows the camera, so third
+	-- person hears the mix from further back; these values are set in first
+	-- person.
 	ImpactSoundDistance      = 2.0,
 
-	-- A shove disturbs someone's clothing rather than striking them, so the
-	-- walk tier carries no impact at all: two cloth foleys and a body
-	-- settling, each doubled because those samples are very quiet, over a
-	-- single hoofstep.
-
-	-- A trot puts someone on the ground, so the blunt impact leads, doubled
-	-- with the second copy taken back a fraction to shade it down. Both
-	-- copies sit back from the ear: at zero distance the lead impact is
-	-- louder from the saddle than a trot deserves.
-
-	-- A gallop stacks four different blunt impacts rather than repeats of one,
-	-- so it reads as a collision instead of a flam, with the body settling
-	-- underneath. Every impact layer is a token, so a mailed guard and a
-	-- peasant in cloth sound different on all four.
-	--
-	-- No hoofstep. `hs_hp_soil` is `hoofsteps_player`, the same family as
-	-- `a_o_jump_landing`, and those events ignore position: it played at a
-	-- fixed full level under every other layer and was the loudest thing in
-	-- the mix with no way down. The horse is already making that noise at a
-	-- gallop on its own.
-
-	-- The occasional injury, gallop only. A foley event, so unlike
-	-- `c_special_bone_crack1` it can be quietened; that one is 2D and came out
-	-- at cartoon volume whatever was done to it.
+	-- The occasional bone crack, at a gallop or a charge, as an impact layer.
 	ImpactSoundCrack         = { "f_bodyfall_leg_break", 20, 6 },
 	ImpactSoundCrackChance   = 0.12,
 
-	-- Henry's own grunt as the collision goes through him. The game authors
-	-- him three severities of taking a hit and each tier names one, so a shove
-	-- at a walk and a body taken at a gallop do not sound alike.
-	--
-	-- These are sound events, not dialogue, which is why they are short: the
-	-- mod names the exact event instead of asking the dialog system for a line
-	-- and being given a speech.
-	--
-	-- Read as an impact layer: `{ trigger, delayMs, distance, chance }`.
-	-- `distance` is the only volume control the game has, so raise it to push
-	-- the grunt back. `chance` below 1 makes it occasional. A trigger of `""`
-	-- silences that one tier and leaves the others alone.
-	--
-	-- The three triggers available are `v_henry_hit_soft`,
-	-- `v_henry_hit_medium` and `v_henry_hit_heavy`.
+	-- Whether Henry grunts as the collision goes through him, from
+	-- RiderVocalByTier.
 	RiderVocal               = true,
 
-	-- How long the rider stays quiet after grunting. Riding into a group lands
-	-- several collisions inside a second and one grunt each reads as broken
-	-- audio rather than as a man being jolted. A harder impact is still let
-	-- through, so a gallop is never silenced by the walk shove before it.
+	-- How long the rider stays quiet after grunting, so riding into a group is
+	-- not a grunt per person. A harder impact is still let through.
 	RiderVocalCooldownMs     = 1500,
 
-	-- Henry saying something about the impact, rather than only grunting. The
-	-- lines are vanilla's, addressed by `alias` so the mod names one topic
-	-- instead of a whole bark set; `Bark.lua` carries the list and why these
-	-- ones. Every impact draws from the same pool regardless of tier.
-	--
-	-- Words and breath share one gate, because both come out of Henry and two
-	-- at once is a defect. So the chance below is how often an impact produces a
-	-- line *instead of* a grunt, and a line holds the grunt off for its own
-	-- cooldown, which is longer because a line takes longer to say.
+	-- Henry's spoken lines. RiderBark gives an ordinary impact a chance of a
+	-- line instead of a grunt; the pool of impact lines ships empty, so it has
+	-- no effect. RiderBarkKill gives a collision that kills its own line.
 	RiderBark                = false,
-	RiderBarkChance          = 0.35,
-	RiderBarkCooldownMs      = 5000,
-	RiderBarkKill            = true,
+	RiderBarkChance          = 0.35,  -- how often an impact gets a line
+	RiderBarkCooldownMs      = 5000,  -- how long Henry stays quiet after a line
+	RiderBarkKill            = true,  -- a line when a collision kills
 
-	-- Henry's own line gets its own priority rather than sharing the victims'.
-	-- Requests register in a shared array which the dialog system sorts
-	-- descending, and a request below the top is discarded with no error, so at
-	-- the default of zero a line loses every contest it enters. Both aliases
-	-- that were confirmed audible in testing were sent at 50, so that is the
-	-- shipped value: it makes the tested configuration the default one.
+	-- The priority Henry's lines are sent at. The dialog system discards a
+	-- request below the top without error, so at 0 a line loses to anything
+	-- else the speaker is saying.
 	RiderBarkPriority        = 50,
 
-	-- How long a victim is left alone after being hit. The knockdown tiers
-	-- read the victim's own state rather than counting. The victim is busy
-	-- while an animation the mod started or a ragdoll owns their body, and
-	-- hittable again once HitReadySettleMs has passed with neither. Any busy
-	-- state restarts that window, because a trot victim is briefly idle
-	-- between the fall clip ending and the ragdoll taking over.
-	-- HitReadyCeilingMs releases a victim who is never seen busy at all.
-	--
-	-- The settle was 2000 and the ceiling 12000, which put roughly nine
-	-- seconds between a gallop and being able to hit the same person again:
-	-- their reaction, then two more seconds of standing there. The engine's
-	-- own collision keeps firing through all of it, so a second impact gave a
-	-- vanilla bark, no feedback from the mod, and the horse wedged inside the
-	-- victim. That is what "muddy and unresponsive" was.
-	--
-	-- Zero is worse in the other direction. At a 1500 ceiling a victim was
-	-- released while still flat, and trotting a downed guard rotated him along
-	-- the ground, which looks wrong. The ceiling has to outlast a knockdown.
-	--
-	-- So the settle is short enough to be immediate once they are up, and the
-	-- ceiling long enough that it never releases someone mid-knockdown.
-	-- Only the tiers that play an animation wait. A gallop ragdolls, which is
-	-- pure physics with no pose to start from, so it can land at any stage of a
-	-- victim's recovery; gating it meant the mod declined the impact while the
-	-- engine's own collision happened anyway, which is the vanilla result of
-	-- getting wedged in someone with no reaction and a bark.
-	-- One contact is one impact. Detection runs every 33 ms and a galloping
-	-- horse clears a person in about 150 ms, so a single pass is four or five
-	-- ticks and each is a collision by the loop's reckoning. Long enough to
-	-- outlast a pass, far short of the time it takes to turn around and make a
-	-- second deliberate run.
+	-- The least time between two impacts on the same person, so one pass of
+	-- the horse through them counts once.
 	HitMinIntervalMs         = 700,
 
-
-
-	-- The dust a body throws up where it lands. Nothing at a walk, where
-	-- nobody falls. Scale is the size of the effect, so a gallop kicks up
-	-- more than a trot; 0 switches a tier off.
-	--
-	-- The dust waits for the victim to land rather than firing on contact,
-	-- because at a gallop the two are several meters apart and the point of
-	-- contact is behind the rider before it renders. The victim's height is
-	-- position is sampled every ImpactDustSampleMs and the dust goes out on
-	-- the first sample they have moved less than ImpactDustSettleDistance
-	-- meters between, giving up after ImpactDustMaxSamples and spawning it
-	-- anyway. Distance rather than height: a galloped victim is thrown almost
-	-- flat, so watching height alone fires at the point of collision.
-	--
-	-- The effect name is a particle library node, from the game's own
-	-- Libs/Particles. `collisions.destructibles.arrow_soil` is the soil an
-	-- arrow kicks out of the ground and is the closest thing the game has to
-	-- a body landing on dirt. `WH_Particels.other.gravel` and
-	-- `WH_Particels.dust.sweep` are the alternatives worth trying.
+	-- The dust a body throws up where it lands, sized per tier by
+	-- ImpactDustScaleByTier. The victim's vertical speed is sampled every
+	-- ImpactDustSampleMs: once they fall faster than ImpactDustFallVz and then
+	-- slow past ImpactDustLandVz, they have landed. A victim not seen falling
+	-- within ImpactDustFallWaitSamples, or not landed by ImpactDustMaxSamples,
+	-- gets the dust anyway. The effect is a particle library node from the
+	-- game's own Libs/Particles.
 	ImpactDust               = true,
 	ImpactDustEffect         = "WH_Particels.other.explosion_dust",
 	ImpactDustHeight         = 0.05,
@@ -977,17 +602,15 @@ HorseCollisionModSettings = {
 	ImpactDustFallWaitSamples = 8,
 	ImpactDustMaxSamples     = 30,
 
-	-- What a victim looks like afterwards. Someone ridden down at a gallop
-	-- otherwise stands back up immaculate. Dirt covers everything they are
-	-- wearing; blood goes on the side of the body the horse struck. Both are
-	-- amounts between 0 and 1 and both accumulate, so a man ridden down
-	-- repeatedly gets steadily filthier. Setting either to 0 switches that
-	-- half off. Nothing is applied at a walk, where nobody hits the ground.
+	-- The dirt and blood a collision leaves on the victim, from
+	-- VictimDirtByTier and VictimBloodByTier. Dirt covers everything they are
+	-- wearing; blood goes on the side of the body the horse struck. Both
+	-- accumulate across impacts. Nothing is applied at a walk.
 	VictimMarks              = true,
 
 	-- Switches.
-	CollisionIsCrime         = true,  -- riding someone down is a crime at trot
-	                                  -- and gallop; never at a walk
+	CollisionIsCrime         = true,  -- riding someone down is a crime at every
+	                                  -- tier that wounds; never at a walk
 	ReleaseAnimationMovement = true,  -- keeps staggering victims out of walls
 	ReleaseMovementAttempts  = 4,     -- repeated, since a blend can undo it
 	ReleaseMovementGapMs     = 80,    -- how far apart the attempts are
@@ -996,29 +619,18 @@ HorseCollisionModSettings = {
 	SuppressStaggerInCombat  = true,  -- skip the stagger during a fight
 
 	-- Spoken reactions. Every line is vanilla, spoken by the character's own
-	-- voice actor, chosen by naming a bark set. Nothing new ships.
-	--
-	-- Deliberately not the sets vanilla already fires on contact, the "Look
-	-- where you're going!" lines, which the player hears anyway. These are
-	-- moments the game has no line for: a horse shoving somebody, rearing in
-	-- their face, or leaving them in the road.
-	--
-	-- A character whose voice never recorded a set simply stays silent, with
-	-- no error, exactly as in vanilla, so this is safe on every NPC.
+	-- voice actor, chosen by naming a bark set. Nothing new ships. A character
+	-- whose voice never recorded a set stays silent, as in vanilla.
 	--
 	-- A knockdown speaks twice: a wordless cry at the moment of impact, graded
-	-- by how hard the hit was, and then actual words once the victim is back
-	-- on their feet. Each draws from a weighted pool holding both the mod's
-	-- own finds and vanilla's collision lines, so the same impact does not
-	-- produce the same sentence every time.
+	-- by how hard the hit was, and then words once the victim is back on their
+	-- feet.
 	Barks                    = true,  -- the feature as a whole
 	CollisionBarks           = true,  -- victims and bystanders of an impact
 	RearBarks                = true,  -- whoever a rear is aimed at
-	RiderBarks               = true,  -- Henry's own remark over a body
 	BarkCooldownMs           = 3000,  -- per speaker, so a crowd is not a choir.
-	                                  -- Keep at or below HitCooldownMs: a
-	                                  -- longer value silences whole impacts,
-	                                  -- it does not just thin them out
+	                                  -- An impact inside it is silent for
+	                                  -- that speaker
 	BarkSuppressMs           = 2500,  -- how long vanilla's own bark is held
 	                                  -- off so the mod's line is not talked over
 	BarkGapMs                = 2500,  -- least silence between two lines from
@@ -1037,13 +649,10 @@ HorseCollisionModSettings = {
 	ShieldWindowMs           = 6000,  -- crash backstop only; the damage call lifts it
 
 	WalkStagger              = true,  -- false gives vanilla behavior at a walk
-	ProtectMutt              = true,  -- whether your dog is immune
-	                                  -- around on his back
 
-	-- Characters the game will not let you attack -- Captain Bernard, the Lord
-	-- of Leipa and anyone else a quest is protecting -- take no damage from a
-	-- collision. They are still knocked down, because that is the game's own
-	-- physics and not something this mod applies, but the impact costs them no
+	-- Characters the game will not let you attack, such as Captain Bernard, the
+	-- Lord of Leipa and anyone else a quest is protecting, take no damage from a
+	-- collision. They are still knocked down, but the impact costs them no
 	-- health. Turning this off lets a horse kill a quest-critical character.
 	ProtectStoryCharacters   = true,
 	LogTelemetry             = true,  -- diagnostics in kcd.log
@@ -1055,45 +664,37 @@ HorseCollisionModSettings = {
 	DiagnoseMisses           = false,
 
 	-- ======================================================================
-	-- Everything below is exposed for completeness. It was tuned by riding at
-	-- people repeatedly and the shipped values are the ones that felt right,
-	-- so treat each group's warning as the real guidance rather than an
-	-- invitation. A key removed from this file falls back to its built-in
+	-- Everything below is exposed for completeness; the values here are the
+	-- tuned ones. A key removed from this file falls back to its built-in
 	-- default, so deleting a line is always a safe way back.
 	-- ======================================================================
 
-	-- Detection and scoring. The safest group to experiment with: these decide
-	-- what counts as a hit and how fast the horse is judged to have been going,
-	-- so a wrong value shows up as impacts that do not land or land when you
-	-- rode past, which is obvious and harmless.
+	-- Detection and scoring. These decide what counts as a hit and how fast
+	-- the horse is judged to have been going, so a wrong value shows up as
+	-- impacts that do not land, or land when you rode past.
 	HitRadius                = 2.5,   -- broad-phase sphere around the horse
 	HorseMaxVerticalDiff     = 2.35,  -- height difference above which a hit is
 	                                  -- ignored, so you do not strike someone
 	                                  -- on a floor above or below you
 	HorseAirborneVz          = 2.5,   -- upward speed counted as a jump
 	MaxImpactSpeed           = 13.0,  -- ceiling on the speed a hit is scored
-	                                  -- at, set just above the fastest gallop
-	                                  -- in the game: a horse at the stat cap
-	                                  -- holds 12.55 m/s, where Pebbles holds
-	                                  -- 10.75
+	                                  -- at, just above the fastest gallop in
+	                                  -- the game
 	ImpactSpeedSamples       = 9,     -- ticks of speed history a hit is scored
-	                                  -- from, which is what stops a single
-	                                  -- stuttering frame deciding the tier
+	                                  -- from, so a single stuttering frame
+	                                  -- does not decide the tier
 	SweepMultiplier          = 0.50,  -- how far ahead to sweep per m/s
 	MaxSweepExtra            = 0.35,  -- cap on that forward sweep, in meters
 	TickSeconds              = 0.033, -- detection interval
 
-	-- Ragdoll motion after the throw. Raise the risk here: these shape how a
-	-- thrown body travels and comes to rest, and the settled look at a gallop
-	-- came out of tuning them together. Changing one alone usually reads as a
-	-- body that slides, floats or stops dead.
+	-- Ragdoll motion after the throw. These shape how a thrown body travels
+	-- and comes to rest; changing one alone usually reads as a body that
+	-- slides, floats or stops dead.
 	ImpulseDelayMs           = 50,    -- wait before the ragdoll impulse
-	LateralImpulse           = 0.0,   -- sideways share of the impulse; the
-	                                  -- throw direction is the engine's, and
-	                                  -- adding to it fought that
+	LateralImpulse           = 0.0,   -- sideways share of the impulse
 	RagdollBrake             = true,  -- whether a braking tier brakes at all
-	RagdollBrakeArmorScaleArmored = 0.35,
-	RagdollBrakeArmorScaleUnarmored = 1.26,
+	RagdollBrakeArmorScaleArmored = 0.35,   -- armor scale counted as full mail
+	RagdollBrakeArmorScaleUnarmored = 1.26, -- armor scale counted as unarmored
 	RagdollDampContactRun    = 3,     -- samples of contact in a row before the
 	                                  -- body counts as down
 	RagdollDampRampSamples   = 8,     -- samples over which damping ramps up
@@ -1105,30 +706,28 @@ HorseCollisionModSettings = {
 	-- after the horse has come down.
 	RearImpactSpeed          = 6.0,   -- the speed a rear is scored at, since
 	                                  -- the horse is barely moving
-	RearAnimSpeed            = 1.0,   -- how fast the rear plays
+	RearAnimSpeed            = 1.0,   -- how fast the charge's rear plays
 	RearChargeLungePeakMin   = 3.0,   -- top speed a lunge must reach to count
 	RearChargeLungeSpentAt   = 0.5,   -- fraction of its peak at which the
 	                                  -- lunge is treated as spent
 	RearChargeStrikeBehind   = 0.2,   -- how far behind the horse still counts
 	RearChargeStrikeMs       = 1600,  -- how long the strike sweeps for
 	RearChargeStrikePollMs   = 50,    -- how often it sweeps
-	                                  -- further hits
 	RearChargeWaitMs         = 400,   -- when the mod starts watching for the
 	                                  -- rear to end
 	RearChargeWaitPollMs     = 30,    -- how often it looks
 	RearChargeWaitCeilingMs  = 3000,  -- push anyway by this point
 
-	-- How a spoken line is submitted to the dialog system. The system runs an
-	-- auction and silently discards a losing request, so these decide whether
-	-- a line is heard at all rather than how it sounds. Documented in full in
-	-- docs/TECHNICAL_DETAILS.md.
+	-- How a spoken line is submitted to the dialog system. The system discards
+	-- a losing request silently, so these decide whether a line is heard at
+	-- all. Documented in full in docs/TECHNICAL_DETAILS.md.
 	BarkPriority             = 0,     -- rank in the dialog system's auction
 	BarkCanBeDelayed         = false, -- queue a line that loses, instead of
 	                                  -- dropping it
 	BarkOverrideSuppress     = false, -- ignore a suppressMonologs context
 	BarkInCombat             = false, -- whether a victim already fighting still
-	                                  -- remarks on being ridden into; vanilla's
-	                                  -- judgment is that they do not
+	                                  -- remarks on being ridden into, which
+	                                  -- vanilla refuses
 
 	-- Internals. These name files and animation tags the mod ships, or switch
 	-- off machinery other features depend on. There is no useful value other
@@ -1136,8 +735,8 @@ HorseCollisionModSettings = {
 	RearActionMap            = "hcm_rear",
 	RearActionMapFile        = "Libs/Config/hcm_actionmaps.xml",
 	SettleFragTag            = "hcm_settle",
-	SendHitReaction          = true,  -- posting this is what makes vanilla's
-	                                  -- own barks fire on an impact
+	SendHitReaction          = true,  -- tells the victim's brain it was hit,
+	                                  -- which feeds its perception
 	TraceRecovery            = false  -- times every animation state during a
 	                                  -- recovery; diagnostic only
 

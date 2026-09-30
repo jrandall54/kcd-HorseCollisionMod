@@ -5,12 +5,11 @@
 -- and something has to wait for that moment and then put the game back in
 -- charge of them.
 --
--- The two waits poll `actor:GetCurrentAnimationState`, which is the only
--- signal the engine offers for either transition: `AnimationControlled` while
--- one of this mod's clips is playing, `BlendRagdoll` while physics owns the
--- body. Both carry a ceiling, because neither state is guaranteed to be
--- observed at all, and a wait that never ends would strand the victim
--- permanently.
+-- The waits here poll either `actor:GetCurrentAnimationState` or the body
+-- itself. `AnimationControlled` means one of this mod's clips is playing;
+-- `BlendRagdoll` is the get-up on a fall tier and the whole time down on a
+-- ragdoll tier. Every wait carries a ceiling, because no state is guaranteed
+-- to be observed at all, and a wait that never ends would strand the victim.
 --
 -- `ReleaseActorMovement` is here rather than with the reaction that needs it
 -- because its ordering belongs to the recovery: it must run on the tick after
@@ -22,7 +21,7 @@
 --
 -- @module HorseCollisionMod.Recovery
 -- @author jrandall54
--- @release 5.31.4
+
 --- Stops the animation driving an actor's own movement.
 --
 -- `actor:SetMovementControlledByAnimation` is the runtime equivalent of a
@@ -34,8 +33,7 @@
 --
 -- Called on the tick after the action starts, never before it. An interactive
 -- action applies the fragment's own movement control as it begins, so a call
--- made ahead of it is overwritten and does nothing at all: victims clipped
--- into walls exactly as they did without it.
+-- made ahead of it is overwritten and does nothing.
 --
 -- Written for victims and used by the rear charge as well, where the actor is
 -- the horse. The two want it at different moments, so the caller decides when.
@@ -59,12 +57,13 @@ function HorseCollisionMod:ReleaseActorMovement(ent, what)
 	return ok
 end
 
---- How high a victim carries their head when they are on their feet.
+--- How high a victim carries their body when they are on their feet.
 --
--- Recorded once, at the first impact that reaches them, because a victim the
--- speed tiers have scored is by definition someone the horse rode into while
--- they were standing. It is the reference every later check is read against,
--- so nothing here is a number anybody chose.
+-- The reading is the physics body's center-of-mass height above the entity
+-- origin, which tracks posture. The tallest reading ever seen is kept, taken
+-- at every impact, so a first reading off a body already down corrects itself
+-- the first time the victim stands. It is the reference every later check is
+-- read against, so nothing here is a number anybody chose.
 --
 -- @tparam table npc victim entity
 function HorseCollisionMod:RecordStandingHeight(npc)
@@ -87,19 +86,8 @@ function HorseCollisionMod:RecordStandingHeight(npc)
 		return
 	end
 
-	-- The tallest this victim has ever been seen, not the first reading.
-	--
-	-- Recording once was wrong and quietly poisoned everything downstream. A
-	-- victim's first contact with the mod is usually made while they are
-	-- standing, but not always, and a first reading taken off a body already
-	-- on the ground sticks for good: one guard was carrying a standing height
-	-- of 0.27, against a real one near 1.5, so "flat" meant below four
-	-- centimetres and he was never once judged to be down. Every posture
-	-- decision about him was wrong from then on.
-	--
-	-- A maximum is self-correcting and needs no threshold to decide whether a
-	-- reading is plausible. Whatever state a victim is first seen in, they
-	-- stand at some point, and the reference converges on the truth.
+	-- The tallest this victim has ever been seen, not the first reading. A
+	-- maximum needs no threshold to decide whether a reading is plausible.
 	local seen = head - origin
 	local best = self.StandingHead[id]
 
@@ -108,42 +96,11 @@ function HorseCollisionMod:RecordStandingHeight(npc)
 	end
 end
 
---- Whether a victim is lying flat rather than upright or getting up.
+--- Holsters a victim's drawn weapon before a fall, and marks it for redrawing.
 --
--- The single answer to "can this body take an animation right now", and it
--- reads the body instead of a clock or a state string.
---
--- **Measured, through an untouched trot knockdown.** `headUp` is the head's
--- height above the entity origin, and the entity origin sits on the ground:
---
---     t+0000ms  AnimationControlled  headUp 1.55   upright, the impact lands
---     t+0624ms  AnimationControlled  headUp 0.94   falling
---     t+1840ms  AnimationControlled  headUp 0.15   flat
---     t+2448ms  MotionIdle           headUp 0.15   flat
---     t+3072ms  MotionIdle           headUp 0.15   flat
---     t+3664ms  BlendRagdoll         headUp 0.27   rising
---     t+4880ms  BlendRagdoll         headUp 1.21   rising
---     t+5472ms  BlendRagdoll         headUp 1.59   standing
---
--- Two things that trace settles, both of which the rest of this mod had
--- wrong. **`BlendRagdoll` is the get-up, not the lie-down** -- the head climbs
--- right through it -- so anything treating that state as "still down" has the
--- sequence backwards. And the flat stretch is `AnimationControlled` followed
--- by `MotionIdle`, the second of which is indistinguishable from a person
--- standing about doing nothing, which is the hole every state-string test fell
--- through.
---
--- Nothing else measured separates the phases. The physicalization profile
--- reads `alive` from the impact to standing, the entity's pitch and roll stay
--- at 0.00 throughout because the entity does not rotate with the body, and the
--- velocity never exceeds 0.39.
---
--- The halfway point is a bisection rather than a tuned figure: flat reads 0.15
--- against a standing 1.55, so the two are an order of magnitude apart and any
--- split between them gives the same answer.
+-- A drawn weapon on a body on the ground glitches its IK.
 --
 -- @tparam table npc victim entity
--- @treturn boolean true while they are flat on the ground
 function HorseCollisionMod:DisarmVictim(npc)
 	if npc and npc.human
 			and npc.human:IsWeaponDrawn() then
@@ -158,6 +115,9 @@ function HorseCollisionMod:DisarmVictim(npc)
 	end
 end
 
+--- Draws a victim's weapon again if `DisarmVictim` holstered it.
+--
+-- @tparam table npc victim entity
 function HorseCollisionMod:RearmVictim(npc)
 	if not self.NeedsWeaponRedraw then
 		return
@@ -174,53 +134,35 @@ function HorseCollisionMod:RearmVictim(npc)
 	end
 end
 
-function HorseCollisionMod:WatchRecoveryForRearm(npc)
-	if not self.NeedsWeaponRedraw or not self.NeedsWeaponRedraw[tostring(npc.id)] then
-		return
-	end
-
-	self:WhenVictimStands(npc, function(why, waited)
-		self:RearmVictim(npc)
-	end)
-end
-
-function HorseCollisionMod:WhenVictimStands(npc, fn)
-	local generation = self.TimerTick
-	local gap = self.Config.RisePollMs
-	local ceiling = self.Config.RiseCeilingMs
-	local spent = 0
-
-	local function poll()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		if spent >= ceiling then
-			fn("gave up", spent)
-			return
-		end
-
-		local state = nil
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		-- If they are no longer in a ragdoll state, they are standing
-		if state and not self:IsRagdollState(state) and state ~= "?" then
-			fn("stood", spent)
-			return
-		end
-
-		spent = spent + gap
-		Script.SetTimer(gap, poll)
-	end
-
-	Script.SetTimer(gap, poll)
-end
-
+--- Whether a victim is lying flat rather than upright or getting up.
+--
+-- The single answer to "can this body take an animation right now", read from
+-- the body rather than a clock. `headUp` is the height `RecordStandingHeight`
+-- reads. Traced through a trot knockdown:
+--
+--     t+0000ms  AnimationControlled  headUp 1.55   upright, the impact lands
+--     t+0624ms  AnimationControlled  headUp 0.94   falling
+--     t+1840ms  AnimationControlled  headUp 0.15   flat
+--     t+2448ms  MotionIdle           headUp 0.15   flat
+--     t+3072ms  MotionIdle           headUp 0.15   flat
+--     t+3664ms  BlendRagdoll         headUp 0.27   rising
+--     t+4880ms  BlendRagdoll         headUp 1.21   rising
+--     t+5472ms  BlendRagdoll         headUp 1.59   standing
+--
+-- On a fall tier `BlendRagdoll` is the get-up, and the flat stretch includes
+-- `MotionIdle`, which no state test can tell from a person standing idle. On
+-- a ragdoll tier the victim is in `BlendRagdoll` the whole time they are down
+-- and the height reads as standing, so this test cannot see them flat;
+-- `WhenVictimRises` uses the ragdoll state for those tiers.
+--
+-- @tparam table npc victim entity
+-- @treturn boolean true while they are flat on the ground
+-- @treturn number the current height, or -1 when unreadable
+-- @treturn number the recorded standing height, or -1 when none is recorded
+-- @treturn string the animation state, `"unrecorded"` or `"?"`
 function HorseCollisionMod:IsVictimFlat(npc)
 	if not npc or not npc.id then
-		return false
+		return false, -1, -1, "?"
 	end
 
 	local standing = self.StandingHead[tostring(npc.id)]
@@ -249,42 +191,17 @@ function HorseCollisionMod:IsVictimFlat(npc)
 		state = tostring(npc.actor:GetCurrentAnimationState())
 	end)
 
-	-- A reaction still playing blocks regardless of height, because the body
-	-- is high through most of a fall: it reads 0.94 of a standing 1.55 six
-	-- hundred milliseconds in, and interrupting there is what broke the pose.
+	-- A reaction still playing counts as flat whatever the height, because the
+	-- body is high through most of a fall and interrupting it breaks the pose.
 	if state == self.ReactionAnimationState then
 		return true, head - origin, standing, state
 	end
 
-	-- Everything else is decided by how high the body is carrying its head,
-	-- and by nothing else.
-	--
-	-- A shortcut stood here that treated `BlendRagdoll` as the get-up, because
-	-- a trot knockdown was traced and the head climbs 0.27, 0.62, 1.21, 1.59
-	-- across that state. That is true of the fall tiers, where Mannequin hands
-	-- the body to physics partway through a clip and the ragdoll resolves into
-	-- a rise. It is false of the ragdoll tiers: a gallop victim is dropped by
-	-- `actor:Fall` and sits in `BlendRagdoll` for the whole time they are
-	-- down, so the shortcut answered "not flat" from the impact until they
-	-- stood, and the log showed it -- a rise watcher running its full fifteen
-	-- second ceiling and reporting `neverFlat`.
-	--
-	-- One state string meaning two different things on two paths is what this
-	-- mod has been caught by twice. Height means the same thing on both.
-	--
-	-- The fraction is measured rather than bisected, and the difference
-	-- mattered. A halfway split stood here on the reasoning that flat and
-	-- standing are an order of magnitude apart, so anything between them would
-	-- answer alike. They are, and it does not: a victim on the way up passes
-	-- through every value in between, and half of standing is most of the way
-	-- to their feet. Logged from play, one guard of standing 1.58 was refused
-	-- at 0.62, 0.39 and 0.34 while visibly getting up, and correctly refused
-	-- at 0.06.
-	--
-	-- Against their own standing height, every flat reading taken so far is
-	-- 0.04 or 0.10 of it, and every reading of a body that has begun to rise is
-	-- 0.17 or more. `VictimFlatFraction` sits between the two with margin on
-	-- both sides.
+	-- Everything else is decided by height. Against their own standing
+	-- height, every flat reading is 0.04 or 0.10 of it, and every reading of a
+	-- body that has begun to rise is 0.17 or more. `VictimFlatFraction` sits
+	-- between the two with margin on both sides; half of standing would be
+	-- most of the way to their feet.
 	local fraction = self.Config.VictimFlatFraction
 
 	return (head - origin) < (standing * fraction), head - origin, standing, state
@@ -292,22 +209,18 @@ end
 
 --- Runs something the moment a victim stops lying flat and starts to rise.
 --
--- The middle of a get-up. A recovery line wants
--- to land while the victim is getting to their feet, and the two states either
--- side of that moment are both wrong: waiting for the reaction to end fires
--- while they are still on the ground, and waiting for `BlendRagdoll` to end
--- fires once they are already walking. The rider heard the second as "a large
--- gap between when they actually stand up and then the 2nd line plays".
+-- The middle of a get-up, which a recovery line and the deferred crime want
+-- to land on. Waiting for the reaction to end fires while the victim is still
+-- on the ground, and waiting for `BlendRagdoll` to end fires once they are
+-- already walking.
 --
--- A tuned delay stood here instead, and its comment said no readable state
--- marked the moment. That was true of the states anyone had looked at. It is
--- not true of the body: the head climbs from about 0.15 of its standing height
--- to 1.59 across the get-up, so leaving flat is exactly the instant wanted,
--- and `IsVictimFlat` reads it.
---
--- The state has to be seen before its absence counts, as everywhere else here.
--- A poll landing in the moment between the impact and the body reaching the
--- ground would otherwise report a rise that has not begun as already over.
+-- Two signals, one per kind of tier. On a fall tier the height test serves:
+-- the body reads about 0.15 m flat and 1.59 m standing, so leaving flat is
+-- the instant wanted, and flat has to be seen before its absence counts, or
+-- a poll before the body reaches the ground would report a rise already
+-- over. On a ragdoll tier the height test cannot see the victim flat, and the
+-- ragdoll state serves instead: it fires the first time the victim is seen in
+-- it, 1.7 to 2.0 s after impact.
 --
 -- @tparam table npc victim entity
 -- @tparam function fn called with the reason and the wait in milliseconds
@@ -329,9 +242,8 @@ function HorseCollisionMod:WhenVictimRises(npc, fn)
 			state = tostring(npc.actor:GetCurrentAnimationState())
 		end)
 
-		-- The engine transitions the victim to BlendRagdoll the moment it hands
-		-- them back from physics to the animation system so they can stand up.
-		-- This is the most reliable indicator that they have started rising.
+		-- The ragdoll tiers' signal; see the doc above. On a fall tier the
+		-- ragdoll state is the get-up itself, so it serves there as well.
 		if self:IsRagdollState(state) then
 			fn("ragdoll", elapsed)
 			return
@@ -436,85 +348,11 @@ function HorseCollisionMod:WatchFallHandover(npc)
 	Script.SetTimer(self.ReactionPollMs, poll)
 end
 
---- Records how long a requested ragdoll took to actually take.
---
--- Instrumentation, and it answers a question the mod could not previously be
--- asked. `actor:Fall` requests a ragdoll; it does not perform one, and nothing
--- reports back. So a fall that takes on the next frame and one the engine
--- holds for two and a half seconds look identical in the log, and the rider
--- has been describing the second for hours with no way to show it: a victim
--- takes the impact, walks a few steps, and falls over long afterwards.
---
--- The diary measured the mechanism once, firing `actor:Fall` every 33ms from
--- the first frame of a get-up: seventy-six calls did nothing and the
--- seventy-seventh landed at the instant the animation released, and two
--- unrelated sequences both landed at 2532ms to the millisecond. What is not
--- known is how often it happens in ordinary play, which this counts.
---
--- Costs one line per impact and nothing per frame.
---
--- @tparam table npc victim entity
--- @tparam string tierName the tier that struck them
-function HorseCollisionMod:TraceFallLanding(npc, tierName)
-	if not self.Config.LogTelemetry then
-		return
-	end
-
-	local generation = self.TimerTick
-	local startedAt = self:TimeMs()
-	local deadline = startedAt + self.GetUpCeilingMs
-
-	local function poll()
-		if generation ~= self.TimerTick then
-			return
-		end
-
-		local state = nil
-
-		pcall(function()
-			state = tostring(npc.actor:GetCurrentAnimationState())
-		end)
-
-		local elapsed = self:TimeMs() - startedAt
-
-		if self:IsRagdollState(state) then
-			self:Log("FallLanded " .. self:NameOf(npc)
-					.. " tier=" .. tostring(tierName)
-					.. " after=" .. tostring(elapsed) .. "ms"
-					.. " state=" .. tostring(state))
-
-			return
-		end
-
-		if self:TimeMs() >= deadline then
-			self:Log("FallLanded " .. self:NameOf(npc)
-					.. " tier=" .. tostring(tierName)
-					.. " never, last=" .. tostring(state))
-
-			return
-		end
-
-		Script.SetTimer(self.ReactionPollMs, poll)
-	end
-
-	poll()
-end
-
 --- Runs something once a victim has finished getting up.
 --
--- Named for what it measures. It watches for `BlendRagdoll` and fires when
--- that state ends, which is not a ragdoll settling: sampling a knockdown
--- every 100ms shows
--- the head climbing 0.27, 0.62, 1.21, 1.59 across `BlendRagdoll`, so that
--- state is the get-up itself and its end is the victim back on their feet.
---
--- The distinction is not cosmetic. Two separate mechanisms were built on the
--- old reading, each treating `BlendRagdoll` as "still down", and both were
--- wrong in the same direction: they held a victim immune through the whole of
--- their own recovery. `docs/TECHNICAL_DETAILS.md` carries the measurements.
---
--- `GetPhysicalizationProfile` is no use here. Measured through the same
--- sequence it reads `alive` from the impact to standing, without exception.
+-- It watches for the ragdoll state and fires when that state ends, which is
+-- the victim standing, on either kind of tier. `GetPhysicalizationProfile` is
+-- no use here: it reads `alive` from the impact to standing.
 --
 -- The state has to be seen before its absence counts. A poll landing before
 -- the get-up begins would otherwise report a recovery that has not started as
@@ -563,17 +401,15 @@ end
 
 --- Runs something the moment a victim's body stops moving.
 --
--- Rest is the same thing `ImpactThrow` already means by it: the body has moved
--- less than `RestStillMeters` since the last poll. Read from position rather
--- than from `GetVelocity`, and rather than from the animation state, because
--- `BlendRagdoll` never appears on a victim the impact killed.
+-- Rest means the entity has moved less than `RestStillMeters` since the last
+-- poll. Read from position rather than from the animation state, because
+-- `BlendRagdoll` never appears on a victim the impact killed. The entity
+-- position does not track how far a ragdoll travels, but it moves until the
+-- body settles, which is what timing the rest needs.
 --
--- Exact position equality is the stricter test and is the wrong one. A body
--- only returns identical coordinates once the physics has fully slept, and a
--- settled body keeps micro-jittering well past the point it has visibly
--- stopped: measured against the throw's own reading, equality fired between
--- 400ms and 1150ms late, which the rider saw as the damage landing long after
--- the body came to rest.
+-- Exact position equality would be the wrong test: a body only returns
+-- identical coordinates once the physics has fully slept, and a settled body
+-- keeps micro-jittering well past the point it has visibly stopped.
 --
 -- The body has to be seen moving before stillness counts, or a victim struck
 -- while standing still is reported at rest on the first poll, before the
@@ -636,6 +472,10 @@ end
 
 --- Rebuilds a victim and sends them back to their activity.
 --
+-- The rebuild is skipped for a victim marked `hcm_combat_injected`, whom the
+-- crime hit or a provocation has put into combat, because a rebuild would
+-- wipe that combat state.
+--
 -- @tparam table npc victim entity
 -- @tparam string action the reaction that played
 -- @tparam string why how the wait before this ended
@@ -657,11 +497,6 @@ function HorseCollisionMod:FinishRecovery(npc, action, why, waited)
 		end
 	end
 
-	-- Watching starts here rather than after a delay. The delay that used to
-	-- sit in front of this existed so a replan did not land in the frame the
-	-- brain was being remade in; watching carries no such constraint, and the
-	-- wait it imposed was paid by every victim including the ones that needed
-	-- nothing.
 	self:ReplanIfStranded(npc)
 end
 
@@ -670,8 +505,7 @@ end
 -- The recovery is not one phase. A victim is animation-driven while the fall
 -- clip plays, limp while physics holds the body, and animation-driven again
 -- while the game stands them up. A single duration covering all of it cannot
--- say which phase is long, and the complaint is about one of them: the pause
--- between the ragdoll taking hold and the victim beginning to rise.
+-- show which phase is long.
 --
 -- So each distinct state is timed and the sequence is logged as one line. Any
 -- state occupying seconds is where the time is going, and it is named.
@@ -738,153 +572,18 @@ function HorseCollisionMod:TraceRecovery(npc, action)
 	poll()
 end
 
---- Measures how far a victim has turned once the whole recovery is over.
---
--- A guard carrying a polearm was reported finishing his get-up facing roughly
--- the opposite way, where other victims do not. The get-up options carry no
--- weapon tag at all, four per direction and nothing else, so whatever is
--- happening is not a different clip being chosen. That leaves the victim's
--- orientation, which is what this measures.
---
--- Sampled at the impact and again well after the stand-up has finished, so it
--- covers the whole sequence rather than a phase of it. The item in hand is
--- recorded alongside, because the whole question is whether what a victim is
--- carrying changes the result.
---
--- Diagnostic, and off unless `TraceRecovery` is set.
---
--- @tparam table npc victim entity
--- @tparam string action the reaction that played
-function HorseCollisionMod:WatchTurn(npc, action)
-	if not self.Config.TraceRecovery then
-		return
-	end
-
-	local function facing()
-		local ok, dir = pcall(function()
-			return npc:GetDirectionVector(1)
-		end)
-
-		if not ok or not dir then
-			return nil
-		end
-
-		return { x = dir.x, y = dir.y }
-	end
-
-	-- Both hands, because a shouldered polearm is not in the main one, and the
-	-- whole inventory as a fallback, because a weapon that is neither drawn nor
-	-- held still reports nothing at all. Named by class rather than by WUID,
-	-- which is what the hand calls return and is not readable.
-	local held = {}
-
-	pcall(function()
-		for hand = 0, 1 do
-			local wuid = npc.human and npc.human:GetItemInHand(hand)
-			local entry = wuid and ItemManager.GetItem(wuid)
-
-			if entry and entry.class then
-				held[#held + 1] = "hand" .. hand .. "=" .. tostring(entry.class)
-			end
-		end
-	end)
-
-	pcall(function()
-		local drawn = npc.human and npc.human:IsWeaponDrawn()
-		held[#held + 1] = "drawn=" .. tostring(drawn)
-	end)
-
-	pcall(function()
-		local carried = {}
-
-		for _, wuid in pairs(npc.inventory:GetInventoryTable() or {}) do
-			local entry = ItemManager.GetItem(wuid)
-
-			if entry and entry.class then
-				local name = tostring(entry.class)
-
-				if string.find(name, "hlbrd") or string.find(name, "halberd")
-						or string.find(name, "spear") or string.find(name, "pole")
-						or string.find(name, "pike") or string.find(name, "axe") then
-					carried[#carried + 1] = name
-				end
-			end
-		end
-
-		if #carried > 0 then
-			held[#held + 1] = "polearm=" .. table.concat(carried, "/")
-		end
-	end)
-
-	held = table.concat(held, " ")
-
-	if held == "" then
-		held = "none"
-	end
-
-	local before = facing()
-
-	if not before then
-		return
-	end
-
-	local generation = self.TimerTick
-
-	local function report(at)
-		local after = facing()
-
-		if not after then
-			return
-		end
-
-		-- The angle between two unit headings, from their dot product. Clamped
-		-- because drift can push it outside the domain of acos and return nan
-		-- for two identical headings.
-		local dot = (before.x * after.x) + (before.y * after.y)
-
-		if dot > 1 then
-			dot = 1
-		elseif dot < -1 then
-			dot = -1
-		end
-
-		self:Log("Turn " .. self:NameOf(npc)
-				.. " action=" .. tostring(action)
-				.. " at=" .. tostring(at) .. "ms"
-				.. " turned=" .. string.format("%.0f", math.deg(math.acos(dot)))
-				.. "deg " .. held)
-	end
-
-	-- Twice, because the turn was described as happening near the end of the
-	-- get-up and then being undone. One late sample cannot tell a victim who
-	-- turned and came back from one who never turned.
-	for _, at in pairs({ 5000, 9000 }) do
-		Script.SetTimer(at, function()
-			if generation == self.TimerTick then
-				report(at)
-			end
-		end)
-	end
-end
-
-
 --- Replans a victim only when the game has not recovered them itself.
 --
 -- The replan restarts the victim's daycycle, which is the only way a beggar or
 -- an innkeeper regains their loop: they are bound to a smart object they
 -- cannot re-approach on their own, and without it they stand where they got
 -- up. Everyone else recovers unaided, and for them the restart interrupts
--- correct behavior visibly. A woman carrying a bucket drops it, because
--- restarting the daycycle tears down the activity holding the prop.
+-- correct behavior visibly: restarting the daycycle tears down the activity
+-- holding any prop they carry, and they drop it.
 --
--- The two cases are told apart by one reading. A stranded victim sits in
--- `MotionIdle`; a recovered one is already in `MotionMovement`, `IdleToMove`
--- or a turn. Measured across nine recoveries, that held without exception.
---
--- Taken immediately rather than after a wait. Nothing about the reading
--- improves by being taken later, and everything a victim needs is owed to them
--- the moment they are on their feet: the wait was only ever the cost of a
--- weaker signal.
+-- The two cases are told apart by one reading, taken as soon as the victim is
+-- up. A stranded victim sits in `MotionIdle`; a recovered one is already in
+-- `MotionMovement`, `IdleToMove` or a turn.
 --
 -- A victim whose own activity is standing still is not stranded, so a state
 -- matching what they were hit in counts as recovered whatever it is.
@@ -943,9 +642,8 @@ end
 -- after teleporting an NPC, both being cases where a body has been moved
 -- without its behavior being told.
 --
--- Entity links are not involved. Probing a victim before a reaction, after it
--- and after the rebuild showed an unchanged list of persistent assignments, a
--- home and a workplace, with no `usedSO` link visible at any point.
+-- Entity links are not involved: a victim's persistent assignments are
+-- unchanged by a reaction and the rebuild, and no `usedSO` link appears.
 --
 -- @tparam table npc victim entity
 -- @treturn boolean true when the message was accepted without error
@@ -957,20 +655,11 @@ function HorseCollisionMod:ReplanVictim(npc)
 	-- Sent with its members filled in.
 	--
 	-- `daycycle:restartRequest` declares `reason` and `speed` in
-	-- `Libs/AI/TypeDefinitions.xml`, and every send this mod made before this
-	-- one passed an empty payload. The message was delivered and discarded with
-	-- nothing for the receiving node to match on, which is indistinguishable
-	-- from a call that does nothing, and it is why a beggar, an innkeeper and a
-	-- merchant could be left standing with no way found to recover them.
-	--
-	-- Measured on one victim parked after a collision: the empty send moved him
-	-- 0.00 m and this one moved him 3.94 m, back to his stall.
-	--
-	-- The fault was the empty payload rather than the string form. Vanilla's own
-	-- trees send this message both ways, as `values="reason(...), speed(...)"`
-	-- and as a table built by `Utils.makeTable`, which is what is used here
-	-- because it is checked against the type definition rather than parsed from
-	-- text.
+	-- `Libs/AI/TypeDefinitions.xml`, and a message with an empty payload is
+	-- delivered and discarded with nothing for the receiving node to match on.
+	-- Vanilla's own trees send it both as `values="reason(...), speed(...)"`
+	-- and as a table built by `Utils.makeTable`, which is used here because it
+	-- is checked against the type definition rather than parsed from text.
 	local target = npc.id
 
 	if npc.this and npc.this.id then
@@ -1029,157 +718,4 @@ function HorseCollisionMod:RebuildVictim(npc)
 	end
 
 	return ok
-end
-
---- Whether enough time has passed since this victim was last scored.
---
--- One contact should be one impact. The detection loop runs every 33 ms and a
--- galloping horse takes about 150 ms to clear a person, so a single pass
--- crosses four or five ticks and every one of them is a collision by the
--- loop's reckoning.
---
--- Repeats were suppressed by accident before this existed. The readiness
--- wait blocked a second
--- impact for seconds afterward, which suppressed the repeats as a side effect
--- of suppressing everything. Taking a gallop out of that wait, so it can land
--- at any stage of a victim's recovery, removed the accident with it and the
--- repeats came straight back.
---
--- So they are separate rules now, because they are separate questions.
--- Readiness asks whether an animation has anything to blend from. This asks
--- whether the horse has already been charged for the contact it is still in.
--- A gallop needs the second and not the first.
---
--- The interval only has to outlast one pass. It must not approach the time a
--- rider needs to turn around and come back, because a deliberate second run is
--- a second impact and should be scored as one.
---
--- @tparam string npcId the victim's id, as the table is keyed
--- @tparam number now the current time in milliseconds
--- @treturn boolean true when this impact should be scored
-function HorseCollisionMod:ImpactIsNewContact(npcId, now)
-	local interval = self.Config.HitMinIntervalMs
-
-	if interval <= 0 then
-		return true
-	end
-
-	-- An explicit lockout outlives the ordinary interval.
-	--
-	-- A charge is one deliberate move, not a series of collisions, so a victim
-	-- it strikes is closed to further impacts for the whole of it rather than
-	-- for the 700 ms that separates two passes of an ordinary gallop.
-	local until_ = self.LockedUntil and self.LockedUntil[npcId]
-
-	if until_ and now < until_ then
-		return false
-	end
-
-	local last = self.LastScoredHit[npcId]
-
-	if last and now - last < interval then
-		return false
-	end
-
-	return true
-end
-
-
---- Calculates the dynamic recovery get-up delay for a fallen victim.
---
--- Armored victims (low armorScale) shake off the impact and recover quickly.
--- Unarmored peasants (high armorScale) absorb the concussive force and stay
--- stunned on the ground longer.
---
--- @tparam string tierName "Trot", "Gallop", "Charge", "Rear"
--- @tparam[opt] number armorScale victim's armor scale (~0.35 armored, ~1.26 unarmored)
--- @treturn number duration in seconds
-function HorseCollisionMod:CalculateRecoveryDuration(tierName, armorScale)
-	if not self.Config.DynamicRecovery then
-		return self.Config.RecoveryMinSec
-	end
-
-	-- A tier with no entry gets the floor rather than an invented figure. Only
-	-- the tiers that put someone on the ground carry one, so reaching this
-	-- means a tier that does not, and holding such a victim down for a made-up
-	-- second and a half is worse than not holding them at all.
-	local delays = self.Config.RecoveryDelayByTier
-	local baseSec = delays and delays[tierName]
-
-	if type(baseSec) ~= "number" then
-		return self.Config.RecoveryMinSec
-	end
-
-	local mult = 1.0
-
-	if armorScale then
-		mult = self:ArmorBlend(armorScale,
-				self.Config.RecoveryArmorScaleArmored,
-				self.Config.RecoveryArmorScaleUnarmored)
-	end
-
-	local dur = baseSec * mult
-	local minSec = self.Config.RecoveryMinSec
-	local maxSec = self.Config.RecoveryMaxSec
-
-	if dur < minSec then
-		dur = minSec
-	end
-	if dur > maxSec then
-		dur = maxSec
-	end
-
-	return dur
-end
-
---- Applies dynamic recovery groans and telemetry to an impacted victim.
---
--- Armored victims shake off the impact quickly, while unarmored peasants
--- stay stunned and emit periodic groans of pain while on the ground.
---
--- @tparam table npc victim entity
--- @tparam string tierName impact tier
--- @tparam[opt] number armorScale victim's armor scale
-function HorseCollisionMod:ApplyDynamicRecovery(npc, tierName, armorScale)
-	if not self.Config.DynamicRecovery or not npc then
-		return
-	end
-
-	-- Walk tier only staggers and never knocks to the ground
-	if tierName == "Walk" then
-		return
-	end
-
-	local durationSec = self:CalculateRecoveryDuration(tierName, armorScale)
-
-	if self.Config.LogTelemetry then
-		self:Log("DynamicRecovery " .. self:NameOf(npc)
-				.. " tier=" .. tostring(tierName)
-				.. " armorScale=" .. string.format("%.2f", armorScale or 1.0)
-				.. " duration=" .. string.format("%.2f", durationSec) .. "s")
-	end
-
-	local generation = self.TimerTick
-	local startedAt = self:TimeMs()
-	local durationMs = durationSec * 1000
-
-	-- Schedule ground barks while recovering
-	if self.Config.RecoveryGroundBarks and durationSec >= 1.0 then
-		local barkInterval = self.Config.RecoveryBarkIntervalMs
-		local function barkLoop()
-			if generation ~= self.TimerTick then
-				return
-			end
-			local elapsed = self:TimeMs() - startedAt
-			if elapsed < durationMs - 400 then
-				local isDead = false
-				pcall(function() isDead = npc:IsDead() end)
-				if not isDead then
-					self:Bark(npc, "HurtDown", false, true)
-				end
-				Script.SetTimer(barkInterval, barkLoop)
-			end
-		end
-		Script.SetTimer(barkInterval, barkLoop)
-	end
 end

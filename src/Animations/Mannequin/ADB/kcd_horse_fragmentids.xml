@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<TagDefinition version="2">
+  <Tags>
+    <Tag name="MotionMovement" />
+    <Tag name="MotionIdle" />
+    <Tag name="MotionTurn" />
+    <Tag name="MotionJump" />
+    <Tag name="MotionLand" />
+    <Tag name="HitDeath" subTagDef="Animations/Mannequin/ADB/kcd_hitdeath_tags.xml" />
+    <Tag name="Mount" subTagDef="Animations/Mannequin/ADB/kcd_side_tags.xml" />
+    <Tag name="Dismount" subTagDef="Animations/Mannequin/ADB/kcd_side_tags.xml" />
+    <Tag name="Rear" />
+    <Tag name="FastStop" />
+    <Tag name="BlendRagdoll" subTagDef="Animations/Mannequin/ADB/kcd_blendRagdoll_tags.xml" />
+    <Tag name="MotionIdleVAR" />
+    <Tag name="Eating" />
+    <Tag name="MotionIdle_Var" />
+    <Tag name="Exhausted" />
+    <!--
+      Added by HorseCollisionMod. The horse has no AnimationControlled
+      fragment in vanilla, and it is the only fragment
+      StartInteractiveActionByName can reach, so a rear cannot be asked
+      for without declaring it. The subTagDef is the same file the human
+      side of this mod already owns.
+    -->
+    <Tag name="AnimationControlled" subTagDef="Animations/Mannequin/ADB/kcd_animationControlledTags.xml" />
+  </Tags>
+</TagDefinition>

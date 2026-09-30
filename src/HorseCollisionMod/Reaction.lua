@@ -5,8 +5,8 @@
 -- perception but drives no animation and does not cause the vanilla bark.
 -- `PlayReaction` runs one of this mod's own clips through
 -- `actor:StartInteractiveActionByName`, the only call that moves an actor's
--- body from Lua. `Ragdoll` and `ImpulseVictim` hand the body to physics
--- instead, which is what the faster tiers use.
+-- body from Lua. `Ragdoll` hands the body to physics instead, for the ragdoll
+-- tiers, and `ImpulseVictim` pushes the body once physics owns it.
 --
 -- Attached to the `HorseCollisionMod` table created by the entry point, which
 -- pulls this file in with `Script.ReloadScript`. The clip names are built from
@@ -16,7 +16,7 @@
 --
 -- @module HorseCollisionMod.Reaction
 -- @author jrandall54
--- @release 5.31.4
+
 --- Posts the native `hitReaction` message to the victim's brain.
 --
 -- It feeds the victim's perception, so the reaction registers as something
@@ -55,7 +55,6 @@ function HorseCollisionMod:SendHitReaction(npc, horseWuid, strength)
 	end)
 end
 
-
 --- Plays one of this mod's reactions on a victim.
 --
 -- Calls `actor:StartInteractiveActionByName` with a name this mod adds to the
@@ -68,38 +67,24 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number speed horse speed in meters per second
--- @tparam string prefix the reaction family, `hcm_stagger_` at walk or
---   `hcm_knockdown_` at trot, completed with the impact direction
+-- @tparam string prefix the reaction family, `hcm_stagger_`, `hcm_fall_` or
+--   `hcm_knockdown_`, completed with the impact direction
 -- @treturn boolean true when the call was accepted without error
-function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
+function HorseCollisionMod:PlayReaction(npc, velocity, prefix)
 	if not npc.actor or type(npc.actor.StartInteractiveActionByName) ~= "function" then
 		return false
 	end
 
-	-- GetImpactDir speaks the engine's "so_" vocabulary; the database entries
-	-- this mod adds are named without that prefix, so strip it.
-	local dir = self:GetImpactDir(npc, velocity, speed)
+	local dir = self:GetImpactDir(npc, velocity)
 
-	-- The engine's vocabulary is `so_left`; this mod's option names and its
-	-- per-direction tables are keyed on the bare word. Stripping it once and
-	-- using the result everywhere avoids a table lookup silently missing and
-	-- falling back, which is how every direction ended up sharing one
-	-- ragdoll timing while appearing to have four.
+	-- `GetImpactDir` speaks the engine's `so_left` vocabulary; this mod's option
+	-- names and per-direction tables use the bare word.
 	local side = string.gsub(dir, "so_", "")
 	local action = prefix .. side
-
 
 	-- Gender is logged because the two character sets resolve this call through
 	-- separate databases, so a reaction can work on one and not the other and
 	-- the misses look random without it.
-	--
-	-- This used to say the women had no AnimationControlled fragment at all and
-	-- could never play a reaction. That was true, but it was this mod's own
-	-- doing: it shipped a copy of `wh_female_fragmentids.xml` taken from the
-	-- 2018 game, which is the version where the declaration is absent, and the
-	-- copy overrode the patched file that has it. The women have had the
-	-- fragment, and a scope for it, since patch 1.9.
 	local gender = "?"
 
 	pcall(function()
@@ -116,7 +101,7 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 		self.VictimActivity[tostring(npc.id)] = tostring(npc.actor:GetCurrentAnimationState())
 	end)
 
-		local ok, err = pcall(function()
+	local ok, err = pcall(function()
 		-- Disarm before ragdolling to prevent IK glitches on the ground
 		if string.find(action, "fall") then
 			self:DisarmVictim(npc)
@@ -129,20 +114,13 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 					action, npc.id, true, 1)
 	end)
 
-	-- Deferred by a tick for the same reason the ragdoll impulse is: the
-	-- action has to have started before anything it sets can be overridden.
-	-- Repeated rather than asked once.
+	-- Deferred for the same reason the ragdoll impulse is: an interactive
+	-- action applies its fragment's movement layer as it starts, so the first
+	-- release waits 50 ms, a tick or so past the start, or it is overwritten.
 	--
-	-- One call at 50 ms is right in principle: an interactive action applies
-	-- its fragment's movement layer as it starts, so an earlier call is
-	-- overwritten. But a fragment can apply that layer again as it blends
-	-- between clips, and a single release is then undone. Victims were still
-	-- being carried through walls occasionally with the call reporting
-	-- success, which is what that looks like from outside.
-	--
-	-- Cheap to repeat: the call is idempotent, and a handful of attempts over
-	-- the first part of the reaction costs nothing next to the loop that found
-	-- the victim in the first place.
+	-- Repeated rather than asked once, because a fragment can apply that layer
+	-- again as it blends between clips and undo a single release. The call is
+	-- idempotent, so repeating it costs nothing.
 	if self.Config.ReleaseAnimationMovement then
 		local generation = self.TimerTick
 		local attempts = self.Config.ReleaseMovementAttempts
@@ -169,25 +147,16 @@ function HorseCollisionMod:PlayReaction(npc, velocity, speed, prefix)
 	-- arriving then evicts them from it, which the smart object does not undo.
 	--
 	-- What remains here is the wait for that ragdoll to resolve, because the
-	-- rebuild that follows has to land after it. A victim can leave the ragdoll
-	-- upright and still have no plan, and only the rebuild gives them one.
-	-- Only the fall carries this. The knockdown and stagger prefixes play
-	-- their clip and nothing follows, so a victim of one stands up wherever
-	-- they finished, facing whatever direction the animation left them, with
-	-- no activity to return to. The innkeeper leaning on nothing, facing the
-	-- wrong way, is what that looks like.
-	--
-	-- The wait here is for a ragdoll to resolve, and only the fall fragments
-	-- carry a Ragdoll ProcLayer, so extending this to the other prefixes needs
-	-- a different signal rather than the same call. Until then both tiers that
-	-- can knock someone down default to "fall".
+	-- rebuild that follows has to land after it: a victim can leave the ragdoll
+	-- upright and still have no plan, and only the rebuild gives them one. Only
+	-- the `hcm_fall_` fragments carry a Ragdoll ProcLayer, so only they get the
+	-- wait; a stagger plays its clip and nothing follows.
 	if prefix == "hcm_fall_" then
-		-- The handover this clip carries is now in flight. Nothing may start
+		-- The handover this clip carries is in flight. Nothing may start
 		-- another clip on this victim until it has landed.
 		self:WatchFallHandover(npc)
 
 		self:TraceRecovery(npc, action)
-		self:WatchTurn(npc, action)
 
 		local generation = self.TimerTick
 
@@ -212,11 +181,8 @@ end
 
 --- What a tier does to the victim's body, dispatched from `ReactionByTier`.
 --
--- The one place a tier is turned into a reaction. Every tier used to decide
--- this at its own call site, and two of those sites carried a throw scalar on
--- a branch the shipped settings never reached, so a live-looking number sat in
--- the code doing nothing. Reading the style from a table means a tier that does
--- not ragdoll cannot carry a throw figure at all.
+-- The one place a tier is turned into a reaction. Reading the style from a
+-- table means a tier that does not ragdoll cannot carry a throw figure at all.
 --
 -- The caller still owns whether a reaction happens. A walk is suppressed during
 -- a fight and a victim already reacting is left alone; those are the caller's
@@ -236,14 +202,13 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 
 	-- An animation is refused on a body that is lying flat, and only then.
 	--
-	-- A victim who has begun to get up takes the reaction: watching one shrug
-	-- off a hoof because a clock had not run out reads exactly like vanilla's
-	-- non-reactions, which is the thing this mod exists to replace.
+	-- A victim who has begun to get up takes the reaction, rather than
+	-- shrugging off a hoof as vanilla does.
 	--
 	-- Only the animation is refused. The impact itself lands in full: a second
 	-- hit on a victim already down registers and costs them health, so
 	-- declining the whole thing loses damage the engine charges anyway. The
-	-- sound, the dust, the marks and the damage all happen; the body simply
+	-- sound, the dust, the marks and the damage all happen; the body
 	-- stays where it is instead of snapping upright into a second fall.
 	--
 	-- The ragdoll styles are never refused. `Ragdoll` re-physicalizes a body
@@ -263,16 +228,8 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 		-- handover the first was carrying, and the canceled handover lands
 		-- later against whatever the victim is doing by then: they collapse
 		-- seconds after the impact if they are idle, or are pulled limp in the
-		-- middle of another clip, which lifts the body and drops it. One
-		-- defect, two appearances, and it needs two impacts close together,
-		-- which is why it is so hard to reproduce on purpose.
-		--
-		-- The readiness cooldown used to prevent this as a side effect of
-		-- refusing every impact for several seconds, and the diary said so:
-		-- it existed "to prevent ghost damage and the awkward restart of a
-		-- fall clip on a victim who is not standing". Removing those timers
-		-- took the protection with them. This refuses only the thing that
-		-- causes it, and only while it is actually pending.
+		-- middle of another clip, which lifts the body and drops it. This
+		-- refuses only that, and only while it is pending.
 		local unsettled = self.RagdollUnsettled and self.RagdollUnsettled[tostring(npc.id)]
 		local pending = self:HasFallPending(npc) or unsettled
 		local refused = flat or pending
@@ -297,15 +254,15 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 	end
 
 	if style == "stagger" then
-		return self:PlayReaction(npc, velocity, speed, "hcm_stagger_")
+		return self:PlayReaction(npc, velocity, "hcm_stagger_")
 	end
 
 	if style == "knockdown" then
-		return self:PlayReaction(npc, velocity, speed, "hcm_knockdown_")
+		return self:PlayReaction(npc, velocity, "hcm_knockdown_")
 	end
 
 	if style == "fall" then
-		return self:PlayReaction(npc, velocity, speed, "hcm_fall_")
+		return self:PlayReaction(npc, velocity, "hcm_fall_")
 	end
 
 	if style ~= "ragdoll" then
@@ -317,7 +274,7 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 
 	local throw = self:TierValue("ThrowByTier", tierName)
 
-	-- A ragdoll tier with no throw figure still goes down; it is simply not
+	-- A ragdoll tier with no throw figure still goes down; it is not
 	-- pushed. Said out loud rather than defaulted silently, because the only
 	-- way to reach it is a player editing one table and not the other.
 	if type(throw) ~= "number" then
@@ -328,7 +285,7 @@ function HorseCollisionMod:PlayTierReaction(npc, tierName, velocity, speed,
 	end
 
 	-- The tier's throw profile: how it enters, what ceiling holds it and how
-	-- hard, with every armour pair already blended against this victim.
+	-- hard, with every armor pair already blended against this victim.
 	--
 	-- Resolved once, here, and carried through the whole throw. Nothing
 	-- downstream reads a tier name or a setting of its own, which is what
@@ -341,27 +298,11 @@ end
 
 --- Waits for a falling victim to become a physics body, then hands control on.
 --
--- `actor:Fall` requests the fall, it does not perform it. For one frame after
--- the request the victim is still an animated character, and physics calls
--- aimed at one are discarded silently, so the brake and the damping have to
--- wait. Without the wait the brake fires onto a body still
--- carrying the peak velocity of the engine's collision and, being
--- proportional, takes more speed away. Gallop throws fell from a mean of
--- 1.81 m to 1.57 m over 18 impacts and the rider described the victims as
--- bricks.
---
--- The wait is one frame, because that is what it has measured at. Every
--- impact in the telemetry has answered at `PhysicsReadyMs`, never sooner and
--- never later.
---
--- This replaced a probe that wrote a mass and read it back, on a six rung
--- ladder, because writes are refused on a living actor and accepted on a
--- ragdoll. The probe worked and the ladder never left its second rung, so all
--- of it was machinery around a fact that does not vary. It also carried three
--- settings, `RagdollMass`, `RagdollMassArmorScaled` and
--- `RagdollMassArmorExponent`, which presented a weight lever the mod did not
--- have: the scaling shipped off, so the write was the engine's own 80 over
--- itself.
+-- The settle fragment requests the ragdoll; it does not perform it. For one
+-- frame after the request the victim is still an animated character, and
+-- physics calls aimed at one are discarded silently, so the impulse, the brake
+-- and the damping wait. The wait is `PhysicsReadyMs`, one frame, which is
+-- when the handover is observed on every impact.
 --
 -- @tparam table npc victim entity
 -- @tparam func onReady called once the body is physical
@@ -379,13 +320,10 @@ function HorseCollisionMod:WhenVictimIsPhysical(npc, onReady)
 	end)
 end
 
-
 --- Slows a ragdolled victim so it stops sliding.
 --
--- A thrown body keeps going long after the throw, and that slide is most of
--- the distance an impact appears to produce. It makes the ground read as ice,
--- and it makes distance a poor measure of force, because what is being
--- measured is mostly the surface rather than the impulse.
+-- A thrown body keeps going long after the throw, which makes the ground
+-- read as ice.
 --
 -- `damping` bleeds velocity off the body and `min_energy` is the threshold
 -- below which physics puts it to rest. Both are fields of
@@ -397,8 +335,8 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam[opt] number armorScale the victim's armor scale, high for an
---   unarmored victim and low for one in mail. Chooses the commanded throw
---   distance
+--   unarmored victim and low for one in mail. Logged only; armor reaches the
+--   throw through `profile`
 -- @tparam[opt] table profile the tier's resolved throw profile, from
 --   `ThrowProfile`. Carries the brake or the rail, the ceiling and the drag, all
 --   already blended against this victim's armor. Without one the victim is
@@ -418,18 +356,8 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 	local generation = self.TimerTick
 	local startedAt = self:TimeMs()
 
-	-- Read from the physics body, not from the entity.
-	--
-	-- `GetWorldPos` returns the entity's position and the entity does not
-	-- follow a ragdoll: this project established that once already, when a
-	-- corpse appeared to hang in the air while its entity sat on the ground.
-	-- Every throw figure the telemetry has carried was read that way, and every
-	-- one was fiction, reporting one to five meters while the rider watched
-	-- bodies thrown eight to twelve.
-	--
-	-- `GetCenterOfMassPos` is the physics body, and the brake below already
-	-- calls it on a ragdoll to place its impulse, so it is known to work on
-	-- exactly the thing being measured here.
+	-- Read from the physics body with `GetCenterOfMassPos`, because the
+	-- entity's `GetWorldPos` does not follow a ragdoll.
 	local function bodyPos()
 		local at = nil
 
@@ -442,16 +370,13 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 
 	local origin = bodyPos()
 
-	-- =========================================================================
-	-- Phase 1: The Impact Parachute (Airborne Counter-Impulse)
-	-- =========================================================================
 	-- Step 1, the brake: a counter-impulse along the body's own velocity that
-	-- leaves it `keep` of the speed it arrived with.
+	-- leaves it `keep` of the speed it arrived with. Logged as `Phase1Brake`.
 	--
 	-- Only a tier that reacts to the engine's throw carries a keep, and it is
 	-- the only kind that brakes. A tier that commands its own throw has
 	-- nothing of the engine's to subtract and carries a launch and a rail
-	-- instead; the two are exclusive, and a tier that did both fought itself.
+	-- instead; the two are exclusive, because a tier doing both fights itself.
 	local keep = (profile and profile.keep) or 1.0
 	local braked = false
 
@@ -512,23 +437,18 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 		end
 	end
 
-	-- The brake fires at a fixed delay, which is right for the one tier that
-	-- uses it. The gallop's victim is thrown by the engine's collision at the
-	-- moment of contact, so sixty milliseconds is at or past the peak: the
-	-- diary checked exactly this and found the brake reading 16.83 m/s against
-	-- a later `airPeak` of 12.51.
-	--
-	-- A tier the mod throws itself does not brake at all. It carries a launch
-	-- and a rail instead, because there is nothing of the engine's to subtract.
+	-- The brake fires at a fixed delay, 10 ms after `ImpulseDelayMs` so it
+	-- lands after the impulse. That is right for the one tier that uses it:
+	-- the gallop's victim is thrown by the engine's collision at the moment of
+	-- contact, so by then the body is at or past its peak speed.
 	if self.Config.RagdollBrake and keep < 1.0 then
 		Script.SetTimer((self.Config.ImpulseDelayMs) + 10, function()
 			fireBrake("delay")
 		end)
 	end
 
-	-- =========================================================================
-	-- Phase 2: The Anti-Slide (Grounded & Bouncing Damping)
-	-- =========================================================================
+	-- Steps 2 and 3, the airborne cap and the settle, polled until the body
+	-- rests. Logged as `Phase2Grounded`.
 	local last = nil
 	local moving = false
 	local contactLog = {}
@@ -583,12 +503,8 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 					.. " drag=" .. string.format("%.1f", lastDrag)
 					.. " railHits=" .. tostring(railImpulses)
 
-					-- How far the body actually came, against the fraction of
-					-- its speed it was allowed to keep. The pair is what makes
-					-- a single throw readable: commanded beside achieved,
-					-- with no ratio and no sample size in the way. It was
-					-- computed and then dropped from this line, which left
-					-- `traveled` accumulating every poll for nobody.
+					-- How far the body came, beside the fraction of its speed
+					-- it was allowed to keep.
 					.. " achieved=" .. string.format("%.2f", traveled)
 					.. " sDamp=" .. string.format("%.2f", damping * scale)
 					.. " ok=" .. tostring(ok)
@@ -601,27 +517,12 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 		--
 		-- `min_energy` is the threshold below which physics puts a body to
 		-- sleep, and a sleeping body ignores impulses and parameter writes
-		-- alike. So a body that reached its sleep threshold before this watch
-		-- ended never received the release at all: the write was issued,
-		-- reported no error, and was discarded, leaving `min_energy` set on
-		-- that corpse permanently. A corpse carrying it sleeps the moment it
-		-- slows, and one lifted by the horse and then left unsupported holds
-		-- its position in the air.
+		-- alike. A body that slept before this watch ended would silently
+		-- discard the release and keep `min_energy` permanently; a corpse
+		-- carrying it sleeps the moment it slows, and one lifted by the horse
+		-- and then left unsupported holds its position in the air.
 		--
-		-- That is why the symptom was intermittent. It bites only when the
-		-- body sleeps before the watch closes, which depends on how quickly it
-		-- came to rest.
-		--
-		-- Diagnosed from the rider's cure rather than from telemetry. Walking
-		-- the horse into a stuck corpse drops it, and physical contact wakes a
-		-- sleeping physics body and does almost nothing else, which is a much
-		-- narrower clue than a probe reading. Entity position read as normal
-		-- throughout, because the entity was never what moved: the ragdoll's
-		-- bones were asleep in a raised pose while the entity sat on the
-		-- ground, so probing entity height and animation state both led
-		-- nowhere.
-		--
-		-- `AwakePhysics` is the neighbouring call to `SetPhysicParams` and
+		-- `AwakePhysics` is the neighboring call to `SetPhysicParams`, and
 		-- vanilla uses it on doors and elevators for the same reason.
 		pcall(function()
 			npc:AwakePhysics(1)
@@ -639,13 +540,9 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 			return
 		end
 
-		-- The physics body again, and this one is not instrumentation: the
-		-- speed derived from these positions is what the airborne cap and the
-		-- drag act on. Read from the entity, which does not follow a ragdoll,
-		-- that speed came back far lower than the body's own, so the cap was
-		-- rarely reached and the drag rarely applied. A ceiling of 6 m/s was
-		-- letting bodies travel eight to twelve meters because it was watching
-		-- the wrong thing.
+		-- The physics body again, and not as instrumentation: the speed
+		-- derived from these positions is what the airborne cap and the drag
+		-- act on, so it must be the body's own.
 		local here = bodyPos()
 
 		local elapsed = self:TimeMs() - startedAt
@@ -696,38 +593,16 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 			return
 		end
 
-		-- Drag on a body still traveling and not yet settled, and **the lever
-		-- that actually decides how far a victim goes**.
+		-- Drag on a body still traveling and not yet settled, and the lever
+		-- that decides how far a victim goes.
 		--
-		-- Measured over 24 throws with mass flat at 80 kg, the distance a body
-		-- reached tracked the number of samples it spent above this cap and
-		-- barely tracked `keep` at all:
-		--
-		--     airBraked 0     0.45  0.55  0.56  0.92  1.03  1.40
-		--     airBraked 1-2   1.74  2.08  2.96  3.27  3.39
-		--     airBraked 3-4   3.43 ... 5.32
-		--
-		-- Separation across the whole run was 1.11x, which is nothing, because
-		-- this cap was the same figure for everyone. The counter-impulse
-		-- removes 55 per cent of an armored victim's speed and the cap then
-		-- flattens what is left onto the same curve as an unarmored one.
-		--
-		-- The impulse also fires before the engine has finished delivering the
-		-- throw at this mass. A guard braked at 10.43 m/s with keep 0.45 should
-		-- have been left at 4.7, and his `airPeak` afterwards read 11.17: the
-		-- horse goes on driving a body of 80 kg well past the sixty
-		-- millisecond mark. At the 1,208 kg the mod used to write onto armored
-		-- victims it did not, which is why the one-shot brake looked sufficient
-		-- while that rewrite was carrying the separation. The rewrite is gone
-		-- and every body is the engine's 80, so the cap carries it alone.
-		--
-		-- So the cap is what armor scales. It is a ceiling rather than a
+		-- The cap is what armor scales. It is a ceiling rather than a
 		-- subtraction, so it does not care how the body got its speed or when
 		-- the engine stopped pushing: a body held under 2.5 m/s cannot travel
-		-- like one allowed 6.0 however it was set moving. That is what a
-		-- one-shot correction cannot do, because the horse's collider goes on
-		-- driving a limp body well past the moment of impact and overwrites
-		-- whatever was applied once.
+		-- like one allowed 6.0 however it was set moving. A one-shot correction
+		-- cannot do that, because the horse's collider goes on driving a limp
+		-- body well past the moment of impact and overwrites whatever was
+		-- applied once.
 		--
 		-- On a tier the mod throws itself the same figure is a rail rather
 		-- than a ceiling: it is resolved to the speed that tier commanded, so
@@ -740,26 +615,15 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 		-- Holding the rail by taking the excess speed away, for a tier that
 		-- commands its own throw.
 		--
-		-- Drag does not bind a ragdoll. Measured on a victim railed at 6.03
-		-- with the drag applied on every poll, the horse's collider still
-		-- drove the body to 8.64 and 9.17 m/s, and one traveled 7.62 m. A
-		-- mailed victim railed at 1.97 held 10.93 m/s across seven
-		-- consecutive polls. The drag moves when the throw starts and never
-		-- how much of it there is.
-		--
-		-- A counter-impulse does bind, and it is the same mechanism as the
-		-- Phase 1 brake, which is the largest force this mod applies to
-		-- anything. `mass * (speed - cap)` against the body's own velocity
-		-- removes exactly the excess and leaves the rail, and it is applied
-		-- on every poll the body is over the line rather than once, because
-		-- the horse's collider goes on pushing long after any single moment.
+		-- Drag does not bind a ragdoll the horse's collider keeps pushing. A
+		-- counter-impulse does, the same mechanism as the brake:
+		-- `mass * (speed - cap)` against the body's own velocity removes
+		-- exactly the excess and leaves the rail. It is applied on every poll
+		-- the body is over the line rather than once, because the collider
+		-- goes on pushing long after any single moment.
 		--
 		-- This cannot shorten the throw the tier commanded. The rail *is* that
-		-- commanded speed, so there is nothing between the two for this to
-		-- take: it removes only what the collider added on top. That is the
-		-- difference between this and the enforcement that was removed, which
-		-- railed a body below the speed the mod had just given it and so
-		-- fought its own launch.
+		-- commanded speed, so it removes only what the collider added on top.
 		if railEnforce and cap > 0 and speed and speed > cap
 				and touching < (self.Config.RagdollDampContactRun) then
 			pcall(function()
@@ -807,21 +671,10 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 			end
 
 			-- The drag itself is armor scaled, not only the ceiling.
-			--
-			-- The ceiling alone could not separate anyone on the throws that
-			-- matter. `strength` is `(speed - cap) / span` clamped to 1, so
-			-- past `cap + span`, about 5.5 m/s, it saturates and every victim
-			-- receives the identical figure however their ceiling was set.
-			-- Measured, armored bodies held to a ceiling of 2.50 still reached
-			-- peaks of 11.37, 13.28 and 15.37 m/s, because 8.0 of drag is
-			-- simply not enough to hold a body the engine threw that hard.
-			-- The ceiling moved when the drag started and never moved how much
-			-- there was.
-			--
-			-- Heavy drag was the objection raised against this whole approach
-			-- before it was tested, on the grounds it would read as syrup. The
-			-- rider rode armored victims at a flat 15.0 and reported no syrup
-			-- at all, so the objection is already withdrawn on evidence.
+			-- `strength` is `(speed - cap) / span` clamped to 1, so past
+			-- `cap + span` it saturates and every victim would receive the
+			-- same drag however their ceiling was set; the drag figure is what
+			-- separates them on a hard throw.
 			local drag = profile.drag
 
 			lastDrag = drag
@@ -859,78 +712,53 @@ function HorseCollisionMod:DampVictim(npc, armorScale, profile)
 	Script.SetTimer(pollMs, watch)
 end
 
-
 --- Knocks a victim down with a physics ragdoll.
 --
--- Used at trot and gallop. `actor:Fall` switches the victim to a ragdoll,
--- after which an impulse can be applied. Impulses are ignored on an upright,
--- animation-driven actor, so the order matters and the impulse is deferred
--- by a tick.
+-- Used by the ragdoll tiers, the gallop and the charge. The settle fragment
+-- switches the victim to a ragdoll, after which an impulse can be applied.
+-- Impulses are ignored on an upright, animation-driven actor, so the order
+-- matters and the impulse waits for `WhenVictimIsPhysical`.
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
 -- @tparam number speed horse speed in meters per second
--- @tparam number tierScale the tier's share of the configured impulse, 0 to 1
--- @tparam number armorScale the victim's armor scale, which sets their ragdoll
---   mass and nothing else
+-- @tparam number tierScale the tier's `ThrowByTier` trim on `Knockback` and
+--   `Uplift`
+-- @tparam number armorScale the victim's armor scale, passed on for logging;
+--   armor reaches the throw through `profile`
 -- @tparam table horsePos horse world position, the origin a push points away
 --   from, so a victim is never thrown back under the rider
 -- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
 -- @tparam[opt] table profile the tier's resolved throw profile, from
 --   `ThrowProfile`: how the throw enters, the ceiling that holds it and the
 --   drag that holds it there, all blended against this victim's armor
--- @tparam[opt] string tierName the tier this impact resolved as, carried only
---   so the throw measurement can name it. `ImpactDamage` logs the tier and the
---   armor scale on its own line, but it returns early when damage is switched
---   off, which is exactly the configuration a throw is measured in
+-- @tparam[opt] string tierName the tier this impact resolved as, logged on the
+--   `FallToBlend` line
 function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 								   horsePos, horseEnt, profile, tierName)
 	-- Undo the previous impact's damping before doing anything else.
 	--
 	-- `DampVictim` sets `damping` and `min_energy` to stop a thrown body
 	-- sliding forever. A physics body below its minimum energy is put to sleep,
-	-- and a sleeping body ignores impulses and parameter writes alike. That is
-	-- one cause for three symptoms that looked separate: on a victim hit while
-	-- already down, the impulse is accepted and does nothing, and there is no
-	-- visible reaction. Measured, a commanded 3.00 m/s
-	-- on an 80 kg body moved it eight centimeters.
-	--
-	-- Clearing both wakes it, so the fall and the impulse below
-	-- all meet a body that can respond.
+	-- and a sleeping body ignores impulses and parameter writes alike, so on a
+	-- victim hit while already down the impulse would be accepted and do
+	-- nothing. Clearing both wakes it, so the fall and the impulse below meet
+	-- a body that can respond.
 	pcall(function()
 		npc:SetPhysicParams(PHYSICPARAM_SIMULATION, {
 			damping = 0, min_energy = 0
 		})
 	end)
 
-	-- A victim already ragdolling is re-physicalized before anything else.
+	-- The ragdoll is requested through an interactive action rather than
+	-- `actor:Fall`.
 	--
-	-- `actor:Fall` on a body that is already down has nothing to perform, so
-	-- the body never re-enters the physicalized state and the impulse meets
-	-- something that will not move: measured, a commanded 3.00 m/s moved an
-	-- 80 kg body eight centimeters.
-	--
-	-- `RagDollize` does re-physicalize it, which is exactly why it looked like
-	-- the answer, and on its own it snaps the victim into a T-pose. Calling it
-	-- first and letting `Fall` follow immediately uses the half of it that
-	-- works and lets the fall overwrite the pose it wrecks.
-	--
-	-- Only for a victim already down. The standing path does not need it and
-	-- is where the T-pose came from when this was applied to every impact.
-		-- Force the engine into an immediate ragdoll via an interactive action fragment,
-	-- rather than using actor:Fall.
-	--
-	-- actor:Fall merely queues a physics transition. If the victim is playing an
-	-- uninterruptible animation (like walking in combat, getting up, etc.), the engine
-	-- ignores the fall request until the animation finishes. This causes the
-	-- "delayed reaction" bug where a victim takes the hit, walks three steps,
-	-- and then suddenly collapses.
-	--
-	-- hcm_settle is an empty fragment with a Ragdoll ProcLayer at ExitTime 0.
-	-- Because it is an interactive action, the engine immediately aborts whatever
-	-- the victim is doing to play it, instantly snapping them into the physics
-	-- ragdoll state and bypassing the engine's internal queue.
-			local function requestFall()
+	-- `actor:Fall` only queues a physics transition, which waits behind an
+	-- uninterruptible animation such as a get-up, so a victim could take the
+	-- hit, walk on and collapse seconds later. `SettleFragTag` is an empty
+	-- fragment with a Ragdoll ProcLayer at ExitTime 0; as an interactive action
+	-- it aborts whatever the victim is doing and ragdolls them at once.
+	local function requestFall()
 		pcall(function()
 			self:DisarmVictim(npc)
 
@@ -944,21 +772,17 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 
 	requestFall()
 
-	-- How far the victim travels between the fall and the ragdoll, measured at
-	-- the two moments the rider named.
+	-- How far the victim travels between the fall and the blend out of the
+	-- ragdoll, logged as `FallToBlend`.
 	--
-	-- Every earlier attempt read a position *during* the ragdoll and failed:
-	-- the entity does not follow a ragdolling body, the center of mass reports
-	-- centimeters on a throw the rider watches cross meters, and both bone binds
-	-- returned nothing at all. These two markers sit outside that interval.
-	-- `requestFall` is the last moment the victim is still animation-driven, so
-	-- `GetWorldPos` is honest there, and the engine re-syncs the entity to the
-	-- body to play the blend, so it is honest again at the far end.
+	-- Both readings sit outside the ragdoll, where the entity matches the body.
+	-- `requestFall` is the last moment the victim is still animation-driven,
+	-- and the engine re-syncs the entity to the body to play the blend, so
+	-- `GetWorldPos` is right at both ends. The figures are relative: they do
+	-- not match the distance seen on screen.
 	--
 	-- `BlendRagdoll` is what `IsRagdollState` already recognizes, and the poll
-	-- interval and ceiling are `RisePollMs` and `RiseCeilingMs`, the same pair
-	-- every other wait on this victim uses. Nothing here is a figure of this
-	-- watcher's own.
+	-- interval and ceiling are `RisePollMs` and `RiseCeilingMs`.
 	if self.Config.LogTelemetry then
 		local generation = self.TimerTick
 		local gap = self.Config.RisePollMs
@@ -1024,32 +848,23 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 
 	-- `actor:RagDollize` does not belong here and must not be added back. It
 	-- asks for the physics profile directly rather than telling the actor to
-	-- fall, which is why it looks like the answer for re-hitting a victim who
-	-- is already down, and in game it snaps the victim upright into a T-pose
-	-- on every gallop impact.
+	-- fall, so it looks like the answer for re-hitting a victim who is already
+	-- down, and in game it snaps the victim upright into a T-pose.
 
-	-- Nothing below throws the victim. The throw is the engine resolving its
-	-- own collision between a 480 kg horse and the body. What this pair does is
-	-- shape what the engine started, through the brake and the damping, and
-	-- both have to wait for a body that physics owns.
+	-- The gallop's victim is thrown by the engine's own collision and braked
+	-- here; the charge's is thrown by the launch in `ImpulseVictim`. Both wait
+	-- for a body that physics owns.
 	self:WhenVictimIsPhysical(npc, function()
 		self:ImpulseVictim(npc, velocity, tierScale, horsePos, horseEnt,
-				profile, armorScale)
+				profile)
 		self:DampVictim(npc, armorScale, profile)
 	end)
 
-	-- The control for the same reading taken on the fall path. This tier uses
-	-- actor:Fall and touches no animation data of this mod's, so a turn seen
-	-- here belongs to the game rather than to the reaction.
-	self:WatchTurn(npc, "engine-ragdoll")
-
-	-- Traced as the control for the fall path. This tier hands the body to
-	-- physics through actor:Fall with no fragment of this mod's involved, so
-	-- how long the engine then holds it is the engine's own figure.
+	-- Traced as `engine-ragdoll`, for comparison with the fall path.
 	self:TraceRecovery(npc, "engine-ragdoll")
 
 	local generation = self.TimerTick
-	self:WhenVictimIsUp(npc, function(state, waitedForBody)
+	self:WhenVictimIsUp(npc, function()
 		if generation ~= self.TimerTick then
 			return
 		end
@@ -1057,21 +872,22 @@ function HorseCollisionMod:Ragdoll(npc, velocity, speed, tierScale, armorScale,
 	end)
 end
 
-
 --- Pushes a victim who is already a physics body.
 --
--- Separated from `Ragdoll` because the fall tier ragdolls the victim itself,
--- partway through an animation rather than at the moment of impact, and needs
--- the push without the rest.
+-- The trim push from `Knockback` and `Uplift`, plus the barding bonus, and
+-- for a tier with a launch the shortfall up to the commanded speed. Called
+-- from `Ragdoll` once the body is physical.
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number tierScale the tier's share of the configured impulse, 0 to 1
--- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
+-- @tparam number tierScale the tier's `ThrowByTier` trim
 -- @tparam table horsePos horse world position, the origin the push points away
 --   from, so a victim is never thrown back under the rider
+-- @tparam[opt] table horseEnt the player's horse, for the barding force bonus
+-- @tparam[opt] table profile the tier's resolved throw profile, which carries
+--   the launch when there is one
 function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
-										horseEnt, profile, armorScale)
+										horseEnt, profile)
 	-- Barding is a flat addition to the two force figures rather than a factor
 	-- on the result, so a barded horse adds the same absolute push whoever it
 	-- hits, and the victim's own armor still scales the whole thing.
@@ -1093,8 +909,7 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 
 	-- A tier with a launch still has work to do here with the two trim figures
 	-- set to nothing, because the launch is the part of this that carries the
-	-- throw. Leaving early on their account was what stopped the charge being
-	-- thrown at all on a horse with no barding.
+	-- throw.
 	if k_back <= 0 and k_up <= 0 and launch <= 0 then
 		return
 	end
@@ -1107,8 +922,9 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 			hitPos = npc:GetPos()
 		end
 
-		-- Lift the application point to roughly chest height so the victim
-		-- rotates over the impact instead of having their feet swept.
+		-- Lift the application point a meter above the victim's origin,
+		-- roughly chest height, so the victim rotates over the impact instead
+		-- of having their feet swept.
 		hitPos.z = hitPos.z + 1.0
 
 		-- Normalized against the velocity's own length, not against the
@@ -1117,11 +933,9 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 		-- horse carried into it, while the velocity here is what the horse is
 		-- doing now, after the contact has slowed it.
 		--
-		-- Dividing one by the other leaves a direction shorter than unit and
-		-- an impulse weakened by that ratio, so the same target took 67.3 at
-		-- full speed and 37.7 when the horse had dropped to 2.84 against a
-		-- score of 10.72. Knockback then varies with how hard the horse
-		-- happened to brake rather than with the tier and the target.
+		-- Dividing one by the other would leave a direction shorter than unit,
+		-- so knockback would vary with how hard the horse happened to brake
+		-- rather than with the tier and the target.
 		local moving = self:VectorLength(velocity or { x = 0, y = 0, z = 0 })
 
 		if moving > 0 then
@@ -1131,11 +945,9 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 		else
 			-- No velocity means no direction to throw along, and the default
 			-- above is world +X, which is not a direction anything in the
-			-- game is facing. Sending a victim along it reads as a body
-			-- flying off at a right angle to the horse for no reason, which
-			-- is exactly what a charge did whenever the horse's position
-			-- tracker returned zero through the rear animation. Nothing is
-			-- thrown rather than something thrown the wrong way.
+			-- game is facing, so the impulse is dropped rather than sent the
+			-- wrong way. The horse's velocity can read zero through the rear
+			-- animation.
 			self:Log("ImpulseVictim " .. self:NameOf(npc)
 					.. " no velocity to throw along, dropping the impulse")
 
@@ -1184,10 +996,8 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 				+ (combined.y * combined.y)
 				+ (combined.z * combined.z))
 
-		-- Logged because the multiplier and the tier scalar are both visible
-		-- in telemetry while the figure they produce was not, which left a
-		-- report of armored targets moving further at trot than at gallop
-		-- with nothing to check it against.
+		-- Logged because the multiplier and the tier scalar are visible in
+		-- telemetry elsewhere and the figure they produce is not.
 		if self.Config.LogTelemetry then
 			-- The mass is read rather than assumed, because the throw is a
 			-- velocity and the velocity is the magnitude over the mass. The
@@ -1230,29 +1040,20 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 			end
 
 			-- The ragdoll needs time to physicalize before it accepts an
-			-- impulse, and one applied too early is ignored without saying so.
-			-- The wait is settable because a fixed 50 ms produced throws of
-			-- four meters and of nothing at all from the same magnitude.
+			-- impulse, and one applied too early is ignored without saying so;
+			-- the wait is `ImpulseDelayMs`.
 			--
 			-- No tier both brakes and launches, so this never has to be
 			-- ordered against the brake.
 			Script.SetTimer(self.Config.ImpulseDelayMs, function()
-				local before, after = nil, nil
-
-				pcall(function()
-					before = npc:GetWorldPos()
-				end)
-
 				-- The launch, decided here rather than where the trim was,
 				-- because it is a floor under the body's speed and the body's
 				-- speed is only knowable at the moment the impulse lands.
 				--
-				-- `ThrowProfileByTier` carries the derivation. In short: the
-				-- charge commands its throw because the engine does not
-				-- reliably deliver one -- the lunge is animation-controlled
-				-- and its victims moved 0.3 to 1.0 m with no mod throw in
-				-- place -- while the gallop is thrown by a real collision and
-				-- subtracts from it instead.
+				-- `ThrowProfileByTier` carries the derivation: the charge
+				-- commands its throw because the engine does not reliably
+				-- deliver one, while the gallop is thrown by a real collision
+				-- and subtracts from it instead.
 				local total = impulseMag
 
 				if launch > 0 then
@@ -1277,19 +1078,14 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 					--
 					-- Only the shortfall above what the body already holds is
 					-- sent, so a charge that did catch a real shove from the
-					-- collider is not thrown twice. The other direction -- a
-					-- body the collider shoved far past the tier's figure --
-					-- is the ceiling's job, not this one's, and it has to be:
-					-- an impulse or a velocity written once here is applied a
-					-- quarter of a second after impact, while the horse is
-					-- still driving the body, and whatever the collider does
-					-- next overwrites it. Measured, two victims commanded at
-					-- the same speed and arriving at 12.44 and 14.04 m/s
-					-- traveled 21.73 m and 0.31 m. Floor here, ceiling in the
-					-- watch, and the pair of them leaves one outcome.
+					-- collider is not thrown twice. A body the collider shoved
+					-- past the tier's figure is the rail's job in `DampVictim`:
+					-- anything written once here, `ImpulseDelayMs` after
+					-- impact, is overwritten by whatever the collider does
+					-- next. Floor here, ceiling in the watch.
 					--
-					-- Armour has already been applied, at the point the
-					-- profile was resolved. It is not applied again here.
+					-- Armor has already been applied, when the profile was
+					-- resolved. It is not applied again here.
 					local shortfall = launch - held
 
 					if mass > 0 and shortfall > 0 then
@@ -1309,12 +1105,11 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 
 				-- The launch goes along the ground, not along the trim's
 				-- line. `Knockback` and `Uplift` are 50 and 30, so the
-				-- direction they shape is about half vertical: sent along it,
-				-- a 620 unit launch threw a peasant ten meters through the
-				-- air, with thirteen samples above the speed cap. A horse
-				-- knocking a man down drives him along its own line and the
-				-- lift is trim on top, so the launch is added to the trim's
-				-- vector rather than sent through its direction.
+				-- direction they shape is about half vertical, and a launch
+				-- sent along it throws a body high through the air. A horse
+				-- knocking someone down drives them along its own line with
+				-- the lift as trim on top, so the launch is added to the
+				-- trim's vector rather than sent through its direction.
 				local sendDir = normDir
 				local sendMag = total
 
@@ -1342,38 +1137,14 @@ function HorseCollisionMod:ImpulseVictim(npc, velocity, tierScale, horsePos,
 					npc:AddImpulse(-1, hitPos, sendDir, sendMag, 1)
 				end)
 
-				-- Reported from inside the timer, and with what the body did
-				-- next. The line written when the impulse is computed says
-				-- only what was intended: the call itself happens a quarter of
-				-- a second later, and a failure or a body that does not move
-				-- looked identical to a throw from outside.
-				Script.SetTimer(300, function()
-					pcall(function()
-						after = npc:GetWorldPos()
-					end)
-
-					local moved = 0
-
-					if before and after then
-						moved = math.sqrt(((after.x - before.x) ^ 2)
-								+ ((after.y - before.y) ^ 2)
-								+ ((after.z - before.z) ^ 2))
-					end
-
-					if self.Config.LogTelemetry then
-						self:Log("ImpulseApplied " .. self:NameOf(npc)
-								.. " ok=" .. tostring(ok)
-								.. " err=" .. tostring(err)
-								.. " movedIn300ms=" .. string.format("%.2f", moved) .. "m")
-					end
-				end)
+				-- The line written when the impulse is computed says only
+				-- what was intended; this one reports the call itself.
+				if self.Config.LogTelemetry then
+					self:Log("ImpulseApplied " .. self:NameOf(npc)
+							.. " ok=" .. tostring(ok)
+							.. " err=" .. tostring(err))
+				end
 			end)
 		end
 	end)
 end
-
-
-
-
-
-

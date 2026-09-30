@@ -141,8 +141,7 @@ param (
 
     # Posts the changelog for a version already on the page, and exits. The
     # changelog call is additive and independent of the upload, so a release
-    # published without one is repaired rather than re-uploaded. 4.2.2 went out
-    # with none, because the field is optional and nothing looked for it.
+    # published without one is repaired rather than re-uploaded.
     [switch]$ChangelogOnly
 )
 
@@ -347,20 +346,28 @@ if (-not (Test-Path $Zip)) {
     throw "No release zip at $Zip. Build it first: .\build.ps1 -Version $Version"
 }
 
+# The animation layout and file set proved against the game's own paks, for
+# the zip about to go out.
+if (-not $Force) {
+    python (Join-Path $PSScriptRoot "verify_additive.py") $Zip
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "verify_additive.py refused $Zip. Fix the failures above and rebuild."
+    }
+}
+
 # A release has to have been played from its pak before it goes out. The
 # development loop deploys loose files and runs at sys_PakPriority 0, where the
 # engine prefers them over any pak, so a pak with wrong entry names or wrong
 # reference paths overrides nothing, logs nothing, and looks exactly like a
-# working one. Version 4.0.0 was published without this check.
+# working one.
 #
 # An install still holding loose mod files, or still set to development pak
 # priority, is proof that whatever was last played was not the packaged build.
 if (-not $DryRun -and -not $Force) {
-    $gameRoot = $env:KCD_PATH
+    . (Join-Path $PSScriptRoot "game_root.ps1")
 
-    if (-not $gameRoot -or -not (Test-Path $gameRoot)) {
-        $gameRoot = "C:\Games\Kingdom Come - Deliverance"
-    }
+    $gameRoot = Resolve-GameRoot
 
     if (Test-Path $gameRoot) {
         $loose = @(
@@ -389,8 +396,8 @@ if (-not $DryRun -and -not $Force) {
                 Write-Host "  sys_PakPriority = 0, so paks are not read first" -ForegroundColor Red
             }
 
-            throw ("Test the release first: .\tools\dev_deploy.ps1 " +
-                   "-PrepareShippingTest, install the zip through Vortex, " +
+            throw ("Test the release first: .\tools\flow.ps1 " +
+                   "shipping, install the zip through Vortex, " +
                    "launch without -devmode, and ride into someone at each " +
                    "speed tier.")
         }
@@ -415,9 +422,8 @@ $zipItem = Get-Item $Zip
 $zipBytes = $zipItem.Length
 
 # The notes for a version are a release artifact like the Files tab entry, and
-# they sit at a predictable path beside it. Finding them without being asked is
-# what stops a release going out with an empty changelog, which is what happened
-# to 4.2.2: the field is optional and nothing looked for it.
+# they sit at a predictable path beside it. They are found without being asked,
+# because the field is optional and nothing else looks for it.
 if (-not $Changelog -and -not $ChangelogFile) {
     $conventionalNotes = Join-Path $repoRoot (Join-Path "releases" "notes-$Version.md")
     if (Test-Path $conventionalNotes) { $ChangelogFile = $conventionalNotes }
@@ -451,20 +457,13 @@ if (-not $Force -and $Version -match 'dev|alpha|beta|rc') {
     throw "Version '$Version' looks like a pre-release. Pass -Force if that is deliberate."
 }
 
-# build.ps1 copies src\mod.manifest verbatim, so its <version> is maintained by
-# hand and can drift from the -Version the zip was built with. The manifest is
-# what the game reads, so a mismatch ships a mod that reports the wrong version
-# to anyone debugging it.
+# The manifest's <version> is checked again against the zip, since -Zip can
+# name any file. The manifest is what the game reads, so a mismatch ships a mod
+# that reports the wrong version to anyone debugging it.
 Add-Type -AssemblyName System.IO.Compression.FileSystem | Out-Null
 $archive = [System.IO.Compression.ZipFile]::OpenRead($zipItem.FullName)
 try {
-    # Compress-Archive stores Windows separators, so the release zip does
-    # does hold "Data\HorseCollisionMod.pak". Harmless for the outer zip, which
-    # is unpacked by Vortex or by hand rather than looked up by path, and the
-    # pak inside it is built entry by entry to get forward slashes. Worth
-    # knowing that Python's zipfile quietly normalizes these on read while .NET
-    # reports them as stored, so the two disagree about the same file.
-    $names = $archive.Entries | ForEach-Object { $_.FullName.Replace([char]92, [char]47) }
+    $names = $archive.Entries | ForEach-Object { $_.FullName }
 
     foreach ($required in @("mod.manifest", "Data/HorseCollisionMod.pak")) {
         if ($names -notcontains $required) {
@@ -513,8 +512,7 @@ $modId = $mod.id
 # out without one is repaired here rather than re-uploaded.
 if ($ChangelogOnly) {
     if (-not $Changelog) {
-        throw ("No changelog to post. Write releases
-otes-$Version.md, or " +
+        throw ("No changelog to post. Write releases\notes-$Version.md, or " +
                "pass -Changelog or -ChangelogFile.")
     }
 
@@ -530,7 +528,6 @@ otes-$Version.md, or " +
 
     exit 0
 }
-
 
 Write-Host "  mod:      $($mod.name) [$modId]"
 
@@ -618,7 +615,7 @@ if ($uploadId) {
 }
 else {
     # Files over 100 MiB need the S3 multipart flow instead. This mod's release
-    # zip is around 190 KB, so the single PUT path is the only one implemented;
+    # zip is far smaller, so the single PUT path is the only one implemented;
     # fail clearly rather than silently truncating if that ever changes.
     if ($zipBytes -gt 100MB) {
         throw ("$($zipItem.Name) is $([math]::Round($zipBytes / 1MB, 1)) MB, over the 100 MiB single-part limit." +
@@ -660,7 +657,7 @@ else {
         $ProgressPreference = $previousProgress
     }
 
-    Write-Host "Finalising ..."
+    Write-Host "Finalizing ..."
     Invoke-NexusApi POST "/uploads/$uploadId/finalise" | Out-Null
 }
 
@@ -721,14 +718,8 @@ Write-Host "  version id $($published.version.id)" -ForegroundColor Green
 # Because it appends, calling this twice for one version leaves two entries on
 # the Changelogs tab and there is no API to remove either.
 #
-# The public pages lag behind. A changelog posted for 4.2.2 was visible under
-# the author's own management and documentation view straight away and still
-# absent from the mod page and its logs tab well afterwards, which went on
-# listing 4.0.0 as the newest entry. So a successful post is not something to
-# confirm by reloading the public page, and its absence there is not evidence
-# the call failed. That was concluded twice from the page alone, once as an
-# endpoint refusing requests and once as no release ever having carried a
-# changelog, and both were wrong.
+# The public changelog page lags behind the author's own view, so a post's
+# absence there is not evidence the call failed.
 if ($Changelog) {
     Write-Host "Adding changelog ..."
 

@@ -42,6 +42,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -56,6 +58,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -92,7 +96,7 @@ StartMonolog  does <span class="keyword">not</span> work, proven against alias o
 
 <p> ## What a set has to pass to be used here</p>
 
-<p> Four tests, each of which has already cost a wrong choice:</p>
+<p> Four tests:</p>
 
 <ol>
     <li><strong>It must be able to play.</strong> Anything named <code>COMBAT_</code> speaks only from
@@ -127,15 +131,10 @@ on.
 and only watching vanilla answers 4.</li>
 </ol>
 
-<p> The vanilla <code>KOLIZE_*</code> collision sets <strong>are</strong> used, which reverses an earlier
- decision. They were excluded while vanilla still fired its own collision bark
- on every contact, because driving them would have duplicated what the player
- already heard. <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:HushVanillaBark">HushVanillaBark</a> now closes that branch, so they no longer
- play on their own and excluding them would simply delete the game's most
- directly descriptive writing for this exact situation.</p>
+<p> The vanilla <code>KOLIZE_*</code> collision sets are pooled with the mod's own finds,
+ because <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:HushVanillaBark">HushVanillaBark</a> keeps vanilla from playing them itself.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 5.11.3</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -149,6 +148,14 @@ and only watching vanilla answers 4.</li>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:RiderVoiceReady">HorseCollisionMod:RiderVoiceReady (rank)</a></td>
 	<td class="summary">Whether Henry is free to speak, or still inside a hold from his last sound.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RiderVoiceGate">HorseCollisionMod:RiderVoiceGate ()</a></td>
+	<td class="summary">Henry's voice gate, as <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:VoiceGateOpen">VoiceGateOpen</a> and <code>PlayGatedVocal</code> read it.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:VoiceGateOpen">HorseCollisionMod:VoiceGateOpen (gate, rank)</a></td>
+	<td class="summary">Whether a ranked voice gate lets a sound through.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BarkRiderImpact">HorseCollisionMod:BarkRiderImpact (playerEnt, tierName)</a></td>
@@ -175,12 +182,12 @@ and only watching vanilla answers 4.</li>
 	<td class="summary">Whether this speaker has said something recently enough to stay quiet.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:Bark">HorseCollisionMod:Bark (entity, set, rider, ignoreCooldown)</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:Bark">HorseCollisionMod:Bark (entity, set, ignoreCooldown, priority, overrideSuppress)</a></td>
 	<td class="summary">Asks a character to speak one of a named bark set.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BarkForTier">HorseCollisionMod:BarkForTier (tier)</a></td>
-	<td class="summary">The bark set an impact at this speed should raise.</td>
+	<td class="summary">The bark set an impact at this tier should raise at the moment of contact.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:BarkCollision">HorseCollisionMod:BarkCollision (npc, tier, inCombat)</a></td>
@@ -195,32 +202,21 @@ and only watching vanilla answers 4.</li>
 	<td class="summary">Speaks for a rear, its own pillar with its own switch.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:BarkDeath">HorseCollisionMod:BarkDeath (npc)</a></td>
-	<td class="summary">Speaks when the mod's own actions have killed somebody.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ShieldFromEngineDamage">HorseCollisionMod:ShieldFromEngineDamage (npc)</a></td>
-	<td class="summary">Makes a victim briefly immortal so the engine's collision damage lands on
- nothing.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:LiftCollisionShield">HorseCollisionMod:LiftCollisionShield (npc)</a></td>
-	<td class="summary">Takes the collision shield off a victim, now.</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:HushVanillaBark">HorseCollisionMod:HushVanillaBark (npc)</a></td>
-	<td class="summary">Switches off vanilla's collision bark on somebody the horse is approaching.</td>
+	<td class="summary">Switches off vanilla's collision bark on somebody near the horse.</td>
 	</tr>
 </table>
 <h2><a href="#Tables">Tables</a></h2>
 <table class="function_list">
 	<tr>
 	<td class="name" nowrap><a href="#RiderBarkAliases">RiderBarkAliases</a></td>
-	<td class="summary">Lines Henry can be made to say on an impact, addressed by <code>alias</code>.</td>
+	<td class="summary">Lines Henry says on an impact, addressed by dialog <code>alias</code>, drawn as one
+ weighted pool (<code>{ name, weight }</code>, read by <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:PickFromPool">PickFromPool</a>) whatever the tier.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#RiderVoiceRanks">RiderVoiceRanks</a></td>
-	<td class="summary">What each kind of sound out of Henry is worth against the others.</td>
+	<td class="summary">What each kind of spoken line out of Henry is worth against the others,
+ above every grunt's <code>RiderVocalRankByTier</code>.</td>
 	</tr>
 </table>
 
@@ -239,9 +235,9 @@ and only watching vanilla answers 4.</li>
     The subset of a pool whose lines suit this victim. </p>
 
 <p> A pool entry may carry a third field naming the only gender of victim the line
- fits, <code>&quot;m&quot;</code> or <code>&quot;f&quot;</code>. Lines that name the body -- "he was only a boy",
- "shameless hussy" -- read as the mod describing someone who is not there when
- they land on the wrong victim, which is what this removes.</p>
+ fits, <code>&quot;m&quot;</code> or <code>&quot;f&quot;</code>, and none on a line that fits either. Lines that name the
+ body, such as "he was only a boy" or "shameless hussy", read as the mod
+ describing someone who is not there when they land on the wrong victim.</p>
 
 <p> Returns the pool unchanged when the victim's gender cannot be read, because a
  line is better than silence and an unreadable soul is not evidence of anything.
@@ -277,19 +273,16 @@ and only watching vanilla answers 4.</li>
     <dd>
     Whether Henry is free to speak, or still inside a hold from his last sound. </p>
 
-<p> One gate for words and breath alike, because both come out of the same man
- and two at once is a defect rather than a richer moment.</p>
+<p> One gate for words and breath alike, because both come out of Henry and two
+ at once is a defect rather than a richer moment.</p>
 
-<p> A hold further out than any cooldown that can be written was not written
- against this clock: <code>System.GetCurrTime</code> is persisted in the save, so loading
- an earlier one moves it backwards, and without this the rewind would mute
- Henry until it had been ridden back through.</p>
+<p> A hold further out than the longest cooldown means the save clock was wound
+ back by a load; it is ignored.</p>
 
 <p> Ranked, so that the more important sound wins a contest rather than whichever
- was asked first. A grunt is <code>RiderVoiceGrunt</code>, an impact line outranks it, and
- a line about a death outranks both: four gallop kills in quick succession
- produced one death line and three silences when the gate was rank-blind,
- because the grunt at each contact had already taken it.</p>
+ was asked first: a grunt at its <code>RiderVocalRankByTier</code>, then an impact line,
+ then a line about a death, so a grunt at the contact cannot silence a kill
+ line.</p>
 
 <p> Equal rank still loses, so two death lines do not talk over each other.
 
@@ -314,6 +307,65 @@ and only watching vanilla answers 4.</li>
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:RiderVoiceGate"></a>
+    <strong>HorseCollisionMod:RiderVoiceGate ()</strong>
+    </dt>
+    <dd>
+    Henry's voice gate, as <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:VoiceGateOpen">VoiceGateOpen</a> and <code>PlayGatedVocal</code> read it. </p>
+
+<p> <code>cooldown</code> is the grunt's hold; a spoken line stamps its own.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        the gate
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:VoiceGateOpen"></a>
+    <strong>HorseCollisionMod:VoiceGateOpen (gate, rank)</strong>
+    </dt>
+    <dd>
+    Whether a ranked voice gate lets a sound through. </p>
+
+<p> A gate is a hold stamped on this table: <code>untilKey</code> names the field holding
+ when it ends and <code>rankKey</code> the rank that set it. A sound of higher rank
+ passes a hold; equal or lower is refused. A hold further out than
+ <code>longest</code>, the longest the gate can legitimately carry, means the save
+ clock was wound back by a load, and it is ignored.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">gate</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         <code>untilKey</code>, <code>rankKey</code> and <code>longest</code>
+        </li>
+        <li><span class="parameter">rank</span>
+            <span class="types">optional <span class="type">number</span></span>
+         what is asking, defaulting to the lowest
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when nothing of equal or greater weight is holding it
+    </ol>
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:BarkRiderImpact"></a>
     <strong>HorseCollisionMod:BarkRiderImpact (playerEnt, tierName)</strong>
     </dt>
@@ -326,9 +378,9 @@ and only watching vanilla answers 4.</li>
 
 <p> ### Why this cannot run alongside the grunt</p>
 
-<p> <code>PlayRiderVocal</code> already puts a wordless grunt on every impact, and two Henry
- voices at once is a defect rather than a richer moment. So the two share one
- gate: a line that goes out stamps the rider's voice clock at the top rank,
+<p> <code>PlayRiderVocal</code> already puts a wordless grunt on every impact, and the two
+ share one gate (<a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:RiderVoiceReady">RiderVoiceReady</a>): a line that goes out stamps Henry's
+ voice clock at a rank above the grunt,
  which suppresses the grunt for the length of <code>RiderBarkCooldownMs</code>. The two
  are therefore alternatives on any given impact, and <code>RiderBarkChance</code> decides
  how often Henry uses words instead of breath.</p>
@@ -369,7 +421,7 @@ and only watching vanilla answers 4.</li>
     <dd>
     Sends one line from a pool as Henry, and takes the voice gate on success. </p>
 
-<p> The dispatch shared by every spoken line the rider has: the impact pool and
+<p> The dispatch shared by every spoken line Henry has: the impact pool and
  the kill pool differ only in which pool they draw from and what the telemetry
  calls the moment. Both stamp the same clock, because there is one Henry.</p>
 
@@ -504,8 +556,7 @@ and only watching vanilla answers 4.</li>
  as often as <code>b</code>.</p>
 
 <p> Kept separate from <a href="../modules/HorseCollisionMod.Bark.html">Bark</a> so that a pool can be drawn from and inspected
- without sending anything, and because the weighting is the part most likely
- to be tuned once the rider reports which lines they actually hear.
+ without sending anything.
 
 
     <h3>Parameters:</h3>
@@ -536,8 +587,7 @@ and only watching vanilla answers 4.</li>
 
 <p> Without this a rider working through a crowd produces a chorus, and a single
  victim struck twice talks over their own first line. Tracked per entity
- rather than globally so two different people can react to the same event,
- which is the point of having a bystander set at all.
+ rather than globally so two different people can react to the same event.
 
 
     <h3>Parameters:</h3>
@@ -561,13 +611,10 @@ and only watching vanilla answers 4.</li>
 </dd>
     <dt>
     <a name = "HorseCollisionMod:Bark"></a>
-    <strong>HorseCollisionMod:Bark (entity, set, rider, ignoreCooldown)</strong>
+    <strong>HorseCollisionMod:Bark (entity, set, ignoreCooldown, priority, overrideSuppress)</strong>
     </dt>
     <dd>
     Asks a character to speak one of a named bark set. </p>
-
-<p> The shape of this call is the whole finding of the investigation behind this
- file, so it is worth stating precisely why each part is here.</p>
 
 <p> <code>Utils.makeTable</code> builds the message from its declared type, filling every
  member. A hand-built table leaves the receiving node with nothing to match
@@ -586,7 +633,7 @@ and only watching vanilla answers 4.</li>
  look different from the game's own.</p>
 
 <p> Failure is silent by design: a character whose voice never recorded the set
- simply says nothing, with no error and no glitch, exactly as in vanilla.
+ says nothing, with no error and no glitch, exactly as in vanilla.
 
 
     <h3>Parameters:</h3>
@@ -597,16 +644,22 @@ and only watching vanilla answers 4.</li>
         </li>
         <li><span class="parameter">set</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         a key of <code>BarkSets</code> or <code>RiderBarkSets</code>
-        </li>
-        <li><span class="parameter">rider</span>
-            <span class="types">optional <span class="type">boolean</span></span>
-         true to read from the rider's table instead
+         a key of <code>BarkSets</code>
         </li>
         <li><span class="parameter">ignoreCooldown</span>
             <span class="types">optional <span class="type">boolean</span></span>
          true to speak even inside the speaker's
-   cooldown, used only for the recovery line that follows a cry of pain
+   cooldown, for a line deliberately sequenced after another; it still
+   stamps the clock
+        </li>
+        <li><span class="parameter">priority</span>
+            <span class="types">optional <span class="type">number</span></span>
+         the rank to send at, in place of <code>BarkPriority</code>
+        </li>
+        <li><span class="parameter">overrideSuppress</span>
+            <span class="types">optional <span class="type">boolean</span></span>
+         true to ignore a <code>suppressMonologs</code>
+   context whatever <code>BarkOverrideSuppress</code> says
         </li>
     </ul>
 
@@ -626,22 +679,19 @@ and only watching vanilla answers 4.</li>
     <strong>HorseCollisionMod:BarkForTier (tier)</strong>
     </dt>
     <dd>
-    The bark set an impact at this speed should raise. </p>
-
-<p> Mirrors <code>GetSpeedTier</code> rather than inventing a second set of thresholds, so
- that what is said always agrees with what the body does.</p>
+    The bark set an impact at this tier should raise at the moment of contact. </p>
 
 <p> A walk shoves, which does not hurt, so the victim goes straight to words.
- Anything harder knocks them down, and what comes out at the moment of
- impact is a wordless cry graded by how hard they were hit. Their words come
- later, from <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:BarkRecovered">BarkRecovered</a>, once they are back on their feet.
+ A tier in <code>PainByTier</code> knocks them down, and what comes out at the moment
+ of impact is a wordless cry. Their words come later, from <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:BarkRecovered">BarkRecovered</a>,
+ once they are back on their feet.
 
 
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">tier</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         "Walk", "Trot" or "Gallop"
+         "Walk", "Trot", "Gallop" or "Charge"
         </li>
     </ul>
 
@@ -698,25 +748,13 @@ and only watching vanilla answers 4.</li>
     <dd>
     Speaks for a victim who is getting back to their feet. </p>
 
-<p> The gap this closes: a trot or gallop victim cried out on impact, lay there,
- stood up and walked off without ever saying a word about what had happened,
- which reads as the game forgetting rather than as a person recovering.</p>
+<p> Without it a knocked-down victim cries out on impact, stands up and walks
+ off without a word about what happened.</p>
 
-<p> <strong>Timed from the impact rather than triggered by standing up.</strong> Two earlier
- attempts were driven by state and both landed late. <code>WatchHitReady</code> requires
- <code>HitReadySettleMs</code> of stillness before it reports, so it could not fire until
- two seconds after the victim was already upright; and waiting for the
- animation state to leave <code>BlendRagdoll</code> fires only once the get-up has
- finished. Both left an audible hole, which the rider described as "a large
- gap between when they actually stand up and then the 2nd line plays".</p>
-
-<p> A timer is the right instrument here and not a shortcut, because the target
- is a moment <em>inside</em> an animation rather than its end, and no readable state
- marks it. <code>BarkRecoveryDelayMs</code> is tuned by ear against the get-up so the
- line lands while the victim is rising.</p>
-
-<p> Walk is excluded: a shove has no knockdown to recover from and already spoke
- at the moment of contact.
+<p> <strong>Fired when the body begins to rise</strong>, a moment inside the get-up rather
+ than at either end of it. No animation state marks it, and a delay from
+ the impact cannot, because a get-up is not one length. <code>WhenVictimRises</code>
+ reads it: the head height for a fall, the ragdoll state for a throw.
 
 
     <h3>Parameters:</h3>
@@ -762,123 +800,23 @@ and only watching vanilla answers 4.</li>
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:BarkDeath"></a>
-    <strong>HorseCollisionMod:BarkDeath (npc)</strong>
-    </dt>
-    <dd>
-    Speaks when the mod's own actions have killed somebody. </p>
-
-<p> Henry only. The bystander raising the alarm used to fire from here and has
- been removed: vanilla couples that line to a whole flee-and-fetch-a-guard
- reaction that the mod cannot reproduce, and it already fires it correctly on
- its own when a body is found.</p>
-
-<p> Henry speaks from <code>RiderBarkKillAliases</code> here, chosen in <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:BarkRiderOnImpact">BarkRiderOnImpact</a>.
- logs the death and says nothing.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the victim who died
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:ShieldFromEngineDamage"></a>
-    <strong>HorseCollisionMod:ShieldFromEngineDamage (npc)</strong>
-    </dt>
-    <dd>
-    Makes a victim briefly immortal so the engine's collision damage lands on
- nothing. </p>
-
-<p> The engine charges a victim health for being struck by a moving physical
- body and the mod cannot stop it. Five separate levers leave it unchanged.
- <code>BasicActor</code>'s collision multipliers belong to CryEngine's legacy damage
- path rather than to the RPG layer that charges <code>soul</code> health, and the
- one parameter that does work, <code>CollisionVelocityDeltaToDmgR</code>, is global and
- also governs arrows.</p>
-
-<p> So rather than stop the damage, this stops it <strong>landing</strong>. <code>imm=1</code> is the
- parameter behind the game's own <code>immortality</code> and <code>death_protection</code> buffs,
- and <code>immortality_nonpersistent</code> carries it without being able to survive a
- save. Applied ahead of contact and removed once the engine has settled, the
- victim is untouchable for exactly the window the trample occupies, and the
- mod's own damage lands afterwards on a mortal target.</p>
-
-<p> <strong>This is deliberately narrow.</strong> It is one buff, on one victim, for a few
- hundred milliseconds, and it is removed by GUID so nothing of it persists.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         somebody in front of the horse
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:LiftCollisionShield"></a>
-    <strong>HorseCollisionMod:LiftCollisionShield (npc)</strong>
-    </dt>
-    <dd>
-    Takes the collision shield off a victim, now. </p>
-
-<p> Called from <code>ApplyImpactDamage</code> immediately before it charges the victim, so
- the immortality that swallowed the engine's trample cannot also swallow the
- mod's own damage. Safe to call on somebody who was never shielded.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">npc</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the victim
-        </li>
-    </ul>
-
-    <h3>Returns:</h3>
-    <ol>
-
-           <span class="types"><span class="type">boolean</span></span>
-        true when a removal was attempted
-    </ol>
-
-
-
-
-</dd>
-    <dt>
     <a name = "HorseCollisionMod:HushVanillaBark"></a>
     <strong>HorseCollisionMod:HushVanillaBark (npc)</strong>
     </dt>
     <dd>
-    Switches off vanilla's collision bark on somebody the horse is approaching. </p>
+    Switches off vanilla's collision bark on somebody near the horse. </p>
 
 <p> Per impact suppression loses a race it cannot win. The mod's detection loop
- runs about ten times a second, while the engine raises its own hit reaction
- the instant bodies touch, so vanilla's line can already be playing before the
- tick that would have silenced it. The rider heard the result as "a vanilla
- interrupted by the mod's".</p>
+ runs about thirty times a second, while the engine raises its own hit
+ reaction the instant bodies touch, so vanilla's line can already be playing
+ before the tick that would have silenced it.</p>
 
 <p> Setting the option while the victim is still in front of the horse removes
  the race: by the time contact happens the branch is already closed. It is
- refreshed rather than set every tick, because a context write twenty times a
- second per nearby person is not free.</p>
+ refreshed every half <code>BarkSuppressMs</code> rather than set every tick, because a
+ context write every tick per nearby person is not free.</p>
 
-<p> Cleared on a timer well after the impact, so an NPC the rider passes without
+<p> Cleared on a timer well after the impact, so an NPC the player passes without
  touching gets their own bark back a moment later and nothing is permanently
  changed. Non-persistent, so a save cannot carry it.
 
@@ -887,7 +825,7 @@ and only watching vanilla answers 4.</li>
     <ul>
         <li><span class="parameter">npc</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         somebody inside the horse's footprint
+         a human within <code>HitRadius</code> of the horse
         </li>
     </ul>
 
@@ -905,92 +843,27 @@ and only watching vanilla answers 4.</li>
     <strong>RiderBarkAliases</strong>
     </dt>
     <dd>
-    Lines Henry can be made to say on an impact, addressed by <code>alias</code>. </p>
+    Lines Henry says on an impact, addressed by dialog <code>alias</code>, drawn as one
+ weighted pool (<code>{ name, weight }</code>, read by <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:PickFromPool">PickFromPool</a>) whatever the tier. </p>
 
-<p> This is the answer to the table above, and it works because the addressing
- scheme is different rather than because anything about Henry changed.</p>
+<p> Empty on purpose. An impact gets <code>PlayRiderVocal</code>'s wordless grunt; the lines
+ Henry can speak are sentences, and sentences belong to kills
+ (<code>RiderBarkKillAliases</code>). The pool and <code>RiderBark</code>, which defaults to false,
+ are kept so a line can be added without restructuring.</p>
 
-<p> <code>RiderBarkSets</code> is empty because a <strong>metarole</strong> names a whole bark set and
- lets the dialog system choose the member, and the only set Henry speaks
- freely is the Skalitz monologs. An <strong>alias</strong> names one topic, so the wording
- is nearly pinned: a topic holding a single short line is effectively a line
- the mod chose.</p>
-
-<p> ### Where these came from</p>
-
-<p> The alias namespace was recorded as unrecoverable, on the grounds that a
- label is only visible where vanilla's AI files happen to reference one. It is
- a shipped column: <code>label</code> in <code>Libs/Tables/text/topic.xml</code>, 1656 of them
- against the 861 those files mention. <code>tools/bark_alias.py</code> reads it and
- <code>tools/legacy/henry_quips.py</code> cross-references it with who recorded each line,
- having the audio is the gate.</p>
-
-<p> That produced 1076 lines Henry can be asked for, of which the rider chose
- these. <strong>Theirs to judge, not a filter applied here</strong> -- the survey they picked
- from was narrowed only by what is mechanically possible.</p>
-
-<p> ### One flat pool, by instruction</p>
-
-<p> Every impact draws from the whole list regardless of tier. Per-tier pools were
- offered and declined:</p>
-
-<p> > "Just wire them as a random pool that every impact calls from."</p>
-
-<p> Weights are all 1 for now. <a href="../modules/HorseCollisionMod.Bark.html#HorseCollisionMod:PickFromPool">PickFromPool</a> reads the same
- <code>{ name, weight }</code> shape as the victim pools, so any line can be made rarer
- without restructuring anything.</p>
-
-<p> Note that <code>NPC</code> and <code>PLAYER</code> are absent for a reason given at length above:
- they are conversation roles, they open a dialogue scene rather than speaking,
- and 58 further lines the rider liked are reachable by nothing else and so are
- not reachable at all.</p>
-
-<p> ### Empty on purpose: an impact is breath, not words</p>
-
-<p> Every spoken line the mod has belongs to <code>RiderBarkKillAliases</code> and fires only
- when the collision killed somebody. An ordinary impact gets <code>PlayRiderVocal</code>'s
- wordless grunt instead, which is also what the engine itself does for the
- player: Henry holds the <code>COMBAT_VICTIM_SCREAM_RECEIVED_HIT</code> and
- <code>COMBAT_ACTOR_SCREAM_ATTACK</code> metaroles, but neither carries any audio recorded
- by his actor -- only NPCs' -- so vanilla reaches for an audio trigger for the
- player's own impact vocals, exactly as this mod does.</p>
-
-<p> The reason is the length of what is available. Of 1,656 aliases, 173 hold a
- Henry line on an always-true sequence and 124 survive every usability filter,
- and the ones that actually speak are sentences. A sentence is right over a
- body and wrong for a shove, and the short exclamations that would have suited
- a shove are the ones that do not play.</p>
-
-<p> The pool and its switch are kept rather than deleted so a line can be put back
- here without restructuring anything. <code>RiderBark</code> defaults to false to match.</p>
-
-<p> ### What makes a line usable, and why listening was not optional</p>
-
-<p> Four filters, applied by <code>tools/henry_impact_lines.py</code>:</p>
+<p> An entry must pass four filters, which <code>tools/henry_impact_lines.py</code> applies:</p>
 
 <ol>
-    <li>**<code>topic2sequence.entry_condition</code> must be <code>&apos;1&apos;</code>**, always-true. A quest
-    condition refuses silently while the mod still logs <code>sent=true</code>.</li>
-    <li>**<code>sequence.timeout</code> must not be <code>-1</code>**, which means usable once per
-    playthrough and then never again.</li>
-    <li><strong>The shipped audio must exist and carry exactly one actor, Henry's.</strong> The
-    localization paks name every file
-    <code>&lt;actor&gt;_t&lt;topic&gt;_s&lt;sequence&gt;_&lt;n&gt;_&lt;slug&gt;_&lt;hash&gt;.ogg</code>, so this is a matter of
-    record. Two actors means a conversation, which is refused or opens a
-    cutscene; no audio at all means a line that has text and no recording.</li>
-    <li><strong>Every member of the topic must fit</strong>, since the dialog system picks which
-    member plays. A label reading "Oh, shit!" fronted "Shit, where's that
-    damned ring?".</li>
+    <li><code>topic2sequence.entry_condition</code> is <code>&apos;1&apos;</code>, always-true. A quest condition
+    refuses silently.</li>
+    <li><code>sequence.timeout</code> is not <code>-1</code>, which allows one use per playthrough.</li>
+    <li>The shipped audio carries exactly one actor, Henry's. Two actors is a
+    conversation; no audio is a line that cannot be heard.</li>
+    <li>Every member of the topic fits, since the dialog system picks the member.</li>
 </ol>
 
-<p> Passing all four is still not proof a line is audible, so every alias below
- was fired individually in game and kept only on the rider's word that they
- heard it. <code>tools/legacy/make_audition.py</code> fires one by number for that purpose.</p>
-
-<p> One caution for anyone auditioning more: a silence observed during that
- audition turned out not to be reliable, and several lines recorded silent
- played perfectly when fired again. The cause was never established. So fire a
- candidate again and hear it before adding it here.
+<p> Passing the filters does not prove a line is audible. Fire a candidate in
+ game and hear it, more than once, before adding it.
 
 
 
@@ -1004,16 +877,12 @@ and only watching vanilla answers 4.</li>
     <strong>RiderVoiceRanks</strong>
     </dt>
     <dd>
-    What each kind of sound out of Henry is worth against the others.
+    What each kind of spoken line out of Henry is worth against the others,
+ above every grunt's <code>RiderVocalRankByTier</code>.
 
 
     <h3>Fields:</h3>
     <ul>
-        <li><span class="parameter">Grunt</span>
-
-
-
-        </li>
         <li><span class="parameter">Impact</span>
 
 
@@ -1038,7 +907,7 @@ and only watching vanilla answers 4.</li>
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

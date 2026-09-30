@@ -43,6 +43,7 @@
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
   <li><strong>HorseCollisionMod.Tiers</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -57,6 +58,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -70,25 +73,22 @@
  Charge each have their own sound, their own dust, their own camera shake,
  their own reaction and so on. Each of those is one table keyed by tier, read
  through one accessor, rather than a run of loose settings keys behind a
- hand-written <code>if</code> chain at each point of use.</p>
-
-<p> That shape is what let the rear and the charge quietly fall out of the
- Horsemanship progression: nine separate chains, each typed by hand, and no
- single place where all five tiers could be seen beside each other. A table
- keyed by tier is one row per concern, so a tier that is missing a value is
- missing it visibly.</p>
+ hand-written <code>if</code> chain at each point of use. A table keyed by tier shows
+ all five side by side, so a tier missing a value is missing it visibly.</p>
 
 <p> <a href="../modules/HorseCollisionMod.Tiers.html#HorseCollisionMod:TierValue">TierValue</a> is the only way those tables are read. It takes the settings
  file's table when there is one and the compiled-in default when there is
  not, per key rather than per table, so a player who overrides three tiers
  still gets shipped values for the other two.</p>
 
-<p> This file defines data and one accessor: it is pulled in by
- <code>Script.ReloadScript</code> from <code>Scripts/Startup/HorseCollisionMod.lua</code> and
- re-running it is harmless.</p>
+<p> This file defines nine of those tables with their derivations, one
+ accessor, and the binding at its foot that puts each table into <code>Config</code> so
+ the settings file can reach it; the entry point declares none of them. The
+ settings file ships its own copy of each, and <code>build.ps1</code> refuses a copy
+ that differs from this one. It is pulled in by <code>Script.ReloadScript</code> from
+ <code>Scripts/Startup/HorseCollisionMod.lua</code> and re-running it is harmless.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>: 5.13.0</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -99,6 +99,14 @@
 	<td class="name" nowrap><a href="#HorseCollisionMod:TierValue">HorseCollisionMod:TierValue (name, tierName)</a></td>
 	<td class="summary">One tier's value for one concern.</td>
 	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:GetSpeedTier">HorseCollisionMod:GetSpeedTier (speed)</a></td>
+	<td class="summary">Resolves a speed to the tier it falls in.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ThrowProfile">HorseCollisionMod:ThrowProfile (tierName[, armorScale])</a></td>
+	<td class="summary">Resolves a tier's throw profile against a victim's armor.</td>
+	</tr>
 </table>
 <h2><a href="#Tables">Tables</a></h2>
 <table class="function_list">
@@ -107,9 +115,10 @@
 	<td class="summary">What each tier is worth in health, before armor.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod.StaminaDrainByTier">HorseCollisionMod.StaminaDrainByTier</a></td>
-	<td class="summary">What each tier costs the horse, before the rider's Horsemanship, the
- horse's barding and the combat penalty.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod.StaminaShareByTier">HorseCollisionMod.StaminaShareByTier</a></td>
+	<td class="summary">What each tier costs the horse, as a share of that horse's own maximum
+ stamina, before the rider's Horsemanship, the horse's barding and the
+ combat surcharge.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod.ReactionByTier">HorseCollisionMod.ReactionByTier</a></td>
@@ -118,6 +127,31 @@
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod.ThrowByTier">HorseCollisionMod.ThrowByTier</a></td>
 	<td class="summary">The tier's share of the configured impulse, for the tiers that ragdoll.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.ThrowProfileByTier">HorseCollisionMod.ThrowProfileByTier</a></td>
+	<td class="summary">How each ragdoll tier throws a victim, and what holds the throw down.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.HitStrengthByTier">HorseCollisionMod.HitStrengthByTier</a></td>
+	<td class="summary">How hard the engine is told each tier hit, by <code>HitReactionStrength</code> name.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.VictimBarkByTier">HorseCollisionMod.VictimBarkByTier</a></td>
+	<td class="summary">Which set of spoken lines a victim answers each tier with.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.RetaliationByTier">HorseCollisionMod.RetaliationByTier</a></td>
+	<td class="summary">Which tiers can make a victim lose patience and fight back.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.StaminaPerVictimByTier">HorseCollisionMod.StaminaPerVictimByTier</a></td>
+	<td class="summary">Which tiers charge the horse once per victim.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod.TierTables">HorseCollisionMod.TierTables</a></td>
+	<td class="summary">Binds every table above into <code>Config</code>, which is the only place a player can
+ reach them from.</td>
 	</tr>
 </table>
 
@@ -163,6 +197,84 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod:GetSpeedTier"></a>
+    <strong>HorseCollisionMod:GetSpeedTier (speed)</strong>
+    </dt>
+    <dd>
+    Resolves a speed to the tier it falls in. </p>
+
+<p> The three loop tiers are speed bands and this is where a speed becomes one
+ of them.</p>
+
+<p> The rear and the charge are not reachable from here. They are commanded
+ moves rather than speed bands, and their entry points name their own tier
+ and score it at <code>RearImpactSpeed</code> and <code>RearChargeImpactSpeed</code>.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">speed</span>
+            <span class="types"><span class="type">number</span></span>
+         speed in meters per second
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        one of "Gallop", "Trot", "Walk" or "Idle"
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ThrowProfile"></a>
+    <strong>HorseCollisionMod:ThrowProfile (tierName[, armorScale])</strong>
+    </dt>
+    <dd>
+    Resolves a tier's throw profile against a victim's armor. </p>
+
+<p> Returns a flat table of the figures the throw pipeline needs, with every
+ armor pair already blended, or nil for a tier that does not ragdoll. The
+ pipeline reads only what comes back from here, so no part of it knows which
+ tier it is working for.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the tier that struck
+        </li>
+        <li><span class="parameter">armorScale</span>
+            <span class="types"><span class="type">number</span></span>
+         the victim's armor scale, high for an
+   unarmored victim and low for one in mail
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        a keep or a launch, the cap that rails it and the drag
+    </ol>
+     <h3>Or</h3>
+    <ol>
+
+           <span class="types"><span class="type">nil</span></span>
+        for a tier with no profile
+    </ol>
+
+
+
+
+</dd>
 </dl>
     <h2 class="section-header "><a name="Tables"></a>Tables</h2>
 
@@ -174,17 +286,31 @@
     <dd>
     What each tier is worth in health, before armor. </p>
 
-<p> The gallop figure is set from measurement rather than picked. At 90 the soft
- end killed six of eight, and both survivors finished on 3.5 and 0.5 health,
- having been dealt 81.0 and 80.6 against a villager's 100. The engine's own
- trample adds a further 15 to 20 on top in most impacts but varies from
- nothing to 28, and that variation is what leaves any survivors at all. 95
- carries those two over and lands the rate near the nine in ten asked for.</p>
+<p> Every figure here is derived from the outcome it should produce against an
+ unarmored victim on a bare horse, and the arithmetic is the same each time.
+ NPC health is a flat 100, not a vitality-scaled pool.
+ <code>ImpactDamageVariance</code> rolls the figure uniformly across 0.85 to 1.15, and
+ barding raises it by up to <code>BardingDamageBonus</code>. The mod's damage is the
+ only damage the victim keeps, because <code>ShieldVictimFromEngineDamage</code> hands
+ the engine's own trample back, so a tier reaches 100 on its own or it does
+ not reach it.</p>
 
-<p> Walk is 0 deliberately: a shove staggers, it does not wound. A trot is worth
- far less than the gallop rather than proportionally less, because the mod
- puts a man on the ground at a trot and being knocked down is most of the
- weight the rider wanted a trotting horse to carry.
+<p> Walk is 0: a shove staggers, it does not wound. A trot is worth far less
+ than the gallop rather than proportionally less, because being knocked down
+ is most of what a trot impact carries.</p>
+
+<p> The gallop is the blow that usually kills. At 111 the roll clears 100 above
+ 0.90, about four times in five.</p>
+
+<p> A rear never kills a healthy victim outright. At 75 its span is 64 to 86,
+ and 99 at most on a fully barded horse, so a victim on full health always
+ survives one and one already hurt does not: it takes two rears to put
+ someone down. This keeps the rear clearly below the gallop, as it is in
+ reaction, hit strength, dirt, blood and vocal rank.</p>
+
+<p> A charge is the heaviest thing the mod does and the only impact a player
+ spends a perk, a key and most of the horse's stamina on. It is the one blow
+ that kills on every roll: 118 x the worst roll of 0.85 is 100.3.
 
 
     <h3>Fields:</h3>
@@ -222,17 +348,35 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod.StaminaDrainByTier"></a>
-    <strong>HorseCollisionMod.StaminaDrainByTier</strong>
+    <a name = "HorseCollisionMod.StaminaShareByTier"></a>
+    <strong>HorseCollisionMod.StaminaShareByTier</strong>
     </dt>
     <dd>
-    What each tier costs the horse, before the rider's Horsemanship, the
- horse's barding and the combat penalty. </p>
+    What each tier costs the horse, as a share of that horse's own maximum
+ stamina, before the rider's Horsemanship, the horse's barding and the
+ combat surcharge. </p>
 
-<p> The rear and the charge carry figures of their own rather than borrowing a
- loop tier's. They are separate moves with separate costs: a rear is hooves
- coming down from a standstill and is charged near a trot, while a charge is
- the heaviest thing the mod does and is charged a gallop's.</p>
+<p> A share rather than a point figure because the pool is that horse's own
+ stamina stat and differs between mounts, so a flat cost would mean
+ different things on different horses.</p>
+
+<p> The gallop's 0.20 is the anchor and everything else is derived from it: a
+ horse should not become a tank, Henry should be able to ride down a few
+ people with ease, and one gallop impact empties the horse at level 0
+ Horsemanship. With the Horsemanship span running 5.0 down to 1.0, 0.20 is
+ exactly one full pool at level 0 and five back-to-back impacts at the top of
+ the skill. A trot is 0.13, about eight back to back, because it knocks a
+ victim down without being the blow that kills. Walk is 0 for the same
+ reason it deals no damage: a shove is not an impact. Stamina refills
+ between passes, so a player who circles and lines up again gets more than
+ these back-to-back counts.</p>
+
+<p> The rear and the charge cost the same 0.20 as the gallop. They are
+ commanded attacks, rationed by the cooldown on the move rather than by
+ stamina, so their share is only a cost the player feels. They are
+ perk-gated, the rear at Horsemanship 7 and the charge at 10, so a freshly
+ unlocked move costs 0.72 and 0.60 of the pool and never empties a full
+ horse on its own.</p>
 
 <p> A charge is charged once for the whole lunge rather than once per victim,
  which is decided at the call site, because riding down a group is the move
@@ -278,7 +422,8 @@
     <strong>HorseCollisionMod.ReactionByTier</strong>
     </dt>
     <dd>
-    What a victim's body does when the tier lands on them. </p>
+
+<p>What a victim's body does when the tier lands on them. </p>
 
 <p> Three kinds, and the split is not the two it looks like from the outside:</p>
 
@@ -292,9 +437,6 @@
      throw from this mod.</li>
 </ul>
 
-<p> The rear sits with the trot rather than with the gallop, which is what the
- old <code>RearReaction or TrotReaction</code> fallback was saying in a way that could
- silently change the rear by changing the trot.
 
 
     <h3>Fields:</h3>
@@ -339,13 +481,14 @@
     The tier's share of the configured impulse, for the tiers that ragdoll. </p>
 
 <p> Only the <code>ragdoll</code> tiers appear. The others hand the body to physics through
- Mannequin and this mod never pushes it, so a figure for them would be a
- number that looks live and is not; two such figures sat in the code for
- months behind branches that shipped settings never reached.</p>
+ Mannequin and this mod never pushes it, so a figure for them would look live
+ and do nothing.</p>
 
-<p> The charge is below a gallop rather than above it. The horse is still moving
- under its own impulse when the victim goes down in front of it, so its
- collider shoves the ragdoll on top of whatever this applies.
+<p> This scales <code>Knockback</code> and <code>Uplift</code> and nothing else, together a velocity
+ change of about 0.73 m/s on an 80 kg body, so it is trim and both tiers sit
+ at 1.0. It must not scale the brake or the airborne cap as well: stacked
+ multipliers on one throw run away. How far a charge throws is
+ <a href="../modules/HorseCollisionMod.Tiers.html#HorseCollisionMod.ThrowProfileByTier">ThrowProfileByTier</a> and <code>RearChargeThrow</code>.
 
 
     <h3>Fields:</h3>
@@ -367,6 +510,385 @@
 
 
 </dd>
+    <dt>
+    <a name = "HorseCollisionMod.ThrowProfileByTier"></a>
+    <strong>HorseCollisionMod.ThrowProfileByTier</strong>
+    </dt>
+    <dd>
+    How each ragdoll tier throws a victim, and what holds the throw down. </p>
+
+<p> The two ragdoll tiers are opposite in kind under the hood and identical to
+ the player: both look like physical contact and both throw a body in
+ ragdoll. What differs is who owns the throw.</p>
+
+<p> <strong>The gallop reacts to physics.</strong> The horse is genuinely moving at 8 to
+ 12 m/s under its own locomotion and carries through the victim, so the
+ engine's collision does the throwing and there is a real throw to take away.
+ The gallop is subtractive: a brake keeps a fraction of what the engine gave,
+ and a ceiling with a soft drag holds what is left.</p>
+
+<p> <strong>The charge sidesteps physics.</strong> The lunge starts from a stop and ends at a
+ stop. The horse only moves because this mod hands it <code>RearChargeImpulse</code>,
+ and through the rear Mannequin holds it <code>AnimationControlled</code>, so its own
+ velocity cannot be read, and the engine's collision alone moves a victim
+ under a meter.</p>
+
+<p> So the mod owns the charge outright. It commands the throw, and nothing
+ downstream may take it back out: the gallop's brake and ceiling never run
+ on a charge, because two systems over one body fight.</p>
+
+<p> ## The steps</p>
+
+<ol>
+    <li><strong>Throw.</strong> Either a brake, which keeps a fraction of the speed the body
+     arrived with (the gallop), or a launch, which commands a speed outright
+     as a floor under whatever the body holds (the charge). A tier carries
+     one or the other, never both.</li>
+    <li><strong>Cap.</strong> The speed the body may not exceed while it is in the air, held
+     there by drag. For the gallop it is what removes variance from the
+     engine's throw. For the charge it is only a rail: it sits at the
+     commanded speed, so it never touches the throw itself and catches only
+     what the horse's collider adds on top afterwards.</li>
+    <li><strong>Settle.</strong> Damping and a sleep threshold once it is on the ground,
+     which is the same for every tier and lives in the <code>RagdollDamp*</code>
+     settings.</li>
+</ol>
+
+<p> Both endpoints of every pair are blended across the victim's armor, so
+ armor is what decides distance within a tier, in both tiers.</p>
+
+<p> ## The charge's throw is 1:1 with the horse</p>
+
+<p> The charge commands a speed, derived from the lunge the mod itself
+ commanded rather than from an invented constant:</p>
+
+<pre><code> throw = RearChargeImpactSpeed * transfer * RearChargeThrow
+</code></pre>
+
+<p> <code>RearChargeImpactSpeed</code> is the lunge, declared rather than measured:
+ <code>RearChargeImpulse</code> of 6000 on a horse of about 480 kg is 12.5 m/s, and the
+ setting says 12.3.</p>
+
+<p> <code>transfer</code> is the fraction of a striker's speed a struck body leaves with,
+ and the gallop supplies it. Its ceilings are 6.0 m/s unarmored and 2.5 in
+ full mail, so the transfer that reproduces them off a 12.3 m/s lunge is
+ 6.0/12.3 = 0.49 and 2.5/12.3 = 0.20. That is what makes a charge at
+ <code>RearChargeThrow</code> of 1.0 land like a gallop.</p>
+
+<p> <code>RearChargeThrow</code> is then the only dial, and it has a wide range on purpose:
+ a charge is an offensive attack the player commands, not a consequence of
+ riding into somebody.</p>
+
+<p> The drag is the gallop's, 20.0 in mail and 4.0 unarmored, because drag is
+ not a distance axis in either tier. It is what makes a ceiling true.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">brakeKeepUnarmored</span>
+
+
+
+        </li>
+        <li><span class="parameter">capArmored</span>
+
+
+
+        </li>
+        <li><span class="parameter">capUnarmored</span>
+
+
+
+        </li>
+        <li><span class="parameter">dragArmored</span>
+
+
+
+        </li>
+        <li><span class="parameter">dragUnarmored</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.HitStrengthByTier"></a>
+    <strong>HorseCollisionMod.HitStrengthByTier</strong>
+    </dt>
+    <dd>
+    How hard the engine is told each tier hit, by <code>HitReactionStrength</code> name. </p>
+
+<p> Named rather than numbered so the settings file reads as English and so a
+ value that is not a strength fails visibly instead of becoming a plausible
+ integer.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.VictimBarkByTier"></a>
+    <strong>HorseCollisionMod.VictimBarkByTier</strong>
+    </dt>
+    <dd>
+    Which set of spoken lines a victim answers each tier with. </p>
+
+<p> The collision reactions and the rear are separate pillars with separate
+ switches, and this is where that separation is stated rather than implied by
+ which file the call happened to sit in.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.RetaliationByTier"></a>
+    <strong>HorseCollisionMod.RetaliationByTier</strong>
+    </dt>
+    <dd>
+    Which tiers can make a victim lose patience and fight back. </p>
+
+<p> Retaliation answers being shoved, and the escalating roll behind it is built
+ around a nuisance that does no real harm. A rear brings hooves down on
+ somebody and a charge rides them down; neither is a shove.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.StaminaPerVictimByTier"></a>
+    <strong>HorseCollisionMod.StaminaPerVictimByTier</strong>
+    </dt>
+    <dd>
+    Which tiers charge the horse once per victim. </p>
+
+<p> The detection loop resolves one victim per impact, so it charges there. A
+ rear and a charge are one deliberate move that can land on several people at
+ once, and charging per victim would empty the horse for riding at a crowd,
+ so their entry points charge once for the whole move instead.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">Walk</span>
+
+
+
+        </li>
+        <li><span class="parameter">Trot</span>
+
+
+
+        </li>
+        <li><span class="parameter">Gallop</span>
+
+
+
+        </li>
+        <li><span class="parameter">Rear</span>
+
+
+
+        </li>
+        <li><span class="parameter">Charge</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod.TierTables"></a>
+    <strong>HorseCollisionMod.TierTables</strong>
+    </dt>
+    <dd>
+    Binds every table above into <code>Config</code>, which is the only place a player can
+ reach them from. </p>
+
+<p> <code>ApplySettings</code> refuses a settings key that <code>Config</code> does not already
+ declare, so a tier table that lived only on this module could never be
+ overridden at all. Bound rather than copied, so the entry point carries no
+ second literal, and the two lookups <a href="../modules/HorseCollisionMod.Tiers.html#HorseCollisionMod:TierValue">TierValue</a> makes have distinct jobs:</p>
+
+<ul>
+    <li><code>Config[name]</code> is the whole table, replaced outright when the settings
+     file carries one, because <code>ApplySettings</code> assigns rather than merges.</li>
+    <li><code>self[name]</code> is this module's own table, which that assignment cannot
+     reach, and is therefore the per-tier floor under a partial override.</li>
+</ul>
+
+<p> A player who writes <code>ImpactDamageByTier = { Gallop = 200 }</code> gets 200 for a
+ gallop and the shipped figures for the other four.</p>
+
+<p> Re-running this file rebinds <code>Config</code> to the shipped tables and so discards
+ an applied override, which is harmless: every path that reloads the mod
+ reloads the settings file and calls <code>ApplySettings</code> after it.
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">ImpactDamageByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">StaminaShareByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">ReactionByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">ThrowByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">ThrowProfileByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">HitStrengthByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">VictimBarkByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">RetaliationByTier</span>
+
+
+
+        </li>
+        <li><span class="parameter">StaminaPerVictimByTier</span>
+
+
+
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
 </dl>
 
 
@@ -374,7 +896,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 16:27:45 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

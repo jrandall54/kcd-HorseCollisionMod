@@ -41,6 +41,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -55,6 +57,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><strong>HorseCollisionMod.Lean</strong></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -81,41 +85,22 @@
 <p> <code>actor:SetViewShake</code> is the one call that displaces the camera. Its second
  vector is a positional shake in meters, and vanilla uses it for explosions.</p>
 
-<p> ### What the shake actually does, measured</p>
-
-<p> Polled from <code>System.GetViewCameraPos</code> every 100 ms across a full cycle. At
- amplitude 2.0 and period 8.0 the camera reaches <strong>1.264 m at 8.0 s</strong> and then
- falls away again.</p>
-
-
-<pre>
-<span class="number">2000</span>ms <span class="number">0.41</span>   <span class="number">4000</span>ms <span class="number">0.78</span>   <span class="number">6000</span>ms <span class="number">1.02</span>   <span class="number">8064</span>ms <span class="number">1.264</span>   <span class="number">12064</span>ms <span class="number">0.485</span>
-</pre>
-
-<p> Two rules come out of it, and both differ from what the argument names
- suggest:</p>
+<p> ### What the shake does</p>
 
 <ul>
     <li><strong>The peak is about 0.63 of the amplitude</strong>, not the amplitude itself.</li>
     <li><strong>The peak arrives at t = period</strong>, not at a quarter of it.</li>
 </ul>
 
-<p> So the period is the time to full extension and the amplitude sets how far.
- A shake cut before its peak returns home smoothly in about 160 ms.</p>
-
-<p> Sampling a short window is what makes this mechanism easy to get wrong: over
- its first eighth the curve is indistinguishable from a straight line, and
- reading a velocity off it gives an amplitude twenty times too large.</p>
+<p> So the period is the time to full extension and the amplitude sets how far.</p>
 
 <p> Firing a shake while one is running <strong>reverses the camera's direction of
- travel</strong>. It neither sums with the running shake nor replaces it from zero.
- Four identical calls two seconds apart drove the camera out, back through
- center, out again and back, each flip smooth and continuous.</p>
+ travel</strong>. It neither sums with the running shake nor replaces it from zero.</p>
 
 <p> That is a toggle for an actuator, and <code>System.GetViewCameraPos</code> is a sensor,
  so the hold is bang-bang control: drive out, then flip on every crossing back
- over the target. The residual wobble is the travel speed times the poll
- interval, which at the hold amplitude is under a centimeter.</p>
+ over the target. The hold corrects only outside <code>LeanDeadband</code>, so the
+ deadband sets how far the camera wobbles about the target.</p>
 
 <p> A shake whose duration expires returns the camera home smoothly in about
  160 ms, and that is the release.</p>
@@ -220,16 +205,11 @@
  more ground in a second than the whole lean travels, so the controller reads
  the horse's journey instead of the camera's.</p>
 
-<p> The rider's own resting position is not the right frame either, and that is
- what made the two sides read differently. Measured, the rider's entity sits
- on the centerline to within 7 mm but <strong>the camera rests 6 cm to the horse's
- left</strong>, so a lean of equal travel each way finishes 0.71 m out on the left
- and 0.59 m on the right. A rider judging against the horse's head sees that
- as the left reaching further, which is exactly what was reported.</p>
-
-<p> Against the centerline both sides finish the same distance from the head,
- which is the thing being aimed past. The travel differs slightly instead,
- and travel is not what anyone is looking at.
+<p> The rider's own resting position is not the right frame either: <strong>the
+ camera rests about 6 cm to the horse's left</strong>, so a lean of equal travel
+ each way would finish further out on the left. Against the centerline both
+ sides finish the same distance from the head, which is the thing being
+ aimed past.
 
 
 
@@ -260,9 +240,12 @@
 
     <h3>Returns:</h3>
     <ol>
-
+        <li>
            <span class="types">optional <span class="type">number</span></span>
-        degrees, 0 looking straight ahead, always positive
+        degrees, 0 looking straight ahead, never negative</li>
+        <li>
+           <span class="types"><span class="type">boolean</span></span>
+        true if pitch limit was exceeded</li>
     </ol>
 
 
@@ -277,9 +260,8 @@
     Flips the camera's direction of travel. </p>
 
 <p> <code>SetViewShake</code> does not set a position or a speed. Firing it while a shake is
- running reverses which way the camera is going, measured across four calls
- at two second intervals. The sign of the amplitude only chooses a direction
- when nothing is already running.</p>
+ running reverses which way the camera is going; the sign of the amplitude
+ only chooses a direction when nothing is already running.</p>
 
 <p> The forward component rides along on the same call, so a lean carries the
  camera a little past the horse's shoulder rather than straight out from it.
@@ -316,9 +298,8 @@
 
 <p> Bang-bang control. The camera is driven out at the travel amplitude, and once
  it has passed the target offset every crossing back over that offset flips it
- again, so it dithers around the target rather than sailing past. The dither
- is the travel speed times the poll interval, which at the hold amplitude is
- under a centimeter.
+ again, so it dithers around the target rather than sailing past, within
+ <code>LeanDeadband</code>.
 
 
     <h3>Parameters:</h3>
@@ -342,7 +323,8 @@
     Releases the lean and lets the camera come home. </p>
 
 <p> A shake whose duration expires returns the camera smoothly in about 160 ms,
- so the release is a short shake rather than any attempt to drive back.
+ so the release is a short shake rather than any attempt to drive back, and
+ <code>LeanHomeMs</code> refuses a new lean until the camera is home.
 
 
 
@@ -389,7 +371,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

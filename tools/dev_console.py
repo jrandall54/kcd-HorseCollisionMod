@@ -2,19 +2,15 @@
 
 CryEngine embeds a console server, and this build has it: with
 `log_EnableRemoteConsole = 1` in system.cfg the game listens on port 4600,
-accepts console commands, and streams its console output back. Confirmed
-against the running game: `MemInfo` executed and echoed, and the mod's own
-telemetry arrived live while the game was being played.
+accepts console commands, and streams its console output back.
 
-Two limits found the same way:
+Two limits:
 
-  * Commands marked VF_CHEAT are refused, `lua_reload_script` among them.
-    Dev mode is what lifts that, and it comes from the **command line**
-    (`-devmode`), not from a config file. The `sys_DevMode = 1` line sitting
-    in system.cfg is inert: querying it answers "Unknown command".
+  * Commands marked VF_CHEAT are refused, `lua_reload_script` among them,
+    unless the game was launched with `-devmode` on the command line.
   * `wh_con_expr_prefix` is `!`, not `#`.
 
-The wire format, confirmed against the running game:
+The wire format:
 
   * Every packet is one event-type character, then the payload, then a zero
     byte.
@@ -24,8 +20,7 @@ The wire format, confirmed against the running game:
     and looks like a protocol mismatch when nothing is wrong.
   * The exchange is driven by the server. It sends eCET_Req to ask whether the
     client has anything to say, and **waits**. A client that never answers gets
-    one packet and then silence, which is exactly what the first run produced.
-    Answer every request, with a queued command if there is one and eCET_Noop
+    one packet and then silence. Answer every request, with a queued command if there is one and eCET_Noop
     if there is not, and the log stream follows.
 
 Usage:
@@ -33,13 +28,12 @@ Usage:
     python tools/dev_console.py                          interactive
     python tools/dev_console.py "e_TimeOfDay"            one command
     python tools/dev_console.py --lua "System.LogAlways('hi')"
-    python tools/dev_console.py --reload                 reload the mod's Lua
     python tools/dev_console.py --listen                 watch the log stream only
-    python tools/dev_console.py --raw                    also dump the bytes
 
-Setup, once, in the game's system.cfg:
+`--help` lists every option.
 
-    log_EnableRemoteConsole = 1
+Setup: `tools/flow.ps1 test` writes `log_EnableRemoteConsole = 1` into the
+game's system.cfg with the rest of the development values.
 """
 
 import argparse
@@ -65,9 +59,10 @@ def show(text):
 
     Python block-buffers stdout when it is not a terminal, so a long listening
     run that is stopped from outside prints nothing at all and looks like the
-    game sent nothing. That cost one wrong conclusion already.
+    game sent nothing.
     """
     print(text, flush=True)
+
 
 HOST = "127.0.0.1"
 PORT = 4600
@@ -96,8 +91,7 @@ EVENT_NAMES = {
 LOG_EVENTS = (EV_LOG_MESSAGE, EV_LOG_WARNING, EV_LOG_ERROR)
 
 # Backend chatter the game emits constantly and that says nothing about the
-# game itself. Both groups were read off a live session and confirmed to carry
-# no gameplay information before being muted here:
+# game itself. Neither group carries gameplay information:
 #
 #   PROS: ...            Warhorse's own online backend (Pros.Global.Api.Auth).
 #                        It retries whenever it cannot reach its service, and
@@ -121,6 +115,7 @@ def is_noise(text):
     stripped = COLOUR_CODES.sub("", text).strip()
     return any(pattern.search(stripped) for pattern in NOISE)
 
+
 # The mod's scripts as the engine's file system names them.
 #
 # Only the two Startup scripts are named. The rest of the mod lives in
@@ -131,10 +126,27 @@ MOD_SCRIPT = "Scripts/Startup/HorseCollisionMod.lua"
 SETTINGS_SCRIPT = "Scripts/Startup/HorseCollisionMod_Settings.lua"
 TESTWORLD_SCRIPT = "Scripts/Startup/HorseCollisionMod_TestWorld.lua"
 
-# Reloading the mod's Lua without restarting. `lua_reload_script` is a native
-# console command this build registers, which is a better bet than driving
-# Script.ReloadScript through the "#" Lua prefix. Both are listed so a failure
-# of the first can be told apart from a failure of the mechanism.
+# Largest Lua chunk the remote console will accept, in bytes.
+#
+# The server drops an oversized command without a word, so an over-long script
+# looks exactly like a game launched without -devmode. A padded chunk was
+# accepted at 4200 bytes and dropped at 4250; the guard sits below that edge,
+# which was located only to within fifty bytes, so a file near it does not
+# break the next time a line is added.
+MAX_CHUNK_BYTES = 4000
+
+
+def game_root():
+    """The game install, resolved as tools/build_adb.py resolves it.
+
+    Imported only when needed, since resolving it exits when no install is
+    found, and only an oversized script needs the game folder.
+    """
+    from build_adb import GAME_ROOT
+
+    return GAME_ROOT
+
+
 # What a measurement ride needs running, in the order it wants starting.
 #
 # None of it survives a save load: these are Script.SetTimer chains, and a load
@@ -142,31 +154,13 @@ TESTWORLD_SCRIPT = "Scripts/Startup/HorseCollisionMod_TestWorld.lua"
 # looks alive from its generation number long after it has stopped. Running
 # --ride again after any reload is the whole remedy, and the loops report a
 # rising pass count so that "is it actually running" has an answer.
-# Largest Lua chunk the remote console will accept, in bytes.
-#
-# Found the same way as the two limits above: a padded chunk ending in a
-# LogAlways was sent at rising sizes, and the last one to produce any output at
-# all was 4200 bytes, with 4250 and everything above it silent. The server
-# drops an oversized command without a word, so an over-long script looks
-# exactly like a game launched without -devmode, and a working development
-# script can be broken by adding a comment to it.
-#
-# The guard is set below the measured edge because the edge was located to
-# within fifty bytes rather than exactly, and because a file that sits on it
-# would break again the next time a line was added.
-MAX_CHUNK_BYTES = 4000
-
-# Where a script too large for a console command is dropped instead. Read from
-# the environment so a different install does not need this file edited, with
-# the recorded path as the default.
-GAME_ROOT = os.environ.get(
-    "KCD_ROOT", r"C:\Games\Kingdom Come - Deliverance")
-
 RIDE_SCRIPTS = [
     "tools/dev_survival.lua",
 ]
 
-
+# Reloading the mod's Lua without restarting. `lua_reload_script` is a native
+# console command this build registers, which is a better bet than driving
+# Script.ReloadScript through the "#" Lua prefix.
 RELOAD_COMMANDS = [
     # The settings file defines the global table the mod reads while applying
     # settings, and it is a separate file, so it is re-executed first.
@@ -176,9 +170,7 @@ RELOAD_COMMANDS = [
     "lua_reload_script " + SETTINGS_SCRIPT,
     # The testing world assigns over the settings global and is a startup
     # script too, so it is only read when the game starts unless it is
-    # re-executed here. Without this a world change needed a restart, which is
-    # the opposite of what it exists for: the whole point is changing what a
-    # test runs against without leaving the saddle.
+    # re-executed here.
     #
     # Ordered between the two because it overrides the settings and is then
     # read by ApplySettings, which the mod script's entry point runs. Missing
@@ -190,8 +182,8 @@ RELOAD_COMMANDS = [
     # loop is only started by its UI listener when a loading screen ends,
     # because a Startup script has no "game loaded" hook to hang off. Reloading
     # rebuilds the HorseCollisionMod table with TimerTick unset, so the loop
-    # still running from before sees its generation no longer matches and stops
-    # -- and nothing starts a new one. The mod goes silent and the game looks
+    # still running from before sees its generation no longer matches and stops,
+    # and nothing starts a new one. The mod goes silent and the game looks
     # completely vanilla until a save is loaded.
     #
     # Calling the entry point directly stands in for that loading screen, which
@@ -201,14 +193,13 @@ RELOAD_COMMANDS = [
 
 # The animation half. Mannequin owns the databases the stagger options live in.
 #
-# mn_allowEditableDatabasesInPureGame is the reason mn_reload appeared to do
-# nothing: a shipping build treats its Mannequin databases as read only, and
-# this build ships the CVar at 0. It is sent first, every time, because it is a
-# runtime value that resets with the game exactly like log_Verbosity does.
+# mn_reload needs mn_allowEditableDatabasesInPureGame, since a shipping build
+# treats its Mannequin databases as read only. It is sent first, every time,
+# because it resets with the game.
 #
 # The reload only sees new data if the ADB files are also on disk loose, under
-# Data/Animations/Mannequin/ADB, and sys_PakPriority is 0. dev_deploy.ps1
-# -Reload puts them there.
+# Data/Animations/Mannequin/ADB, and sys_PakPriority is 0. `flow.ps1 test` puts
+# them there.
 ANIM_RELOAD_COMMANDS = [
     "mn_allowEditableDatabasesInPureGame 1",
     "mn_reload",
@@ -222,10 +213,6 @@ ANIM_RELOAD_COMMANDS = [
 # re-reads the named table from disk, so a loose override under
 # Data/Libs/Tables reaches a running game the same way the Mannequin databases
 # do, without a restart.
-#
-# Verified rather than assumed: after the override landed,
-# `GetTableInfo("rpg_param").LineCount` went from 0 to 182 and the changed row
-# read back its new value.
 #
 # **Loading the table is not the same as the game using it.** Several systems
 # copy their values into their own structures at startup, and the RPG
@@ -251,15 +238,15 @@ def table_reload_commands(names=None):
 
     return out
 
+
 # The console refuses cheat-flagged commands unless the game was launched with
 # -devmode. Seeing this text back is the signal that the flag did not take.
 CHEAT_REFUSAL = "VF_CHEAT"
 
 # Sent on every connection before anything else. Console verbosity is a runtime
 # value that resets with the game, so a session started after a restart is
-# silent until it is raised again; a run that relied on a previous session
-# having set it looked like the command had vanished. con_restricted is cleared
-# in the same breath since it is the other thing that can refuse input.
+# silent until it is raised again. con_restricted is cleared in the same breath
+# since it is the other thing that can refuse input.
 #
 # The level is deliberately not 4. The mod logs through System.LogAlways, which
 # does not consult verbosity, so its telemetry arrives either way. What level 4
@@ -279,11 +266,16 @@ def setup_commands(verbosity):
     """The per-connection preamble at a given console verbosity."""
     return ["log_Verbosity %d" % verbosity, "con_restricted 0"]
 
-# Why no log line ever came back on the first working session. The remote
-# console forwards console output, and a shipping build generally has console
-# verbosity turned off, so there is nothing to forward even while the game is
-# writing plenty to kcd.log. con_restricted is cleared first in case it is what
-# refuses commands from a remote client.
+
+# The names the preamble echoes back, which say nothing about what ran.
+SETUP_ECHOES = tuple(c.split()[0] for c in setup_commands(SETUP_VERBOSITY))
+
+
+# Turns on console output and reads it back. The remote console forwards
+# console output, and a shipping build generally has console verbosity turned
+# off, so there is nothing to forward even while the game is writing plenty to
+# kcd.log. con_restricted is cleared first in case it is what refuses commands
+# from a remote client.
 DIAGNOSE_COMMANDS = [
     "con_restricted 0",
     "log_Verbosity 4",
@@ -326,9 +318,7 @@ def check_lua_syntax(code):
 
     The remote console does not report a compile error. A chunk with an
     unbalanced `end` produces no output and no complaint, which is
-    indistinguishable from a chunk that ran and found nothing, and that
-    ambiguity has cost several rounds of guessing at results that were never
-    produced.
+    indistinguishable from a chunk that ran and found nothing.
 
     Returns an error string, or None when the chunk compiles or when no Lua
     is available to ask.
@@ -409,13 +399,8 @@ class Console(object):
     def lua(self, code):
         # The remote console evaluates a leading "#" as Lua. This is separate
         # from wh_con_expr_prefix, which reads "!" and governs the in-game
-        # console; "#" works here regardless. An earlier comment credited
-        # sys_DevMode, which is not a CVar in this build at all.
+        # console; "#" works here regardless.
         self.queue("#" + code)
-
-
-    def reload_mod(self):
-        self.lua('Script.ReloadScript("%s")' % MOD_SCRIPT)
 
     def drained(self):
         return not self.outbox
@@ -424,10 +409,7 @@ class Console(object):
         """Reply with queued work if there is any, a noop if there is not.
 
         Called once for every packet received, not only for eCET_Req. The
-        server sends one packet and then waits: replying only to requests got
-        a single autocomplete entry and then silence, with the same result
-        whether the reply was a noop or a command, which rules out the reply's
-        content and leaves strict alternation as the explanation.
+        server alternates strictly: one reply per packet received.
         """
         if self.outbox:
             command = self.outbox.popleft()
@@ -469,9 +451,9 @@ class Console(object):
                 self.commands.append(text)
 
                 # The server sends its whole autocomplete list, every command
-                # and CVar in the build, on connect. That is 4545 entries here,
-                # so printing them buries whatever was actually asked for: a
-                # one-command query scrolls its own answer off the screen.
+                # and CVar in the build, on connect, so printing them buries
+                # whatever was actually asked for: a one-command query scrolls
+                # its own answer off the screen.
                 # They are collected either way, because --commands wants them,
                 # but only --commands prints progress and only --raw shows the
                 # entries themselves.
@@ -514,8 +496,7 @@ class Console(object):
             # The setup commands echo their own assignments back, and those
             # arrive whether or not anything the caller asked for ran. Counting
             # them would defeat the whole point of the flag.
-            if not clean.startswith(("log_Verbosity", "con_restricted",
-                                     "log_SpamDelay")):
+            if not clean.startswith(SETUP_ECHOES):
                 self.saw_output = True
 
             show("[%s] %s" % (label, clean))
@@ -698,7 +679,7 @@ def main():
                 # The full source is written, comments and all. Only the
                 # console needed it stripped.
                 dropped = os.path.join(
-                    GAME_ROOT, "Data", "Scripts", "hcm_dev_scratch.lua")
+                    game_root(), "Data", "Scripts", "hcm_dev_scratch.lua")
 
                 try:
                     os.makedirs(os.path.dirname(dropped), exist_ok=True)
@@ -757,11 +738,8 @@ def main():
     # A Lua chunk that produced no output at all almost always means the game
     # was launched without -devmode. The console accepts the expression, the
     # server acknowledges it, and the evaluation is dropped in silence: there
-    # is no refusal message the way there is for a VF_CHEAT variable.
-    #
-    # That silence reads exactly like a chunk that ran and logged nothing, and
-    # a session was spent probing an unresponsive game before the cause was
-    # found. Saying so costs one line and removes the whole class of confusion.
+    # is no refusal message the way there is for a VF_CHEAT variable, so the
+    # silence reads exactly like a chunk that ran and logged nothing.
     if (args.lua or args.file or args.ride) and console.sent > 0 and not console.saw_output:
         print()
         print("The chunk produced no output at all.")
@@ -770,11 +748,10 @@ def main():
         print("which the Lua console needs; without it an expression is "
               "accepted")
         print("and dropped without a word. Relaunch with:")
-        # Raw, so `\t` and `\d` stay literal. Without it Python emits a
-        # SyntaxWarning on import, and PowerShell treats anything a native
-        # command writes to stderr as an error, which failed the deploy's
-        # reload step for a message that is only ever printed on advice.
-        print(r"    .\tools\dev_deploy.ps1 -NoBuild -Launch")
+        # Raw, so the backslashes stay literal. Without it Python emits a
+        # SyntaxWarning on import, and stderr output fails a PowerShell
+        # caller.
+        print(r"    .\tools\flow.ps1 test -Launch")
 
     console.close()
     console.report_muted()
@@ -832,17 +809,12 @@ def interactive(console):
     reader.start()
 
     print("commands go to the game. '#' prefix evaluates Lua. Ctrl-C to quit.")
-    print("  :reload   reload the mod's Lua script")
 
     try:
         while console.alive:
             line = input("> ").strip()
 
             if not line:
-                continue
-
-            if line == ":reload":
-                console.reload_mod()
                 continue
 
             console.queue(line)

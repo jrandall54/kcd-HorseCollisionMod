@@ -12,13 +12,12 @@
 --
 -- @module HorseCollisionMod.Detection
 -- @author jrandall54
--- @release 5.31.4
+
 --- Tests whether a victim is actually under the horse.
 --
--- The sphere search is a broad-phase cull and nothing more. A horse is about
--- two meters long and under a meter wide, so a sphere around its origin also
--- catches people walking alongside or trailing behind it, which is what makes
--- collisions feel like they reach too far.
+-- The sphere search is a broad-phase cull and nothing more: a sphere around
+-- the horse's origin also catches people walking alongside or trailing
+-- behind it.
 --
 -- This narrows the sphere to an oriented box: the victim must be within the
 -- horse's width laterally, between its rear and front reach along its facing,
@@ -26,10 +25,8 @@
 -- horse travels in one tick so that fast victims are not missed between
 -- frames.
 --
--- The measurements are only formatted when somebody asks for them. This runs
--- for every entity near the horse on every tick, thirty times a second, and
--- building a diagnostic string that is then discarded is the most expensive
--- thing in the loop.
+-- The measurements are only formatted when somebody asks for them, since this
+-- runs for every entity near the horse on every tick.
 --
 -- @tparam table npc victim entity
 -- @tparam table horsePos world position of the horse
@@ -79,9 +76,7 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 			and lateralDistance <= cfg.HorseHalfWidth
 
 	-- Formatted only when it will be read. `DiagnoseMisses` is the switch that
-	-- turns the loop's diagnostics on, and the footprint line is one of them:
-	-- gating it on `LogTelemetry` instead wrote a line for every tick a victim
-	-- stood in range, which is thirty a second in ordinary play.
+	-- turns the loop's diagnostics on, and the footprint line is one of them.
 	if not wantDetail and not cfg.DiagnoseMisses then
 		return inside, nil
 	end
@@ -99,11 +94,11 @@ function HorseCollisionMod:IsInHorseFootprint(npc, horsePos, horseForward, speed
 	return inside, detail
 end
 
-
 --- Measurements for a candidate the footprint test rejected.
 --
 -- Same geometry as the test itself rather than a second copy of it, so the
--- numbers reported are the numbers the decision was made on.
+-- numbers reported are the numbers the decision was made on. The parameters
+-- are `IsInHorseFootprint`'s.
 --
 -- @treturn string the distances and the limits they were checked against
 function HorseCollisionMod:FootprintDetail(npc, horsePos, horseForward, speed)
@@ -120,12 +115,16 @@ end
 -- reused until the horse has traveled `SphereCacheTravel`, or the result is
 -- older than `SphereCacheMaxAgeMs`, whichever comes first.
 --
--- That is safe rather than merely cheap. The sphere reaches `HitRadius` and
--- the footprint can never reach beyond `HorseFrontReach` plus `MaxSweepExtra`,
--- so anyone the query did not return is at least the difference away from
--- being hit. Both thresholds are set inside that difference, and keying the
--- refresh on distance traveled rather than on elapsed ticks means the
--- guarantee does not depend on how fast the horse is going.
+-- The sphere reaches `HitRadius`, 2.5 m. The footprint's far corner is
+-- `HorseFrontReach` plus `MaxSweepExtra` ahead and `HorseHalfWidth` across,
+-- about 1.57 m out, so anyone the query did not return is at least 0.93 m
+-- from being hit. `SphereCacheTravel` spends 0.7 m of that, leaving 0.23 m
+-- for the victim's own movement, more than the 0.22 m a walking victim
+-- covers in `SphereCacheMaxAgeMs`.
+-- The margin is horizontal: the sphere does not contain the whole
+-- `HorseMaxVerticalDiff` allowance. Keying the refresh on distance traveled
+-- rather than on elapsed ticks keeps the margin independent of the horse's
+-- speed.
 --
 -- A cached entity may have been unstreamed since. Every use of one is already
 -- wrapped, and its position is read fresh each tick, so a stale list costs a
@@ -133,8 +132,7 @@ end
 --
 -- @tparam table horsePos world position of the horse
 -- @tparam number now engine clock in milliseconds
--- @treturn table the entities near the horse, possibly from the last tick
--- @treturn boolean true when the query actually ran
+-- @treturn ?table the entities near the horse, possibly from the last tick
 function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
 	local cache = self.SphereCache
 
@@ -146,7 +144,7 @@ function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
 
 		if moved < self.SphereCacheTravel
 				and (now - cache.at) < self.SphereCacheMaxAgeMs then
-			return cache.ents, false
+			return cache.ents
 		end
 	end
 
@@ -157,14 +155,14 @@ function HorseCollisionMod:EntitiesNearHorse(horsePos, now)
 	end)
 
 	if type(found) ~= "table" then
-		return nil, true
+		return nil
 	end
 
 	cache.ents = found
 	cache.pos = { x = horsePos.x, y = horsePos.y, z = horsePos.z }
 	cache.at = now
 
-	return found, true
+	return found
 end
 
 --- Works out which side of the victim the impact lands on.
@@ -182,9 +180,8 @@ end
 --
 -- @tparam table npc victim entity
 -- @tparam table velocity horse velocity vector
--- @tparam number speed horse speed in meters per second
 -- @treturn string one of "so_forward", "so_back", "so_left", "so_right"
-function HorseCollisionMod:GetImpactDir(npc, velocity, speed)
+function HorseCollisionMod:GetImpactDir(npc, velocity)
 	local forward = nil
 
 	pcall(function()
@@ -193,15 +190,17 @@ function HorseCollisionMod:GetImpactDir(npc, velocity, speed)
 		end
 	end)
 
-	if not forward or not velocity or speed <= 0 then
+	if not forward or not velocity then
 		return "so_forward"
 	end
 
 	-- The blow arrives from the direction the horse came from, which is the
 	-- opposite of its travel. Flattened to the ground plane, since a rider
 	-- is always above a pedestrian and the height would bias every result.
-	local fromX = -velocity.x / speed
-	local fromY = -velocity.y / speed
+	-- Left unnormalized: the comparisons below depend only on the signs and
+	-- the ratio, and a horse at rest resolves to `so_forward`.
+	local fromX = -velocity.x
+	local fromY = -velocity.y
 
 	-- Projected onto the victim's axes: dot is how much the blow comes from
 	-- ahead of them (negative means from behind), cross is how much it comes

@@ -41,6 +41,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><strong>HorseCollisionMod.Detection</strong></li>
@@ -55,6 +57,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -75,24 +79,6 @@
  runs.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  5.11.3
- Tests whether a victim is actually under the horse.</p>
-
-<p> The sphere search is a broad-phase cull and nothing more. A horse is about
- two meters long and under a meter wide, so a sphere around its origin also
- catches people walking alongside or trailing behind it, which is what makes
- collisions feel like they reach too far.</p>
-
-<p> This narrows the sphere to an oriented box: the victim must be within the
- horse's width laterally, between its rear and front reach along its facing,
- and at a comparable height. The front reach is extended by the distance the
- horse travels in one tick so that fast victims are not missed between
- frames.</p>
-
-<p> The measurements are only formatted when somebody asks for them. This runs
- for every entity near the horse on every tick, thirty times a second, and
- building a diagnostic string that is then discarded is the most expensive
- thing in the loop.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -100,10 +86,8 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#returns...">returns... (npc, horsePos, horseForward, speed[, wantDetail])</a></td>
-	<td class="summary">
-
-</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:IsInHorseFootprint">HorseCollisionMod:IsInHorseFootprint (npc, horsePos, horseForward, speed[, wantDetail])</a></td>
+	<td class="summary">Tests whether a victim is actually under the horse.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:FootprintDetail">HorseCollisionMod:FootprintDetail (npc, horsePos, horseForward, speed)</a></td>
@@ -114,7 +98,7 @@
 	<td class="summary">The entities near the horse, from a cached broad phase where possible.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:GetImpactDir">HorseCollisionMod:GetImpactDir (npc, velocity, speed)</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:GetImpactDir">HorseCollisionMod:GetImpactDir (npc, velocity)</a></td>
 	<td class="summary">Works out which side of the victim the impact lands on.</td>
 	</tr>
 </table>
@@ -127,13 +111,24 @@
 
     <dl class="function">
     <dt>
-    <a name = "returns..."></a>
-    <strong>returns... (npc, horsePos, horseForward, speed[, wantDetail])</strong>
+    <a name = "HorseCollisionMod:IsInHorseFootprint"></a>
+    <strong>HorseCollisionMod:IsInHorseFootprint (npc, horsePos, horseForward, speed[, wantDetail])</strong>
     </dt>
     <dd>
+    Tests whether a victim is actually under the horse. </p>
 
+<p> The sphere search is a broad-phase cull and nothing more: a sphere around
+ the horse's origin also catches people walking alongside or trailing
+ behind it.</p>
 
+<p> This narrows the sphere to an oriented box: the victim must be within the
+ horse's width laterally, between its rear and front reach along its facing,
+ and at a comparable height. The front reach is extended by the distance the
+ horse travels in one tick so that fast victims are not missed between
+ frames.</p>
 
+<p> The measurements are only formatted when somebody asks for them, since this
+ runs for every entity near the horse on every tick.
 
 
     <h3>Parameters:</h3>
@@ -184,7 +179,8 @@
     Measurements for a candidate the footprint test rejected. </p>
 
 <p> Same geometry as the test itself rather than a second copy of it, so the
- numbers reported are the numbers the decision was made on.
+ numbers reported are the numbers the decision was made on. The parameters
+ are <a href="../modules/HorseCollisionMod.Detection.html#HorseCollisionMod:IsInHorseFootprint">IsInHorseFootprint</a>'s.
 
 
     <h3>Parameters:</h3>
@@ -234,12 +230,16 @@
  reused until the horse has traveled <code>SphereCacheTravel</code>, or the result is
  older than <code>SphereCacheMaxAgeMs</code>, whichever comes first.</p>
 
-<p> That is safe rather than merely cheap. The sphere reaches <code>HitRadius</code> and
- the footprint can never reach beyond <code>HorseFrontReach</code> plus <code>MaxSweepExtra</code>,
- so anyone the query did not return is at least the difference away from
- being hit. Both thresholds are set inside that difference, and keying the
- refresh on distance traveled rather than on elapsed ticks means the
- guarantee does not depend on how fast the horse is going.</p>
+<p> The sphere reaches <code>HitRadius</code>, 2.5 m. The footprint's far corner is
+ <code>HorseFrontReach</code> plus <code>MaxSweepExtra</code> ahead and <code>HorseHalfWidth</code> across,
+ about 1.57 m out, so anyone the query did not return is at least 0.93 m
+ from being hit. <code>SphereCacheTravel</code> spends 0.7 m of that, leaving 0.23 m
+ for the victim's own movement, more than the 0.22 m a walking victim
+ covers in <code>SphereCacheMaxAgeMs</code>.
+ The margin is horizontal: the sphere does not contain the whole
+ <code>HorseMaxVerticalDiff</code> allowance. Keying the refresh on distance traveled
+ rather than on elapsed ticks keeps the margin independent of the horse's
+ speed.</p>
 
 <p> A cached entity may have been unstreamed since. Every use of one is already
  wrapped, and its position is read fresh each tick, so a stale list costs a
@@ -260,12 +260,9 @@
 
     <h3>Returns:</h3>
     <ol>
-        <li>
-           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-        the entities near the horse, possibly from the last tick</li>
-        <li>
-           <span class="types"><span class="type">boolean</span></span>
-        true when the query actually ran</li>
+
+           <span class="types">optional <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+        the entities near the horse, possibly from the last tick
     </ol>
 
 
@@ -274,7 +271,7 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:GetImpactDir"></a>
-    <strong>HorseCollisionMod:GetImpactDir (npc, velocity, speed)</strong>
+    <strong>HorseCollisionMod:GetImpactDir (npc, velocity)</strong>
     </dt>
     <dd>
     Works out which side of the victim the impact lands on. </p>
@@ -301,10 +298,6 @@
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
          horse velocity vector
         </li>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         horse speed in meters per second
-        </li>
     </ul>
 
     <h3>Returns:</h3>
@@ -325,7 +318,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

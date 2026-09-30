@@ -1,17 +1,13 @@
 -- What speed does the horse actually travel at in each gait?
 --
--- Stage 2 step 1 of docs/BALANCE_AUDIT.md is tier identity: SpeedWalk 1.8,
--- SpeedTrot 4.5 and SpeedGallop 8.5 were set from plateaus measured in the
--- 2.0.0 era, and the diary records trot impacts topping out at 8.03 against a
--- gallop threshold of 8.5, which is a cliff in reaction strength sitting right
--- where the horse spends much of its time. This samples the mounted horse's
--- speed at 10 Hz and reports the peak and mean of each second, so the four
--- gaits' plateaus can be read off rather than guessed at.
+-- Samples the mounted horse's speed at 10 Hz and reports the peak and mean of
+-- each second, so each gait's plateau can be read against `SpeedWalk`,
+-- `SpeedTrot` and `SpeedGallop`.
 --
 --     python tools/dev_console.py --file tools/probe_gait_speed.lua
 --
--- Then ride: walk ~15 s, trot ~15 s, canter ~15 s, gallop ~15 s. It stops on
--- its own after three minutes.
+-- Then ride: walk ~15 s, trot ~15 s, gallop ~15 s. It stops on its own after
+-- three minutes.
 
 local SAMPLE_MS = 100
 local REPORT_EVERY = 10
@@ -101,5 +97,5 @@ function HCM_GaitProbe:Tick()
 	end)
 end
 
-say("sampling for 180 s: ride walk, trot, canter, then gallop, ~15 s each")
+say("sampling for 180 s: ride walk, trot, then gallop, ~15 s each")
 HCM_GaitProbe:Tick()

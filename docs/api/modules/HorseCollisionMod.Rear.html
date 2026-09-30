@@ -42,6 +42,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -56,6 +58,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><strong>HorseCollisionMod.Rear</strong></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -100,6 +104,18 @@
 	<td class="summary">Decides whether a press should rear.</td>
 	</tr>
 	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearAnimMs">HorseCollisionMod:RearAnimMs ()</a></td>
+	<td class="summary">How long the standing rear holds the horse, in milliseconds.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:StartMoveCooldown">HorseCollisionMod:StartMoveCooldown (clock, cooldown)</a></td>
+	<td class="summary">Starts a move's cooldown and puts its icon on the player.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:UpdateMoveCooldowns">HorseCollisionMod:UpdateMoveCooldowns (now)</a></td>
+	<td class="summary">Takes a cooldown icon off once its move is available again.</td>
+	</tr>
+	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ChargeForward">HorseCollisionMod:ChargeForward (horseEnt)</a></td>
 	<td class="summary">Drives the charge forward with physics once the rear has finished.</td>
 	</tr>
@@ -108,12 +124,8 @@
 	<td class="summary">Closes the charge window when the lunge has spent itself.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:LogActionEnd">HorseCollisionMod:LogActionEnd (horseEnt, tag)</a></td>
-	<td class="summary">Reports how long an interactive action held the horse.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:RearHorse">HorseCollisionMod:RearHorse (horseEnt)</a></td>
-	<td class="summary">Rears the horse.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearHorse">HorseCollisionMod:RearHorse (horseEnt[, fragTag])</a></td>
+	<td class="summary">Rears the horse, on the spot or into a charge.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:ChargeStrike">HorseCollisionMod:ChargeStrike (horseEnt)</a></td>
@@ -128,8 +140,8 @@
 	<td class="summary">Brings the hooves down on whoever is in front.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:RearHit">HorseCollisionMod:RearHit (npc, horseEnt, playerEnt, heading)</a></td>
-	<td class="summary">What a hoof landing on someone does.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:RearHit">HorseCollisionMod:RearHit (npc, horseEnt, playerEnt, heading[, tier[, hitSpeed]])</a></td>
+	<td class="summary">What a rear or a charge landing on someone does.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:LoadRearActionMap">HorseCollisionMod:LoadRearActionMap ()</a></td>
@@ -225,13 +237,10 @@
 
 <p> The action itself is the mod's own, loaded from <code>Libs/Config/
  hcm_actionmaps.xml</code> through <code>ActionMapManager.LoadFromXML</code>, because a
- vanilla key cannot be borrowed. Consuming a press here does not stop the
- game acting on it: bound to <code>jump</code>, this reared the horse and then jumped
- anyway. Nor is there a hold to distinguish one use from another, since a two
- second hold and a tap both deliver a single <code>press</code> and no <code>release</code>.</p>
-
-<p> So the mod brings its own action on its own key and disturbs no existing
- control.
+ vanilla action cannot be borrowed: consuming a press here does not stop the
+ game acting on it, and a hold and a tap both deliver a single <code>press</code> and no
+ <code>release</code>, so there is no second use to separate out. The mod's own action
+ on its own key disturbs no existing control.
 
 
 
@@ -247,19 +256,9 @@
     <dd>
     Keeps a real speed for the player's horse, derived from where it has been. </p>
 
-<p> <code>GetVelocity</code> cannot be trusted for this. At the moment a rear was requested
- it read 0.24 m/s; the horse then covered 0.12 m in the next 128 ms, which is
- 0.94 m/s. That is the same unreliability this project already documented on
- the vertical axis, where a stationary horse reports 1 to 2 m/s because the
- reading carries its settling fall.</p>
-
-<p> It matters because the standstill gate is built on that number, and a gate
- reading a quarter of the true speed lets through exactly the rears that
- slide. The slide is the whole defect: the horse travels about 0.12 m in the
- first 128 ms of a rear and is then frozen by the fragment for the rest of
- the animation.</p>
-
-<p> Two positions and the time between them cannot be wrong in that way.
+<p> <code>GetVelocity</code> under-reports a slow horse, and the standstill gate is built
+ on this number, so a low reading lets through exactly the rears that slide.
+ Two positions and the time between them cannot be wrong in that way.
 
 
     <h3>Parameters:</h3>
@@ -304,37 +303,98 @@
 
 </dd>
     <dt>
+    <a name = "HorseCollisionMod:RearAnimMs"></a>
+    <strong>HorseCollisionMod:RearAnimMs ()</strong>
+    </dt>
+    <dd>
+    How long the standing rear holds the horse, in milliseconds. </p>
+
+<p> Read from the animation itself rather than declared. The standing rear
+ plays at normal speed; <code>RearAnimSpeed</code> applies to the charge only.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">number</span></span>
+        the length, or 0 when it cannot be read
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:StartMoveCooldown"></a>
+    <strong>HorseCollisionMod:StartMoveCooldown (clock, cooldown)</strong>
+    </dt>
+    <dd>
+    Starts a move's cooldown and puts its icon on the player. </p>
+
+<p> Called at the move's first contact, which is when its cooldown starts.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">clock</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "RearNextAt" or "ChargeNextAt"
+        </li>
+        <li><span class="parameter">cooldown</span>
+            <span class="types"><span class="type">number</span></span>
+         the cooldown, in milliseconds
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:UpdateMoveCooldowns"></a>
+    <strong>HorseCollisionMod:UpdateMoveCooldowns (now)</strong>
+    </dt>
+    <dd>
+    Takes a cooldown icon off once its move is available again. </p>
+
+<p> Read from the move's clock every tick, so an icon clears at the moment a
+ press would be taken, and after a save load, whose handler clears the
+ deadline.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">now</span>
+            <span class="types"><span class="type">number</span></span>
+         the mod's clock, in milliseconds
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
     <a name = "HorseCollisionMod:ChargeForward"></a>
     <strong>HorseCollisionMod:ChargeForward (horseEnt)</strong>
     </dt>
     <dd>
     Drives the charge forward with physics once the rear has finished. </p>
 
-<p> The charge used to travel by root motion, blending the rear into
- <code>relaxed_gallop_jump</code>. An interactive action moves the actor kinematically
- with collision off, and every fault on this feature came from that: riding
- through walls, wedging in fences, and a divergence the engine discharged at
- over 20 m/s when the action ended.</p>
+<p> An interactive action moves the actor kinematically with collision off,
+ and none of the three movement control methods gives travel and collision
+ together inside one: <code>eMCM_Animation</code> travels without colliding,
+ <code>eMCM_AnimationHCollision</code> builds a divergence the engine discharges when
+ the action ends, and <code>eMCM_Entity</code> zeroes an impulse on the next frame. Once
+ the action has ended the horse is an ordinary horse and an impulse moves it.</p>
 
-<p> All three movement control methods were measured and none gives travel and
- collision together. <code>eMCM_Animation</code> travels without colliding.
- <code>eMCM_AnimationHCollision</code> collides while the animation keeps demanding a
- position collision refuses, which is the discharge. <code>eMCM_Entity</code> admits no
- divergence but hands the horse to its movement controller, which zeroes an
- impulse on the next frame.</p>
-
-<p> That last one is only true <em>inside</em> the action. Once it has ended the horse
- is an ordinary horse and an impulse moves it: measured at 4300 the horse
- reached 8.33 m/s and traveled, and at 20000 it went a very long way.</p>
-
-<p> So the rear plays in place and the travel is a real push afterwards. The
- horse then collides with the world by default, reports a genuine velocity,
- and the detection loop scores the collision exactly as it scores a gallop,
- with no synthetic speed and no raycast brake.</p>
-
-<p> Waited for rather than timed, because the action's length is not fixed and
- an impulse applied while it still holds the horse is stored and discharged
- later.
+<p> So the rear plays in place and the travel is a real push afterwards, and
+ the horse collides with the world like any moving horse. Waited for rather
+ than timed, because the action's length is not fixed and an impulse applied
+ while it still holds the horse is stored and discharged later.
 
 
     <h3>Parameters:</h3>
@@ -357,44 +417,23 @@
     <dd>
     Closes the charge window when the lunge has spent itself. </p>
 
-<p> The rider's definition, and it is a better one than any threshold: the charge
- is over the moment the horse is no longer being carried by the impulse.</p>
-
-<p> What came before was three numbers that had to agree with each other -- a
- speed under which the horse counted as stopped, a floor before that test was
- allowed to run, and a ceiling in case it never fired. All three were guesses,
- and the rider could finish the whole animation and then walk into someone and
- have it score as a charge.</p>
-
-<p> The impulse is a single shove rather than sustained drive, so the horse
- reaches its top speed within a frame or two of the push and everything after
- that is friction taking it back. That makes the shape of the lunge readable
- without any absolute figure in it: track the peak, and call the move finished
- once the speed has decayed to a fraction of it. A horse walking away
+<p> The charge is over the moment the horse stops being carried by the
+ impulse. The impulse is a single shove rather than sustained drive, so the
+ horse reaches its top speed within a frame or two of the push and everything
+ after that is friction taking it back. The move is finished once the speed
+ has decayed to <code>RearChargeLungeSpentAt</code> of its peak; a horse walking away
  afterwards is nowhere near its own peak, so it cannot hold the window open.</p>
 
-<p> Started at the push and not at the key press, which is what removes the need
- for a floor: the horse is stationary through the rear itself, and a watcher
- begun there would have closed on the animation rather than on the lunge.</p>
+<p> Started at the push and not at the key press, because the horse is
+ stationary through the rear itself.</p>
 
 <p> <strong>A single sample cannot set the peak.</strong> <code>HorseSpeed</code> is derived from two
- positions rather than read from <code>GetVelocity</code>, for the reasons in
- <a href="../modules/HorseCollisionMod.Rear.html#HorseCollisionMod:TrackHorseSpeed">TrackHorseSpeed</a>, and the first version of this closed every window inside
- 200 ms because of it: measured peaks of 21.2, 25.5 and 25.8 m/s appeared for
- one sample each, against 13.0 on the same move, and half of a spike is
- reached by the very next ordinary reading. The lunge then ended before the
- horse had traveled, the sweep died with it, and the charge landed as an
- ordinary walk stagger.</p>
-
-<p> So the peak is the larger of each neighbouring pair, which a lone spike can
- never win. <code>RearChargeLungePeakMin</code> is the second guard, against a dip early
- on being read as decay before the horse has gone anywhere.</p>
-
-<p> Whether those spikes are measurement noise or the engine really discharging
- the horse at 25 m/s is not settled, and it matters: the second would explain
- bodies thrown thirty meters. <code>moved=</code> is here to tell them apart. A real
- 25 m/s for even a tenth of a second puts the horse meters further along than
- a 13 m/s lunge does.
+ positions, which spike for one sample at a time, and half of a spike is
+ reached by the next ordinary reading. So the peak is the smaller of
+ each neighboring pair, which a lone spike can never set.
+ <code>RearChargeLungePeakMin</code> is the second guard, against a dip early on being
+ read as decay before the horse has gone anywhere. The log's <code>spike=</code> and
+ <code>moved=</code> record the raw peak and the distance covered.
 
 
     <h3>Parameters:</h3>
@@ -402,39 +441,6 @@
         <li><span class="parameter">horseEnt</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
          the player's horse
-        </li>
-    </ul>
-
-
-
-
-
-</dd>
-    <dt>
-    <a name = "HorseCollisionMod:LogActionEnd"></a>
-    <strong>HorseCollisionMod:LogActionEnd (horseEnt, tag)</strong>
-    </dt>
-    <dd>
-    Reports how long an interactive action held the horse. </p>
-
-<p> The charge gets this figure for free, because it has to wait for the action
- to end before it can push and logs the wait as <code>after=</code>. The rear waits for
- nothing, so without this its length can only be judged by eye, and choosing
- where to cut it then costs a ride per guess.</p>
-
-<p> Same instrument as the charge's wait: the action owns the horse for exactly
- as long as <code>GetCurrentAnimationState</code> reads <code>AnimationControlled</code>.
-
-
-    <h3>Parameters:</h3>
-    <ul>
-        <li><span class="parameter">horseEnt</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the player's horse
-        </li>
-        <li><span class="parameter">tag</span>
-            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the fragment tag that was started, for the log line
         </li>
     </ul>
 
@@ -445,31 +451,25 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:RearHorse"></a>
-    <strong>HorseCollisionMod:RearHorse (horseEnt)</strong>
+    <strong>HorseCollisionMod:RearHorse (horseEnt[, fragTag])</strong>
     </dt>
     <dd>
-    Rears the horse. </p>
+    Rears the horse, on the spot or into a charge. </p>
 
-<p> The horse plays its own <code>relaxed_rearing</code> clip and the rider stays in the
- saddle, because nothing is dismounted: this is the animation, not a throw
- caught in mid-air.</p>
+<p> The horse plays a rear and the rider stays in the saddle, because nothing
+ is dismounted: this is the animation, not a throw caught in mid-air.</p>
 
-<p> Reaching it took the whole chain. The horse has a <a href="../modules/HorseCollisionMod.Rear.html">Rear</a> fragment in
- <code>kcd_horse_database.adb</code>, but a fragment is not something Lua can ask for.
- <code>StartInteractiveActionByName</code> resolves its argument against the FragTags of
- one fragment, <code>AnimationControlled</code>, which the horse does not have, so the
- mod ships four files: a parent database defining that fragment with an
- <code>hcm_rear</code> option carrying vanilla's <a href="../modules/HorseCollisionMod.Rear.html">Rear</a> contents, the horse fragment ids
- with <code>AnimationControlled</code> declared, the tag itself, and the horse
- controller definition giving the fragment a <code>FullBody</code> scope. A fragment
- with no scope can never play whatever the database says, and humans needed
- no equivalent only because vanilla already declares the fragment for them.</p>
-
-<p> The last piece is the call itself. The bind takes
- <code>ActionName, ObjectId, UpdateVisibility, AnimSpeed</code>, and with the name
- alone it does nothing at all and still returns true: the horse must be given
- as its own object. Every earlier attempt passed the name only, which is why
- correct data looked like broken data.
+<p> The standing rear plays <code>relaxed_rearing</code> directly with <code>StartAnimation</code>,
+ outside Mannequin. The charge's rear is the <code>hcm_rear_charge</code> option,
+ reached through <code>StartInteractiveActionByName</code>, which resolves its argument
+ against the FragTags of one fragment, <code>AnimationControlled</code>, which the horse
+ does not have in vanilla. So the mod ships four files: a parent database
+ defining that fragment with the rear options, the horse fragment ids with
+ <code>AnimationControlled</code> declared, the tags, and the horse controller
+ definition giving the fragment a <code>FullBody</code> scope; a fragment with no scope
+ never plays. The bind takes <code>ActionName, ObjectId, UpdateVisibility,
+ AnimSpeed</code>, and with the name alone it does nothing and still returns true:
+ the horse must be given as its own object.
 
 
     <h3>Parameters:</h3>
@@ -477,6 +477,12 @@
         <li><span class="parameter">horseEnt</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
          the player's horse
+        </li>
+        <li><span class="parameter">fragTag</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         <code>RearFragTag</code> for the charge or <code>RearOnlyFragTag</code>
+   for the standing rear; the charge when omitted
+         (<em>optional</em>)
         </li>
     </ul>
 
@@ -492,17 +498,11 @@
     <dd>
     The charge's own strike, swept along the lunge. </p>
 
-<p> The charge does not use the mod's ordinary detection loop. That loop is
- driven by the horse's speed, which is a poor fit here: it exits below
- walking pace, so a charge detected nobody at all until the horse was given a
- physical push, and it then depended on the impulse landing cleanly for
- anyone to be hit. Whether a special move connects should not rest on how
- well the physics behaved.</p>
-
-<p> So the charge carries its own detection, the way the rear on the spot
- already does. The rider asked for a move that knocks several people down at
- once, so there is no cap and no cooldown between victims: everyone in the
- corridor goes down, and each is hit once per charge.</p>
+<p> The charge does not use the mod's ordinary detection loop, which is driven
+ by the horse's speed and would make whether the move connects depend on how
+ the physics behaved. The sweep is the only thing that scores a charge. It
+ knocks several people down at once: there is no cap and no cooldown between
+ victims, and each is hit once per charge.</p>
 
 <p> Swept rather than sampled once, because the horse is moving and a single
  test at one instant would miss anyone it passes. The corridor is measured
@@ -531,11 +531,9 @@
 
 <p> The same three tests the detection loop applies, for the same reasons. The
  sphere returns crates, doors and dropped weapons as readily as people;
- humans are named by class, because a faction test gave dogs a human
- fragment on a dog skeleton and reached women only by a fallback. Corpses are
- already ragdolls and reacting to them twitches bodies around. And Henry's
- dog follows close enough to be caught constantly, so he is excluded by name,
- dogs sharing the generic NPC class.
+ humans are matched by class, which admits men and women and no animal. Corpses are
+ already ragdolls and reacting to them twitches bodies around. Dogs, Henry's
+ included, are class <code>Dog</code> and fail the class test.
 
 
     <h3>Parameters:</h3>
@@ -564,10 +562,6 @@
     <dd>
     Brings the hooves down on whoever is in front. </p>
 
-<p> The rear is the only thing this mod does that does not need speed. Every
- other reaction is scored from how fast the horse was going, which is why a
- stationary rider has never had anything to do but shove people at a walk.</p>
-
 <p> Fired on a delay rather than with the request, because the strike is the
  hooves landing and not the horse going up. <code>RearStrikeMs</code> is when that
  happens in <code>relaxed_rearing</code>.</p>
@@ -592,17 +586,14 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:RearHit"></a>
-    <strong>HorseCollisionMod:RearHit (npc, horseEnt, playerEnt, heading)</strong>
+    <strong>HorseCollisionMod:RearHit (npc, horseEnt, playerEnt, heading[, tier[, hitSpeed]])</strong>
     </dt>
     <dd>
-    What a hoof landing on someone does. </p>
+    What a rear or a charge landing on someone does. </p>
 
-<p> The trot treatment, not the gallop one. A horse coming down on its front
- hooves from a standstill is a real blow but it is not a charge, and the
- charge is the move that earns the ragdoll.</p>
-
-<p> Scored at a fixed speed rather than the horse's own, which is zero here:
- what matters is the hooves, not ground the horse covered.
+<p> Shared by the standing rear's strike and the charge's sweep; the tier's own
+ tables decide the reaction. Scored at a fixed speed rather than the horse's
+ own, which is zero for a rear and unmeasurable through a lunge.
 
 
     <h3>Parameters:</h3>
@@ -622,6 +613,17 @@
         <li><span class="parameter">heading</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
          the horse's facing, which the victim is thrown along
+        </li>
+        <li><span class="parameter">tier</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Rear" or "Charge"; "Rear" when omitted
+         (<em>optional</em>)
+        </li>
+        <li><span class="parameter">hitSpeed</span>
+            <span class="types"><span class="type">number</span></span>
+         the speed to score at; <code>RearImpactSpeed</code> when
+   omitted
+         (<em>optional</em>)
         </li>
     </ul>
 
@@ -719,7 +721,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

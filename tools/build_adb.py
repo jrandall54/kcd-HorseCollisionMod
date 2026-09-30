@@ -1,38 +1,36 @@
 """Generates this mod's animation data.
 
 `actor:StartInteractiveActionByName(name, ...)` resolves `name` against the
-FragTags of exactly one fragment, `AnimationControlled`. Vanilla ships 30
-options there and every one is an object interaction (cabinet_o, alarmBell,
-door_*), so calling it with a hit-reaction name acquires the NPC's body and
-aborts within a frame: a valid call with no matching option.
+FragTags of exactly one fragment, `AnimationControlled`. Vanilla's options
+there, 32 on the male set in the patched game, are all object interactions
+(cabinet_o, alarmBell, door_*), so calling it with a hit-reaction name
+acquires the NPC's body and aborts within a frame: a valid call with no
+matching option.
 
-Before 2.1.0, adding an option meant shipping a modified copy of the 5.5 MB
-vanilla database under its own name. Two mods cannot both do that: the later
-one in mod_order.txt wins and the other's changes vanish with no error.
+Adding options by shipping a modified copy of the vanilla database under its
+own name does not combine: two mods cannot both do it, since the later one in
+mod_order.txt wins and the other's changes vanish with no error. So three
+files are generated, and the large vanilla databases are referenced rather
+than replaced:
 
-Four files are generated now, and the two large databases are referenced
-rather than replaced:
+  hcm_<set>_database.adb           the parent, one per character set, and the
+                                   authoritative definition of
+                                   AnimationControlled. Carries vanilla's own
+                                   options plus this mod's, and references the
+                                   untouched vanilla database as a SubADB for
+                                   every other fragment.
+  kcd_animationControlledTags.xml  vanilla's FragTags plus this mod's reaction
+                                   tags and the horse's two.
 
-  hcm_<set>_database.adb           the parent, and the authoritative
-                                   definition of AnimationControlled. Carries
-                                   vanilla's own options plus this mod's, and
-                                   references the untouched vanilla database
-                                   as a SubADB for every other fragment.
-  kcd_animationControlledTags.xml  vanilla's 16 FragTags plus this mod's 4.
-  wh_female_fragmentids.xml        declares AnimationControlled for the
-                                   women, who have no such fragment at all.
-
-The last two keep vanilla's names deliberately. Giving them mod names means
+The tag file keeps vanilla's name deliberately. Giving it a mod name means
 restating the fragment id and controller definitions, 123 KB of vanilla data,
 and putting this mod in the resolution path of every human animation rather
-than just its own, which is what broke unrelated animations in an earlier
-layout. Owning 15 KB of declarations is the smaller thing to own.
+than just its own.
 
 HorseCollisionMod.lua then points the human entity classes' AnimDatabase3P
 at the parent. ActionController is deliberately left alone.
 
-Three conditions have to hold at once. See
-TESTING_DIARY.md, builds 2.0.1-dev.15 through 2.1.0.
+Three conditions have to hold at once:
 
 1. The parent must be the one defining AnimationControlled. Sub-databases do
    not merge options into a fragment another database already defines.
@@ -167,12 +165,12 @@ def find_game_root():
 GAME_ROOT = find_game_root()
 PAK = os.path.join(GAME_ROOT, PAK_RELATIVE)
 
-# The subTagDef for the AnimationControlled fragment. This mod ships its own
-# version of this file, under this same name, with four tags added.
 # FragTags used by the hand-authored horse database. Declared here because this
 # is the tag file the mod ships and the horse database is not generated.
 HORSE_TAGS = ("hcm_rear", "hcm_rear_charge")
 
+# The subTagDef for the AnimationControlled fragment. This mod ships its own
+# version of this file, under this same name, with its tags added.
 TAGS_ENTRY = "Animations/Mannequin/ADB/kcd_animationControlledTags.xml"
 
 # Output lands in mod_assets/ at the repository root, never in the working
@@ -182,27 +180,22 @@ TAGS_ENTRY = "Animations/Mannequin/ADB/kcd_animationControlledTags.xml"
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(REPO_ROOT, "mod_assets", "Animations", "Mannequin", "ADB")
 
-# Every vanilla file this reads, per character set. All three are read only.
+# The vanilla files each character set's parent names. None is copied.
 #
-#   db    the stock animation database, referenced from the mod's parent as a
-#         SubADB so it is never copied or replaced
-#   ids   the fragment id definitions, copied so AnimationControlled can be
-#         pointed at the mod's tag file
-#   ctrl  the controller def, copied so the ids copy above is what entities
-#         resolve names through at runtime
-#   tags  the character set's tag definitions, referenced unchanged
+#   db    the stock animation database: read for its AnimationControlled
+#         options, and referenced from the parent as a SubADB
+#   ids   the fragment id definitions, the parent's FragDef
+#   tags  the character set's tag definitions, the parent's TagDef
 GENDERS = {
     "male": {
         "db": "Animations/Mannequin/ADB/kcd_male_database.adb",
         "ids": "Animations/Mannequin/ADB/kcd_male_fragmentids.xml",
         "tags": "Animations/Mannequin/ADB/kcd_male_tags.xml",
-        "ctrl": "Animations/Mannequin/ADB/kcd_male_controllerdefs.xml",
     },
     "female": {
         "db": "Animations/Mannequin/ADB/wh_female_database.adb",
         "ids": "Animations/Mannequin/ADB/wh_female_fragmentids.xml",
         "tags": "Animations/Mannequin/ADB/wh_female_tags.xml",
-        "ctrl": "Animations/Mannequin/ADB/wh_female_controllerdefs.xml",
     },
 }
 
@@ -210,23 +203,17 @@ GENDERS = {
 # FragTags name -> clip. The direction suffix matches what the Lua sends,
 # which is GetImpactDir's so_* result with "so_" stripped, hence "forward"
 # rather than "front" even though the clip names say front.
-#
-# Heavier hcm_shove_* entries pointing at hitreaction_idle_heavy_* existed
-# briefly, but nothing referenced them, so they were removed rather than left
-# as dead data. Add them back here when the trot tier moves off the physics
-# ragdoll.
 BOTH = ("male", "female")
 MALE_ONLY = ("male",)
 
 REACTIONS = [
-    # Walk. A standing hit reaction, and the only family both character sets
-    # have had since 2.0.0.
+    # Stagger: a standing hit reaction.
     ("hcm_stagger_forward", "hitreaction_idle_medium_torso_stab_front", BOTH),
     ("hcm_stagger_back", "hitreaction_idle_medium_torso_stab_back", BOTH),
     ("hcm_stagger_left", "hitreaction_idle_medium_torso_stab_left", BOTH),
     ("hcm_stagger_right", "hitreaction_idle_medium_torso_stab_right", BOTH),
 
-    # Trot, replacing the physics ragdoll. Vanilla plays these on its own
+    # Knockdown: an animated fall and get-up. Vanilla plays the falls on its own
     # HitDeath fragment under `so_forward+death` with `Tags="walk"`, for a
     # person collapsing while walking, which is the shape of a knockdown.
     # Both character sets have all four.
@@ -261,39 +248,22 @@ REACTIONS = [
     # drops the rotation with it, and the falls are kept untouched because a
     # comparison of all eighteen shared fall clips found these four to be the
     # best available.
-    #
-    # Recovery is not chained here, by the fragment or otherwise. The ragdoll
-    # settle layer cannot do it: measured on this exact shape, a fall with no
-    # get-up and the settle layer present, the actor left the animation before
-    # three seconds, stood up, and was only taken by the ragdoll two seconds
-    # after that. The layer arrives too late to catch a fall however its
-    # ExitTime is set, so it is left disabled and recovery is driven from Lua
-    # against the animation state instead.
     ("hcm_fall_forward", "relaxed_death_walk_front_01", BOTH),
     ("hcm_fall_back", "relaxed_death_walk_back_01", BOTH),
     ("hcm_fall_left", "relaxed_death_walk_left_01", BOTH),
     ("hcm_fall_right", "relaxed_death_walk_right_01", BOTH),
 
-    # The recovery half of the knockdown. Without one the fall clip ends and
-    # the victim snaps upright, which reads as a break rather than a get-up.
-    # Both character sets carry all four.
     # Nothing to play, for taking a victim out of a ragdoll without imposing a
     # pose or a facing on them.
     #
     # An actor has to be animation driven or it holds its bind pose, which is
     # the T-pose seen when a ragdolled victim is returned to the alive profile
-    # with no fragment running. Every real option carries a pose of its own,
-    # and the get-up options carry a measured rotation with it: +53 forward,
-    # +90 back, -176 left and 0 right. This one carries neither.
+    # with no fragment running. Every real option carries a pose of its own;
+    # this one carries none.
     #
     # See `render_option` for the shape, which is the terminal clip found for
     # the charge.
     ("hcm_settle", (), BOTH),
-
-    ("hcm_getup_forward", "getup_ground_front", BOTH),
-    ("hcm_getup_back", "getup_ground_back", BOTH),
-    ("hcm_getup_left", "getup_ground_left", BOTH),
-    ("hcm_getup_right", "getup_ground_right", BOTH),
 
     # collision_stand_{front,back,left,right}_heavy are named for exactly this
     # case and are not here. They exist as assets under
@@ -319,19 +289,19 @@ def reactions_for(gender):
     return [(tag, clip) for tag, clip, genders in REACTIONS
             if gender in genders]
 
+
 # Collider mode held for the duration of the reaction.
 #
-# Vanilla declares `Interactive` on 29 of the 32 options in the
-# `AnimationControlled` fragment, which is the fragment these options live in.
-# It declares nothing on 90 of the 106 in `HitDeath`, which is where the clips
-# themselves come from.
+# In the patched male database, vanilla declares `Interactive` on 29 of the 32
+# options in the `AnimationControlled` fragment, which is the fragment these
+# options live in, and nothing on 83 of the 99 in `HitDeath`, which is where
+# the clips themselves come from.
 #
-# An earlier value of None was chosen by matching the clip's original fragment
-# rather than the fragment the option sits in. Without a collider layer an
-# interactive action leaves the actor able to pass through geometry, which is
-# why a victim knocked down beside a wagon ends up inside it and is pushed back
-# out on standing, and why vanilla's own hit reactions never do that: they are
-# played through HitDeath, where the actor keeps its ordinary collider.
+# The collider follows the fragment the option sits in, not the clip's origin.
+# Without a collider layer an interactive action leaves the actor able to pass
+# through geometry, so a victim knocked down beside a wagon ends up inside it.
+# Vanilla's hit reactions keep their ordinary collider because they play
+# through HitDeath.
 COLLIDER_MODE = "Interactive"
 
 # Modeled on the vanilla HitDeath option that plays these same clips
@@ -351,12 +321,6 @@ TEMPLATE = """      <Fragment BlendOutDuration="0.2" Tags="" FragTags="{tags}">
 # vanilla settles a fallen actor onto ground that is not flat. Without it the
 # clip holds its authored pose whatever the slope underneath, and the body
 # clips into the terrain.
-#
-# This is not the physics knockdown the trot tier moved away from. That ragdoll
-# was created at the moment of impact, underneath a horse still traveling
-# through the same space, and the engine charged the trample that followed.
-# This one is created two seconds into the animation, by which time a horse at
-# trot is some fourteen meters away.
 #
 # ExitTime is when the layer takes over, in seconds from the start of the
 # fragment. Stiffness 100 is vanilla's own value and barely deforms the pose;
@@ -383,21 +347,19 @@ GROUND_ROTATION_LAYER = """
           </Procedural>
         </ProcLayer>"""
 
-# Whether a knockdown carries it. False restores the build before this.
+# Whether a knockdown carries it.
 GROUND_ROTATION = True
 
-# How much of the actor's movement the animation drives, as vanilla's own
-# hit reactions set it. ZMove governs the vertical: at zero the clip plays in
-# a flat plane and a body on a slope is buried going uphill and left in the
-# air going downhill, which is what a fallen victim does on a gradient.
 # Whether the reaction declares a movement control layer at all. Vanilla's own
-# hit reactions mostly do not: 84 of the 106 options in HitDeath declare none,
-# which leaves the actor on default entity-driven movement and therefore
-# collision-aware. The 29 of 32 in AnimationControlled that do declare one are
-# object interactions, where the actor is meant to be driven onto a door or a
-# bed and geometry is not in the way.
+# hit reactions mostly do not: 77 of the 99 options in the patched male
+# HitDeath declare none, which leaves the actor on default entity-driven
+# movement and therefore collision-aware. The 29 of 32 in AnimationControlled
+# that do declare one are object interactions, where the actor is meant to be
+# driven onto a door or a bed and geometry is not in the way.
 MCM_DECLARE = True
 
+# How much of the actor's movement the animation drives, as vanilla's own hit
+# reactions set it.
 MCM_HORIZONTAL = 2
 MCM_ROTATE = 0
 MCM_VERTICAL = 0
@@ -436,37 +398,15 @@ FALL_SETTLE_SLEEP = 1
 #   male    back 1710  forward 2425  left 4120  right 3060
 #   female  back 1890  forward 3340  left 2016  right 2335
 #
-# Expressing them here rather than in Lua is the point: Mannequin owns the
-# timing, and the mod stops running a timer against a clip whose length it has
-# to know.
+# Expressing them here rather than in Lua lets Mannequin own the timing, so the
+# mod runs no timer against a clip whose length it would have to know.
 #
-# These were fractions of clip length, 0.68 for male and 0.50 for female,
-# because nothing could measure when a body actually reached the ground. That
-# is wrong in principle: landing time is a property of the fall, not of how
-# long the clip runs on afterwards, so scaling by clip length stretches the
-# handover on exactly the longest clips.
+# Each figure is the clip's length times a fixed share, 0.68 for the male set
+# and 0.50 for the female, so the clip has finished settling the pose before
+# physics takes the body. Handing over when the head stops descending is
+# earlier, and gives physics a half-posed body.
 #
-# Measured directly, with `tools/probe_fall_landing.lua`, by watching the head
-# stop descending. `GetHeadPos().z` minus the entity origin reads about 1.55
-# standing and about 0.15 flat:
-#
-#   male    right 1440, 1504    back 1344, 976    left ~1650
-#   female  forward 1824  right 1232  back 1056, 1056  left 1040
-#
-# The female set and male back were already within noise of their landings. The
-# two long male clips were not: left ran 2.80 against a body down at 1.65, and
-# right 2.08 against 1.47, which is a second or more of a victim lying still
-# while the clip plays on. Both now carry their measured landing.
-#
-# Male forward is left at its old figure. It was never measured, and 1.65 is
-# the same value male left measured at, so it is the better guess of the two
-# available rather than a reading.
-#
-# This does not touch the long lie-down. That is roughly a second of
-# `MotionIdle` after the clip ends plus the get-up itself, and
-# docs/TESTING_DIARY.md records the get-up as vanilla's, proven on a path that
-# reads none of this data. Handover timing was tested against it and moved it
-# by tens of milliseconds.
+# The long lie-down that follows is vanilla's get-up, which reads none of this.
 FALL_SETTLE_AT = {
     "male": {"forward": 1.65, "back": 1.16, "left": 2.80, "right": 2.08},
     "female": {"forward": 1.67, "back": 0.95, "left": 1.01, "right": 1.17}
@@ -529,13 +469,9 @@ def read_pak_entry(pak, entry):
 
 # Every pak the game reads vanilla data out of, lowest priority first.
 #
-# This exists because reading `Data/Animations-part1.pak` alone is reading the
-# game as it shipped in February 2018, and that is not the game anyone runs.
-# The patches in `Data/patch/` replace whole files, and `wh_female_fragmentids.xml`
-# grew from 277 fragment ids at launch to 379 by 1.9. A mod that copied the
-# launch file and shipped it under vanilla's name deleted 103 fragments from
-# every female character, among them `PickingHerbs`, which is how a player
-# reported being locked in place picking a herb as Theresa in Woman's Lot.
+# The base paks in `Data/` are the game as it launched; the patches in
+# `Data/patch/` replace whole files. Reading the base pak alone derives the
+# mod's files from data the running game does not use.
 #
 # The order is the engine's own, read off its log rather than guessed: the base
 # paks in `Data/` are opened first, then `Data/patch/` in ascending name order,
@@ -556,21 +492,19 @@ _PAK_ENTRIES = {}
 
 
 def pak_key(name):
-    """Normalises a pak entry name so the same file matches across paks.
+    """Normalizes a pak entry name so the same file matches across paks.
 
     Paks are not consistent about how they spell an entry. The launch paks and
     the patches up to 1.7 use `Animations/Mannequin/ADB/...`; 1.8 onward store
     the whole path lowercased. Some store backslashes. A literal match therefore
     finds an entry in the old paks and misses it in every modern one, and a
-    resolver that misses the highest patch falls back to a lower one without
-    saying so — which is this bug over again, one layer up. It happened during
-    this fix: the first version of the resolver silently picked 1.7.1b.
+    resolver that misses the highest patch silently falls back to a lower one.
     """
     return name.replace("\\", "/").lower()
 
 
 def pak_entries(pak):
-    """Cached {normalised name: name as stored} for one pak.
+    """Cached {normalized name: name as stored} for one pak.
 
     A pak that cannot be opened raises rather than resolving to nothing: an
     empty table would drop that pak out of the priority order in silence, which
@@ -638,8 +572,7 @@ def settle_for(tag, gender):
     Returns None when the option carries none.
 
     The fall tier is the case this exists for. Its whole purpose is to hand the
-    body to physics partway through the clip, which is what the knockdown tier
-    did from Lua with a timer against a clip length it had to be told.
+    body to physics partway through the clip.
     """
     if tag.startswith("hcm_fall_"):
         side = tag[len("hcm_fall_"):]
@@ -650,7 +583,7 @@ def settle_for(tag, gender):
 
         return (at, FALL_SETTLE_SLEEP, FALL_SETTLE_STIFFNESS)
 
-    if tag.startswith(("hcm_knockdown_", "hcm_pb_")) and SETTLE_AT is not None:
+    if tag.startswith("hcm_knockdown_") and SETTLE_AT is not None:
         return (SETTLE_AT, SETTLE_SLEEP, SETTLE_STIFFNESS)
 
     # The empty fragment carries one too, and it is the whole point of it.
@@ -725,19 +658,15 @@ def out(name):
 
 
 def write_shared_tags(nl):
-    """Adds the stagger FragTags to the AnimationControlled tag definition.
+    """Adds the reaction and horse FragTags to the AnimationControlled tag file.
 
     Written under vanilla's own name, deliberately.
 
     The alternative, shipping it as hcm_animationControlledTags.xml, means
     every entity has to be pointed at a copy of the fragment id file to reach
     it, and that file at a copy of the controller def. Those two copies are
-    123 KB of vanilla data restated under mod names, and they sit in the
+    123 KB of vanilla data restated under mod names, and they would sit in the
     resolution path of every fragment a human uses, not just this mod's.
-    An earlier layout did that, and unrelated animations stopped playing: the
-    beggar's kneeling resolves through BeggarIn and kcd_beggar_tags.xml,
-    nothing to do with this mod, but it travels through the same copied
-    files.
 
     Replacing 1 KB of tag names is a far smaller thing to own than restating
     the whole fragment and controller definitions, and it leaves every
@@ -755,13 +684,9 @@ def write_shared_tags(nl):
     # `hcm_rear` and `hcm_rear_charge` are the FragTags of the two options in
     # `hcm_horse_database.adb`, and that file is hand authored and not produced
     # here. This file is, and it is the only place those tags are declared, so
-    # regenerating without them silently deletes them.
-    #
-    # That has happened. The fragments stayed, the tags went, and
-    # `StartInteractiveActionByName` returned true while resolving nothing:
-    # seventy-seven rears that worked, then seventeen that requested the
-    # fragment and left the horse in `MotionIdle`. Nothing in the log said why,
-    # because a fragment that cannot resolve is not an error.
+    # regenerating without them deletes them. The rears would then request a
+    # fragment that cannot resolve, which is not an error: the call returns
+    # true and the horse stays in `MotionIdle`.
     group += ['    <Group name="HcmHorse">']
     group += ['      <Tag name="%s" />' % tag for tag in HORSE_TAGS]
     group += ["    </Group>"]
@@ -782,33 +707,9 @@ def write_shared_tags(nl):
              raw.count("<Tag "), len(REACTIONS) + len(HORSE_TAGS), source))
 
 
-# This generator used to write a third file: a copy of
-# `wh_female_fragmentids.xml` with `AnimationControlled` appended, because the
-# women had no such fragment and the mod's female reactions are options on it.
-#
-# It no longer does, for two reasons.
-#
-# It was never needed. Patch 1.9 declares the fragment itself, with the same
-# subTagDef this mod uses, and `wh_female_controllerdefs.xml` gives it
-# `scopes="FullBody+HoldItem+Looking"`, a scope the mod never shipped for the
-# women, so its female reactions could not have played even when the file was
-# doing its job. The check that would have caught this was already written into
-# the function, raising "the female fragment ids already declare it; this patch
-# is no longer needed"; it never fired only because the file was being read out
-# of the launch pak, where the declaration genuinely is absent.
-#
-# And it did real harm. The file it copied was the February 2018 one, 277
-# fragment ids against the 379 the running game has, so shipping it under
-# vanilla's name deleted 103 fragments from every female character: all of
-# combat, all of lockpicking, drawing and holstering a weapon, the whole bow
-# set, `Weeding`, `Sowing`, corpse dragging, stealth kills, NPC monologues, the
-# Woman's Lot quest sets, and `PickingHerbs`. A player reported the last of
-# those as being locked in place picking a herb as Theresa, which is what a
-# minigame waiting forever on a fragment that no longer exists looks like. The
-# engine says nothing: an unresolvable fragment is not an error.
-#
-# `read_vanilla` now resolves out of `Data/patch/`, so the same mistake in a
-# future file raises instead of shipping.
+# `wh_female_fragmentids.xml` is not generated: patch 1.9 declares
+# `AnimationControlled` for the women itself, and a copy under vanilla's name
+# would override the patched file and drop its fragment ids.
 
 
 def write_parent(gender, paths, nl):
@@ -837,8 +738,7 @@ def write_parent(gender, paths, nl):
     options = nl.join(
         render_option(tag, clip, nl,
                       settle=settle_for(tag, gender),
-                      ground=tag.startswith(("hcm_knockdown_", "hcm_fall_",
-                                             "hcm_pb_")))
+                      ground=tag.startswith(("hcm_knockdown_", "hcm_fall_")))
         for tag, clip in wanted)
 
     existing = re.search(
@@ -874,6 +774,7 @@ def write_parent(gender, paths, nl):
           % (gender, name, os.path.getsize(out(name)), inherited, len(wanted),
              source))
 
+
 def write_additive():
     """Generates the whole layout."""
     nl = newline_of(read_vanilla(TAGS_ENTRY)[0].decode("ascii", "replace"))
@@ -893,25 +794,18 @@ def write_additive():
     # A stale file here is still an override, and would quietly change which
     # chain entities resolve through.
     #
-    # `wh_female_fragmentids.xml` is deliberately absent: it is no longer
+    # `wh_female_fragmentids.xml` is deliberately absent: it is not
     # generated, so leaving it in this set would keep an already-installed copy
     # alive forever. It stays in `generated` below, which is what licenses the
     # sweep to delete it.
     keep = set(["hcm_male_database.adb", "hcm_female_database.adb",
                 TAGS_ENTRY.rsplit("/", 1)[-1]])
 
-    # Only files this generator has produced before may be removed.
-    #
-    # Everything else in this directory is hand authored and, because
-    # `mod_assets` is excluded from git, deleting one destroys it outright.
-    # This sweep did exactly that to the horse database and the two horse
-    # declaration files, which carry work no generator can reproduce, and they
-    # were recoverable only because the game folder still held installed
-    # copies.
-    #
-    # The horse set is named rather than pattern matched, so a file this
-    # generator does not know about is left alone by default instead of being
-    # removed by default.
+    # Only files this generator has produced before may be removed. The set is
+    # named rather than pattern matched, so a file this generator does not know
+    # about is left alone rather than deleted; `mod_assets` is not in git, so a
+    # deletion here cannot be recovered. Hand-authored animation data lives in
+    # `src/Animations` and is never in this directory.
     generated = set(["hcm_male_database.adb", "hcm_female_database.adb",
                      "kcd_male_database.adb", "wh_female_database.adb",
                      TAGS_ENTRY.rsplit("/", 1)[-1],
@@ -923,6 +817,7 @@ def write_additive():
 
     for foreign in sorted(set(os.listdir(OUT_DIR)) - keep - generated):
         print("  left alone, not generated here: %s" % foreign)
+
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)

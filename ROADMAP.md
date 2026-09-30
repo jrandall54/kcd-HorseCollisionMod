@@ -112,7 +112,7 @@ Folded in here:
 - **The charge's throw distance**, reported as too far. The charge is its own
   tier with its own force settings and has never been tuned by eye against the
   others.
-- **Victim mass.** The rider's position is that unarmored NPCs sit at their
+- **Victim mass.** The design position is that unarmored NPCs sit at their
   normal mass and the curve scales up from there, instead of writing light
   victims down below it. Over 40 logged throws, an unarmored victim travels
   about three times the armored distance, and every 42 kg victim ranges from
@@ -141,7 +141,7 @@ anything vanilla.
 
 ## Parked ideas
 
-Neither is scheduled. Both are kept because the rider asked for them.
+Neither is scheduled. Both are kept on request.
 
 - **A protected story character unhorses the rider** instead of absorbing a
   collision. `IsProtectedFromHarm` identifies them at the impact, and the

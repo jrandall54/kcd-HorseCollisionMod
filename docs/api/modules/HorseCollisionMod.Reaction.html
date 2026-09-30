@@ -41,6 +41,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -55,6 +57,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><a href="../modules/HorseCollisionMod.Update.html">HorseCollisionMod.Update</a></li>
 </ul>
 
@@ -65,12 +69,12 @@
 <h1>Module <code>HorseCollisionMod.Reaction</code></h1>
 <p>Reaction: making a victim visibly respond to being ridden into.</p>
 <p> The three ways a collision reaches the victim's body, in ascending force.
- <code>SendHitReaction</code> posts the native brain message, which feeds the victim's
+ <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:SendHitReaction">SendHitReaction</a> posts the native brain message, which feeds the victim's
  perception but drives no animation and does not cause the vanilla bark.
  <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:PlayReaction">PlayReaction</a> runs one of this mod's own clips through
  <code>actor:StartInteractiveActionByName</code>, the only call that moves an actor's
- body from Lua. <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:Ragdoll">Ragdoll</a> and <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:ImpulseVictim">ImpulseVictim</a> hand the body to physics
- instead, which is what the faster tiers use.</p>
+ body from Lua. <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:Ragdoll">Ragdoll</a> hands the body to physics instead, for the ragdoll
+ tiers, and <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:ImpulseVictim">ImpulseVictim</a> pushes the body once physics owns it.</p>
 
 <p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
  pulls this file in with <code>Script.ReloadScript</code>. The clip names are built from
@@ -79,19 +83,6 @@
  rather than captured when this file loads.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  5.11.3
- Posts the native <code>hitReaction</code> message to the victim's brain.</p>
-
-<p> It feeds the victim's perception, so the reaction registers as something
- the game knows happened rather than as an animation played over the top.
- It does <strong>not</strong> drive animation.</p>
-
-<p> It does not produce the collision bark either. Vanilla barks on a mounted
- collision on its own, and does so with this message switched off.</p>
-
-<p> Delivery is best effort. The receiving handler is declared <code>Atomic=&quot;true&quot;</code>
- and drops messages when busy, so nothing here may depend on a given
- message arriving.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -99,30 +90,31 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#returns...">returns... (npc, horseWuid, strength)</a></td>
-	<td class="summary">
-
-</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:SendHitReaction">HorseCollisionMod:SendHitReaction (npc, horseWuid, strength)</a></td>
+	<td class="summary">Posts the native <code>hitReaction</code> message to the victim's brain.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:PlayReaction">HorseCollisionMod:PlayReaction (npc, velocity, speed, prefix)</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayReaction">HorseCollisionMod:PlayReaction (npc, velocity, prefix)</a></td>
 	<td class="summary">Plays one of this mod's reactions on a victim.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:MassVictim">HorseCollisionMod:MassVictim (npc, armorScale)</a></td>
-	<td class="summary">Sets a ragdolled victim's physical mass, so the horse's own collision
- does the work.</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:PlayTierReaction">HorseCollisionMod:PlayTierReaction (npc, tierName, velocity, speed, armorScale, horsePos, horseEnt)</a></td>
+	<td class="summary">What a tier does to the victim's body, dispatched from <code>ReactionByTier</code>.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:DampVictim">HorseCollisionMod:DampVictim (npc[, armorScale])</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:WhenVictimIsPhysical">HorseCollisionMod:WhenVictimIsPhysical (npc, onReady)</a></td>
+	<td class="summary">Waits for a falling victim to become a physics body, then hands control on.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:DampVictim">HorseCollisionMod:DampVictim (npc[, armorScale[, profile]])</a></td>
 	<td class="summary">Slows a ragdolled victim so it stops sliding.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:Ragdoll">HorseCollisionMod:Ragdoll (npc, velocity, speed, tierScale, armorScale, horsePos[, horseEnt])</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:Ragdoll">HorseCollisionMod:Ragdoll (npc, velocity, speed, tierScale, armorScale, horsePos[, horseEnt[, profile[, tierName]]])</a></td>
 	<td class="summary">Knocks a victim down with a physics ragdoll.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#HorseCollisionMod:ImpulseVictim">HorseCollisionMod:ImpulseVictim (npc, velocity, tierScale[, horseEnt], horsePos)</a></td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ImpulseVictim">HorseCollisionMod:ImpulseVictim (npc, velocity, tierScale, horsePos[, horseEnt[, profile]])</a></td>
 	<td class="summary">Pushes a victim who is already a physics body.</td>
 	</tr>
 </table>
@@ -135,13 +127,22 @@
 
     <dl class="function">
     <dt>
-    <a name = "returns..."></a>
-    <strong>returns... (npc, horseWuid, strength)</strong>
+    <a name = "HorseCollisionMod:SendHitReaction"></a>
+    <strong>HorseCollisionMod:SendHitReaction (npc, horseWuid, strength)</strong>
     </dt>
     <dd>
+    Posts the native <code>hitReaction</code> message to the victim's brain. </p>
 
+<p> It feeds the victim's perception, so the reaction registers as something
+ the game knows happened rather than as an animation played over the top.
+ It does <strong>not</strong> drive animation.</p>
 
+<p> It does not produce the collision bark either. Vanilla barks on a mounted
+ collision on its own, and does so with this message switched off.</p>
 
+<p> Delivery is best effort. The receiving handler is declared <code>Atomic=&quot;true&quot;</code>
+ and drops messages when busy, so nothing here may depend on a given
+ message arriving.
 
 
     <h3>Parameters:</h3>
@@ -167,7 +168,7 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:PlayReaction"></a>
-    <strong>HorseCollisionMod:PlayReaction (npc, velocity, speed, prefix)</strong>
+    <strong>HorseCollisionMod:PlayReaction (npc, velocity, prefix)</strong>
     </dt>
     <dd>
     Plays one of this mod's reactions on a victim. </p>
@@ -191,14 +192,10 @@
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
          horse velocity vector
         </li>
-        <li><span class="parameter">speed</span>
-            <span class="types"><span class="type">number</span></span>
-         horse speed in meters per second
-        </li>
         <li><span class="parameter">prefix</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
-         the reaction family, <code>hcm_stagger_</code> at walk or
-   <code>hcm_knockdown_</code> at trot, completed with the impact direction
+         the reaction family, <code>hcm_stagger_</code>, <code>hcm_fall_</code> or
+   <code>hcm_knockdown_</code>, completed with the impact direction
         </li>
     </ul>
 
@@ -214,55 +211,18 @@
 
 </dd>
     <dt>
-    <a name = "HorseCollisionMod:MassVictim"></a>
-    <strong>HorseCollisionMod:MassVictim (npc, armorScale)</strong>
+    <a name = "HorseCollisionMod:PlayTierReaction"></a>
+    <strong>HorseCollisionMod:PlayTierReaction (npc, tierName, velocity, speed, armorScale, horsePos, horseEnt)</strong>
     </dt>
     <dd>
-    Sets a ragdolled victim's physical mass, so the horse's own collision
- does the work. </p>
+    What a tier does to the victim's body, dispatched from <code>ReactionByTier</code>. </p>
 
-<p> What throws a victim at gallop is the engine resolving a collision between
- the horse, 480 kg at gravity -30, and the body. Nothing this mod adds on
- top of that collision moves the body: an impulse and a set velocity produce
- the same distribution across three rides.</p>
+<p> The one place a tier is turned into a reaction. Reading the style from a
+ table means a tier that does not ragdoll cannot carry a throw figure at all.</p>
 
-<p> Armor cannot matter while every human weighs the same. <code>GetMass</code> answers
- <strong>80 for every human including the player</strong>, so the horse hits an identical
- mass whether the target is a peasant or a man in mail.</p>
-
-<p> <code>pe_simulation_params</code> carries <code>mass</code> beside the <code>damping</code> and <code>min_energy</code>
- that <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:DampVictim">DampVictim</a> already sets through the same group. Changing it changes
- what the horse is hitting, and the engine does the rest.</p>
-
-<p> <strong>It only takes while ragdolled.</strong> Setting mass on a living entity is
- accepted and ignored: measured, a value of 300 written to an actor on the
- <code>alive</code> profile left <code>GetMass</code> reading 80, and the same write to the same
- actor ragdolled read back 300.</p>
-
-<p> Nothing here is written back. It does not need to be: standing up
- re-physicalizes the actor as a living entity and the engine restores its own
- 80. Measured on a guard written to 2543 kg, which read that figure while
- down and 80 once it was walking again.</p>
-
-<p> ### The coupling is weak, which is the whole design problem</p>
-
-<p> The throw goes as roughly <code>mass ^ -0.185</code>, measured across a fiftyfold flat
- comparison at p = 0.012. Doubling a victim's mass shortens the throw by 12%,
- so a visible difference between armor and cloth costs a spread around a
- hundredfold, and <code>RagdollMassArmorScaled</code> on its own, which is a 3.4x
- spread, is worth nothing that can be seen. <code>RagdollMassArmorExponent</code> is
- what buys the spread; see the config comments for which number does what.</p>
-
-<p> ### Timing</p>
-
-<p> The mass has to be in place before the collision resolves. The body is not
- physicalized at the moment of contact, which is why the impulse path waits
- <code>ImpulseDelayMs</code>, and a horse at ten meters per second covers a centimeter
- a millisecond. So this retries on a short ladder rather than guessing one
- delay, takes the first attempt that sticks, and logs which one that was
- together with how far the victim had already traveled by then. Every
- impact measured has taken, almost all at 16 ms with the victim still within
- 8 cm of where they stood, so the write beats the horse.
+<p> The caller still owns whether a reaction happens. A walk is suppressed during
+ a fight and a victim already reacting is left alone; those are the caller's
+ policy about this impact, not a property of the tier.
 
 
     <h3>Parameters:</h3>
@@ -271,10 +231,66 @@
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
          victim entity
         </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         "Walk", "Trot", "Gallop", "Rear" or "Charge"
+        </li>
+        <li><span class="parameter">velocity</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse velocity vector
+        </li>
+        <li><span class="parameter">speed</span>
+            <span class="types"><span class="type">number</span></span>
+         horse speed in meters per second
+        </li>
         <li><span class="parameter">armorScale</span>
             <span class="types"><span class="type">number</span></span>
-         the tier's armor multiplier, high for an
-   unarmored target and low for one in mail
+         the victim's armor impulse scale
+        </li>
+        <li><span class="parameter">horsePos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the horse's world position
+        </li>
+        <li><span class="parameter">horseEnt</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the player's horse
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when a reaction was started
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:WhenVictimIsPhysical"></a>
+    <strong>HorseCollisionMod:WhenVictimIsPhysical (npc, onReady)</strong>
+    </dt>
+    <dd>
+    Waits for a falling victim to become a physics body, then hands control on. </p>
+
+<p> The settle fragment requests the ragdoll; it does not perform it. For one
+ frame after the request the victim is still an animated character, and
+ physics calls aimed at one are discarded silently, so the impulse, the brake
+ and the damping wait. The wait is <code>PhysicsReadyMs</code>, one frame, which is
+ when the handover is observed on every impact.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npc</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         victim entity
+        </li>
+        <li><span class="parameter">onReady</span>
+            <span class="types"><span class="type">func</span></span>
+         called once the body is physical
         </li>
     </ul>
 
@@ -285,15 +301,13 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:DampVictim"></a>
-    <strong>HorseCollisionMod:DampVictim (npc[, armorScale])</strong>
+    <strong>HorseCollisionMod:DampVictim (npc[, armorScale[, profile]])</strong>
     </dt>
     <dd>
     Slows a ragdolled victim so it stops sliding. </p>
 
-<p> A thrown body keeps going long after the throw, and that slide is most of
- the distance an impact appears to produce. It makes the ground read as ice,
- and it makes distance a poor measure of force, because what is being
- measured is mostly the surface rather than the impulse.</p>
+<p> A thrown body keeps going long after the throw, which makes the ground
+ read as ice.</p>
 
 <p> <code>damping</code> bleeds velocity off the body and <code>min_energy</code> is the threshold
  below which physics puts it to rest. Both are fields of
@@ -313,8 +327,16 @@
         <li><span class="parameter">armorScale</span>
             <span class="types"><span class="type">number</span></span>
          the victim's armor scale, high for an
-   unarmored victim and low for one in mail, the same figure the ragdoll mass
-   is derived from. Chooses the commanded throw distance
+   unarmored victim and low for one in mail. Logged only; armor reaches the
+   throw through <code>profile</code>
+         (<em>optional</em>)
+        </li>
+        <li><span class="parameter">profile</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the tier's resolved throw profile, from
+   <code>ThrowProfile</code>. Carries the brake or the rail, the ceiling and the drag, all
+   already blended against this victim's armor. Without one the victim is
+   neither braked nor held, which is what a tier with no profile means
          (<em>optional</em>)
         </li>
     </ul>
@@ -326,15 +348,15 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:Ragdoll"></a>
-    <strong>HorseCollisionMod:Ragdoll (npc, velocity, speed, tierScale, armorScale, horsePos[, horseEnt])</strong>
+    <strong>HorseCollisionMod:Ragdoll (npc, velocity, speed, tierScale, armorScale, horsePos[, horseEnt[, profile[, tierName]]])</strong>
     </dt>
     <dd>
     Knocks a victim down with a physics ragdoll. </p>
 
-<p> Used at trot and gallop. <code>actor:Fall</code> switches the victim to a ragdoll,
- after which an impulse can be applied. Impulses are ignored on an upright,
- animation-driven actor, so the order matters and the impulse is deferred
- by a tick.
+<p> Used by the ragdoll tiers, the gallop and the charge. The settle fragment
+ switches the victim to a ragdoll, after which an impulse can be applied.
+ Impulses are ignored on an upright, animation-driven actor, so the order
+ matters and the impulse waits for <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:WhenVictimIsPhysical">WhenVictimIsPhysical</a>.
 
 
     <h3>Parameters:</h3>
@@ -353,12 +375,13 @@
         </li>
         <li><span class="parameter">tierScale</span>
             <span class="types"><span class="type">number</span></span>
-         the tier's share of the configured impulse, 0 to 1
+         the tier's <code>ThrowByTier</code> trim on <code>Knockback</code> and
+   <code>Uplift</code>
         </li>
         <li><span class="parameter">armorScale</span>
             <span class="types"><span class="type">number</span></span>
-         the victim's armor scale, which sets their ragdoll
-   mass and nothing else
+         the victim's armor scale, passed on for logging;
+   armor reaches the throw through <code>profile</code>
         </li>
         <li><span class="parameter">horsePos</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
@@ -370,6 +393,19 @@
          the player's horse, for the barding force bonus
          (<em>optional</em>)
         </li>
+        <li><span class="parameter">profile</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         the tier's resolved throw profile, from
+   <code>ThrowProfile</code>: how the throw enters, the ceiling that holds it and the
+   drag that holds it there, all blended against this victim's armor
+         (<em>optional</em>)
+        </li>
+        <li><span class="parameter">tierName</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the tier this impact resolved as, logged on the
+   <code>FallToBlend</code> line
+         (<em>optional</em>)
+        </li>
     </ul>
 
 
@@ -379,14 +415,14 @@
 </dd>
     <dt>
     <a name = "HorseCollisionMod:ImpulseVictim"></a>
-    <strong>HorseCollisionMod:ImpulseVictim (npc, velocity, tierScale[, horseEnt], horsePos)</strong>
+    <strong>HorseCollisionMod:ImpulseVictim (npc, velocity, tierScale, horsePos[, horseEnt[, profile]])</strong>
     </dt>
     <dd>
     Pushes a victim who is already a physics body. </p>
 
-<p> Separated from <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:Ragdoll">Ragdoll</a> because the fall tier ragdolls the victim itself,
- partway through an animation rather than at the moment of impact, and needs
- the push without the rest.
+<p> The trim push from <code>Knockback</code> and <code>Uplift</code>, plus the barding bonus, and
+ for a tier with a launch the shortfall up to the commanded speed. Called
+ from <a href="../modules/HorseCollisionMod.Reaction.html#HorseCollisionMod:Ragdoll">Ragdoll</a> once the body is physical.
 
 
     <h3>Parameters:</h3>
@@ -401,17 +437,23 @@
         </li>
         <li><span class="parameter">tierScale</span>
             <span class="types"><span class="type">number</span></span>
-         the tier's share of the configured impulse, 0 to 1
+         the tier's <code>ThrowByTier</code> trim
+        </li>
+        <li><span class="parameter">horsePos</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         horse world position, the origin the push points away
+   from, so a victim is never thrown back under the rider
         </li>
         <li><span class="parameter">horseEnt</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
          the player's horse, for the barding force bonus
          (<em>optional</em>)
         </li>
-        <li><span class="parameter">horsePos</span>
+        <li><span class="parameter">profile</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         horse world position, the origin the push points away
-   from, so a victim is never thrown back under the rider
+         the tier's resolved throw profile, which carries
+   the launch when there is one
+         (<em>optional</em>)
         </li>
     </ul>
 
@@ -427,7 +469,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

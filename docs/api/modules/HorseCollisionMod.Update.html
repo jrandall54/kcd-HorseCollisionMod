@@ -41,6 +41,8 @@
 <ul class="nowrap">
   <li><a href="../modules/HorseCollisionMod.html">HorseCollisionMod</a></li>
   <li><a href="../modules/HorseCollisionMod.Enums.html">HorseCollisionMod.Enums</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tiers.html">HorseCollisionMod.Tiers</a></li>
+  <li><a href="../modules/HorseCollisionMod.Impact.html">HorseCollisionMod.Impact</a></li>
   <li><a href="../modules/HorseCollisionMod.Log.html">HorseCollisionMod.Log</a></li>
   <li><a href="../modules/HorseCollisionMod.Armor.html">HorseCollisionMod.Armor</a></li>
   <li><a href="../modules/HorseCollisionMod.Detection.html">HorseCollisionMod.Detection</a></li>
@@ -55,6 +57,8 @@
   <li><a href="../modules/HorseCollisionMod.Rider.html">HorseCollisionMod.Rider</a></li>
   <li><a href="../modules/HorseCollisionMod.Lean.html">HorseCollisionMod.Lean</a></li>
   <li><a href="../modules/HorseCollisionMod.Rear.html">HorseCollisionMod.Rear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Fear.html">HorseCollisionMod.Fear</a></li>
+  <li><a href="../modules/HorseCollisionMod.Tutorial.html">HorseCollisionMod.Tutorial</a></li>
   <li><strong>HorseCollisionMod.Update</strong></li>
 </ul>
 
@@ -64,7 +68,7 @@
 
 <h1>Module <code>HorseCollisionMod.Update</code></h1>
 <p>Update: the loop that finds collisions, and what it does with one.</p>
-<p> The detection loop runs ten times a second while the player is mounted. It
+<p> The detection loop runs every <code>TickSeconds</code> while the player is mounted. It
  reads the horse's velocity, sweeps a footprint forward proportional to
  speed, and for every human inside it decides a tier and dispatches the
  reaction. Everything else in this mod is called from here.</p>
@@ -72,25 +76,16 @@
 <p> <a href="../modules/HorseCollisionMod.Update.html#HorseCollisionMod:UpdateTimer">UpdateTimer</a> is what keeps it running, and it carries the generation guard.
  Re-executing the entry point builds a fresh <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table, and
  without that guard every reload would leave another loop sweeping for
- collisions ten times a second, all of them writing to the same cooldown
- table.</p>
+ collisions, all of them writing to the same tables.</p>
 
-<p> <a href="../modules/HorseCollisionMod.Update.html#HorseCollisionMod:SafeUpdate">SafeUpdate</a> is wrapped in <a href="https://www.lua.org/manual/5.1/manual.html#pdf-pcall">pcall</a> by its caller for a reason worth keeping:
- an error thrown inside a timer callback kills the loop silently, and the mod
- would simply stop working with nothing in the log to say so.</p>
-
-<p> This file was moved last, because it calls into every other part and a
- mistake here would have been indistinguishable from a mistake in whichever
- part it called.</p>
+<p> <a href="../modules/HorseCollisionMod.Update.html#HorseCollisionMod:SafeUpdate">SafeUpdate</a> is wrapped in <a href="https://www.lua.org/manual/5.1/manual.html#pdf-pcall">pcall</a> by its caller: an error thrown inside a
+ timer callback kills the loop silently, and the mod would stop working with
+ nothing in the log to say so.</p>
 
 <p> Attached to the <a href="../modules/HorseCollisionMod.html#">HorseCollisionMod</a> table created by the entry point, which
  pulls this file in with <code>Script.ReloadScript</code>.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Release</strong>:  5.11.3
- Applies the appropriate reaction for one collision.</p>
-
-<p> Enforces the per-victim cooldown, then dispatches on gait.</li>
         <li><strong>Author</strong>: jrandall54</li>
     </ul>
 
@@ -98,10 +93,12 @@
 <h2><a href="#Functions">Functions</a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#returns...">returns... (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</a></td>
-	<td class="summary">
-
-</td>
+	<td class="name" nowrap><a href="#HorseCollisionMod:TriggerCollision">HorseCollisionMod:TriggerCollision (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</a></td>
+	<td class="summary">Applies the appropriate reaction for one collision.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#HorseCollisionMod:ImpactIsNewContact">HorseCollisionMod:ImpactIsNewContact (npcId, now)</a></td>
+	<td class="summary">Whether enough time has passed since this victim was last scored.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:SafeUpdate">HorseCollisionMod:SafeUpdate ()</a></td>
@@ -109,7 +106,7 @@
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#HorseCollisionMod:UpdateTimer">HorseCollisionMod:UpdateTimer (assignedTick)</a></td>
-	<td class="summary">Reschedules itself every 100 ms and runs one detection tick.</td>
+	<td class="summary">Reschedules itself every <code>TickSeconds</code> and runs one detection tick.</td>
 	</tr>
 </table>
 
@@ -121,13 +118,15 @@
 
     <dl class="function">
     <dt>
-    <a name = "returns..."></a>
-    <strong>returns... (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</strong>
+    <a name = "HorseCollisionMod:TriggerCollision"></a>
+    <strong>HorseCollisionMod:TriggerCollision (npc, velocity, speed, horseEnt, playerEnt, horseWuid, sampledSpeed)</strong>
     </dt>
     <dd>
+    Applies the appropriate reaction for one collision. </p>
 
-
-
+<p> Stands out of a charge, scores the tier from the speed, refuses a contact
+ the horse has already been charged for, and hands the rest to
+ <code>ResolveImpact</code>.
 
 
     <h3>Parameters:</h3>
@@ -150,7 +149,7 @@
         </li>
         <li><span class="parameter">playerEnt</span>
             <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
-         the player entity
+         the player entity, <code>player</code>
         </li>
         <li><span class="parameter">horseWuid</span>
             <span class="types"><span class="type">userdata</span></span>
@@ -163,6 +162,48 @@
         </li>
     </ul>
 
+
+
+
+
+</dd>
+    <dt>
+    <a name = "HorseCollisionMod:ImpactIsNewContact"></a>
+    <strong>HorseCollisionMod:ImpactIsNewContact (npcId, now)</strong>
+    </dt>
+    <dd>
+    Whether enough time has passed since this victim was last scored. </p>
+
+<p> One contact should be one impact. The detection loop runs every 33 ms and a
+ galloping horse takes about 150 ms to clear a person, so a single pass
+ crosses four or five ticks and every one of them is a collision by the
+ loop's reckoning. This asks whether the horse has already been charged for
+ the contact it is still in, which is a different question from whether a
+ victim can take an animation (<code>IsVictimFlat</code>).</p>
+
+<p> The interval only has to outlast one pass. It must not approach the time a
+ player needs to turn around and come back, because a deliberate second run
+ is a second impact and should be scored as one.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">npcId</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the victim's id, as the table is keyed
+        </li>
+        <li><span class="parameter">now</span>
+            <span class="types"><span class="type">number</span></span>
+         the current time in milliseconds
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><span class="type">boolean</span></span>
+        true when this impact should be scored
+    </ol>
 
 
 
@@ -194,11 +235,12 @@
     <strong>HorseCollisionMod:UpdateTimer (assignedTick)</strong>
     </dt>
     <dd>
-    Reschedules itself every 100 ms and runs one detection tick. </p>
+    Reschedules itself every <code>TickSeconds</code> and runs one detection tick. </p>
 
-<p> The tick number guards against duplicate loops. Each load screen starts a
- new loop, and any loop whose number no longer matches the current one stops
- on its next iteration, so reloading a save leaves no stale timers running.
+<p> The tick number guards against duplicate loops. The entry point's load
+ screen handler starts a new loop, and any loop whose number does not match
+ the current one stops on its next iteration, so reloading a save leaves no
+ stale timers running.
 
 
     <h3>Parameters:</h3>
@@ -221,7 +263,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
-<i style="float:right;">Last updated 2026-09-14 09:53:39 </i>
+<i style="float:right;">Last updated 2026-09-29 16:26:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>

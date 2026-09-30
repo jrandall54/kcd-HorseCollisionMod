@@ -2,9 +2,9 @@
 
 Every Lua function the game exposes on the objects this mod touches, extracted from the engine's own script-bind registration.
 
-This is a catalog of what exists, not of what works. A name here has not been called unless it is marked, and several documented binds accept a call and then do nothing: `human:PlayAnim` is the standing example, and the whole `Can`/`Request` family answers `Undefined` under conditions that are not yet identified. Signatures come from the registration, so an argument count can differ from what the engine accepts in practice; `actor:Fall` is registered with one argument and takes two.
+This is a catalog of what exists, not of what works. Several documented binds accept a call and then do nothing: `human:PlayAnim` is the standing example, and the whole `Can`/`Request` family answers `Undefined` under conditions that are not identified. Signatures come from the registration, so an argument count can differ from what the engine accepts in practice; `actor:Fall` is registered with one argument and takes two.
 
-Entries this mod calls are marked with a dagger. See `docs/kcd_api.lua` for annotated definitions of those, and `docs/TESTING_DIARY.md` for what was learned about the ones that misbehave.
+Entries the mod's source calls are marked with a dagger. See `docs/kcd_api.lua` for annotated definitions of those, and `docs/TESTING_DIARY.md` for what was learned about the ones that misbehave.
 
 ## Actor
 
@@ -15,8 +15,8 @@ Reached through `npc.actor`. Body, health, animation state and the full-body act
 | Function | Arguments |
 | --- | --- |
 | `AcceptStealthActionByVictim` | none |
-| `AddBlood` | string, number |
-| `AddDirt` | number |
+| `AddBlood` &dagger; | string, number |
+| `AddDirt` &dagger; | number |
 | `AddFrost` | number |
 | `AttachTo` | Actor |
 | `AttachVulnerabilityEffect` | number, number, vector, number, string, string |
@@ -24,13 +24,13 @@ Reached through `npc.actor`. Body, health, animation state and the full-body act
 | `CanDoMercyKill` | id |
 | `CanGrabCorpse` | id |
 | `CanHorsePullDown` &dagger; | id |
-| `CanHuntAttack` &dagger; | id |
+| `CanHuntAttack` | id |
 | `CanInteractWith` | id |
 | `CanKnockOut` | id |
 | `CanLoot` | id |
 | `CanPutCorpse` | none |
-| `CanStealthKill` &dagger; | id |
-| `CanStealthKnockout` &dagger; | id |
+| `CanStealthKill` | id |
+| `CanStealthKnockout` | id |
 | `CanTalk` | none |
 | `ChangeAnimGraph` | string, number |
 | `CheckInventoryRestrictions` | string |
@@ -53,7 +53,7 @@ Reached through `npc.actor`. Body, health, animation state and the full-body act
 | `GetChannel` | none |
 | `GetCloseColliderParts` | number, vector, number |
 | `GetClosestAttachment` | number, vector, number, string |
-| `GetCurrentAnimationState` | none |
+| `GetCurrentAnimationState` &dagger; | none |
 | `GetExtensionParams` | string, table |
 | `GetFrozenAmount` | none |
 | `GetHeadDir` | none |
@@ -64,7 +64,7 @@ Reached through `npc.actor`. Body, health, animation state and the full-body act
 | `GetLinkedEntity` | none |
 | `GetMaxArmor` | none |
 | `GetMaxHealth` | none |
-| `GetPhysicalizationProfile` | none |
+| `GetPhysicalizationProfile` &dagger; | none |
 | `GetSpectatorMode` | none |
 | `GoLimp` | none |
 | `IsCarryingCorpse` | none |
@@ -81,11 +81,11 @@ Reached through `npc.actor`. Body, health, animation state and the full-body act
 | `PlayerSetViewAngles` | angles |
 | `PostPhysicalize` | none |
 | `QueueAnimationState` | string |
-| `RagDollize` | none |
+| `RagDollize` &dagger; | none |
 | `RenderScore` | id, number, number, number |
 | `RequestDialog` | none |
 | `RequestGrabCorpse` | id |
-| `RequestHorsePullDown` | id |
+| `RequestHorsePullDown` &dagger; | id |
 | `RequestHuntAttack` | id |
 | `RequestItemExchange` | none |
 | `RequestKnockOut` | id |
@@ -116,7 +116,7 @@ Reached through `npc.actor`. Body, health, animation state and the full-body act
 | `SetStats` | none |
 | `SetVariationInput` | string, string |
 | `SetViewLimits` | vector, number, number |
-| `SetViewShake` | angles, vector, number, number, number |
+| `SetViewShake` &dagger; | angles, vector, number, number, number |
 | `SimulateOnAction` | string, number, number |
 | `StandUp` | none |
 | `StartInteractiveActionByName` &dagger; | string, id, boolean, number |
@@ -149,7 +149,7 @@ Reached through `npc.human`. Everything specific to a person rather than to an a
 | `Dismount` | none |
 | `DoStepOnGrindstone` | none |
 | `DrawFromInventory` | id, number, boolean |
-| `DrawWeapon` | none |
+| `DrawWeapon` &dagger; | none |
 | `ForceDismount` | none |
 | `ForceMount` | id |
 | `GetDialogRequestSourceName` | none |
@@ -161,14 +161,14 @@ Reached through `npc.human`. Everything specific to a person rather than to an a
 | `GetWheelSpeed` | none |
 | `GrabOnLadder` | id |
 | `HolsterToInventory` | number, boolean |
-| `HolsterWeapon` | none |
+| `HolsterWeapon` &dagger; | none |
 | `InterruptDialog` | none |
 | `IsInDialog` | none |
 | `IsMounted` &dagger; | none |
 | `IsOnLadder` | none |
 | `IsPickpocketing` | none |
 | `IsSharpeningActive` | none |
-| `IsWeaponDrawn` | none |
+| `IsWeaponDrawn` &dagger; | none |
 | `Mount` | id |
 | `MoveToWorstZone` | none |
 | `PickUpItem` | id, boolean |
@@ -207,11 +207,11 @@ Reached through `npc.soul`. Stats, skills, buffs and identity.
 
 | Function | Arguments |
 | --- | --- |
-| `AddBuff` | string |
+| `AddBuff` &dagger; | string |
 | `AddInjury` | number, string |
 | `AddMetaRole` | MetaRoleId |
 | `AddMetaRoleByName` | string |
-| `AddPerk` | string |
+| `AddPerk` &dagger; | string |
 | `AddSkillXP` | string, unsigned |
 | `AddStatXP` | string, unsigned |
 | `AddXP` | string, XP_T, boolean |
@@ -219,12 +219,12 @@ Reached through `npc.soul`. Stats, skills, buffs and identity.
 | `AdvanceToStatLevel` | string, SoulLvlValue |
 | `AttachTo` | IEntity, Soul |
 | `CalculateBarterDominance` | framework__T_WUIDScriptType |
-| `DealDamage` | number, number |
+| `DealDamage` &dagger; | number, number |
 | `DetachFrom` | IEntity |
 | `GenerateCompanionEventDebug` | none |
 | `GetArchetype` | none |
 | `GetAverageSuperFaction` | none |
-| `GetDerivedStat` | string |
+| `GetDerivedStat` &dagger; | string |
 | `GetFactionID` | none |
 | `GetGatherMult` | none |
 | `GetGender` &dagger; | none |
@@ -237,19 +237,19 @@ Reached through `npc.soul`. Stats, skills, buffs and identity.
 | `GetNextLevelStatXP` | string, unsigned |
 | `GetPerceivedSuperfaction` | none |
 | `GetReadCaptionObjectText` | none |
-| `GetRelationship` | framework__T_WUIDScriptType |
+| `GetRelationship` &dagger; | framework__T_WUIDScriptType |
 | `GetRoles` | none |
 | `GetSchedule` | none |
-| `GetSkillLevel` | string |
+| `GetSkillLevel` &dagger; | string |
 | `GetSkillProgress` | string |
-| `GetSocialClass` | none |
+| `GetSocialClass` &dagger; | none |
 | `GetSoul` | table |
 | `GetSoulValue` | string |
 | `GetStatLevel` | string |
 | `GetStatProgress` | string |
 | `GetState` &dagger; | string |
 | `GetSuperfaction` | none |
-| `HasAbility` | string |
+| `HasAbility` &dagger; | string |
 | `HasBuffDebug` | string |
 | `HasMetaRoleByName` | string |
 | `HasRoleByName` | string |
@@ -259,14 +259,14 @@ Reached through `npc.soul`. Stats, skills, buffs and identity.
 | `IsInCombatDanger` &dagger; | none |
 | `IsPublicEnemy` | none |
 | `ModifyMoraleDebug` | number |
-| `ModifyPlayerReputation` | string, boolean |
+| `ModifyPlayerReputation` &dagger; | string, boolean |
 | `OnCompanionEvent` | framework__T_WUIDScriptType, string |
 | `OnPerkUsed` | string |
 | `OverrideCharacterElement` | string, entitymodule__T_CharacterElementId_S_CharacterBodyDescription |
 | `OverrideHair` | string |
 | `OverrideHead` | string |
-| `RemoveAllBuffsByGuid` | string |
-| `RemoveBuff` | framework__T_WUIDScriptType |
+| `RemoveAllBuffsByGuid` &dagger; | string |
+| `RemoveBuff` &dagger; | framework__T_WUIDScriptType |
 | `RemoveMetaRole` | MetaRoleId |
 | `RemoveMetaRoleByName` | string |
 | `RemovePerk` | string |
@@ -387,7 +387,7 @@ Reached through `XGenAIModule`. Global. WUIDs, brain variables, daycycle patches
 | `RemoveDaycyclePatch` &dagger; | framework__T_WUIDScriptType, string |
 | `SaveCombatSimulatorHumanExperimentResult` | number, number |
 | `SendMessageToEntity` &dagger; | table, string, string |
-| `SendMessageToEntityData` | table, string, table |
+| `SendMessageToEntityData` &dagger; | table, string, table |
 | `SetBrainVariable` | framework__T_WUIDScriptType, string, table |
 | `SetModuleLink` | XGenAIModule |
 | `SetPlayerDogMode` | string |
@@ -614,9 +614,9 @@ absolute.
 ## Globals that are not script binds
 
 The sections above are `C_ScriptBind*` classes. Several of the most useful Lua
-globals are not among them, which is why a survey of those headers cannot
-answer "what can Lua call". Everything below was verified present in this
-build by probing the running game, 43 entry points out of 43 tried.
+globals are not among them, so a survey of those headers cannot answer "what
+can Lua call". Everything below was verified present in this build by probing
+the running game.
 
 The source is spraguep's Cheat mod, `references/kcd1tools/cheat-106-*.zip`,
 which is pure Lua in a pak and therefore demonstrates working calls rather
@@ -628,7 +628,7 @@ World time, readable and settable, without the in-game wait dialog.
 
 | Function | Notes |
 | --- | --- |
-| `Calendar.GetWorldTime()` | seconds; 3,319,760 read at day 38 |
+| `Calendar.GetWorldTime()` | seconds |
 | `Calendar.SetWorldTime(seconds)` | absolute; add `hours * 3600` to skip |
 | `Calendar.GetWorldTimeRatio()` | **15** by default |
 | `Calendar.SetWorldTimeRatio(n)` | higher is faster, 0 pauses |
@@ -734,8 +734,8 @@ whether an NPC stops treating the player as hostile.
 
 The practical consequence: **punching someone sets a hostility flag, and only
 a change with `can_change_hostility` can clear it.** `payToTalk` raises the
-number and cannot clear the flag, which is why paying a fine never repairs a
-victim while surrendering to him does.
+number and cannot clear the flag, so paying a fine never repairs a victim
+while surrendering does.
 
 `angriness_enum` has nine lines: `min_angriness` 0, `max_angriness` 1, `death`
 0.55, `event_roadsideCorpse_unsolvedMurder` 0.2, `unatributedStealthKill` 0.15,
@@ -743,31 +743,24 @@ victim while surrendering to him does.
 
 ## Actor and human methods vanilla uses
 
-Gathered from `vanilla_scripts/`, and listed because several bear directly on
-this mod and were not known to it. Presence in vanilla means the method exists;
-none of the ones marked untried has been called here.
+Gathered from `vanilla_scripts/`. Presence in vanilla means the method exists.
+Methods this mod calls carry a dagger in the tables above.
 
 ### Actor, reached as `ent.actor`
 
-Already used by this mod: `Fall`, `GetCurrentAnimationState`,
-`GetPhysicalizationProfile`, `SetPhysicalizationProfile`,
-`StartInteractiveActionByName`, `SetMovementRestriction`, `SetHealth`.
-
-Untried and relevant:
-
-| Method | Why it matters here |
+| Method | Use |
 | --- | --- |
-| `StandUp()` | stands an actor up, which is what several improvised repairs were reaching for |
-| `IsUnconscious()` | the state read that `IsDead` failed to provide |
-| `RequestKnockOut()` | a knockout, which is how a brawl can end without a death |
-| `SetMovementTarget(...)` | send an actor somewhere, rather than asking the daycycle to replan |
-| `HolsterItem(...)` | put a weapon away |
-| `UnequipInventoryItem(item)` | vanilla's `Crime.lua` holsters the **player's** weapon with this during a confrontation |
+| `StandUp()` | stands an actor up |
+| `IsUnconscious()` | reads unconsciousness, which `IsDead` does not |
+| `RequestKnockOut()` | a knockout |
+| `SetMovementTarget(...)` | sends an actor somewhere directly |
+| `HolsterItem(...)` | puts a weapon away |
+| `UnequipInventoryItem(item)` | vanilla's `Crime.lua` holsters the player's weapon with this during a confrontation |
 | `EquipWeaponPreset`, `EquipClothingPreset` | wholesale loadout changes |
-| `AddBlood(str, n)`, `AddDirt(n)`, `AddFrost`, `CleanDirt`, `WashDirtAndBlood` | the cosmetic roadmap item |
-| `CameraShake(...)`, `SetViewShake(...)` | impact feedback for the rider, never considered |
-| `SetForcedLookDir`, `SetForcedLookObjectId` | make a victim look at the rider |
-| `Revive()`, `ReviveToDefaults()` | reset an actor |
+| `AddFrost`, `CleanDirt`, `WashDirtAndBlood` | the rest of the cosmetic family beside `AddBlood` and `AddDirt` |
+| `CameraShake(...)` | a camera shake, beside `SetViewShake` |
+| `SetForcedLookDir`, `SetForcedLookObjectId` | makes an actor look somewhere |
+| `Revive()`, `ReviveToDefaults()` | resets an actor |
 | `GetArmor()` | armor, read directly rather than summed from the item tables |
 | `CanHorsePullDown(id)`, `RequestHorsePullDown(id)` | see below |
 | `CanStealthKnockout`, `RequestStealthKill`, `RequestMercyKill` | |
@@ -775,14 +768,9 @@ Untried and relevant:
 
 ### Human, reached as `ent.human`
 
-Already used: `IsMounted`, `GetItemInHand`, `ForceDismount`.
-
-Untried: `DrawWeapon`, `DrawPrimaryWeapon`, `IsWeaponDrawn`, `CycleWeapon`,
+`DrawWeapon`, `DrawPrimaryWeapon`, `IsWeaponDrawn`, `CycleWeapon`,
 `EquipItemInSlot`, `CanBeRobbed`, `RequestDialog`, `RequestPickpocketing`,
 `Mount`, `GrabOnLadder`, `StartBuilding`, `StartBookTranscription`.
-
-`IsWeaponDrawn` is the read that the polearm get-up investigation inferred
-from item names.
 
 ## Horse pull-down is a vanilla interaction
 
@@ -793,15 +781,15 @@ hunt attack:
     ...
     user.actor:RequestHorsePullDown(self.id)
 
-with the hint `@ui_hud_horse_pulldown` and the interaction `inr_pullDown`. The
-binary carries `wh_cs_HorsePullDownAngle`, `wh_cs_HorsePullDownZAngle` and
-`wh_cs_HorsePullDownZeroAngle`, so the geometry that permits it is tunable.
+with the hint `@ui_hud_horse_pulldown` and the interaction `inr_pullDown`.
 
-In vanilla the `user` is the player and the target is a mounted NPC. **Whether
-an NPC can be the `user` and the player the target is untested**, and if it
-can, an NPC pulling the rider off the horse is a native mechanic rather than
-something this mod would have to build. That is the roadmap's braced-polearm
-dismount and a large part of what victims fighting back should look like.
+In vanilla the `user` is the player and the target is a mounted NPC. The
+reverse works: the retaliation pull-down calls
+`npc.actor:RequestHorsePullDown(player.id)`. `CanHorsePullDown` answers 2 when
+the pull is available, 1 when it is not, and 0 when it does not apply. The
+geometry that permits it is `wh_cs_HorsePullDownAngle`,
+`wh_cs_HorsePullDownZAngle` and `wh_cs_HorsePullDownZeroAngle`. An accepted
+request runs when the NPC's brain is ready for it, not at once.
 
 ## The engine names rider-specific combat behaviours
 
@@ -814,17 +802,15 @@ A combat action type group in the binary carries, among forty-six entries:
 **`riderGuardRear`**, `horsePullDownAttackSuccess`, `horsePullDownHitSuccess`.
 
 These are behavior and animation identifiers rather than Lua entry points, so
-they are not callable as they stand. What they establish is that the AI has
-combat behavior written specifically for fighting a mounted target and for
-mounted guards, including a rear. The roadmap item about striking a heavy
-target rearing the horse has a named behavior behind it.
+they are not callable as they stand. They establish that the AI has combat
+behavior written for fighting a mounted target and for mounted guards,
+including a rear.
 
 ## The verified surface, enumerated from the running game
 
-The lists above were gathered by reading vanilla scripts, which finds only
-what vanilla happens to call. These were read out of the running game by
-walking each object and its metatable's `__index`, so they are what this build
-actually exposes.
+Read out of the running game by walking each object and its metatable's
+`__index`, so these are what this build exposes, including methods vanilla
+never calls.
 
 | Object | Entries |
 | --- | --- |
@@ -848,20 +834,11 @@ actually exposes.
     CreateLink  GetLink  GetLinkName  GetLinkTarget  SetLinkTarget
     CountLinks  RemoveLink  RemoveAllLinks
 
-**`SetVelocity` is the one that matters most here.** This mod throws victims
-with `AddImpulse` and a `Knockback` figure that has never meant anything: 50
-was measured as indistinguishable from applying nothing, and 600 threw a
-villager 27 meters. An impulse must be divided by mass to become motion, and
-the mass of a victim is not constant. Setting velocity directly states the
-outcome in meters per second, and `GetMass` is there for the cases where an
-impulse is genuinely wanted.
-
-The link API is complete rather than read-only, which is the opposite of what
-this project recorded.
+`SetVelocity` states a body's motion in meters per second, independent of its
+mass; `AddImpulse` is divided by mass. The link API is complete, writing as
+well as reading.
 
 ### actor, the hundred
-
-Beyond what this mod already uses:
 
     StandUp  IsUnconscious  RequestKnockOut  RagDollize  Revive
     ReviveToDefaults  SetMovementTarget  SetMovementRestriction
@@ -878,11 +855,9 @@ Beyond what this mod already uses:
     VectorToLocal  GetAngles  SetAngles  IsFlying  DumpActorInfo
     AttachVulnerabilityEffect  ResetVulnerabilityEffects  SetStats
 
-`RagDollize` is a direct call where this mod goes through
-`SetPhysicalizationProfile("ragdoll")`. `DumpActorInfo` is an unexplored
-diagnostic. `GetCloseColliderParts` bears on the detection footprint, and
-`VectorToLocal` on the maths that decides which side of the horse a victim is
-on.
+`DumpActorInfo` is a diagnostic. `GetCloseColliderParts` bears on the
+detection footprint, and `VectorToLocal` on which side of the horse a victim
+is on.
 
 ### human, the forty-three
 
@@ -896,8 +871,8 @@ on.
     GrabOnLadder  IsOnLadder  CanUseLadder
     StartBuilding  StartReading  StartBookTranscription  PrepareFood
 
-**`human:HolsterWeapon()`** is the clean answer to forcing an unarmed brawl.
-It needs no unregistered message and no behavior tree node.
+`human:HolsterWeapon()` forces an unarmed brawl without an unregistered message
+or a behavior tree node; the mod calls it.
 
 ### player.player
 

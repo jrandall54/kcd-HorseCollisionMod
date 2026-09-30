@@ -24,6 +24,7 @@ sequence may be used only once ever.
 """
 
 import argparse
+import re
 import sys
 from collections import defaultdict
 
@@ -61,11 +62,8 @@ def load():
                 "timeout": timeout, "priority": prio, "flags": flags, "next": nxt}
 
     text_by_seq = {}
-    for topic, speaker, txt in B.lines():
-        pass
     # Localization keys carry the sequence id in their second field, which is a
     # more direct map from a sequence to its words than going through the topic.
-    import re
     xml = B._read(B.LOCALE, "text_ui_dialog.xml").decode("utf-8", "replace")
     row = re.compile(r"<Row><Cell>t(\d+)_s(\d+)_(\d+)_([^<]*?)_[A-Za-z0-9]{4}</Cell>"
                      r"<Cell>[^<]*</Cell><Cell>([^<]*)</Cell></Row>")
@@ -90,8 +88,8 @@ def describe_timeout(value):
     return "%ds" % secs
 
 
-def walk(topic, depth, seen, tables, out, only_role=None):
-    role_name, topics_by_pair, seqs_by_topic, seq_info, text_by_seq = tables
+def walk(topic, depth, seen, tables, out):
+    _names, _pairs, seqs_by_topic, seq_info, text_by_seq = tables
     if topic in seen or depth > 6:
         return
     seen.add(topic)
@@ -117,7 +115,7 @@ def walk(topic, depth, seen, tables, out, only_role=None):
         nxt = meta.get("next")
         if nxt and nxt not in ("0", ""):
             out.append("%s      next -> topic %s" % (pad, nxt))
-            walk(int(nxt), depth + 1, seen, tables, out, only_role)
+            walk(int(nxt), depth + 1, seen, tables, out)
 
 
 def main():
@@ -145,7 +143,7 @@ def main():
             print("  role %-5d %s" % (rid, role_name.get(rid, "?")))
             for topic in sorted(topics_by_pair[(_m, rid)]):
                 out = []
-                walk(topic, 2, set(), tables, out, args.role)
+                walk(topic, 2, set(), tables, out)
                 print("\n".join(out))
 
 
