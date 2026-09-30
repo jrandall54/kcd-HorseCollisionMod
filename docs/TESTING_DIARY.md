@@ -22815,3 +22815,65 @@ carry a `Ragdoll` ProcLayer, so Mannequin owns the ragdoll and the game recovers
 the actor its own way. The fix was that shape with an empty terminal animation
 and the `Ragdoll` ProcLayer at `ExitTime 0`; the six settings added while
 guessing were deleted. The empty-terminal fragment was the rider's suggestion.
+
+## Moved from `docs/TECHNICAL_DETAILS.md`
+
+Accounts cut from the technical reference during the v6 audit, where the diary
+had no entry of its own.
+
+**Skipping the physics wait.** Without `PhysicsReadyMs` the brake fired onto a
+body still carrying the collision's peak velocity; gallop throws fell from a
+mean of 1.81 m to 1.57 m over 18 impacts, and the rider described the victims
+as bricks. The mass rewrite doubled as the readiness probe on a six-rung ladder,
+and every impact answered on the second rung, so it was replaced by the
+constant.
+
+**The air brake's first cap.** It was set at 9.0 on the theory that far throws
+were victims launched into the air. It fired on nothing. Pairing the contact
+string against the speed trace showed a launch holding 8 to 9 m/s across its
+uncontacted samples while a short throw never passed 3.9.
+
+**The multiplied stamina chain.** `base x combat x victimArmor x barding x
+horsemanship` put a gallop anywhere between 14.85 and 1452 points against a pool
+of about 210, so the tier separation, a factor of 1.6, was invisible beside a
+stack spanning nearly a hundredfold.
+
+**The rear before it was a tier.** Until 4.19.2 it borrowed the trot's figures.
+`ImpactDamageByTier` carried a `Rear` entry nothing read, so the move did a
+trot's 18 rather than its 60; connecting it made the rear able to kill, which
+exposed the corpse left by a death inside an interactive action and the
+recovery attached only to the fall prefix. The rear and charge also drained a
+flat setting at their own call sites, missing Horsemanship, barding and the
+combat surcharge. The detection loop set `tierName = "Gallop"` during a charge,
+which gave the charge a gallop's stamina and, with the corridor sweep honoring
+no existing contact, scored each victim twice. The victim lockout sat
+unconditionally in a function both moves call, so an ordinary rear held its
+victim out of every impact for 2.6 seconds.
+
+**The lunge window.** Before `WatchLunge`, a `SpeedWalk` threshold, a floor of
+1200 ms and a ceiling of 2600 governed it, and the horse went on striking people
+after it was slowing. The first `WatchLunge` peaked on single samples, and a
+derived-speed spike closed every window inside 200 ms.
+
+**The damage prediction the shield replaced.** `ApplyImpactDamage` once decided
+before the wait who would land the killing blow: if the engine's trample could
+finish what the mod's damage left, the mod added overkill.
+`ImpactDamageEngineCeiling` held the largest trample seen per tier over 136
+impacts, and a variance roll that turned a fatal blow non-fatal was overruled.
+When it was wrong the rider was charged with murder at random. Removing it left
+a gallop at `95 * 1.00 * 1.02 = 96.9` against 100 health, surviving about seven
+times in ten, until the balance pass set 111. `ImpactDamageRushBelow`, an
+earlier version keyed on how hurt the victim already was, was removed in 5.0.0.
+Earlier shield timings: a 700 ms shield against an 1100 ms damage delay left
+victims clamped at 1 health, and a look-ahead that shielded anyone the horse
+would strike a tick later caught bystanders it then missed.
+
+**The cooldown across a save load.** `RearNextAt` survived a load while the
+clock went backwards, so the rear keys were dead for an unpredictable stretch.
+Seven attempts went at the action map, the listener and the hook before logging
+every press showed 56 consecutive presses refused at the cooldown gate and the
+57th accepted at +14256 ms.
+
+**The merchant's marks.** A merchant ridden down twice, dirty with blood on both
+arms, was clean after a night spent away from his booth; forty-eight in-game
+hours standing at the booth changed nothing.

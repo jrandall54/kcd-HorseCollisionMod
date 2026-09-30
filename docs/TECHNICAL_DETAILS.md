@@ -78,9 +78,8 @@ There is no error and no log line: the call returns exactly as it does when it
 works.
 
 `daycycle:restartRequest` declares `reason` and `speed`. Sent with an empty
-payload it does nothing at all, which is what left victims standing after a
-collision with no apparent way to recover them. Sent with both members it
-returns them to their day.
+payload it does nothing at all, and the victim is left standing. Sent with both
+members it returns them to their day.
 
 Two forms work. Vanilla's trees use text, `values="reason($enum:...),
 speed($enum:...)"`, and its Lua uses a table:
@@ -108,16 +107,15 @@ while nothing plays.
 
 1. **Fragment IDs** declare which fragments exist and point each at its tag
    definition file. Both `kcd_male_fragmentids.xml` and
-   `wh_female_fragmentids.xml` declare `AnimationControlled` as the game ships
-   today, so the mod touches neither. The female file did not declare it at
-   launch, and the mod used to ship a patched copy; see **Read vanilla from the
-   patch paks** below for what that cost.
+   `wh_female_fragmentids.xml` declare `AnimationControlled`, so the mod
+   touches neither.
 2. **The tag definition** (`kcd_animationControlledTags.xml`) declares the valid
    FragTags. A FragTags value absent from this file does nothing, even when the
-   database entry exists. Both sexes share the file, and it is the one vanilla
-   file the mod still replaces, because no patch has ever rewritten it.
-3. **The databases** hold the options. The mod's own point at standing hit
-   reactions already in the game. Both `kcd_male_database.adb` and
+   database entry exists. Both sexes share the file. The mod replaces it,
+   since no patch has rewritten it.
+3. **The databases** hold the options. The mod's own point at animations
+   already in the game: a stagger, a knockdown and a fall for each of four
+   directions, and a settle. Both `kcd_male_database.adb` and
    `wh_female_database.adb` have an existing `AnimationControlled` block, whose
    options the mod's parent database has to carry over, since a sub-database
    does not merge into a fragment its parent defines.
@@ -135,25 +133,18 @@ Anything copied out of the game must be read from `Data/patch/`, never from
 the engine's own open order: base paks, then `Data/patch/` ascending, which is
 the copy the running game serves.
 
-This is not a hypothetical. The generator read only the launch pak, and two
-files came out wrong:
-
-- `wh_female_fragmentids.xml` grew from 277 fragment ids at launch to 379 by
-  1.9. Shipping the launch copy under vanilla's name deleted 103 of them from
-  every female character, `PickingHerbs` among them, which locked the game on
-  picking a herb as Theresa. A player reported it after 90 hours as Henry, since
-  none of it touches the men.
-- `wh_female_database.adb` had no `AnimationControlled` block at launch and has
-  27 options by 1.9. The mod's parent database defines that fragment and so
-  shadows the sub-database's copy of it, and with nothing inherited every
-  redirected woman lost all 25 of her door and gate options.
+Two files show what a launch copy costs. `wh_female_fragmentids.xml` holds 277
+fragment ids at launch and 379 by 1.9, so a launch copy shipped under vanilla's
+name deletes 103 from every female character, `PickingHerbs` among them.
+`wh_female_database.adb` has no `AnimationControlled` block at launch and 27
+options by 1.9; a parent database built from the launch copy strips every
+redirected woman of her door and gate options.
 
 Matching an entry name needs care, because the paks do not agree on how they
 spell one. Launch and the patches to 1.7 use `Animations/Mannequin/ADB/...`; 1.8
 onward store the path lowercased; some use backslashes. A case-sensitive match
 finds the entry in the old paks, misses every modern one, and falls back to an
-older pak without saying so. The first version of `read_vanilla` silently
-resolved to 1.7.1b and looked correct. `pak_key` normalizes both.
+older pak without saying so. `pak_key` normalizes both.
 
 ## Pak packaging
 
@@ -179,40 +170,31 @@ prints each entry name so the separators are visible.
 
 `Scripts/Startup/HorseCollisionMod.lua` is the entry point. It creates the
 table, holds `Config`, the state tables and the timing constants, and applies
-the settings file; the behavior lives in thirteen part files under
-`Scripts/HorseCollisionMod/`, named at the foot of the entry point in the order
-they are wanted:
-
-```lua
-Script.ReloadScript("Scripts/HorseCollisionMod/Enums.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Log.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Armor.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Detection.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Health.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Reaction.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Marks.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Sound.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Recovery.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Crime.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Retaliation.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Rider.lua")
-Script.ReloadScript("Scripts/HorseCollisionMod/Update.lua")
-```
+the settings file. The behavior lives in part files under
+`Scripts/HorseCollisionMod/`, each named by a `Script.ReloadScript` line at the
+foot of the entry point in the order they are wanted.
 
 | File | What it holds |
 |---|---|
 | `Enums.lua` | the two engine enums, transcribed from `TypeDefinitions.xml` |
+| `Tiers.lua` | the per-tier tables and `TierValue`, the accessor that reads them |
 | `Log.lua` | logging, entity names, the engine clock, vector length, speed history and tier |
 | `Armor.lua` | what a victim is wearing, and both curves derived from it |
 | `Detection.lua` | the horse footprint test and the impact direction |
-| `Health.lua` | what an impact cost, and the auto-cure suppression |
+| `Health.lua` | what an impact costs the victim, the collision shield and the auto-cure suppression |
 | `Reaction.lua` | the brain message, the reaction clip, the physics ragdoll |
 | `Marks.lua` | the dirt and blood a knockdown leaves on the victim |
 | `Sound.lua` | the layered noise an impact makes, matched to the victim's armor |
+| `Bark.lua` | the spoken lines, and holding vanilla's collision bark off |
 | `Recovery.lua` | the waits, the rebuild and the replan that follow |
-| `Crime.lua` | the combat hit that makes riding someone down an offence |
+| `Crime.lua` | the combat hit that makes riding someone down an offense |
 | `Retaliation.lua` | a victim losing patience at a walk, and the brawl that follows |
-| `Rider.lua` | horse stamina, the combat multiplier and the dismount |
+| `Rider.lua` | horse stamina, the combat surcharge and the dismount |
+| `Lean.lua` | leaning out of the saddle in first person |
+| `Rear.lua` | the rear and the charge: input, cooldowns and the charge's corridor |
+| `Fear.lua` | the fear band around a rear and a charge |
+| `Impact.lua` | `ResolveImpact`, the one path every impact takes |
+| `Tutorial.lua` | the maneuver banners |
 | `Update.lua` | the detection loop, and dispatching one collision |
 
 `Config`, the state tables and the timing constants stay in the entry point,
@@ -252,14 +234,15 @@ Two consequences follow from the section above. The parts are looked up by
 path, so they do not inherit the accidental protection that keeps enumerated
 Startup Lua working in a backslash pak; a part file that fails to load is the
 first thing to suspect there. And a part that does not load raises no error on
-its own - the methods it defines stay nil, and the mod silently does less -
-which is why `verify_additive.py` checks that every part ships and that the
+its own: the methods it defines stay nil, and the mod silently does less.
+`verify_additive.py` therefore checks that every part ships and that the
 entry point names it.
 
 Each part adds to the table and carries no top-level statements beyond its
 function definitions, so re-running the entry point cascades a reload through
-all of them. The development loop reloads only
-`Scripts/Startup/HorseCollisionMod.lua`.
+all of them. The development loop's reload re-executes the settings file, the
+testing world and `Scripts/Startup/HorseCollisionMod.lua`, then calls the entry
+point.
 
 The game's own paks store forward slashes in the central directory and
 backslashes in the local file headers. Python's `zipfile` treats that as
@@ -325,13 +308,11 @@ that starts a new timer loop on every load screen can accumulate several running
 at once, which costs performance and can disrupt audio.
 
 The mod increments a counter on each load screen and passes that value into the
-timer closure. Any loop whose value no longer matches the current one stops on
+timer closure. Any loop whose value does not match the current one stops on
 its next iteration, so at most one loop is live.
 
 Detection runs at `TickSeconds`, which is 0.033. That figure is the loop rate
-and the distance the footprint sweeps forward, so the two cannot disagree; they
-were separate numbers until the impact sound made the lag between a contact and
-the reaction audible.
+and the distance the footprint sweeps forward, so the two cannot disagree.
 
 Each tick checks that the player is mounted and moving at least at walking pace
 before doing anything else, so the cost while on foot is negligible. Thirty
@@ -373,14 +354,12 @@ a rejected candidate rather than an error.
 
 ### Speed tiers
 
-Horse speed occupies three plateaus: 2.05 to 3.74, 6.38 to 7.03, and 9.18 to
-10.81 m/s. `SpeedWalk`, `SpeedTrot` and `SpeedGallop` sit in the empty gaps
-between them instead of on round numbers, so a threshold is never set at a speed
-the horse holds.
-
-The gap between 8.03 and 8.84 m/s is empty, which places the trot-to-gallop
-boundary at 8.5 in open space. Reaction strength changes sharply across it, at a
-speed the horse passes through often.
+Each gait holds a plateau, and a horse's agility trims it by up to about 30
+percent. `tools/probe_gait_speed.lua` on the slowest and fastest stabled horses
+reads walk 3.08 to 3.25, trot 7.00 to 7.56 and a sustained gallop 10.75 to
+12.55 m/s. `SpeedWalk`, `SpeedTrot` and `SpeedGallop` sit in the gaps between
+them instead of on round numbers, so a threshold is never set at a speed a
+horse holds. `SpeedGallop` at 8.5 sits above the fastest trot.
 
 ### The speed a collision is scored at
 
@@ -393,9 +372,10 @@ The tier comes from the peak of the last `ImpactSpeedSamples` ticks instead.
 The window is short by design: taken over a longer span it would charge gallop
 to a rider who galloped up and then slowed deliberately to nudge someone.
 
-`MaxImpactSpeed` caps the result. The value scales knockback force as well as
-selecting the tier, and the physics system reports occasional speeds above
-anything a horse holds.
+`MaxImpactSpeed` caps the result, because the physics system reports
+occasional speeds above anything a horse holds. It sits above the fastest
+sustained gallop. The scored speed selects the tier and the impact direction;
+no force scales with it.
 
 ### Footprint
 
@@ -403,14 +383,11 @@ A horse is long and narrow. A sphere alone catches people alongside and behind
 it who were never struck, so the second stage tests an oriented box.
 
 `HorseHalfWidth = 0.70` gives a footprint 1.4 m wide, wide enough to catch a
-body struck against the flank rather than only a dead-center hit. At 0.35, 22
-of 104 pooled rejections across three instrumented rides were contacts the
-footprint wrongly rejected, three of them unambiguous flank hits on stationary
-guards, and the engine still damaged those victims without the mod ever
-registering the hit to suppress vanilla's auto-cure daycycle. At 0.70,
-rejections no longer occur inside the 0.70-0.90 m band that would mean a real
-near-touch is still being missed, while people the horse passes with genuine
-clearance, out to 2.46 m, are still correctly rejected.
+body struck against the flank rather than only a dead-center hit. At 0.35 the
+footprint rejected flank contacts the engine still damaged, so the mod never
+registered them. At 0.70 no rejection falls inside the 0.70 to 0.90 m band that
+would mean a real near-touch is missed, while people the horse passes with
+clearance are still rejected.
 
 ### Forward sweep
 
@@ -425,7 +402,7 @@ stride.
 
 ### Per-victim cooldown
 
-The footprint is tested ten times a second. Without a cooldown the same NPC's
+The footprint is tested every tick. Without `HitMinIntervalMs` the same NPC's
 reaction restarts every tick and they never finish staggering.
 
 ## Reaction defaults
@@ -433,27 +410,14 @@ reaction restarts every tick and they never finish staggering.
 Why the defaults in `HorseCollisionMod.Config` are set where they are. The
 config table itself is kept scannable, since it is read to change a setting.
 
-### Every victim weighs what the engine says, and why
+### Every victim weighs what the engine says
 
-`GetMass` answers 80 for every human including the player, so a peasant and a
-knight are the same thing for a horse to hit. The mod once wrote over that
-figure, dividing a base by the armor scale raised to an exponent, so that a
-mailed guard was the heavier body to move. That path is gone.
-
-It was removed for two reasons. The coupling is weak: the throw goes as roughly
-`mass ^ -0.185`, measured across a fiftyfold flat comparison, so doubling a
-victim's mass shortens the throw by 12% and a visible difference costs a spread
-around a hundredfold. Buying that spread meant an exponent of 3.7, which ran
-from 43 kg for a villager to 1,208 kg for a mailed guard and 501,187 kg at the
-armor scale real guards score. Between scale 0.35 and 0.10 the mass moved by a
-factor of a hundred, which is a cliff rather than a scale, and everything
-stacked above it stopped meaning anything: an impulse of 58 against 1,208 kg
-moves a guard five centimeters per second, so the knockback, the uplift and the
-barding force bonus did nothing at all to anyone in armor.
-
+`GetMass` answers 80 for every human including the player, and the mod does not
+rewrite it. The throw goes as roughly `mass ^ -0.185`, so a visible difference
+between victims would need a mass spread of around a hundredfold, and at that
+spread every force figure stacked above it does nothing to anyone in armor.
 Armor is separated by the ragdoll brake instead, which removes a commanded
-fraction of a thrown body's speed. That is a lever with a bounded range and it
-does not lie about what a person weighs.
+fraction of a thrown body's speed: a lever with a bounded range.
 
 ### Waiting for the body to become physics
 
@@ -462,17 +426,13 @@ request the victim is still an animated character, and physics calls aimed at
 one are discarded silently, so the brake and the damping wait
 `PhysicsReadyMs` before running.
 
-The wait cannot be skipped. Without it the brake fires onto
-a body still carrying the peak velocity of the engine's collision and, being
-proportional, takes more speed away: gallop throws fell from a mean of 1.81 m to
-1.57 m over 18 impacts, and the rider described the victims as bricks.
+The wait cannot be skipped. Without it the brake fires onto a body still
+carrying the peak velocity of the engine's collision and, being proportional,
+takes more speed away.
 
-The figure is one frame because that is what it measured at. The mass rewrite
-doubled as the readiness probe, writing a value and reading it back on a six
-rung ladder of 0, 16, 33, 50, 80 and 120 ms, because a write is refused on a
-living actor and accepted on a ragdoll. Every impact ever logged answered on the
-second rung. The probe worked and never varied, so it was machinery around a
-constant.
+The figure is one frame because that is what it measures at. A mass write is
+refused on a living actor and accepted on a ragdoll; read back at 0, 16, 33,
+50, 80 and 120 ms, it was accepted at 16 ms on every impact logged.
 
 ### Ending a throw
 
@@ -491,17 +451,13 @@ figure the instant a body lands reads as braking, so it comes in gradually.
 
 **The air brake** covers the window the grounded brake cannot reach. The first
 three or four samples of a long throw are exactly the ones that report no
-contact, and that is where the distance is. Above `RagdollSpeedSoftCap` the mod
-applies drag proportional to how far over the cap the body is, scaled across
-`RagdollSpeedSoftCapSpan` and released again below it. Drag rather than a
-velocity clamp, because a hard ceiling applied every frame reads as the body
-hitting an invisible wall.
-
-The cap was first set at 9.0 on the theory that the far throws were victims
-launched into the air. They were not, and it fired on nothing. Pairing the
-contact string against the speed trace, one sample per column, settled it: a
-launch holds 8 to 9 m/s across its uncontacted samples while a short throw
-never passes 3.9, so 4.0 separates them.
+contact, and that is where the distance is. Above the tier's cap in
+`ThrowProfileByTier` the mod applies drag proportional to how far over the cap
+the body is, scaled across `RagdollSpeedSoftCapSpan` and released again below
+it. Drag rather than a velocity clamp, because a hard ceiling applied every
+frame reads as the body hitting an invisible wall. The gallop's cap runs from
+6.0 m/s unarmored to 2.5 in full mail; the charge's cap is its own launch
+speed.
 
 **Both are released when the watch ends.** `damping` and `min_energy` are
 persistent fields of `pe_simulation_params`, not a one-shot effect, so a body
@@ -525,13 +481,9 @@ and 230 on another.
          * Horsemanship
 
 The three situational figures are added to the tier's share rather than
-multiplied with it. Multiplied, the chain ran `base x combat x victimArmor x
-barding x horsemanship`, all unbounded, and put a gallop anywhere between 14.85
-and 1452 points against a pool of about 210, so the tier separation the rider
-tunes, a factor of 1.6, was invisible beside a stack spanning nearly a
-hundredfold. Added, the worst case is the sum of the named maxima, 0.38 of the
-pool before Horsemanship, and each term is readable on its own in the telemetry
-line.
+multiplied with it. The worst case is the sum of the named maxima, 0.38 of the
+pool before Horsemanship, and each term is readable on its own in the
+telemetry line. Multiplied, unbounded factors would drown the tier separation.
 
 Horsemanship remains a multiplier because it is the one factor meant to
 dominate. It runs from 5.0 at level 0 to 1.0 at the top of the skill, so a
@@ -552,9 +504,9 @@ in `StaminaShareByTier`. The rear and the charge are commanded attacks rather
 than consequences of riding, so what stops a player spamming them is the
 cooldown on the move itself, `RearCooldownMs` for the rear and
 `ChargeCooldownMs` for the charge, each on its own clock. Both start on the
-move's first contact, so a move that reaches nobody costs no cooldown; their share is a cost
-the player feels, not a budget they count. Both match the gallop's 0.20 by the
-rider's ruling. The cooldown figures are set by feel on a ride, not derived.
+move's first contact, so a move that reaches nobody costs no cooldown; their
+share is a cost the player feels, not a budget they count. Both match the
+gallop's 0.20. The cooldown figures are set by feel on a ride, not derived.
 
 While a cooldown runs, the player carries the mod's `hcm_rear_cooldown` or
 `hcm_charge_cooldown` buff, so the game's own buff icons show it. The rows copy
@@ -567,13 +519,11 @@ Buff rows are read at startup only; neither `Database.LoadTable('buff')` nor
 Because no cooldown starts until contact, a press is also refused while a move
 is in progress: during a charge on `RearCharging`, during a standing rear for
 the length of `relaxed_rearing` as the horse reports it. Without it, a second
-charge press in the idle moment between the rear and the push doubled the
+charge press in the idle moment between the rear and the push doubles the
 push.
 
-Every tier is charged through one function, `DrainImpactStamina`. The rear and
-the charge went through it late: each used to drain a flat setting at its own
-call site, so Horsemanship, barding and the combat surcharge reached every tier
-except the two heaviest.
+Every tier is charged through one function, `DrainImpactStamina`, so
+Horsemanship, barding and the combat surcharge reach every tier.
 
 | Surcharge | Share | Effect on a gallop at full Horsemanship |
 | --- | --- | --- |
@@ -582,8 +532,8 @@ except the two heaviest.
 | Full barding | -0.03 | 6 impacts |
 
 The victim's armor surcharge rises with the weight of what they are wearing and
-reaches `MaxArmorStaminaAdd` at `ArmorReferenceWeight`, the weight counted as a
-full set. It is the one term that does not reach the rear and the charge, and
+reaches `MaxArmorStaminaAdd` at `ArmorStaminaFullWeight`, the weight counted as
+a full set. It is the one term that does not reach the rear and the charge, and
 that is deliberate rather than an omission. Those two are charged once for the
 whole move and the move can land on several people at once, so there is no
 single victim whose armor to read. What the horse and rider bring, meaning
@@ -631,23 +581,21 @@ sits on the ground, so it is the head's height above the floor.
 | 5472 | `BlendRagdoll` | 1.59 | standing |
 | 6064+ | `MotionIdle` | 1.59 | standing, finished |
 
-Three things follow, and the mod had all three wrong.
+Three things follow.
 
 **`BlendRagdoll` is the get-up, not the lie-down.** The head climbs from 0.27 to
 1.59 across it. Every piece of code that treated that state as "the victim is
 still a settling ragdoll" had the sequence backwards, and anything waiting for
-it to end was waiting until after the victim was already on their feet.
+it to end waits until after the victim is already on their feet.
 
 **The flat stretch is `AnimationControlled` followed by `MotionIdle`.** The fall
 clip ends before Mannequin's Ragdoll ProcLayer takes hold, leaving roughly
 600 ms in which a victim lying face down reads `MotionIdle`, the same state as
-somebody standing about doing nothing. That hole is why every test built on
-animation-state strings eventually let an impact through mid-fall and snapped
-the body upright into a second fall clip.
+somebody standing about doing nothing. A test built on animation-state strings
+lets an impact through there, mid-fall, and snaps the body upright into a
+second fall clip.
 
-**A victim is flat for about 1.8 seconds and standing again by 5.5.** Not the
-eight seconds the old `VictimRebuild` timings suggested; that figure was the
-mod noticing late, not the body taking that long.
+**A victim is flat by about 1.8 seconds and standing again by 5.5.**
 
 ### What does not work as a signal
 
@@ -669,12 +617,15 @@ with no ambiguity anywhere in the sequence.
 
 ### How the mod uses it
 
-`RecordStandingHeight` stores a victim's upright `headUp` at the first impact
-that reaches them, since a victim the speed tiers scored is by definition
-someone the horse rode into while they were standing. `IsVictimFlat` then reads
-the current value against half of that. The halfway point is a bisection rather
-than a tuned figure: flat reads 0.15 against a standing 1.55, so the two are an
-order of magnitude apart and any split between them answers identically.
+The mod reads the physics body's center of mass rather than the head, which
+tracks posture the same way. `RecordStandingHeight` keeps the tallest reading
+above the entity origin seen at any impact, so a first reading off a body
+already down corrects itself once the victim stands. `IsVictimFlat` reads the
+current height against `VictimFlatFraction` of that: flat readings sit at 0.04
+to 0.10 of standing and a body that has begun to rise reads 0.17 or more. A
+reaction still playing counts as flat whatever the height. On a ragdoll tier
+the height does not read a downed body as flat, so `WhenVictimRises` uses the
+ragdoll state for those tiers.
 
 An animated reaction is refused only while the victim is flat. One that has
 begun to get up takes the reaction, because a victim shrugging off a hoof reads
@@ -710,17 +661,10 @@ twice does not carry two identical marks.
 Nothing is applied at the walk tier: a stagger puts nobody on the ground, and
 dirt on a victim who never fell reads as a bug.
 
-The mod does not clean up after itself, because something in the game already
-does. A merchant ridden down twice was seen covered in dirt with blood on both
-arms, and seen clean again after a night had passed with him away from his
-booth. That contradicts the script evidence, which had `CleanDirt` documented
-as leaving blood alone and `WashDirtAndBlood` called on the player and nowhere
-else. Whatever removes it has not been identified.
-
-The form of the waiting mattered. Forty eight in-game hours spent standing at
-the merchant's booth changed nothing about him at all; the night that cleaned
-him was one he spent elsewhere. Why that is so is untested, so a routine-driven
-effect should be checked the way this one was rather than by waiting in place.
+The mod does not clean up after itself, because something in the game does.
+The marks wear off once the victim's routine takes them away; waiting beside
+them changes nothing. What removes them is not identified: vanilla's scripts
+call `WashDirtAndBlood` only on the player.
 
 ## Spoken reactions
 
@@ -750,8 +694,8 @@ player alike.
 
 A metarole names a *set*, and the dialog system decides which member plays. So a
 set is only usable when every one of its lines is acceptable at the moment it
-fires, which is a stronger condition than it looks and has caused three wrong
-choices:
+fires, which is a stronger condition than it looks. Each of these rules a set
+out:
 
 - **Length.** `JINDRICH_NARAZIL_NA_MRTVOLY` fits Henry finding a body, and the
   bodies it was recorded for are the Skalitz massacre. Its longest line runs 139
@@ -811,25 +755,14 @@ A knockdown speaks twice: a wordless cry at impact, then words during the
 get-up. The second fires when the body begins to rise, which `WhenVictimRises`
 reads from head height.
 
-Three earlier attempts missed the moment. The readiness watcher could not
-report until two seconds after the victim was upright. Waiting for the
-animation state to leave `BlendRagdoll` fires once the get-up has already
-finished, because that state *is* the get-up. And a delay tuned from the impact
-is one figure for a rise that is not one length: measured, a body lies flat
-from about 1.8 seconds and starts rising anywhere from there to past seven,
-depending on the fall and the character set, so 3200 ms landed mid-ragdoll for
-some victims and after others had walked away.
-
-The target is a moment inside the get-up rather than at either end, and no
-animation state marks it. The body does: the head climbs from about 0.15 of its
-standing height to 1.59 across the rise, so leaving flat is the instant wanted.
+Leaving `BlendRagdoll` is too late, since that state *is* the get-up on a fall
+tier. A delay from the impact cannot work either: a body lies flat from about
+1.8 seconds and starts rising anywhere from there to past seven, depending on
+the fall and the character set. The target is a moment inside the get-up, and
+the body marks it: leaving flat is the instant wanted.
 
 `BarkGapMs` keeps the two apart: a victim who recovers quickly would otherwise
 speak over their own cry, and the second request cuts the first off mid-word.
-
-`BarkCooldownMs` must stay at or below `HitCooldownMs`. At 6000 against a hit
-cooldown of 3000 it silenced exactly every second impact the mod acted on, which
-reads as barks randomly failing rather than as a cooldown.
 
 ### Never request a generic metarole
 
@@ -854,21 +787,19 @@ without playing it or rebuilding anything.
 ### There is no sound for this, so it is built from layers
 
 Vanilla horse collisions are silent, so nothing in the game's library is a
-horse striking a person. No single trigger works: twenty three of them were
-auditioned and every one reads as a weapon, a footstep or a dropped object. A
-tier therefore names a list of
+horse striking a person. No single trigger works: each reads as a weapon, a
+footstep or a dropped object. A tier therefore names a list of
 `{ trigger, delay, distance, chance }`, played a few milliseconds apart so the
 ear takes them as one event.
 
-Two trigger names are tokens resolved per victim from the armor data
-`Armor.lua` already computes: `body` is the blunt impact against that material
-and `foley` the movement rustle it makes. Cloth, leather, mail and plate each
-have both.
+Four trigger names are tokens resolved per victim from the armor data
+`Armor.lua` already computes: `body`, `body_armed`, `face_armed` and `blunt`,
+each the sample matching the material the victim wears.
 
 ### Volume, of which there is none
 
 The audio translation layer in `Libs/GameAudio/*.xml` declares no gain, and the
-parser at line 3610277 of the decompilation reads only `fmod_name`,
+parser in `CWh_AudioImplFmod` reads only `fmod_name`,
 `sustained`, `sustained_cutscene_audio` and `distance_culling`. None of the 66
 parameters is a volume; the only ones that exist are the player's own master
 sliders. Material effects declare `<Audio trigger="..."/>` and nothing else.
@@ -903,9 +834,8 @@ v_henry_hit_medium   Trot, Rear
 v_henry_hit_heavy    Gallop, Charge
 ```
 
-This is deliberately not routed through the dialog system, and the distinction
-matters because every earlier attempt at giving Henry something to say went that
-way and produced full monologs. A `dialog:monologRequest` names a bark *set* and
+This is deliberately not routed through the dialog system. A
+`dialog:monologRequest` names a bark *set* and
 the dialog system chooses which member plays, so the mod cannot ask for a grunt
 and be certain of getting one. An audio trigger names the event outright: there
 is no selection, no priority auction and no cooldown of the system's own, so a
@@ -913,16 +843,16 @@ crime reaction cannot take it the way it takes a collision bark.
 
 The cost is that the vocabulary is non-verbal. All fourteen human-voice events
 in `Libs/GameAudio` are grunts, sighs and cries; none is a line of dialogue, so
-words remain the dialog system's alone. Two further Henry events were found and
-confirmed audible and may be worth adding, `v_henry_hyje` and
-`v_henry_nostamina_sigh`; the cinematic ones recorded by his actor resolve to a
+words remain the dialog system's alone. Two further Henry events,
+`v_henry_hyje` and `v_henry_nostamina_sigh`, are audible and unused; the
+cinematic ones recorded by his actor resolve to a
 valid trigger id and make no sound, their FMOD events being tied to a cutscene's
 own mix.
 
 This division is also the engine's. Henry holds the
 `COMBAT_VICTIM_SCREAM_RECEIVED_HIT` and `COMBAT_ACTOR_SCREAM_ATTACK` metaroles,
-but not one of their sequences carries audio recorded by his actor -- only NPCs'
--- so vanilla does not use dialogue for the player's own impact vocals either.
+but not one of their sequences carries audio recorded by his actor, only NPCs',
+so vanilla does not use dialogue for the player's own impact vocals either.
 That is why the mod's ordinary impacts are wordless and its spoken lines fire
 only on a kill.
 
@@ -936,17 +866,14 @@ moves the clock backwards.
 
 ### An audio trigger plays on a corpse, which dialogue does not
 
-Worth recording next to the above, because it removes a constraint the project
-had accepted. A dead entity's subbrain is torn down, so a `dialog:monologRequest`
-sent to it has no recipient and is silently dropped; that is why the mod's kills
-were silent where vanilla's are not. `ExecuteAudioTrigger` is not a message. It
+A dead entity's subbrain is torn down, so a `dialog:monologRequest` sent to it
+has no recipient and is silently dropped. `ExecuteAudioTrigger` is not a message. It
 is a direct call on the entity's audio proxy, which is a rendering attachment
 rather than a brain, and a body two seconds dead plays
 `v_stealth_stealthkill_man` normally.
 
-So death sounds do not require letting the engine resolve the killing hit, which
-was the only route the diary had left and would have cost the attribution
-ordering in `ApplyImpactDamage`. Not yet implemented; the mechanism is proven.
+So a death sound needs neither dialogue nor the engine resolving the killing
+hit.
 
 ### The spoken line has to be predicted, not observed
 
@@ -967,24 +894,21 @@ measured at 96.9 intended against 83.0 health on kills and 11.6 against 58.4 on
 survivals. The engine's own trample is not added in, because the mod reclaims it
 and restores the health the victim had at impact.
 
-`RiderVoiceRanks` orders the three sounds -- grunt 3, impact line 4, death line
-5 -- and a request outranking the hold that is running passes it. Before that the
-gate was rank-blind and four fatal gallops in one ride produced one death line,
-the grunt at each contact having already claimed it. Equal rank still loses, so
-two death lines never overlap.
+`RiderVoiceRanks` places the impact line at 4 and the death line at 5, above
+the grunts' `RiderVocalRankByTier`, and a request outranking the hold that is
+running passes it. Equal rank loses, so two death lines never overlap.
 
 ### Levels can only be judged from the saddle
 
 Every sample is clearly audible standing still, and most disappear under the
 horse's own hoofbeats at speed. A mix tuned while parked will not survive
-being ridden, which cost several rounds of tuning before it was understood.
+being ridden.
 
 ### Why not the animation data
 
 The generated databases can carry a `PlaySound` procedural layer, and it works:
 the stock male database ships twenty four of them, all `c_w_sword_clinch`. It
-was built, tested and abandoned, because a fragment cannot make a sound before
-it starts. Even at `ExitTime="0.0"` the noise follows the contact that caused
+cannot serve here, because a fragment cannot make a sound before it starts. Even at `ExitTime="0.0"` the noise follows the contact that caused
 it.
 
 ## Collision damage
@@ -1048,9 +972,9 @@ Three properties of that buff decide the design:
   shielded soul dealt 999 damage goes from 100 health to 1, never to 0. So
   telemetry showing a shielded victim losing health is the mechanism working,
   not failing.
-- **It takes effect in the call that applies it.** Measured directly, which
-  removed an earlier look-ahead that shielded anyone the horse was about to
-  strike a tick before contact and caught bystanders it then missed.
+- **It takes effect in the call that applies it.** So it is granted at
+  contact, never ahead of it, and a bystander the horse then misses is never
+  shielded.
 - **`AddBuff` returns an instance handle**, and `RemoveBuff(instance)` removes
   only that instance. `RemoveAllBuffsByGuid` would strip every instance,
   including immortality a quest granted a story character, so the handle is
@@ -1065,8 +989,7 @@ reload, and this one removing immortality must not.
 `LiftCollisionShield` is called synchronously at the top of the damage path, so
 the shield ends exactly where the mod's own damage begins. A timed lift cannot
 do this: it has to outlast the trample and end before the damage, and missing
-on either side is silent. At a 700 ms shield against a 1100 ms delay victims
-came out clamped at 1 health, because the removal had not taken effect.
+on either side is silent.
 
 The shield ends when the victim's body comes to rest, and the mod's damage
 lands at that same moment: `ApplyImpactDamage` shields the victim, waits on
@@ -1074,30 +997,28 @@ lands at that same moment: `ApplyImpactDamage` shields the victim, waits on
 
 That single event is what makes the whole thing simple. The engine charges a
 body for as long as it is being thrown, so the shield has to span exactly that
-and no more, and the mod's damage has to land the instant it ends. Two
-mechanisms watching two different signals is what produced every defect below.
+and no more, and the mod's damage has to land the instant it ends. One signal
+serves both.
 
 **Rest is read from position, not velocity.** `WhenBodyStops` treats a body
 as stopped once it moves less than `RestStillMeters` (0.05) between two polls
 `RestPollMs` (200) apart.
 
-Four other signals are wrong for this, each for a reason worth keeping:
+The entity does not follow a ragdoll's distance, but it moves until the body
+settles, which is what timing the rest needs. Other signals are wrong for this:
 
-- **A fixed delay.** 600 ms, against a real settle time of 1200 to 2000 ms at a
-  gallop. The victim was charged while still in the air, and the engine had the
-  rest of the throw to kill them in.
+- **A fixed delay.** A gallop settles in 1200 to 2000 ms, so any one figure
+  charges some victims while still in the air, with the rest of the throw left
+  for the engine to kill them in.
 - **A velocity threshold.** A thrown ragdoll passes through near-zero speed at
   the top of its arc and again on first ground contact, so a couple of slow
-  samples is a bounce, not rest. Worse, a victim who survived and walked away
-  reads as moving: two were held unkillable for a fifteen second cap at 0.96
-  and 2.90 m/s, which is walking and running pace.
-- **Exact position equality.** Stricter than rest and therefore later. A body
-  returns identical coordinates only once the physics has fully slept, and a
-  settled body micro-jitters well past the point it has visibly stopped, so
-  this fired 400 ms to 1150 ms after the throw's own reading.
-- **`WhenRagdollResolves`.** Reports the character blended back and standing,
-  which is later still: the damage arrived as the victim stood up and dropped
-  them again.
+  samples is a bounce, not rest. A victim who survived and walked away also
+  reads as moving, and stays unkillable until the ceiling.
+- **Exact position equality.** A body returns identical coordinates only once
+  the physics has fully slept, and a settled body micro-jitters well past the
+  point it has visibly stopped, so this is hundreds of milliseconds late.
+- **The victim standing again.** Later still: the damage lands as the victim
+  stands up and drops them again.
 
 `BlendRagdoll` is unusable as the signal for this, for a reason that is easy to
 miss: it never appears on a victim the impact killed, so a state test reports
@@ -1108,43 +1029,10 @@ victim a physical object, so there is no engine damage to protect against, and
 `ApplyImpactDamage` returns early on a tier worth no damage, which left the
 shield on with nothing to take it off.
 
-**The shield must be granted past every early return.** Applied in the
-detection loop it reached victims still inside their per-victim cooldown, whose
-impact was then dropped, so nothing lifted it and they stood unkillable until
-the backstop. It is granted inside `TriggerCollision` instead.
-
-**The prediction this replaced.** `ApplyImpactDamage` used to decide who would
-land the killing blow before the wait started, by asking whether the engine's
-trample could finish whatever the mod's damage left behind:
-
-```
-if damage >= atImpact then          -- already fatal, do not wait
-elseif (atImpact - damage) <= ceiling[tier] then
-    damage = atImpact + overkill    -- the engine could finish it, so finish it
-end
-```
-
-`ImpactDamageEngineCeiling` carried the largest trample seen per tier over 136
-logged impacts. Damage variance was overruled in the same spirit: a roll that
-turned a fatal blow non-fatal handed the kill back to the engine, so it did not
-stand.
-
-All of it is gone. It had to be right about a number the mod does not control,
-and when it was wrong the rider was charged with murder at random. The shield
-removes the race rather than trying to win it.
-
-It also had a second effect nobody intended. A gallop on an unarmored villager
-deals `95 * 1.00 * 1.02 = 96.9` against 100 health, so it was never lethal on
-its own; what killed them was the finishing rule upgrading any remainder under
-36. Removing it made unarmored victims survive a single gallop about seven
-times in ten. That is the damage figure being honest rather than a regression
-in the shield, and it is left for damage tuning rather than corrected by
-rounding outcomes up.
-
-An earlier setting, `ImpactDamageRushBelow`, asked instead how hurt the victim
-already was. What matters instead is the size of the remainder against what
-the engine can take, and its threshold was never measured. It was removed in
-5.0.0.
+**The shield must be granted past every early return.** A victim shielded and
+then dropped by a later check, such as the per-victim interval, has nothing to
+lift it and stands unkillable until the backstop. It is granted inside
+`TriggerCollision`, after those checks.
 
 ## The auto-cure daycycle
 
@@ -1190,7 +1078,9 @@ first lets the cure restart within seconds.
 
 ## Additive animation deployment
 
-Since 3.0.0 the mod adds Mannequin fragments without replacing a vanilla file.
+The mod adds Mannequin options without replacing a vanilla animation database.
+It replaces three declaration files, `kcd_animationControlledTags.xml`,
+`kcd_horse_fragmentids.xml` and `kcd_horse_controllerdefs.xml`.
 `docs/HOW_IT_WORKS.md` covers the purpose and the trade-offs. What follows is
 the reference for changing it.
 
@@ -1222,22 +1112,27 @@ can point it elsewhere.
 
 ### The layout
 
-Seven files, all named `hcm_*`, so none collides with anything:
+The build ships these under `Animations/Mannequin/ADB/`:
 
 ```
-hcm_<set>_database.adb          the parent
-  AnimationControlled           vanilla's 30 options + this mod's 4
-  SubADB -> kcd_male_database.adb   untouched, in its own pak
-hcm_<set>_fragmentids.xml       vanilla's ids, AnimationControlled repointed
-hcm_<set>_controllerdefs.xml    vanilla's controller def, Fragments repointed
-hcm_animationControlledTags.xml vanilla's 16 FragTags + this mod's 4
+hcm_male_database.adb            the parent for men
+  AnimationControlled            vanilla's options and the mod's
+  SubADB -> kcd_male_database.adb    untouched, in its own pak
+hcm_female_database.adb          the same for women
+hcm_horse_database.adb           the horse's parent, with the rear and charge
+kcd_animationControlledTags.xml  vanilla's FragTags and the mod's
+kcd_horse_fragmentids.xml        vanilla's horse ids, AnimationControlled added
+kcd_horse_controllerdefs.xml     vanilla's horse controller def, with a scope
+                                 for AnimationControlled
 ```
 
-`HorseCollisionMod.lua` then points the human entity classes at the parent.
+The human databases are generated by `tools/build_adb.py`; the horse files are
+authored under `src/Animations/`. `HorseCollisionMod.lua` points the entity
+classes at the parents.
 
-### The four requirements
+### The three requirements
 
-All four must hold. Each produces the same symptom on its own: a one-frame
+All three must hold. Each produces the same symptom on its own: a one-frame
 twitch, with `StartInteractiveActionByName` returning success.
 
 **1. The parent must define `AnimationControlled` itself.** Sub-databases do not
@@ -1246,23 +1141,18 @@ comes from one place. Options placed in a sub-database are unreachable no matter
 which order the subs are listed in.
 
 **2. The parent must carry vanilla's options too.** It takes authority over the
-fragment, so anything it omits is gone. Without vanilla's 30 options a
-redirected NPC loses every door, cabinet and wardrobe interaction in the game.
-The fragment is 69 KB, 1.24% of the database.
+fragment, so anything it omits is gone. Without vanilla's options a redirected
+NPC loses every door, cabinet and wardrobe interaction in the game. The
+fragment is 69 KB, 1.24% of the database.
 
-**3. The parent's `FragDef` must be the mod's fragment ids.** That is what the
-loader validates FragTags against. Pointing it at vanilla's gives:
+**3. Every new FragTag must be declared in `kcd_animationControlledTags.xml`**,
+the tag file the fragment ids name for `AnimationControlled`. That is what the
+loader validates FragTags against. An undeclared tag gives:
 
 ```
 [CAnimationDatabaseManager::LoadDatabase] Unknown tags for fragmentID
     AnimationControlled tag  fragTags hcm_stagger_forward
 ```
-
-**4. `ActionController` must be redirected as well as `AnimDatabase3P`.** The
-controller def owns the fragment and tag definitions an entity resolves names
-through at runtime. A database's `FragDef` governs load-time validation only.
-Redirect the database alone and the options load and validate cleanly, then
-every call against them resolves to nothing.
 
 ### Redirect the exposed class, not the template
 
@@ -1299,8 +1189,7 @@ after the world is populated.
   not be for a mod that had to share a tag group.
 - Nothing else vanilla may be copied without checking `Data/patch/` for a newer
   version of it first, and preferring a file the patches have never touched. The
-  tag file above qualifies; the female fragment id file did not, and shipping a
-  copy of it broke every female character.
+  tag file above qualifies; the female fragment id file does not.
 - Two mods redirecting `AnimDatabase3P` on the same class conflict. The
   contested resource is a Lua string, not a binary, so a cooperative mod can
   chain by referencing whatever is already set.
@@ -1352,8 +1241,8 @@ only one on `real`:
   `SpawnExpiringPerceptibleVolume` one meter across at the victim, labeled
   `assault`, for six seconds at full conspicuousness, blinds the attacker and
   the victim to it, and leaves every bystander able to see it. That volume is
-  how a witness learns an assault happened, and sending `combat:hit` charged
-  the rider with brawling before a punch had been thrown.
+  how a witness learns an assault happened, so sending `combat:hit` charges
+  the rider with brawling before a punch is thrown.
 
 `combat:stimulus:hit` is what that switch forwards to the combat subbrain
 anyway. The subbrain starter listens for it by name on
@@ -1376,30 +1265,25 @@ by it, so women fall through to the report or flee branches.
 than opening with an attack.
 
 The soldier branch instead calls `CreateInformation label='assault'` whenever
-the attacker is the player, unconditionally, which is why a provoked guard
-arrests. Read the distinction with
+the attacker is the player, unconditionally, so a provoked guard arrests. Read the distinction with
 `soul:GetSocialClass().SoulCrimeRoleId`: 1 for a civilian, 2 for a soldier.
 
 ### Ending it
 
-`WatchRetaliation` polls `actor:GetCurrentAnimationState()` once a second
-alongside distance covered, and classifies the victim:
+`WatchRetaliation` polls `actor:GetCurrentAnimationState()` every
+`RetaliationPollMs`, and `IsStillFighting` reads a `Combat` or `Surrender`
+prefix as the fight still running. Surrender matters: a victim mid-yield stands
+in `SurrenderIn`, perfectly still, and reading that as finished would close the
+incident during the surrender. Anything else is finished, including a victim
+running away, whom `WatchAftermath` then takes.
 
-- `engaged` for a `Combat` or `Surrender` prefix. Surrender matters: a victim
-  mid-yield stands in `SurrenderIn`, perfectly still, and reading that as
-  settled closed incidents during the surrender.
-- `fleeing` for speed at or above `RetaliationFleeSpeed` **and** the rider
-  more than `RetaliationFleeIgnoreRange` away. Running from someone stood over
-  you is not a fault.
-- `settled` otherwise.
+Two endings, named in the telemetry. `settled` once the victim has been seen
+fighting and then reads finished for `RetaliationSettledSamples` samples in a
+row, since a fighter between exchanges reads finished for an instant. `ceiling`
+at `RetaliationCeilingSec`, a failsafe.
 
-Three endings, named in the telemetry. `natural` after three settled samples,
-where nothing is sent because the game resolved its own fight. `runaway`
-after `RetaliationFleeSamples` consecutive fleeing samples, which sends
-`combat:stimulus:standDownRequest` followed by the reaction recovery's
-`daycycle:restartRequest`. `ceiling` at `RetaliationCeilingSec`, a failsafe.
-
-`standDownRequest` is the only message that reaches someone mid-flight:
+`combat:stimulus:standDownRequest` is the only message that reaches someone
+mid-flight:
 `sb_combat.xml` rejects every stimulus arriving during `fight` or `flee`
 except it and `customBehaviorRequest`, which are named exemptions. Its payload
 is empty; the declared member `_` is a placeholder and passing it is rejected
@@ -1414,9 +1298,9 @@ What decides "the last to end" is the set of victims it was raised for, not the
 combat reading. Each is dropped on death and when `EndRetaliation` fires for
 their fight, and an empty set hides the prompt at once. Hanging on that ending
 is safe because the watcher requires having seen the victim fight before
-counting settled samples, so being pulled off the horse no longer reads as the
-fight finishing. `SurrenderHintCalmPasses` remains as a fallback against the
-danger reading blinking out mid-fight, which is all it was ever for.
+counting settled samples, so being pulled off the horse does not read as the
+fight finishing. `SurrenderHintCalmPasses` is a fallback against the danger
+reading blinking out mid-fight.
 
 Exactly one re-assert loop runs, enforced by a token. The loop ends by noticing
 the count has reached zero, which it can only do on its next pass, so a fight
@@ -1458,34 +1342,15 @@ equivalent only because vanilla already declares the fragment for them.
 
 The call itself takes `ActionName, ObjectId, UpdateVisibility, AnimSpeed`, and
 the horse must be passed as its own object. With the name alone it does nothing
-and still returns true, which is why correct data looked like broken data for
-some time.
-
-### The charge is one fragment, not two
-
-`relaxed_rearing` is cut at 0.8 s by a second Blend in the same AnimLayer and
-hands straight to `relaxed_gallop_jump`, with the MovementControlMethod
-switching at the same moment: the rear needs the animation to own position, or
-momentum drags the horse sideways, and the jump needs it free with inertia on,
-or it cannot travel.
-
-Chaining two fragments from Lua instead shows a gap at 700, 1400 and 1900 ms
-alike. `relaxed_rearing` spends its last third back on all fours
-doing nothing while still holding the horse, releasing at 2064 ms when the rear
-is visually over at around 1400.
-
-The charge covers about 5.4 m in a second, which the detection loop would score
-as a trot, so `RearCharging` forces it to a gallop for the duration.
+and still returns true.
 
 ### The charge is physics, not animation
 
 An interactive action moves the actor by root motion with collision off, and
 `Horizontal` in the fragment is CryEngine's `EMovementControlMethod`: `1` is
-`eMCM_Entity`, `2` is `eMCM_Animation`, `6` is `eMCM_AnimationHCollision`. The
-charge shipped at `2` and blended into `relaxed_gallop_jump`, whose root motion
-carried the horse 5.4 m. That is where every fault came from: riding through
-walls, wedging in fences, bouncing, and a divergence discharged at over 20 m/s
-when the action ended.
+`eMCM_Entity`, `2` is `eMCM_Animation`, `6` is `eMCM_AnimationHCollision`.
+Travel by root motion rides through walls, wedges in fences, bounces, and
+discharges a divergence at over 20 m/s when the action ends.
 
 None of the three values fixes it. `2` travels without colliding. `6` collides
 while the animation keeps demanding a position collision refuses, so the gap
@@ -1499,14 +1364,16 @@ place, and the travel is an impulse applied once the action has ended, where a
 push does survive. The horse is then an ordinary moving horse: it collides with
 the world by default, and no raycast brake or synthetic speed is needed.
 
+It is one fragment, not two chained from Lua: chaining shows a visible gap
+between them wherever the cut is placed.
+
 **Timing is the animation's length, not its speed.** The impulse cannot fire
 while the action holds the horse, so the delay before the horse moves is the
 fragment's duration. `relaxed_rearing` runs 2.06 s and spends its last third
 back on all fours doing nothing, so it is cut at 1.0 s and finished with
 `relaxed_idle_jump_land`. That landing is entered at `StartTime` 0.45 rather
 than played whole, since the front of a jump landing is the airborne part a
-rear has already done. Measured, the action ended at 1856 ms played whole and
-1408 ms with the front skipped.
+rear has already done; that ends the action about 450 ms sooner.
 
 Raising `RearAnimSpeed` is not an alternative. It compresses the useful part
 and the dead part alike, so the move looks wrong and the delay barely moves.
@@ -1514,17 +1381,13 @@ and the dead part alike, so the move looks wrong and the delay barely moves.
 ### The rear is a tier, not a trot
 
 The rear on the spot has its own damage, sound, dust, camera shake, view blur
-and reaction, keyed on `"Rear"`. It borrowed the trot's until 4.19.2, which hid
-three faults.
-
-`ImpactDamageByTier` carried a `Rear` entry that nothing read, so the move did
-a trot's 18 rather than the 60 the table said. Connecting it made the rear able
-to kill, which exposed the other two.
+and reaction, keyed on `"Rear"`. Its damage can kill a victim already hurt,
+which puts two constraints on it.
 
 **A death during an animated reaction leaves a broken corpse.** The game marks
 the victim dead while the interactive action still owns the body: it holds an
-idle pose, has no collision, and passes through walls. The gallop tier never
-showed this because it ragdolls, and a death on a body physics already owns
+idle pose, has no collision, and passes through walls. A ragdoll tier cannot
+show this, because a death on a body physics already owns
 resolves normally. `ApplyImpactDamage` reads health back after dealing it, so
 the death is already detected there, and a victim who died while still in
 `AnimationControlled` is handed to `RagDollize`. Deaths outside an action are
@@ -1534,30 +1397,26 @@ override it.
 **The recovery is attached to the fall prefix.** `RebuildVictim` and
 `ReplanIfStranded` run only for `hcm_fall_`, so a victim of a knockdown or
 a stagger stands up facing wherever the clip left them with no activity to
-return to. Both tiers that can knock someone down therefore default to
-`"fall"`. Extending the recovery to the other prefixes needs a different
+return to. The trot and the rear therefore use `"fall"`. Extending the recovery to the other prefixes needs a different
 completion signal, because it waits on a ragdoll resolving and only the fall
 fragments carry a `Ragdoll` ProcLayer.
 
-**Reactions do not stack.** A victim already in `AnimationControlled` or
-`BlendRagdoll` is not given a second interactive action, because the two
-blending produce a face-down pose that rotates. The hit still lands in full:
-refusing it would be wrong, since a second impact on a downed victim
-demonstrably registers and costs health.
+**Reactions do not stack on a body that is down.** A victim `IsVictimFlat`
+reads as flat is not given a second interactive action, because the two
+blending produce a face-down pose that rotates. The hit still lands in full,
+since a second impact on a downed victim registers and costs health.
 
 **The movement release repeats.** A fragment can re-apply its movement layer as
 it blends, undoing a single `SetMovementControlledByAnimation(false)`, so the
 call is made `ReleaseMovementAttempts` times `ReleaseMovementGapMs` apart. It
-is idempotent, and victims were otherwise still carried through walls
-occasionally with the call reporting success.
+is idempotent, and a single call can leave a victim carried through a wall with
+the call reporting success.
 
 ### The charge has its own detection and its own tier
 
 The charge does not use the mod's collision loop. That loop is driven by the
-horse's speed and exits below walking pace, so a charge from a standstill
-detected nobody at all: measured across whole charges, every tick reported the
-loop declining to run. Making it work would have meant the move connecting only
-when the physics happened to behave.
+horse's speed and exits below walking pace, so it detects nobody in a charge
+from a standstill.
 
 Instead the charge sweeps its own corridor, measured from the horse every
 `RearChargeStrikePollMs` so it follows the lunge wherever it goes:
@@ -1569,40 +1428,28 @@ per charge.
 `Charge` is a tier in its own right rather than a gallop wearing another name.
 It has its own damage in `ImpactDamageByTier`, its own sound in
 `ImpactSoundByTier`, its own stamina share in `StaminaShareByTier`, its own victim
-lockout in `RearChargeVictimLockMs`, and its own dust, camera shake, view blur
-and throw scalar. Nothing about it can be tuned by changing what an ordinary
-collision does, or the reverse.
+lockout in `VictimLockMsByTier`, its own throw in `RearChargeThrow`, and its own
+dust, camera shake and view blur. Nothing about it can be tuned by changing what
+an ordinary collision does, or the reverse.
 
-Keeping that separation took removing an explicit alias. The detection loop used
-to set `tierName = "Gallop"` whenever a charge was in progress; it now returns
-instead, so the loop stays out of a lunge entirely and `ChargeStrike` owns it
-end to end. Two things had been resting on the alias. The charge received a
-gallop's stamina as a side effect of being counted as one, which is why it now
-pays its own. And the corridor sweep honored no existing contact while
-recording one, so with the loop also running each victim was scored twice; the
-sweep now consults `ImpactIsNewContact` like every other path.
-
-The victim lockout is gated on the tier for the same reason. It was written for
-the charge but sat unconditionally in a function both the rear and the charge
-call, so an ordinary rear held its victim out of every impact for 2.6 seconds.
+The detection loop stands out of a lunge for `ChargeScoringUntil`, stamped at
+the key press, and scores nothing during it, so `ChargeStrike` owns the charge
+end to end. The corridor sweep consults `ImpactIsNewContact` like every other
+path, so a victim is scored once. The victim lockout applies only to a tier
+with a `VictimLockMsByTier` row, so an ordinary rear holds nobody out.
 
 ### When the lunge is over
 
-A stopwatch cannot say when a lunge is over. Three numbers governed the window
-before this and had to agree with each other: a `SpeedWalk` threshold, a floor
-of 1200 ms and a ceiling of 2600. None of them described the lunge, so the horse
-went on striking people after it was already slowing.
-
-`WatchLunge` closes the window when the lunge itself is spent. It starts at the
+A stopwatch cannot say when a lunge is over, so `WatchLunge` closes the window when the lunge itself is spent. It starts at the
 push rather than at the key press, tracks the horse's peak speed, and closes
 when speed decays to `RearChargeLungeSpentAt` of that peak.
 `RearChargeLungePeakMin` is the speed a lunge has to reach before it can be
-judged spent at all. The 2600 ms remains as a ceiling and nothing else.
+judged spent at all. `RearChargeWindowMs` is a ceiling and nothing else.
 
 The peak is taken as the larger of each neighbouring pair rather than any single
 sample. Derived horse speed throws occasional 21 to 28 m/s readings, and half of
-a spike is reached by the next ordinary sample, so the first version of this
-closed every window inside 200 ms. A healthy lunge reads as
+a spike is reached by the next ordinary sample, so a single-sample peak closes
+every window at once. A healthy lunge reads as
 `peak=13.4 spike=13.5 moved=2.1 after=256ms`: about two meters in a quarter
 second off a 13 m/s peak.
 
@@ -1631,33 +1478,22 @@ registers the actions a second and third time and one press then arrives three
 times over. The listener is re-pointed on every load screen, because the
 listener is the player and the world reload replaces that entity.
 
-`HookRearKey` reinstalls itself rather than refusing once hooked. Refusing left
-a wrapper from an older copy of the file in place after a hot reload, closed
-over an older original, with the hook still reporting itself installed.
+`HookRearKey` reinstalls itself rather than refusing once hooked. Refusing
+would leave a wrapper from an older copy of the file in place after a hot
+reload, closed over an older original, with the hook still reporting itself
+installed.
 
 ### The cooldown must not survive a load
 
-`RearNextAt` is stamped from `System.GetCurrTime`, which is level time. Loading
-a save winds that clock backwards, and the deadline lives on the mod table,
-which the load does not touch. The mod therefore came back holding a time that
-had not happened yet and refused every press until the clock climbed past it.
+`RearNextAt` and `ChargeNextAt` are stamped from `System.GetCurrTime`, which is
+level time. Loading a save winds that clock backwards, and the deadline lives on
+the mod table, which the load does not touch, so a surviving deadline refuses
+every press until the clock climbs past it. The load screen handler drops both
+with `RecentHits`, `RecentRejections` and `VictimActivity`.
 
-This presented as the rear keys being dead for an unpredictable stretch after a
-load, from instantly to never, and it cost seven attempts aimed at the action
-map, the listener and the hook, none of which were ever involved. Logging every
-press settled it in one ride: presses reached `Player.OnAction` at +112 ms with
-the map reporting itself listening and enabled, 56 consecutive presses were
-refused at the cooldown gate, and the 57th was accepted at +14256 ms. The range
-of the symptom is just the arithmetic: the wait is how far the clock moved, and
-a player who had not reared before loading had no deadline and saw no problem.
-
-The load screen handler drops it with `RecentHits`, `RecentRejections` and
-`VictimActivity`, which were already dropped there for exactly this reason.
-
-The general lesson is in `RearRequested`: every gate that refuses a press says
-which one it was. A press that arrives and is dropped silently looks, from
-outside the game, exactly like a press that never arrived, and those two have
-opposite answers.
+Every gate in `RearRequested` that refuses a press says which one it was. A
+press dropped silently looks, from outside the game, exactly like a press that
+never arrived, and those two have opposite answers.
 
 ## Patching a game table without replacing it
 
@@ -1683,7 +1519,8 @@ The suffix needs no registration. Four properties matter in practice:
   megabytes, and two mods patching the same table do not conflict unless they
   touch the same row.
 
-This is the same mechanism third-party perk mods use. It does not make dialogue
+The mod's own `rpg/*__horsecollisionmod.xml` tables add the Horsemanship perks
+this way, as third-party perk mods do. It does not make dialogue
 gated on `var(...)` reachable: those conditions read variables that live on the
 engine's own request rather than on the character, and the `COMBAT_*` metaroles
 listed in `Libs/Tables/rpg/combat_shout_type.xml` are dispatched by the combat
